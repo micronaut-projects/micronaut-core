@@ -34,15 +34,12 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 
 import java.lang.annotation.Annotation;
-import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Array;
 import java.util.AbstractMap;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -56,7 +53,6 @@ import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -82,15 +78,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     Map<String, Map<CharSequence, Object>> allStereotypes;
     @Nullable
     Map<String, List<String>> annotationsByStereotype;
-    @Nullable
-    Map<String, Map<CharSequence, Object>> annotationDefaultValues;
-    @Nullable
-    Map<String, String> annotationRepeatableContainer;
-    @Nullable
-    Set<String> sourceRetentionAnnotations;
-    @Nullable
-    Map<String, Map<CharSequence, Object>> sourceAnnotationDefaultValues;
-    private Map<String, List> annotationValuesByType = new ConcurrentHashMap<>(2);
+
+    private final Map<String, List> annotationValuesByType = new ConcurrentHashMap<>(2);
 
     private final boolean hasPropertyExpressions;
 
@@ -114,11 +103,11 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Internal
     @UsedByGeneratedCode
     public DefaultAnnotationMetadata(
-        @Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
-        @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes,
-        @Nullable Map<String, Map<CharSequence, Object>> allStereotypes,
-        @Nullable Map<String, Map<CharSequence, Object>> allAnnotations,
-        @Nullable Map<String, List<String>> annotationsByStereotype) {
+            @Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
+            @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes,
+            @Nullable Map<String, Map<CharSequence, Object>> allStereotypes,
+            @Nullable Map<String, Map<CharSequence, Object>> allAnnotations,
+            @Nullable Map<String, List<String>> annotationsByStereotype) {
         this(declaredAnnotations, declaredStereotypes, allStereotypes, allAnnotations, annotationsByStereotype, true);
     }
 
@@ -135,12 +124,12 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Internal
     @UsedByGeneratedCode
     public DefaultAnnotationMetadata(
-        @Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
-        @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes,
-        @Nullable Map<String, Map<CharSequence, Object>> allStereotypes,
-        @Nullable Map<String, Map<CharSequence, Object>> allAnnotations,
-        @Nullable Map<String, List<String>> annotationsByStereotype,
-        boolean hasPropertyExpressions) {
+            @Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
+            @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes,
+            @Nullable Map<String, Map<CharSequence, Object>> allStereotypes,
+            @Nullable Map<String, Map<CharSequence, Object>> allAnnotations,
+            @Nullable Map<String, List<String>> annotationsByStereotype,
+            boolean hasPropertyExpressions) {
         this(declaredAnnotations, declaredStereotypes, allStereotypes, allAnnotations, annotationsByStereotype, hasPropertyExpressions, false);
     }
 
@@ -161,13 +150,13 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @NextMajorVersion("Remove after Micronaut 4 Milestone 1")
     @Deprecated(forRemoval = true, since = "4")
     public DefaultAnnotationMetadata(
-        @Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
-        @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes,
-        @Nullable Map<String, Map<CharSequence, Object>> allStereotypes,
-        @Nullable Map<String, Map<CharSequence, Object>> allAnnotations,
-        @Nullable Map<String, List<String>> annotationsByStereotype,
-        boolean hasPropertyExpressions,
-        boolean useRepeatableDefaults) {
+            @Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
+            @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes,
+            @Nullable Map<String, Map<CharSequence, Object>> allStereotypes,
+            @Nullable Map<String, Map<CharSequence, Object>> allAnnotations,
+            @Nullable Map<String, List<String>> annotationsByStereotype,
+            boolean hasPropertyExpressions,
+            boolean useRepeatableDefaults) {
         super(declaredAnnotations, allAnnotations);
         this.declaredAnnotations = declaredAnnotations;
         this.declaredStereotypes = declaredStereotypes;
@@ -181,29 +170,18 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Override
     public AnnotationMetadata getDeclaredMetadata() {
         return new DefaultAnnotationMetadata(
-            this.declaredAnnotations,
-            this.declaredStereotypes,
-            null,
-            null,
-            annotationsByStereotype,
-            hasPropertyExpressions
+                this.declaredAnnotations,
+                this.declaredStereotypes,
+                null,
+                null,
+                annotationsByStereotype,
+                hasPropertyExpressions
         );
     }
 
     @Override
     public boolean hasPropertyExpressions() {
         return hasPropertyExpressions;
-    }
-
-    /**
-     * @return The annotations that are source retention.
-     */
-    @Internal
-    Set<String> getSourceRetentionAnnotations() {
-        if (sourceRetentionAnnotations != null) {
-            return Collections.unmodifiableSet(sourceRetentionAnnotations);
-        }
-        return Collections.emptySet();
     }
 
     @NonNull
@@ -215,19 +193,20 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @Override
     public boolean isPresent(@NonNull String annotation, @NonNull String member) {
-        boolean isPresent = false;
-        if (allAnnotations != null && StringUtils.isNotEmpty(annotation)) {
-            Map<CharSequence, Object> values = allAnnotations.get(annotation);
+        if (allAnnotations == null || StringUtils.isEmpty(annotation)) {
+            return false;
+        }
+        Map<CharSequence, Object> values = allAnnotations.get(annotation);
+        if (values != null) {
+            return values.containsKey(member);
+        }
+        if (allStereotypes != null) {
+            values = allStereotypes.get(annotation);
             if (values != null) {
-                isPresent = values.containsKey(member);
-            } else if (allStereotypes != null) {
-                values = allStereotypes.get(annotation);
-                if (values != null) {
-                    isPresent = values.containsKey(member);
-                }
+                return values.containsKey(member);
             }
         }
-        return isPresent;
+        return false;
     }
 
     @Override
@@ -268,8 +247,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
         if (repeatableTypeName != null) {
             Object v = getRawSingleValue(repeatableTypeName, VALUE_MEMBER, valueMapper);
-            if (v instanceof AnnotationValue) {
-                return ((AnnotationValue<?>) v).enumValue(member, enumType, valueMapper);
+            if (v instanceof AnnotationValue<?> annotationValue) {
+                return annotationValue.enumValue(member, enumType, valueMapper);
             }
             return Optional.empty();
         } else {
@@ -304,8 +283,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
         if (repeatableTypeName != null) {
             Object v = getRawValue(repeatableTypeName, member);
-            if (v instanceof AnnotationValue) {
-                return ((AnnotationValue<?>) v).enumValues(member, enumType);
+            if (v instanceof AnnotationValue<?> annotationValue) {
+                return annotationValue.enumValues(member, enumType);
             }
             return (E[]) Array.newInstance(enumType, 0);
         } else {
@@ -376,8 +355,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
         if (repeatableTypeName != null) {
             Object v = getRawSingleValue(repeatableTypeName, member, null);
-            if (v instanceof AnnotationValue) {
-                Class<?>[] classes = ((AnnotationValue<?>) v).classValues(member);
+            if (v instanceof AnnotationValue<?> annotationValue) {
+                Class<?>[] classes = annotationValue.classValues(member);
                 return (Class<T>[]) classes;
             }
             //noinspection unchecked
@@ -408,8 +387,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
         if (repeatableTypeName != null) {
             Object v = getRawSingleValue(repeatableTypeName, member, valueMapper);
-            if (v instanceof AnnotationValue) {
-                return (Optional) ((AnnotationValue<?>) v).classValue(member, valueMapper);
+            if (v instanceof AnnotationValue<?> annotationValue) {
+                return (Optional) (annotationValue.classValue(member, valueMapper));
             }
             return Optional.empty();
         } else {
@@ -425,7 +404,6 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         return classValue(annotation, member, null);
     }
 
-
     /**
      * Retrieve the class value and optionally map its value.
      *
@@ -438,9 +416,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Internal
     public Optional<Class> classValue(@NonNull String annotation, @NonNull String member, @Nullable Function<Object, Object> valueMapper) {
         Object rawValue = getRawSingleValue(annotation, member, valueMapper);
-
-        if (rawValue instanceof AnnotationClassValue) {
-            return ((AnnotationClassValue) rawValue).getType();
+        if (rawValue instanceof AnnotationClassValue annotationClassValue) {
+            return annotationClassValue.getType();
         } else if (rawValue instanceof Class) {
             return Optional.of((Class) rawValue);
         } else if (rawValue != null) {
@@ -480,8 +457,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
         if (repeatableTypeName != null) {
             Object v = getRawSingleValue(repeatableTypeName, VALUE_MEMBER, valueMapper);
-            if (v instanceof AnnotationValue) {
-                return ((AnnotationValue<?>) v).intValue(member, valueMapper);
+            if (v instanceof AnnotationValue<?> annotationValue) {
+                return annotationValue.intValue(member, valueMapper);
             }
             return OptionalInt.empty();
         } else {
@@ -517,8 +494,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
         if (repeatableTypeName != null) {
             Object v = getRawSingleValue(repeatableTypeName, VALUE_MEMBER, null);
-            if (v instanceof AnnotationValue) {
-                return ((AnnotationValue<?>) v).booleanValue(member, valueMapper);
+            if (v instanceof AnnotationValue<?> annotationValue) {
+                return annotationValue.booleanValue(member, valueMapper);
             }
             return Optional.empty();
         } else {
@@ -538,8 +515,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @NonNull
     public Optional<Boolean> booleanValue(@NonNull String annotation, @NonNull String member, @Nullable Function<Object, Object> valueMapper) {
         Object rawValue = getRawSingleValue(annotation, member, valueMapper);
-        if (rawValue instanceof Boolean) {
-            return Optional.of((Boolean) rawValue);
+        if (rawValue instanceof Boolean aBoolean) {
+            return Optional.of(aBoolean);
         } else if (rawValue != null) {
             return Optional.of(StringUtils.isTrue(rawValue.toString()));
         }
@@ -577,8 +554,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
         if (repeatableTypeName != null) {
             Object v = getRawSingleValue(repeatableTypeName, VALUE_MEMBER, valueMapper);
-            if (v instanceof AnnotationValue) {
-                return ((AnnotationValue<?>) v).longValue(member, valueMapper);
+            if (v instanceof AnnotationValue<?> annotationValue) {
+                return annotationValue.longValue(member, valueMapper);
             }
             return OptionalLong.empty();
         } else {
@@ -598,8 +575,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @NonNull
     public OptionalLong longValue(@NonNull String annotation, @NonNull String member, @Nullable Function<Object, Object> valueMapper) {
         Object rawValue = getRawSingleValue(annotation, member, valueMapper);
-        if (rawValue instanceof Number) {
-            return OptionalLong.of(((Number) rawValue).longValue());
+        if (rawValue instanceof Number number) {
+            return OptionalLong.of(number.longValue());
         } else if (rawValue instanceof CharSequence) {
             final String str = rawValue.toString();
             if (StringUtils.isNotEmpty(str)) {
@@ -627,8 +604,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @NonNull
     public OptionalInt intValue(@NonNull String annotation, @NonNull String member, @Nullable Function<Object, Object> valueMapper) {
         Object rawValue = getRawSingleValue(annotation, member, valueMapper);
-        if (rawValue instanceof Number) {
-            return OptionalInt.of(((Number) rawValue).intValue());
+        if (rawValue instanceof Number number) {
+            return OptionalInt.of(number.intValue());
         } else if (rawValue instanceof CharSequence) {
             final String str = rawValue.toString();
             if (StringUtils.isNotEmpty(str)) {
@@ -664,8 +641,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
         if (repeatableTypeName != null) {
             Object v = getRawSingleValue(repeatableTypeName, VALUE_MEMBER, valueMapper);
-            if (v instanceof AnnotationValue) {
-                return ((AnnotationValue<?>) v).stringValue(member, valueMapper);
+            if (v instanceof AnnotationValue<?> annotationValue) {
+                return annotationValue.stringValue(member, valueMapper);
             }
             return Optional.empty();
         } else {
@@ -700,8 +677,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
         if (repeatableTypeName != null) {
             Object v = getRawValue(repeatableTypeName, member);
-            if (v instanceof AnnotationValue) {
-                return ((AnnotationValue<?>) v).stringValues(member, valueMapper);
+            if (v instanceof AnnotationValue<?> annotationValue) {
+                return annotationValue.stringValues(member, valueMapper);
             }
             return StringUtils.EMPTY_STRING_ARRAY;
         } else {
@@ -710,7 +687,6 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             return strings != null ? strings : StringUtils.EMPTY_STRING_ARRAY;
         }
     }
-
 
     /**
      * Retrieve the string value and optionally map its value.
@@ -754,8 +730,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             return Optional.of(s);
         } else if (rawValue instanceof CharSequence) {
             return Optional.of(rawValue.toString());
-        } else if (rawValue instanceof Class) {
-            String name = ((Class) rawValue).getName();
+        } else if (rawValue instanceof Class<?> aClass) {
+            String name = aClass.getName();
             return Optional.of(name);
         } else if (rawValue != null) {
             return Optional.of(rawValue.toString());
@@ -783,8 +759,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
         if (repeatableTypeName != null) {
             Object v = getRawSingleValue(repeatableTypeName, VALUE_MEMBER, valueMapper);
-            if (v instanceof AnnotationValue) {
-                return ((AnnotationValue<?>) v).isTrue(member, valueMapper);
+            if (v instanceof AnnotationValue<?> annotationValue) {
+                return annotationValue.isTrue(member, valueMapper);
             }
             return false;
         } else {
@@ -811,9 +787,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Override
     public boolean isTrue(@NonNull String annotation, @NonNull String member, @Nullable Function<Object, Object> valueMapper) {
         Object rawValue = getRawSingleValue(annotation, member, valueMapper);
-
-        if (rawValue instanceof Boolean) {
-            return (Boolean) rawValue;
+        if (rawValue instanceof Boolean aBoolean) {
+            return aBoolean;
         } else if (rawValue != null) {
             String booleanString = rawValue.toString().toLowerCase(Locale.ENGLISH);
             return StringUtils.isTrue(booleanString);
@@ -856,8 +831,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation.getName());
         if (repeatableTypeName != null) {
             Object v = getRawSingleValue(repeatableTypeName, VALUE_MEMBER, valueMapper);
-            if (v instanceof AnnotationValue) {
-                return ((AnnotationValue<?>) v).doubleValue(member, valueMapper);
+            if (v instanceof AnnotationValue<?> annotationValue) {
+                return annotationValue.doubleValue(member, valueMapper);
             }
             return OptionalDouble.empty();
         } else {
@@ -878,8 +853,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Internal
     public OptionalDouble doubleValue(@NonNull String annotation, @NonNull String member, Function<Object, Object> valueMapper) {
         Object rawValue = getRawSingleValue(annotation, member, valueMapper);
-        if (rawValue instanceof Number) {
-            return OptionalDouble.of(((Number) rawValue).doubleValue());
+        if (rawValue instanceof Number number) {
+            return OptionalDouble.of(number.doubleValue());
         } else if (rawValue instanceof CharSequence) {
             final String str = rawValue.toString();
             if (StringUtils.isNotEmpty(str)) {
@@ -944,9 +919,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                     if (valueMapper != null) {
                         rawValue = valueMapper.apply(rawValue);
                     }
-                    resolved = ConversionService.SHARED.convert(
-                        rawValue, requiredType
-                    );
+                    resolved = ConversionService.SHARED.convert(rawValue, requiredType);
                 }
             } else if (allStereotypes != null) {
                 values = allStereotypes.get(annotation);
@@ -956,18 +929,14 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                         if (valueMapper != null) {
                             rawValue = valueMapper.apply(rawValue);
                         }
-                        resolved = ConversionService.SHARED.convert(
-                            rawValue, requiredType
-                        );
+                        resolved = ConversionService.SHARED.convert(rawValue, requiredType);
                     }
                 }
             }
         }
-
-        if (!resolved.isPresent() && hasStereotype(annotation)) {
+        if (resolved.isEmpty() && hasStereotype(annotation)) {
             return getDefaultValue(annotation, member, requiredType);
         }
-
         return resolved;
     }
 
@@ -978,114 +947,95 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         ArgumentUtils.requireNonNull("requiredType", requiredType);
 
         Map<CharSequence, Object> defaultValues = getDefaultValues(annotation);
-        if (defaultValues.containsKey(member)) {
-            final Object v = defaultValues.get(member);
-            if (requiredType.isInstance(v)) {
-                return (Optional<T>) Optional.of(v);
-            } else {
-                return ConversionService.SHARED.convert(v, requiredType);
-            }
+        final Object v = defaultValues.get(member);
+        if (v == null) {
+            return Optional.empty();
         }
-        return Optional.empty();
+        if (requiredType.isInstance(v)) {
+            return (Optional<T>) Optional.of(v);
+        }
+        return ConversionService.SHARED.convert(v, requiredType);
     }
 
     @SuppressWarnings("unchecked")
     @Override
     public @NonNull <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(@Nullable Class<T> annotationType) {
-        if (annotationType != null) {
-            final String annotationTypeName = annotationType.getName();
-            List<AnnotationValue<T>> results = annotationValuesByType.get(annotationTypeName);
-            if (results == null) {
-
-                results = resolveAnnotationValuesByType(annotationType, allAnnotations, allStereotypes);
-                if (results != null) {
-                    return results;
-                } else if (allAnnotations != null) {
-                    final Map<CharSequence, Object> values = allAnnotations.get(annotationTypeName);
-                    if (values != null) {
-                        results = Collections.singletonList(newAnnotationValue(annotationTypeName, values));
-                    }
+        if (annotationType == null) {
+            return Collections.emptyList();
+        }
+        final String annotationTypeName = annotationType.getName();
+        List<AnnotationValue<T>> results = annotationValuesByType.get(annotationTypeName);
+        if (results == null) {
+            results = resolveAnnotationValuesByType(annotationType, allAnnotations, allStereotypes);
+            if (results != null) {
+                return results;
+            } else if (allAnnotations != null) {
+                final Map<CharSequence, Object> values = allAnnotations.get(annotationTypeName);
+                if (values != null) {
+                    results = Collections.singletonList(newAnnotationValue(annotationTypeName, values));
                 }
-
-                if (results == null) {
-                    results = Collections.emptyList();
-                }
-                annotationValuesByType.put(annotationTypeName, results);
             }
+            if (results == null) {
+                results = Collections.emptyList();
+            }
+            annotationValuesByType.put(annotationTypeName, results);
+        }
+        return results;
+    }
+
+    @Override
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByName(String annotationType) {
+        if (annotationType == null) {
+            return Collections.emptyList();
+        }
+        String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotationType);
+        if (repeatableTypeName == null) {
+            return Collections.emptyList();
+        }
+        List<AnnotationValue<T>> results = resolveRepeatableAnnotations(repeatableTypeName, allAnnotations, allStereotypes);
+        if (results != null) {
+            return results;
+        }
+        if (allAnnotations != null) {
+            final Map<CharSequence, Object> values = allAnnotations.get(annotationType);
+            if (values != null) {
+                results = Collections.singletonList(newAnnotationValue(annotationType, values));
+            }
+        }
+        if (results == null) {
+            results = Collections.emptyList();
+        }
+        annotationValuesByType.put(annotationType, results);
+        return Collections.emptyList();
+    }
+
+    @NonNull
+    protected  <T extends Annotation> AnnotationValue<T> newAnnotationValue(String annotationType, Map<CharSequence, Object> values) {
+        return new AnnotationValue<>(annotationType, values, AnnotationMetadataSupport.getDefaultValuesOrNull(annotationType));
+    }
+
+    @NonNull
+    @Override
+    public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(@NonNull Class<T> annotationType) {
+        if (annotationType == null) {
+            return Collections.emptyList();
+        }
+        List<AnnotationValue<T>> results = resolveAnnotationValuesByType(annotationType, declaredAnnotations, declaredStereotypes);
+        if (results != null) {
             return results;
         }
         return Collections.emptyList();
     }
 
     @Override
-    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByName(String annotationType) {
-        if (annotationType != null) {
-            String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotationType);
-            if (repeatableTypeName != null) {
-
-                List<AnnotationValue<T>> results =
-                    resolveRepeatableAnnotations(repeatableTypeName,
-                        allAnnotations,
-                        allStereotypes
-                    );
-                if (results != null) {
-                    return results;
-                } else if (allAnnotations != null) {
-                    final Map<CharSequence, Object> values = allAnnotations.get(annotationType);
-                    if (values != null) {
-                        results = Collections.singletonList(newAnnotationValue(annotationType, values));
-                    }
-                }
-
-                if (results == null) {
-                    results = Collections.emptyList();
-                }
-                annotationValuesByType.put(annotationType, results);
-            }
-        }
-        return Collections.emptyList();
-    }
-
-    @NonNull
-    private <T extends Annotation> AnnotationValue<T> newAnnotationValue(String annotationType, Map<CharSequence, Object> values) {
-        Map<CharSequence, Object> defaultValues = null;
-        if (annotationDefaultValues != null) {
-            defaultValues = annotationDefaultValues.get(annotationType);
-        }
-        if (defaultValues == null && sourceAnnotationDefaultValues != null) {
-            defaultValues = sourceAnnotationDefaultValues.get(annotationType);
-        }
-        if (defaultValues == null) {
-            defaultValues = AnnotationMetadataSupport.getDefaultValuesOrNull(annotationType);
-        }
-        return new AnnotationValue<>(annotationType, values, defaultValues);
-    }
-
-    @Override
-    public @NonNull <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(@NonNull Class<T> annotationType) {
-        if (annotationType != null) {
-            Map<String, Map<CharSequence, Object>> sourceAnnotations = this.declaredAnnotations;
-            Map<String, Map<CharSequence, Object>> sourceStereotypes = this.declaredStereotypes;
-
-            List<AnnotationValue<T>> results = resolveAnnotationValuesByType(annotationType, sourceAnnotations, sourceStereotypes);
-            if (results != null) {
-                return results;
-            }
-        }
-        return Collections.emptyList();
-    }
-
-    @Override
     public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByName(String annotationType) {
-        if (annotationType != null) {
-            Map<String, Map<CharSequence, Object>> sourceAnnotations = this.declaredAnnotations;
-            Map<String, Map<CharSequence, Object>> sourceStereotypes = this.declaredStereotypes;
-            String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotationType);
-            List<AnnotationValue<T>> results =
-                resolveRepeatableAnnotations(repeatableTypeName, sourceAnnotations, sourceStereotypes);
-            if (results != null) {
-                return results;
-            }
+        if (annotationType == null) {
+            return Collections.emptyList();
+        }
+        String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotationType);
+        List<AnnotationValue<T>> results = resolveRepeatableAnnotations(repeatableTypeName, declaredAnnotations, declaredStereotypes);
+        if (results != null) {
+            return results;
         }
         return Collections.emptyList();
     }
@@ -1093,31 +1043,22 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @SuppressWarnings("unchecked")
     @Override
     public <T extends Annotation> T[] synthesizeAnnotationsByType(@NonNull Class<T> annotationClass) {
-
-        if (annotationClass != null) {
-            List<AnnotationValue<T>> values = getAnnotationValuesByType(annotationClass);
-
-            return values.stream()
+        if (annotationClass == null) {
+            return (T[]) AnnotationUtil.ZERO_ANNOTATIONS;
+        }
+        return getAnnotationValuesByType(annotationClass).stream()
                 .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, entries))
                 .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
-        }
-
-        //noinspection unchecked
-        return (T[]) AnnotationUtil.ZERO_ANNOTATIONS;
     }
 
     @Override
     public <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(@NonNull Class<T> annotationClass) {
-        if (annotationClass != null) {
-            List<AnnotationValue<T>> values = getAnnotationValuesByType(annotationClass);
-
-            return values.stream()
+        if (annotationClass == null) {
+            return (T[]) AnnotationUtil.ZERO_ANNOTATIONS;
+        }
+        return getAnnotationValuesByType(annotationClass).stream()
                 .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, entries))
                 .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
-        }
-
-        //noinspection unchecked
-        return (T[]) AnnotationUtil.ZERO_ANNOTATIONS;
     }
 
     @Override
@@ -1148,19 +1089,20 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @NonNull
     @Override
     public Optional<Class<? extends Annotation>> getAnnotationTypeByStereotype(@Nullable String stereotype) {
-        if (stereotype != null) {
-            if (annotationsByStereotype != null) {
-                List<String> annotations = annotationsByStereotype.get(stereotype);
-                if (CollectionUtils.isNotEmpty(annotations)) {
-                    return getAnnotationType(annotations.get(0));
-                }
+        if (stereotype == null) {
+            return Optional.empty();
+        }
+        if (annotationsByStereotype != null) {
+            List<String> annotations = annotationsByStereotype.get(stereotype);
+            if (CollectionUtils.isNotEmpty(annotations)) {
+                return getAnnotationType(annotations.get(0));
             }
-            if (allAnnotations != null && allAnnotations.containsKey(stereotype)) {
-                return getAnnotationType(stereotype);
-            }
-            if (declaredAnnotations != null && declaredAnnotations.containsKey(stereotype)) {
-                return getAnnotationType(stereotype);
-            }
+        }
+        if (allAnnotations != null && allAnnotations.containsKey(stereotype)) {
+            return getAnnotationType(stereotype);
+        }
+        if (declaredAnnotations != null && declaredAnnotations.containsKey(stereotype)) {
+            return getAnnotationType(stereotype);
         }
         return Optional.empty();
     }
@@ -1168,26 +1110,27 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @NonNull
     @Override
     public Optional<String> getAnnotationNameByStereotype(@Nullable String stereotype) {
-        if (stereotype != null) {
-            if (annotationsByStereotype != null) {
-                List<String> annotations = annotationsByStereotype.get(stereotype);
-                if (CollectionUtils.isNotEmpty(annotations)) {
-                    return Optional.of(annotations.get(0));
-                }
+        if (stereotype == null) {
+            return Optional.empty();
+        }
+        if (annotationsByStereotype != null) {
+            List<String> annotations = annotationsByStereotype.get(stereotype);
+            if (CollectionUtils.isNotEmpty(annotations)) {
+                return Optional.of(annotations.get(0));
             }
-            if (allAnnotations != null && allAnnotations.containsKey(stereotype)) {
-                return Optional.of(stereotype);
-            }
-            if (declaredAnnotations != null && declaredAnnotations.containsKey(stereotype)) {
-                return Optional.of(stereotype);
-            }
+        }
+        if (allAnnotations != null && allAnnotations.containsKey(stereotype)) {
+            return Optional.of(stereotype);
+        }
+        if (declaredAnnotations != null && declaredAnnotations.containsKey(stereotype)) {
+            return Optional.of(stereotype);
         }
         return Optional.empty();
     }
 
+    @NonNull
     @Override
-    public @NonNull
-    List<String> getAnnotationNamesByStereotype(@Nullable String stereotype) {
+    public List<String> getAnnotationNamesByStereotype(@Nullable String stereotype) {
         if (stereotype == null) {
             return Collections.emptyList();
         }
@@ -1219,10 +1162,10 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                     String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotation);
                     if (repeatableTypeName != null) {
                         List<AnnotationValue<T>> results =
-                            resolveRepeatableAnnotations(repeatableTypeName,
-                                allAnnotations,
-                                allStereotypes
-                            );
+                                resolveRepeatableAnnotations(repeatableTypeName,
+                                        allAnnotations,
+                                        allStereotypes
+                                );
                         if (results != null) {
                             result.addAll(results);
                         }
@@ -1242,15 +1185,16 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         return Collections.emptyList();
     }
 
+    @NonNull
     @Override
-    public @NonNull
-    Set<String> getAnnotationNames() {
+    public Set<String> getAnnotationNames() {
         if (allAnnotations != null) {
             return allAnnotations.keySet();
         }
         return Collections.emptySet();
     }
 
+    @NonNull
     @Override
     public Set<String> getStereotypeAnnotationNames() {
         if (allStereotypes != null) {
@@ -1259,6 +1203,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         return Collections.emptySet();
     }
 
+    @NonNull
     @Override
     public Set<String> getDeclaredStereotypeAnnotationNames() {
         if (declaredStereotypes != null) {
@@ -1267,18 +1212,18 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         return Collections.emptySet();
     }
 
+    @NonNull
     @Override
-    public @NonNull
-    Set<String> getDeclaredAnnotationNames() {
+    public Set<String> getDeclaredAnnotationNames() {
         if (declaredAnnotations != null) {
             return declaredAnnotations.keySet();
         }
         return Collections.emptySet();
     }
 
+    @NonNull
     @Override
-    public @NonNull
-    List<String> getDeclaredAnnotationNamesByStereotype(@Nullable String stereotype) {
+    public List<String> getDeclaredAnnotationNamesByStereotype(@Nullable String stereotype) {
         if (stereotype == null) {
             return Collections.emptyList();
         }
@@ -1301,49 +1246,55 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         return Collections.emptyList();
     }
 
+    @NonNull
     @Override
-    public @NonNull
-    Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name) {
+    public Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name) {
         return AnnotationMetadataSupport.getAnnotationType(name);
     }
 
+    @NonNull
     @Override
-    public @NonNull
-    Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name, @NonNull ClassLoader classLoader) {
+    public Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name, @NonNull ClassLoader classLoader) {
         return AnnotationMetadataSupport.getAnnotationType(name, classLoader);
     }
 
     @SuppressWarnings("Duplicates")
+    @NonNull
     @Override
-    public @NonNull <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(@NonNull String annotation) {
+    public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(@NonNull String annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
-        if (allAnnotations != null && StringUtils.isNotEmpty(annotation)) {
-            Map<CharSequence, Object> values = allAnnotations.get(annotation);
+        if (allAnnotations == null || StringUtils.isEmpty(annotation)) {
+            return Optional.empty();
+        }
+        Map<CharSequence, Object> values = allAnnotations.get(annotation);
+        if (values != null) {
+            return Optional.of(newAnnotationValue(annotation, values));
+        }
+        if (allStereotypes != null) {
+            values = allStereotypes.get(annotation);
             if (values != null) {
                 return Optional.of(newAnnotationValue(annotation, values));
-            } else if (allStereotypes != null) {
-                values = allStereotypes.get(annotation);
-                if (values != null) {
-                    return Optional.of(newAnnotationValue(annotation, values));
-                }
             }
         }
         return Optional.empty();
     }
 
     @SuppressWarnings("Duplicates")
+    @NonNull
     @Override
-    public @NonNull <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(@NonNull String annotation) {
+    public <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(@NonNull String annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
-        if (declaredAnnotations != null && StringUtils.isNotEmpty(annotation)) {
-            Map<CharSequence, Object> values = declaredAnnotations.get(annotation);
+        if (declaredAnnotations == null || StringUtils.isEmpty(annotation)) {
+            return Optional.empty();
+        }
+        Map<CharSequence, Object> values = declaredAnnotations.get(annotation);
+        if (values != null) {
+            return Optional.of(newAnnotationValue(annotation, values));
+        }
+        if (declaredStereotypes != null) {
+            values = declaredStereotypes.get(annotation);
             if (values != null) {
                 return Optional.of(newAnnotationValue(annotation, values));
-            } else if (declaredStereotypes != null) {
-                values = declaredStereotypes.get(annotation);
-                if (values != null) {
-                    return Optional.of(newAnnotationValue(annotation, values));
-                }
             }
         }
         return Optional.empty();
@@ -1353,15 +1304,17 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     public @NonNull <T> OptionalValues<T> getValues(@NonNull String annotation, @NonNull Class<T> valueType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("valueType", valueType);
-        if (allAnnotations != null && StringUtils.isNotEmpty(annotation)) {
-            Map<CharSequence, Object> values = allAnnotations.get(annotation);
+        if (allAnnotations == null || StringUtils.isEmpty(annotation)) {
+            return OptionalValues.empty();
+        }
+        Map<CharSequence, Object> values = allAnnotations.get(annotation);
+        if (values != null) {
+            return OptionalValues.of(valueType, values);
+        }
+        if (allStereotypes != null) {
+            values = allStereotypes.get(annotation);
             if (values != null) {
                 return OptionalValues.of(valueType, values);
-            } else if (allStereotypes != null) {
-                values = allStereotypes.get(annotation);
-                if (values != null) {
-                    return OptionalValues.of(valueType, values);
-                }
             }
         }
         return OptionalValues.empty();
@@ -1371,29 +1324,33 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Override
     public Map<CharSequence, Object> getValues(@NonNull String annotation) {
         ArgumentUtils.requireNonNull("annotation", annotation);
-        if (allAnnotations != null && StringUtils.isNotEmpty(annotation)) {
-            Map<CharSequence, Object> values = allAnnotations.get(annotation);
+        if (allAnnotations == null || StringUtils.isEmpty(annotation)) {
+            return Collections.emptyMap();
+        }
+        Map<CharSequence, Object> values = allAnnotations.get(annotation);
+        if (values != null) {
+            return Collections.unmodifiableMap(values);
+        }
+        if (allStereotypes != null) {
+            values = allStereotypes.get(annotation);
             if (values != null) {
                 return Collections.unmodifiableMap(values);
-            } else if (allStereotypes != null) {
-                values = allStereotypes.get(annotation);
-                if (values != null) {
-                    return Collections.unmodifiableMap(values);
-                }
             }
         }
         return Collections.emptyMap();
     }
 
+    @NonNull
     @Override
-    public @NonNull <T> Optional<T> getDefaultValue(@NonNull String annotation, @NonNull String member, @NonNull Argument<T> requiredType) {
+    public <T> Optional<T> getDefaultValue(@NonNull String annotation, @NonNull String member, @NonNull Argument<T> requiredType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
         ArgumentUtils.requireNonNull("requiredType", requiredType);
         // Note this method should never reference the "annotationDefaultValues" field, which is used only at compile time
         Map<CharSequence, Object> defaultValues = getDefaultValues(annotation);
-        if (defaultValues.containsKey(member)) {
-            return ConversionService.SHARED.convert(defaultValues.get(member), requiredType);
+        Object value = defaultValues.get(member);
+        if (value != null) {
+            return ConversionService.SHARED.convert(value, requiredType);
         }
         return Optional.empty();
     }
@@ -1426,44 +1383,32 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Override
     public DefaultAnnotationMetadata clone() {
         DefaultAnnotationMetadata cloned = new DefaultAnnotationMetadata(
-            declaredAnnotations != null ? cloneMapOfMapValue(declaredAnnotations) : null,
-            declaredStereotypes != null ? cloneMapOfMapValue(declaredStereotypes) : null,
-            allStereotypes != null ? cloneMapOfMapValue(allStereotypes) : null,
-            allAnnotations != null ? cloneMapOfMapValue(allAnnotations) : null,
-            annotationsByStereotype != null ? cloneMapOfListValue(annotationsByStereotype) : null,
-            hasPropertyExpressions
+                declaredAnnotations != null ? cloneMapOfMapValue(declaredAnnotations) : null,
+                declaredStereotypes != null ? cloneMapOfMapValue(declaredStereotypes) : null,
+                allStereotypes != null ? cloneMapOfMapValue(allStereotypes) : null,
+                allAnnotations != null ? cloneMapOfMapValue(allAnnotations) : null,
+                annotationsByStereotype != null ? cloneMapOfListValue(annotationsByStereotype) : null,
+                hasPropertyExpressions
         );
-        if (annotationRepeatableContainer != null) {
-            cloned.annotationRepeatableContainer = new HashMap<>(annotationRepeatableContainer);
-        }
-        if (sourceRetentionAnnotations != null) {
-            cloned.sourceRetentionAnnotations = new HashSet<>(sourceRetentionAnnotations);
-        }
-        if (annotationDefaultValues != null) {
-            cloned.annotationDefaultValues = cloneMapOfMapValue(annotationDefaultValues);
-        }
-        if (sourceAnnotationDefaultValues != null) {
-            cloned.sourceAnnotationDefaultValues = cloneMapOfMapValue(sourceAnnotationDefaultValues);
-        }
         return cloned;
     }
 
     protected final <X, Y, K> Map<K, Map<X, Y>> cloneMapOfMapValue(Map<K, Map<X, Y>> toClone) {
         return toClone.entrySet().stream()
-            .map(e -> new AbstractMap.SimpleEntry<>(e.getKey(), cloneMap(e.getValue())))
-            .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, (a, b) -> a, LinkedHashMap::new));
+                .map(e -> new AbstractMap.SimpleEntry<>(e.getKey(), cloneMap(e.getValue())))
+                .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, (a, b) -> a, LinkedHashMap::new));
     }
 
     protected final <K, V> Map<K, List<V>> cloneMapOfListValue(Map<K, List<V>> toClone) {
         return toClone.entrySet().stream()
-            .map(e -> new AbstractMap.SimpleEntry<>(e.getKey(), new ArrayList<>(e.getValue())))
-            .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, (a, b) -> a, LinkedHashMap::new));
+                .map(e -> new AbstractMap.SimpleEntry<>(e.getKey(), new ArrayList<>(e.getValue())))
+                .collect(Collectors.toMap(AbstractMap.SimpleEntry::getKey, AbstractMap.SimpleEntry::getValue, (a, b) -> a, LinkedHashMap::new));
     }
 
     protected final <K, V> Map<K, V> cloneMap(Map<K, V> map) {
         Map<K, V> newMap;
-        if (map instanceof LinkedHashMap) {
-            newMap = (Map<K, V>) ((LinkedHashMap<K, V>) map).clone();
+        if (map instanceof LinkedHashMap<K, V> linkedHashMap) {
+            newMap = (Map<K, V>) linkedHashMap.clone();
         } else {
             newMap = new LinkedHashMap<>(map);
         }
@@ -1474,90 +1419,6 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             }
         }
         return new HashMap<>(newMap);
-    }
-
-    /**
-     * Adds an annotation and its member values, if the annotation already exists the data will be merged with existing
-     * values replaced.
-     *
-     * @param annotation The annotation
-     * @param values     The values
-     */
-    @SuppressWarnings("WeakerAccess")
-    protected void addAnnotation(String annotation, Map<CharSequence, Object> values) {
-        addAnnotation(annotation, values, RetentionPolicy.RUNTIME);
-    }
-
-
-    /**
-     * Adds an annotation and its member values, if the annotation already exists the data will be merged with existing
-     * values replaced.
-     *
-     * @param annotation      The annotation
-     * @param values          The values
-     * @param retentionPolicy The retention policy
-     */
-    @SuppressWarnings("WeakerAccess")
-    protected void addAnnotation(String annotation, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
-        if (annotation != null) {
-            if (isRepeatableAnnotationContainer(annotation)) {
-                Object v = values.get(AnnotationMetadata.VALUE_MEMBER);
-                if (v instanceof io.micronaut.core.annotation.AnnotationValue<?>[] annotationValues) {
-                    for (io.micronaut.core.annotation.AnnotationValue<?> annotationValue : annotationValues) {
-                        addRepeatable(annotation, annotationValue);
-                    }
-                } else if (v instanceof Iterable<?> iterable) {
-                    for (Object o : iterable) {
-                        if (o instanceof io.micronaut.core.annotation.AnnotationValue<?> annotationValue) {
-                            addRepeatable(annotation, annotationValue);
-                        }
-                    }
-                }
-            } else {
-                Map<String, Map<CharSequence, Object>> allAnnotations = getAllAnnotations();
-                addAnnotation(annotation, values, null, allAnnotations, false, retentionPolicy);
-            }
-        }
-    }
-
-    /**
-     * Adds an annotation directly declared on the element and its member values, if the annotation already exists the
-     * data will be merged with existing values replaced.
-     *
-     * @param annotation The annotation
-     * @param values     The values
-     */
-    protected final void addDefaultAnnotationValues(String annotation, Map<CharSequence, Object> values) {
-        addDefaultAnnotationValues(annotation, values, RetentionPolicy.RUNTIME);
-    }
-
-    /**
-     * Adds an annotation directly declared on the element and its member values, if the annotation already exists the
-     * data will be merged with existing values replaced.
-     *
-     * @param annotation      The annotation
-     * @param values          The values
-     * @param retentionPolicy The retention policy
-     */
-    protected final void addDefaultAnnotationValues(String annotation, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
-        if (annotation == null) {
-            return;
-        }
-        Map<String, Map<CharSequence, Object>> annotationDefaults;
-        if (retentionPolicy == RetentionPolicy.RUNTIME) {
-            annotationDefaults = this.annotationDefaultValues;
-            if (annotationDefaults == null) {
-                this.annotationDefaultValues = new LinkedHashMap<>();
-                annotationDefaults = this.annotationDefaultValues;
-            }
-        } else {
-            annotationDefaults = this.sourceAnnotationDefaultValues;
-            if (annotationDefaults == null) {
-                this.sourceAnnotationDefaultValues = new LinkedHashMap<>();
-                annotationDefaults = this.sourceAnnotationDefaultValues;
-            }
-        }
-        putValues(annotation, values, annotationDefaults);
     }
 
     /**
@@ -1611,273 +1472,6 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     /**
-     * Adds a repeatable annotation value. If a value already exists will be added
-     *
-     * @param annotationName  The annotation name
-     * @param annotationValue The annotation value
-     */
-    protected void addRepeatable(String annotationName, io.micronaut.core.annotation.AnnotationValue annotationValue) {
-        addRepeatable(annotationName, annotationValue, annotationValue.getRetentionPolicy());
-    }
-
-    /**
-     * Adds a repeatable annotation value. If a value already exists will be added
-     *
-     * @param annotationName  The annotation name
-     * @param annotationValue The annotation value
-     * @param retentionPolicy The retention policy
-     */
-    protected void addRepeatable(String annotationName, io.micronaut.core.annotation.AnnotationValue annotationValue, RetentionPolicy retentionPolicy) {
-        if (StringUtils.isNotEmpty(annotationName) && annotationValue != null) {
-            Map<String, Map<CharSequence, Object>> allAnnotations = getAllAnnotations();
-
-            addRepeatableInternal(annotationName, annotationValue, allAnnotations, retentionPolicy);
-        }
-    }
-
-    /**
-     * Adds a repeatable stereotype value. If a value already exists will be added
-     *
-     * @param parents         The parent annotations
-     * @param stereotype      The annotation name
-     * @param annotationValue The annotation value
-     */
-    protected void addRepeatableStereotype(List<String> parents, String stereotype, io.micronaut.core.annotation.AnnotationValue annotationValue) {
-        Map<String, Map<CharSequence, Object>> allStereotypes = getAllStereotypes();
-        List<String> annotationList = getAnnotationsByStereotypeInternal(stereotype);
-        for (String parentAnnotation : parents) {
-            if (!annotationList.contains(parentAnnotation)) {
-                annotationList.add(parentAnnotation);
-            }
-        }
-
-        addRepeatableInternal(stereotype, annotationValue, allStereotypes, RetentionPolicy.RUNTIME);
-    }
-
-    /**
-     * Adds a repeatable declared stereotype value. If a value already exists will be added
-     *
-     * @param parents         The parent annotations
-     * @param stereotype      The annotation name
-     * @param annotationValue The annotation value
-     */
-    protected void addDeclaredRepeatableStereotype(List<String> parents, String stereotype, io.micronaut.core.annotation.AnnotationValue annotationValue) {
-        Map<String, Map<CharSequence, Object>> declaredStereotypes = getDeclaredStereotypesInternal();
-        List<String> annotationList = getAnnotationsByStereotypeInternal(stereotype);
-        for (String parentAnnotation : parents) {
-            if (!annotationList.contains(parentAnnotation)) {
-                annotationList.add(parentAnnotation);
-            }
-        }
-
-        addRepeatableInternal(stereotype, annotationValue, declaredStereotypes, RetentionPolicy.RUNTIME);
-        addRepeatableInternal(stereotype, annotationValue, getAllStereotypes(), RetentionPolicy.RUNTIME);
-    }
-
-    /**
-     * Adds a repeatable annotation value. If a value already exists will be added
-     *
-     * @param annotationName  The annotation name
-     * @param annotationValue The annotation value
-     */
-    protected void addDeclaredRepeatable(String annotationName, io.micronaut.core.annotation.AnnotationValue annotationValue) {
-        addDeclaredRepeatable(annotationName, annotationValue, annotationValue.getRetentionPolicy());
-    }
-
-    /**
-     * Adds a repeatable annotation value. If a value already exists will be added
-     *
-     * @param annotationName  The annotation name
-     * @param annotationValue The annotation value
-     * @param retentionPolicy The retention policy
-     */
-    protected void addDeclaredRepeatable(String annotationName, io.micronaut.core.annotation.AnnotationValue annotationValue, RetentionPolicy retentionPolicy) {
-        if (StringUtils.isNotEmpty(annotationName) && annotationValue != null) {
-            Map<String, Map<CharSequence, Object>> allAnnotations = getDeclaredAnnotationsInternal();
-
-            addRepeatableInternal(annotationName, annotationValue, allAnnotations, retentionPolicy);
-
-            addRepeatable(annotationName, annotationValue);
-        }
-    }
-
-    /**
-     * Adds a stereotype and its member values, if the annotation already exists the data will be merged with existing
-     * values replaced.
-     *
-     * @param parentAnnotations The parent annotations
-     * @param stereotype        The annotation
-     * @param values            The values
-     */
-    @SuppressWarnings("WeakerAccess")
-    protected final void addStereotype(List<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values) {
-        addStereotype(parentAnnotations, stereotype, values, RetentionPolicy.RUNTIME);
-    }
-
-
-    /**
-     * Adds a stereotype and its member values, if the annotation already exists the data will be merged with existing
-     * values replaced.
-     *
-     * @param parentAnnotations The parent annotations
-     * @param stereotype        The annotation
-     * @param values            The values
-     * @param retentionPolicy   The retention policy
-     */
-    @SuppressWarnings("WeakerAccess")
-    protected final void addStereotype(List<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
-        if (stereotype != null) {
-            if (isRepeatableAnnotationContainer(stereotype)) {
-                Object v = values.get(AnnotationMetadata.VALUE_MEMBER);
-                if (v instanceof io.micronaut.core.annotation.AnnotationValue<?>[] annotationValues) {
-                    for (io.micronaut.core.annotation.AnnotationValue<?> annotationValue : annotationValues) {
-                        addRepeatableStereotype(parentAnnotations, stereotype, annotationValue);
-                    }
-                } else if (v instanceof Iterable<?> iterable) {
-                    for (Object o : iterable) {
-                        if (o instanceof io.micronaut.core.annotation.AnnotationValue<?> annotationValue) {
-                            addRepeatableStereotype(parentAnnotations, stereotype, annotationValue);
-                        }
-                    }
-                }
-            } else {
-                Map<String, Map<CharSequence, Object>> allStereotypes = getAllStereotypes();
-                List<String> annotationList = getAnnotationsByStereotypeInternal(stereotype);
-                if (!parentAnnotations.isEmpty()) {
-                    final String parentAnnotation = CollectionUtils.last(parentAnnotations);
-                    if (!annotationList.contains(parentAnnotation)) {
-                        annotationList.add(parentAnnotation);
-                    }
-                }
-
-                // add to stereotypes
-                addAnnotation(
-                    stereotype,
-                    values,
-                    null,
-                    allStereotypes,
-                    false,
-                    retentionPolicy
-                );
-            }
-        }
-    }
-
-    /**
-     * Adds a stereotype and its member values, if the annotation already exists the data will be merged with existing
-     * values replaced.
-     *
-     * @param parentAnnotations The parent annotations
-     * @param stereotype        The annotation
-     * @param values            The values
-     */
-    @SuppressWarnings("WeakerAccess")
-    protected void addDeclaredStereotype(List<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values) {
-        addDeclaredStereotype(parentAnnotations, stereotype, values, RetentionPolicy.RUNTIME);
-    }
-
-    /**
-     * Adds a stereotype and its member values, if the annotation already exists the data will be merged with existing
-     * values replaced.
-     *
-     * @param parentAnnotations The parent annotations
-     * @param stereotype        The annotation
-     * @param values            The values
-     * @param retentionPolicy   The retention policy
-     */
-    @SuppressWarnings("WeakerAccess")
-    protected void addDeclaredStereotype(List<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
-        if (stereotype != null) {
-            if (isRepeatableAnnotationContainer(stereotype)) {
-                Object v = values.get(AnnotationMetadata.VALUE_MEMBER);
-                if (v instanceof io.micronaut.core.annotation.AnnotationValue<?>[] annotationValues) {
-                    for (io.micronaut.core.annotation.AnnotationValue<?> annotationValue : annotationValues) {
-                        addDeclaredRepeatableStereotype(parentAnnotations, stereotype, annotationValue);
-                    }
-                } else if (v instanceof Iterable<?> iterable) {
-                    for (Object o : iterable) {
-                        if (o instanceof io.micronaut.core.annotation.AnnotationValue<?> annotationValue) {
-                            addDeclaredRepeatableStereotype(parentAnnotations, stereotype, annotationValue);
-                        }
-                    }
-                }
-            } else {
-                Map<String, Map<CharSequence, Object>> declaredStereotypes = getDeclaredStereotypesInternal();
-                Map<String, Map<CharSequence, Object>> allStereotypes = getAllStereotypes();
-                List<String> annotationList = getAnnotationsByStereotypeInternal(stereotype);
-                if (!parentAnnotations.isEmpty()) {
-                    final String parentAnnotation = CollectionUtils.last(parentAnnotations);
-                    if (!annotationList.contains(parentAnnotation)) {
-                        annotationList.add(parentAnnotation);
-                    }
-                }
-
-                addAnnotation(
-                    stereotype,
-                    values,
-                    declaredStereotypes,
-                    allStereotypes,
-                    true,
-                    retentionPolicy
-                );
-            }
-
-        }
-    }
-
-    /**
-     * Adds an annotation directly declared on the element and its member values, if the annotation already exists the
-     * data will be merged with existing values replaced.
-     *
-     * @param annotation The annotation
-     * @param values     The values
-     */
-    protected void addDeclaredAnnotation(String annotation, Map<CharSequence, Object> values) {
-        addDeclaredAnnotation(annotation, values, RetentionPolicy.RUNTIME);
-    }
-
-    /**
-     * Adds an annotation directly declared on the element and its member values, if the annotation already exists the
-     * data will be merged with existing values replaced.
-     *
-     * @param annotation      The annotation
-     * @param values          The values
-     * @param retentionPolicy The retention policy
-     */
-    protected void addDeclaredAnnotation(String annotation, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
-        if (annotation != null) {
-            boolean hasOtherMembers = false;
-            boolean repeatableAnnotationContainer = isRepeatableAnnotationContainer(annotation);
-            if (isRepeatableAnnotationContainer(annotation)) {
-                for (Map.Entry<CharSequence, Object> entry : values.entrySet()) {
-                    if (entry.getKey().equals(AnnotationMetadata.VALUE_MEMBER)) {
-                        Object v = entry.getValue();
-                        if (v instanceof io.micronaut.core.annotation.AnnotationValue<?>[] annotationValues) {
-                            for (io.micronaut.core.annotation.AnnotationValue<?> annotationValue : annotationValues) {
-                                addDeclaredRepeatable(annotation, annotationValue);
-                            }
-                        } else if (v instanceof Iterable<?> iterable) {
-                            for (Object o : iterable) {
-                                if (o instanceof io.micronaut.core.annotation.AnnotationValue<?> annotationValue) {
-                                    addDeclaredRepeatable(annotation, annotationValue);
-                                }
-                            }
-                        }
-                    } else {
-                        hasOtherMembers = true;
-                    }
-                }
-            }
-
-            if (!repeatableAnnotationContainer || hasOtherMembers) {
-                Map<String, Map<CharSequence, Object>> declaredAnnotations = getDeclaredAnnotationsInternal();
-                Map<String, Map<CharSequence, Object>> allAnnotations = getAllAnnotations();
-                addAnnotation(annotation, values, declaredAnnotations, allAnnotations, true, retentionPolicy);
-            }
-        }
-    }
-
-    /**
      * Dump the values.
      */
     @SuppressWarnings("unused")
@@ -1894,8 +1488,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         String repeatableTypeName = findRepeatableAnnotationContainerInternal(annotationType.getName());
         if (repeatableTypeName != null) {
             return resolveRepeatableAnnotations(repeatableTypeName,
-                sourceStereotypes,
-                sourceAnnotations
+                    sourceStereotypes,
+                    sourceAnnotations
             );
         }
         return null;
@@ -1905,127 +1499,23 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     private <T extends Annotation> List<AnnotationValue<T>> resolveRepeatableAnnotations(String repeatableTypeName,
                                                                                          Map<String, Map<CharSequence, Object>> sourceStereotypes,
                                                                                          Map<String, Map<CharSequence, Object>> sourceAnnotations) {
-        if (hasStereotype(repeatableTypeName)) {
-            List<AnnotationValue<T>> results = new ArrayList<>();
-            if (sourceAnnotations != null) {
-                Map<CharSequence, Object> values = sourceAnnotations.get(repeatableTypeName);
-                addAnnotationValuesFromData(results, values);
-            }
-
-            if (sourceStereotypes != null) {
-                Map<CharSequence, Object> values = sourceStereotypes.get(repeatableTypeName);
-                addAnnotationValuesFromData(results, values);
-            }
-
-            return results;
+        if (!hasStereotype(repeatableTypeName)) {
+            return null;
         }
-        return null;
+        List<AnnotationValue<T>> results = new ArrayList<>();
+        if (sourceAnnotations != null) {
+            Map<CharSequence, Object> values = sourceAnnotations.get(repeatableTypeName);
+            addAnnotationValuesFromData(results, values);
+        }
+        if (sourceStereotypes != null) {
+            Map<CharSequence, Object> values = sourceStereotypes.get(repeatableTypeName);
+            addAnnotationValuesFromData(results, values);
+        }
+        return results;
     }
 
-    private void addAnnotation(String annotation,
-                               Map<CharSequence, Object> values,
-                               Map<String, Map<CharSequence, Object>> declaredAnnotations,
-                               Map<String, Map<CharSequence, Object>> allAnnotations,
-                               boolean isDeclared,
-                               RetentionPolicy retentionPolicy) {
-        if (isDeclared && declaredAnnotations != null) {
-            putValues(annotation, values, declaredAnnotations);
-        }
-        putValues(annotation, values, allAnnotations);
-
-        // Annotations with retention CLASS need not be retained at run time
-        if (retentionPolicy == RetentionPolicy.SOURCE || retentionPolicy == RetentionPolicy.CLASS) {
-            addSourceRetentionAnnotation(annotation);
-        }
-    }
-
-    private void addSourceRetentionAnnotation(String annotation) {
-        if (sourceRetentionAnnotations == null) {
-            sourceRetentionAnnotations = new HashSet<>(5);
-        }
-        sourceRetentionAnnotations.add(annotation);
-    }
-
-    private void putValues(String annotation, Map<CharSequence, Object> values, Map<String, Map<CharSequence, Object>> currentAnnotationValues) {
-        Map<CharSequence, Object> existing = currentAnnotationValues.get(annotation);
-        boolean hasValues = CollectionUtils.isNotEmpty(values);
-        if (existing != null && hasValues) {
-            if (existing.isEmpty()) {
-                existing = new LinkedHashMap<>();
-                currentAnnotationValues.put(annotation, existing);
-            }
-            for (CharSequence key : values.keySet()) {
-                if (!existing.containsKey(key)) {
-                    existing.put(key, values.get(key));
-                }
-            }
-        } else {
-            if (!hasValues) {
-                existing = existing == null ? new LinkedHashMap<>(3) : existing;
-            } else {
-                existing = new LinkedHashMap<>(values.size());
-                existing.putAll(values);
-            }
-            currentAnnotationValues.put(annotation, existing);
-        }
-    }
-
-    @SuppressWarnings("MagicNumber")
-    private Map<String, Map<CharSequence, Object>> getAllStereotypes() {
-        Map<String, Map<CharSequence, Object>> stereotypes = this.allStereotypes;
-        if (stereotypes == null) {
-            stereotypes = new HashMap<>(3);
-            this.allStereotypes = stereotypes;
-        }
-        return stereotypes;
-    }
-
-    @SuppressWarnings("MagicNumber")
-    private Map<String, Map<CharSequence, Object>> getDeclaredStereotypesInternal() {
-        Map<String, Map<CharSequence, Object>> stereotypes = this.declaredStereotypes;
-        if (stereotypes == null) {
-            stereotypes = new HashMap<>(3);
-            this.declaredStereotypes = stereotypes;
-        }
-        return stereotypes;
-    }
-
-    @SuppressWarnings("MagicNumber")
-    private Map<String, Map<CharSequence, Object>> getAllAnnotations() {
-        Map<String, Map<CharSequence, Object>> annotations = this.allAnnotations;
-        if (annotations == null) {
-            annotations = new HashMap<>(3);
-            this.allAnnotations = annotations;
-        }
-        return annotations;
-    }
-
-    @SuppressWarnings("MagicNumber")
-    private Map<String, Map<CharSequence, Object>> getDeclaredAnnotationsInternal() {
-        Map<String, Map<CharSequence, Object>> annotations = this.declaredAnnotations;
-        if (annotations == null) {
-            annotations = new HashMap<>(3);
-            this.declaredAnnotations = annotations;
-        }
-        return annotations;
-    }
-
-    private List<String> getAnnotationsByStereotypeInternal(String stereotype) {
-        return getAnnotationsByStereotypeInternal().computeIfAbsent(stereotype, s -> new ArrayList<>());
-    }
-
-    @SuppressWarnings("MagicNumber")
-    private Map<String, List<String>> getAnnotationsByStereotypeInternal() {
-        Map<String, List<String>> annotations = this.annotationsByStereotype;
-        if (annotations == null) {
-            annotations = new HashMap<>(3);
-            this.annotationsByStereotype = annotations;
-        }
-        return annotations;
-    }
-
-    private @Nullable
-    Object getRawSingleValue(@NonNull String annotation, @NonNull String member, @Nullable Function<Object, Object> valueMapper) {
+    @Nullable
+    private Object getRawSingleValue(@NonNull String annotation, @NonNull String member, @Nullable Function<Object, Object> valueMapper) {
         Object rawValue = getRawValue(annotation, member);
         if (rawValue != null) {
             if (rawValue.getClass().isArray()) {
@@ -2033,8 +1523,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 if (len > 0) {
                     rawValue = Array.get(rawValue, 0);
                 }
-            } else if (rawValue instanceof Iterable) {
-                Iterator i = ((Iterable) rawValue).iterator();
+            } else if (rawValue instanceof Iterable<?> iterable) {
+                Iterator<?> i = iterable.iterator();
                 if (i.hasNext()) {
                     rawValue = i.next();
                 }
@@ -2049,421 +1539,29 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @Nullable
     private Object getRawValue(@NonNull String annotation, @NonNull String member) {
-        Object rawValue = null;
-        if (allAnnotations != null && StringUtils.isNotEmpty(annotation)) {
-            Map<CharSequence, Object> values = allAnnotations.get(annotation);
+        if (allAnnotations == null || StringUtils.isEmpty(annotation)) {
+            return null;
+        }
+        Map<CharSequence, Object> values = allAnnotations.get(annotation);
+        if (values != null) {
+            return values.get(member);
+        }
+        if (allStereotypes != null) {
+            values = allStereotypes.get(annotation);
             if (values != null) {
-                rawValue = values.get(member);
-            } else if (allStereotypes != null) {
-                values = allStereotypes.get(annotation);
-                if (values != null) {
-                    rawValue = values.get(member);
-                }
+                return values.get(member);
             }
         }
-        return rawValue;
-    }
-
-    private void addRepeatableInternal(
-        String annotationName,
-        io.micronaut.core.annotation.AnnotationValue annotationValue,
-        Map<String, Map<CharSequence, Object>> allAnnotations,
-        RetentionPolicy retentionPolicy) {
-        addRepeatableInternal(annotationName, AnnotationMetadata.VALUE_MEMBER, annotationValue, allAnnotations, retentionPolicy);
-    }
-
-    private void addRepeatableInternal(
-        String annotationName,
-        String member,
-        io.micronaut.core.annotation.AnnotationValue annotationValue,
-        Map<String, Map<CharSequence, Object>> allAnnotations,
-        RetentionPolicy retentionPolicy) {
-        if (annotationRepeatableContainer == null) {
-            annotationRepeatableContainer = new HashMap<>(2);
-        }
-        annotationRepeatableContainer.put(annotationValue.getAnnotationName(), annotationName);
-        if (retentionPolicy == RetentionPolicy.SOURCE) {
-            addSourceRetentionAnnotation(annotationName);
-        }
-
-        Map<CharSequence, Object> values = allAnnotations.computeIfAbsent(annotationName, s -> new HashMap<>());
-        Object v = values.get(member);
-        if (v != null) {
-            if (v.getClass().isArray()) {
-                Object[] array = (Object[]) v;
-                Set newValues = new LinkedHashSet(array.length + 1);
-                newValues.addAll(Arrays.asList(array));
-                newValues.add(annotationValue);
-                values.put(member, newValues);
-            } else if (v instanceof Collection) {
-                ((Collection) v).add(annotationValue);
-            }
-        } else {
-            Set<Object> newValues = new LinkedHashSet<>(2);
-            newValues.add(annotationValue);
-            values.put(member, newValues);
-        }
+        return null;
     }
 
     /**
-     * <p>Sets a member of the given {@link AnnotationMetadata} return a new annotation metadata instance without
-     * mutating the existing.</p>
-     *
-     * <p>WARNING: for internal use only be the framework</p>
-     *
-     * @param annotationMetadata The metadata
-     * @param annotationName     The annotation name
-     * @param member             The member
-     * @param value              The value
-     * @return The metadata
+     * Find annotation's repeatable container.
+     * @param annotation The annotation
+     * @return the repeatable container or null
      */
-    @Internal
-    public static AnnotationMetadata mutateMember(
-        AnnotationMetadata annotationMetadata,
-        String annotationName,
-        String member,
-        Object value) {
-
-        return mutateMember(annotationMetadata, annotationName, Collections.singletonMap(member, value));
-    }
-
-    /**
-     * Include the annotation metadata from the other instance of {@link DefaultAnnotationMetadata}.
-     *
-     * @param annotationMetadata The annotation metadata
-     * @since 4.0.0
-     */
-    @Internal
-    protected void addAnnotationMetadata(DefaultAnnotationMetadata annotationMetadata) {
-        if (annotationMetadata.declaredAnnotations != null && !annotationMetadata.declaredAnnotations.isEmpty()) {
-            if (declaredAnnotations == null) {
-                declaredAnnotations = new LinkedHashMap<>();
-            }
-            for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationMetadata.declaredAnnotations.entrySet()) {
-                putValues(entry.getKey(), entry.getValue(), declaredAnnotations);
-            }
-        }
-        if (annotationMetadata.declaredStereotypes != null && !annotationMetadata.declaredStereotypes.isEmpty()) {
-            if (declaredStereotypes == null) {
-                declaredStereotypes = new LinkedHashMap<>();
-            }
-            for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationMetadata.declaredStereotypes.entrySet()) {
-                putValues(entry.getKey(), entry.getValue(), declaredStereotypes);
-            }
-        }
-        if (annotationMetadata.allStereotypes != null && !annotationMetadata.allStereotypes.isEmpty()) {
-            if (allStereotypes == null) {
-                allStereotypes = new LinkedHashMap<>();
-            }
-            for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationMetadata.allStereotypes.entrySet()) {
-                putValues(entry.getKey(), entry.getValue(), allStereotypes);
-            }
-        }
-        if (annotationMetadata.allAnnotations != null && !annotationMetadata.allAnnotations.isEmpty()) {
-            if (allAnnotations == null) {
-                allAnnotations = new LinkedHashMap<>();
-            }
-            for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationMetadata.allAnnotations.entrySet()) {
-                putValues(entry.getKey(), entry.getValue(), allAnnotations);
-            }
-        }
-        Map<String, List<String>> source = annotationMetadata.annotationsByStereotype;
-        if (source != null && !source.isEmpty()) {
-            if (annotationsByStereotype == null) {
-                annotationsByStereotype = new LinkedHashMap<>();
-            }
-            for (Map.Entry<String, List<String>> entry : source.entrySet()) {
-                String ann = entry.getKey();
-                List<String> prevValues = annotationsByStereotype.get(ann);
-                if (prevValues == null) {
-                    annotationsByStereotype.put(ann, new ArrayList<>(entry.getValue()));
-                } else {
-                    Set<String> prevValuesSet = new LinkedHashSet<>(prevValues);
-                    prevValuesSet.addAll(entry.getValue());
-                    annotationsByStereotype.put(ann, new ArrayList<>(prevValuesSet));
-                }
-            }
-        }
-        if (annotationMetadata.annotationRepeatableContainer != null) {
-            if (annotationRepeatableContainer == null) {
-                annotationRepeatableContainer = new LinkedHashMap<>(annotationMetadata.annotationRepeatableContainer);
-            } else {
-                annotationRepeatableContainer.putAll(annotationMetadata.annotationRepeatableContainer);
-            }
-        }
-        if (annotationMetadata.sourceRetentionAnnotations != null) {
-            if (sourceRetentionAnnotations == null) {
-                sourceRetentionAnnotations = new HashSet<>(annotationMetadata.sourceRetentionAnnotations);
-            } else {
-                sourceRetentionAnnotations.addAll(annotationMetadata.sourceRetentionAnnotations);
-            }
-        }
-        if (annotationMetadata.annotationDefaultValues != null) {
-            if (annotationDefaultValues == null) {
-                annotationDefaultValues = new LinkedHashMap<>(annotationMetadata.annotationDefaultValues);
-            } else {
-                // No need to merge values
-                annotationDefaultValues.putAll(annotationMetadata.annotationDefaultValues);
-            }
-        }
-        if (annotationMetadata.sourceAnnotationDefaultValues != null) {
-            if (sourceAnnotationDefaultValues == null) {
-                sourceAnnotationDefaultValues = new LinkedHashMap<>(annotationMetadata.sourceAnnotationDefaultValues);
-            } else {
-                // No need to merge values
-                sourceAnnotationDefaultValues.putAll(annotationMetadata.sourceAnnotationDefaultValues);
-            }
-        }
-    }
-
-    /**
-     * Contributes defaults to the given target.
-     *
-     * <p>WARNING: for internal use only be the framework</p>
-     *
-     * @param target The target
-     * @param source The source
-     */
-    @Internal
-    public static void contributeDefaults(AnnotationMetadata target, AnnotationMetadata source) {
-        source = source.getTargetAnnotationMetadata();
-        if (source instanceof AnnotationMetadataHierarchy) {
-            source = ((AnnotationMetadataHierarchy) source).merge();
-        }
-        if (target instanceof DefaultAnnotationMetadata damTarget && source instanceof DefaultAnnotationMetadata damSource) {
-            final Map<String, Map<CharSequence, Object>> existingDefaults = damTarget.annotationDefaultValues;
-            final Map<String, Map<CharSequence, Object>> additionalDefaults = damSource.annotationDefaultValues;
-            if (existingDefaults != null) {
-                if (additionalDefaults != null) {
-                    existingDefaults.putAll(
-                        additionalDefaults
-                    );
-                }
-            } else {
-                if (additionalDefaults != null) {
-                    additionalDefaults.forEach(damTarget::addDefaultAnnotationValues);
-                }
-            }
-        }
-        // We don't need to contribute the default source annotation
-        contributeRepeatable(target, source);
-    }
-
-    /**
-     * Contributes repeatable annotation metadata to the given target.
-     *
-     * <p>WARNING: for internal use only be the framework</p>
-     *
-     * @param target The target
-     * @param source The source
-     */
-    @Internal
-    public static void contributeRepeatable(AnnotationMetadata target, AnnotationMetadata source) {
-        source = source.getTargetAnnotationMetadata();
-        if (source instanceof AnnotationMetadataHierarchy) {
-            source = ((AnnotationMetadataHierarchy) source).merge();
-        }
-        if (target instanceof DefaultAnnotationMetadata && source instanceof DefaultAnnotationMetadata) {
-            DefaultAnnotationMetadata damTarget = (DefaultAnnotationMetadata) target;
-            DefaultAnnotationMetadata damSource = (DefaultAnnotationMetadata) source;
-            if (damSource.annotationRepeatableContainer != null && !damSource.annotationRepeatableContainer.isEmpty()) {
-                if (damTarget.annotationRepeatableContainer == null) {
-                    damTarget.annotationRepeatableContainer = new HashMap<>(damSource.annotationRepeatableContainer);
-                } else {
-                    damTarget.annotationRepeatableContainer.putAll(damSource.annotationRepeatableContainer);
-                }
-            }
-        }
-    }
-
-    /**
-     * <p>Sets a member of the given {@link AnnotationMetadata} return a new annotation metadata instance without
-     * mutating the existing.</p>
-     *
-     * <p>WARNING: for internal use only be the framework</p>
-     *
-     * @param annotationMetadata The metadata
-     * @param annotationName     The annotation name
-     * @param members            The key/value set of members and values
-     * @return The metadata
-     */
-    @Internal
-    public static AnnotationMetadata mutateMember(
-        AnnotationMetadata annotationMetadata,
-        String annotationName,
-        Map<CharSequence, Object> members) {
-        if (StringUtils.isEmpty(annotationName)) {
-            throw new IllegalArgumentException("Argument [annotationName] cannot be blank");
-        }
-        if (!members.isEmpty()) {
-            for (Map.Entry<CharSequence, Object> entry : members.entrySet()) {
-                if (StringUtils.isEmpty(entry.getKey())) {
-                    throw new IllegalArgumentException("Argument [members] cannot have a blank key");
-                }
-                if (entry.getValue() == null) {
-                    throw new IllegalArgumentException("Argument [members] cannot have a null value. Key [" + entry.getKey() + "]");
-                }
-            }
-        }
-        if (!(annotationMetadata instanceof DefaultAnnotationMetadata)) {
-            MutableAnnotationMetadata mutableAnnotationMetadata = new MutableAnnotationMetadata();
-            mutableAnnotationMetadata.addDeclaredAnnotation(annotationName, members);
-            return mutableAnnotationMetadata;
-        } else {
-            DefaultAnnotationMetadata defaultMetadata = (DefaultAnnotationMetadata) annotationMetadata;
-
-            defaultMetadata = defaultMetadata.clone();
-
-            defaultMetadata
-                .addDeclaredAnnotation(annotationName, members);
-
-            return defaultMetadata;
-        }
-    }
-
-    /**
-     * Removes an annotation for the given predicate.
-     *
-     * @param predicate The predicate
-     * @param <A>       The annotation
-     */
-    protected <A extends Annotation> void removeAnnotationIf(
-        @NonNull Predicate<AnnotationValue<A>> predicate) {
-        removeAnnotationsIf(predicate, this.declaredAnnotations);
-        removeAnnotationsIf(predicate, this.allAnnotations);
-    }
-
-    private <A extends Annotation> void removeAnnotationsIf(@NonNull Predicate<AnnotationValue<A>> predicate, Map<String, Map<CharSequence, Object>> annotations) {
-        if (annotations != null) {
-            annotations.entrySet().removeIf(entry -> {
-                final String annotationName = entry.getKey();
-                if (predicate.test(newAnnotationValue(annotationName, entry.getValue()))) {
-                    removeFromStereotypes(annotationName, annotations);
-                    return true;
-                }
-                return false;
-            });
-        }
-    }
-
-    /**
-     * Removes an annotation for the given annotation type.
-     *
-     * @param annotationType The annotation type
-     * @since 3.0.0
-     */
-    protected void removeAnnotation(String annotationType) {
-        if (annotationType != null) {
-            if (annotationDefaultValues != null) {
-                this.annotationDefaultValues.remove(annotationType);
-            }
-            if (allAnnotations != null) {
-                this.allAnnotations.remove(annotationType);
-            }
-            final Map<String, Map<CharSequence, Object>> declaredAnnotations = this.declaredAnnotations;
-            if (declaredAnnotations != null) {
-                declaredAnnotations.remove(annotationType);
-                removeFromStereotypes(annotationType, declaredAnnotations);
-            }
-            if (this.annotationRepeatableContainer != null) {
-                this.annotationRepeatableContainer.remove(annotationType);
-            }
-        }
-    }
-
-    /**
-     * Removes a stereotype annotation for the given annotation type.
-     *
-     * @param annotationType The annotation type
-     * @since 3.0.0
-     */
-    protected void removeStereotype(String annotationType) {
-        if (annotationType != null) {
-            if (annotationsByStereotype != null && annotationsByStereotype.remove(annotationType) != null) {
-                if (allStereotypes != null) {
-                    this.allStereotypes.remove(annotationType);
-                }
-                if (declaredStereotypes != null) {
-                    this.declaredStereotypes.remove(annotationType);
-                }
-
-                final Iterator<Map.Entry<String, List<String>>> i = annotationsByStereotype.entrySet().iterator();
-                while (i.hasNext()) {
-                    Map.Entry<String, List<String>> entry = i.next();
-                    final List<String> value = entry.getValue();
-                    if (value.remove(annotationType)) {
-                        if (value.isEmpty()) {
-                            i.remove();
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private void removeFromStereotypes(String annotationType, Map<String, Map<CharSequence, Object>> declaredAnnotations) {
-        if (annotationsByStereotype != null) {
-            final Iterator<Map.Entry<String, List<String>>> i = annotationsByStereotype.entrySet().iterator();
-            Set<String> toBeRemoved = CollectionUtils.setOf(annotationType);
-            while (i.hasNext()) {
-                final Map.Entry<String, List<String>> entry = i.next();
-                final String stereotypeName = entry.getKey();
-                final List<String> value = entry.getValue();
-                if (value.removeAll(toBeRemoved)) {
-                    if (value.isEmpty()) {
-                        toBeRemoved.add(stereotypeName);
-                        i.remove();
-                        if (allStereotypes != null) {
-                            this.allStereotypes.remove(stereotypeName);
-                        }
-                        if (declaredStereotypes != null) {
-                            this.declaredStereotypes.remove(stereotypeName);
-                        }
-                        if (annotationDefaultValues != null) {
-                            annotationDefaultValues.remove(stereotypeName);
-                        }
-                    }
-
-                    if (AnnotationUtil.ANN_AROUND.equals(stereotypeName) || AnnotationUtil.ANN_INTRODUCTION.equals(stereotypeName) || AnnotationUtil.ANN_AROUND_CONSTRUCT.equals(stereotypeName)) {
-                        // purge from interceptor binding
-                        purgeInterceptorBindings(declaredAnnotations, toBeRemoved);
-                        purgeInterceptorBindings(this.allAnnotations, toBeRemoved);
-                    }
-                }
-            }
-        }
-    }
-
-    private void purgeInterceptorBindings(Map<String, Map<CharSequence, Object>> declaredAnnotations, Set<String> toBeRemoved) {
-        if (declaredAnnotations != null) {
-            final Map<CharSequence, Object> v = declaredAnnotations.get(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
-            if (v != null) {
-                final Object o = v.get(AnnotationMetadata.VALUE_MEMBER);
-                if (o instanceof Collection) {
-                    Collection<AnnotationValue<?>> col = (Collection) o;
-                    col.removeIf(av -> Arrays.stream(av.annotationClassValues(AnnotationMetadata.VALUE_MEMBER))
-                        .anyMatch(acv -> toBeRemoved.contains(acv.getName())));
-
-                    if (col.isEmpty()) {
-                        declaredAnnotations.remove(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
-                    }
-                }
-            }
-        }
-    }
-
-    private boolean isRepeatableAnnotationContainer(String annotation) {
-        // This method is only used during the compilation time so we don't bother checking AnnotationMetadataSupport
-        return annotationRepeatableContainer != null && annotationRepeatableContainer.values().contains(annotation);
-    }
-
-    private String findRepeatableAnnotationContainerInternal(String annotation) {
-        if (annotationRepeatableContainer != null) {
-            String repeatedName = annotationRepeatableContainer.get(annotation);
-            if (repeatedName != null) {
-                return repeatedName;
-            }
-        }
+    @Nullable
+    protected String findRepeatableAnnotationContainerInternal(@NonNull String annotation) {
         return AnnotationMetadataSupport.getRepeatableAnnotation(annotation);
     }
 }

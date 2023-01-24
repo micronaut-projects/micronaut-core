@@ -124,7 +124,7 @@ class Test {
 
     void "test write annotation metadata with primitive arrays"() {
         given:
-        AnnotationMetadata toWrite = new DefaultAnnotationMetadata(
+        AnnotationMetadata toWrite = new MutableAnnotationMetadata(
                 [
                         "io.micrometer.core.annotation.Timed": [
                                 percentiles: [1.1d] as double[]
@@ -135,7 +135,7 @@ class Test {
                         percentiles: [1.1d] as double[]
                 ]
 
-        ], null
+        ], null, false
         )
         when:
         def className = "test"

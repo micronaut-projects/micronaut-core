@@ -75,7 +75,6 @@ import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
@@ -1553,12 +1552,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                      String interceptedProxyClassName,
                                      String interceptedProxyBridgeMethodName) {
 
-        DefaultAnnotationMetadata.contributeDefaults(
+        MutableAnnotationMetadata.contributeDefaults(
                 this.annotationMetadata,
                 methodElement.getAnnotationMetadata()
         );
         for (ParameterElement parameterElement : methodElement.getSuspendParameters()) {
-            DefaultAnnotationMetadata.contributeDefaults(
+            MutableAnnotationMetadata.contributeDefaults(
                     this.annotationMetadata,
                     parameterElement.getAnnotationMetadata()
             );
@@ -2148,7 +2147,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             boolean requiresGenericType) {
 
         autoApplyNamedIfPresent(fieldElement, annotationMetadata);
-        DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, annotationMetadata);
+        MutableAnnotationMetadata.contributeDefaults(this.annotationMetadata, annotationMetadata);
         VisitorContextUtils.contributeRepeatable(this.annotationMetadata, fieldElement.getGenericField());
 
         GeneratorAdapter injectMethodVisitor = this.injectMethodVisitor;
@@ -2401,14 +2400,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         final String methodName = methodElement.getName();
         final boolean requiresReflection = methodVisitData.requiresReflection;
         final ClassElement returnType = methodElement.getReturnType();
-        DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, annotationMetadata);
+        MutableAnnotationMetadata.contributeDefaults(this.annotationMetadata, annotationMetadata);
         VisitorContextUtils.contributeRepeatable(this.annotationMetadata, returnType);
         boolean hasArguments = methodElement.hasParameters();
         int argCount = hasArguments ? argumentTypes.size() : 0;
         Type declaringTypeRef = JavaModelUtils.getTypeReference(declaringType);
         boolean hasInjectScope = false;
         for (ParameterElement value : argumentTypes) {
-            DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, value.getAnnotationMetadata());
+            MutableAnnotationMetadata.contributeDefaults(this.annotationMetadata, value.getAnnotationMetadata());
             VisitorContextUtils.contributeRepeatable(this.annotationMetadata, value.getGenericType());
             if (value.hasDeclaredAnnotation(InjectScope.class)) {
                 hasInjectScope = true;
@@ -2766,8 +2765,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private void removeAnnotations(AnnotationMetadata annotationMetadata, String... annotationNames) {
-        if (annotationMetadata instanceof MutableAnnotationMetadata) {
-            MutableAnnotationMetadata mutableAnnotationMetadata = (MutableAnnotationMetadata) annotationMetadata;
+        if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
             for (String annotation : annotationNames) {
                 mutableAnnotationMetadata.removeAnnotation(annotation);
             }
@@ -2777,7 +2775,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private void applyDefaultNamedToParameters(List<ParameterElement> argumentTypes) {
         for (ParameterElement parameterElement : argumentTypes) {
             final AnnotationMetadata annotationMetadata = parameterElement.getAnnotationMetadata();
-            DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, annotationMetadata);
+            MutableAnnotationMetadata.contributeDefaults(this.annotationMetadata, annotationMetadata);
             VisitorContextUtils.contributeRepeatable(this.annotationMetadata, parameterElement.getGenericType());
             autoApplyNamedIfPresent(parameterElement, annotationMetadata);
         }
@@ -3992,7 +3990,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
         if (constructor instanceof MethodElement methodElement) {
             AnnotationMetadata constructorMetadata = methodElement.getAnnotationMetadata();
-            DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, constructorMetadata);
+            MutableAnnotationMetadata.contributeDefaults(this.annotationMetadata, constructorMetadata);
             VisitorContextUtils.contributeRepeatable(this.annotationMetadata, methodElement.getGenericReturnType());
             ParameterElement[] parameters = methodElement.getParameters();
             List<ParameterElement> parameterList = Arrays.asList(parameters);
@@ -4152,7 +4150,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                         boolean isPreDestroyMethod) {
         annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         for (ParameterElement value : methodElement.getParameters()) {
-            DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, value.getAnnotationMetadata());
+            MutableAnnotationMetadata.contributeDefaults(this.annotationMetadata, value.getAnnotationMetadata());
             VisitorContextUtils.contributeRepeatable(this.annotationMetadata, value.getGenericType());
         }
         staticInit.newInstance(Type.getType(AbstractInitializableBeanDefinition.MethodReference.class));
@@ -4232,20 +4230,20 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA || annotationMetadata.isEmpty()) {
             staticInit.push((String) null);
-        } else if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
+        } else if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
             AnnotationMetadataWriter.instantiateNewMetadataHierarchy(
                     beanDefinitionType,
                     classWriter,
                     staticInit,
-                    (AnnotationMetadataHierarchy) annotationMetadata,
+                    annotationMetadataHierarchy,
                     defaultsStorage,
                     loadTypeMethods);
-        } else if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+        } else if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
             AnnotationMetadataWriter.instantiateNewMetadata(
                     beanDefinitionType,
                     classWriter,
                     staticInit,
-                    (DefaultAnnotationMetadata) annotationMetadata,
+                    mutableAnnotationMetadata,
                     defaultsStorage,
                     loadTypeMethods);
         } else {
