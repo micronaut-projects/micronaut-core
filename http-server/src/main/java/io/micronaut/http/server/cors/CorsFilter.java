@@ -21,6 +21,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ImmutableArgumentConversionContext;
+import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
@@ -183,9 +184,13 @@ public class CorsFilter implements HttpServerFilter {
      * For Origin, we need to be more strict as otherwise an address like 127.malicious.com would be allowed.
      */
     private boolean isOriginLocal(@NonNull String hostString) {
-        URI uri = URI.create(hostString);
-        String host = uri.getHost();
-        return "localhost".equals(host) || "127.0.0.1".equals(host);
+        try {
+            URI uri = URI.create(hostString);
+            String host = uri.getHost();
+            return SocketUtils.LOCALHOST.equals(host) || "127.0.0.1".equals(host);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     @Override
