@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.netty.binding;
 
-import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
@@ -37,7 +37,7 @@ public class HttpRequestTest extends TestCase {
         HttpRequest<?> request = new NettyHttpRequest(
                 nettyRequest,
                 new DetachedMockFactory().Mock(ChannelHandlerContext.class),
-                ConversionService.SHARED,
+                new DefaultConversionService(),
                 new HttpServerConfiguration()
         );
         final HttpHeaders headers = request.getHeaders();
@@ -58,7 +58,7 @@ public class HttpRequestTest extends TestCase {
         HttpRequest<?> request = new NettyHttpRequest(
                 nettyRequest,
                 new DetachedMockFactory().Mock(ChannelHandlerContext.class),
-                ConversionService.SHARED,
+                new DefaultConversionService(),
                 new HttpServerConfiguration()
         );
         final HttpHeaders headers = request.getHeaders();

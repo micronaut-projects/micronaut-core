@@ -18,6 +18,7 @@ package io.micronaut.http.server.util;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.http.MutableHttpHeaders;
 
 import java.util.ArrayList;
@@ -32,9 +33,11 @@ import java.util.stream.Collectors;
 public class MockHttpHeaders implements MutableHttpHeaders {
 
     private final Map<CharSequence, List<String>> headers;
+    private final ConversionService<?> conversionService;
 
     public MockHttpHeaders(Map<CharSequence, List<String>> headers) {
         this.headers = headers;
+        this.conversionService = new DefaultConversionService();
     }
 
     @Override
@@ -88,6 +91,6 @@ public class MockHttpHeaders implements MutableHttpHeaders {
 
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
-        return ConversionService.SHARED.convert(get(name), conversionContext);
+        return conversionService.convert(get(name), conversionContext);
     }
 }

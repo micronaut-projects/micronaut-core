@@ -194,7 +194,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             .orElse(argument.getName());
                     // Convert and put as path param
                     if (argument.getAnnotationMetadata().hasStereotype(Format.class)) {
-                        ConversionService.SHARED.convert(value,
+                        conversionService.convert(value,
                                 ConversionContext.STRING.with(argument.getAnnotationMetadata()))
                                 .ifPresent(v -> pathParams.put(name, v));
                     } else {
@@ -458,9 +458,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 if (reactiveValueType == ByteBuffer.class) {
                     return byteBufferPublisher;
                 } else {
-                    if (ConversionService.SHARED.canConvert(ByteBuffer.class, reactiveValueType)) {
+                    if (conversionService.canConvert(ByteBuffer.class, reactiveValueType)) {
                         // It would be nice if we could capture the TypeConverter here
-                        return Publishers.map(byteBufferPublisher, value -> ConversionService.SHARED.convert(value, reactiveValueType).get());
+                        return Publishers.map(byteBufferPublisher, value -> conversionService.convert(value, reactiveValueType).get());
                     } else {
                         throw new ConfigurationException("Cannot create the generated HTTP client's " +
                                 "required return type, since no TypeConverter from ByteBuffer to " +

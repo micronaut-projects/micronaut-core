@@ -16,6 +16,7 @@
 package io.micronaut.http.simple;
 
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.http.HttpMethod;
@@ -41,9 +42,10 @@ import java.util.Set;
 public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
 
     private final MutableConvertibleValues<Object> attributes = new MutableConvertibleValuesMap<>();
-    private final SimpleCookies cookies = new SimpleCookies(ConversionService.SHARED);
-    private final SimpleHttpHeaders headers = new SimpleHttpHeaders(ConversionService.SHARED);
-    private final SimpleHttpParameters parameters = new SimpleHttpParameters(ConversionService.SHARED);
+    private final ConversionService conversionService = new DefaultConversionService();
+    private final SimpleCookies cookies = new SimpleCookies(conversionService);
+    private final SimpleHttpHeaders headers = new SimpleHttpHeaders(conversionService);
+    private final SimpleHttpParameters parameters = new SimpleHttpParameters(conversionService);
 
     private HttpMethod method;
     private URI uri;

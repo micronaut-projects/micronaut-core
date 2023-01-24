@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseFactory;
 import io.micronaut.http.HttpStatus;
@@ -37,16 +38,18 @@ import java.util.Optional;
 @Internal
 public class NettyHttpResponseFactory implements HttpResponseFactory {
 
+    private final ConversionService<?> conversionService = new DefaultConversionService();
+
     @Override
     public <T> MutableHttpResponse<T> ok(T body) {
-        MutableHttpResponse<T> ok = new NettyMutableHttpResponse<>(ConversionService.SHARED);
+        MutableHttpResponse<T> ok = new NettyMutableHttpResponse<>(conversionService);
 
         return body != null ? ok.body(body) : ok;
     }
 
     @Override
     public <T> MutableHttpResponse<T> status(HttpStatus status, T body) {
-        MutableHttpResponse<T> ok = new NettyMutableHttpResponse<>(ConversionService.SHARED);
+        MutableHttpResponse<T> ok = new NettyMutableHttpResponse<>(conversionService);
         ok.status(status);
         return body != null ? ok.body(body) : ok;
     }
@@ -60,7 +63,7 @@ public class NettyHttpResponseFactory implements HttpResponseFactory {
             nettyStatus = new HttpResponseStatus(status.getCode(), reason);
         }
 
-        return new NettyMutableHttpResponse(HttpVersion.HTTP_1_1, nettyStatus, ConversionService.SHARED);
+        return new NettyMutableHttpResponse(HttpVersion.HTTP_1_1, nettyStatus, conversionService);
     }
 
     /**

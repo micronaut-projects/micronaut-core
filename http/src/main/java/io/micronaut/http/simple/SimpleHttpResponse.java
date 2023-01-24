@@ -17,6 +17,7 @@ package io.micronaut.http.simple;
 
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.http.HttpStatus;
@@ -41,8 +42,9 @@ import java.util.Set;
 @TypeHint(value = SimpleHttpResponse.class)
 class SimpleHttpResponse<B> implements MutableHttpResponse<B> {
 
-    private final MutableHttpHeaders headers = new SimpleHttpHeaders(ConversionService.SHARED);
-    private final SimpleCookies cookies = new SimpleCookies(ConversionService.SHARED);
+    private final ConversionService conversionService = new DefaultConversionService();
+    private final MutableHttpHeaders headers = new SimpleHttpHeaders(conversionService);
+    private final SimpleCookies cookies = new SimpleCookies(conversionService);
     private final MutableConvertibleValues<Object> attributes = new MutableConvertibleValuesMap<>();
 
     private HttpStatus status = HttpStatus.OK;

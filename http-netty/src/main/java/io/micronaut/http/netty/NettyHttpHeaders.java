@@ -18,6 +18,7 @@ package io.micronaut.http.netty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpHeaderValues;
 import io.micronaut.http.MediaType;
@@ -66,7 +67,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
      */
     public NettyHttpHeaders() {
         this.nettyHeaders = new DefaultHttpHeaders();
-        this.conversionService = ConversionService.SHARED;
+        this.conversionService = new DefaultConversionService();
     }
 
     /**

@@ -22,6 +22,7 @@ import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
@@ -63,7 +64,7 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
             BeanLocator beanLocator,
             BeanProvider<HttpServerConfiguration> httpServerConfiguration,
             @Named(TaskExecutors.IO) BeanProvider<ExecutorService> executorService) {
-        this.conversionService = conversionService == null ? ConversionService.SHARED : conversionService;
+        this.conversionService = conversionService == null ? new DefaultConversionService() : conversionService;
         this.httpContentProcessorResolver = httpContentProcessorResolver;
         this.beanLocator = beanLocator;
         this.httpServerConfiguration = httpServerConfiguration;

@@ -17,7 +17,7 @@ package io.micronaut.http;
 
 import io.micronaut.core.attr.MutableAttributeHolder;
 import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
@@ -81,7 +81,7 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
      */
     default @NonNull <T> Optional<T> getBody(@NonNull Argument<T> type) {
         ArgumentUtils.requireNonNull("type", type);
-        return getBody().flatMap(b -> ConversionService.SHARED.convert(b, ConversionContext.of(type)));
+        return getBody().flatMap(b -> new DefaultConversionService().convert(b, ConversionContext.of(type)));
     }
 
     /**

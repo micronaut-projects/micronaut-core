@@ -24,6 +24,7 @@ import io.micronaut.core.bind.DefaultExecutableBinder;
 import io.micronaut.core.bind.ExecutableBinder;
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
@@ -97,6 +98,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     protected final WebSocketSessionRepository webSocketSessionRepository;
     private final AtomicBoolean closed = new AtomicBoolean(false);
     private AtomicReference<CompositeByteBuf> frameBuffer = new AtomicReference<>();
+    private final ConversionService<?> conversionService;
 
     /**
      * Default constructor.
@@ -131,6 +133,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         this.pongHandler = webSocketBean.pongMethod().orElse(null);
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.webSocketVersion = version;
+        this.conversionService = new DefaultConversionService();
     }
 
     /**
@@ -331,7 +334,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 }
 
                 Argument<?> bodyArgument = this.getBodyArgument();
-                Optional<?> converted = ConversionService.SHARED.convert(content, bodyArgument);
+                Optional<?> converted = conversionService.convert(content, bodyArgument);
                 content.release();
 
                 if (!converted.isPresent()) {
