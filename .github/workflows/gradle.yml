@@ -48,6 +48,8 @@ jobs:
         run: |
           ./gradlew check --no-daemon --parallel --continue
         env:
+           GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
+           GH_USERNAME: ${{ secrets.GH_USERNAME }}
            TESTCONTAINERS_RYUK_DISABLED: true
            GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
            GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
@@ -67,7 +69,7 @@ jobs:
             })
       - name: Publish Test Report
         if: always()
-        uses: mikepenz/action-junit-report@v3.7.0
+        uses: mikepenz/action-junit-report@v3.7.1
         with:
           check_name: Java CI / Test Report (${{ matrix.java }})
           report_paths: '**/build/test-results/test/TEST-*.xml'
@@ -81,6 +83,8 @@ jobs:
       - name: Publish to Sonatype Snapshots
         if: success() && github.event_name == 'push' && matrix.java == '17'
         env:
+          GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
+          GH_USERNAME: ${{ secrets.GH_USERNAME }}        
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
           GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
