@@ -147,7 +147,7 @@ public final class TestScenario {
          * @return The Test Scneario Builder
          */
         public Builder request(HttpRequest<?> request) {
-            this.request = (server) -> request;
+            this.request = server -> request;
             return this;
         }
 

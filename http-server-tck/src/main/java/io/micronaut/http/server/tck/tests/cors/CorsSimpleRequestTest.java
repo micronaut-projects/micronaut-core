@@ -185,7 +185,7 @@ public class CorsSimpleRequestTest {
     }
 
     private RequestSupplier createRequestFor(String host, String origin) {
-        return (server) -> createRequest(server.getPort().map(p -> "http://" + host + ":" + p + "/refresh").orElseThrow(() -> new RuntimeException("Unknown port for " + server)), origin);
+        return server -> createRequest(server.getPort().map(p -> "http://" + host + ":" + p + "/refresh").orElseThrow(() -> new RuntimeException("Unknown port for " + server)), origin);
     }
 
     static void isForbidden(ServerUnderTest server, HttpRequest<?> request) {
