@@ -197,16 +197,6 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
-    protected boolean isInheritedAnnotationType(@NonNull Element annotationType) {
-        for (AnnotationMirror mirror : annotationType.getAnnotationMirrors()) {
-            if (getAnnotationTypeName(mirror).equals(Inherited.class.getName())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    @Override
     protected Map<String, Element> getAnnotationMembers(String annotationType) {
         final Element element = getAnnotationMirror(annotationType).orElse(null);
         if (element != null && element.getKind() == ElementKind.ANNOTATION_TYPE) {

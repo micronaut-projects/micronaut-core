@@ -394,17 +394,6 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
-    protected boolean isInheritedAnnotationType(@NonNull AnnotatedNode annotationType) {
-        final List<AnnotationNode> annotations = annotationType.getAnnotations();
-        if (CollectionUtils.isNotEmpty(annotations)) {
-            return annotations.stream().anyMatch((ann) ->
-                    ann.getClassNode().getName().equals(Inherited.class.getName())
-            );
-        }
-        return false;
-    }
-
-    @Override
     protected Map<String, ? extends AnnotatedNode> getAnnotationMembers(String annotationType) {
         final AnnotatedNode node = getAnnotationMirror(annotationType).orElse(null);
         if (node instanceof final ClassNode cn) {

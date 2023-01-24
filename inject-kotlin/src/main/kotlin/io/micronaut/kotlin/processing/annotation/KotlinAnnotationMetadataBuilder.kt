@@ -508,12 +508,6 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
         }
     }
 
-    override fun isInheritedAnnotationType(annotationType: KSAnnotated): Boolean {
-        return annotationType.annotations.any {
-            it.annotationType.resolve().declaration.qualifiedName?.asString() == Inherited::class.qualifiedName
-        }
-    }
-
     private fun populateTypeHierarchy(element: KSClassDeclaration, hierarchy: MutableList<KSAnnotated>) {
         element.superTypes.forEach {
             val t = it.resolve()

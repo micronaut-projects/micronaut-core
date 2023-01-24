@@ -1027,7 +1027,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         String annotationName = annotationValue.getAnnotationName();
         T annotationType = processedAnnotation.getAnnotationType();
         Map<CharSequence, Object> annotationDefaults = annotationValue.getDefaultValues();
-        if (annotationDefaults == null) {
+        if (annotationDefaults == null && annotationType != null) {
             annotationDefaults = getCachedAnnotationDefaults(annotationName, annotationType);
         }
         annotationMetadata.addDefaultAnnotationValues(annotationName, annotationDefaults, annotationValue.getRetentionPolicy());
@@ -1059,11 +1059,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         // @AliasFor can modify the annotation values by aliasing to a member from the same annotation
         if (newValues.equals(annotationValue.getValues())) {
             return processedAnnotation;
-        } else {
-            return processedAnnotation.withAnnotationValue(
-                    AnnotationValue.builder(annotationValue).members(newValues).build()
-            );
         }
+        return processedAnnotation.withAnnotationValue(
+                AnnotationValue.builder(annotationValue).members(newValues).build()
+        );
     }
 
     private void processStereotypes(MutableAnnotationMetadata annotationMetadata,
@@ -1180,14 +1179,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     protected abstract boolean isInheritedAnnotation(@NonNull A annotationMirror);
 
-    /**
-     * Test whether the annotation mirror is inherited.
-     *
-     * @param annotationType The mirror
-     * @return True if it is
-     */
-    protected abstract boolean isInheritedAnnotationType(@NonNull T annotationType);
-
     private void addStereotypeAnnotations(Stream<ProcessedAnnotation> stream,
                                           @Nullable
                                           T element,
@@ -1282,7 +1273,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                             metadata,
                             isDeclared
                     );
-
                 }
 
                 for (String annotationName : modifiedStereotypes.getAnnotationNames()) {
