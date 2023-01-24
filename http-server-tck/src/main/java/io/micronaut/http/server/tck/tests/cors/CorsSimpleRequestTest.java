@@ -111,7 +111,7 @@ public class CorsSimpleRequestTest {
     }
 
     /**
-     * A request to localhost with an origin of 127.0.0.1 should be allowed as they are both local
+     * A request to localhost with an origin of 127.0.0.1 should be allowed as they are both local.
      *
      * @throws IOException
      */
@@ -125,7 +125,7 @@ public class CorsSimpleRequestTest {
     }
 
     /**
-     * Spoof attempt with origin should fail
+     * Spoof attempt with origin should fail.
      *
      * @throws IOException
      */
