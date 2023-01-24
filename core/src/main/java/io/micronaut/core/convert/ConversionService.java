@@ -33,7 +33,7 @@ public interface ConversionService<Impl extends ConversionService> {
     /**
      * The default shared conversion service.
      *
-     * @deprecated This will be removed in the next version. Use an injected {@link ConversionService} instead.
+     * @deprecated This will be removed in the next major version. Use an injected {@link ConversionService} instead.
      */
     @Deprecated
     ConversionService<?> SHARED = new DefaultConversionService();
