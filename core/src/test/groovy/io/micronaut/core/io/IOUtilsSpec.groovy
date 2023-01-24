@@ -8,6 +8,7 @@ import spock.lang.Unroll
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -135,7 +136,7 @@ class IOUtilsSpec extends Specification {
         URI uri = new URI(uriStr)
 
         expect:
-        expected == IOUtils.resolvePath(uri, path, toClose, (closeables, s) -> Path.of("/")).toString()
+        expected == IOUtils.resolvePath(uri, path, toClose, (closeables, s) -> Paths.get("/")).toString()
 
         where:
         path                                                             | expected                                                          | uriStr
