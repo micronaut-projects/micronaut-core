@@ -158,8 +158,17 @@ public class CorsFilter implements HttpServerFilter {
      * We only need to check host for starting with "localhost" "127." (as there are multiple loopback addresses on linux)
      *
      * This is fine for host, as the request had to get here.
+     *
+     * We check the first character as a performance optimization prior to calling startsWith.
      */
     private boolean isHostLocal(@NonNull String hostString) {
+        if (hostString.isEmpty()) {
+            return false;
+        }
+        char initialChar = hostString.charAt(0);
+        if (initialChar != 'h' && initialChar != 'w') {
+            return false;
+        }
         return hostString.startsWith("http://localhost")
             || hostString.startsWith("https://localhost")
             || hostString.startsWith("http://127.")
