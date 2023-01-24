@@ -1,6 +1,6 @@
 package io.micronaut.http.server.netty.websocket
 
-import io.micronaut.core.convert.ConversionService
+import io.micronaut.core.convert.DefaultConversionService
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository
@@ -34,7 +34,7 @@ class UpgradeSpec extends Specification {
         HttpRequest<?> request = new NettyHttpRequest(
                 nettyRequest,
                 new DetachedMockFactory().Mock(ChannelHandlerContext.class),
-                ConversionService.SHARED,
+                new DefaultConversionService(),
                 new HttpServerConfiguration()
         )
 

@@ -1,6 +1,6 @@
 package io.micronaut.http.netty.cookies
 
-import io.micronaut.core.convert.ConversionService
+import io.micronaut.core.convert.DefaultConversionService
 import io.micronaut.http.cookie.Cookie
 import io.netty.handler.codec.http.DefaultHttpHeaders
 import io.netty.handler.codec.http.HttpHeaderNames
@@ -16,7 +16,7 @@ class NettyCookiesSpec extends Specification {
         HttpHeaders httpHeaders = new DefaultHttpHeaders(false).add(HttpHeaderNames.SET_COOKIE, cookieDef);
 
         when:
-            NettyCookies nettyCookies = new NettyCookies(httpHeaders, ConversionService.SHARED);
+            NettyCookies nettyCookies = new NettyCookies(httpHeaders, new DefaultConversionService())
 
         then:
           Cookie cookie = nettyCookies.get("simple-cookie");
@@ -30,7 +30,7 @@ class NettyCookiesSpec extends Specification {
         HttpHeaders httpHeaders = new DefaultHttpHeaders(false).add(HttpHeaderNames.SET_COOKIE, cookieDef)
 
         when:
-        NettyCookies nettyCookies = new NettyCookies(httpHeaders, ConversionService.SHARED)
+        NettyCookies nettyCookies = new NettyCookies(httpHeaders, new DefaultConversionService())
 
         then:
         noExceptionThrown()
