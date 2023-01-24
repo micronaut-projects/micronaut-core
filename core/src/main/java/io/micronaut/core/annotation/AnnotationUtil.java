@@ -51,7 +51,9 @@ public class AnnotationUtil {
             "kotlin.annotation.MustBeDocumented",
             Target.class.getName(),
             "kotlin.annotation.Target",
-            KOTLIN_METADATA
+            Experimental.class.getName(),
+            KOTLIN_METADATA,
+            "jdk.internal.ValueBased"
     );
 
     /**
@@ -61,7 +63,8 @@ public class AnnotationUtil {
             "javax.annotation",
             "java.lang.annotation",
             "io.micronaut.core.annotation",
-            "edu.umd.cs.findbugs.annotations"
+            "edu.umd.cs.findbugs.annotations",
+            "jdk.internal"
     );
 
     /**

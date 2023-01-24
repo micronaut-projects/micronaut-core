@@ -1,8 +1,6 @@
 package io.micronaut.annotation.mapping
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
-import io.micronaut.context.annotation.Requirements
-import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.inject.ast.ClassElement
@@ -18,22 +16,21 @@ class ReplacesRepeatableAnnotationSpec extends AbstractTypeElementSpec {
             def definition = buildBeanDefinition('addann.ReplaceAnnotationsTo', '''
 package addann;
 
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Bean;
 
-@Requires(property = "foo")
-@Requires(property = "bar")
+@io.micronaut.annotation.mapping.MyRequires(property = "foo")
+@io.micronaut.annotation.mapping.MyRequires(property = "bar")
 @Bean
 class ReplaceAnnotationsTo {
 
-    @Requires(property = "xyz")
+    @io.micronaut.annotation.mapping.MyRequires(property = "xyz")
     public Object myField;
 
 }
 ''')
         expect:
-            definition.getAnnotationValuesByType(Requires).size() == 3
-            definition.getAnnotationValuesByType(Requires).stream()
+            definition.getAnnotationValuesByType(MyRequires).size() == 3
+            definition.getAnnotationValuesByType(MyRequires).stream()
                     .flatMap { it.stringValue("property").stream() }
                     .toList().toSet() == ["foo", "bar", "xyz"].toSet()
     }
@@ -42,19 +39,19 @@ class ReplaceAnnotationsTo {
         @Override
         void visitClass(ClassElement element, VisitorContext context) {
             if (element.getSimpleName() == "ReplaceAnnotationsTo") {
-                final List<AnnotationValue<Requires>> indexes = Stream.concat(
+                final List<AnnotationValue<MyRequires>> indexes = Stream.concat(
                         getIndexes(element),
                         element.getFields().stream().flatMap(this::getIndexes)
                 ).toList()
-                element.annotate(Requirements.class, builder -> builder.values(indexes.toArray(new AnnotationValue[]{})))
+                element.annotate(MyRequirements.class, builder -> builder.values(indexes.toArray(new AnnotationValue[]{})))
             }
         }
 
-        private Stream<AnnotationValue<Requires>> getIndexes(AnnotationMetadata am) {
-            if (am.getAnnotation(Requirements).getAnnotations("value", Requires).isEmpty()) {
+        private Stream<AnnotationValue<MyRequires>> getIndexes(AnnotationMetadata am) {
+            if (am.getAnnotation(MyRequirements).getAnnotations("value", MyRequires).isEmpty()) {
                 throw new IllegalStateException();
             }
-            return am.getAnnotationValuesByType(Requires.class).stream();
+            return am.getAnnotationValuesByType(MyRequires.class).stream();
         }
     }
 

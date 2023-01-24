@@ -242,9 +242,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
         writers.put(writer.getBeanType().getClassName(), writer);
 
-        if (!ce.isAbstract() || constructorElement.isPresent() || !ce.hasStereotype(Introspected.class)) {
-            addExecutableMethods(ce, writer, beanProperties);
-        }
+        addExecutableMethods(ce, writer, beanProperties);
     }
 
     private void addExecutableMethods(ClassElement ce, BeanIntrospectionWriter writer, List<PropertyElement> beanProperties) {
@@ -253,11 +251,11 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             if (beanProperty.isExcluded()) {
                 continue;
             }
-            beanProperty.getReadMethod().filter(m -> m.hasStereotype(Executable.class)).ifPresent(methodElement -> {
+            beanProperty.getReadMethod().filter(m -> m.hasStereotype(Executable.class) && !m.isAbstract()).ifPresent(methodElement -> {
                 added.add(methodElement);
                 writer.visitBeanMethod(methodElement);
             });
-            beanProperty.getWriteMethod().filter(m -> m.hasStereotype(Executable.class)).ifPresent(methodElement -> {
+            beanProperty.getWriteMethod().filter(m -> m.hasStereotype(Executable.class) && !m.isAbstract()).ifPresent(methodElement -> {
                 added.add(methodElement);
                 writer.visitBeanMethod(methodElement);
             });

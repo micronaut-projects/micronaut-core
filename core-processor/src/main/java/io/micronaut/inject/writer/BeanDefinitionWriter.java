@@ -110,7 +110,6 @@ import org.objectweb.asm.signature.SignatureVisitor;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.annotation.Annotation;
-import java.lang.annotation.Repeatable;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.time.Duration;
@@ -2322,13 +2321,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     t
             );
         } else {
-            final String repeatableName = visitorContext
-                    .getClassElement(annotationName)
-                    .flatMap(ce -> ce.stringValue(Repeatable.class)).orElse(null);
+            final String repeatableContainerName = element.findRepeatableAnnotation(annotationName).orElse(null);
             resolveArgument.run();
             retrieveAnnotationMetadataFromProvider(generatorAdapter);
-            if (repeatableName != null) {
-                generatorAdapter.push(repeatableName);
+            if (repeatableContainerName != null) {
+                generatorAdapter.push(repeatableContainerName);
                 generatorAdapter.invokeStatic(TYPE_QUALIFIERS, METHOD_QUALIFIER_BY_REPEATABLE_ANNOTATION);
             } else {
                 generatorAdapter.push(annotationName);

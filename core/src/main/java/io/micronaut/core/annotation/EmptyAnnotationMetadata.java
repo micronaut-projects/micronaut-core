@@ -137,7 +137,7 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
 
     @NonNull
     @Override
-    public Map<String, Object> getDefaultValues(@NonNull String annotation) {
+    public Map<CharSequence, Object> getDefaultValues(@NonNull String annotation) {
         return Collections.emptyMap();
     }
 

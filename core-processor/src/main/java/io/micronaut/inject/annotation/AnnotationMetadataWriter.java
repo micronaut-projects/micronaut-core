@@ -509,6 +509,8 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         constructor.visitInsn(RETURN);
         constructor.visitMaxs(1, 1);
         constructor.visitEnd();
+        defaultsStorage.clear(); // Defaults were valid only in the constructor scope
+
         if (writeAnnotationDefaults) {
             writeAnnotationDefaults(annotationMetadata, classWriter, owningType, defaultsStorage, loadTypeMethods);
         }

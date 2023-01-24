@@ -362,7 +362,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotation The annotation name
      * @return The default values
      */
-    default @NonNull Map<String, Object> getDefaultValues(@NonNull String annotation) {
+    default @NonNull Map<CharSequence, Object> getDefaultValues(@NonNull String annotation) {
         return Collections.emptyMap();
     }
 

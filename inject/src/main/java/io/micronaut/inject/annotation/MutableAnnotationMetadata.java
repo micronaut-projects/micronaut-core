@@ -122,8 +122,8 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
 
     @NonNull
     @Override
-    public Map<String, Object> getDefaultValues(@NonNull String annotation) {
-        Map<String, Object> values = super.getDefaultValues(annotation);
+    public Map<CharSequence, Object> getDefaultValues(@NonNull String annotation) {
+        Map<CharSequence, Object> values = super.getDefaultValues(annotation);
         if (values.isEmpty() && annotationDefaultValues != null) {
             final Map<CharSequence, Object> compileTimeDefaults = annotationDefaultValues.get(annotation);
             if (compileTimeDefaults != null && !compileTimeDefaults.isEmpty()) {
