@@ -21,6 +21,7 @@ import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanDefinition;
@@ -78,7 +79,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
     public ScheduledMethodProcessor(BeanContext beanContext, Optional<ConversionService<?>> conversionService, TaskExceptionHandler<?, ?> taskExceptionHandler) {
         this.beanContext = beanContext;
-        this.conversionService = conversionService.orElse(ConversionService.SHARED);
+        this.conversionService = conversionService.orElse(new DefaultConversionService());
         this.taskExceptionHandler = taskExceptionHandler;
     }
 

@@ -33,7 +33,7 @@ public class ConversionServiceBenchmark {
 
     @Setup
     public void prepare() {
-        conversionService = ConversionService.SHARED;
+        conversionService = new DefaultConversionService();
     }
 
     @Benchmark
