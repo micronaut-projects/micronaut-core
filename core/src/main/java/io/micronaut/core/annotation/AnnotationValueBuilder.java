@@ -108,7 +108,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
     public AnnotationValueBuilder<T> stereotype(AnnotationValue<?> annotation) {
         if (annotation != null) {
             if (stereotypes == null) {
-                stereotypes = new ArrayList<>();
+                stereotypes = new ArrayList<>(10);
             }
             stereotypes.add(annotation);
         }
@@ -125,9 +125,10 @@ public class AnnotationValueBuilder<T extends Annotation> {
     public AnnotationValueBuilder<T> defaultValues(Map<? extends CharSequence, Object> defaultValues) {
         if (defaultValues != null) {
             if (this.defaultValues == null) {
-                this.defaultValues = new LinkedHashMap<>();
+                this.defaultValues = new LinkedHashMap<>(defaultValues);
+            } else {
+                this.defaultValues.putAll(defaultValues);
             }
-            this.defaultValues.putAll((Map) defaultValues);
         }
         return this;
     }

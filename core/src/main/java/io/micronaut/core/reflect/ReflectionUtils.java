@@ -305,7 +305,7 @@ public class ReflectionUtils {
      * @since 4.0.0
      */
     @Internal
-    public static Optional<Object> getFieldValue(Class<?> fieldOwnerClass, String fieldName, Object instance) {
+    public static Optional<Object> getFieldValue(@NonNull Class<?> fieldOwnerClass, @NonNull String fieldName, @NonNull Object instance) {
         try {
             final Field f = getRequiredField(fieldOwnerClass, fieldName);
             f.setAccessible(true);

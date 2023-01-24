@@ -529,7 +529,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             return new AnnotationValue<>(annotationTypeName, Collections.emptyMap());
         }
 
-        Map<CharSequence, Object> resolvedValues = new LinkedHashMap<>();
+        Map<CharSequence, Object> resolvedValues = CollectionUtils.newLinkedHashMap(annotationValues.size());
         for (Map.Entry<? extends T, ?> entry : annotationValues.entrySet()) {
             T member = entry.getKey();
             Optional<AnnotationValue<AliasFor>> aliasForValues = getAnnotationValues(annotationElement, member, AliasFor.class);

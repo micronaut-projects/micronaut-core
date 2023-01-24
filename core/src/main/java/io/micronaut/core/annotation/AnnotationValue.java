@@ -198,6 +198,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     /**
      * The default values.
      * @return The default of the annotation or null if not specified.
+     * @since 4.0.0
      */
     @Nullable
     public Map<CharSequence, Object> getDefaultValues() {
