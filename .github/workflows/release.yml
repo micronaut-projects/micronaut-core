@@ -78,11 +78,13 @@ jobs:
           path: artifacts-sha256
           retention-days: 5
       - name: Generate docs
+        run: ./gradlew docs
         env:
           GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
           GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
           GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
-        run: ./gradlew docs
+          GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
+          GH_USERNAME: ${{ secrets.GH_USERNAME }}
       - name: Export Gradle Properties
         uses: micronaut-projects/github-actions/export-gradle-properties@master
       - name: Publish to Github Pages
