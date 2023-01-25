@@ -465,13 +465,9 @@ public class FilterRunner {
         }
         if (type.isVoid()) {
             if (hasContinuation) {
-                return (r, o, c) -> {
-                    // use response/failure from other filters
-                    c.forwardResponse(r.response, r.failure);
-                    return false;
-                };
+                return FilterReturnHandler.VOID_WITH_CONTINUATION;
             } else {
-                return (r, o, c) -> true;
+                return FilterReturnHandler.VOID;
             }
         }
         boolean nullable = type.isNullable() || fromOptional;
@@ -480,37 +476,20 @@ public class FilterRunner {
                 if (hasContinuation) {
                     throw new IllegalArgumentException("Filter method that accepts a continuation cannot return an HttpRequest");
                 }
-                return (r, o, c) -> {
-                    if (o == null && nullable) {
-                        return true;
-                    }
-                    r.request = (HttpRequest<?>) Objects.requireNonNull(o, "Returned request must not be null, or mark the method as @Nullable");
-                    return true;
-                };
+                if (nullable) {
+                    return FilterReturnHandler.REQUEST_NULLABLE;
+                } else {
+                    return FilterReturnHandler.REQUEST;
+                }
             } else if (type.getType() == HttpResponse.class || type.getType() == MutableHttpResponse.class) {
                 if (hasContinuation) {
-                    return (r, o, c) -> {
-                        if (o == null) {
-                            // use response/failure from other filters
-                            c.forwardResponse(r.response, r.failure);
-                        } else {
-                            c.forwardResponse((HttpResponse<?>) o, null);
-                        }
-                        return false;
-                    };
+                    return FilterReturnHandler.FROM_REQUEST_RESPONSE_WITH_CONTINUATION;
                 } else {
-                    return (r, o, c) -> {
-                        if (o == null && nullable) {
-                            return true;
-                        }
-
-                        // cancel request pipeline, move immediately to response handling
-                        r.response = (HttpResponse<?>) Objects.requireNonNull(o, "Returned response must not be null, or mark the method as @Nullable");
-                        r.failure = null;
-                        r.responseNeedsProcessing = true;
-                        r.workResponse();
-                        return false;
-                    };
+                    if (nullable) {
+                        return FilterReturnHandler.FROM_REQUEST_RESPONSE_NULLABLE;
+                    } else {
+                        return FilterReturnHandler.FROM_REQUEST_RESPONSE;
+                    }
                 }
             }
         } else {
@@ -518,17 +497,11 @@ public class FilterRunner {
                 throw new AssertionError();
             }
             if (type.getType() == HttpResponse.class || type.getType() == MutableHttpResponse.class) {
-                return (r, o, c) -> {
-                    if (o == null && nullable) {
-                        return true;
-                    }
-
-                    // cancel request pipeline, move immediately to response handling
-                    r.response = (HttpResponse<?>) Objects.requireNonNull(o, "Returned response must not be null, or mark the method as @Nullable");
-                    r.failure = null;
-                    r.responseNeedsProcessing = true;
-                    return true;
-                };
+                if (nullable) {
+                    return FilterReturnHandler.FROM_RESPONSE_RESPONSE_NULLABLE;
+                } else {
+                    return FilterReturnHandler.FROM_RESPONSE_RESPONSE;
+                }
             }
         }
         if (isReactive(type)) {
@@ -633,6 +606,98 @@ public class FilterRunner {
     }
 
     private interface FilterReturnHandler {
+        /**
+         * Void method that accepts a continuation.
+         */
+        FilterReturnHandler VOID_WITH_CONTINUATION = (r, o, c) -> {
+            // use response/failure from other filters
+            c.forwardResponse(r.response, r.failure);
+            return false;
+        };
+        /**
+         * Void method.
+         */
+        FilterReturnHandler VOID = (r, o, c) -> true;
+        /**
+         * Request handler that returns a response but also accepts a continuation.
+         */
+        FilterReturnHandler FROM_REQUEST_RESPONSE_WITH_CONTINUATION = (r, o, c) -> {
+            if (o == null) {
+                // use response/failure from other filters
+                c.forwardResponse(r.response, r.failure);
+            } else {
+                c.forwardResponse((HttpResponse<?>) o, null);
+            }
+            return false;
+        };
+        /**
+         * Request handler that returns a new request.
+         */
+        FilterReturnHandler REQUEST = (r, o, c) -> {
+            r.request = (HttpRequest<?>) Objects.requireNonNull(o, "Returned request must not be null, or mark the method as @Nullable");
+            return true;
+        };
+        /**
+         * Request handler that returns a new request (nullable).
+         */
+        FilterReturnHandler REQUEST_NULLABLE = (r, o, c) -> {
+            if (o == null) {
+                return true;
+            }
+            r.request = (HttpRequest<?>) o;
+            return true;
+        };
+        /**
+         * Request handler that returns a response.
+         */
+        FilterReturnHandler FROM_REQUEST_RESPONSE = (r, o, c) -> {
+            // cancel request pipeline, move immediately to response handling
+            r.response = (HttpResponse<?>) Objects.requireNonNull(o, "Returned response must not be null, or mark the method as @Nullable");
+            r.failure = null;
+            r.responseNeedsProcessing = true;
+            r.workResponse();
+            return false;
+        };
+        /**
+         * Request handler that returns a response (nullable).
+         */
+        FilterReturnHandler FROM_REQUEST_RESPONSE_NULLABLE = (r, o, c) -> {
+            if (o == null) {
+                return true;
+            }
+
+            // cancel request pipeline, move immediately to response handling
+            r.response = (HttpResponse<?>) o;
+            r.failure = null;
+            r.responseNeedsProcessing = true;
+            r.workResponse();
+            return false;
+        };
+        /**
+         * Response handler that returns a new response.
+         */
+        FilterReturnHandler FROM_RESPONSE_RESPONSE = (r, o, c) -> {
+            // cancel request pipeline, move immediately to response handling
+            r.response = (HttpResponse<?>) Objects.requireNonNull(o, "Returned response must not be null, or mark the method as @Nullable");
+            r.failure = null;
+            r.responseNeedsProcessing = true;
+            return true;
+        };
+        /**
+         * Response handler that returns a new response (nullable).
+         */
+        FilterReturnHandler FROM_RESPONSE_RESPONSE_NULLABLE = (r, o, c) -> {
+            if (o == null) {
+                return true;
+            }
+
+            // cancel request pipeline, move immediately to response handling
+            r.response = (HttpResponse<?>) o;
+            r.failure = null;
+            r.responseNeedsProcessing = true;
+            return true;
+        };
+
         boolean handle(FilterRunner runner, @Nullable Object o, FilterContinuationImpl<?> passedOnContinuation) throws Throwable;
     }
 
