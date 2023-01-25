@@ -226,10 +226,10 @@ public class FilterRunner {
             }
             if (executeOn == null) {
                 // possibly continue with next filter
-                return invokeBefore(before, null);
+                return before.invokeBefore(this, null);
             } else {
                 executeOn.execute(() -> {
-                    if (invokeBefore(before, executeOn)) {
+                    if (before.invokeBefore(this, executeOn)) {
                         workRequest();
                     }
                 });
@@ -335,13 +335,13 @@ public class FilterRunner {
 
             if (filter instanceof FilterMethod<?> after && after.isResponseFilter) {
                 if (executeOn == null) {
-                    if (!invokeAfter(after)) {
+                    if (!after.invokeAfter(this)) {
                         // suspend
                         return;
                     }
                 } else {
                     executeOn.execute(() -> {
-                        if (invokeAfter(after)) {
+                        if (after.invokeAfter(this)) {
                             workResponse();
                         }
                     });
@@ -350,60 +350,6 @@ public class FilterRunner {
                 }
             }
         }
-    }
-
-    private <T> boolean invokeBefore(FilterMethod<T> before, @Nullable Executor completeOn) {
-        FilterContinuationImpl<?> passedOnContinuation = null;
-        try {
-            if (before.filterCondition != null && !before.filterCondition.test(this)) {
-                return true;
-            }
-            Object[] args = bindArgs(before);
-            if (before.passedOnContinuationArgIndex != -1) {
-                passedOnContinuation = (FilterContinuationImpl<?>) args[before.passedOnContinuationArgIndex];
-                if (completeOn != null) {
-                    passedOnContinuation.completeOn = completeOn;
-                }
-            }
-            Object returnValue = before.method.invoke(before.bean, args);
-
-            boolean proceed = before.returnHandler.handle(this, returnValue, passedOnContinuation);
-            if (passedOnContinuation != null && proceed) {
-                throw new AssertionError("handleFilterReturn should never return true if there is a continuation");
-            }
-            return proceed;
-        } catch (Throwable e) {
-            if (passedOnContinuation == null) {
-                failure = e;
-                responseNeedsProcessing = true;
-                workResponse();
-            } else {
-                passedOnContinuation.forwardResponse(null, e);
-            }
-            return false;
-        }
-    }
-
-    private <T> boolean invokeAfter(FilterMethod<T> after) {
-        try {
-            if (after.filterCondition != null && !after.filterCondition.test(this)) {
-                return true;
-            }
-            Object returnValue = after.method.invoke(after.bean, bindArgs(after));
-            return after.returnHandler.handle(this, returnValue, null);
-        } catch (Throwable e) {
-            failure = e;
-            responseNeedsProcessing = true;
-        }
-        return true;
-    }
-
-    private Object[] bindArgs(FilterMethod<?> filterMethod) {
-        Object[] args = new Object[filterMethod.argBinders.length];
-        for (int i = 0; i < args.length; i++) {
-            args[i] = filterMethod.argBinders[i].bind(this);
-        }
-        return args;
     }
 
     @Internal
@@ -625,6 +571,60 @@ public class FilterRunner {
         @Override
         public int getOrder() {
             return order.getOrder(bean);
+        }
+
+        private boolean invokeBefore(FilterRunner runner, @Nullable Executor completeOn) {
+            FilterContinuationImpl<?> passedOnContinuation = null;
+            try {
+                if (filterCondition != null && !filterCondition.test(runner)) {
+                    return true;
+                }
+                Object[] args = bindArgs(runner);
+                if (passedOnContinuationArgIndex != -1) {
+                    passedOnContinuation = (FilterContinuationImpl<?>) args[passedOnContinuationArgIndex];
+                    if (completeOn != null) {
+                        passedOnContinuation.completeOn = completeOn;
+                    }
+                }
+                Object returnValue = method.invoke(bean, args);
+
+                boolean proceed = returnHandler.handle(runner, returnValue, passedOnContinuation);
+                if (passedOnContinuation != null && proceed) {
+                    throw new AssertionError("handleFilterReturn should never return true if there is a continuation");
+                }
+                return proceed;
+            } catch (Throwable e) {
+                if (passedOnContinuation == null) {
+                    runner.failure = e;
+                    runner.responseNeedsProcessing = true;
+                    runner.workResponse();
+                } else {
+                    passedOnContinuation.forwardResponse(null, e);
+                }
+                return false;
+            }
+        }
+
+        private boolean invokeAfter(FilterRunner runner) {
+            try {
+                if (filterCondition != null && !filterCondition.test(runner)) {
+                    return true;
+                }
+                Object returnValue = method.invoke(bean, bindArgs(runner));
+                return returnHandler.handle(runner, returnValue, null);
+            } catch (Throwable e) {
+                runner.failure = e;
+                runner.responseNeedsProcessing = true;
+            }
+            return true;
+        }
+
+        private Object[] bindArgs(FilterRunner runner) {
+            Object[] args = new Object[argBinders.length];
+            for (int i = 0; i < args.length; i++) {
+                args[i] = argBinders[i].bind(runner);
+            }
+            return args;
         }
     }
 
