@@ -17,6 +17,7 @@ package io.micronaut.inject.processing;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
@@ -26,6 +27,8 @@ import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Introduction interface proxy builder.
@@ -66,15 +69,22 @@ final class IntroductionInterfaceBeanElementCreator extends AbstractBeanElementC
 
         // The introduction will include overridden methods* (find(List) <- find(Iterable)*) but ordinary class introduction doesn't
         // Because of the caching we need to process declared methods first
-        List<MethodElement> methods = new ArrayList<>(classElement.getEnclosedElements(ElementQuery.ALL_METHODS.includeHiddenElements().includeOverriddenMethods()));
-        Collections.reverse(methods); // reverse to process hierarchy starting from declared methods
-        for (MethodElement methodElement : methods) {
+        List<MethodElement> allMethods = new ArrayList<>(classElement.getEnclosedElements(ElementQuery.ALL_METHODS.includeOverriddenMethods().includeOverriddenMethods()));
+
+        // Remove non-abstract methods and abstract methods overridden by non-abstract ones
+        Map<Boolean, List<MethodElement>> groups = allMethods.stream().collect(Collectors.groupingBy(Element::isAbstract));
+        List<MethodElement> abstractMethods = groups.getOrDefault(true, Collections.emptyList());
+        List<MethodElement> nonAbstractMethods = groups.getOrDefault(false, Collections.emptyList());
+        abstractMethods.removeIf(abstractMethod -> nonAbstractMethods.stream().anyMatch(nonAbstractMethod -> nonAbstractMethod.overrides(abstractMethod)));
+
+        Collections.reverse(abstractMethods); // reverse to process hierarchy starting from declared methods
+        for (MethodElement methodElement : abstractMethods) {
             visitIntrospectedMethod(aopProxyWriter, classElement, methodElement);
         }
         List<PropertyElement> beanProperties = classElement.getSyntheticBeanProperties();
         for (PropertyElement beanProperty : beanProperties) {
-            handlePropertyMethod(aopProxyWriter, methods, beanProperty.getReadMethod().orElse(null));
-            handlePropertyMethod(aopProxyWriter, methods, beanProperty.getWriteMethod().orElse(null));
+            handlePropertyMethod(aopProxyWriter, abstractMethods, beanProperty.getReadMethod().orElse(null));
+            handlePropertyMethod(aopProxyWriter, abstractMethods, beanProperty.getWriteMethod().orElse(null));
         }
         beanDefinitionWriters.add(aopProxyWriter);
     }
