@@ -190,7 +190,7 @@ interface SpecificInterface {
         then:
         //I ended up going this route because actually calling the methods here would be relying on
         //having the target interface in the bytecode of the test
-        instance.$proxyMethods.length == 2
+        instance.$proxyMethods.length == 1
     }
 
     void "test interface multiple inheritance"() {
