@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
@@ -76,6 +77,7 @@ public class FilterRunner {
     private static final Logger LOG = LoggerFactory.getLogger(FilterRunner.class);
     private static final Predicate<FilterRunner> FILTER_CONDITION_ALWAYS_TRUE = runner -> true;
 
+    private final ConversionService conversionService;
     private final List<GenericHttpFilter> filters;
 
     private HttpRequest<?> request;
@@ -90,9 +92,11 @@ public class FilterRunner {
     /**
      * Create a new filter runner, to be used only once.
      *
+     * @param conversionService The conversion service
      * @param filters The filters to run
      */
-    public FilterRunner(List<GenericHttpFilter> filters) {
+    public FilterRunner(ConversionService conversionService, List<GenericHttpFilter> filters) {
+        this.conversionService = conversionService;
         this.filters = Objects.requireNonNull(filters, "filters");
     }
 
@@ -511,7 +515,7 @@ public class FilterRunner {
                 protected ExecutionFlow<?> toFlow(FilterRunner runner, Object o) {
                     //noinspection unchecked
                     return ReactiveExecutionFlow.fromPublisher(
-                        Mono.from(Publishers.convertPublisher(o, Publisher.class))
+                        Mono.from(Publishers.convertPublisher(runner.conversionService, o, Publisher.class))
                             .contextWrite(runner.reactorContext));
                 }
             };
@@ -895,7 +899,7 @@ public class FilterRunner {
 
         @Override
         public R proceed() {
-            return Publishers.convertPublisher(this, reactiveType);
+            return Publishers.convertPublisher(conversionService, this, reactiveType);
         }
 
         @SuppressWarnings("NullableProblems")

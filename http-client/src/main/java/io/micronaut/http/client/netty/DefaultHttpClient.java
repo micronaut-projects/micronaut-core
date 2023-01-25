@@ -1269,7 +1269,7 @@ public class DefaultHttpClient implements
         FilterRunner.sortReverse(filters);
         filters.add(new GenericHttpFilter.TerminalReactive(responsePublisher));
 
-        FilterRunner runner = new FilterRunner(filters);
+        FilterRunner runner = new FilterRunner(conversionService, filters);
         Mono<R> responseMono = Mono.deferContextual(ctx -> {
             runner.reactorContext(Context.of(ctx));
             return Mono.from(ReactiveExecutionFlow.fromFlow((ExecutionFlow<R>) runner.run(request)).toPublisher());

@@ -1,6 +1,7 @@
 package io.micronaut.http.filter
 
 import io.micronaut.core.annotation.Nullable
+import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.execution.CompletableFutureExecutionFlow
 import io.micronaut.core.execution.ExecutionFlow
 import io.micronaut.core.execution.ImperativeExecutionFlow
@@ -23,6 +24,10 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ThreadFactory
 
 class FilterRunnerSpec extends Specification {
+    private FilterRunner filterRunner(List<GenericHttpFilter> filters) {
+        return new FilterRunner(ConversionService.SHARED, filters);
+    }
+
     def 'simple tasks should not suspend'() {
         given:
         def events = []
@@ -42,7 +47,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        def result = new FilterRunner(filters).run(HttpRequest.GET("/")).tryComplete().value
+        def result = filterRunner(filters).run(HttpRequest.GET("/")).tryComplete().value
         then:
         result.status() == HttpStatus.OK
         events == ["before", "terminal", "after"]
@@ -73,7 +78,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        def result = await(new FilterRunner(filters).run(req1))
+        def result = await(filterRunner(filters).run(req1))
         then:
         result != null
         events == ["before", "terminal", "after"]
@@ -107,7 +112,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        def runner = new FilterRunner(filters)
+        def runner = filterRunner(filters)
         runner.reactorContext(Context.of('value', 'outer'))
         def result = await(runner.run(HttpRequest.GET("/req1")))
         then:
@@ -131,7 +136,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        await(new FilterRunner(filters).run(HttpRequest.GET("/")))
+        await(filterRunner(filters).run(HttpRequest.GET("/")))
         then:
         def actual = thrown Exception
         actual == testExc
@@ -151,7 +156,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        await(new FilterRunner(filters).run(HttpRequest.GET("/")))
+        await(filterRunner(filters).run(HttpRequest.GET("/")))
         then:
         def actual = thrown Exception
         actual == testExc
@@ -168,7 +173,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        await(new FilterRunner(filters).run(HttpRequest.GET("/")))
+        await(filterRunner(filters).run(HttpRequest.GET("/")))
         then:
         def actual = thrown Exception
         actual == testExc
@@ -184,7 +189,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        await(new FilterRunner(filters).run(HttpRequest.GET("/")))
+        await(filterRunner(filters).run(HttpRequest.GET("/")))
         then:
         def actual = thrown Exception
         actual == testExc
@@ -205,7 +210,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        await(new FilterRunner(filters).run(HttpRequest.GET("/")))
+        await(filterRunner(filters).run(HttpRequest.GET("/")))
         then:
         def actual = thrown Exception
         actual == testExc
@@ -230,7 +235,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        await(new FilterRunner(filters).run(HttpRequest.GET("/")))
+        await(filterRunner(filters).run(HttpRequest.GET("/")))
         then:
         def actual = thrown Exception
         actual == testExc
@@ -257,7 +262,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        await(new FilterRunner(filters).run(HttpRequest.GET("/")))
+        await(filterRunner(filters).run(HttpRequest.GET("/")))
         then:
         def actual = thrown Exception
         actual == testExc
@@ -283,7 +288,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        def flow = new FilterRunner(filters).run(HttpRequest.GET("/"))
+        def flow = filterRunner(filters).run(HttpRequest.GET("/"))
         // after the run() call, we're suspended waiting for the terminal to finish
         // this exception is logged and dropped
         terminalFuture.completeExceptionally(new RuntimeException("Test exception 2"))
@@ -311,7 +316,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        def resp = await(new FilterRunner(filters).run(HttpRequest.GET("/"))).value
+        def resp = await(filterRunner(filters).run(HttpRequest.GET("/"))).value
         then:
         resp.status == HttpStatus.OK
         events == ["around"]
@@ -339,7 +344,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        await(new FilterRunner(filters).run(req1))
+        await(filterRunner(filters).run(req1))
         then:
         events == ["before", "terminal"]
     }
@@ -359,7 +364,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        await(new FilterRunner(filters).run(HttpRequest.GET("/")))
+        await(filterRunner(filters).run(HttpRequest.GET("/")))
         then:
         events == ["before"]
     }
@@ -383,7 +388,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        await(new FilterRunner(filters).run(req1))
+        await(filterRunner(filters).run(req1))
         then:
         events == ["before", "terminal"]
     }
@@ -407,7 +412,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        await(new FilterRunner(filters).run(req1))
+        await(filterRunner(filters).run(req1))
         then:
         events == ["before", "terminal"]
     }
@@ -427,7 +432,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        await(new FilterRunner(filters).run(HttpRequest.GET("/")))
+        await(filterRunner(filters).run(HttpRequest.GET("/")))
         then:
         events == ["before"]
     }
@@ -450,7 +455,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        def resp = await(new FilterRunner(filters).run(HttpRequest.GET("/"))).value
+        def resp = await(filterRunner(filters).run(HttpRequest.GET("/"))).value
         then:
         resp == resp2
         events == ["terminal", "after"]
@@ -474,7 +479,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        def resp = await(new FilterRunner(filters).run(HttpRequest.GET("/"))).value
+        def resp = await(filterRunner(filters).run(HttpRequest.GET("/"))).value
         then:
         resp == resp2
         events == ["terminal", "after"]
@@ -496,7 +501,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        await(new FilterRunner(filters).run(HttpRequest.GET("/")))
+        await(filterRunner(filters).run(HttpRequest.GET("/")))
         then:
         def actual = thrown Exception
         actual == testExc
@@ -521,7 +526,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        def resp = await(new FilterRunner(filters).run(HttpRequest.GET("/"))).value
+        def resp = await(filterRunner(filters).run(HttpRequest.GET("/"))).value
         then:
         resp == resp1
         events == ["terminal", "after"]
@@ -543,7 +548,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        await(new FilterRunner(filters).run(HttpRequest.GET("/")))
+        await(filterRunner(filters).run(HttpRequest.GET("/")))
         then:
         def actual = thrown Exception
         actual == testExc
@@ -580,7 +585,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        def response = await(new FilterRunner(filters).run(HttpRequest.GET("/"))).value
+        def response = await(filterRunner(filters).run(HttpRequest.GET("/"))).value
         then:
         response.status() == HttpStatus.OK
         events == ["before thread-before", "terminal thread-before", "after thread-after"]
@@ -610,7 +615,7 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        def result = await(new FilterRunner(filters).run(req1))
+        def result = await(filterRunner(filters).run(req1))
         then:
         result != null
         events == ["before", "terminal", "after"]

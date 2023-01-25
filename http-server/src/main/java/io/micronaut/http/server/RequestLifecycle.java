@@ -267,7 +267,7 @@ public class RequestLifecycle {
             this.context = context;
             return downstream.get();
         });
-        FilterRunner filterRunner = new FilterRunner(filters) {
+        FilterRunner filterRunner = new FilterRunner(routeExecutor.beanContext.getConversionService(), filters) {
             @Override
             protected ExecutionFlow<? extends HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response) {
                 RequestLifecycle.this.request = request;
