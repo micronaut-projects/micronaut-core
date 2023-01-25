@@ -17,7 +17,7 @@ package io.micronaut.core.annotation;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -30,7 +30,20 @@ import io.micronaut.core.util.StringUtils;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Array;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -1017,7 +1030,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         if (!result.isPresent()) {
             Object dv = defaultValues.get(member.toString());
             if (dv != null) {
-                return ConversionService.SHARED.convert(dv, conversionContext);
+                return new DefaultConversionService().convert(dv, conversionContext);
             }
         }
         return result;

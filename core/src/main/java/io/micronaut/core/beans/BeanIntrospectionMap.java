@@ -16,11 +16,16 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.util.CollectionUtils;
 
-import io.micronaut.core.annotation.NonNull;
-import java.util.*;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -34,6 +39,7 @@ import java.util.stream.Collectors;
 final class BeanIntrospectionMap<T> implements BeanMap<T> {
     private final BeanIntrospection<T> beanIntrospection;
     private final T bean;
+    private final ConversionService<?> conversionService = new DefaultConversionService();
 
     /**
      * Default constructor.
@@ -107,7 +113,7 @@ final class BeanIntrospectionMap<T> implements BeanMap<T> {
         beanIntrospection.getProperty(key).ifPresent(bp -> {
             final Class<Object> propertyType = bp.getType();
             if (value != null && !propertyType.isInstance(value)) {
-                Optional<?> converted = ConversionService.SHARED.convert(value, propertyType);
+                Optional<?> converted = conversionService.convert(value, propertyType);
                 converted.ifPresent(o -> bp.set(bean, o));
             } else {
                 bp.set(bean, value);

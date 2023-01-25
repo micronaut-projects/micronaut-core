@@ -15,10 +15,11 @@
  */
 package io.micronaut.core.reflect;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
@@ -27,9 +28,13 @@ import io.micronaut.core.util.ArgumentUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import io.micronaut.core.annotation.NonNull;
 import java.lang.reflect.Constructor;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -102,7 +107,7 @@ public class InstantiationUtils {
 
                     for (Argument<?> argument : constructorArguments) {
                         if (bindMap.containsKey(argument.getName())) {
-                            Object converted = ConversionService.SHARED.convert(bindMap.get(argument.getName()), argument.getType(), ConversionContext.of(argument)).orElseThrow(() ->
+                            Object converted = new DefaultConversionService().convert(bindMap.get(argument.getName()), argument.getType(), ConversionContext.of(argument)).orElseThrow(() ->
                                     new ConversionErrorException(argument, context.getLastError()
                                             .orElse(() -> new IllegalArgumentException("Value [" + bindMap.get(argument.getName()) + "] cannot be converted to type : " + argument.getType())))
                             );

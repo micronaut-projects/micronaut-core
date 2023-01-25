@@ -16,6 +16,7 @@
 package io.micronaut.core.serialize;
 
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.serialize.exceptions.SerializationException;
 import io.micronaut.core.type.Argument;
@@ -49,7 +50,7 @@ public class JdkSerializer implements ObjectSerializer {
      * Default constructor.
      */
     public JdkSerializer() {
-        this(ConversionService.SHARED);
+        this(new DefaultConversionService());
     }
 
     @Override

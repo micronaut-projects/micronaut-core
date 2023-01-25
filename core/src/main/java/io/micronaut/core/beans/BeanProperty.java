@@ -17,16 +17,16 @@ package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentCoercible;
 import io.micronaut.core.util.ArgumentUtils;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import javax.annotation.concurrent.Immutable;
 import java.util.Arrays;
 import java.util.Collection;
@@ -102,7 +102,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
         ArgumentUtils.requireNonNull("conversionContext", conversionContext);
 
         final T v = get(bean);
-        return ConversionService.SHARED.convert(v, conversionContext);
+        return new DefaultConversionService().convert(v, conversionContext);
     }
 
     /**
@@ -120,7 +120,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
             return defaultValue;
         } else {
             final T v = get(bean);
-            return ConversionService.SHARED.convert(v, type).orElse(defaultValue);
+            return new DefaultConversionService().convert(v, type).orElse(defaultValue);
         }
     }
 
@@ -234,7 +234,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
         if (value != null) {
             final Argument<T> argument = asArgument();
             final ArgumentConversionContext<T> context = ConversionContext.of(argument);
-            final T converted = ConversionService.SHARED.convert(value, context).orElseThrow(() ->
+            final T converted = new DefaultConversionService().convert(value, context).orElseThrow(() ->
                     new ConversionErrorException(argument, context.getLastError()
                             .orElse(() -> new IllegalArgumentException("Value [" + value + "] cannot be converted to type : " + getType())))
             );

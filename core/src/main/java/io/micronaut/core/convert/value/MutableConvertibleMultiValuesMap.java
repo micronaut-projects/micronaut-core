@@ -16,6 +16,7 @@
 package io.micronaut.core.convert.value;
 
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,7 +41,7 @@ public class MutableConvertibleMultiValuesMap<V> extends ConvertibleMultiValuesM
      * @param values The values
      */
     public MutableConvertibleMultiValuesMap(Map<CharSequence, List<V>> values) {
-        super(values, ConversionService.SHARED);
+        super(values, new DefaultConversionService());
     }
 
     /**

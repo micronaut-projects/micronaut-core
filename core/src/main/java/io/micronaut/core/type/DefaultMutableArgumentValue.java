@@ -17,6 +17,7 @@ package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 
 /**
  * Default implementation of {@link MutableArgumentValue}.
@@ -29,6 +30,7 @@ import io.micronaut.core.convert.ConversionService;
 class DefaultMutableArgumentValue<V> extends DefaultArgumentValue<V> implements MutableArgumentValue<V> {
 
     private V value;
+    private final ConversionService<?> conversionService;
 
     /**
      * @param argument The argument
@@ -37,6 +39,7 @@ class DefaultMutableArgumentValue<V> extends DefaultArgumentValue<V> implements 
     DefaultMutableArgumentValue(Argument<V> argument, V value) {
         super(argument, value);
         this.value = value;
+        this.conversionService = new DefaultConversionService();
     }
 
     @Override
@@ -44,7 +47,7 @@ class DefaultMutableArgumentValue<V> extends DefaultArgumentValue<V> implements 
         if (!getType().isInstance(value)) {
             this.value = value;
         } else {
-            this.value = ConversionService.SHARED.convert(value, getType()).orElseThrow(() ->
+            this.value = conversionService.convert(value, getType()).orElseThrow(() ->
                 new IllegalArgumentException("Invalid value [" + value + "] for argument: " + this)
             );
         }

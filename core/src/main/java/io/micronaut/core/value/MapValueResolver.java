@@ -17,6 +17,7 @@ package io.micronaut.core.value;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.type.Argument;
 
 import java.util.Map;
@@ -31,12 +32,14 @@ import java.util.Optional;
  */
 class MapValueResolver<K extends CharSequence> implements ValueResolver<K> {
     private final Map<K, ?> map;
+    private final ConversionService<?> conversionService;
 
     /**
      * @param map The map
      */
     MapValueResolver(Map<K, ?> map) {
         this.map = map;
+        this.conversionService = new DefaultConversionService();
     }
 
     @Override
@@ -50,7 +53,7 @@ class MapValueResolver<K extends CharSequence> implements ValueResolver<K> {
         if (argument.getType().isInstance(v)) {
             return Optional.of((T) v);
         }
-        return ConversionService.SHARED.convert(v, conversionContext);
+        return conversionService.convert(v, conversionContext);
     }
 
     @Override

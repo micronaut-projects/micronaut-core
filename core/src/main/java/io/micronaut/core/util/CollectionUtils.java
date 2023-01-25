@@ -15,13 +15,28 @@
  */
 package io.micronaut.core.util;
 
-import io.micronaut.core.annotation.UsedByGeneratedCode;
-import io.micronaut.core.convert.ConversionService;
-
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.convert.DefaultConversionService;
+
 import java.lang.reflect.Constructor;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.NavigableSet;
+import java.util.Optional;
+import java.util.Queue;
+import java.util.Set;
 
 /**
  * <p>Utility methods for working with {@link java.util.Collection} types</p>.
@@ -231,7 +246,7 @@ public class CollectionUtils {
                 if (CharSequence.class.isInstance(o)) {
                     builder.append(o.toString());
                 } else {
-                    Optional<String> converted = ConversionService.SHARED.convert(o, String.class);
+                    Optional<String> converted = new DefaultConversionService().convert(o, String.class);
                     converted.ifPresent(builder::append);
                 }
             }

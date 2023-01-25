@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.convert.format.MapFormat;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.naming.NameUtils;
@@ -105,7 +106,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * Creates a new, initially empty, {@link PropertySourcePropertyResolver}.
      */
     public PropertySourcePropertyResolver() {
-        this(ConversionService.SHARED);
+        this(new DefaultConversionService());
     }
 
     /**
@@ -114,7 +115,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * @param propertySources The {@link PropertySource} instances
      */
     public PropertySourcePropertyResolver(PropertySource... propertySources) {
-        this(ConversionService.SHARED);
+        this(new DefaultConversionService());
         if (propertySources != null) {
             for (PropertySource propertySource : propertySources) {
                 addPropertySource(propertySource);

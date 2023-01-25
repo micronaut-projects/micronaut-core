@@ -18,6 +18,7 @@ package io.micronaut.core.value;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.util.StringUtils;
 
 import java.util.Collection;
@@ -41,7 +42,7 @@ public class MapPropertyResolver implements PropertyResolver {
      */
     public MapPropertyResolver(Map<String, Object> map) {
         this.map = map;
-        this.conversionService = ConversionService.SHARED;
+        this.conversionService = new DefaultConversionService();
     }
 
     /**

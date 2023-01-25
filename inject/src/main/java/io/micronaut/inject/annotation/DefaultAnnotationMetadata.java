@@ -25,6 +25,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
@@ -92,6 +93,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     private final boolean hasPropertyExpressions;
     // This should be removed in the next major version
     private final boolean useRepeatableDefaults;
+    private final ConversionService<?> conversionService = new DefaultConversionService();
 
     /**
      * Constructs empty annotation metadata.
@@ -441,7 +443,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         } else if (rawValue instanceof Class) {
             return Optional.of((Class) rawValue);
         } else if (rawValue != null) {
-            return ConversionService.SHARED.convert(rawValue, Class.class);
+            return conversionService.convert(rawValue, Class.class);
         }
         return Optional.empty();
     }
@@ -941,7 +943,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                     if (valueMapper != null) {
                         rawValue = valueMapper.apply(rawValue);
                     }
-                    resolved = ConversionService.SHARED.convert(
+                    resolved = conversionService.convert(
                             rawValue, requiredType
                     );
                 }
@@ -953,7 +955,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                         if (valueMapper != null) {
                             rawValue = valueMapper.apply(rawValue);
                         }
-                        resolved = ConversionService.SHARED.convert(
+                        resolved = conversionService.convert(
                                 rawValue, requiredType
                         );
                     }
@@ -981,7 +983,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             if (requiredType.isInstance(v)) {
                 return (Optional<T>) Optional.of(v);
             } else {
-                return ConversionService.SHARED.convert(v, requiredType);
+                return conversionService.convert(v, requiredType);
             }
         }
         return Optional.empty();
@@ -1394,7 +1396,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         // Note this method should never reference the "annotationDefaultValues" field, which is used only at compile time
         Map<String, Object> defaultValues = getDefaultValues(annotation);
         if (defaultValues.containsKey(member)) {
-            return ConversionService.SHARED.convert(defaultValues.get(member), requiredType);
+            return conversionService.convert(defaultValues.get(member), requiredType);
         }
         return Optional.empty();
     }

@@ -18,6 +18,7 @@ package io.micronaut.core.convert.value;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -44,7 +45,7 @@ public class ConvertibleValuesMap<V> implements ConvertibleValues<V> {
      * Constructor.
      */
     public ConvertibleValuesMap() {
-        this(new LinkedHashMap<>(), ConversionService.SHARED);
+        this(new LinkedHashMap<>(), new DefaultConversionService());
     }
 
     /**
@@ -52,7 +53,7 @@ public class ConvertibleValuesMap<V> implements ConvertibleValues<V> {
      * @param map map of values.
      */
     public ConvertibleValuesMap(Map<? extends CharSequence, V> map) {
-        this(map, ConversionService.SHARED);
+        this(map, new DefaultConversionService());
     }
 
     /**
