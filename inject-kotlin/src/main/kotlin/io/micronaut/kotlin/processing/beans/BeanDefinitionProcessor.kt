@@ -29,6 +29,7 @@ import io.micronaut.inject.visitor.VisitorConfiguration
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.kotlin.processing.KotlinOutputVisitor
+import io.micronaut.kotlin.processing.unwrap
 import io.micronaut.kotlin.processing.visitor.KotlinClassElement
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 import java.io.IOException
@@ -60,7 +61,11 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
             }
             .toList()
 
-        processClassDeclarations(elements, visitorContext)
+        try {
+            processClassDeclarations(elements, visitorContext)
+        } catch (e: ProcessingException) {
+            handleProcessingException(environment, e)
+        }
         return emptyList()
     }
 
@@ -100,10 +105,31 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
                 }
             }
         } catch (e: ProcessingException) {
-            environment.logger.error(e.message!!, e.originatingElement as KSNode)
+            handleProcessingException(environment, e)
         } finally {
             AbstractAnnotationMetadataBuilder.clearMutated()
             beanDefinitionMap.clear()
+        }
+    }
+
+
+
+    companion object Helper {
+        fun handleProcessingException(environment: SymbolProcessorEnvironment, e: ProcessingException) {
+            val message = e.message
+            val originatingNode = (e.originatingElement as KSNode).unwrap()
+            if (message != null) {
+                environment.logger.error("Originating element: $originatingNode")
+                environment.logger.error(message, originatingNode)
+            } else {
+                environment.logger.error("Unknown error processing element", originatingNode)
+                val cause = e.cause
+                if (cause != null) {
+                    environment.logger.exception(cause)
+                } else {
+                    environment.logger.exception(e)
+                }
+            }
         }
     }
 

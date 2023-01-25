@@ -33,6 +33,7 @@ import io.micronaut.inject.ast.*
 import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
+import io.micronaut.kotlin.processing.beans.BeanDefinitionProcessor
 import java.util.*
 
 open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnvironment): SymbolProcessor {
@@ -105,18 +106,7 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
                             try {
                                 typeElement.accept(ElementVisitor(loadedVisitor, typeElement), className)
                             } catch (e: ProcessingException) {
-                                val message = e.message
-                                if (message != null) {
-                                    environment.logger.error(message, e.originatingElement as KSNode)
-                                } else {
-                                    environment.logger.error("Unknown error processing element", e.originatingElement as KSNode)
-                                    val cause = e.cause
-                                    if (cause != null) {
-                                        environment.logger.exception(cause)
-                                    } else {
-                                        environment.logger.exception(e)
-                                    }
-                                }
+                                BeanDefinitionProcessor.handleProcessingException(environment, e)
                             }
                         }
                     }
@@ -130,6 +120,8 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
         for (loadedVisitor in loadedVisitors) {
             try {
                 loadedVisitor.visitor.finish(visitorContext)
+            } catch (e: ProcessingException) {
+                BeanDefinitionProcessor.handleProcessingException(environment, e)
             } catch (e: Throwable) {
                 environment.logger.error("Error finalizing type visitor  [${loadedVisitor.visitor}]: ${e.message}")
             }
