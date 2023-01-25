@@ -16,6 +16,29 @@ import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class ConfigPropertiesParseSpec extends Specification {
 
+    void "test default as a property name"() {
+        given:
+
+        def config = ['foo.bar.host': 'test', 'foo.bar.default': true]
+        def context = buildContext('''
+package test
+
+import io.micronaut.context.annotation.*
+
+@ConfigurationProperties("foo.bar")
+data class DefaultConfigTest(val host : String, val default: Boolean )
+''', false, config)
+
+        def bean = getBean(context, 'test.DefaultConfigTest')
+
+        expect:
+        bean.host == 'test'
+        bean.default
+
+        cleanup:
+        context.close()
+    }
+
     void "test data classes that are configuration properties inject values"() {
         given:
 
