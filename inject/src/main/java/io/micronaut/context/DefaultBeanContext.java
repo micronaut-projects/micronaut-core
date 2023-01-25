@@ -3335,6 +3335,9 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
         reference:
         for (BeanDefinitionProducer beanDefinitionProducer : producers) {
+            if (beanDefinitionProducer.isDisabled()) {
+                continue;
+            }
             BeanDefinitionReference beanDefinitionReference = beanDefinitionProducer.reference;
             for (BeanConfiguration disableConfiguration : configurationsDisabled) {
                 if (disableConfiguration.isWithin(beanDefinitionReference)) {
