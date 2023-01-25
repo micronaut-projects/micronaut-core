@@ -186,9 +186,8 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         }
         if (annotationMetadata instanceof DefaultAnnotationMetadata) {
             this.annotationMetadata = annotationMetadata;
-        } else if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
-            final AnnotationMetadataHierarchy hierarchy = (AnnotationMetadataHierarchy) annotationMetadata;
-            this.annotationMetadata = hierarchy.getDeclaredMetadata();
+        } else if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
+            this.annotationMetadata = annotationMetadataHierarchy.getDeclaredMetadata();
         } else {
             throw new ClassGenerationException("Compile time metadata required to generate class: " + className);
         }
@@ -251,7 +250,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     }
 
     /**
-     * Writes out the byte code necessary to instantiate the given {@link DefaultAnnotationMetadata}.
+     * Writes out the byte code necessary to instantiate the given {@link MutableAnnotationMetadata}.
      *
      * @param owningType           The owning type
      * @param declaringClassWriter The declaring class writer
@@ -262,7 +261,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
      */
     @Internal
     @UsedByGeneratedCode
-    public static void instantiateNewMetadata(Type owningType, ClassWriter declaringClassWriter, GeneratorAdapter generatorAdapter, DefaultAnnotationMetadata annotationMetadata, Map<String, Integer> defaultsStorage, Map<String, GeneratorAdapter> loadTypeMethods) {
+    public static void instantiateNewMetadata(Type owningType, ClassWriter declaringClassWriter, GeneratorAdapter generatorAdapter, MutableAnnotationMetadata annotationMetadata, Map<String, Integer> defaultsStorage, Map<String, GeneratorAdapter> loadTypeMethods) {
         instantiateInternal(owningType, declaringClassWriter, generatorAdapter, annotationMetadata, true, defaultsStorage, loadTypeMethods);
     }
 
@@ -338,12 +337,12 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         if (annotationMetadata.isEmpty()) {
             generatorAdapter.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
-        } else if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+        } else if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
             instantiateNewMetadata(
                     owningType,
                     classWriter,
                     generatorAdapter,
-                    (DefaultAnnotationMetadata) annotationMetadata,
+                    mutableAnnotationMetadata,
                     defaultsStorage,
                     loadTypeMethods
             );
@@ -355,7 +354,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     }
 
     /**
-     * Writes out the byte code necessary to instantiate the given {@link DefaultAnnotationMetadata}.
+     * Writes out the byte code necessary to instantiate the given {@link MutableAnnotationMetadata}.
      *
      * @param annotationMetadata The annotation metadata
      * @param classWriter        The class writer
@@ -364,7 +363,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
      * @param loadTypeMethods    The generated load type methods
      */
     @Internal
-    public static void writeAnnotationDefaults(DefaultAnnotationMetadata annotationMetadata, ClassWriter classWriter, Type owningType, Map<String, Integer> defaultsStorage, Map<String, GeneratorAdapter> loadTypeMethods) {
+    public static void writeAnnotationDefaults(MutableAnnotationMetadata annotationMetadata, ClassWriter classWriter, Type owningType, Map<String, Integer> defaultsStorage, Map<String, GeneratorAdapter> loadTypeMethods) {
         final Map<String, Map<CharSequence, Object>> annotationDefaultValues = annotationMetadata.annotationDefaultValues;
         if (CollectionUtils.isNotEmpty(annotationDefaultValues)) {
 
@@ -394,10 +393,10 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             Type owningType,
             ClassWriter classWriter,
             GeneratorAdapter staticInit,
-            DefaultAnnotationMetadata annotationMetadata,
+            MutableAnnotationMetadata annotationMetadata,
             Map<String, Integer> defaultsStorage,
             Map<String, GeneratorAdapter> loadTypeMethods) {
-        final Map<String, Map<CharSequence, Object>> annotationDefaultValues = annotationMetadata.annotationDefaultValues;
+            final Map<String, Map<CharSequence, Object>> annotationDefaultValues = annotationMetadata.annotationDefaultValues;
         if (CollectionUtils.isNotEmpty(annotationDefaultValues)) {
             for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationDefaultValues.entrySet()) {
                 final Map<CharSequence, Object> annotationValues = entry.getValue();
@@ -453,7 +452,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             Type owningType,
             ClassWriter declaringClassWriter,
             GeneratorAdapter generatorAdapter,
-            DefaultAnnotationMetadata annotationMetadata,
+            MutableAnnotationMetadata annotationMetadata,
             boolean isNew,
             Map<String, Integer> defaultsStorage,
             Map<String, GeneratorAdapter> loadTypeMethods) {
@@ -494,7 +493,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         startClass(classWriter, getInternalName(className), TYPE_DEFAULT_ANNOTATION_METADATA);
 
         GeneratorAdapter constructor = startConstructor(classWriter);
-        DefaultAnnotationMetadata annotationMetadata = (DefaultAnnotationMetadata) this.annotationMetadata;
+        MutableAnnotationMetadata annotationMetadata = (MutableAnnotationMetadata) this.annotationMetadata;
 
         Map<String, Integer> defaultsStorage = new HashMap<>(3);
         final HashMap<String, GeneratorAdapter> loadTypeMethods = new HashMap<>(5);

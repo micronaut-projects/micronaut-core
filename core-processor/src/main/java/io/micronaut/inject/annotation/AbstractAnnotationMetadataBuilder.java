@@ -54,6 +54,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -75,22 +76,21 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     private static final Map<String, String> DEPRECATED_ANNOTATION_NAMES = Collections.emptyMap();
     private static final Map<String, List<AnnotationMapper<?>>> ANNOTATION_MAPPERS = new HashMap<>(10);
-    private static final Map<String, List<AnnotationTransformer<Annotation>>> ANNOTATION_TRANSFORMERS = new HashMap<>(5);
+    private static final Map<String, List<AnnotationTransformer<?>>> ANNOTATION_TRANSFORMERS = new HashMap<>(5);
     private static final Map<String, List<AnnotationRemapper>> ANNOTATION_REMAPPERS = new HashMap<>(5);
     private static final Map<MetadataKey<?>, CachedAnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>(100);
     private static final Map<String, Set<String>> NON_BINDING_CACHE = new HashMap<>(50);
     private static final Map<String, Map<CharSequence, Object>> ANNOTATION_DEFAULTS = new HashMap<>(20);
-    private static final String MSG_UNRECOGNIZED_ANNOTATION_METADATA = "Unrecognized annotation metadata: ";
 
     static {
-        for (AnnotationMapper mapper : SoftServiceLoader.load(AnnotationMapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader())
+        for (AnnotationMapper<?> mapper : SoftServiceLoader.load(AnnotationMapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader())
                 .disableFork().collectAll()) {
             try {
                 String name = null;
-                if (mapper instanceof TypedAnnotationMapper) {
-                    name = ((TypedAnnotationMapper) mapper).annotationType().getName();
-                } else if (mapper instanceof NamedAnnotationMapper) {
-                    name = ((NamedAnnotationMapper) mapper).getName();
+                if (mapper instanceof TypedAnnotationMapper<?> typedAnnotationMapper) {
+                    name = typedAnnotationMapper.annotationType().getName();
+                } else if (mapper instanceof NamedAnnotationMapper namedAnnotationMapper) {
+                    name = namedAnnotationMapper.getName();
                 }
                 if (StringUtils.isNotEmpty(name)) {
                     ANNOTATION_MAPPERS.computeIfAbsent(name, s -> new ArrayList<>(2)).add(mapper);
@@ -100,14 +100,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
         }
 
-        for (AnnotationTransformer transformer : SoftServiceLoader.load(AnnotationTransformer.class, AbstractAnnotationMetadataBuilder.class.getClassLoader())
+        for (AnnotationTransformer<?> transformer : SoftServiceLoader.load(AnnotationTransformer.class, AbstractAnnotationMetadataBuilder.class.getClassLoader())
                 .disableFork().collectAll()) {
             try {
                 String name = null;
-                if (transformer instanceof TypedAnnotationTransformer) {
-                    name = ((TypedAnnotationTransformer) transformer).annotationType().getName();
-                } else if (transformer instanceof NamedAnnotationTransformer) {
-                    name = ((NamedAnnotationTransformer) transformer).getName();
+                if (transformer instanceof TypedAnnotationTransformer<?> typedAnnotationTransformer) {
+                    name = typedAnnotationTransformer.annotationType().getName();
+                } else if (transformer instanceof NamedAnnotationTransformer namedAnnotationTransformer) {
+                    name = namedAnnotationTransformer.getName();
                 }
                 if (StringUtils.isNotEmpty(name)) {
                     ANNOTATION_TRANSFORMERS.computeIfAbsent(name, s -> new ArrayList<>(2)).add(transformer);
@@ -1519,33 +1519,17 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @param <A2>               The annotation type
      * @return The mutated metadata
      */
-    public <A2 extends Annotation> AnnotationMetadata annotate(AnnotationMetadata annotationMetadata,
-                                                               AnnotationValue<A2> annotationValue) {
-        final boolean isReference = annotationMetadata instanceof AnnotationMetadataReference;
-        boolean isReferenceOrEmpty = annotationMetadata == AnnotationMetadata.EMPTY_METADATA || isReference;
-        if (annotationMetadata instanceof MutableAnnotationMetadata || isReferenceOrEmpty) {
-            final MutableAnnotationMetadata mutableAnnotationMetadata = isReferenceOrEmpty
-                    ? new MutableAnnotationMetadata()
-                    : (MutableAnnotationMetadata) annotationMetadata;
-
+    @NonNull
+    public <A2 extends Annotation> AnnotationMetadata annotate(@NonNull AnnotationMetadata annotationMetadata,
+                                                               @NonNull AnnotationValue<A2> annotationValue) {
+        return modify(annotationMetadata, metadata -> {
             addAnnotations(
-                    mutableAnnotationMetadata,
+                    metadata,
                     Stream.of(toProcessedAnnotation(annotationValue)),
                     true,
                     Collections.emptyList()
             );
-
-            if (isReference) {
-                AnnotationMetadataReference ref = (AnnotationMetadataReference) annotationMetadata;
-                return new AnnotationMetadataHierarchy(ref, mutableAnnotationMetadata);
-            } else {
-                return mutableAnnotationMetadata;
-            }
-        } else if (annotationMetadata instanceof AnnotationMetadataHierarchy hierarchy) {
-            AnnotationMetadata declaredMetadata = annotate(hierarchy.getDeclaredMetadata(), annotationValue);
-            return hierarchy.createSibling(declaredMetadata);
-        }
-        throw new IllegalStateException(MSG_UNRECOGNIZED_ANNOTATION_METADATA + annotationMetadata);
+        });
     }
 
     /**
@@ -1556,38 +1540,22 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The updated metadata
      * @since 3.0.0
      */
-    public AnnotationMetadata removeAnnotation(AnnotationMetadata annotationMetadata, String annotationType) {
-        if (annotationMetadata.isEmpty()) {
-            return annotationMetadata;
-        }
-        // we only care if the metadata is an hierarchy or default mutable
-        final boolean isHierarchy = annotationMetadata instanceof AnnotationMetadataHierarchy;
-        AnnotationMetadata declaredMetadata = annotationMetadata;
-        if (isHierarchy) {
-            declaredMetadata = annotationMetadata.getDeclaredMetadata();
-        }
-        // if it is anything else other than DefaultAnnotationMetadata here it is probably empty
-        // in which case nothing needs to be done
-        if (declaredMetadata instanceof DefaultAnnotationMetadata defaultMetadata) {
+    @NonNull
+    public AnnotationMetadata removeAnnotation(@NonNull AnnotationMetadata annotationMetadata,
+                                               @NonNull String annotationType) {
+        return modify(annotationMetadata, metadata -> {
             T annotationMirror = getAnnotationMirror(annotationType).orElse(null);
             if (annotationMirror != null) {
                 String repeatableName = getRepeatableNameForType(annotationMirror);
                 if (repeatableName != null) {
-                    defaultMetadata.removeAnnotation(repeatableName);
+                    metadata.removeAnnotation(repeatableName);
                 } else {
-                    defaultMetadata.removeAnnotation(annotationType);
+                    metadata.removeAnnotation(annotationType);
                 }
             } else {
-                defaultMetadata.removeAnnotation(annotationType);
+                metadata.removeAnnotation(annotationType);
             }
-
-            if (isHierarchy) {
-                return ((AnnotationMetadataHierarchy) annotationMetadata).createSibling(declaredMetadata);
-            }
-            return declaredMetadata;
-        } else {
-            throw new IllegalStateException(MSG_UNRECOGNIZED_ANNOTATION_METADATA + annotationMetadata);
-        }
+        });
     }
 
     /**
@@ -1598,36 +1566,22 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The updated metadata
      * @since 3.0.0
      */
-    public AnnotationMetadata removeStereotype(AnnotationMetadata annotationMetadata, String annotationType) {
-        if (annotationMetadata.isEmpty()) {
-            return annotationMetadata;
-        }
-        // we only care if the metadata is an hierarchy or default mutable
-        final boolean isHierarchy = annotationMetadata instanceof AnnotationMetadataHierarchy;
-        AnnotationMetadata declaredMetadata = annotationMetadata;
-        if (isHierarchy) {
-            declaredMetadata = annotationMetadata.getDeclaredMetadata();
-        }
-        // if it is anything else other than DefaultAnnotationMetadata here it is probably empty
-        // in which case nothing needs to be done
-        if (declaredMetadata instanceof DefaultAnnotationMetadata defaultMetadata) {
+    @NonNull
+    public AnnotationMetadata removeStereotype(@NonNull AnnotationMetadata annotationMetadata,
+                                               @NonNull String annotationType) {
+        return modify(annotationMetadata, metadata -> {
             T annotationMirror = getAnnotationMirror(annotationType).orElse(null);
             if (annotationMirror != null) {
                 String repeatableName = getRepeatableNameForType(annotationMirror);
                 if (repeatableName != null) {
-                    defaultMetadata.removeStereotype(repeatableName);
+                    metadata.removeStereotype(repeatableName);
                 } else {
-                    defaultMetadata.removeStereotype(annotationType);
+                    metadata.removeStereotype(annotationType);
                 }
             } else {
-                defaultMetadata.removeStereotype(annotationType);
+                metadata.removeStereotype(annotationType);
             }
-            if (isHierarchy) {
-                return ((AnnotationMetadataHierarchy) annotationMetadata).createSibling(declaredMetadata);
-            }
-            return declaredMetadata;
-        }
-        throw new IllegalStateException(MSG_UNRECOGNIZED_ANNOTATION_METADATA + annotationMetadata);
+        });
     }
 
     /**
@@ -1638,28 +1592,33 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @param <T1>               The annotation type
      * @return The potentially modified metadata
      */
-    public @NonNull <T1 extends Annotation> AnnotationMetadata removeAnnotationIf(
-            @NonNull AnnotationMetadata annotationMetadata,
-            @NonNull Predicate<AnnotationValue<T1>> predicate) {
-        if (annotationMetadata.isEmpty()) {
-            return annotationMetadata;
-        }
-        // we only care if the metadata is an hierarchy or default mutable
+    @NonNull
+    public <T1 extends Annotation> AnnotationMetadata removeAnnotationIf(@NonNull AnnotationMetadata annotationMetadata,
+                                                                         @NonNull Predicate<AnnotationValue<T1>> predicate) {
+        return modify(annotationMetadata, metadata -> metadata.removeAnnotationIf(predicate));
+    }
+
+    private AnnotationMetadata modify(AnnotationMetadata annotationMetadata, Consumer<MutableAnnotationMetadata> consumer) {
         final boolean isHierarchy = annotationMetadata instanceof AnnotationMetadataHierarchy;
         AnnotationMetadata declaredMetadata = annotationMetadata;
         if (isHierarchy) {
             declaredMetadata = annotationMetadata.getDeclaredMetadata();
         }
-        // if it is anything else other than DefaultAnnotationMetadata here it is probably empty
-        // in which case nothing needs to be done
-        if (declaredMetadata instanceof DefaultAnnotationMetadata defaultMetadata) {
-            defaultMetadata.removeAnnotationIf(predicate);
-            if (isHierarchy) {
-                return ((AnnotationMetadataHierarchy) annotationMetadata).createSibling(declaredMetadata);
-            }
-            return declaredMetadata;
+        MutableAnnotationMetadata mutableAnnotationMetadata;
+        if (declaredMetadata == AnnotationMetadata.EMPTY_METADATA) {
+            mutableAnnotationMetadata = new MutableAnnotationMetadata();
+        } else if (declaredMetadata instanceof MutableAnnotationMetadata mutable) {
+            mutableAnnotationMetadata = mutable;
+        } else if (declaredMetadata instanceof DefaultAnnotationMetadata) {
+            mutableAnnotationMetadata = MutableAnnotationMetadata.of(declaredMetadata);
+        } else {
+            throw new IllegalStateException("Unrecognized annotation metadata: " + annotationMetadata);
         }
-        throw new IllegalStateException(MSG_UNRECOGNIZED_ANNOTATION_METADATA + annotationMetadata);
+        consumer.accept(mutableAnnotationMetadata);
+        if (isHierarchy) {
+            return ((AnnotationMetadataHierarchy) annotationMetadata).createSibling(mutableAnnotationMetadata);
+        }
+        return mutableAnnotationMetadata;
     }
 
     /**

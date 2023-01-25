@@ -30,7 +30,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementQuery;
@@ -202,7 +202,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Map<String, ClassElement> typeArguments) {
 
-        DefaultAnnotationMetadata.contributeDefaults(
+        MutableAnnotationMetadata.contributeDefaults(
                 this.annotationMetadata,
                 annotationMetadata
         );
@@ -919,24 +919,23 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         if (annotationMetadata.isEmpty()) {
             staticInit.push((String) null);
-        } else if (annotationMetadata instanceof AnnotationMetadataReference) {
-            AnnotationMetadataReference reference = (AnnotationMetadataReference) annotationMetadata;
-            String className = reference.getClassName();
+        } else if (annotationMetadata instanceof AnnotationMetadataReference annotationMetadataReference) {
+            String className = annotationMetadataReference.getClassName();
             staticInit.getStatic(getTypeReferenceForName(className), FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
-        } else if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
+        } else if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
             AnnotationMetadataWriter.instantiateNewMetadataHierarchy(
                     introspectionType,
                     classWriter,
                     staticInit,
-                    (AnnotationMetadataHierarchy) annotationMetadata,
+                    annotationMetadataHierarchy,
                     defaults,
                     loadTypeMethods);
-        } else if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+        } else if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
             AnnotationMetadataWriter.instantiateNewMetadata(
                     introspectionType,
                     classWriter,
                     staticInit,
-                    (DefaultAnnotationMetadata) annotationMetadata,
+                    mutableAnnotationMetadata,
                     defaults,
                     loadTypeMethods);
         } else {

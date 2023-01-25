@@ -18,12 +18,17 @@ package io.micronaut.inject.visitor.util;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import javax.annotation.processing.ProcessingEnvironment;
-import java.util.*;
+import java.util.AbstractMap;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -88,7 +93,7 @@ public class VisitorContextUtils {
 
     private static void contributeRepeatable(AnnotationMetadata target, ClassElement classElement, Set<ClassElement> alreadySeen) {
         alreadySeen.add(classElement);
-        DefaultAnnotationMetadata.contributeRepeatable(target, classElement.getAnnotationMetadata());
+        MutableAnnotationMetadata.contributeRepeatable(target, classElement.getAnnotationMetadata());
         for (ClassElement element : classElement.getTypeArguments().values()) {
             if (alreadySeen.contains(classElement)) {
                 continue;

@@ -15,15 +15,15 @@
  */
 package io.micronaut.inject.writer;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.AbstractExecutableMethod;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -40,7 +40,12 @@ import org.objectweb.asm.commons.Method;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
 
 /**
  * Writes out {@link io.micronaut.inject.ExecutableMethod} implementations.
@@ -271,7 +276,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
             );
 
             for (ParameterElement pe : argumentTypes) {
-                DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, pe.getAnnotationMetadata());
+                MutableAnnotationMetadata.contributeDefaults(this.annotationMetadata, pe.getAnnotationMetadata());
                 VisitorContextUtils.contributeRepeatable(this.annotationMetadata, pe.getGenericType());
             }
             // now invoke super(..) if no arg constructor
