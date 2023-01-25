@@ -43,16 +43,46 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
                         @NonNull WildcardType wildcardType,
                         @NonNull List<JavaClassElement> upperBounds,
                         @NonNull List<JavaClassElement> lowerBounds) {
+        this(
+                elementAnnotationMetadataFactory,
+                wildcardType,
+                findUpperType(upperBounds, lowerBounds),
+                upperBounds,
+                lowerBounds
+        );
+    }
+
+    JavaWildcardElement(ElementAnnotationMetadataFactory elementAnnotationMetadataFactory,
+                        @NonNull WildcardType wildcardType,
+                        @NonNull JavaClassElement mostUpper,
+                        @NonNull List<JavaClassElement> upperBounds,
+                        @NonNull List<JavaClassElement> lowerBounds) {
         super(
-            upperBounds.get(0).classElement,
-            elementAnnotationMetadataFactory,
-            upperBounds.get(0).visitorContext,
-            upperBounds.get(0).typeArguments,
-            upperBounds.get(0).getGenericTypeInfo()
+                mostUpper.classElement,
+                elementAnnotationMetadataFactory,
+                mostUpper.visitorContext,
+                mostUpper.typeArguments,
+                mostUpper.getGenericTypeInfo()
         );
         this.wildcardType = wildcardType;
         this.upperBounds = upperBounds;
         this.lowerBounds = lowerBounds;
+    }
+
+    @NonNull
+    private static JavaClassElement findUpperType(List<JavaClassElement> upperBounds, List<JavaClassElement> lowerBounds) {
+        JavaClassElement upper = null;
+        for (JavaClassElement lowerBound : lowerBounds) {
+            if (upper == null || lowerBound.isAssignable(upper)) {
+                upper = lowerBound;
+            }
+        }
+        for (JavaClassElement upperBound : upperBounds) {
+            if (upper == null || upperBound.isAssignable(upper)) {
+                upper = upperBound;
+            }
+        }
+        return upper;
     }
 
     @Override
@@ -95,9 +125,9 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
                 throw new UnsupportedOperationException("Cannot convert wildcard / free type variable to JavaClassElement");
             } else {
                 return (JavaClassElement) ((ArrayableClassElement) visitorContext.getClassElement(element.getName(), elementAnnotationMetadataFactory)
-                    .orElseThrow(() -> new UnsupportedOperationException("Cannot convert ClassElement to JavaClassElement, class was not found on the visitor context")))
-                    .withArrayDimensions(element.getArrayDimensions())
-                    .withBoundGenericTypes(element.getBoundGenericTypes());
+                        .orElseThrow(() -> new UnsupportedOperationException("Cannot convert ClassElement to JavaClassElement, class was not found on the visitor context")))
+                        .withArrayDimensions(element.getArrayDimensions())
+                        .withBoundGenericTypes(element.getBoundGenericTypes());
             }
         }
     }
