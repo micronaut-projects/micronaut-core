@@ -558,10 +558,13 @@ class FilterRunnerSpec extends Specification {
     def 'async filter'() {
         given:
         def events = []
-        def testExc = new Exception("Test exception")
         List<GenericHttpFilter> filters = [
+                before(ReturnType.of(void)) {
+                    events.add("before1 " + Thread.currentThread().name)
+                    null
+                },
                 new GenericHttpFilter.Async(before(ReturnType.of(void)) {
-                    events.add("before " + Thread.currentThread().name)
+                    events.add("before2 " + Thread.currentThread().name)
                     null
                 }, Executors.newCachedThreadPool(new ThreadFactory() {
                     @Override
@@ -569,8 +572,16 @@ class FilterRunnerSpec extends Specification {
                         return new Thread(r, "thread-before")
                     }
                 })),
+                before(ReturnType.of(void)) {
+                    events.add("before3 " + Thread.currentThread().name)
+                    null
+                },
+                after(ReturnType.of(void)) {
+                    events.add("after1 " + Thread.currentThread().name)
+                    null
+                },
                 new GenericHttpFilter.Async(after(ReturnType.of(void)) {
-                    events.add("after " + Thread.currentThread().name)
+                    events.add("after2 " + Thread.currentThread().name)
                     null
                 }, Executors.newCachedThreadPool(new ThreadFactory() {
                     @Override
@@ -578,6 +589,10 @@ class FilterRunnerSpec extends Specification {
                         return new Thread(r, "thread-after")
                     }
                 })),
+                after(ReturnType.of(void)) {
+                    events.add("after3 " + Thread.currentThread().name)
+                    null
+                },
                 (GenericHttpFilter.Terminal) (req -> {
                     events.add("terminal " + Thread.currentThread().name)
                     ExecutionFlow.just(HttpResponse.ok())
@@ -585,10 +600,15 @@ class FilterRunnerSpec extends Specification {
         ]
 
         when:
-        def response = await(filterRunner(filters).run(HttpRequest.GET("/"))).value
+        def response = await(ExecutionFlow.async(Executors.newCachedThreadPool(new ThreadFactory() {
+            @Override
+            Thread newThread(Runnable r) {
+                return new Thread(r, "thread-outside")
+            }
+        }), () -> filterRunner(filters).run(HttpRequest.GET("/")))).value
         then:
         response.status() == HttpStatus.OK
-        events == ["before thread-before", "terminal thread-before", "after thread-after"]
+        events == ["before1 thread-outside", "before2 thread-before", "before3 thread-before", "terminal thread-before", "after3 thread-before", "after2 thread-after", "after1 thread-after"]
     }
 
     def 'around filter with blocking continuation'() {
