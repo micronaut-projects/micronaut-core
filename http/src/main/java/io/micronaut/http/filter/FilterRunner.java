@@ -78,12 +78,237 @@ public class FilterRunner {
     private static final Predicate<FilterRunner> FILTER_CONDITION_ALWAYS_TRUE = runner -> true;
 
     private final ConversionService conversionService;
+    /**
+     * All filters to run. Request filters are executed in order from first to last, response
+     * filters in the reverse order.
+     */
     private final List<GenericHttpFilter> filters;
 
+    /*
+    To understand how this class works, let's first look at it in an "imperative" simplification.
+    Filter processing basically works like this (somewhat pseudocode):
+
+    ```java
+    // these are local variables
+    int filterIndex = 0;
+    Request request = ...;
+    Response response;
+    Throwable failure;
+    // workRequest
+    while (filterIndex < filters.size()) {
+        filter = filters[filterIndex++];
+        if (filter.isBefore()) {
+            try {
+                ret = filter(request);
+                if (ret instanceof Response) {
+                    response = ret;
+                    // cancel request filters, continue with response processing
+                    break;
+                } else if (ret instanceof Request) {
+                    request = ret;
+                }
+                // continue with request filters
+            } catch(e) {
+                failure = e;
+                // cancel request filters, continue with response processing
+                break;
+            }
+        }
+    }
+    // workResponse
+    for (filterIndex > 0) {
+        filter = filters[--filterIndex];
+        if (filter.isAfter()) {
+            try {
+                ret = filter(request, response, failure);
+                if (ret instanceof Response) {
+                    response = ret;
+                }
+                // continue with response filters
+            } catch(e) {
+                failure = e;
+                // continue with response filters
+            }
+        }
+    }
+    if (failure) {
+        throw failure;
+    } else {
+        return response
+    }
+    ```
+
+    This would work fine if all filters were blocking, there was no support for continuations, and
+    all filters could run on the same thread. But to support these features, we sometimes need to,
+    *within* this method, switch threads, or asynchronously wait for a filter to complete.
+
+    The solution to this is to transform this imperative code into a *coroutine*. A coroutine can
+    be *suspended* at any point, and then *resumed* when the necessary condition is met. To
+    implement the coroutine, I chose the same approach kotlin coroutines take. Let's take a look at
+    just the request loop, first in imperative style, with the breaks replaced by returns to make
+    the next steps easier:
+
+    ```java
+    // these are local variables
+    int filterIndex = 0;
+    Request request = ...;
+    Response response;
+    Throwable failure;
+    // workRequest
+    while (filterIndex < filters.size()) {
+        filter = filters[filterIndex++];
+        if (filter.isBefore()) {
+            try {
+                ret = filter(request); // possible suspension point!
+                if (ret instanceof Response) {
+                    // cancel request filters, continue with response processing
+                    workResponse(filterIndex, ret);
+                    return;
+                } else if (ret instanceof Request) {
+                    request = ret;
+                }
+                // continue with request filters
+            } catch(e) {
+                // cancel request filters, continue with response processing
+                workResponse(filterIndex, e);
+                return;
+            }
+        }
+    }
+    // note: this line is never reached, because the last request filter *always* returns the
+    // final response (it's the "terminal filter")
+    ```
+
+    Now, we want to support suspension in the `filter(request)` call: The call could be
+    asynchronous, so we want to be able to delay further loop execution until it finishes. Let's
+    write it down (just the loop):
+
+    ```java
+    while (filterIndex < filters.size()) {
+        filter = filters[filterIndex++];
+        if (filter.isBefore()) {
+            filter(request).then((ret, e) -> {
+                if (e != null) {
+                    // cancel request filters, continue with response processing
+                    workResponse(filterIndex, e);
+                } else {
+                    if (ret instanceof Response) {
+                        // cancel request filters, continue with response processing
+                        workResponse(filterIndex, ret);
+                    } else {
+                        if (ret instanceof Request) request = ret;
+                        PROCEED;
+                    }
+                }
+            });
+            AWAIT;
+        }
+    }
+    ```
+
+    At AWAIT, the loop should wait until PROCEED is reached (if it is reached at all). Now here's
+    the trick: At AWAIT, we will store all the aspects of the control flow of the loop into fields.
+    At PROCEED, we will continue where we left off by calling the loop again. We need to make sure
+    that all the state of the method (i.e. local variables) are in fields instead, and that the
+    point where we return in AWAIT is the same place in the control flow graph as the start of the
+    method.
+
+    ```java
+    // these are fields now!
+    int filterIndex = 0;
+    Request request = ...;
+    Response response;
+    Throwable failure;
+
+    void workRequest() {
+        while (filterIndex < filters.size()) {
+            filter = filters[filterIndex++];
+            if (filter.isBefore()) {
+                filter(request).then((ret, e) -> {
+                    if (e != null) {
+                        // cancel request filters, continue with response processing
+                        failure = e;
+                        workResponse(); // workResponse can access filterIndex directly now
+                    } else {
+                        if (ret instanceof Response) {
+                            // cancel request filters, continue with response processing
+                            response = ret;
+                            workResponse(); // workResponse can access filterIndex directly now
+                        } else {
+                            if (ret instanceof Request) request = ret;
+                            workRequest(); // PROCEED
+                        }
+                    }
+                });
+                return; // AWAIT
+            }
+        }
+    }
+    ```
+
+    One big advantage of this approach is that suspension is entirely optional. If a filter is not
+    asynchronous, we don't need to suspend, and this code has almost no overhead over the
+    imperative approach we started with. Only advanced filters need this suspension mechanism at
+    all.
+
+    Another benefit is that this allows us to implement asynchronous "around" filters, i.e. filters
+    that intercept both the request and response in one method, using a continuation:
+
+    ```java
+    void myFilter(request, continuation) {
+        // modify request
+        response = continuation.proceed();
+        // modify response
+    }
+    ```
+
+    Inside the proceed call we need to do two things. First, we need to resume execution of
+    workRequest, to run the downstream filters. This is possible with the tools we have already.
+    But we also need to ensure that workResponse only continues to the filterIndex of our filter,
+    and at that point we need to return from proceed(). Then, when myFilter returns, we can run the
+    remaining response filters.
+
+    The way we do this is to register a *SuspensionPoint* for the filter. The SuspensionPoint is
+    basically a CompletableFuture, but with some additional data attached (the filterIndex).
+    continuation.proceed() first kicks off downstream processing (calls workRequest()) and then
+    waits for the SuspensionPoint to complete. When workResponse walks backwards through the
+    filters, it will see the SuspensionPoint, and notify it (complete the CompletableFuture). When
+    myFilter finishes modifying the response, the return handler will then trigger the remaining
+    response filters (call workResponse()).
+
+    The same SuspensionPoint mechanism is also adapted to reactive filters fairly easily. In that
+    case, proceed() returns a publisher that completes when the downstream filters are done. The
+    filter in turn returns a publisher, and once *that* completes, we run the remaining response
+    filters.
+     */
+
     private HttpRequest<?> request;
+    /**
+     * Current response. During {@link #workRequest()} this is null. During {@link #workResponse()},
+     * this field or {@link #failure} must be set (only one or the other may be non-null).
+     */
     private HttpResponse<?> response;
+    /**
+     * Current failure. During {@link #workRequest()} this is null. During {@link #workResponse()},
+     * this field or {@link #response} must be set (only one or the other may be non-null).
+     */
     private Throwable failure;
+    /**
+     * Linked list of suspension points. Each suspension point has a
+     * {@link SuspensionPoint#filterIndex} where it should be completed, and
+     * {@link SuspensionPoint#next a reference} to the next suspension point. This field always
+     * contains the "last" suspension point (the one with the highest filterIndex).
+     * <br>
+     * Initially, this field contains a "root" suspension point that is used to signal when all
+     * filters have completed. An {@link ExecutionFlow} that is linked to it is returned by
+     * {@link #run}.
+     */
     private SuspensionPoint responseSuspensionPoint = new SuspensionPoint(-1, null);
+    /**
+     * Loop index for {@link #workRequest()} and {@link #workResponse()}. This is the index to the
+     * current (or next) filter in {@link #filters}. During {@link #workRequest()} this counts up,
+     * during {@link #workResponse()} this counts down.
+     */
     private int index;
     private boolean responseNeedsProcessing = false;
 
