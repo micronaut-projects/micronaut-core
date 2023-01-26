@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.io.IOUtils;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
@@ -59,6 +60,7 @@ public class TextPlainCodec implements MediaTypeCodec {
 
     private final Charset defaultCharset;
     private final List<MediaType> additionalTypes;
+    private final ConversionService<?> conversionService = new DefaultConversionService();
 
     /**
      * @param defaultCharset      The default charset used for serialization and deserialization
@@ -97,7 +99,7 @@ public class TextPlainCodec implements MediaTypeCodec {
         if (CharSequence.class.isAssignableFrom(type.getType())) {
             return (T) text;
         }
-        return ConversionService.SHARED
+        return conversionService
             .convert(text, type)
             .orElseThrow(() -> new CodecException("Cannot decode byte buffer with value [" + text + "] to type: " + type));
     }
@@ -108,7 +110,7 @@ public class TextPlainCodec implements MediaTypeCodec {
         if (CharSequence.class.isAssignableFrom(type.getType())) {
             return (T) text;
         }
-        return ConversionService.SHARED
+        return conversionService
             .convert(text, type)
             .orElseThrow(() -> new CodecException("Cannot decode bytes with value [" + text + "] to type: " + type));
     }

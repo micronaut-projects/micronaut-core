@@ -21,6 +21,7 @@ import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
@@ -58,12 +59,14 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
     private static final String FALLBACK_NOT_FOUND = "FALLBACK_NOT_FOUND";
 
     private final BeanContext beanContext;
+    private final ConversionService conversionService;
 
     /**
      * @param beanContext The bean context to allow for DI of class annotated with {@link jakarta.inject.Inject}.
      */
     public RecoveryInterceptor(BeanContext beanContext) {
         this.beanContext = beanContext;
+        this.conversionService = new DefaultConversionService();
     }
 
     @Override
@@ -120,7 +123,7 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
                 if (fallbackResult == null) {
                     return Flux.error(new FallbackException("Fallback handler [" + fallbackHandle + "] returned null value"));
                 } else {
-                    return ConversionService.SHARED.convert(fallbackResult, Publisher.class)
+                    return new DefaultConversionService().convert(fallbackResult, Publisher.class)
                         .orElseThrow(() -> new FallbackException("Unsupported Reactive type: " + fallbackResult));
                 }
             }

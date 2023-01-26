@@ -17,6 +17,7 @@ package io.micronaut.function.client.http;
 
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.function.client.FunctionDefinition;
@@ -85,7 +86,7 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
 
             if (Publishers.isConvertibleToPublisher(outputJavaType)) {
                 Publisher publisher = httpClient.retrieve(request, outputType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT));
-                return ConversionService.SHARED.convert(publisher, outputType).orElseThrow(() ->
+                return new DefaultConversionService().convert(publisher, outputType).orElseThrow(() ->
                     new FunctionExecutionException("Unsupported Reactive type: " + outputJavaType)
                 );
             } else if (outputType.isVoid()) {
