@@ -74,7 +74,7 @@ managed-micronaut-cassandra = "5.1.1"
 managed-micronaut-coherence = "3.7.2"
 managed-micronaut-crac = "1.1.1"
 managed-micronaut-data = "3.9.4"
-managed-micronaut-discovery = "3.2.0"
+managed-micronaut-discovery = "3.3.0"
 managed-micronaut-elasticsearch = "4.3.0"
 managed-micronaut-email = "1.5.0"
 managed-micronaut-flyway = "5.4.1"
@@ -154,6 +154,7 @@ boms-micronaut-coherence = { module = "io.micronaut.coherence:micronaut-coherenc
 boms-micronaut-crac = { module = "io.micronaut.crac:micronaut-crac-bom", version.ref = "managed-micronaut-crac" }
 boms-micronaut-email = { module = "io.micronaut.email:micronaut-email-bom", version.ref = "managed-micronaut-email" }
 boms-micronaut-data = { module = "io.micronaut.data:micronaut-data-bom", version.ref = "managed-micronaut-data" }
+boms-micronaut-discovery = { module = "io.micronaut.discovery:micronaut-discovery-client-bom", version.ref = "managed-micronaut-discovery" }
 boms-micronaut-gcp = { module = "io.micronaut.gcp:micronaut-gcp-bom", version.ref = "managed-micronaut-gcp" }
 boms-micronaut-grpc = { module = "io.micronaut.grpc:micronaut-grpc-bom", version.ref = "managed-micronaut-grpc" }
 boms-micronaut-groovy = { module = "io.micronaut.groovy:micronaut-groovy-bom", version.ref = "managed-micronaut-groovy" }
@@ -291,7 +292,6 @@ managed-netty-transport-native-unix-common = { module = "io.netty:netty-transpor
 
 managed-micronaut-acme = { module = "io.micronaut.acme:micronaut-acme", version.ref = "managed-micronaut-acme" }
 managed-micronaut-cassandra = { module = "io.micronaut.cassandra:micronaut-cassandra", version.ref = "managed-micronaut-cassandra" }
-managed-micronaut-discovery = { module = "io.micronaut.discovery:micronaut-discovery-client", version.ref = "managed-micronaut-discovery" }
 managed-micronaut-elasticsearch = { module = "io.micronaut.elasticsearch:micronaut-elasticsearch", version.ref = "managed-micronaut-elasticsearch" }
 managed-micronaut-graphql = { module = "io.micronaut.graphql:micronaut-graphql", version.ref = "managed-micronaut-graphql" }
 managed-micronaut-ignite-core = { module = "io.micronaut.ignite:micronaut-ignite-core", version.ref = "managed-micronaut-ignite" }
