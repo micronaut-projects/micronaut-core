@@ -14,11 +14,23 @@ import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.context.exceptions.ConfigurationException
 import org.slf4j.LoggerFactory
 import spock.lang.Specification
-import spock.lang.Unroll
 
 class LogbackLogLevelConfigurerSpec extends Specification {
 
-    @Unroll
+    void 'test custom config can be applied if no logback.xml exists'() {
+        when:
+        ApplicationContext context = ApplicationContext.run([
+                'logger.config': 'non-existent-config-so-we-fallback.xml',
+                'logger.levels.aaa.bbb.ccc'   : 'ERROR',
+        ])
+
+        then:
+        ((Logger) LoggerFactory.getLogger(CustomConfigurator.LOGGER_NAME)).getLevel() == CustomConfigurator.LOGGER_LEVEL
+
+        cleanup:
+        context.close()
+    }
+
     void 'test that log levels on logger "#loggerName" can be configured via properties'() {
         given:
             def loggerLevels = [
@@ -35,6 +47,9 @@ class LogbackLogLevelConfigurerSpec extends Specification {
 
         then:
             ((Logger) LoggerFactory.getLogger(loggerName)).getLevel() == expectedLevel
+
+        and: 'the custom SPI config is not applied'
+            ((Logger) LoggerFactory.getLogger(CustomConfigurator.LOGGER_NAME)).getLevel() == null
 
         cleanup:
             context.close()
