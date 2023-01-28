@@ -15,24 +15,14 @@
  */
 package io.micronaut.logging.impl;
 
-import java.net.URL;
-import java.util.Objects;
-
-import ch.qos.logback.classic.BasicConfigurator;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.LoggerContext;
-import ch.qos.logback.classic.spi.Configurator;
-import ch.qos.logback.classic.util.ContextInitializer;
-import ch.qos.logback.classic.util.EnvUtil;
-import ch.qos.logback.core.LogbackException;
-import ch.qos.logback.core.joran.spi.JoranException;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.logging.LoggingSystem;
-import io.micronaut.logging.LoggingSystemException;
 import jakarta.inject.Singleton;
 import org.slf4j.LoggerFactory;
 
@@ -64,34 +54,7 @@ public final class LogbackLoggingSystem implements LoggingSystem {
     public void refresh() {
         LoggerContext context = getLoggerContext();
         context.reset();
-        URL resource = getClass().getClassLoader().getResource(logbackXmlLocation);
-
-        try {
-            if (Objects.isNull(resource)) {
-                Configurator configurator = EnvUtil.loadFromServiceLoader(Configurator.class);
-                programmaticConfiguration(context, configurator);
-            } else {
-                new ContextInitializer(context).configureByResource(resource);
-            }
-        } catch (JoranException e) {
-            throw new LoggingSystemException("Error while refreshing Logback", e);
-        }
-    }
-
-    // Taken from ch.qos.logback.classic.util.ContextInitializer#autoConfig
-    private void programmaticConfiguration(LoggerContext context, Configurator configurator) {
-        if (configurator != null) {
-            try {
-                configurator.setContext(context);
-                configurator.configure(context);
-            } catch (Exception e) {
-                throw new LogbackException(String.format("Failed to initialize Configurator: %s using ServiceLoader", configurator.getClass().getCanonicalName()), e);
-            }
-        } else {
-            BasicConfigurator basicConfigurator = new BasicConfigurator();
-            basicConfigurator.setContext(context);
-            basicConfigurator.configure(context);
-        }
+        LogbackUtils.configure(getClass().getClassLoader(), context, logbackXmlLocation);
     }
 
     /**
