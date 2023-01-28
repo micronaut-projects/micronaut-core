@@ -17,6 +17,8 @@ package io.micronaut.core.io;
 
 import io.micronaut.core.annotation.Blocking;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.util.IOExceptionBiFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,15 +51,22 @@ import java.util.stream.Stream;
  */
 @SuppressWarnings("java:S1118")
 public class IOUtils {
+    private static final Logger LOG = LoggerFactory.getLogger(IOUtils.class);
 
     private static final int BUFFER_MAX = 8192;
+    private static final String SCHEME_FILE = "file";
+    private static final String SCHEME_JAR = "jar";
+    private static final String SCHEME_ZIP = "zip";
+
+    private static final String COLON = ":";
 
     /**
      * Iterates over each directory in a JAR or file system.
-     * @param url The URL
-     * @param path The path
+     *
+     * @param url      The URL
+     * @param path     The path
      * @param consumer The consumer
-     *                 @since 3.5.0
+     * @since 3.5.0
      */
     @Blocking
     @SuppressWarnings({"java:S2095", "S1141"})
@@ -71,42 +80,24 @@ public class IOUtils {
 
     /**
      * Iterates over each directory in a JAR or file system.
-     * @param uri The URI
-     * @param path The path
+     *
+     * @param uri      The URI
+     * @param path     The path
      * @param consumer The consumer
      * @since 3.5.0
      */
     @Blocking
     @SuppressWarnings({"java:S2095", "java:S1141", "java:S3776"})
     public static void eachFile(@NonNull URI uri, String path, @NonNull Consumer<Path> consumer) {
-        Path myPath;
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("uri: {} path: {}", uri, path);
+        }
         List<Closeable> toClose = new ArrayList<>();
         try {
-            String scheme = uri.getScheme();
-
-            try {
-                if ("jar".equals(scheme)) {
-                    // try to match FileSystems.newFileSystem(URI) semantics for zipfs here.
-                    // Basically ignores anything after the !/ if it exists, and uses the part
-                    // before as the jar path to extract.
-                    String jarUri = uri.getRawSchemeSpecificPart();
-                    int sep = jarUri.lastIndexOf("!/");
-                    if (sep != -1) {
-                        jarUri = jarUri.substring(0, sep);
-                    }
-                    // now, add the !/ at the end again so that loadNestedJarUri can handle it:
-                    jarUri += "!/";
-                    myPath = loadNestedJarUri(toClose, jarUri).resolve(path);
-                } else if ("file".equals(scheme)) {
-                    myPath = Paths.get(uri).resolve(path);
-                } else {
-                    // graal resource: case
-                    myPath = Paths.get(uri);
-                }
-            } catch (FileSystemNotFoundException e) {
-                myPath = null;
+            Path myPath = resolvePath(uri, path, toClose, IOUtils::loadNestedJarUri);
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("resolve path: {}", myPath);
             }
-
             if (myPath != null) {
                 try (Stream<Path> walk = Files.walk(myPath, 1)) {
                     for (Iterator<Path> it = walk.iterator(); it.hasNext();) {
@@ -127,6 +118,41 @@ public class IOUtils {
                 } catch (IOException ignored) {
                 }
             }
+        }
+    }
+
+    @Nullable
+    static Path resolvePath(@NonNull URI uri,
+                            String path,
+                            List<Closeable> toClose,
+                            IOExceptionBiFunction<List<Closeable>, String, Path> loadNestedJarUriFunction) throws IOException {
+        String scheme = uri.getScheme();
+        try {
+            if (SCHEME_JAR.equals(scheme) || SCHEME_ZIP.equals(scheme)) {
+                // try to match FileSystems.newFileSystem(URI) semantics for zipfs here.
+                // Basically ignores anything after the !/ if it exists, and uses the part
+                // before as the jar path to extract.
+                String jarUri = uri.getRawSchemeSpecificPart();
+                int sep = jarUri.lastIndexOf("!/");
+                if (sep != -1) {
+                    jarUri = jarUri.substring(0, sep);
+                }
+                if (!jarUri.startsWith(SCHEME_FILE + COLON)) {
+                    // Special case WebLogic classloader
+                    // https://github.com/micronaut-projects/micronaut-core/issues/8636
+                    jarUri = SCHEME_FILE + COLON + jarUri;
+                }
+                // now, add the !/ at the end again so that loadNestedJarUri can handle it:
+                jarUri += "!/";
+                return loadNestedJarUriFunction.apply(toClose, jarUri).resolve(path);
+            } else if ("file".equals(scheme)) {
+                return Paths.get(uri).resolve(path);
+            } else {
+                // graal resource: case
+                return Paths.get(uri);
+            }
+        } catch (FileSystemNotFoundException e) {
+            return null;
         }
     }
 

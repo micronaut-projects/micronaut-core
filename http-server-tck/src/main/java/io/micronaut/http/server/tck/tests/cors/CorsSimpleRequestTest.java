@@ -30,6 +30,8 @@ import io.micronaut.http.annotation.Status;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.server.tck.AssertionUtils;
 import io.micronaut.http.server.tck.HttpResponseAssertion;
+import io.micronaut.http.server.tck.RequestSupplier;
+import io.micronaut.http.server.tck.ServerUnderTest;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -69,15 +71,30 @@ public class CorsSimpleRequestTest {
         asserts(SPECNAME,
             Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
             createRequest("https://foo.com"),
-            (server, request) -> {
-                RefreshCounter refreshCounter = server.getApplicationContext().getBean(RefreshCounter.class);
-                assertEquals(0, refreshCounter.getRefreshCount());
-                AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
-                        .status(HttpStatus.FORBIDDEN)
-                        .assertResponse(response -> assertFalse(response.getHeaders().contains("Vary")))
-                    .build());
-                assertEquals(0, refreshCounter.getRefreshCount());
-        });
+            CorsSimpleRequestTest::isForbidden
+        );
+    }
+
+    /**
+     * @see <a href="https://github.com/micronaut-projects/micronaut-core/security/advisories/GHSA-583g-g682-crxf">GHSA-583g-g682-crxf</a>
+     *
+     * A malicious/compromised website can make HTTP requests to 127.0.0.1. Normally, such requests would trigger a CORS preflight check which would prevent the request; however, some requests are "simple" and do not require a preflight check. These endpoints, if enabled and not secured, are vulnerable to being triggered.
+     * Example with Javascript:
+     * <pre>
+     * let url = "http://127.0.0.1:8080/refresh";
+     * let body = new FormData();
+     * body.append("force", "true");
+     * fetch(url, { method: "POST", body });
+     * </pre>
+     * @throws IOException may throw the try for resources
+     */
+    @Test
+    void corsSimpleRequestNotAllowedFor127AndAny() throws IOException {
+        asserts(SPECNAME,
+            Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
+            createRequestFor("127.0.0.1", "https://foo.com"),
+            CorsSimpleRequestTest::isForbidden
+        );
     }
 
     /**
@@ -89,14 +106,50 @@ public class CorsSimpleRequestTest {
         asserts(SPECNAME,
             Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
             createRequest("http://localhost:8000"),
-            (server, request) -> {
-                RefreshCounter refreshCounter = server.getApplicationContext().getBean(RefreshCounter.class);
-                assertEquals(0, refreshCounter.getRefreshCount());
-                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
-                    .status(HttpStatus.OK)
-                    .build());
-                assertEquals(1, refreshCounter.getRefreshCount());
-            });
+            CorsSimpleRequestTest::isSuccessful
+        );
+    }
+
+    /**
+     * A request to localhost with an origin of 127.0.0.1 should be allowed as they are both local.
+     *
+     * @throws IOException
+     */
+    @Test
+    void corsSimpleRequestAllowedForLocalhostAnd127Origin() throws IOException {
+        asserts(SPECNAME,
+            Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
+            createRequestFor("localhost", "http://127.0.0.1:8000"),
+            CorsSimpleRequestTest::isSuccessful
+        );
+    }
+
+    /**
+     * Spoof attempt with origin should fail.
+     *
+     * @throws IOException
+     */
+    @Test
+    void corsSimpleRequestFailsForLocalhostAndSpoofed127Origin() throws IOException {
+        asserts(SPECNAME,
+            Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
+            createRequestFor("localhost", "http://127.0.0.1.hac0r.com:8000"),
+            CorsSimpleRequestTest::isForbidden
+        );
+    }
+
+    /**
+     * A request to 127.0.0.1 with an origin of localhost should succeed as they're both local.
+     *
+     * @throws IOException
+     */
+    @Test
+    void corsSimpleRequestAllowedFor127RequestAndLocalhostOrigin() throws IOException {
+        asserts(SPECNAME,
+            Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
+            createRequestFor("127.0.0.1", "http://localhost:8000"),
+            CorsSimpleRequestTest::isSuccessful
+        );
     }
 
     /**
@@ -131,8 +184,35 @@ public class CorsSimpleRequestTest {
             });
     }
 
+    private RequestSupplier createRequestFor(String host, String origin) {
+        return server -> createRequest(server.getPort().map(p -> "http://" + host + ":" + p + "/refresh").orElseThrow(() -> new RuntimeException("Unknown port for " + server)), origin);
+    }
+
+    static void isForbidden(ServerUnderTest server, HttpRequest<?> request) {
+        RefreshCounter refreshCounter = server.getApplicationContext().getBean(RefreshCounter.class);
+        assertEquals(0, refreshCounter.getRefreshCount());
+        AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+            .status(HttpStatus.FORBIDDEN)
+            .assertResponse(response -> assertFalse(response.getHeaders().contains("Vary")))
+            .build());
+        assertEquals(0, refreshCounter.getRefreshCount());
+    }
+
+    static void isSuccessful(ServerUnderTest server, HttpRequest<?> request) {
+        RefreshCounter refreshCounter = server.getApplicationContext().getBean(RefreshCounter.class);
+        assertEquals(0, refreshCounter.getRefreshCount());
+        AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+            .status(HttpStatus.OK)
+            .build());
+        assertEquals(1, refreshCounter.getRefreshCount());
+    }
+
     static HttpRequest<?> createRequest(String origin) {
-        return HttpRequest.POST("/refresh", MultipartBody.builder().addPart("force", StringUtils.TRUE).build())
+        return createRequest("/refresh", origin);
+    }
+
+    static HttpRequest<?> createRequest(String uri, String origin) {
+        return HttpRequest.POST(uri, MultipartBody.builder().addPart("force", StringUtils.TRUE).build())
             .header("Content-Type", "multipart/form-data; boundary=----WebKitFormBoundarywxiDZy8kMlSE59h1")
             .header("Origin", origin)
             .header("Accept-Encoding", "gzip, deflate")
