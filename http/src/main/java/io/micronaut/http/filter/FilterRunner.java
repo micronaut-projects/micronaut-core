@@ -277,25 +277,24 @@ public class FilterRunner {
             return filterMethodFlow;
         } else if (filter instanceof GenericHttpFilter.AroundLegacy around) {
             FilterChainImpl chainSuspensionPoint = new FilterChainImpl(conversionService, context);
-            chainSuspensionPoint.completeOn = executeOn;
             // Legacy `Publisher<HttpResponse> proceed(..)` filters are always suspended
-            suspended.put(filter, Map.entry(chainSuspensionPoint.filterProcessedFlow(), chainSuspensionPoint));
-
+            suspended.put(around, Map.entry(chainSuspensionPoint.filterProcessedFlow(), chainSuspensionPoint));
+            chainSuspensionPoint.completeOn = executeOn;
             if (executeOn == null) {
                 try {
                     around.bean().doFilter(context.request, chainSuspensionPoint).subscribe(chainSuspensionPoint);
-                    return chainSuspensionPoint.nextFilterFlow().map(x -> x);
                 } catch (Throwable e) {
-                    return chainSuspensionPoint.asFilterProcessed(context, null, e);
+                    chainSuspensionPoint.triggerFilterProcessed(context, null, e);
                 }
+                return chainSuspensionPoint.nextFilterFlow();
             } else {
                 return ExecutionFlow.async(executeOn, () -> {
                     try {
                         around.bean().doFilter(context.request, chainSuspensionPoint).subscribe(chainSuspensionPoint);
-                        return chainSuspensionPoint.nextFilterFlow().map(x -> x);
                     } catch (Throwable e) {
-                        return chainSuspensionPoint.asFilterProcessed(context, null, e);
+                        chainSuspensionPoint.triggerFilterProcessed(context, null, e);
                     }
+                    return chainSuspensionPoint.nextFilterFlow();
                 });
             }
         } else if (filter instanceof GenericHttpFilter.TerminalReactive || filter instanceof GenericHttpFilter.Terminal || filter instanceof GenericHttpFilter.TerminalWithReactorContext) {
@@ -898,7 +897,7 @@ public class FilterRunner {
         /**
          * The filter method completed with a failure.
          */
-        private ExecutionFlow<FilterContext> afterMethodExecuted(@NonNull Throwable throwable) {
+        ExecutionFlow<FilterContext> afterMethodExecuted(@NonNull Throwable throwable) {
             return afterMethodExecuted(null, throwable);
         }
 
@@ -928,22 +927,23 @@ public class FilterRunner {
                                               HttpResponse<?> newResponse,
                                               @Nullable
                                               Throwable newFailure) {
-
-            CompletableFuture<FilterContext> futureToComplete;
-            if (proceedRequested.get()) {
-                futureToComplete = filterProcessed;
-            } else {
-                futureToComplete = nextFilterProcessing;
+            if (proceedRequested.compareAndSet(false, true)) {
+                // Publish the error to the nextFilterProcessing as well
+                if (newFailure == null) {
+                    nextFilterProcessing.complete(newResponse == null ? filterContext : filterContext.withResponse(newResponse));
+                } else {
+                    nextFilterProcessing.completeExceptionally(newFailure);
+                }
             }
             if (newFailure == null) {
-                futureToComplete.complete(newResponse == null ? filterContext : filterContext.withResponse(newResponse));
+                filterProcessed.complete(newResponse == null ? filterContext : filterContext.withResponse(newResponse));
             } else {
-                futureToComplete.completeExceptionally(newFailure);
+                filterProcessed.completeExceptionally(newFailure);
             }
         }
 
         @NotNull
-        final ExecutionFlow<FilterContext> asFilterProcessed(FilterContext filterContext,
+        private final ExecutionFlow<FilterContext> asFilterProcessed(FilterContext filterContext,
                                                              @Nullable
                                                              HttpResponse<?> newResponse,
                                                              @Nullable

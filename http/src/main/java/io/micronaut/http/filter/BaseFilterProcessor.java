@@ -22,7 +22,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Order;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.AntPathMatcher;
 import io.micronaut.core.util.ArrayUtils;
@@ -51,13 +50,11 @@ import java.util.function.Supplier;
  */
 @Internal
 public abstract class BaseFilterProcessor<A extends Annotation> implements ExecutableMethodProcessor<A> {
-    private final ConversionService conversionService;
     private final BeanContext beanContext;
     private final Class<A> filterAnnotation;
 
     public BaseFilterProcessor(BeanContext beanContext, Class<A> filterAnnotation) {
         this.beanContext = beanContext;
-        this.conversionService = beanContext.getConversionService();
         this.filterAnnotation = filterAnnotation;
     }
 
@@ -81,12 +78,12 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
         if (method.isAnnotationPresent(RequestFilter.class)) {
             FilterMetadata methodLevel = metadata(method, RequestFilter.class);
             FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
-            addFilter(() -> withAsync(combined, FilterRunner.prepareFilterMethod(conversionService, beanContext.getBean(beanDefinition), method, false, combined.order)), method, combined);
+            addFilter(() -> withAsync(combined, FilterRunner.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, false, combined.order)), method, combined);
         }
         if (method.isAnnotationPresent(ResponseFilter.class)) {
             FilterMetadata methodLevel = metadata(method, ResponseFilter.class);
             FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
-            addFilter(() -> withAsync(combined, FilterRunner.prepareFilterMethod(conversionService, beanContext.getBean(beanDefinition), method, true, combined.order)), method, combined);
+            addFilter(() -> withAsync(combined, FilterRunner.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, true, combined.order)), method, combined);
         }
     }
 
