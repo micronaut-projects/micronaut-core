@@ -34,6 +34,11 @@ public class CustomConfigurator extends ContextAwareBase implements Configurator
         controllersLogger.setAdditive(false);
         controllersLogger.addAppender(ca);
 
+        Logger configuredLogger = lc.getLogger("i.should.exist");
+        configuredLogger.setLevel(Level.TRACE);
+        configuredLogger.setAdditive(false);
+        configuredLogger.addAppender(ca);
+
         Logger mnLogger = lc.getLogger("io.micronaut.runtime.Micronaut");
         mnLogger.setLevel(Level.INFO);
         mnLogger.setAdditive(false);
