@@ -15,12 +15,10 @@
  */
 package io.micronaut.logging.impl;
 
-import ch.qos.logback.classic.BasicConfigurator;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.Configurator;
 import ch.qos.logback.classic.util.ContextInitializer;
 import ch.qos.logback.classic.util.EnvUtil;
-import ch.qos.logback.core.LogbackException;
 import ch.qos.logback.core.joran.spi.JoranException;
 import ch.qos.logback.core.status.InfoStatus;
 import io.micronaut.core.annotation.NonNull;
@@ -35,7 +33,7 @@ import java.net.URL;
  * @author Sergio del Amo
  * @since 3.8.4
  */
-public class LogbackUtils {
+public final class LogbackUtils {
 
     private LogbackUtils() {
     }
@@ -56,7 +54,6 @@ public class LogbackUtils {
     /**
      * Configures a Logger Context.
      * If resource is not present searches for a custom {@link Configurator} via a service loader.
-     * If no custom configuration, it uses a {@link BasicConfigurator}.
      * if resource is present it configures the context with the resource.
      *
      * @param context  Logger Context
