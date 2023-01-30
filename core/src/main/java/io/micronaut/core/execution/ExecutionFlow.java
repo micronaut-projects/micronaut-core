@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -85,6 +86,9 @@ public interface ExecutionFlow<T> {
         CompletableFuture<T> completableFuture = new CompletableFuture<>();
         executor.execute(() -> supplier.get().onComplete((t, throwable) -> {
             if (throwable != null) {
+                if (throwable instanceof CompletionException completionException) {
+                    throwable = completionException.getCause();
+                }
                 completableFuture.completeExceptionally(throwable);
             } else {
                 completableFuture.complete(t);
@@ -169,6 +173,9 @@ public interface ExecutionFlow<T> {
         CompletableFuture<T> completableFuture = new CompletableFuture<>();
         onComplete((value, throwable) -> {
             if (throwable != null) {
+                if (throwable instanceof CompletionException completionException) {
+                    throwable = completionException.getCause();
+                }
                 CompletableFuture.failedFuture(throwable);
             }
             CompletableFuture.completedFuture(value);

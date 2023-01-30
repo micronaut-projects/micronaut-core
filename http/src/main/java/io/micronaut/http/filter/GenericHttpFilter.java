@@ -43,6 +43,22 @@ public sealed interface GenericHttpFilter
     GenericHttpFilter.Terminal,
     GenericHttpFilter.TerminalReactive,
     GenericHttpFilter.TerminalWithReactorContext {
+
+    /**
+     * When the filter is using the continuation it needs to be suspended and wait for the response.
+     * @return true if suspended
+     */
+    default boolean isSuspended() {
+        return false;
+    }
+
+    /**
+     * @return true if the filter can receive the processing exception.
+     */
+    default boolean isFiltersException() {
+        return false;
+    }
+
     /**
      * Wrapper around a filter that signifies the filter should be run asynchronously on the given
      * executor. Usually from an {@link io.micronaut.scheduling.annotation.ExecuteOn} annotation.
@@ -55,6 +71,17 @@ public sealed interface GenericHttpFilter
         GenericHttpFilter actual,
         Executor executor
     ) implements GenericHttpFilter, Ordered {
+
+        @Override
+        public boolean isSuspended() {
+            return actual.isSuspended();
+        }
+
+        @Override
+        public boolean isFiltersException() {
+            return actual.isFiltersException();
+        }
+
         @Override
         public int getOrder() {
             return ((Ordered) actual).getOrder();
@@ -72,6 +99,19 @@ public sealed interface GenericHttpFilter
         HttpFilter bean,
         FilterOrder order
     ) implements GenericHttpFilter, Ordered {
+
+        @Override
+        public boolean isSuspended() {
+            // Legacy filters are always suspended
+            return true;
+        }
+
+        @Override
+        public boolean isFiltersException() {
+            // Legacy filters can filter the exception using the publisher
+            return false;
+        }
+
         public boolean isEnabled() {
             return !(bean instanceof Toggleable t) || t.isEnabled();
         }
@@ -105,6 +145,7 @@ public sealed interface GenericHttpFilter
      * Last item in a filter chain, called when all other filters are done. Basically, this runs
      * the actual request.
      */
+    @Internal
     @FunctionalInterface
     non-sealed interface Terminal extends GenericHttpFilter {
         ExecutionFlow<? extends HttpResponse<?>> execute(HttpRequest<?> request) throws Exception;

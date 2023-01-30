@@ -84,11 +84,11 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
 
             if (requestFilterAnnotation != null) {
                 // will throw on validation error
-                FilterRunner.prepareFilterMethod(null, null, args, ret, false, null);
+                FilterRunner.validateFilterMethod(args, ret, false);
             }
             if (responseFilterAnnotation != null) {
                 // will throw on validation error
-                FilterRunner.prepareFilterMethod(null, null, args, ret, true, null);
+                FilterRunner.validateFilterMethod(args, ret, true);
             }
         } catch (IllegalArgumentException e) {
             context.fail(e.getMessage(), element);
