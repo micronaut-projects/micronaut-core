@@ -43,7 +43,7 @@ public final class LogbackUtils {
      *
      * @param classLoader        Class Loader
      * @param context            Logger Context
-     * @param logbackXmlLocation Optional logbackXMLLocation
+     * @param logbackXmlLocation the location of the xml logback config file
      */
     public static void configure(@NonNull ClassLoader classLoader,
                                  @NonNull LoggerContext context,
@@ -53,10 +53,12 @@ public final class LogbackUtils {
 
     /**
      * Configures a Logger Context.
-     * If resource is not present searches for a custom {@link Configurator} via a service loader.
-     * if resource is present it configures the context with the resource.
+     *
+     * Searches fpr a custom {@link Configurator} via a service loader.
+     * If not present it configures the context with the resource.
      *
      * @param context  Logger Context
+     * @param logbackXmlLocation the location of the xml logback config file
      * @param resource A resource for example logback.xml
      */
     private static void configure(
@@ -79,7 +81,9 @@ public final class LogbackUtils {
         }
     }
 
-    // Taken from ch.qos.logback.classic.util.ContextInitializer#autoConfig
+    /**
+     * Taken from {@link ch.qos.logback.classic.util.ContextInitializer#autoConfig}.
+     */
     private static void programmaticConfiguration(@NonNull LoggerContext context,
                                                   @NonNull Configurator configurator) {
         try {
