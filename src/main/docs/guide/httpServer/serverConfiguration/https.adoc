@@ -1,3 +1,4 @@
+
 Micronaut supports HTTPS out of the box. By default HTTPS is disabled and all requests are served using HTTP. To enable HTTPS support, modify your configuration. For example with `application.yml`:
 
 .HTTPS Configuration Example
@@ -12,6 +13,15 @@ micronaut:
 <1> Micronaut will create a self-signed certificate.
 
 TIP: By default Micronaut with HTTPS support starts on port `8443` but you can change the port with the property `micronaut.server.ssl.port`.
+
+For generating self-signed certificates, the Micronaut HTTP server will use netty. Netty uses one of two approaches to generate the certificate.
+
+If you use a pre-generated certificate (as you should, for security), these steps are not necessary.
+
+- Netty can use the JDK-internal `sun.security.x509` package. On newer JDK versions, this package is restricted and may not work. You may need to add `--add-exports=java.base/sun.security.x509=ALL-UNNAMED` as a VM parameter.
+- Alternatively, netty will use the Bouncy Castle BCPKIX API. This needs an additional dependency:
+
+dependency:org.bouncycastle:bcpkix-jdk15on[scope="implementation"]
 
 WARNING: This configuration will generate a warning in the browser.
 
