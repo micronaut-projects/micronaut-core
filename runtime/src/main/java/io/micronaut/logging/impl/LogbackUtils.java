@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2022 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,30 +22,35 @@ import ch.qos.logback.classic.util.ContextInitializer;
 import ch.qos.logback.classic.util.EnvUtil;
 import ch.qos.logback.core.LogbackException;
 import ch.qos.logback.core.joran.spi.JoranException;
+import ch.qos.logback.core.status.InfoStatus;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.logging.LoggingSystemException;
 
 import java.net.URL;
-import java.util.Objects;
 
 /**
  * Utility methods to configure {@link LoggerContext}.
+ *
  * @author Sergio del Amo
- * @since 3.8.3
+ * @since 3.8.4
  */
 public class LogbackUtils {
 
+    private LogbackUtils() {
+    }
+
     /**
      * Configures a Logger Context.
-     * @param classLoader Class Loader
-     * @param context Logger Context
+     *
+     * @param classLoader        Class Loader
+     * @param context            Logger Context
      * @param logbackXmlLocation Optional logbackXMLLocation
      */
     public static void configure(@NonNull ClassLoader classLoader,
                                  @NonNull LoggerContext context,
                                  @NonNull String logbackXmlLocation) {
-        configure(context, classLoader.getResource(logbackXmlLocation));
+        configure(context, logbackXmlLocation, classLoader.getResource(logbackXmlLocation));
     }
 
     /**
@@ -54,37 +59,37 @@ public class LogbackUtils {
      * If no custom configuration, it uses a {@link BasicConfigurator}.
      * if resource is present it configures the context with the resource.
      *
-     * @param context Logger Context
+     * @param context  Logger Context
      * @param resource A resource for example logback.xml
      */
-    private static void configure(@NonNull LoggerContext context,
-                                 @Nullable URL resource) {
-        try {
-            if (Objects.isNull(resource)) {
-                Configurator configurator = EnvUtil.loadFromServiceLoader(Configurator.class);
-                programmaticConfiguration(context, configurator);
-            } else {
+    private static void configure(
+        @NonNull LoggerContext context,
+        @NonNull String logbackXmlLocation,
+        @Nullable URL resource
+    ) {
+        Configurator configurator = EnvUtil.loadFromServiceLoader(Configurator.class);
+        if (configurator != null) {
+            context.getStatusManager().add(new InfoStatus("Using " + configurator.getClass().getName(), context));
+            programmaticConfiguration(context, configurator);
+        } else if (resource != null) {
+            try {
                 new ContextInitializer(context).configureByResource(resource);
+            } catch (JoranException e) {
+                throw new LoggingSystemException("Error while refreshing Logback", e);
             }
-        } catch (JoranException e) {
-            throw new LoggingSystemException("Error while refreshing Logback", e);
+        } else {
+            throw new LoggingSystemException("Resource " + logbackXmlLocation + " not found");
         }
     }
 
     // Taken from ch.qos.logback.classic.util.ContextInitializer#autoConfig
     private static void programmaticConfiguration(@NonNull LoggerContext context,
-                                                  @Nullable Configurator configurator) {
-        if (configurator != null) {
-            try {
-                configurator.setContext(context);
-                configurator.configure(context);
-            } catch (Exception e) {
-                throw new LogbackException(String.format("Failed to initialize Configurator: %s using ServiceLoader", configurator.getClass().getCanonicalName()), e);
-            }
-        } else {
-            BasicConfigurator basicConfigurator = new BasicConfigurator();
-            basicConfigurator.setContext(context);
-            basicConfigurator.configure(context);
+                                                  @NonNull Configurator configurator) {
+        try {
+            configurator.setContext(context);
+            configurator.configure(context);
+        } catch (Exception e) {
+            throw new LoggingSystemException(String.format("Failed to initialize Configurator: %s using ServiceLoader", configurator.getClass().getCanonicalName()), e);
         }
     }
 }
