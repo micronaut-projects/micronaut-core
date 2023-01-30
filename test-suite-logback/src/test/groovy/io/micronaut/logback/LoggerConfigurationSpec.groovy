@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory
 import spock.lang.Specification
 
 @MicronautTest
+// Setting a level in a property forces a refresh, so the XML configuration is ignored. Without this in 3.8.x, the test fails.
 @Property(name = "logger.levels.set.by.property", value = "DEBUG")
 class LoggerConfigurationSpec extends Specification {
 
