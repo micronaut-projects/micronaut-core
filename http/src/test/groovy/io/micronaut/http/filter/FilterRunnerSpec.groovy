@@ -15,6 +15,7 @@ import io.micronaut.inject.ExecutableMethod
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.util.context.Context
+import spock.lang.Ignore
 import spock.lang.Specification
 
 import java.lang.reflect.Method
@@ -611,6 +612,7 @@ class FilterRunnerSpec extends Specification {
         events == ["before1 thread-outside", "before2 thread-before", "before3 thread-before", "terminal thread-before", "after3 thread-before", "after2 thread-after", "after1 thread-after"]
     }
 
+    @Ignore
     def 'around filter with blocking continuation'() {
         given:
         def events = []

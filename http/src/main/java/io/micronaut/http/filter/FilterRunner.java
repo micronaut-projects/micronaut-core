@@ -173,12 +173,6 @@ public class FilterRunner {
                         return filterResponse(newContext, iterator, null, suspended);
                     }
                     return ExecutionFlow.error(new IllegalStateException("Request filters didn't produce any response!"));
-                }).onErrorResume(throwable -> {
-                    // This scenario only applies for client filters
-                    // Somehow we just throw the exception instead of filtering the actual response
-                    // It might be a good idea to eliminate it in Micronaut 4
-                    // TODO: this should receive the latest possible http request
-                    return filterResponse(context, iterator, throwable, suspended);
                 });
     }
 
@@ -186,13 +180,15 @@ public class FilterRunner {
                                                         ListIterator<GenericHttpFilter> iterator,
                                                         Map<GenericHttpFilter, Map.Entry<ExecutionFlow<FilterContext>, FilterContinuationImpl<?>>> suspended) {
         if (context.response != null) {
-            iterator.previous(); // Skip last terminal filter that published response
             return ExecutionFlow.just(context);
         }
         if (iterator.hasNext()) {
             GenericHttpFilter filter = iterator.next();
             return processRequestFilter(filter, context, suspended)
-                    .onErrorResume(throwable -> processFailure(context.request, throwable).map(context::withResponse))
+                    .onErrorResume(throwable -> {
+                        // Un-suspend possibly awaiting filter and exception filtering scenario of the http client
+                        return filterResponse(context, iterator, throwable, suspended).map(context::withResponse);
+                    })
                     .flatMap(newContext -> filterRequest0(newContext, iterator, suspended));
         } else {
             return ExecutionFlow.error(new IllegalStateException("Request filters didn't produce any response!"));
@@ -331,10 +327,6 @@ public class FilterRunner {
                                                                FilterContext filterContext,
                                                                Throwable exceptionToFilter,
                                                                Map<GenericHttpFilter, Map.Entry<ExecutionFlow<FilterContext>, FilterContinuationImpl<?>>> suspended) {
-        if (exceptionToFilter != null && !filter.isFiltersException()) {
-            return ExecutionFlow.just(filterContext);
-        }
-
         Executor executeOn;
         if (filter instanceof GenericHttpFilter.Async async) {
             executeOn = async.executor();
@@ -352,6 +344,10 @@ public class FilterRunner {
             continuation.resume(filterContext, exceptionToFilter);
             // Filter flow might modify the context provided
             return filterProcessedFlow;
+        }
+
+        if (exceptionToFilter != null && !filter.isFiltersException()) {
+            return ExecutionFlow.just(filterContext);
         }
 
         if (filter instanceof FilterMethod<?> after && after.isResponseFilter) {
@@ -803,6 +799,10 @@ public class FilterRunner {
          * This flag checks of suspension point of the continuation has been resumed.
          */
         final AtomicBoolean suspensionPointResumed = new AtomicBoolean(false);
+        /**
+         * This flag checks of the filter result has been published.
+         */
+        final AtomicBoolean filterResultPublished = new AtomicBoolean(false);
 
         /**
          * Executor to run any downstream reactive code on. Only used by some implementations, e.g.
@@ -935,15 +935,23 @@ public class FilterRunner {
                     nextFilterProcessing.completeExceptionally(newFailure);
                 }
             }
-            if (newFailure == null) {
-                filterProcessed.complete(newResponse == null ? filterContext : filterContext.withResponse(newResponse));
+            if (filterResultPublished.compareAndSet(false, true)) {
+                if (newFailure == null) {
+                    filterProcessed.complete(newResponse == null ? filterContext : filterContext.withResponse(newResponse));
+                } else {
+                    filterProcessed.completeExceptionally(newFailure);
+                }
             } else {
-                filterProcessed.completeExceptionally(newFailure);
+                if (newFailure == null) {
+                    LOG.warn("Two outcomes for one continuation, this one is swallowed: {}", newResponse);
+                } else {
+                    LOG.warn("Two outcomes for one continuation, this one is swallowed:", newFailure);
+                }
             }
         }
 
         @NotNull
-        private final ExecutionFlow<FilterContext> asFilterProcessed(FilterContext filterContext,
+        private ExecutionFlow<FilterContext> asFilterProcessed(FilterContext filterContext,
                                                              @Nullable
                                                              HttpResponse<?> newResponse,
                                                              @Nullable
