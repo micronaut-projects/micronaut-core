@@ -16,19 +16,13 @@
 package io.micronaut.tck.http.client;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.BasicAuth;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.CookieValue;
 import io.micronaut.http.annotation.Get;
-import io.micronaut.http.cookie.Cookie;
 import org.junit.jupiter.api.Test;
 import reactor.core.publisher.Flux;
-
-import java.util.HashMap;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 

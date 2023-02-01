@@ -41,6 +41,7 @@ public class HttpHeadersAdapter implements HttpHeaders {
     /**
      *
      * @param httpHeaders HTTP Headers.
+     * @param conversionService Conversion Service.
      */
     public HttpHeadersAdapter(java.net.http.HttpHeaders httpHeaders, ConversionService conversionService) {
         this.httpHeaders = httpHeaders;
