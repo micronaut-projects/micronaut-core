@@ -39,13 +39,19 @@ import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.http.ssl.SslConfigurationException;
+import org.slf4j.Logger;
 import reactor.core.publisher.Flux;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.X509TrustManager;
+import java.net.Authenticator;
 import java.net.CookieManager;
 import java.net.HttpCookie;
+import java.net.InetSocketAddress;
+import java.net.PasswordAuthentication;
+import java.net.ProxySelector;
+import java.net.SocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
@@ -74,7 +80,10 @@ abstract class AbstractJavanetHttpClient {
     protected final ConversionService conversionService;
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
 
+    private final Logger log;
+
     protected AbstractJavanetHttpClient(
+        Logger log,
         LoadBalancer loadBalancer,
         HttpVersionSelection httpVersion,
         HttpClientConfiguration configuration,
@@ -84,9 +93,16 @@ abstract class AbstractJavanetHttpClient {
         String clientId,
         ConversionService conversionService
     ) {
+        this.log = log;
         this.loadBalancer = loadBalancer;
         this.httpVersion = httpVersion;
         this.configuration = configuration;
+        this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
+        this.requestBinderRegistry = requestBinderRegistry;
+        this.clientId = clientId;
+        this.conversionService = conversionService;
+        this.cookieManager = new CookieManager();
+
         if (StringUtils.isNotEmpty(contextPath)) {
             if (contextPath.charAt(0) != '/') {
                 contextPath = '/' + contextPath;
@@ -95,11 +111,6 @@ abstract class AbstractJavanetHttpClient {
         } else {
             this.contextPath = null;
         }
-        this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
-        this.requestBinderRegistry = requestBinderRegistry;
-        this.clientId = clientId;
-        this.conversionService = conversionService;
-        this.cookieManager = new CookieManager();
 
         HttpClient.Builder builder = HttpClient.newBuilder();
         configuration.getConnectTimeout().ifPresent(builder::connectTimeout);
@@ -109,11 +120,40 @@ abstract class AbstractJavanetHttpClient {
             .followRedirects(configuration.isFollowRedirects() ? HttpClient.Redirect.NORMAL : HttpClient.Redirect.NEVER)
             .cookieHandler(cookieManager);
 
+        if (configuration.getProxyAddress().isPresent()) {
+            builder = configureProxy(builder, configuration.getProxyAddress().get(), configuration.getProxyUsername().orElse(null), configuration.getProxyPassword().orElse(null));
+        }
+
         if (configuration.getSslConfiguration() instanceof ClientSslConfiguration clientSslConfiguration) {
-            builder.sslContext(configureSsl(clientSslConfiguration));
+            builder = builder.sslContext(configureSsl(clientSslConfiguration));
         }
 
         this.client = builder.build();
+    }
+
+    private HttpClient.Builder configureProxy(
+        @NonNull HttpClient.Builder builder,
+        @NonNull SocketAddress address,
+        @Nullable String username,
+        @Nullable String password
+    ) {
+        if (log.isDebugEnabled()) {
+            log.debug("Configuring proxy: {} with username: {}", address, username);
+        }
+        if (address instanceof InetSocketAddress inetSocketAddress) {
+            builder = builder.proxy(ProxySelector.of(inetSocketAddress));
+            if (username != null && password != null) {
+                builder = builder.authenticator(new Authenticator() {
+                    @Override
+                    protected PasswordAuthentication getPasswordAuthentication() {
+                        return new PasswordAuthentication(username, password.toCharArray());
+                    }
+                });
+            }
+        } else {
+            throw new IllegalArgumentException("Unsupported proxy address type: " + address.getClass().getName());
+        }
+        return builder;
     }
 
     private SSLContext configureSsl(ClientSslConfiguration clientSslConfiguration) {
