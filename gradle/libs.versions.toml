@@ -292,6 +292,7 @@ managed-netty-transport-native-unix-common = { module = "io.netty:netty-transpor
 
 managed-micronaut-acme = { module = "io.micronaut.acme:micronaut-acme", version.ref = "managed-micronaut-acme" }
 managed-micronaut-cassandra = { module = "io.micronaut.cassandra:micronaut-cassandra", version.ref = "managed-micronaut-cassandra" }
+managed-micronaut-discovery = { module = "io.micronaut.discovery:micronaut-discovery-client", version.ref = "managed-micronaut-discovery" }
 managed-micronaut-elasticsearch = { module = "io.micronaut.elasticsearch:micronaut-elasticsearch", version.ref = "managed-micronaut-elasticsearch" }
 managed-micronaut-graphql = { module = "io.micronaut.graphql:micronaut-graphql", version.ref = "managed-micronaut-graphql" }
 managed-micronaut-ignite-core = { module = "io.micronaut.ignite:micronaut-ignite-core", version.ref = "managed-micronaut-ignite" }
