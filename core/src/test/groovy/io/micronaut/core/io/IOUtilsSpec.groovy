@@ -146,18 +146,18 @@ class IOUtilsSpec extends Specification {
         "META-INF/micronaut/io.micronaut.inject.BeanConfiguration"       | "/META-INF/micronaut/io.micronaut.inject.BeanConfiguration"       | "zip:C:/oracle/user_projects/domains/base_domain/servers/AdminServer/tmp/_WL_user/issue8386-0.1/y2p3pa/war/WEB-INF/lib/micronaut-jackson-databind-3.5.7.jar!/META-INF/micronaut/io.micronaut.inject.BeanConfiguration/"
     }
 
-	void "resolvePath will fix jar uri on Windows/WebLogic"() {
-		given:
-			URI uri = new URI("zip:C:/oracle/path/to/micronaut-inject-3.5.7.jar!/META-INF/micronaut/io.micronaut.inject.BeanConfiguration/")
-			String theJarUri = null
+    void "resolvePath will fix jar uri on Windows/WebLogic"() {
+        given:
+            URI uri = new URI("zip:C:/oracle/path/to/micronaut-inject-3.5.7.jar!/META-INF/micronaut/io.micronaut.inject.BeanConfiguration/")
+            String theJarUri = null
 
-		when:
-			IOUtils.resolvePath(uri, "xyz", []) { List<Closeable> closeables, String jarUri ->
-				theJarUri = jarUri
-				Paths.get("/")
-			}
+        when:
+            IOUtils.resolvePath(uri, "xyz", []) { List<Closeable> closeables, String jarUri ->
+                theJarUri = jarUri
+                Paths.get("/")
+            }
 
-		then:
-			theJarUri == "file:/C:/oracle/path/to/micronaut-inject-3.5.7.jar!/"
-	}
+        then:
+            theJarUri == "file:/C:/oracle/path/to/micronaut-inject-3.5.7.jar!/"
+    }
 }
