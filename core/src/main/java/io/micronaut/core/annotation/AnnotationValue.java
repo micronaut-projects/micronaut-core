@@ -1161,7 +1161,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @throws IllegalStateException If no member is available that conforms to the given name and type
      */
     @NonNull
-    public final <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member, Class<T> type) {
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member, Class<T> type) {
         ArgumentUtils.requireNonNull("type", type);
         String typeName = type.getName();
 
@@ -1206,7 +1206,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @SuppressWarnings("unchecked")
     @NonNull
-    public final <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member) {
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member) {
         ArgumentUtils.requireNonNull("member", member);
         Object v = values.get(member);
         if (v instanceof AnnotationValue annotationValue) {
@@ -1237,7 +1237,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @throws IllegalStateException If no member is available that conforms to the given name and type
      */
     @NonNull
-    public final <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(String member, Class<T> type) {
+    public <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(String member, Class<T> type) {
         ArgumentUtils.requireNonNull("type", type);
         String typeName = type.getName();
 
@@ -1271,7 +1271,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @since 3.3.0
      */
     @NonNull
-    public final <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(@NonNull String member) {
+    public <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(@NonNull String member) {
         ArgumentUtils.requireNonNull("member", member);
         Object v = values.get(member);
         if (v instanceof AnnotationValue av) {
