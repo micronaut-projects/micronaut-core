@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.javanet;
 
+import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -41,6 +42,12 @@ public class JavanetHttpClientFactory implements HttpClientFactory {
     final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final ConversionService conversionService;
 
+    // Used by HttpClient.create(...)
+    public JavanetHttpClientFactory() {
+        this(null, ConversionService.SHARED);
+    }
+
+    @Creator
     public JavanetHttpClientFactory(
         @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
         ConversionService conversionService

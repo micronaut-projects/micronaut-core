@@ -37,8 +37,13 @@ import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.ssl.ClientSslConfiguration;
+import io.micronaut.http.ssl.SslConfigurationException;
 import reactor.core.publisher.Flux;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import java.net.CookieManager;
 import java.net.HttpCookie;
 import java.net.URI;
@@ -47,6 +52,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
 import java.util.Optional;
 
 /*
@@ -92,11 +100,29 @@ abstract class AbstractJavanetHttpClient {
         this.clientId = clientId;
         this.conversionService = conversionService;
         this.cookieManager = new CookieManager();
-        this.client = java.net.http.HttpClient.newBuilder()
+        HttpClient.Builder builder = HttpClient.newBuilder()
             .version(HttpClient.Version.HTTP_1_1)
             .followRedirects(configuration.isFollowRedirects() ? HttpClient.Redirect.NORMAL : HttpClient.Redirect.NEVER)
-            .cookieHandler(cookieManager)
-            .build();
+            .cookieHandler(cookieManager);
+        if (configuration.getSslConfiguration() instanceof ClientSslConfiguration clientSslConfiguration) {
+            builder.sslContext(configureSsl(clientSslConfiguration));
+        }
+        this.client = builder.build();
+    }
+
+    private SSLContext configureSsl(ClientSslConfiguration clientSslConfiguration) {
+        try {
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            if (clientSslConfiguration.isInsecureTrustAllCertificates()) {
+                TrustManager[] trustAllCerts = new TrustManager[]{new TrustAllTrustManager()};
+                sslContext.init(null, trustAllCerts, null);
+            } else {
+                sslContext = SSLContext.getDefault();
+            }
+            return sslContext;
+        } catch (GeneralSecurityException e) {
+            throw new SslConfigurationException(e);
+        }
     }
 
     // TODO: Extract from DefaultHttpClient
@@ -212,5 +238,23 @@ abstract class AbstractJavanetHttpClient {
     protected <E extends HttpClientException> E customizeException(E exc) {
         customizeException0(configuration, clientId, exc);
         return exc;
+    }
+
+    private static class TrustAllTrustManager implements X509TrustManager {
+
+        @Override
+        public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+            // trust everything
+        }
+
+        @Override
+        public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
+            // trust everything
+        }
+
+        @Override
+        public X509Certificate[] getAcceptedIssuers() {
+            return new X509Certificate[0];
+        }
     }
 }
