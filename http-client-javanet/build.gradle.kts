@@ -17,3 +17,8 @@ dependencies {
     testImplementation(projects.httpServerNetty)
     testImplementation(libs.bcpkix)
 }
+
+tasks.named<Test>("test") {
+    useJUnitPlatform()
+    systemProperty("jdk.httpclient.HttpClient.log", "all")
+}

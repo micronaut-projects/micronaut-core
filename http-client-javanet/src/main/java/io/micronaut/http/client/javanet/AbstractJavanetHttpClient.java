@@ -100,13 +100,16 @@ abstract class AbstractJavanetHttpClient {
         this.clientId = clientId;
         this.conversionService = conversionService;
         this.cookieManager = new CookieManager();
+
         HttpClient.Builder builder = HttpClient.newBuilder()
-            .version(HttpClient.Version.HTTP_1_1)
+            .version(httpVersion != null && httpVersion.isAlpn() ? HttpClient.Version.HTTP_2 : HttpClient.Version.HTTP_1_1)
             .followRedirects(configuration.isFollowRedirects() ? HttpClient.Redirect.NORMAL : HttpClient.Redirect.NEVER)
             .cookieHandler(cookieManager);
+
         if (configuration.getSslConfiguration() instanceof ClientSslConfiguration clientSslConfiguration) {
             builder.sslContext(configureSsl(clientSslConfiguration));
         }
+
         this.client = builder.build();
     }
 
