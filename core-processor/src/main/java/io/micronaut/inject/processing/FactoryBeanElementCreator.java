@@ -186,8 +186,20 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
             producedType.annotate(ConfigurationReader.class, builder -> builder.member(ConfigurationReader.PREFIX, ConfigurationUtils.getRequiredTypePath(producedType)));
         }
 
-        if (producingElement instanceof MethodElement) {
-            producedBeanDefinitionWriter.visitBeanFactoryMethod(classElement, (MethodElement) producingElement);
+        if (producingElement instanceof PropertyElement propertyElement) {
+            MethodElement readMethod = propertyElement.getReadMethod().orElse(null);
+            if (readMethod != null) {
+                producedBeanDefinitionWriter.visitBeanFactoryMethod(classElement, readMethod);
+            } else {
+                FieldElement fieldElement = propertyElement.getField().orElse(null);
+                if (fieldElement != null && fieldElement.isAccessible()) {
+                    producedBeanDefinitionWriter.visitBeanFactoryField(classElement, fieldElement);
+                } else {
+                    throw new ProcessingException(producingElement, "A property element that defines the @Bean annotation must have an accessible getter or field");
+                }
+            }
+        } else if (producingElement instanceof MethodElement methodElement) {
+            producedBeanDefinitionWriter.visitBeanFactoryMethod(classElement, methodElement);
         } else {
             producedBeanDefinitionWriter.visitBeanFactoryField(classElement, (FieldElement) producingElement);
         }

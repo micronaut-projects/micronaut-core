@@ -276,7 +276,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
                 tm = ((WildcardType) tm).getSuperBound();
             }
             // check Void
-            if ((tm instanceof DeclaredType) && sameType("kotlin.Unit", (DeclaredType) tm)) {
+            if ((tm instanceof DeclaredType dt) && sameType("kotlin.Unit", dt)) {
                 return PrimitiveElement.VOID;
             } else {
                 return mirrorToClassElement(tm, visitorContext, info, true);

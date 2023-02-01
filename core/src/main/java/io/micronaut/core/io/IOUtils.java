@@ -30,14 +30,16 @@ import java.net.URL;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystemNotFoundException;
 import java.nio.file.FileSystems;
+import java.nio.file.FileVisitResult;
+import java.nio.file.FileVisitor;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Consumer;
-import java.util.stream.Stream;
 
 /**
  * Utility methods for I/O operations.
@@ -106,15 +108,33 @@ public class IOUtils {
             }
 
             if (myPath != null) {
-                try (Stream<Path> walk = Files.walk(myPath, 1)) {
-                    for (Iterator<Path> it = walk.iterator(); it.hasNext();) {
-                        final Path currentPath = it.next();
-                        if (currentPath.equals(myPath) || Files.isHidden(currentPath) || currentPath.getFileName().startsWith(".")) {
-                            continue;
+                Path finalMyPath = myPath;
+                // use this method instead of Files#walk to eliminate the Stream overhead
+                Files.walkFileTree(myPath, Collections.emptySet(), 1, new FileVisitor<>() {
+                    @Override
+                    public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) {
+                        return FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public FileVisitResult visitFile(Path currentPath, BasicFileAttributes attrs) throws IOException {
+                        if (currentPath.equals(finalMyPath) || Files.isHidden(currentPath) || currentPath.getFileName().startsWith(".")) {
+                            return FileVisitResult.CONTINUE;
                         }
                         consumer.accept(currentPath);
+                        return FileVisitResult.CONTINUE;
                     }
-                }
+
+                    @Override
+                    public FileVisitResult visitFileFailed(Path file, IOException exc) {
+                        return FileVisitResult.CONTINUE;
+                    }
+
+                    @Override
+                    public FileVisitResult postVisitDirectory(Path dir, IOException exc) {
+                        return FileVisitResult.CONTINUE;
+                    }
+                });
             }
         } catch (IOException e) {
             // ignore, can't do anything here and can't log because class used in compiler

@@ -28,7 +28,6 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
@@ -407,7 +406,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                     owningType,
                     owningClassWriter,
                     generatorAdapter,
-                    (DefaultAnnotationMetadata) annotationMetadata,
+                    (MutableAnnotationMetadata) annotationMetadata,
                     defaults,
                     loadTypeMethods
             );
@@ -631,7 +630,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                     owningType,
                     declaringClassWriter,
                     generatorAdapter,
-                    (DefaultAnnotationMetadata) annotationMetadata,
+                    (MutableAnnotationMetadata) annotationMetadata,
                     defaults,
                     loadTypeMethods
             );

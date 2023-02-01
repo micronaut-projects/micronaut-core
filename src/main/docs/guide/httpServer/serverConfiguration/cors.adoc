@@ -1,7 +1,7 @@
-Micronaut supports CORS (link:https://www.w3.org/TR/cors/[Cross Origin Resource Sharing]) out of the box. By default, CORS requests are rejected. To enable processing of CORS requests, modify your configuration. For example with `application.yml`:
+Micronaut supports CORS (link:https://www.w3.org/TR/cors/[Cross Origin Resource Sharing]) out of the box. By default, CORS requests are rejected. To enable processing of CORS requests, modify your configuration. For example:
 
 .CORS Configuration Example
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:
@@ -14,7 +14,7 @@ By only enabling CORS processing, a "wide open" strategy is adopted that allows 
 To change the settings for all origins or a specific origin, change the configuration to provide one or more "configurations". By providing any configuration, the default "wide open" configuration is not configured.
 
 .CORS Configurations
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:
@@ -44,7 +44,7 @@ For multiple valid origins, set the `allowedOrigins` key of the configuration to
 Regular expressions are passed to link:{javase}java/util/regex/Pattern.html#compile-java.lang.String-[Pattern#compile] and compared to the request origin with link:{javase}java/util/regex/Matcher.html#matches--[Matcher#matches].
 
 .Example CORS Configuration
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:
@@ -64,7 +64,7 @@ To allow any request method for a given configuration, don't include the `allowe
 For multiple allowed methods, set the `allowedMethods` key of the configuration to a list of strings.
 
 .Example CORS Configuration
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:
@@ -84,7 +84,7 @@ To allow any request header for a given configuration, don't include the `allowe
 For multiple allowed headers, set the `allowedHeaders` key of the configuration to a list of strings.
 
 .Example CORS Configuration
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:
@@ -102,7 +102,7 @@ micronaut:
 To configure the headers that are sent in the response to a CORS request through the `Access-Control-Expose-Headers` header, include a list of strings for the `exposedHeaders` key in your configuration. None are exposed by default.
 
 .Example CORS Configuration
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:
@@ -120,7 +120,7 @@ micronaut:
 Credentials are allowed by default for CORS requests. To disallow credentials, set the `allowCredentials` option to `false`.
 
 .Example CORS Configuration
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:
@@ -136,7 +136,7 @@ micronaut:
 The default maximum age that preflight requests can be cached is 30 minutes. To change that behavior, specify a value in seconds.
 
 .Example CORS Configuration
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:
@@ -151,7 +151,7 @@ micronaut:
 
 By default, when a header has multiple values, multiple headers are sent, each with a single value. It is possible to change the behavior to send a single header with a comma-separated list of values by setting a configuration option.
 
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:

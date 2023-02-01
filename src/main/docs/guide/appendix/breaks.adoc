@@ -114,7 +114,7 @@ To register a type converter into `ConversionService.SHARED`, the registration n
 
 - The <<environmentEndpoint, environmental endpoint>> is now disabled by default. To enable it, you must update your endpoint config:
 
-[source,yaml]
+[configuration]
 ----
 endpoints:
   env:

@@ -23,7 +23,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -420,24 +420,23 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
     private void pushAnnotationMetadata(ClassWriter classWriter, GeneratorAdapter staticInit, AnnotationMetadata annotationMetadata) {
         if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA || annotationMetadata.isEmpty()) {
             staticInit.push((String) null);
-        } else if (annotationMetadata instanceof AnnotationMetadataReference) {
-            AnnotationMetadataReference reference = (AnnotationMetadataReference) annotationMetadata;
-            String className = reference.getClassName();
+        } else if (annotationMetadata instanceof AnnotationMetadataReference annotationMetadataReference) {
+            String className = annotationMetadataReference.getClassName();
             staticInit.getStatic(getTypeReferenceForName(className), AbstractAnnotationMetadataWriter.FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
-        } else if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
+        } else if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
             AnnotationMetadataWriter.instantiateNewMetadataHierarchy(
                     thisType,
                     classWriter,
                     staticInit,
-                    (AnnotationMetadataHierarchy) annotationMetadata,
+                    annotationMetadataHierarchy,
                     defaultsStorage,
                     loadTypeMethods);
-        } else if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+        } else if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
             AnnotationMetadataWriter.instantiateNewMetadata(
                     thisType,
                     classWriter,
                     staticInit,
-                    (DefaultAnnotationMetadata) annotationMetadata,
+                    mutableAnnotationMetadata,
                     defaultsStorage,
                     loadTypeMethods);
         } else {

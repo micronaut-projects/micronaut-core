@@ -1,7 +1,7 @@
 When dealing with blocking operations, Micronaut shifts the blocking operations to an unbound, caching I/O thread pool by default. You can configure the I/O thread pool using the api:scheduling.executor.ExecutorConfiguration[] named `io`. For example:
 
 .Configuring the Server I/O Thread Pool
-[source,yaml]
+[configuration]
 ----
 micronaut:
   executors:
@@ -11,3 +11,21 @@ micronaut:
 ----
 
 The above configuration creates a fixed thread pool with 75 threads.
+
+== Virtual Threads
+
+Since Java 19, the JVM includes experimental support for virtual threads ("project loom"). As it is a preview feature, you need to pass `--enable-preview` as a JVM parameter to enable it.
+
+The Micronaut framework will detect virtual thread support and use it for the executor named `blocking` if available. If virtual threads are not supported, this executor will be aliased to the `io` thread pool.
+
+To use the `blocking` executor, simply mark e.g. a controller with `ExecuteOn`:
+
+.Configuring the Server I/O Thread Pool
+[source,java]
+----
+@ExecuteOn(TaskExecutors.BLOCKING)
+@GET
+String hello() {
+    return "foo"
+}
+----

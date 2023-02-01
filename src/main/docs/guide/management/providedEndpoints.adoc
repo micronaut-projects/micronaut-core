@@ -65,7 +65,7 @@ this should be used with care because private and sensitive information will be 
 
 By default, all management endpoints are exposed over the same port as the application. You can alter this behaviour by specifying the `endpoints.all.port` setting:
 
-[source,yaml]
+[configuration]
 ----
 endpoints:
   all:

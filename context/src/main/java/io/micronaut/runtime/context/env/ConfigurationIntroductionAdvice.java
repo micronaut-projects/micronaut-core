@@ -106,10 +106,11 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
         );
 
         if (defaultValue != null) {
-            return value.orElseGet(() -> environment.convertRequired(
-                defaultValue,
-                argument
-            ));
+            Object result = value.orElse(null);
+            if (result == null) {
+                return environment.convertRequired(defaultValue, argument);
+            }
+            return result;
         } else if (rt.isOptional()) {
             return value.orElse(Optional.empty());
         } else if (context.isNullable()) {

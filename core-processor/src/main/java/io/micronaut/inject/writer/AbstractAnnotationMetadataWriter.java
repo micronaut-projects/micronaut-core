@@ -21,7 +21,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.Element;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
@@ -147,16 +147,15 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
                 if (annotationMetadata.isEmpty()) {
                     staticInit.getStatic(Type.getType(AnnotationMetadata.class), FIELD_EMPTY_METADATA, Type.getType(AnnotationMetadata.class));
                 } else {
-                    if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
-                        annotationMetadata = ((AnnotationMetadataHierarchy) annotationMetadata).merge();
+                    if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
+                        annotationMetadata = annotationMetadataHierarchy.merge();
                     }
-                    if (annotationMetadata instanceof DefaultAnnotationMetadata) {
-                        DefaultAnnotationMetadata dam = (DefaultAnnotationMetadata) annotationMetadata;
+                    if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
                         AnnotationMetadataWriter.writeAnnotationDefaults(
                             targetClassType,
                             classWriter,
                             staticInit,
-                            dam,
+                                mutableAnnotationMetadata,
                             defaults,
                             loadTypeMethods
                         );
@@ -185,21 +184,21 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
         AnnotationMetadata annotationMetadata = this.annotationMetadata.getTargetAnnotationMetadata();
         if (annotationMetadata.isEmpty()) {
             staticInit.getStatic(Type.getType(AnnotationMetadata.class), FIELD_EMPTY_METADATA, Type.getType(AnnotationMetadata.class));
-        } else if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+        } else if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
             AnnotationMetadataWriter.instantiateNewMetadata(
                     targetClassType,
                     classWriter,
                     staticInit,
-                    (DefaultAnnotationMetadata) annotationMetadata,
+                    mutableAnnotationMetadata,
                     defaults,
                     loadTypeMethods
             );
-        } else if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
+        } else if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
             AnnotationMetadataWriter.instantiateNewMetadataHierarchy(
                     targetClassType,
                     classWriter,
                     staticInit,
-                    (AnnotationMetadataHierarchy) annotationMetadata,
+                    annotationMetadataHierarchy,
                     defaults,
                     loadTypeMethods
             );

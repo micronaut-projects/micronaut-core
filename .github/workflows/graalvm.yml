@@ -19,8 +19,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: ['17']
-        graalvm: ['latest', 'dev']
+        graalvm: [ 'latest', 'dev' ]
+        java: [ '17' ]
+        include:
+          - graalvm: 'dev'
+            java: '19'
+        exclude:
+          - graalvm: 'dev'
+            java: '17'
     steps:
        # https://github.com/actions/virtual-environments/issues/709
       - name: Free disk space
@@ -56,6 +62,8 @@ jobs:
           fi
         env:
            TESTCONTAINERS_RYUK_DISABLED: true
+           GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
+           GH_USERNAME: ${{ secrets.GH_USERNAME }}
            GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
            GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
            GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
@@ -74,7 +82,7 @@ jobs:
             })
       - name: Publish Test Report
         if: always()
-        uses: mikepenz/action-junit-report@v3.7.0
+        uses: mikepenz/action-junit-report@v3.7.1
         with:
           check_name: GraalVM CE CI / Test Report (Java ${{ matrix.java }})
           report_paths: '**/build/test-results/test/TEST-*.xml'

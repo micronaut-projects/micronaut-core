@@ -17,10 +17,9 @@ package io.micronaut.http.server.netty.discovery;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.event.BeanCreatedEvent;
-import io.micronaut.context.event.BeanCreatedEventListener;
+import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.order.Ordered;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.event.ServiceReadyEvent;
 import io.micronaut.discovery.event.ServiceStoppedEvent;
@@ -33,38 +32,44 @@ import jakarta.inject.Singleton;
 @Singleton
 @Internal
 @Requires(classes = ServiceInstance.class)
-final class NettyServiceDiscovery implements BeanCreatedEventListener<NettyEmbeddedServer>, Ordered {
-    private NettyEmbeddedServer server;
-    private NettyEmbeddedServerInstance instance;
+final class NettyServiceDiscovery {
+    private final ApplicationEventPublisher<ServiceReadyEvent> serviceReadyEventApplicationEventPublisher;
+    private final ApplicationEventPublisher<ServiceStoppedEvent> serviceStoppedEventApplicationEventPublisher;
+    private NettyEmbeddedServerInstance createdInstance;
 
-    @Override
-    public int getOrder() {
-        return Ordered.LOWEST_PRECEDENCE;
+    NettyServiceDiscovery(ApplicationEventPublisher<ServiceReadyEvent> serviceReadyEventApplicationEventPublisher,
+                          ApplicationEventPublisher<ServiceStoppedEvent> serviceStoppedEventApplicationEventPublisher) {
+        this.serviceReadyEventApplicationEventPublisher = serviceReadyEventApplicationEventPublisher;
+        this.serviceStoppedEventApplicationEventPublisher = serviceStoppedEventApplicationEventPublisher;
     }
 
     @EventListener
     void onStart(ServerStartupEvent event) {
-        if (instance != null) {
-            server.getApplicationContext()
-                .getEventPublisher(ServiceReadyEvent.class)
-                .publishEvent(new ServiceReadyEvent(instance));
+        if (event.getSource() instanceof NettyEmbeddedServer nettyEmbeddedServer) {
+            NettyEmbeddedServerInstance instance = getInstance(nettyEmbeddedServer);
+            if (instance != null) {
+                serviceReadyEventApplicationEventPublisher.publishEvent(new ServiceReadyEvent(instance));
+            }
         }
     }
 
     @EventListener
     void onStop(ServerShutdownEvent event) {
-        if (instance != null) {
-            server.getApplicationContext().getEventPublisher(ServiceStoppedEvent.class)
-                .publishEvent(new ServiceStoppedEvent(instance));
+        if (event.getSource() instanceof NettyEmbeddedServer nettyEmbeddedServer) {
+            NettyEmbeddedServerInstance instance = getInstance(nettyEmbeddedServer);
+            if (instance != null) {
+                serviceStoppedEventApplicationEventPublisher.publishEvent(new ServiceStoppedEvent(instance));
+            }
         }
     }
 
-    @Override
-    public NettyEmbeddedServer onCreated(BeanCreatedEvent<NettyEmbeddedServer> event) {
-        this.server = event.getBean();
-        ApplicationContext applicationContext = server.getApplicationContext();
-        server.getApplicationConfiguration().getName()
-            .ifPresent(id -> this.instance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, server));
-        return server;
+    @Nullable
+    private NettyEmbeddedServerInstance getInstance(NettyEmbeddedServer nettyEmbeddedServer) {
+        if (createdInstance == null) {
+            ApplicationContext applicationContext = nettyEmbeddedServer.getApplicationContext();
+            nettyEmbeddedServer.getApplicationConfiguration().getName()
+                    .ifPresent(id -> this.createdInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, nettyEmbeddedServer));
+        }
+        return createdInstance;
     }
 }
