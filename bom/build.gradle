@@ -47,10 +47,32 @@ micronautBom {
                 "io.opentelemetry.instrumentation:opentelemetry-instrumentation-bom-alpha",
                 ["io.opentelemetry.javaagent", "io.opentelemetry", "io.opentelemetry.instrumentation", "io.opentelemetry.javaagent.instrumentation"] as Set
         )
-        dependencies.add("io.opentelemetry:opentelemetry-bom:1.15.0")
-        dependencies.add("io.opentelemetry:opentelemetry-bom-alpha:1.15.0-alpha")
+        dependencies.add("io.opentelemetry:opentelemetry-bom:1.19.0")
+        dependencies.add("io.opentelemetry:opentelemetry-bom-alpha:1.19.0-alpha")
+        dependencies.add("io.opentelemetry.instrumentation:opentelemetry-instrumentation-bom:1.19.2")
+        dependencies.add("io.zipkin.brave:brave-bom:5.14.1")
+        dependencies.add("io.zipkin.reporter2:zipkin-reporter-bom:2.16.3")
 
         // The R2DBC bom that we include mentions dependencies which do not belong to io.r2dbc group
         bomAuthorizedGroupIds.put("io.r2dbc:r2dbc-bom", ["com.google.cloud", "com.oracle.database.r2dbc", "org.mariadb", "dev.miku"] as Set)
+        
+        // Tracing
+        bomAuthorizedGroupIds.put(
+                "io.zipkin.brave:brave-bom",
+                [
+                        "io.zipkin.brave",
+                        "io.zipkin.zipkin2",
+                        "io.zipkin.reporter2",
+                        "io.zipkin.proto3"
+                ] as Set
+        )
+        bomAuthorizedGroupIds.put(
+                "io.zipkin.reporter2:zipkin-reporter-bom",
+                [
+                        "io.zipkin.reporter2",
+                        "io.zipkin.zipkin2",
+                        "io.zipkin.proto3"
+                ] as Set
+        )
     }
 }
