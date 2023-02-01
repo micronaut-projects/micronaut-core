@@ -22,6 +22,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 
@@ -45,6 +46,7 @@ public final class HttpRequestFactory {
     @NonNull
     public static <I> HttpRequest.Builder builder(
         @NonNull URI uri, io.micronaut.http.HttpRequest<I> request,
+        @NonNull HttpClientConfiguration configuration,
         Argument<?> bodyType,
         MediaTypeCodecRegistry mediaTypeCodecRegistry
     ) {
@@ -55,6 +57,7 @@ public final class HttpRequestFactory {
         if (request.getContentType().isEmpty()) {
             builder.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON);
         }
+        configuration.getReadTimeout().ifPresent(builder::timeout);
         return builder;
     }
 

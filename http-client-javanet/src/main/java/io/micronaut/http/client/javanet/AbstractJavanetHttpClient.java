@@ -101,7 +101,10 @@ abstract class AbstractJavanetHttpClient {
         this.conversionService = conversionService;
         this.cookieManager = new CookieManager();
 
-        HttpClient.Builder builder = HttpClient.newBuilder()
+        HttpClient.Builder builder = HttpClient.newBuilder();
+        configuration.getConnectTimeout().ifPresent(builder::connectTimeout);
+
+        builder
             .version(httpVersion != null && httpVersion.isAlpn() ? HttpClient.Version.HTTP_2 : HttpClient.Version.HTTP_1_1)
             .followRedirects(configuration.isFollowRedirects() ? HttpClient.Redirect.NORMAL : HttpClient.Redirect.NEVER)
             .cookieHandler(cookieManager);
@@ -208,7 +211,7 @@ abstract class AbstractJavanetHttpClient {
                 request.getCookies().getAll().forEach(cookie -> cookieConverter(cookie, request, server));
                 return server.resolve(prependContextPath(request.getUri()));
             })
-            .map(uri -> HttpRequestFactory.builder(uri, request, bodyType, mediaTypeCodecRegistry).build());
+            .map(uri -> HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry).build());
     }
 
     private <I> void cookieConverter(Cookie cookie, io.micronaut.http.HttpRequest<I> request, ServiceInstance server) {
