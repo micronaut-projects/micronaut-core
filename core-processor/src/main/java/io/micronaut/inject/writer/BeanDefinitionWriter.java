@@ -2098,8 +2098,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     generics,
                     new HashSet<>(),
                     new HashMap<>(),
-                    loadTypeMethods,
-                    propertyType.isTypeVariable() || propertyType.isGenericPlaceholder()
+                    loadTypeMethods
             );
         }
 

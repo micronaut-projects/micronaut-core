@@ -339,7 +339,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             Map<String, ClassElement> typeArgs = new LinkedHashMap<>(forType.size());
             for (Map.Entry<String, ClassNode> entry : forType.entrySet()) {
                 ClassNode classNode = entry.getValue();
-                ClassElement rawElement = new GroovyClassElement(visitorContext, classNode, elementAnnotationMetadataFactory);
+                ClassElement rawElement = new GroovyClassElement(visitorContext, classNode, elementAnnotationMetadataFactory, null, 0, true);
                 rawElement = adjustTypeAnnotationMetadata(rawElement);
                 if (thisSpec != null) {
                     rawElement = getGenericElement(sourceUnit, classNode, rawElement, thisSpec);
@@ -396,14 +396,8 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                         ClassNode cn = resolveTypeArgument(info, redirectType.getName());
                         if (cn != null) {
                             Map<String, ClassNode> newInfo = alignNewGenericsInfo(genericsTypes, redirectTypes, info);
-                            typeArgumentMap.put(redirectType.getName(), adjustTypeAnnotationMetadata(new GroovyClassElement(
-                                visitorContext,
-                                cn,
-                                elementAnnotationMetadataFactory,
-                                Collections.singletonMap(cn.getName(), newInfo),
-                                cn.isArray() ? computeDimensions(cn) : 0,
-                                true
-                            )));
+                            typeArgumentMap.put(redirectType.getName(),
+                                    newTypeArgumentClassElement(gt, cn, Collections.singletonMap(cn.getName(), newInfo), true, redirectTypes));
                         }
                     } else {
                         ClassNode type;
@@ -414,13 +408,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                         } else {
                             type = gt.getType();
                         }
-                        typeArgumentMap.put(redirectType.getName(), adjustTypeAnnotationMetadata(new GroovyClassElement(
-                            visitorContext,
-                            type,
-                            elementAnnotationMetadataFactory,
-                            Collections.emptyMap(),
-                            type.isArray() ? computeDimensions(type) : 0
-                        )));
+                        typeArgumentMap.put(redirectType.getName(), newTypeArgumentClassElement(gt, type, Collections.emptyMap(), false, redirectTypes));
                     }
                 }
             } else if (redirectTypes != null) {
@@ -432,14 +420,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                         if (genericsTypes != null) {
                             newInfo = alignNewGenericsInfo(genericsTypes, redirectTypes, info);
                         }
-                        typeArgumentMap.put(gt.getName(), adjustTypeAnnotationMetadata(new GroovyClassElement(
-                            visitorContext,
-                            cn,
-                            elementAnnotationMetadataFactory,
-                            Collections.singletonMap(cn.getName(), newInfo),
-                            cn.isArray() ? computeDimensions(cn) : 0,
-                                true
-                        )));
+                        typeArgumentMap.put(gt.getName(), newTypeArgumentClassElement(gt, cn, Collections.singletonMap(cn.getName(), newInfo), true, redirectTypes));
                     }
                 }
             }
@@ -459,6 +440,43 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             return Collections.unmodifiableMap(map);
         }
         return Collections.emptyMap();
+    }
+
+    private ClassElement newTypeArgumentClassElement(GenericsType genericsType,
+                                                     ClassNode cn,
+                                                     Map<String, Map<String, ClassNode>> info,
+                                                     boolean isTypeVar,
+                                                     GenericsType[] redirectTypes) {
+        if (cn.equals(classNode)) {
+            // In a case of the recursive type return the next type with all object generic types
+            ClassNode objectNode = (ClassNode) visitorContext.getClassElement("java.lang.Object").get().getNativeType();
+            Map<String, Map<String, ClassNode>> newInfo = new LinkedHashMap<>();
+            for (Map.Entry<String, Map<String, ClassNode>> e : info.entrySet()) {
+                Map<String, ClassNode> inner = new LinkedHashMap<>();
+                for (GenericsType redirectType : redirectTypes) {
+                    inner.put(redirectType.getName(), objectNode);
+                }
+                newInfo.put(e.getKey(), inner);
+            }
+            info = newInfo;
+        }
+        if (genericsType.isPlaceholder()) {
+            return adjustTypeAnnotationMetadata(new GroovyGenericPlaceholderElement(
+                    visitorContext,
+                    cn,
+                    elementAnnotationMetadataFactory,
+                    info,
+                    cn.isArray() ? computeDimensions(cn) : 0
+            ));
+        }
+        return adjustTypeAnnotationMetadata(new GroovyClassElement(
+                visitorContext,
+                cn,
+                elementAnnotationMetadataFactory,
+                info,
+                cn.isArray() ? computeDimensions(cn) : 0,
+                isTypeVar
+        ));
     }
 
     @Nullable

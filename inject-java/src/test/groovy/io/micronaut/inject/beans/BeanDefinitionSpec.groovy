@@ -459,6 +459,7 @@ public class Test {
         def param2 = param1.getTypeParameters()[0]
         param2.getTypeParameters().length == 1
         def param3 = param2.getTypeParameters()[0]
+        param3.getType() == String.class
     }
 
     void "test annotation metadata present on deep type parameters of definition"() {

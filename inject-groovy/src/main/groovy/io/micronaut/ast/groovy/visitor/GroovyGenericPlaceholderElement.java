@@ -25,6 +25,7 @@ import org.codehaus.groovy.ast.ClassNode;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
@@ -41,13 +42,14 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
     GroovyGenericPlaceholderElement(GroovyVisitorContext visitorContext,
                                     ClassNode classNode,
                                     ElementAnnotationMetadataFactory annotationMetadataFactory,
+                                    Map<String, Map<String, ClassNode>> genericInfo,
                                     int arrayDimensions) {
-        super(visitorContext, classNode, annotationMetadataFactory, null, arrayDimensions);
+        super(visitorContext, classNode, annotationMetadataFactory, genericInfo, arrayDimensions);
     }
 
     @Override
     protected GroovyClassElement copyConstructor() {
-        return new GroovyGenericPlaceholderElement(visitorContext, classNode, elementAnnotationMetadataFactory, getArrayDimensions());
+        return new GroovyGenericPlaceholderElement(visitorContext, classNode, elementAnnotationMetadataFactory, getGenericTypeInfo(), getArrayDimensions());
     }
 
     @NonNull
@@ -72,7 +74,7 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new GroovyGenericPlaceholderElement(visitorContext, classNode, elementAnnotationMetadataFactory, arrayDimensions);
+        return new GroovyGenericPlaceholderElement(visitorContext, classNode, elementAnnotationMetadataFactory, getGenericTypeInfo(), arrayDimensions);
     }
 
     @Override

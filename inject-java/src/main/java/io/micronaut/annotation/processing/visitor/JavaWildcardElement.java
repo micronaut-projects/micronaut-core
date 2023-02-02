@@ -19,8 +19,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.WildcardElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
 import javax.lang.model.type.WildcardType;
 import java.util.List;
@@ -88,6 +88,21 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
     @Override
     public Object getNativeType() {
         return wildcardType;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null) {
+            return false;
+        }
+        io.micronaut.inject.ast.Element that = (io.micronaut.inject.ast.Element) o;
+        if (that instanceof JavaWildcardElement wildcardElement) {
+            return wildcardElement.wildcardType.equals(wildcardType);
+        }
+        return false;
     }
 
     @NonNull

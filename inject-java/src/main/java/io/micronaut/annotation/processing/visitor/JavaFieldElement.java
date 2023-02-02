@@ -27,6 +27,10 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.TypeVariable;
+import java.util.Collections;
+import java.util.Map;
+import java.util.function.Supplier;
 
 /**
  * A field element returning data from a {@link VariableElement}.
@@ -85,12 +89,9 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
             if (owningType == null) {
                 this.genericType = getType();
             } else {
-                this.genericType = mirrorToClassElement(
-                    variableElement.asType(),
-                    visitorContext,
-                    owningType.getGenericTypeInfo(),
-                    true
-                );
+                TypeMirror returnType = variableElement.asType();
+                Map<String, Map<String, Supplier<ClassElement>>> genericsInfo = owningType.getGenericTypeInfo();
+                this.genericType = mirrorToClassElement(returnType, visitorContext, genericsInfo, true, returnType instanceof TypeVariable);
             }
         }
         return this.genericType;
@@ -116,7 +117,7 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
     public ClassElement getType() {
         if (this.typeElement == null) {
             TypeMirror returnType = variableElement.asType();
-            this.typeElement = mirrorToClassElement(returnType, visitorContext);
+            this.typeElement = mirrorToClassElement(returnType, visitorContext, Collections.emptyMap(), true, returnType instanceof TypeVariable);
         }
         return this.typeElement;
     }
@@ -130,7 +131,9 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
                 if (owningType.getName().equals(te.getQualifiedName().toString())) {
                     resolvedDeclaringClass = owningType;
                 } else {
-                    resolvedDeclaringClass = mirrorToClassElement(te.asType(), visitorContext, owningType.getGenericTypeInfo());
+                    TypeMirror returnType = te.asType();
+                    Map<String, Map<String, Supplier<ClassElement>>> genericsInfo = owningType.getGenericTypeInfo();
+                    resolvedDeclaringClass = mirrorToClassElement(returnType, visitorContext, genericsInfo, true, returnType instanceof TypeVariable);
                 }
             } else {
                 return owningType;

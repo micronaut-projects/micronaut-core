@@ -235,74 +235,68 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             generatorAdapter.visitInsn(ACONST_NULL);
             return;
         }
-        Set<String> visitedTypes = new HashSet<>(5);
-        pushTypeArgumentElements(owningType, owningTypeWriter, generatorAdapter, null, declaringElementName, types, visitedTypes, defaults, loadTypeMethods, false);
+        pushTypeArgumentElements(owningType, owningTypeWriter, generatorAdapter, declaringElementName, null, types, new HashSet<>(5), defaults, loadTypeMethods);
     }
 
     private static void pushTypeArgumentElements(
             Type owningType,
             ClassWriter declaringClassWriter,
             GeneratorAdapter generatorAdapter,
-            @Nullable TypedElement declaringElement,
             String declaringElementName,
+            @Nullable
+            ClassElement element,
             Map<String, ClassElement> types,
-            Set<String> visitedTypes,
+            Set<Object> visitedTypes,
             Map<String, Integer> defaults,
-            Map<String, GeneratorAdapter> loadTypeMethods,
-            boolean areTypeVariableArguments) {
-        boolean isTypeVariable = false;
-        if (declaringElement instanceof ClassElement classElement) {
-            if (classElement.isGenericPlaceholder() || classElement.isTypeVariable()) {
-                isTypeVariable = true;
+            Map<String, GeneratorAdapter> loadTypeMethods) {
+        if (element == null || element.getClass().getSimpleName().equals("KotlinClassElement")) {
+            if (visitedTypes.contains(declaringElementName)) {
+                generatorAdapter.getStatic(
+                        TYPE_ARGUMENT,
+                        ZERO_ARGUMENTS_CONSTANT,
+                        TYPE_ARGUMENT_ARRAY
+                );
+                return;
+            } else {
+                visitedTypes.add(declaringElementName);
             }
         }
 
-        if (areTypeVariableArguments) {
-            generatorAdapter.getStatic(
-                    TYPE_ARGUMENT,
-                    ZERO_ARGUMENTS_CONSTANT,
-                    TYPE_ARGUMENT_ARRAY
-            );
-        } else {
-            visitedTypes.add(declaringElementName);
-
-            int len = types.size();
-            // Build calls to Argument.create(...)
-            pushNewArray(generatorAdapter, Argument.class, len);
-            int i = 0;
-            for (Map.Entry<String, ClassElement> entry : types.entrySet()) {
-                // the array index
-                generatorAdapter.push(i);
-                String argumentName = entry.getKey();
-                ClassElement classElement = entry.getValue();
-                Type classReference = JavaModelUtils.getTypeReference(classElement);
-                Map<String, ClassElement> typeArguments = classElement.getTypeArguments();
-                if (CollectionUtils.isNotEmpty(typeArguments) || !classElement.getAnnotationMetadata().isEmpty()) {
-                    buildArgumentWithGenerics(
-                            owningType,
-                            declaringClassWriter,
-                            generatorAdapter,
-                            argumentName,
-                            classReference,
-                            classElement,
-                            typeArguments,
-                            visitedTypes,
-                            defaults,
-                            loadTypeMethods,
-                            isTypeVariable
-                    );
-                } else {
-                    buildArgument(generatorAdapter, argumentName, classElement);
-                }
-
-                // store the type reference
-                generatorAdapter.visitInsn(AASTORE);
-                // if we are not at the end of the array duplicate array onto the stack
-                if (i != (len - 1)) {
-                    generatorAdapter.visitInsn(DUP);
-                }
-                i++;
+        int len = types.size();
+        // Build calls to Argument.create(...)
+        pushNewArray(generatorAdapter, Argument.class, len);
+        int i = 0;
+        for (Map.Entry<String, ClassElement> entry : types.entrySet()) {
+            // the array index
+            generatorAdapter.push(i);
+            String argumentName = entry.getKey();
+            ClassElement classElement = entry.getValue();
+            Type classReference = JavaModelUtils.getTypeReference(classElement);
+            Map<String, ClassElement> typeArguments = classElement.getTypeArguments();
+            if (CollectionUtils.isNotEmpty(typeArguments) || !classElement.getAnnotationMetadata().isEmpty()) {
+                buildArgumentWithGenerics(
+                        owningType,
+                        declaringClassWriter,
+                        generatorAdapter,
+                        argumentName,
+                        classReference,
+                        classElement,
+                        typeArguments,
+                        visitedTypes,
+                        defaults,
+                        loadTypeMethods
+                );
+            } else {
+                buildArgument(generatorAdapter, argumentName, classElement);
             }
+
+            // store the type reference
+            generatorAdapter.visitInsn(AASTORE);
+            // if we are not at the end of the array duplicate array onto the stack
+            if (i != (len - 1)) {
+                generatorAdapter.visitInsn(DUP);
+            }
+            i++;
         }
     }
 
@@ -388,10 +382,9 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             Type typeReference,
             ClassElement classElement,
             Map<String, ClassElement> typeArguments,
-            Set<String> visitedTypes,
+            Set<Object> visitedTypes,
             Map<String, Integer> defaults,
-            Map<String, GeneratorAdapter> loadTypeMethods,
-            boolean isTypeVariable) {
+            Map<String, GeneratorAdapter> loadTypeMethods) {
         // 1st argument: the type
         generatorAdapter.push(typeReference);
         // 2nd argument: the name
@@ -400,7 +393,16 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         AnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(classElement.getAnnotationMetadata());
         boolean hasAnnotationMetadata = !annotationMetadata.isEmpty();
 
-        if (!hasAnnotationMetadata && typeArguments.isEmpty()) {
+        boolean isRecursiveType = false;
+        if (classElement instanceof GenericPlaceholderElement) {
+            if (visitedTypes.contains(classElement)) {
+                isRecursiveType = true;
+            } else {
+                visitedTypes.add(classElement);
+            }
+        }
+
+        if (isRecursiveType || !hasAnnotationMetadata && typeArguments.isEmpty()) {
             invokeInterfaceStaticMethod(
                     generatorAdapter,
                     Argument.class,
@@ -428,13 +430,12 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                 owningType,
                 owningClassWriter,
                 generatorAdapter,
-                classElement,
                 classElement.getName(),
+                classElement,
                 typeArguments,
                 visitedTypes,
                 defaults,
-                loadTypeMethods,
-                isTypeVariable
+                loadTypeMethods
         );
 
         // Argument.create( .. )

@@ -25,6 +25,8 @@ import io.micronaut.inject.ast.ParameterElement;
 
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.TypeVariable;
+import java.util.Collections;
 import java.util.Map;
 import java.util.function.Supplier;
 
@@ -93,7 +95,7 @@ class JavaParameterElement extends AbstractJavaElement implements ParameterEleme
     public ClassElement getType() {
         if (typeElement == null) {
             TypeMirror parameterType = getNativeType().asType();
-            this.typeElement = mirrorToClassElement(parameterType, visitorContext);
+            this.typeElement = mirrorToClassElement(parameterType, visitorContext, Collections.emptyMap(), true, parameterType instanceof TypeVariable);
         }
         return typeElement;
     }
@@ -104,7 +106,7 @@ class JavaParameterElement extends AbstractJavaElement implements ParameterEleme
         if (this.genericTypeElement == null) {
             TypeMirror returnType = getNativeType().asType();
             Map<String, Map<String, Supplier<ClassElement>>> declaredGenericInfo = owningType.getGenericTypeInfo();
-            this.genericTypeElement = parameterizedClassElement(returnType, visitorContext, declaredGenericInfo);
+            this.genericTypeElement = mirrorToClassElement(returnType, visitorContext, declaredGenericInfo, true, returnType instanceof TypeVariable);
         }
         return this.genericTypeElement;
     }

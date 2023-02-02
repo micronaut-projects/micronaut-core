@@ -24,11 +24,14 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 
 import javax.lang.model.element.TypeParameterElement;
+import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVariable;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Implementation of {@link io.micronaut.inject.ast.GenericPlaceholderElement} for Java.
@@ -60,6 +63,30 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
     }
 
     @Override
+    public int hashCode() {
+        return realTypeVariable.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null) {
+            return false;
+        }
+        io.micronaut.inject.ast.Element that = (io.micronaut.inject.ast.Element) o;
+        if (that instanceof JavaGenericPlaceholderElement placeholderElement) {
+            return placeholderElement.realTypeVariable.equals(realTypeVariable);
+        }
+        return false;
+    }
+
+    public TypeVariable getRealTypeVariable() {
+        return realTypeVariable;
+    }
+
+    @Override
     public MutableAnnotationMetadataDelegate<?> getAnnotationMetadata() {
         return bounds.get(0).getAnnotationMetadata();
     }
@@ -88,7 +115,9 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
 
     @Override
     public Optional<Element> getDeclaringElement() {
-        return Optional.of(mirrorToClassElement(getParameterElement().getGenericElement().asType(), visitorContext, getGenericTypeInfo()));
+        TypeMirror returnType = getParameterElement().getGenericElement().asType();
+        Map<String, Map<String, Supplier<ClassElement>>> genericsInfo = getGenericTypeInfo();
+        return Optional.of(mirrorToClassElement(returnType, visitorContext, genericsInfo, true, returnType instanceof TypeVariable));
     }
 
     @Override

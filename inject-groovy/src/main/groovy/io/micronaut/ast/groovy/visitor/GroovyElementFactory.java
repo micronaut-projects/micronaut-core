@@ -31,6 +31,7 @@ import org.codehaus.groovy.ast.ConstructorNode;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
 
+import java.util.Collections;
 import java.util.Map;
 
 /**
@@ -63,10 +64,9 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
             return new GroovyAnnotationElement(visitorContext, classNode, annotationMetadataFactory);
         }
         if (classNode.isGenericsPlaceHolder()) {
-            return new GroovyGenericPlaceholderElement(visitorContext, classNode, annotationMetadataFactory, 0);
-        } else {
-            return new GroovyClassElement(visitorContext, classNode, annotationMetadataFactory);
+            return new GroovyGenericPlaceholderElement(visitorContext, classNode, annotationMetadataFactory, Collections.emptyMap(), 0);
         }
+        return new GroovyClassElement(visitorContext, classNode, annotationMetadataFactory);
     }
 
     @NonNull

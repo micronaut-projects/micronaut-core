@@ -1959,11 +1959,6 @@ public class Test {
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2083')
     void "test class references in constructor arguments"() {
         given:
-//        TraceClassVisitor traceClassVisitor =
-//                new TraceClassVisitor(null, new ASMifier(), new PrintWriter(System.out));
-//        new ClassReader('io.micronaut.inject.visitor.beans.TestConstructorIntrospection')
-//                .accept(traceClassVisitor, ClassReader.EXPAND_FRAMES)
-
         BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
 package test;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
@@ -1987,7 +1982,7 @@ class Test {
     }
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/1645")
-    void "test recusive generics 2"() {
+    void "test recursive generics 2"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
 package test;

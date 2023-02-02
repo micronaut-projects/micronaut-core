@@ -24,7 +24,6 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.inject.ast.ArrayableClassElement;
@@ -103,6 +102,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @Nullable
     private ClassElement resolvedSuperType;
     private final JavaEnclosedElementsQuery enclosedElementsQuery = new JavaEnclosedElementsQuery();
+
     /**
      * @param classElement              The {@link TypeElement}
      * @param annotationMetadataFactory The annotation metadata factory
@@ -240,22 +240,17 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @NonNull
     @Override
     public Map<String, ClassElement> getTypeArguments(@NonNull String type) {
-        if (StringUtils.isNotEmpty(type)) {
-            Map<String, Map<String, TypeMirror>> data = visitorContext.getGenericUtils().buildGenericTypeArgumentElementInfo(classElement, null, getBoundTypeMirrors());
-            Map<String, TypeMirror> forType = data.get(type);
-            if (forType != null) {
-                Map<String, ClassElement> typeArgs = CollectionUtils.newLinkedHashMap(forType.size());
-                for (Map.Entry<String, TypeMirror> entry : forType.entrySet()) {
-                    TypeMirror v = entry.getValue();
-                    ClassElement ce = v != null ? mirrorToClassElement(v, visitorContext, Collections.emptyMap(), visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments()) : null;
-                    if (ce == null) {
-                        return Collections.emptyMap();
-                    } else {
-                        typeArgs.put(entry.getKey(), ce);
-                    }
-                }
-                return Collections.unmodifiableMap(typeArgs);
+        if (!StringUtils.isEmpty(type)) {
+            return Collections.emptyMap();
+        }
+        for (ClassElement anInterface : getInterfaces()) {
+            if (anInterface.getName().equals(type)) {
+                return anInterface.getTypeArguments();
             }
+        }
+        Optional<ClassElement> superType = getSuperType();
+        if (superType.isPresent()) {
+            return superType.get().getTypeArguments(type);
         }
         return Collections.emptyMap();
     }
@@ -267,7 +262,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     @Override
     public Collection<ClassElement> getInterfaces() {
-        return classElement.getInterfaces().stream().map(mirror -> mirrorToClassElement(mirror, visitorContext, genericTypeInfo)).toList();
+        return classElement.getInterfaces().stream().map(mirror -> mirrorToClassElement(mirror, visitorContext, genericTypeInfo, true, mirror instanceof TypeVariable)).toList();
     }
 
     @Override
@@ -283,8 +278,9 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                     return Optional.empty();
                 }
                 // if super type has type arguments, then build a parameterized ClassElement
-                if (superclass instanceof DeclaredType && !((DeclaredType) superclass).getTypeArguments().isEmpty()) {
-                    resolvedSuperType = parameterizedClassElement(superclass, visitorContext, createTypeArguments());
+                if (superclass instanceof DeclaredType declaredType && !declaredType.getTypeArguments().isEmpty()) {
+                    Map<String, Map<String, Supplier<ClassElement>>> declaredGenericInfo = createTypeArguments();
+                    resolvedSuperType = mirrorToClassElement(superclass, visitorContext, declaredGenericInfo, true, superclass instanceof TypeVariable);
                 } else {
                     resolvedSuperType = new JavaClassElement(superElement, elementAnnotationMetadataFactory, visitorContext);
                 }
@@ -535,7 +531,6 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         } else {
             return PackageElement.DEFAULT_PACKAGE;
         }
-
     }
 
     @Override
@@ -639,7 +634,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 .annotated(annotationMetadata -> annotationMetadata.hasStereotype(Creator.class))).stream().findFirst()
             )
             .filter(method -> !method.isPrivate() && method.getReturnType().equals(this))
-            .map(Collections::singletonList).orElse(Collections.emptyList());
+            .stream().toList();
     }
 
     @Override
@@ -661,7 +656,10 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     public List<ClassElement> getBoundGenericTypes() {
         return typeArguments.stream()
             //return getGenericTypeInfo().getOrDefault(classElement.getQualifiedName().toString(), Collections.emptyMap()).values().stream()
-            .map(tm -> mirrorToClassElement(tm, visitorContext, getGenericTypeInfo()))
+            .map(tm -> {
+                Map<String, Map<String, Supplier<ClassElement>>> genericsInfo = getGenericTypeInfo();
+                return mirrorToClassElement(tm, visitorContext, genericsInfo, true, tm instanceof TypeVariable);
+            })
             .toList();
     }
 
@@ -670,7 +668,10 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     public List<? extends GenericPlaceholderElement> getDeclaredGenericPlaceholders() {
         return classElement.getTypeParameters().stream()
             // we want the *declared* variables, so we don't pass in our genericsInfo.
-            .map(tpe -> (GenericPlaceholderElement) mirrorToClassElement(tpe.asType(), visitorContext))
+            .map(tpe -> {
+                TypeMirror returnType = tpe.asType();
+                return (GenericPlaceholderElement) mirrorToClassElement(returnType, visitorContext, Collections.emptyMap(), true, returnType instanceof TypeVariable);
+            })
             .toList();
     }
 
@@ -701,15 +702,15 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             TypeMirror lowerBound = lowerBounds.isEmpty() ? null : toTypeMirror(visitorContext, lowerBounds.get(0));
             return visitorContext.getTypes().getWildcardType(upperBound, lowerBound);
         } else if (element.isGenericPlaceholder()) {
-            if (!(element instanceof JavaGenericPlaceholderElement)) {
+            if (!(element instanceof JavaGenericPlaceholderElement javaGenericPlaceholderElement)) {
                 throw new UnsupportedOperationException("Free type variable on non-java class");
             }
-            return ((JavaGenericPlaceholderElement) element).realTypeVariable;
+            return javaGenericPlaceholderElement.realTypeVariable;
         } else {
-            if (element instanceof JavaClassElement) {
+            if (element instanceof JavaClassElement javaClassElement) {
                 return visitorContext.getTypes().getDeclaredType(
-                    ((JavaClassElement) element).classElement,
-                    ((JavaClassElement) element).typeArguments.toArray(new TypeMirror[0]));
+                        javaClassElement.classElement,
+                        javaClassElement.typeArguments.toArray(new TypeMirror[0]));
             } else {
                 ClassElement classElement1 = visitorContext.getRequiredClassElement(element.getName(), elementAnnotationMetadataFactory);
                 return visitorContext.getTypes().getDeclaredType(
@@ -728,7 +729,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
         List<TypeMirror> typeMirrors = typeArguments.stream()
             .map(ce -> toTypeMirror(visitorContext, ce))
-            .collect(Collectors.toList());
+            .toList();
         return withBoundGenericTypeMirrors(typeMirrors);
     }
 
@@ -753,25 +754,26 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @NonNull
     public Map<String, ClassElement> getTypeArguments() {
         if (resolvedTypeArguments == null) {
-            resolvedTypeArguments = resolveTypeArguments();
+            List<? extends TypeParameterElement> typeParameters = classElement.getTypeParameters();
+            Iterator<? extends TypeParameterElement> tpi = typeParameters.iterator();
+            Iterator<? extends TypeMirror> tai = typeArguments.iterator();
+
+            Map<String, ClassElement> map = new LinkedHashMap<>();
+            while (tpi.hasNext()) {
+                TypeParameterElement tpe = tpi.next();
+                TypeMirror tme = tai.hasNext() ? tai.next() : null;
+                TypeMirror type = tpe.asType();
+                ClassElement classElement = mirrorToClassElement(type,
+                        visitorContext,
+                        genericTypeInfo,
+                        visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments(),
+                        type instanceof TypeVariable, true);
+                map.put(tpe.toString(), classElement);
+            }
+
+            resolvedTypeArguments = Collections.unmodifiableMap(map);
         }
         return resolvedTypeArguments;
-    }
-
-    private Map<String, ClassElement> resolveTypeArguments() {
-        List<? extends TypeParameterElement> typeParameters = classElement.getTypeParameters();
-        Iterator<? extends TypeParameterElement> tpi = typeParameters.iterator();
-        Iterator<? extends TypeMirror> tai = typeArguments.iterator();
-
-        Map<String, ClassElement> map = new LinkedHashMap<>();
-        while (tpi.hasNext()) {
-            TypeParameterElement tpe = tpi.next();
-            TypeMirror tme = tai.hasNext() ? tai.next() : null;
-            ClassElement classElement = mirrorToClassElement(tpe.asType(), visitorContext, this.genericTypeInfo, visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments(), tme instanceof TypeVariable);
-            map.put(tpe.toString(), classElement);
-        }
-
-        return Collections.unmodifiableMap(map);
     }
 
     private Map<String, TypeMirror> getBoundTypeMirrors() {
@@ -830,8 +832,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     private Map<String, Map<String, Supplier<ClassElement>>> createTypeArguments() {
         Map<String, Map<String, TypeMirror>> gt = visitorContext.getGenericUtils()
                 .buildGenericTypeArgumentElementInfo(classElement, null, getBoundTypeMirrors());
-        Map<String, Map<String, Supplier<ClassElement>>> result = convert(gt);
-        return result;
+        return convert(gt);
     }
 
     private Map<String, Map<String, Supplier<ClassElement>>> convert(Map<String, Map<String, TypeMirror>> gt) {
@@ -841,7 +842,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             for (Map.Entry<String, TypeMirror> e2 : e.getValue().entrySet()) {
                 TypeMirror typeMirror = e2.getValue();
                 result2.put(e2.getKey(), SupplierUtil.memoizedNonEmpty(() -> {
-                    return mirrorToClassElement(typeMirror, visitorContext);
+                    return mirrorToClassElement(typeMirror, visitorContext, Collections.emptyMap(), true, typeMirror instanceof TypeVariable);
                 }));
             }
             result.put(e.getKey(), result2);

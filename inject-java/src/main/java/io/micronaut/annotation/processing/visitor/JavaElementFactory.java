@@ -33,6 +33,7 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.TypeVariable;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -238,7 +239,8 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
                     @Override
                     public ClassElement getGenericType() {
                         if (genericTypes != null) {
-                            return parameterizedClassElement(getNativeType().asType(), javaVisitorContext, genericTypes);
+                            TypeMirror typeMirror = getNativeType().asType();
+                            return mirrorToClassElement(typeMirror, javaVisitorContext, genericTypes, true, typeMirror instanceof TypeVariable);
                         } else {
                             return super.getGenericType();
                         }

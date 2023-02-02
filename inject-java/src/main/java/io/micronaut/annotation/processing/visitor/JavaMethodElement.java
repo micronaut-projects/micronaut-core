@@ -35,6 +35,7 @@ import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.TypeVariable;
 import javax.lang.model.type.WildcardType;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -105,9 +106,8 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
         final TypeMirror receiverType = executableElement.getReceiverType();
         if (receiverType != null) {
             if (receiverType.getKind() != TypeKind.NONE) {
-                final ClassElement classElement = mirrorToClassElement(receiverType,
-                    visitorContext,
-                    owningType.getGenericTypeInfo());
+                Map<String, Map<String, Supplier<ClassElement>>> genericsInfo = owningType.getGenericTypeInfo();
+                final ClassElement classElement = mirrorToClassElement(receiverType, visitorContext, genericsInfo, true, receiverType instanceof TypeVariable);
                 return Optional.of(classElement);
             }
         }
@@ -120,11 +120,10 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
         final List<? extends TypeMirror> thrownTypes = executableElement.getThrownTypes();
         if (!thrownTypes.isEmpty()) {
             return thrownTypes.stream()
-                .map(tm -> mirrorToClassElement(
-                    tm,
-                    visitorContext,
-                    owningType.getGenericTypeInfo()
-                )).toArray(ClassElement[]::new);
+                .map(tm -> {
+                    Map<String, Map<String, Supplier<ClassElement>>> genericsInfo = owningType.getGenericTypeInfo();
+                    return mirrorToClassElement(tm, visitorContext, genericsInfo, true, tm instanceof TypeVariable);
+                }).toArray(ClassElement[]::new);
         }
 
         return ClassElement.ZERO_CLASS_ELEMENTS;
@@ -182,7 +181,10 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     @Override
     public List<? extends GenericPlaceholderElement> getDeclaredTypeVariables() {
         return executableElement.getTypeParameters().stream()
-            .map(tpe -> (GenericPlaceholderElement) mirrorToClassElement(tpe.asType(), visitorContext))
+            .map(tpe -> {
+                TypeMirror returnType1 = tpe.asType();
+                return (GenericPlaceholderElement) mirrorToClassElement(returnType1, visitorContext, Collections.emptyMap(), true, returnType1 instanceof TypeVariable);
+            })
             .collect(Collectors.toList());
     }
 
@@ -248,7 +250,9 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
                 if (owningType.getName().equals(te.getQualifiedName().toString())) {
                     resolvedDeclaringClass = owningType;
                 } else {
-                    resolvedDeclaringClass = (JavaClassElement) mirrorToClassElement(te.asType(), visitorContext, owningType.getGenericTypeInfo());
+                    TypeMirror returnType1 = te.asType();
+                    Map<String, Map<String, Supplier<ClassElement>>> genericsInfo = owningType.getGenericTypeInfo();
+                    resolvedDeclaringClass = (JavaClassElement) mirrorToClassElement(returnType1, visitorContext, genericsInfo, true, returnType1 instanceof TypeVariable);
                 }
             } else {
                 return owningType;
@@ -280,11 +284,11 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
             if ((tm instanceof DeclaredType dt) && sameType("kotlin.Unit", dt)) {
                 return PrimitiveElement.VOID;
             } else {
-                return mirrorToClassElement(tm, visitorContext, info, true);
+                return mirrorToClassElement(tm, visitorContext, info, true, tm instanceof TypeVariable);
             }
         }
         final TypeMirror returnType = executableElement.getReturnType();
-        return mirrorToClassElement(returnType, visitorContext, info, true);
+        return mirrorToClassElement(returnType, visitorContext, info, true, returnType instanceof TypeVariable);
     }
 
     private static boolean sameType(String type, DeclaredType dt) {

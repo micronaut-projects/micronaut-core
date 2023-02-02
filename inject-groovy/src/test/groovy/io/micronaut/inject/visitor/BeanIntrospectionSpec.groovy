@@ -2239,4 +2239,43 @@ class SessionFactoryFactory {
             bd != null
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/1645")
+    void "test recursive generics 2"() {
+        given:
+            BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
+package test;
+
+@io.micronaut.core.annotation.Introspected
+class Test<T extends B> {
+    private T child;
+    public T getChild() {
+        return child;
+    }
+}
+class B<T extends Test> {}
+
+''')
+        expect:
+            introspection != null
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1607')
+    void "test recursive generics"() {
+        given:
+            BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
+package test;
+
+import io.micronaut.inject.visitor.RecursiveGenerics;
+
+@io.micronaut.core.annotation.Introspected
+class Test extends RecursiveGenerics<Test> {
+
+}
+''')
+
+        expect:
+            introspection != null
+    }
+
+
 }
