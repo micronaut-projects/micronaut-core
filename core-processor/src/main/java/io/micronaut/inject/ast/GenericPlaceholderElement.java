@@ -32,6 +32,7 @@ import java.util.Optional;
  */
 @Experimental
 public interface GenericPlaceholderElement extends ClassElement {
+
     /**
      * Returns the bounds of this the generic placeholder empty. Always returns a non-empty list.
      *

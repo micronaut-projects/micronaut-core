@@ -204,7 +204,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     @NonNull
     Map<String, ClassNode> getGenericsSpec() {
         if (genericsSpec == null) {
-            Map<String, Map<String, ClassNode>> info = owningType.getGenericTypeInfo();
+            Map<String, Map<String, ClassNode>> info = owningType.getAllGenericTypeInfo();
             if (CollectionUtils.isNotEmpty(info)) {
                 ClassNode declaringClazz = methodNode.getDeclaringClass();
                 if (declaringClazz == null) {

@@ -27,11 +27,9 @@ import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVariable;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 /**
  * Implementation of {@link io.micronaut.inject.ast.GenericPlaceholderElement} for Java.
@@ -44,22 +42,30 @@ import java.util.function.Supplier;
 final class JavaGenericPlaceholderElement extends JavaClassElement implements GenericPlaceholderElement {
     final TypeVariable realTypeVariable;
     private final List<JavaClassElement> bounds;
+    private final boolean isRawType;
 
     JavaGenericPlaceholderElement(@NonNull TypeVariable realTypeVariable,
                                   @NonNull List<JavaClassElement> bounds,
                                   @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory,
-                                  int arrayDimensions) {
+                                  int arrayDimensions,
+                                  boolean isRawType) {
         super(
             bounds.get(0).classElement,
             annotationMetadataFactory,
             bounds.get(0).visitorContext,
             bounds.get(0).typeArguments,
-            bounds.get(0).getGenericTypeInfo(),
+            bounds.get(0).getTypeArguments(),
             arrayDimensions,
             true
         );
         this.realTypeVariable = realTypeVariable;
         this.bounds = bounds;
+        this.isRawType = isRawType;
+    }
+
+    @Override
+    public boolean isRawType() {
+        return isRawType;
     }
 
     @Override
@@ -82,10 +88,6 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
         return false;
     }
 
-    public TypeVariable getRealTypeVariable() {
-        return realTypeVariable;
-    }
-
     @Override
     public MutableAnnotationMetadataDelegate<?> getAnnotationMetadata() {
         return bounds.get(0).getAnnotationMetadata();
@@ -99,7 +101,7 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
 
     @NonNull
     @Override
-    public List<? extends ClassElement> getBounds() {
+    public List<JavaClassElement> getBounds() {
         return bounds;
     }
 
@@ -116,13 +118,12 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
     @Override
     public Optional<Element> getDeclaringElement() {
         TypeMirror returnType = getParameterElement().getGenericElement().asType();
-        Map<String, Map<String, Supplier<ClassElement>>> genericsInfo = getGenericTypeInfo();
-        return Optional.of(mirrorToClassElement(returnType, visitorContext, genericsInfo, true, returnType instanceof TypeVariable));
+        return Optional.of(mirrorToClassElement(returnType, visitorContext, getTypeArguments()));
     }
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new JavaGenericPlaceholderElement(realTypeVariable, bounds, elementAnnotationMetadataFactory, arrayDimensions);
+        return new JavaGenericPlaceholderElement(realTypeVariable, bounds, elementAnnotationMetadataFactory, arrayDimensions, isRawType);
     }
 
     @Override

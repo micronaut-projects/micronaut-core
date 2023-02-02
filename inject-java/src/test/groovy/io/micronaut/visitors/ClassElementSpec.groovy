@@ -1978,7 +1978,10 @@ class MyBean {
             typeArgument.name == "test.MyBuilder"
             def nextTypeArguments = typeArgument.getTypeArguments()
             def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "java.lang.Object"
+            nextTypeArgument.name == "test.MyBuilder"
+            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+            def nextNextTypeArgument = nextNextTypeArguments.get("T")
+            nextNextTypeArgument.name == "java.lang.Object"
     }
 
     void "test recursive generic method return 5"() {

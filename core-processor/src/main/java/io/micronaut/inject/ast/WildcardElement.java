@@ -42,4 +42,13 @@ public interface WildcardElement extends ClassElement {
      */
     @NonNull
     List<? extends ClassElement> getLowerBounds();
+
+    /**
+     * Is bounded wildcard - not "< ? >".
+     * @return true if the wildcard is bounded, false otherwise
+     * @since 4.0.0
+     */
+    default boolean isBounded() {
+        return !getName().equals("java.lang.Object");
+    }
 }

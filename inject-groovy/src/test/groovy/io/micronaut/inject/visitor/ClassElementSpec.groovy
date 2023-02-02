@@ -488,6 +488,7 @@ public class TestController implements java.util.function.Supplier<String> {
         expect:
         AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
         AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 1
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].getAllTypeArguments().get(Supplier.class.name).get("T").name == String.name
         AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].getTypeArguments(Supplier).get("T").name == String.name
     }
 

@@ -266,17 +266,15 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
     @Override
     public Optional<ClassElement> getSuperType() {
-        final ClassNode superClass = classNode.getUnresolvedSuperClass(false);
+        final ClassNode superClass = classNode.getSuperClass();
         if (superClass != null && !superClass.equals(ClassHelper.OBJECT_TYPE)) {
-            return Optional.of(
-                toGroovyClassElement(superClass)
-            );
+            return Optional.of(toGroovyClassElement(superClass));
         }
         return Optional.empty();
     }
 
-    private ClassElement toGroovyClassElement(ClassNode superClass) {
-        return visitorContext.getElementFactory().newClassElement(superClass, elementAnnotationMetadataFactory);
+    private ClassElement toGroovyClassElement(ClassNode cn) {
+        return new GroovyClassElement(visitorContext, cn, elementAnnotationMetadataFactory, getAllGenericTypeInfo(), 0);
     }
 
     @NonNull
@@ -322,60 +320,70 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
      *
      * @return The generic type info
      */
+    @Nullable
     public Map<String, Map<String, ClassNode>> getGenericTypeInfo() {
-        if (genericInfo == null) {
-            genericInfo = AstGenericUtils.buildAllGenericElementInfo(classNode, new GroovyVisitorContext(sourceUnit, compilationUnit));
-        }
         return genericInfo;
     }
 
-    @NonNull
-    @Override
-    public Map<String, ClassElement> getTypeArguments(@NonNull String type) {
-        Map<String, Map<String, ClassNode>> allData = getGenericTypeInfo();
-        Map<String, ClassNode> thisSpec = allData.get(getName());
-        Map<String, ClassNode> forType = allData.get(type);
-        if (forType != null) {
-            Map<String, ClassElement> typeArgs = new LinkedHashMap<>(forType.size());
-            for (Map.Entry<String, ClassNode> entry : forType.entrySet()) {
-                ClassNode classNode = entry.getValue();
-                ClassElement rawElement = new GroovyClassElement(visitorContext, classNode, elementAnnotationMetadataFactory, null, 0, true);
-                rawElement = adjustTypeAnnotationMetadata(rawElement);
-                if (thisSpec != null) {
-                    rawElement = getGenericElement(sourceUnit, classNode, rawElement, thisSpec);
-                }
-                typeArgs.put(entry.getKey(), rawElement);
-            }
-            return Collections.unmodifiableMap(typeArgs);
-        }
-        return Collections.emptyMap();
+    /**
+     * Builds and returns the generic type information.
+     *
+     * @return The generic type info
+     */
+    public Map<String, Map<String, ClassNode>> getAllGenericTypeInfo() {
+        return AstGenericUtils.buildAllGenericElementInfo(classNode, new GroovyVisitorContext(sourceUnit, compilationUnit));
     }
 
-    @NonNull
-    @Override
-    public Map<String, Map<String, ClassElement>> getAllTypeArguments() {
-        Map<String, Map<String, ClassNode>> genericInfo =
-            AstGenericUtils.buildAllGenericElementInfo(classNode, new GroovyVisitorContext(sourceUnit, compilationUnit));
-        Map<String, Map<String, ClassElement>> results = new LinkedHashMap<>(genericInfo.size());
+//    @NonNull
+//    @Override
+//    public Map<String, ClassElement> getTypeArguments(@NonNull String type) {
+//        Map<String, Map<String, ClassNode>> allData = getGenericTypeInfo();
+//        Map<String, ClassNode> thisSpec = allData.get(getName());
+//        Map<String, ClassNode> forType = allData.get(type);
+//        if (forType != null) {
+//            Map<String, ClassElement> typeArgs = new LinkedHashMap<>(forType.size());
+//            for (Map.Entry<String, ClassNode> entry : forType.entrySet()) {
+//                ClassNode classNode = entry.getValue();
+//                ClassElement rawElement = new GroovyClassElement(visitorContext, classNode, elementAnnotationMetadataFactory, null, 0, true);
+//                rawElement = adjustTypeAnnotationMetadata(rawElement);
+//                if (thisSpec != null) {
+//                    rawElement = getGenericElement(sourceUnit, classNode, rawElement, thisSpec);
+//                }
+//                typeArgs.put(entry.getKey(), rawElement);
+//            }
+//            return Collections.unmodifiableMap(typeArgs);
+//        }
+//        return Collections.emptyMap();
+//    }
 
-        genericInfo.forEach((name, generics) -> {
-            Map<String, ClassElement> resolved = new LinkedHashMap<>(generics.size());
-            generics.forEach((variable, type) -> {
-                ClassElement classElement = new GroovyClassElement(visitorContext, type, elementAnnotationMetadataFactory);
-                classElement = adjustTypeAnnotationMetadata(classElement);
-                resolved.put(variable, classElement);
-            });
-            results.put(name, resolved);
-        });
-        results.put(getName(), getTypeArguments());
-        return results;
-    }
+//    @NonNull
+//    @Override
+//    public Map<String, Map<String, ClassElement>> getAllTypeArguments() {
+//        Map<String, Map<String, ClassNode>> genericInfo =
+//            AstGenericUtils.buildAllGenericElementInfo(classNode, new GroovyVisitorContext(sourceUnit, compilationUnit));
+//        Map<String, Map<String, ClassElement>> results = new LinkedHashMap<>(genericInfo.size());
+//
+//        genericInfo.forEach((name, generics) -> {
+//            Map<String, ClassElement> resolved = new LinkedHashMap<>(generics.size());
+//            generics.forEach((variable, type) -> {
+//                ClassElement classElement = new GroovyClassElement(visitorContext, type, elementAnnotationMetadataFactory);
+//                classElement = adjustTypeAnnotationMetadata(classElement);
+//                resolved.put(variable, classElement);
+//            });
+//            results.put(name, resolved);
+//        });
+//        results.put(getName(), getTypeArguments());
+//        return results;
+//    }
 
     @Override
     @NonNull
     public Map<String, ClassElement> getTypeArguments() {
         if (resolvedTypeArguments == null) {
-            Map<String, Map<String, ClassNode>> genericInfo = getGenericTypeInfo();
+            Map<String, Map<String, ClassNode>> genericInfo = this.genericInfo;
+            if (genericInfo == null) {
+                genericInfo = getAllGenericTypeInfo();
+            }
             Map<String, ClassNode> info = genericInfo.get(classNode.getName());
             resolvedTypeArguments = resolveGenericMap(info);
         }
@@ -383,7 +391,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @NonNull
-    private Map<String, ClassElement> resolveGenericMap(Map<String, ClassNode> info) {
+    private Map<String, ClassElement> resolveGenericMap(@Nullable Map<String, ClassNode> info) {
         if (info != null) {
             Map<String, ClassElement> typeArgumentMap = new LinkedHashMap<>(info.size());
             GenericsType[] genericsTypes = classNode.getGenericsTypes();
@@ -637,7 +645,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new GroovyClassElement(visitorContext, classNode, elementAnnotationMetadataFactory, getGenericTypeInfo(), arrayDimensions);
+        return new GroovyClassElement(visitorContext, classNode, elementAnnotationMetadataFactory, genericInfo, arrayDimensions);
     }
 
     @Override

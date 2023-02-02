@@ -25,7 +25,6 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import javax.lang.model.type.WildcardType;
 import java.util.List;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * Implementation of {@link io.micronaut.inject.ast.WildcardElement} for Java.
@@ -36,21 +35,9 @@ import java.util.stream.Collectors;
 @Internal
 final class JavaWildcardElement extends JavaClassElement implements WildcardElement {
     private final WildcardType wildcardType;
+    private final JavaClassElement upperBound;
     private final List<JavaClassElement> upperBounds;
     private final List<JavaClassElement> lowerBounds;
-
-    JavaWildcardElement(ElementAnnotationMetadataFactory elementAnnotationMetadataFactory,
-                        @NonNull WildcardType wildcardType,
-                        @NonNull List<JavaClassElement> upperBounds,
-                        @NonNull List<JavaClassElement> lowerBounds) {
-        this(
-                elementAnnotationMetadataFactory,
-                wildcardType,
-                findUpperType(upperBounds, lowerBounds),
-                upperBounds,
-                lowerBounds
-        );
-    }
 
     JavaWildcardElement(ElementAnnotationMetadataFactory elementAnnotationMetadataFactory,
                         @NonNull WildcardType wildcardType,
@@ -62,15 +49,16 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
                 elementAnnotationMetadataFactory,
                 mostUpper.visitorContext,
                 mostUpper.typeArguments,
-                mostUpper.getGenericTypeInfo()
+                mostUpper.getTypeArguments()
         );
         this.wildcardType = wildcardType;
+        this.upperBound = mostUpper;
         this.upperBounds = upperBounds;
         this.lowerBounds = lowerBounds;
     }
 
     @NonNull
-    private static JavaClassElement findUpperType(List<JavaClassElement> upperBounds, List<JavaClassElement> lowerBounds) {
+    public static JavaClassElement findUpperType(List<JavaClassElement> upperBounds, List<JavaClassElement> lowerBounds) {
         JavaClassElement upper = null;
         for (JavaClassElement lowerBound : lowerBounds) {
             if (upper == null || lowerBound.isAssignable(upper)) {
@@ -127,9 +115,9 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
 
     @Override
     public ClassElement foldBoundGenericTypes(@NonNull Function<ClassElement, ClassElement> fold) {
-        List<JavaClassElement> upperBounds = this.upperBounds.stream().map(ele -> toJavaClassElement(ele.foldBoundGenericTypes(fold))).collect(Collectors.toList());
-        List<JavaClassElement> lowerBounds = this.lowerBounds.stream().map(ele -> toJavaClassElement(ele.foldBoundGenericTypes(fold))).collect(Collectors.toList());
-        return fold.apply(upperBounds.contains(null) || lowerBounds.contains(null) ? null : new JavaWildcardElement(elementAnnotationMetadataFactory, wildcardType, upperBounds, lowerBounds));
+        List<JavaClassElement> upperBounds = this.upperBounds.stream().map(ele -> toJavaClassElement(ele.foldBoundGenericTypes(fold))).toList();
+        List<JavaClassElement> lowerBounds = this.lowerBounds.stream().map(ele -> toJavaClassElement(ele.foldBoundGenericTypes(fold))).toList();
+        return fold.apply(upperBounds.contains(null) || lowerBounds.contains(null) ? null : new JavaWildcardElement(elementAnnotationMetadataFactory, wildcardType, upperBound, upperBounds, lowerBounds));
     }
 
     private JavaClassElement toJavaClassElement(ClassElement element) {

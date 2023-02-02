@@ -63,18 +63,6 @@ public class GenericUtils {
         return buildGenericTypeArgumentInfo(element, dt, Collections.emptyMap());
     }
 
-    /**
-     * Builds type argument information for the given type.
-     *
-     * @param element The element
-     * @param declaredType The declared type
-     * @param boundTypes The type variables
-     * @return The type argument information
-     */
-    public Map<String, Map<String, TypeMirror>> buildGenericTypeArgumentElementInfo(@NonNull Element element, @Nullable DeclaredType declaredType, Map<String, TypeMirror> boundTypes) {
-        return buildGenericTypeArgumentInfo(element, declaredType, boundTypes);
-    }
-
     private Map<String, Map<String, TypeMirror>> buildGenericTypeArgumentInfo(@NonNull Element element, @Nullable DeclaredType dt, Map<String, TypeMirror> boundTypes) {
 
         Map<String, Map<String, TypeMirror>> beanTypeArguments = new LinkedHashMap<>();
@@ -296,8 +284,7 @@ public class GenericUtils {
             if (superclass.getKind() == TypeKind.NONE) {
                 current = null;
             } else {
-                if (superclass instanceof DeclaredType) {
-                    DeclaredType dt = (DeclaredType) superclass;
+                if (superclass instanceof DeclaredType dt) {
                     List<? extends TypeMirror> superArguments = dt.getTypeArguments();
 
 
@@ -338,11 +325,9 @@ public class GenericUtils {
 
     private void populateTypeArgumentsForInterfaces(Map<String, Map<String, TypeMirror>> typeArguments, TypeElement child) {
         for (TypeMirror anInterface : child.getInterfaces()) {
-            if (anInterface instanceof DeclaredType) {
-                DeclaredType declaredType = (DeclaredType) anInterface;
+            if (anInterface instanceof DeclaredType declaredType) {
                 Element element = declaredType.asElement();
-                if (element instanceof TypeElement) {
-                    TypeElement te = (TypeElement) element;
+                if (element instanceof TypeElement te) {
                     String name = JavaModelUtils.getClassName(te);
                     if (!typeArguments.containsKey(name)) {
                         Map<String, TypeMirror> boundTypes = typeArguments.get(JavaModelUtils.getClassName(child));

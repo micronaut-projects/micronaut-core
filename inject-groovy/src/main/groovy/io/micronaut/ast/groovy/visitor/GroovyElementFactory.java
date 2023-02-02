@@ -16,6 +16,7 @@
 package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
@@ -74,39 +75,10 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
     public ClassElement newClassElement(ClassNode classNode,
                                         ElementAnnotationMetadataFactory annotationMetadataFactory,
                                         Map<String, ClassElement> resolvedGenerics) {
-        if (classNode.isArray()) {
-            ClassNode componentType = classNode.getComponentType();
-            ClassElement componentElement = newClassElement(componentType, annotationMetadataFactory);
-            return componentElement.toArray();
+        if (CollectionUtils.isNotEmpty(resolvedGenerics)) {
+            return newClassElement(classNode, annotationMetadataFactory).withTypeArguments(resolvedGenerics);
         }
-        if (ClassHelper.isPrimitiveType(classNode)) {
-            return PrimitiveElement.valueOf(classNode.getName());
-        }
-        if (classNode.isEnum()) {
-            return new GroovyEnumElement(visitorContext, classNode, annotationMetadataFactory) {
-                @NonNull
-                @Override
-                public Map<String, ClassElement> getTypeArguments() {
-                    if (resolvedGenerics != null) {
-                        return resolvedGenerics;
-                    }
-                    return super.getTypeArguments();
-                }
-            };
-        }
-        if (classNode.isAnnotationDefinition()) {
-            return new GroovyAnnotationElement(visitorContext, classNode, annotationMetadataFactory);
-        }
-        return new GroovyClassElement(visitorContext, classNode, annotationMetadataFactory) {
-            @NonNull
-            @Override
-            public Map<String, ClassElement> getTypeArguments() {
-                if (resolvedGenerics != null) {
-                    return resolvedGenerics;
-                }
-                return super.getTypeArguments();
-            }
-        };
+        return newClassElement(classNode, annotationMetadataFactory);
     }
 
     @NonNull

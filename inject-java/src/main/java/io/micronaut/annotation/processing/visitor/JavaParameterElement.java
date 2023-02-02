@@ -19,16 +19,12 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
 import javax.lang.model.element.VariableElement;
-import javax.lang.model.type.TypeMirror;
-import javax.lang.model.type.TypeVariable;
 import java.util.Collections;
-import java.util.Map;
-import java.util.function.Supplier;
 
 /**
  * Implementation of the {@link ParameterElement} interface for Java.
@@ -94,8 +90,7 @@ class JavaParameterElement extends AbstractJavaElement implements ParameterEleme
     @NonNull
     public ClassElement getType() {
         if (typeElement == null) {
-            TypeMirror parameterType = getNativeType().asType();
-            this.typeElement = mirrorToClassElement(parameterType, visitorContext, Collections.emptyMap(), true, parameterType instanceof TypeVariable);
+            this.typeElement = mirrorToClassElement(getNativeType().asType(), visitorContext, Collections.emptyMap());
         }
         return typeElement;
     }
@@ -104,9 +99,7 @@ class JavaParameterElement extends AbstractJavaElement implements ParameterEleme
     @Override
     public ClassElement getGenericType() {
         if (this.genericTypeElement == null) {
-            TypeMirror returnType = getNativeType().asType();
-            Map<String, Map<String, Supplier<ClassElement>>> declaredGenericInfo = owningType.getGenericTypeInfo();
-            this.genericTypeElement = mirrorToClassElement(returnType, visitorContext, declaredGenericInfo, true, returnType instanceof TypeVariable);
+            this.genericTypeElement = mirrorToClassElement(getNativeType().asType(), visitorContext, methodElement.getDeclaringType().getTypeArguments());
         }
         return this.genericTypeElement;
     }
