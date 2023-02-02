@@ -15,10 +15,59 @@ import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 
 import javax.annotation.processing.SupportedAnnotationTypes
+import java.lang.annotation.ElementType
 import java.lang.annotation.Retention
 import java.lang.annotation.RetentionPolicy
+import java.lang.annotation.Target
 
 class ElementAnnotateSpec extends AbstractTypeElementSpec {
+
+    void "test type_use annotaions"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.*;
+import io.micronaut.inject.visitor.*;
+
+@Introspected
+class Test {
+
+    @TypeUseRuntimeAnn
+    private String name;
+    @TypeUseClassAnn
+    private String secondName;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getSecondName() {
+        return name;
+    }
+
+    public void setSecondName(String secondName) {
+        this.secondName = secondName;
+    }
+}
+''')
+        def nameField = introspection.getProperty("name").orElse(null)
+        def secondNameField = introspection.getProperty("secondName").orElse(null)
+
+        expect:
+        nameField
+        secondNameField
+
+        nameField.hasStereotype(TypeUseRuntimeAnn)
+        nameField.hasStereotype("io.micronaut.inject.visitor.TypeUseRuntimeAnn")
+        secondNameField.hasStereotype(TypeUseClassAnn)
+        secondNameField.hasStereotype("io.micronaut.inject.visitor.TypeUseClassAnn")
+    }
 
     void "test annotate introduction advice"() {
         when:
@@ -60,12 +109,12 @@ class TestListener {
     @Executable
     void receive(String v) {
     }
-    
+
     @Executable
     int[] receiveArray(int[] v) {
         return v;
     }
-    
+
     @Executable
     int receiveInt(int v) {
         return v;
@@ -96,11 +145,11 @@ import io.micronaut.core.annotation.Introspected;
 @Introspected
 class Test {
     private String name;
-    
-    public String getName() { 
+
+    public String getName() {
         return name;
     }
-    
+
     public void setName(String name) {
         this.name = name;
     }
@@ -123,11 +172,11 @@ class Outer {
     @Introspected
     static class Test {
         private String name;
-        
-        public String getName() { 
+
+        public String getName() {
             return name;
         }
-        
+
         public void setName(String name) {
             this.name = name;
         }
@@ -235,6 +284,17 @@ class Outer {
 @interface RuntimeAnn {
     String foo() default ""
 }
+
 @Retention(RetentionPolicy.RUNTIME)
 @interface IntroAnn {
+}
+
+@Target(ElementType.TYPE_USE)
+@Retention(RetentionPolicy.RUNTIME)
+@interface TypeUseRuntimeAnn {
+}
+
+@Target(ElementType.TYPE_USE)
+@Retention(RetentionPolicy.CLASS)
+@interface TypeUseClassAnn {
 }
