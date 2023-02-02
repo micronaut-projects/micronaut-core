@@ -137,11 +137,9 @@ public class IOUtils {
                 if (!jarUri.startsWith(SCHEME_FILE + COLON)) {
                     // Special case WebLogic classloader
                     // https://github.com/micronaut-projects/micronaut-core/issues/8636
-                    if (jarUri.startsWith("/")) {
-                        jarUri = SCHEME_FILE + COLON + jarUri;
-                    } else {
-                        jarUri = SCHEME_FILE + COLON + "/" + jarUri;
-                    }
+                    jarUri = jarUri.startsWith("/") ?
+                        SCHEME_FILE + COLON + jarUri :
+                        SCHEME_FILE + COLON + "/" + jarUri;
                 }
                 // now, add the !/ at the end again so that loadNestedJarUri can handle it:
                 jarUri += "!/";
