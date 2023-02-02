@@ -223,7 +223,7 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
         });
     }
 
-    protected final void maybeRequestMore() { // todo: make private https://github.com/netty/netty-incubator-codec-http3/pull/211
+    private final void maybeRequestMore() {
         if (ctx.channel().isWritable() && !(state == COMPLETE || state == CANCELLED)) {
             subscription.request(1);
         }
