@@ -64,9 +64,6 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     private final Class<In> inClass;
     private final Class<Out> outClass;
 
-    // todo: remove https://github.com/netty/netty-incubator-codec-http3/pull/211
-    private boolean doNotWaitForWrite = false;
-
     /**
      * The incoming message that is currently being streamed out to a subscriber.
      * <p>
@@ -106,14 +103,6 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     HttpStreamsHandler(Class<In> inClass, Class<Out> outClass) {
         this.inClass = inClass;
         this.outClass = outClass;
-    }
-
-    // todo: remove https://github.com/netty/netty-incubator-codec-http3/pull/211
-    /**
-     * Don't wait for the upstream to complete the write call. This works around a netty HTTP/3 bug.
-     */
-    public void doNotWaitForWrite() {
-        doNotWaitForWrite = true;
     }
 
     /**
@@ -370,37 +359,9 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                         //if oncomplete gets called before the message is written the promise
                         //set to lastWriteFuture shouldn't complete until the first content is written
                         lastWriteFuture = messageWritePromise;
-                        if (doNotWaitForWrite) {
-                            // todo: remove https://github.com/netty/netty-incubator-codec-http3/pull/211
-                            if (ctx.executor().inEventLoop()) {
-                                ctx.writeAndFlush(message, ctx.voidPromise());
-                                onNext(httpContent, messageWritePromise);
-                            } else {
-                                ctx.executor().execute(() -> {
-                                    ctx.writeAndFlush(message, ctx.voidPromise());
-                                    onNext(httpContent, messageWritePromise);
-                                });
-                            }
-                        } else {
-                            ctx.writeAndFlush(message).addListener(f -> onNext(httpContent, messageWritePromise));
-                        }
+                        ctx.writeAndFlush(message).addListener(f -> onNext(httpContent, messageWritePromise));
                     } else {
                         super.onNext(httpContent);
-                    }
-                }
-
-                @Override
-                protected void onNext(HttpContent httpContent, ChannelPromise promise) {
-                    if (doNotWaitForWrite) {
-                        // todo: remove https://github.com/netty/netty-incubator-codec-http3/pull/211
-                        if (!ctx.executor().inEventLoop()) {
-                            ctx.executor().execute(() -> onNext(httpContent, promise));
-                            return;
-                        }
-                    }
-                    super.onNext(httpContent, promise);
-                    if (doNotWaitForWrite) {
-                        promise.trySuccess();
                     }
                 }
 
@@ -416,21 +377,8 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                         } else {
                             responseStatus = HttpResponseStatus.INTERNAL_SERVER_ERROR;
                         }
-                        if (doNotWaitForWrite) {
-                            // todo: remove https://github.com/netty/netty-incubator-codec-http3/pull/211
-                            if (ctx.executor().inEventLoop()) {
-                                ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, responseStatus), ctx.voidPromise());
-                                ctx.close();
-                            } else {
-                                ctx.executor().execute(() -> {
-                                    ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, responseStatus), ctx.voidPromise());
-                                    ctx.close();
-                                });
-                            }
-                        } else {
-                            ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, responseStatus))
+                        ctx.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, responseStatus))
                                 .addListener(ChannelFutureListener.CLOSE);
-                        }
                     } finally {
                         ctx.read();
                     }
@@ -439,20 +387,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                 @Override
                 protected void complete() {
                     if (messageWritten.compareAndSet(false, true)) {
-                        if (doNotWaitForWrite) {
-                            // todo: remove https://github.com/netty/netty-incubator-codec-http3/pull/211
-                            if (ctx.executor().inEventLoop()) {
-                                ctx.writeAndFlush(message, ctx.voidPromise());
-                                doOnComplete();
-                            } else {
-                                ctx.executor().execute(() -> {
-                                    ctx.writeAndFlush(message, ctx.voidPromise());
-                                    doOnComplete();
-                                });
-                            }
-                        } else {
-                            ctx.writeAndFlush(message).addListener(future -> doOnComplete());
-                        }
+                        ctx.writeAndFlush(message).addListener(future -> doOnComplete());
                     } else {
                         doOnComplete();
                     }

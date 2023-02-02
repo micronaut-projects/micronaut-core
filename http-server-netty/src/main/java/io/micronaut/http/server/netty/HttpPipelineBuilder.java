@@ -509,9 +509,6 @@ final class HttpPipelineBuilder {
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new Http3FrameToHttpObjectCodec(true, server.getServerConfiguration().isValidateHeaders()));
 
             insertHttp2DownstreamHandlers();
-
-            // todo: remove https://github.com/netty/netty-incubator-codec-http3/pull/211
-            pipeline.get(HttpStreamsServerHandler.class).doNotWaitForWrite();
         }
 
         /**
