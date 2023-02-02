@@ -22,10 +22,10 @@ import ch.qos.logback.classic.util.EnvUtil;
 import ch.qos.logback.core.joran.spi.JoranException;
 import ch.qos.logback.core.status.InfoStatus;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.logging.LoggingSystemException;
 
 import java.net.URL;
+import java.util.function.Supplier;
 
 /**
  * Utility methods to configure {@link LoggerContext}.
@@ -48,7 +48,7 @@ public final class LogbackUtils {
     public static void configure(@NonNull ClassLoader classLoader,
                                  @NonNull LoggerContext context,
                                  @NonNull String logbackXmlLocation) {
-        configure(context, logbackXmlLocation, classLoader.getResource(logbackXmlLocation));
+        configure(context, logbackXmlLocation, () -> classLoader.getResource(logbackXmlLocation));
     }
 
     /**
@@ -59,25 +59,28 @@ public final class LogbackUtils {
      *
      * @param context  Logger Context
      * @param logbackXmlLocation the location of the xml logback config file
-     * @param resource A resource for example logback.xml
+     * @param resourceSupplier A resource for example logback.xml
      */
     private static void configure(
         @NonNull LoggerContext context,
         @NonNull String logbackXmlLocation,
-        @Nullable URL resource
+        Supplier<URL> resourceSupplier
     ) {
         Configurator configurator = EnvUtil.loadFromServiceLoader(Configurator.class);
         if (configurator != null) {
             context.getStatusManager().add(new InfoStatus("Using " + configurator.getClass().getName(), context));
             programmaticConfiguration(context, configurator);
-        } else if (resource != null) {
-            try {
-                new ContextInitializer(context).configureByResource(resource);
-            } catch (JoranException e) {
-                throw new LoggingSystemException("Error while refreshing Logback", e);
-            }
         } else {
-            throw new LoggingSystemException("Resource " + logbackXmlLocation + " not found");
+            URL resource = resourceSupplier.get();
+            if (resource != null) {
+                try {
+                    new ContextInitializer(context).configureByResource(resource);
+                } catch (JoranException e) {
+                    throw new LoggingSystemException("Error while refreshing Logback", e);
+                }
+            } else {
+                throw new LoggingSystemException("Resource " + logbackXmlLocation + " not found");
+            }
         }
     }
 
