@@ -21,7 +21,7 @@ jobs:
         id: check_release_drafter
         run: |
           has_release_drafter=$([ -f .github/release-drafter.yml ] && echo "true" || echo "false")
-          echo ::set-output name=has_release_drafter::${has_release_drafter}
+          echo "name=has_release_drafter::${has_release_drafter}" >> $GITHUB_OUTPUT
 
       # If it has release drafter:
       - uses: release-drafter/release-drafter@v5
