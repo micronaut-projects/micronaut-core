@@ -8,7 +8,6 @@ dependencies {
     implementation(projects.runtime)
     implementation(projects.jacksonDatabind)
     implementation(projects.inject)
-    api(projects.httpTck)
     api(projects.httpServer)
     api(projects.httpClientCore)
     api(libs.junit.jupiter.api)

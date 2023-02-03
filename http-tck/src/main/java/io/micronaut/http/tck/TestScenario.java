@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.tck;
+package io.micronaut.http.tck;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
+
 import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
@@ -29,6 +30,7 @@ import java.util.function.BiConsumer;
  */
 @Experimental
 public final class TestScenario {
+
     private final String specName;
     private final Map<String, Object> configuration;
 

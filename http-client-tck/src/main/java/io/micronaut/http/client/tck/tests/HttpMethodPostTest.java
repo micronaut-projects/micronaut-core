@@ -13,16 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.tck.http.client;
+package io.micronaut.http.client.tck.tests;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
+import io.micronaut.http.tck.AssertionUtils;
+import io.micronaut.http.tck.HttpResponseAssertion;
 import org.junit.jupiter.api.Test;
-import reactor.core.publisher.Flux;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import java.io.IOException;
+
+import static io.micronaut.http.tck.TestScenario.asserts;
 
 @SuppressWarnings({
     "java:S2259", // The tests will show if it's null
@@ -30,23 +34,26 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
     "checkstyle:MissingJavadocType",
     "checkstyle:DesignForExtension",
 })
-public interface HttpMethodPostTest extends AbstractTck {
+class HttpMethodPostTest {
 
-    String HTTP_METHOD_POST_TEST = "HttpMethodPostTest";
+    private static final String SPEC_NAME = "HttpMethodPostTest";
 
     @Test
-    default void postBody() {
-        runTest(HTTP_METHOD_POST_TEST, (server, client) ->
-            assertEquals("Tim:49", Flux.from(client.exchange(HttpRequest.POST("/post/object-body", new Person("Tim", 49)), String.class)).blockFirst().body())
-        );
-        runBlockingTest(HTTP_METHOD_POST_TEST, (server, client) ->
-                assertEquals("Tim:49", client.exchange(HttpRequest.POST("/post/object-body", new Person("Tim", 49)), String.class).body())
+    void postBody() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/post/object-body", new Person("Tim", 49)),
+            (server, request) ->
+                AssertionUtils.assertDoesNotThrow(server, request,
+                    HttpResponseAssertion.builder()
+                        .status(HttpStatus.OK)
+                        .body("Tim:49")
+                        .build())
         );
     }
 
-    @Requires(property = "spec.name", value = HTTP_METHOD_POST_TEST)
+    @Requires(property = "spec.name", value = SPEC_NAME)
     @Controller("/post")
-    class HttpMethodPostTestController {
+    static class HttpMethodPostTestController {
 
         @Post()
         String response() {

@@ -1,18 +1,11 @@
 package netty;
 
-import io.micronaut.tck.http.client.AuthTest;
-import io.micronaut.tck.http.client.CookieTest;
-import io.micronaut.tck.http.client.HttpMethodDeleteTest;
-import io.micronaut.tck.http.client.HttpMethodPostTest;
-import io.micronaut.tck.http.client.RedirectTest;
-import io.micronaut.tck.http.client.StatusTest;
+import org.junit.platform.suite.api.SelectPackages;
+import org.junit.platform.suite.api.Suite;
+import org.junit.platform.suite.api.SuiteDisplayName;
 
-public class NettyHttpMethodTests implements
-    AuthTest
-    , HttpMethodDeleteTest
-    , RedirectTest
-    , HttpMethodPostTest
-    , StatusTest
-    , CookieTest
-{
+@Suite
+@SelectPackages("io.micronaut.http.client.tck.tests")
+@SuiteDisplayName("HTTP Client TCK for Netty based client")
+public class NettyHttpMethodTests {
 }

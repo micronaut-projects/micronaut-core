@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.tck.tests;
+package io.micronaut.http.client.tck.tests;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
@@ -28,60 +28,73 @@ import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import jakarta.inject.Singleton;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
 
 @SuppressWarnings({
+    "java:S2259", // The tests will show if it's null
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
-    "checkstyle:DesignForExtension"
+    "checkstyle:DesignForExtension",
 })
 public class StatusTest {
-    public static final String SPEC_NAME = "StatusTest";
 
-    /**
-     * @see <a href="https://github.com/micronaut-projects/micronaut-aws/issues/1387">micronaut-aws #1387</a>
-     * @param path Request Path
-     */
-    @ParameterizedTest
-    @ValueSource(strings = {"/http-status", "/http-response-status", "/http-exception"})
-    void testControllerReturningHttpStatus(String path) throws IOException {
+    private static final String SPEC_NAME = "StatusTest";
+
+    @Test
+    void returnStatus() throws IOException {
         asserts(SPEC_NAME,
-            HttpRequest.GET(path),
-            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
-                .status(HttpStatus.I_AM_A_TEAPOT)
-                .build()));
+            HttpRequest.GET("/status/http-status"),
+            (server, request) ->
+                AssertionUtils.assertThrows(server, request,
+                    HttpResponseAssertion.builder()
+                        .status(HttpStatus.I_AM_A_TEAPOT)
+                        .build())
+        );
+    }
+
+    @Test
+    void responseStatus() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/status/response-status"),
+            (server, request) ->
+                AssertionUtils.assertThrows(server, request,
+                    HttpResponseAssertion.builder()
+                        .status(HttpStatus.I_AM_A_TEAPOT)
+                        .build())
+        );
+    }
+
+    @Test
+    void exceptionStatus() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/status/exception-status"),
+            (server, request) ->
+                AssertionUtils.assertThrows(server, request,
+                    HttpResponseAssertion.builder()
+                        .status(HttpStatus.I_AM_A_TEAPOT)
+                        .build())
+        );
     }
 
     @Requires(property = "spec.name", value = SPEC_NAME)
-    @Controller("/http-status")
+    @Controller("/status")
     static class HttpStatusController {
-        @Get
-        HttpStatus index() {
+        @Get("/http-status")
+        HttpStatus status() {
             return HttpStatus.I_AM_A_TEAPOT;
         }
-    }
 
-    @Requires(property = "spec.name", value = SPEC_NAME)
-    @Controller("/http-response-status")
-    static class HttpResponseStatusController {
-
-        @Get
-        HttpResponse<?> index() {
+        @Get("/response-status")
+        HttpResponse<?> response() {
             return HttpResponse.status(HttpStatus.I_AM_A_TEAPOT);
         }
-    }
 
-    @Requires(property = "spec.name", value = SPEC_NAME)
-    @Controller("/http-exception")
-    static class HttpResponseErrorController {
-
-        @Get
-        HttpResponse<?> index() {
+        @Get("/exception-status")
+        HttpResponse<?> exception() {
             throw new TeapotException();
         }
     }
@@ -91,6 +104,7 @@ public class StatusTest {
 
     @Produces
     @Singleton
+    @Requires(property = "spec.name", value = SPEC_NAME)
     static class TeapotExceptionHandler implements ExceptionHandler<TeapotException, HttpResponse<?>> {
         private final ErrorResponseProcessor<?> errorResponseProcessor;
 

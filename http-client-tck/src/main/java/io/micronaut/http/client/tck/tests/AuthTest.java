@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.tck.http.client;
+package io.micronaut.http.client.tck.tests;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.BasicAuth;
@@ -21,10 +21,13 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.tck.AssertionUtils;
+import io.micronaut.http.tck.HttpResponseAssertion;
 import org.junit.jupiter.api.Test;
-import reactor.core.publisher.Flux;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import java.io.IOException;
+
+import static io.micronaut.http.tck.TestScenario.asserts;
 
 @SuppressWarnings({
     "java:S2259", // The tests will show if it's null
@@ -32,27 +35,24 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
     "checkstyle:MissingJavadocType",
     "checkstyle:DesignForExtension",
 })
-public interface AuthTest extends AbstractTck {
+class AuthTest {
 
-    String AUTH_TEST = "AuthTest";
+    private static final String SPEC_NAME = "AuthTest";
 
     @Test
-    default void basicAuth() {
-        runTest(AUTH_TEST, (server, client) -> {
-            var exchange = Flux.from(client.exchange(HttpRequest.GET("/auth-test").basicAuth("Tim", "Yates"), String.class)).blockFirst();
-            assertEquals(HttpStatus.OK, exchange.getStatus());
-            assertEquals("Tim:Yates", exchange.body());
-        });
-        runBlockingTest(AUTH_TEST, (server, client) -> {
-            var exchange = client.exchange(HttpRequest.GET("/auth-test").basicAuth("Tim", "Yates"), String.class);
-            assertEquals(HttpStatus.OK, exchange.getStatus());
-            assertEquals("Tim:Yates", exchange.body());
-        });
+    void authTest() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/auth-test").basicAuth("Tim", "Yates"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("Tim:Yates")
+                    .build()));
     }
 
     @Controller("/auth-test")
-    @Requires(property = "spec.name", value = AUTH_TEST)
-    class AuthController {
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class AuthController {
 
         @Get
         String get(BasicAuth auth) {

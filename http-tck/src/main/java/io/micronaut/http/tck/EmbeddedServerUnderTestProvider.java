@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.tck;
+package io.micronaut.http.tck;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
@@ -27,6 +27,7 @@ import java.util.Map;
  */
 @Experimental
 public class EmbeddedServerUnderTestProvider implements ServerUnderTestProvider {
+
     @Override
     @NonNull
     public ServerUnderTest getServer(@NonNull Map<String, Object> properties) {

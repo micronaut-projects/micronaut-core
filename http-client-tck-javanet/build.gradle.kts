@@ -1,12 +1,14 @@
 plugins {
     id("io.micronaut.build.internal.convention-library")
 }
+
 dependencies {
-    testImplementation(project(":http-client-tck"))
-    testImplementation(project(":runtime"))
-    testImplementation(project(":http-client-javanet"))
-    testImplementation(project(":jackson-databind"))
+    testImplementation(projects.httpServerNetty)
+    testImplementation(projects.httpClientJavanet)
+    testImplementation(projects.httpClientTck)
+    testImplementation(libs.junit.platform.engine)
 }
+
 tasks.named<Test>("test") {
     useJUnitPlatform()
     systemProperty("jdk.httpclient.HttpClient.log", "all")

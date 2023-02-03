@@ -24,16 +24,16 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Status;
-import io.micronaut.http.server.tck.AssertionUtils;
-import io.micronaut.http.server.tck.HttpResponseAssertion;
 import io.micronaut.http.server.util.HttpHostResolver;
+import io.micronaut.http.tck.AssertionUtils;
+import io.micronaut.http.tck.HttpResponseAssertion;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.Collections;
 
-import static io.micronaut.http.server.tck.TestScenario.asserts;
+import static io.micronaut.http.tck.TestScenario.asserts;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 @SuppressWarnings({
@@ -46,7 +46,7 @@ public class CorsDisabledByDefaultTest {
     private static final String SPECNAME = "CorsDisabledByDefaultTest";
 
     /**
-     * By default CORS is disabled no cors headers are present in response.
+     * By default, CORS is disabled no cors headers are present in response.
      * @throws IOException may throw the try for resources
      */
     @Test
