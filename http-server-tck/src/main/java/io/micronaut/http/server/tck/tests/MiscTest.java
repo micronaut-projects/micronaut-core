@@ -29,14 +29,19 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.server.tck.AssertionUtils;
+import io.micronaut.http.server.tck.BodyAssertion;
 import io.micronaut.http.server.tck.HttpResponseAssertion;
 import static io.micronaut.http.server.tck.TestScenario.asserts;
 import org.junit.jupiter.api.Test;
 
 import javax.validation.constraints.NotBlank;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Map;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 
 
 @SuppressWarnings({
@@ -158,6 +163,16 @@ public class MiscTest {
                 .build()));
     }
 
+    @Test
+    void canReadOctetEncodedData() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/octets"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body(BodyAssertion.builder().body(OctetController.BODY_BYTES).equals())
+                .build()));
+    }
+
     @Controller
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class SimpleController {
@@ -180,6 +195,22 @@ public class MiscTest {
         @Get(value = "/ok", produces = MediaType.TEXT_HTML)
         String getOkAsHtml() {
             return "<div>ok</div>";
+        }
+    }
+
+    @Controller("/octets")
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class OctetController {
+
+        static final byte[] BODY_BYTES = IntStream.iterate(1, i -> i + 1)
+            .limit(256)
+            .map(i -> (byte) i)
+            .collect(ByteArrayOutputStream::new, ByteArrayOutputStream::write, (a, b) -> a.write(b.toByteArray(), 0, b.size()))
+            .toByteArray();
+
+        @Get(produces = MediaType.APPLICATION_OCTET_STREAM)
+        HttpResponse<byte[]> byteArray() {
+            return HttpResponse.ok(BODY_BYTES);
         }
     }
 
