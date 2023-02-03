@@ -242,7 +242,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     @Override
     public Collection<ClassElement> getInterfaces() {
-        return classElement.getInterfaces().stream().map(mirror -> mirrorToClassElement(mirror, visitorContext, getTypeArguments())).toList();
+        return classElement.getInterfaces().stream().map(mirror -> newClassElement(mirror, getTypeArguments())).toList();
     }
 
     @Override
@@ -257,7 +257,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 if (Object.class.getName().equals(superElement.getQualifiedName().toString())) {
                     return Optional.empty();
                 }
-                resolvedSuperType = mirrorToClassElement(superclass, visitorContext, getTypeArguments());
+                resolvedSuperType = newClassElement(superclass, getTypeArguments());
             }
         }
         return Optional.ofNullable(resolvedSuperType);
@@ -633,7 +633,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             return Collections.emptyList();
         }
         return typeArguments.stream()
-                .map(tm -> mirrorToClassElement(tm, visitorContext, getTypeArguments()))
+                .map(tm -> newClassElement(tm, getTypeArguments()))
                 .toList();
     }
 
@@ -642,7 +642,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     public List<? extends GenericPlaceholderElement> getDeclaredGenericPlaceholders() {
         return classElement.getTypeParameters().stream()
                 // we want the *declared* variables, so we don't pass in our genericsInfo.
-                .map(tpe -> (GenericPlaceholderElement) mirrorToClassElement(tpe.asType(), visitorContext, Collections.emptyMap()))
+                .map(tpe -> (GenericPlaceholderElement) newClassElement(tpe.asType(), Collections.emptyMap()))
                 .toList();
     }
 

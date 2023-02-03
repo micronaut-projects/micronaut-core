@@ -88,7 +88,7 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
                 this.genericType = getType();
             } else {
                 ClassElement declaringType = getDeclaringType();
-                this.genericType = mirrorToClassElement(variableElement.asType(), visitorContext, declaringType.getTypeArguments());
+                this.genericType = newClassElement(variableElement.asType(), declaringType.getTypeArguments());
             }
         }
         return this.genericType;
@@ -113,7 +113,7 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
     @Override
     public ClassElement getType() {
         if (this.typeElement == null) {
-            this.typeElement = mirrorToClassElement(variableElement.asType(), visitorContext, Collections.emptyMap());
+            this.typeElement = newClassElement(variableElement.asType(), Collections.emptyMap());
         }
         return this.typeElement;
     }
@@ -129,7 +129,7 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
                 } else {
                     TypeMirror returnType = te.asType();
                     Map<String, ClassElement> genericsInfo = owningType.getTypeArguments(typeName);
-                    resolvedDeclaringClass = mirrorToClassElement(returnType, visitorContext, genericsInfo);
+                    resolvedDeclaringClass = newClassElement(returnType, genericsInfo);
                 }
             } else {
                 return owningType;

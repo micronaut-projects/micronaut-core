@@ -90,7 +90,7 @@ class JavaParameterElement extends AbstractJavaElement implements ParameterEleme
     @NonNull
     public ClassElement getType() {
         if (typeElement == null) {
-            this.typeElement = mirrorToClassElement(getNativeType().asType(), visitorContext, Collections.emptyMap());
+            this.typeElement = newClassElement(getNativeType().asType(), Collections.emptyMap());
         }
         return typeElement;
     }
@@ -99,7 +99,7 @@ class JavaParameterElement extends AbstractJavaElement implements ParameterEleme
     @Override
     public ClassElement getGenericType() {
         if (this.genericTypeElement == null) {
-            this.genericTypeElement = mirrorToClassElement(getNativeType().asType(), visitorContext, methodElement.getDeclaringType().getTypeArguments());
+            this.genericTypeElement = newClassElement(getNativeType().asType(), methodElement.getDeclaringType().getTypeArguments());
         }
         return this.genericTypeElement;
     }

@@ -118,7 +118,7 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
     @Override
     public Optional<Element> getDeclaringElement() {
         TypeMirror returnType = getParameterElement().getGenericElement().asType();
-        return Optional.of(mirrorToClassElement(returnType, visitorContext, getTypeArguments()));
+        return Optional.of(newClassElement(returnType, getTypeArguments()));
     }
 
     @Override
