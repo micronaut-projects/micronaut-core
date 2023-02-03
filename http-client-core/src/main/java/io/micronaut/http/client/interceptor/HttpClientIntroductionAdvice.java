@@ -344,9 +344,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                         CompletableFuture<Object> future = new CompletableFuture<>();
                         csPublisher.subscribe(new CompletionAwareSubscriber<Object>() {
                             AtomicReference<Object> reference = new AtomicReference<>();
+                            Subscription subscription;
 
                             @Override
                             protected void doOnSubscribe(Subscription subscription) {
+                                this.subscription = subscription;
                                 subscription.request(1);
                             }
 
@@ -355,6 +357,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                 if (Void.class != reactiveValueType) {
                                     reference.set(message);
                                 }
+                                // we only want the first item
+                                subscription.cancel();
+                                doOnComplete();
                             }
 
                             @Override
