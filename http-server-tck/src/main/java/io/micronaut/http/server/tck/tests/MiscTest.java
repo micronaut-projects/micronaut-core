@@ -37,12 +37,9 @@ import org.junit.jupiter.api.Test;
 import javax.validation.constraints.NotBlank;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Map;
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
-
 
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only

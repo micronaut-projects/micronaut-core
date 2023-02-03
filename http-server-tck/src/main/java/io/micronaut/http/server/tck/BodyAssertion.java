@@ -18,21 +18,23 @@ package io.micronaut.http.server.tck;
 import io.micronaut.core.annotation.Experimental;
 
 import java.util.Arrays;
-import java.util.function.BiFunction;
+import java.util.function.BiPredicate;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * HTTP Response's body assertions.
+ *
+ * @param <T> The body type
  */
 @Experimental
 public final class BodyAssertion<T> {
 
     private final Class<T> bodyType;
     private final T expected;
-    private final BiFunction<T, T, Boolean> evaluator;
+    private final BiPredicate<T, T> evaluator;
 
-    private BodyAssertion(Class<T> bodyType, T expected, BiFunction<T, T, Boolean> evaluator) {
+    private BodyAssertion(Class<T> bodyType, T expected, BiPredicate<T, T> evaluator) {
         this.bodyType = bodyType;
         this.expected = expected;
         this.evaluator = evaluator;
@@ -50,8 +52,9 @@ public final class BodyAssertion<T> {
      *
      * @param body The HTTP Response Body
      */
+    @SuppressWarnings("java:S5960") // Assertion is the whole point of this method
     public void evaluate(T body) {
-        assertTrue(this.evaluator.apply(expected, body));
+        assertTrue(this.evaluator.test(expected, body));
     }
 
     /**
@@ -61,6 +64,11 @@ public final class BodyAssertion<T> {
         return bodyType;
     }
 
+    /**
+     * The interface for typed BodyAssertion Builders.
+     *
+     * @param <T> The body type
+     */
     public interface AssertionBuilder<T> {
 
         /**
@@ -96,6 +104,9 @@ public final class BodyAssertion<T> {
         }
     }
 
+    /**
+     * String BodyAssertion Builder.
+     */
     public static class StringBodyAssertionBuilder extends BodyAssertion.Builder implements AssertionBuilder<String> {
 
         private final String body;
@@ -108,17 +119,20 @@ public final class BodyAssertion<T> {
          * @return a body assertion which verifiers the HTTP Response's body contains the expected body
          */
         public BodyAssertion<String> contains() {
-            return new BodyAssertion<>(String.class, this.body, (expected, body) -> body.contains(expected));
+            return new BodyAssertion<>(String.class, this.body, (required, received) -> received.contains(required));
         }
 
         /**
          * @return a body assertion which verifiers the HTTP Response's body is equals to the expected body
          */
         public BodyAssertion<String> equals() {
-            return new BodyAssertion<>(String.class, this.body, (expected, body) -> body.equals(expected));
+            return new BodyAssertion<>(String.class, this.body, (required, received) -> received.equals(required));
         }
     }
 
+    /**
+     * Byte Array BodyAssertion Builder.
+     */
     public static class ByteArrayBodyAssertionBuilder extends BodyAssertion.Builder implements BodyAssertion.AssertionBuilder<byte[]> {
 
         private final byte[] body;
@@ -131,13 +145,13 @@ public final class BodyAssertion<T> {
          * @return a body assertion which verifiers the HTTP Response's body contains the expected body
          */
         public BodyAssertion<byte[]> contains() {
-            return new BodyAssertion<>(byte[].class, this.body, (expected, body) -> {
-                for (int i = 0; i <= body.length - expected.length; i++) {
+            return new BodyAssertion<>(byte[].class, this.body, (required, received) -> {
+                for (int i = 0; i <= received.length - required.length; i++) {
                     int j = 0;
-                    while (j < expected.length && body[i + j] == expected[j]) {
+                    while (j < required.length && received[i + j] == required[j]) {
                         j++;
                     }
-                    if (j == expected.length) {
+                    if (j == required.length) {
                         return true;
                     }
                 }
@@ -149,7 +163,7 @@ public final class BodyAssertion<T> {
          * @return a body assertion which verifiers the HTTP Response's body is equals to the expected body
          */
         public BodyAssertion<byte[]> equals() {
-            return new BodyAssertion<>(byte[].class, this.body, (expected, body) -> Arrays.equals(body, expected));
+            return new BodyAssertion<>(byte[].class, this.body, (required, received) -> Arrays.equals(received, required));
         }
     }
 }
