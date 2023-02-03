@@ -655,11 +655,10 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     @NonNull
     @Override
-    public ClassElement withBoundGenericTypes(@NonNull List<? extends ClassElement> typeArguments) {
+    public ClassElement withTypeArguments(@NonNull Collection<ClassElement> typeArguments) {
         if (getTypeArguments().equals(typeArguments)) {
             return this;
         }
-
         Map<String, ClassElement> boundByName = new LinkedHashMap<>();
         Iterator<? extends TypeParameterElement> tpes = classElement.getTypeParameters().iterator();
         Iterator<? extends ClassElement> args = typeArguments.iterator();

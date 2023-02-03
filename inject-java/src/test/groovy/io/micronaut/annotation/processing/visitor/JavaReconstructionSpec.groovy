@@ -347,7 +347,7 @@ class Sub<U> extends Sup<$params> {
 }
 class Sup<$decl> {
 }
-""").withBoundGenericTypes([ClassElement.of(String)])
+""").withTypeArguments([ClassElement.of(String)])
         def interfaceElement = buildClassElement("""
 package example;
 
@@ -357,7 +357,7 @@ class Sub<U> implements Sup<$params> {
 }
 interface Sup<$decl> {
 }
-""").withBoundGenericTypes([ClassElement.of(String)])
+""").withTypeArguments([ClassElement.of(String)])
 
         expect:
         reconstructTypeSignature(superElement.getSuperType().get()) == expected
@@ -382,7 +382,7 @@ class Sub<U> extends Sup<$params> {
 }
 class Sup<$decl> {
 }
-""").withBoundGenericTypes([ClassElement.of(String)])
+""").withTypeArguments([ClassElement.of(String)])
         def interfaceElement = buildClassElement("""
 package example;
 
@@ -392,7 +392,7 @@ class Sub<U> implements Sup<$params> {
 }
 interface Sup<$decl> {
 }
-""").withBoundGenericTypes([ClassElement.of(String)])
+""").withTypeArguments([ClassElement.of(String)])
 
         expect:
         reconstructTypeSignature(superElement.getSuperType().get()) == expected

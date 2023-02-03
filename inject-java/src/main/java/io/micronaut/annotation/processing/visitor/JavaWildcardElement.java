@@ -23,6 +23,7 @@ import io.micronaut.inject.ast.WildcardElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
 import javax.lang.model.type.WildcardType;
+import java.util.Collection;
 import java.util.List;
 import java.util.function.Function;
 
@@ -55,22 +56,6 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
         this.upperBound = mostUpper;
         this.upperBounds = upperBounds;
         this.lowerBounds = lowerBounds;
-    }
-
-    @NonNull
-    public static JavaClassElement findUpperType(List<JavaClassElement> upperBounds, List<JavaClassElement> lowerBounds) {
-        JavaClassElement upper = null;
-        for (JavaClassElement lowerBound : lowerBounds) {
-            if (upper == null || lowerBound.isAssignable(upper)) {
-                upper = lowerBound;
-            }
-        }
-        for (JavaClassElement upperBound : upperBounds) {
-            if (upper == null || upperBound.isAssignable(upper)) {
-                upper = upperBound;
-            }
-        }
-        return upper;
     }
 
     @Override
@@ -130,7 +115,7 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
                 return (JavaClassElement) ((ArrayableClassElement) visitorContext.getClassElement(element.getName(), elementAnnotationMetadataFactory)
                         .orElseThrow(() -> new UnsupportedOperationException("Cannot convert ClassElement to JavaClassElement, class was not found on the visitor context")))
                         .withArrayDimensions(element.getArrayDimensions())
-                        .withBoundGenericTypes(element.getBoundGenericTypes());
+                        .withTypeArguments((Collection<ClassElement>) element.getBoundGenericTypes());
             }
         }
     }

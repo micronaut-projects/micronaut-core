@@ -19,10 +19,10 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementFactory;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.PrimitiveElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import org.codehaus.groovy.ast.AnnotatedNode;
@@ -65,7 +65,7 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
             return new GroovyAnnotationElement(visitorContext, classNode, annotationMetadataFactory);
         }
         if (classNode.isGenericsPlaceHolder()) {
-            return new GroovyGenericPlaceholderElement(visitorContext, classNode, annotationMetadataFactory, Collections.emptyMap(), 0);
+            return new GroovyGenericPlaceholderElement(visitorContext, classNode, annotationMetadataFactory, Collections.emptyMap(), 0, Collections.emptyList(),false);
         }
         return new GroovyClassElement(visitorContext, classNode, annotationMetadataFactory);
     }

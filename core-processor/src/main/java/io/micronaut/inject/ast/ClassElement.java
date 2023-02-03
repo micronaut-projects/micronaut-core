@@ -25,6 +25,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 
 import java.lang.reflect.GenericArrayType;
@@ -36,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +46,7 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Stream;
 
@@ -553,7 +556,7 @@ public interface ClassElement extends TypedElement {
     @NonNull
     @Experimental
     default ClassElement getRawClassElement() {
-        return withBoundGenericTypes(Collections.emptyList());
+        return withTypeArguments(Collections.emptyList());
     }
 
     /**
@@ -564,11 +567,13 @@ public interface ClassElement extends TypedElement {
      * @param typeArguments The new type arguments.
      * @return A {@link ClassElement} of the same raw class with the new type arguments.
      * @throws UnsupportedOperationException If any of the given type arguments are unsupported.
+     * @deprecated replaced with {@link #withTypeArguments(Collection)} for consistent API.
      */
     @NonNull
     @Experimental
+    @Deprecated(since = "4", forRemoval = true)
     default ClassElement withBoundGenericTypes(@NonNull List<? extends ClassElement> typeArguments) {
-        return this;
+        return withTypeArguments((Collection<ClassElement>) typeArguments);
     }
 
     /**
@@ -594,7 +599,7 @@ public interface ClassElement extends TypedElement {
         if (typeArgs.contains(null)) {
             typeArgs = Collections.emptyList();
         }
-        return fold.apply(withBoundGenericTypes(typeArgs));
+        return fold.apply(withTypeArguments(typeArgs));
     }
 
     /**
@@ -709,8 +714,35 @@ public interface ClassElement extends TypedElement {
      * @return A new element
      * @since 4.0.0
      */
+    @NonNull
     default ClassElement withTypeArguments(Map<String, ClassElement> typeArguments) {
         throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support copy constructor");
+    }
+    /**
+     * Copies this element and overrides its type arguments.
+     * Variation of {@link #withTypeArguments(Map)} that doesn't require type argument names.
+     *
+     * @param typeArguments The type arguments
+     * @return A new element
+     * @since 4.0.0
+     */
+    @NonNull
+    default ClassElement withTypeArguments(@NonNull Collection<ClassElement> typeArguments) {
+        if (typeArguments.isEmpty()) {
+            // Allow to eliminate all arguments
+            return withTypeArguments(Collections.emptyMap());
+        }
+        Set<String> genericNames = getTypeArguments().keySet();
+        if (genericNames.size() != typeArguments.size()) {
+            throw new IllegalStateException("Expected to have: " + genericNames.size() + " type arguments! Got: " + typeArguments.size());
+        }
+        Map<String, ClassElement> boundByName = CollectionUtils.newLinkedHashMap(typeArguments.size());
+        Iterator<String> keys = genericNames.iterator();
+        Iterator<? extends ClassElement> args = typeArguments.iterator();
+        while (keys.hasNext() && args.hasNext()) {
+            boundByName.put(keys.next(), args.next());
+        }
+        return withTypeArguments(boundByName);
     }
 
     /**

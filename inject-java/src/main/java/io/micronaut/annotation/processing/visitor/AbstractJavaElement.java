@@ -286,7 +286,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                                               boolean includeTypeAnnotations,
                                               boolean isRawTypeParameter,
                                               @Nullable
-                                               TypeParameterElement representedTypeParameter) {
+                                              TypeParameterElement representedTypeParameter) {
         if (declaredTypeArguments == null) {
             declaredTypeArguments = Collections.emptyMap();
         }
@@ -383,14 +383,14 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         List<JavaClassElement> lowerBoundsAsElements = lowerBounds
                 .map(tm -> (JavaClassElement) mirrorToClassElement(tm, visitorContext, declaredTypeArguments, visitedTypes, includeTypeAnnotations))
                 .toList();
-        JavaClassElement upperType = JavaWildcardElement.findUpperType(upperBoundsAsElements, lowerBoundsAsElements);
+        JavaClassElement upperType = WildcardElement.findUpperType(upperBoundsAsElements, lowerBoundsAsElements);
         if (upperType.getType().getName().equals("java.lang.Object")) {
             // Not bounded wildcard: <?>
             if (representedTypeParameter != null) {
                 JavaClassElement definedTypeBound = (JavaClassElement) mirrorToClassElement(representedTypeParameter.asType(), visitorContext, declaredTypeArguments, visitedTypes, includeTypeAnnotations);
                 // Use originating parameter to extract the bound defined
                 if (definedTypeBound instanceof JavaGenericPlaceholderElement javaGenericPlaceholderElement) {
-                    upperType = JavaWildcardElement.findUpperType(javaGenericPlaceholderElement.getBounds(), Collections.emptyList());
+                    upperType = WildcardElement.findUpperType(javaGenericPlaceholderElement.getBounds(), Collections.emptyList());
                 }
             }
         }

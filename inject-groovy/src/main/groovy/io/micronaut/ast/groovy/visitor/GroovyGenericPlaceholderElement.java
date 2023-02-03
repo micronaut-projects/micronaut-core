@@ -19,11 +19,10 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import org.codehaus.groovy.ast.ClassNode;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -39,26 +38,34 @@ import java.util.function.Function;
 @Internal
 final class GroovyGenericPlaceholderElement extends GroovyClassElement implements GenericPlaceholderElement {
 
+    private final List<GroovyClassElement> bounds;
+    private final boolean rawType;
+
     GroovyGenericPlaceholderElement(GroovyVisitorContext visitorContext,
                                     ClassNode classNode,
                                     ElementAnnotationMetadataFactory annotationMetadataFactory,
-                                    Map<String, Map<String, ClassNode>> genericInfo,
-                                    int arrayDimensions) {
+                                    Map<String, ClassElement> genericInfo,
+                                    int arrayDimensions,
+                                    List<GroovyClassElement> bounds, boolean rawType) {
         super(visitorContext, classNode, annotationMetadataFactory, genericInfo, arrayDimensions);
+        this.bounds = bounds;
+        this.rawType = rawType;
+    }
+
+    @Override
+    public boolean isRawType() {
+        return rawType;
     }
 
     @Override
     protected GroovyClassElement copyConstructor() {
-        return new GroovyGenericPlaceholderElement(visitorContext, classNode, elementAnnotationMetadataFactory, getGenericTypeInfo(), getArrayDimensions());
+        return new GroovyGenericPlaceholderElement(visitorContext, classNode, elementAnnotationMetadataFactory, resolvedTypeArguments, getArrayDimensions(), bounds, rawType);
     }
 
     @NonNull
     @Override
-    public List<? extends ClassElement> getBounds() {
-        // this is a hack: .redirect() follows the entire chain of redirects, but using this approach, we can only go
-        // one down.
-        ClassNode singleRedirect = this.classNode.asGenericsType().getUpperBounds()[0];
-        return Collections.singletonList(toClassElement(singleRedirect));
+    public List<? extends GroovyClassElement> getBounds() {
+        return bounds;
     }
 
     @NonNull
@@ -74,7 +81,7 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new GroovyGenericPlaceholderElement(visitorContext, classNode, elementAnnotationMetadataFactory, getGenericTypeInfo(), arrayDimensions);
+        return new GroovyGenericPlaceholderElement(visitorContext, classNode, elementAnnotationMetadataFactory, resolvedTypeArguments, arrayDimensions, bounds, rawType);
     }
 
     @Override

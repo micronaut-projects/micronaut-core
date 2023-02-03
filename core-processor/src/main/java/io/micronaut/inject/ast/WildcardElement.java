@@ -51,4 +51,27 @@ public interface WildcardElement extends ClassElement {
     default boolean isBounded() {
         return !getName().equals("java.lang.Object");
     }
+
+    /**
+     * Find the most upper type.
+     * @param bounds1 The bounds 1
+     * @param bounds2 The bounds 2
+     * @param <T> The class element type
+     * @return the most upper type
+     */
+    @NonNull
+    static <T extends ClassElement> T findUpperType(@NonNull List<T> bounds1, @NonNull List<T> bounds2) {
+        T upper = null;
+        for (T lowerBound : bounds2) {
+            if (upper == null || lowerBound.isAssignable(upper)) {
+                upper = lowerBound;
+            }
+        }
+        for (T upperBound : bounds1) {
+            if (upper == null || upperBound.isAssignable(upper)) {
+                upper = upperBound;
+            }
+        }
+        return upper;
+    }
 }
