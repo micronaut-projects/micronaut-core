@@ -146,16 +146,7 @@ public final class BodyAssertion<T> {
          */
         public BodyAssertion<byte[]> contains() {
             return new BodyAssertion<>(byte[].class, this.body, (required, received) -> {
-                for (int i = 0; i <= received.length - required.length; i++) {
-                    int j = 0;
-                    while (j < required.length && received[i + j] == required[j]) {
-                        j++;
-                    }
-                    if (j == required.length) {
-                        return true;
-                    }
-                }
-                return false;
+                throw new AssertionError("Not implemented yet!");
             });
         }
 
