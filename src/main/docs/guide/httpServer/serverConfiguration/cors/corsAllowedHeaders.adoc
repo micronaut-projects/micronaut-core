@@ -1,0 +1,17 @@
+To allow any request header for a given configuration, don't include the `allowedHeaders` key in your configuration.
+
+For multiple allowed headers, set the `allowedHeaders` key of the configuration to a list of strings.
+
+.Example CORS Configuration
+[source,yaml]
+----
+micronaut:
+  server:
+    cors:
+      enabled: true
+      configurations:
+        web:
+          allowedHeaders:
+            - Content-Type
+            - Authorization
+----

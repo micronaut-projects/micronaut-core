@@ -129,6 +129,8 @@ class CorsFilterSpec extends Specification {
         ['^http://www\\.(foo|bar)\\.com$']  | 'http://www.foo.com'
         ['.*bar$', '.*foo$']                | 'asdfasdf foo'
         ['.*bar$', '.*foo$']                | 'asdfasdf bar'
+        ['.*bar$', '.*foo$']                | 'http://asdfasdf.foo'
+        ['.*bar$', '.*foo$']                | 'http://asdfasdf.bar'
     }
 
     void "test handleRequest with disallowed method"() {
