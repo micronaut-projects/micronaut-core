@@ -171,7 +171,9 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     @NonNull
     @Override
     public ClassElement getGenericReturnType() {
-        return newClassElement(methodNode.getReturnType(), getDeclaringType().getTypeArguments());
+        Map<String, ClassElement> parentTypeArguments = getDeclaringType().getTypeArguments();
+        Map<String, ClassElement> methodTypeArguments = resolveTypeArguments(methodNode, parentTypeArguments);
+        return newClassElement(methodNode.getReturnType(), methodTypeArguments);
     }
 
     @Override
@@ -223,7 +225,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
             return Collections.emptyList();
         }
         return Arrays.stream(genericsTypes)
-                .map(gt -> (GenericPlaceholderElement) newClassElement(gt.getType()))
+                .map(gt -> (GenericPlaceholderElement) newClassElement(gt))
                 .collect(Collectors.toList());
     }
 

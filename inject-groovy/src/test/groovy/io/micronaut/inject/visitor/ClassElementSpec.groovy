@@ -683,9 +683,11 @@ class Foo {}
         expect:
         AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
         AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 1
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.name == 'java.util.List'
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.typeArguments.size() == 1
-        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.typeArguments.get("E").name == 'clselem8.Foo'
+
+        def type = AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType
+        type.name == 'java.util.List'
+        type.typeArguments.size() == 1
+        type.typeArguments.get("E").name == 'clselem8.Foo'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters.size() == 1
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.name == 'java.util.Set'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.typeArguments.get("E").name == 'clselem8.Foo'
@@ -1150,7 +1152,10 @@ final class Test<T extends Test> { // Missing argument
             typeArgument.name == "test.Test"
             def nextTypeArguments = typeArgument.getTypeArguments()
             def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "java.lang.Object"
+            nextTypeArgument.name == "test.Test"
+            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+            def nextNextTypeArgument = nextNextTypeArguments.get("T")
+            nextNextTypeArgument.name == "java.lang.Object"
     }
 
     void "test recursive generic type parameter 3"() {
@@ -1169,7 +1174,10 @@ final class Test<T extends Test<T>> {
             typeArgument.name == "test.Test"
             def nextTypeArguments = typeArgument.getTypeArguments()
             def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "java.lang.Object"
+            nextTypeArgument.name == "test.Test"
+            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+            def nextNextTypeArgument = nextNextTypeArguments.get("T")
+            nextNextTypeArgument.name == "java.lang.Object"
     }
 
     void "test recursive generic type parameter 4"() {
@@ -1188,7 +1196,10 @@ final class Test<T extends Test<?>> {
             typeArgument.name == "test.Test"
             def nextTypeArguments = typeArgument.getTypeArguments()
             def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "java.lang.Object"
+            nextTypeArgument.name == "test.Test"
+            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+            def nextNextTypeArgument = nextNextTypeArguments.get("T")
+            nextNextTypeArgument.name == "java.lang.Object"
     }
 
     void "test recursive generic method return"() {
@@ -1216,7 +1227,10 @@ class MyFactory {
             typeArgument.name == "org.hibernate.SessionBuilder"
             def nextTypeArguments = typeArgument.getTypeArguments()
             def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "java.lang.Object"
+            nextTypeArgument.name == "org.hibernate.SessionBuilder"
+            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+            def nextNextTypeArgument = nextNextTypeArguments.get("T")
+            nextNextTypeArgument.name == "java.lang.Object"
     }
 
     void "test recursive generic method return 2"() {
@@ -1224,9 +1238,13 @@ class MyFactory {
             ClassElement ce = buildClassElement('''\
 package test;
 
+interface MyBuilder<T extends MyBuilder> {
+    T build();
+}
+
 class MyBean {
 
-   io.micronaut.inject.visitor.MyBuilder myBuilder() {
+   MyBuilder<test.MyBuilder> myBuilder() {
        return null;
    }
 
@@ -1235,9 +1253,10 @@ class MyBean {
 class MyFactory {
 
     MyBean myBean() {
-        return new MyBean()
+        return new MyBean();
     }
 }
+
 
 ''')
         expect:
@@ -1246,10 +1265,16 @@ class MyFactory {
             def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
             typeArguments.size() == 1
             def typeArgument = typeArguments.get("T")
-            typeArgument.name == "io.micronaut.inject.visitor.MyBuilder"
+            typeArgument.name == "test.MyBuilder"
             def nextTypeArguments = typeArgument.getTypeArguments()
             def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "java.lang.Object"
+            nextTypeArgument.name == "test.MyBuilder"
+            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+            def nextNextTypeArgument = nextNextTypeArguments.get("T")
+            nextNextTypeArgument.name == "test.MyBuilder"
+            def nextNextNextTypeArguments = nextNextTypeArgument.getTypeArguments()
+            def nextNextNextTypeArgument = nextNextNextTypeArguments.get("T")
+            nextNextNextTypeArgument.name == "java.lang.Object"
     }
 
     void "test recursive generic method return 3"() {
@@ -1257,9 +1282,13 @@ class MyFactory {
             ClassElement ce = buildClassElement('''\
 package test;
 
+interface MyBuilder<T extends MyBuilder> {
+    T build();
+}
+
 class MyBean {
 
-   io.micronaut.inject.visitor.MyBuilder<?> myBuilder() {
+   MyBuilder myBuilder() {
        return null;
    }
 
@@ -1268,7 +1297,7 @@ class MyBean {
 class MyFactory {
 
     MyBean myBean() {
-        return new MyBean()
+        return new MyBean();
     }
 }
 
@@ -1279,10 +1308,13 @@ class MyFactory {
             def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
             typeArguments.size() == 1
             def typeArgument = typeArguments.get("T")
-            typeArgument.name == "java.lang.Object"
-//            def nextTypeArguments = typeArgument.getTypeArguments()
-//            def nextTypeArgument = nextTypeArguments.get("T")
-//            nextTypeArgument.name == "java.lang.Object"
+            typeArgument.name == "test.MyBuilder"
+            def nextTypeArguments = typeArgument.getTypeArguments()
+            def nextTypeArgument = nextTypeArguments.get("T")
+            nextTypeArgument.name == "test.MyBuilder"
+            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+            def nextNextTypeArgument = nextNextTypeArguments.get("T")
+            nextNextTypeArgument.name == "java.lang.Object"
     }
 
     void "test recursive generic method return 4"() {
@@ -1290,9 +1322,13 @@ class MyFactory {
             ClassElement ce = buildClassElement('''\
 package test;
 
+interface MyBuilder<T extends MyBuilder> {
+    T build();
+}
+
 class MyBean {
 
-   io.micronaut.inject.visitor.MyBuilder<io.micronaut.inject.visitor.MyBuilder> myBuilder() {
+   MyBuilder<?> myBuilder() {
        return null;
    }
 
@@ -1301,7 +1337,7 @@ class MyBean {
 class MyFactory {
 
     MyBean myBean() {
-        return new MyBean()
+        return new MyBean();
     }
 }
 
@@ -1312,16 +1348,13 @@ class MyFactory {
             def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
             typeArguments.size() == 1
             def typeArgument = typeArguments.get("T")
-            typeArgument.name == "io.micronaut.inject.visitor.MyBuilder"
+            typeArgument.name == "test.MyBuilder"
             def nextTypeArguments = typeArgument.getTypeArguments()
             def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "io.micronaut.inject.visitor.MyBuilder"
+            nextTypeArgument.name == "test.MyBuilder"
             def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
             def nextNextTypeArgument = nextNextTypeArguments.get("T")
-            nextNextTypeArgument.name == "io.micronaut.inject.visitor.MyBuilder"
-            def nextNextNextTypeArguments = nextNextTypeArgument.getTypeArguments()
-            def nextNextNextTypeArgument = nextNextNextTypeArguments.get("T")
-            nextNextNextTypeArgument.name == "java.lang.Object"
+            nextNextTypeArgument.name == "java.lang.Object"
     }
 
     void "test recursive generic method return 5"() {
@@ -1329,9 +1362,13 @@ class MyFactory {
             ClassElement ce = buildClassElement('''\
 package test;
 
+interface MyBuilder<T extends MyBuilder> {
+    T build();
+}
+
 class MyBean {
 
-   io.micronaut.inject.visitor.MyBuilder<? extends io.micronaut.inject.visitor.MyBuilder> myBuilder() {
+   MyBuilder<? extends MyBuilder> myBuilder() {
        return null;
    }
 
@@ -1340,7 +1377,7 @@ class MyBean {
 class MyFactory {
 
     MyBean myBean() {
-        return new MyBean()
+        return new MyBean();
     }
 }
 
@@ -1351,13 +1388,13 @@ class MyFactory {
             def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
             typeArguments.size() == 1
             def typeArgument = typeArguments.get("T")
-            typeArgument.name == "io.micronaut.inject.visitor.MyBuilder"
+            typeArgument.name == "test.MyBuilder"
             def nextTypeArguments = typeArgument.getTypeArguments()
             def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "io.micronaut.inject.visitor.MyBuilder"
+            nextTypeArgument.name == "test.MyBuilder"
             def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
             def nextNextTypeArgument = nextNextTypeArguments.get("T")
-            nextNextTypeArgument.name == "io.micronaut.inject.visitor.MyBuilder"
+            nextNextTypeArgument.name == "test.MyBuilder"
             def nextNextNextTypeArguments = nextNextTypeArgument.getTypeArguments()
             def nextNextNextTypeArgument = nextNextNextTypeArguments.get("T")
             nextNextNextTypeArgument.name == "java.lang.Object"
@@ -1368,9 +1405,13 @@ class MyFactory {
             ClassElement ce = buildClassElement('''\
 package test;
 
-class MyBean<T extends io.micronaut.inject.visitor.MyBuilder> {
+interface MyBuilder<T extends MyBuilder> {
+    T build();
+}
 
-   io.micronaut.inject.visitor.MyBuilder<T> myBuilder() {
+class MyBean<T extends MyBuilder> {
+
+   MyBuilder<T> myBuilder() {
        return null;
    }
 
@@ -1379,7 +1420,7 @@ class MyBean<T extends io.micronaut.inject.visitor.MyBuilder> {
 class MyFactory {
 
     MyBean myBean() {
-        return new MyBean()
+        return new MyBean();
     }
 }
 
@@ -1390,10 +1431,13 @@ class MyFactory {
             def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
             typeArguments.size() == 1
             def typeArgument = typeArguments.get("T")
-            typeArgument.name == "io.micronaut.inject.visitor.MyBuilder"
+            typeArgument.name == "test.MyBuilder"
             def nextTypeArguments = typeArgument.getTypeArguments()
             def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "java.lang.Object"
+            nextTypeArgument.name == "test.MyBuilder"
+            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+            def nextNextTypeArgument = nextNextTypeArguments.get("T")
+            nextNextTypeArgument.name == "java.lang.Object"
     }
 
     void "test recursive generic method return 7"() {
@@ -1401,9 +1445,13 @@ class MyFactory {
             ClassElement ce = buildClassElement('''\
 package test;
 
-class MyBean<T extends io.micronaut.inject.visitor.MyBuilder> {
+interface MyBuilder<T extends MyBuilder> {
+    T build();
+}
 
-   io.micronaut.inject.visitor.MyBuilder<? extends T> myBuilder() {
+class MyBean<T extends MyBuilder> {
+
+   MyBuilder<? extends T> myBuilder() {
        return null;
    }
 
@@ -1412,7 +1460,7 @@ class MyBean<T extends io.micronaut.inject.visitor.MyBuilder> {
 class MyFactory {
 
     MyBean myBean() {
-        return new MyBean()
+        return new MyBean();
     }
 }
 
@@ -1423,16 +1471,13 @@ class MyFactory {
             def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
             typeArguments.size() == 1
             def typeArgument = typeArguments.get("T")
-            typeArgument.name == "io.micronaut.inject.visitor.MyBuilder"
+            typeArgument.name == "test.MyBuilder"
             def nextTypeArguments = typeArgument.getTypeArguments()
             def nextTypeArgument = nextTypeArguments.get("T")
-            nextTypeArgument.name == "io.micronaut.inject.visitor.MyBuilder"
+            nextTypeArgument.name == "test.MyBuilder"
             def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
             def nextNextTypeArgument = nextNextTypeArguments.get("T")
-            nextNextTypeArgument.name == "io.micronaut.inject.visitor.MyBuilder"
-            def nextNextNextTypeArguments = nextNextTypeArgument.getTypeArguments()
-            def nextNextNextTypeArgument = nextNextNextTypeArguments.get("T")
-            nextNextNextTypeArgument.name == "java.lang.Object"
+            nextNextTypeArgument.name == "java.lang.Object"
     }
 
     private void assertListGenericArgument(ClassElement type, Closure cl) {

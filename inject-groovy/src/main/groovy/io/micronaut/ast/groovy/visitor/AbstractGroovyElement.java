@@ -44,9 +44,11 @@ import org.codehaus.groovy.control.SourceUnit;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -61,6 +63,7 @@ import java.util.stream.Stream;
  * Abstract Groovy element.
  *
  * @author Graeme Rocher
+ * @author Denis Stepanov
  * @since 1.1
  */
 
@@ -227,28 +230,42 @@ public abstract class AbstractGroovyElement implements Element, ElementMutableAn
     @NonNull
     private ClassElement newClassElement(GenericsType genericsType,
                                          GenericsType redirectType,
-                                         Map<String, ClassElement> declaredTypeArguments,
+                                         Map<String, ClassElement> parentTypeArguments,
                                          Set<Object> visitedTypes,
                                          boolean isRawType) {
-        if (declaredTypeArguments == null) {
-            declaredTypeArguments = Collections.emptyMap();
+        if (parentTypeArguments == null) {
+            parentTypeArguments = Collections.emptyMap();
         }
         if (genericsType.isWildcard()) {
-            return resolveWildcard(genericsType, redirectType, declaredTypeArguments, visitedTypes);
+            return resolveWildcard(genericsType, redirectType, parentTypeArguments, visitedTypes);
         }
         if (genericsType.isPlaceholder()) {
-            return resolvePlaceholder(genericsType, declaredTypeArguments, visitedTypes, isRawType);
+            return resolvePlaceholder(genericsType, redirectType, parentTypeArguments, visitedTypes, isRawType);
         }
-        return newClassElement(genericsType.getType(), declaredTypeArguments, visitedTypes, isRawType);
+        return newClassElement(genericsType.getType(), parentTypeArguments, visitedTypes, isRawType);
     }
 
     @NonNull
     private ClassElement newClassElement(ClassNode classNode,
-                                         Map<String, ClassElement> declaredTypeArguments,
+                                         Map<String, ClassElement> parentTypeArguments,
                                          Set<Object> visitedTypes,
                                          boolean isRawTypeParameter) {
-        if (declaredTypeArguments == null) {
-            declaredTypeArguments = Collections.emptyMap();
+        return newClassElement(classNode, parentTypeArguments, visitedTypes, isRawTypeParameter, false);
+    }
+
+    @NonNull
+    private ClassElement newClassElement(ClassNode classNode,
+                                         Map<String, ClassElement> parentTypeArguments,
+                                         Set<Object> visitedTypes,
+                                         boolean isRawTypeParameter,
+                                         boolean stripTypeArguments) {
+        if (parentTypeArguments == null) {
+            parentTypeArguments = Collections.emptyMap();
+        }
+        if (classNode.isArray()) {
+            ClassNode componentType = classNode.getComponentType();
+            return newClassElement(componentType, parentTypeArguments, visitedTypes, isRawTypeParameter)
+                    .toArray();
         }
         if (classNode.isGenericsPlaceHolder()) {
             GenericsType genericsType;
@@ -260,21 +277,14 @@ public abstract class AbstractGroovyElement implements Element, ElementMutableAn
                 if (ArrayUtils.isNotEmpty(redirectTypes)) {
                     redirectType = redirectTypes[0];
                 } else {
-                    redirectType = genericsType;
+                    redirectType = new GenericsType(classNode.redirect());
                 }
             } else {
                 // Bypass Groovy compiler weirdness
-                genericsType = new GenericsType(classNode, new ClassNode[]{classNode.redirect()}, null);
-                genericsType.setName(classNode.getUnresolvedName());
-                genericsType.setPlaceholder(true);
+                genericsType = new GenericsType(classNode.redirect());
                 redirectType = genericsType;
             }
-            return newClassElement(genericsType, redirectType, declaredTypeArguments, visitedTypes, isRawTypeParameter);
-        }
-        if (classNode.isArray()) {
-            ClassNode componentType = classNode.getComponentType();
-            return newClassElement(componentType, declaredTypeArguments, visitedTypes, isRawTypeParameter)
-                    .toArray();
+            return newClassElement(genericsType, redirectType, parentTypeArguments, visitedTypes, isRawTypeParameter);
         }
         if (ClassHelper.isPrimitiveType(classNode)) {
             return PrimitiveElement.valueOf(classNode.getName());
@@ -285,38 +295,78 @@ public abstract class AbstractGroovyElement implements Element, ElementMutableAn
         if (classNode.isAnnotationDefinition()) {
             return new GroovyAnnotationElement(visitorContext, classNode, elementAnnotationMetadataFactory);
         }
-        Map<String, ClassElement> newTypeArguments = resolveTypeArguments(classNode, declaredTypeArguments, visitedTypes);
+        Map<String, ClassElement> newTypeArguments;
+        if (stripTypeArguments) {
+            newTypeArguments = resolveTypeArgumentsToObject(classNode);
+        } else {
+            newTypeArguments = resolveTypeArguments(classNode, parentTypeArguments, visitedTypes);
+        }
         return new GroovyClassElement(visitorContext, classNode, elementAnnotationMetadataFactory, newTypeArguments, 0);
     }
 
     private ClassElement resolvePlaceholder(GenericsType genericsType,
-                                            Map<String, ClassElement> declaredTypeArguments,
+                                            GenericsType redirectType,
+                                            Map<String, ClassElement> parentTypeArguments,
                                             Set<Object> visitedTypes,
                                             boolean isRawType) {
-        ClassNode type = genericsType.getType();
-        List<GroovyClassElement> bounds = Collections.emptyList();
-        if (!visitedTypes.contains(type) && !getNativeType().equals(type)) {
-            visitedTypes.add(type);
-            String variableName = genericsType.getName();
-            ClassElement b = declaredTypeArguments.get(variableName);
-            if (b != null) {
-                if (b instanceof WildcardElement wildcardElement) {
-                    if (wildcardElement.isBounded()) {
-                        return wildcardElement;
-                    }
-                } else {
-                    return b;
+        PlaceholderEntry entry = new PlaceholderEntry(getNativeType(), genericsType.getName());
+        String variableName = genericsType.getName();
+        ClassElement boundVariable = parentTypeArguments.get(variableName);
+        if (boundVariable != null) {
+            if (boundVariable instanceof WildcardElement wildcardElement) {
+                if (wildcardElement.isBounded()) {
+                    return wildcardElement;
                 }
+            } else {
+                return boundVariable;
             }
-            Stream<ClassNode> classNodeBounds = genericsType.getUpperBounds() == null ? Stream.empty() : Arrays.stream(genericsType.getUpperBounds());
-            bounds = classNodeBounds
-                    .map(classNode -> (GroovyClassElement) newClassElement(classNode, declaredTypeArguments, visitedTypes, isRawType))
-                    .toList();
         }
+        List<ClassNode> classNodeBounds = new ArrayList<>();
+        addBounds(genericsType, classNodeBounds);
+        if (genericsType != redirectType) {
+            addBounds(redirectType, classNodeBounds);
+        }
+
+        boolean alreadyVisitedPlaceholder = visitedTypes.contains(entry);
+        if (!alreadyVisitedPlaceholder) {
+            visitedTypes.add(entry);
+        }
+
+        List<GroovyClassElement> bounds = classNodeBounds
+                .stream()
+                .map(classNode -> {
+                    if (alreadyVisitedPlaceholder && classNode.isGenericsPlaceHolder()) {
+                        classNode = classNode.redirect();
+                    }
+                    return classNode;
+                })
+                .filter(classNode -> !alreadyVisitedPlaceholder || !classNode.isGenericsPlaceHolder())
+                .map(classNode -> {
+                    // Strip declared type arguments and replace with an Object to prevent recursion
+                    boolean stripTypeArguments = alreadyVisitedPlaceholder;
+                    return (GroovyClassElement) newClassElement(classNode, parentTypeArguments, visitedTypes, isRawType, stripTypeArguments);
+                })
+                .toList();
+
         if (bounds.isEmpty()) {
             bounds = Collections.singletonList((GroovyClassElement) getObjectClassElement());
         }
-        return new GroovyGenericPlaceholderElement(visitorContext, genericsType.getType(), elementAnnotationMetadataFactory, Collections.emptyMap(), 0, bounds, isRawType);
+        return new GroovyGenericPlaceholderElement(visitorContext, genericsType.getType(), bounds, isRawType);
+    }
+
+    private static void addBounds(GenericsType genericsType, List<ClassNode> classNodeBounds) {
+        if (genericsType.getUpperBounds() != null) {
+            for (ClassNode ub : genericsType.getUpperBounds()) {
+                if (!classNodeBounds.contains(ub)) {
+                    classNodeBounds.add(ub);
+                }
+            }
+        } else {
+            ClassNode type = genericsType.getType();
+            if (!classNodeBounds.contains(type)) {
+                classNodeBounds.add(type);
+            }
+        }
     }
 
     private ClassElement getObjectClassElement() {
@@ -325,7 +375,7 @@ public abstract class AbstractGroovyElement implements Element, ElementMutableAn
 
     private ClassElement resolveWildcard(GenericsType genericsType,
                                          GenericsType redirectType,
-                                         Map<String, ClassElement> declaredTypeArguments,
+                                         Map<String, ClassElement> parentTypeArguments,
                                          Set<Object> visitedTypes) {
         Stream<ClassNode> lowerBounds = Stream.ofNullable(genericsType.getLowerBound());
         Stream<ClassNode> upperBounds;
@@ -336,10 +386,10 @@ public abstract class AbstractGroovyElement implements Element, ElementMutableAn
             upperBounds = Arrays.stream(genericsUpperBounds);
         }
         List<GroovyClassElement> upperBoundsAsElements = upperBounds
-                .map(classNode -> (GroovyClassElement) newClassElement(classNode, declaredTypeArguments, visitedTypes, false))
+                .map(classNode -> (GroovyClassElement) newClassElement(classNode, parentTypeArguments, visitedTypes, false))
                 .toList();
         List<GroovyClassElement> lowerBoundsAsElements = lowerBounds
-                .map(classNode -> (GroovyClassElement) newClassElement(classNode, declaredTypeArguments, visitedTypes, false))
+                .map(classNode -> (GroovyClassElement) newClassElement(classNode, parentTypeArguments, visitedTypes, false))
                 .toList();
         if (upperBoundsAsElements.isEmpty()) {
             upperBoundsAsElements = Collections.singletonList((GroovyClassElement) getObjectClassElement());
@@ -348,7 +398,7 @@ public abstract class AbstractGroovyElement implements Element, ElementMutableAn
         if (upperType.getType().getName().equals("java.lang.Object")) {
             // Not bounded wildcard: <?>
             if (redirectType != null && redirectType != genericsType) {
-                GroovyClassElement definedTypeBound = (GroovyClassElement) newClassElement(redirectType, redirectType, declaredTypeArguments, visitedTypes, false);
+                GroovyClassElement definedTypeBound = (GroovyClassElement) newClassElement(redirectType, redirectType, parentTypeArguments, visitedTypes, false);
                 // Use originating parameter to extract the bound defined
                 if (definedTypeBound instanceof GroovyGenericPlaceholderElement groovyGenericPlaceholderElement) {
                     upperType = WildcardElement.findUpperType(groovyGenericPlaceholderElement.getBounds(), Collections.emptyList());
@@ -364,8 +414,44 @@ public abstract class AbstractGroovyElement implements Element, ElementMutableAn
     }
 
     @NonNull
+    protected final Map<String, ClassElement> resolveTypeArguments(MethodNode methodNode,
+                                                                   @Nullable Map<String, ClassElement> parentTypeArguments) {
+        if (parentTypeArguments == null) {
+            parentTypeArguments = Collections.emptyMap();
+        }
+        Set<Object> visitedTypes = new HashSet<>();
+        GenericsType[] genericsTypes = methodNode.getGenericsTypes();
+        if (ArrayUtils.isEmpty(genericsTypes)) {
+            return parentTypeArguments;
+        }
+        Map<String, ClassElement> newTypeArguments = new LinkedHashMap<>(parentTypeArguments);
+        for (GenericsType genericsType : genericsTypes) {
+            String variableName = genericsType.getName();
+            ClassNode classNode;
+            if (genericsType.isPlaceholder()) {
+                ClassNode[] upperBounds = genericsType.getUpperBounds();
+                ClassNode lowerBound = genericsType.getLowerBound();
+                if (ArrayUtils.isNotEmpty(upperBounds)) {
+                    classNode = upperBounds[0];
+                } else if (lowerBound != null) {
+                    classNode = lowerBound;
+                } else {
+                    classNode = ClassHelper.OBJECT_TYPE;
+                }
+            } else {
+                classNode = genericsType.getType();
+            }
+            newTypeArguments.put(
+                    variableName,
+                    newClassElement(classNode, parentTypeArguments, visitedTypes, false)
+            );
+        }
+        return newTypeArguments;
+    }
+
+    @NonNull
     protected final Map<String, ClassElement> resolveTypeArguments(ClassNode classNode,
-                                                                   @Nullable Map<String, ClassElement> info,
+                                                                   @Nullable Map<String, ClassElement> parentTypeArguments,
                                                                    Set<Object> visitedTypes) {
         GenericsType[] genericsTypes = classNode.getGenericsTypes();
         GenericsType[] redirectTypes = classNode.redirect().getGenericsTypes();
@@ -377,23 +463,33 @@ public abstract class AbstractGroovyElement implements Element, ElementMutableAn
             for (int i = 0; i < genericsTypes.length; i++) {
                 GenericsType genericsType = genericsTypes[i];
                 GenericsType redirectType = redirectTypes[i];
-                String variableName = redirectType.getName();
-                resolved.put(
-                        variableName,
-                        newClassElement(genericsType, redirectType, info, visitedTypes, false)
-                );
+                ClassElement classElement = newClassElement(genericsType, redirectType, parentTypeArguments, visitedTypes, false);
+                resolved.put(redirectType.getName(), classElement);
             }
         } else {
-            // Not null means raw type definition: "List myMethod()"
-            // Null value means a class definition: "class List<T> {}"
             boolean isRaw = genericsTypes == null;
             for (GenericsType redirectType : redirectTypes) {
                 String variableName = redirectType.getName();
                 resolved.put(
                         variableName,
-                        newClassElement(redirectType, redirectType, info, visitedTypes, isRaw)
+                        newClassElement(redirectType, redirectType, parentTypeArguments, visitedTypes, isRaw)
                 );
             }
+        }
+        return resolved;
+    }
+
+    @NonNull
+    protected final Map<String, ClassElement> resolveTypeArgumentsToObject(ClassNode classNode) {
+        GenericsType[] redirectTypes = classNode.redirect().getGenericsTypes();
+        if (redirectTypes == null || redirectTypes.length == 0) {
+            return Collections.emptyMap();
+        }
+        ClassElement objectClassElement = getObjectClassElement();
+        Map<String, ClassElement> resolved = CollectionUtils.newLinkedHashMap(redirectTypes.length);
+        for (GenericsType redirectType : redirectTypes) {
+            String variableName = redirectType.getName();
+            resolved.put(variableName, objectClassElement);
         }
         return resolved;
     }
@@ -471,6 +567,9 @@ public abstract class AbstractGroovyElement implements Element, ElementMutableAn
             modifiers.add(ElementModifier.FINAL);
         }
         return modifiers;
+    }
+
+    record PlaceholderEntry(AnnotatedNode owner, String placeholderName) {
     }
 }
 

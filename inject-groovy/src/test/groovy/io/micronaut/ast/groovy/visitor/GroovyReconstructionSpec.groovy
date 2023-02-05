@@ -205,15 +205,15 @@ abstract class Test<A> {
 
         where:
         decl << [
-//                'T',
+                'T',
                 'T extends CharSequence',
-//                'T extends A',
-//                'T extends List',
-//                'T extends List<?>',
-//                'T extends List<T>',
-//                'T extends List<? extends T>',
-//                'T extends List<? extends A>',
-//                'T extends List<T[]>',
+                'T extends A',
+                'T extends List',
+                'T extends List<?>',
+                'T extends List<T>',
+                'T extends List<? extends T>',
+                'T extends List<? extends A>',
+                'T extends List<T[]>',
         ]
     }
 
@@ -335,7 +335,9 @@ class Wrapper<U> {
     Test<U> test;
 }
 """)
-        def field = element.getEnclosedElement(ElementQuery.ALL_FIELDS.named(s -> s == 'test')).get()
+
+            def get = element.getEnclosedElement(ElementQuery.ALL_FIELDS.named(s -> s == 'test')).get()
+            def field = get
                 .genericType.getEnclosedElement(ElementQuery.ALL_FIELDS.named(s -> s == 'field')).get()
 
         expect:

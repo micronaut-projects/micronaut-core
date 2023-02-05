@@ -20,11 +20,11 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.WildcardElement;
 import org.codehaus.groovy.ast.ClassNode;
 
+import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
@@ -38,19 +38,53 @@ import java.util.function.Function;
 @Internal
 final class GroovyGenericPlaceholderElement extends GroovyClassElement implements GenericPlaceholderElement {
 
+    private final GroovyClassElement mostUpper;
     private final List<GroovyClassElement> bounds;
     private final boolean rawType;
+    private final ClassNode placeholderClassNode;
 
     GroovyGenericPlaceholderElement(GroovyVisitorContext visitorContext,
-                                    ClassNode classNode,
-                                    ElementAnnotationMetadataFactory annotationMetadataFactory,
-                                    Map<String, ClassElement> genericInfo,
+                                    ClassNode placeholderClassNode,
+                                    List<GroovyClassElement> bounds,
+                                    boolean rawType) {
+        this(visitorContext, placeholderClassNode, WildcardElement.findUpperType(bounds, Collections.emptyList()), bounds, 0, rawType);
+    }
+
+    GroovyGenericPlaceholderElement(GroovyVisitorContext visitorContext,
+                                    ClassNode placeholderClassNode,
+                                    GroovyClassElement mostUpper,
+                                    List<GroovyClassElement> bounds,
                                     int arrayDimensions,
-                                    List<GroovyClassElement> bounds, boolean rawType) {
-        super(visitorContext, classNode, annotationMetadataFactory, genericInfo, arrayDimensions);
+                                    boolean rawType) {
+        super(visitorContext, mostUpper.classNode, mostUpper.elementAnnotationMetadataFactory, mostUpper.resolvedTypeArguments, arrayDimensions);
+        this.mostUpper = mostUpper;
         this.bounds = bounds;
         this.rawType = rawType;
+        this.placeholderClassNode = placeholderClassNode;
     }
+
+    @Override
+    public int hashCode() {
+        return placeholderClassNode.hashCode();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null) {
+            return false;
+        }
+        if (!(o instanceof Element that)) {
+            return false;
+        }
+        if (that instanceof GroovyGenericPlaceholderElement placeholderElement) {
+            return placeholderElement.placeholderClassNode.equals(placeholderClassNode);
+        }
+        return false;
+    }
+
 
     @Override
     public boolean isRawType() {
@@ -59,7 +93,7 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
 
     @Override
     protected GroovyClassElement copyConstructor() {
-        return new GroovyGenericPlaceholderElement(visitorContext, classNode, elementAnnotationMetadataFactory, resolvedTypeArguments, getArrayDimensions(), bounds, rawType);
+        return new GroovyGenericPlaceholderElement(visitorContext, placeholderClassNode, mostUpper, bounds, getArrayDimensions(), rawType);
     }
 
     @NonNull
@@ -71,7 +105,7 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
     @NonNull
     @Override
     public String getVariableName() {
-        return classNode.getUnresolvedName();
+        return placeholderClassNode.getUnresolvedName();
     }
 
     @Override
@@ -81,7 +115,7 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new GroovyGenericPlaceholderElement(visitorContext, classNode, elementAnnotationMetadataFactory, resolvedTypeArguments, arrayDimensions, bounds, rawType);
+        return new GroovyGenericPlaceholderElement(visitorContext, placeholderClassNode, mostUpper, bounds, arrayDimensions, rawType);
     }
 
     @Override

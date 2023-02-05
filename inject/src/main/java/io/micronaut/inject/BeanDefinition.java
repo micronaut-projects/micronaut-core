@@ -128,10 +128,9 @@ public interface BeanDefinition<T> extends QualifiedBeanType<T>, Named, BeanType
                 for (int i = 0; i < beanTypeParameters.length; i++) {
                     Argument<?> candidateParameter = beanTypeParameters[i];
                     final Argument<?> requestedParameter = typeArguments[i];
-                    if (!requestedParameter.isAssignableFrom(candidateParameter.getType())) {
-                        if (!(candidateParameter.isTypeVariable() && candidateParameter.isAssignableFrom(requestedParameter.getType()))) {
-                            return false;
-                        }
+                    if (!requestedParameter.isAssignableFrom(candidateParameter.getType())
+                            && !(candidateParameter.isAssignableFrom(requestedParameter.getType()))) {
+                        return false;
                     }
                 }
                 return true;
