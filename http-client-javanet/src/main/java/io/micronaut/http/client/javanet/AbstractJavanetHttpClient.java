@@ -286,6 +286,7 @@ abstract class AbstractJavanetHttpClient {
         return exc;
     }
 
+    @SuppressWarnings("java:S4830") // This is explicitly to turn security off when isInsecureTrustAllCertificates
     private static class TrustAllTrustManager implements X509TrustManager {
 
         @Override
