@@ -46,7 +46,7 @@ jobs:
       - name: Build with Gradle
         id: gradle
         run: |
-          ./gradlew check --no-daemon --parallel --continue
+          ./gradlew check --no-daemon --parallel --continue -x japiCmp
         env:
           GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
           GH_USERNAME: ${{ secrets.GH_USERNAME }}
@@ -74,8 +74,18 @@ jobs:
           check_name: Java CI / Test Report (${{ matrix.java }})
           report_paths: '**/build/test-results/test/TEST-*.xml'
           check_retries: 'true'
+      - name: Check Binary Compatibility
+        run: |
+          ./gradlew japiCmp
+        env:
+          GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
+          GH_USERNAME: ${{ secrets.GH_USERNAME }}
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
+          GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
+          GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
+        if: matrix.java == '17'
       - name: "📜 Upload binary compatibility check results"
-        if: always()
+        if: matrix.java == '17'
         uses: actions/upload-artifact@v3
         with:
           name: binary-compatibility-reports

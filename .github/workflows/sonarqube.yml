@@ -48,7 +48,7 @@ jobs:
           [ -f ./setup.sh ] && ./setup.sh || true
       - name: Analyse with Gradle
         run: |
-          ./gradlew check sonarqube --no-daemon --parallel --continue
+          ./gradlew check sonarqube -x japiCmp --no-daemon --parallel --continue
         env:
           TESTCONTAINERS_RYUK_DISABLED: true
           GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}

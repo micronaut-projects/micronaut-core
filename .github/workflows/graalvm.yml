@@ -50,9 +50,9 @@ jobs:
         run: |
           if ./gradlew tasks --no-daemon --all | grep -w "testNativeImage"
           then
-            ./gradlew check testNativeImage --continue --no-daemon
+            ./gradlew check testNativeImage -x japiCmp --continue --no-daemon
           else
-            ./gradlew check --continue --no-daemon
+            ./gradlew check --continue --no-daemon -x japiCmp
           fi
         env:
           TESTCONTAINERS_RYUK_DISABLED: true
