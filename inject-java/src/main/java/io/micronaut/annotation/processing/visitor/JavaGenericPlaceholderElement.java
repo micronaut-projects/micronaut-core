@@ -55,12 +55,16 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
             bounds.get(0).visitorContext,
             bounds.get(0).typeArguments,
             bounds.get(0).getTypeArguments(),
-            arrayDimensions,
-            true
+            arrayDimensions
         );
         this.realTypeVariable = realTypeVariable;
         this.bounds = bounds;
         this.isRawType = isRawType;
+    }
+
+    @Override
+    public boolean isTypeVariable() {
+        return true;
     }
 
     @Override

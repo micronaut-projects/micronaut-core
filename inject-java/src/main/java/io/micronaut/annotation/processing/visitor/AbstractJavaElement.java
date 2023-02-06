@@ -262,15 +262,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
     @NonNull
     protected final ClassElement newClassElement(TypeMirror type,
                                                  Map<String, ClassElement> declaredElementTypeArguments) {
-        return newClassElement(type, declaredElementTypeArguments, new HashSet<>(), true);
-    }
-
-    @NonNull
-    private ClassElement newClassElement(TypeMirror type,
-                                         Map<String, ClassElement> declaredTypeArguments,
-                                         Set<TypeMirror> visitedTypes,
-                                         boolean includeTypeAnnotations) {
-        return newClassElement(type, declaredTypeArguments, visitedTypes, includeTypeAnnotations, false, null);
+        return newClassElement(type, declaredElementTypeArguments, new HashSet<>(), true, false);
     }
 
     @NonNull
@@ -278,6 +270,16 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                                          Map<String, ClassElement> declaredTypeArguments,
                                          Set<TypeMirror> visitedTypes,
                                          boolean includeTypeAnnotations,
+                                         boolean isTypeVariable) {
+        return newClassElement(type, declaredTypeArguments, visitedTypes, includeTypeAnnotations, isTypeVariable, false, null);
+    }
+
+    @NonNull
+    private ClassElement newClassElement(TypeMirror type,
+                                         Map<String, ClassElement> declaredTypeArguments,
+                                         Set<TypeMirror> visitedTypes,
+                                         boolean includeTypeAnnotations,
+                                         boolean isTypeVariable,
                                          boolean isRawTypeParameter,
                                          @Nullable
                                          TypeParameterElement representedTypeParameter) {
@@ -291,7 +293,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             Element e = dt.asElement();
             // Declared types can wrap other types, like primitives
             if (!(e.asType() instanceof DeclaredType)) {
-                return newClassElement(e.asType(), declaredTypeArguments, visitedTypes, includeTypeAnnotations);
+                return newClassElement(e.asType(), declaredTypeArguments, visitedTypes, includeTypeAnnotations, isTypeVariable);
             }
             if (e instanceof TypeElement typeElement) {
                 List<? extends TypeMirror> typeMirrorArguments = dt.getTypeArguments();
@@ -322,7 +324,8 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                         visitorContext,
                         typeMirrorArguments,
                         resolvedTypeArguments,
-                        0
+                        0,
+                        isTypeVariable
                 ).withAnnotationMetadata(createAnnotationMetadata(typeElement, dt, includeTypeAnnotations));
             }
             return PrimitiveElement.VOID;
@@ -332,7 +335,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         }
         if (type instanceof ArrayType at) {
             TypeMirror componentType = at.getComponentType();
-            return newClassElement(componentType, declaredTypeArguments, visitedTypes, includeTypeAnnotations)
+            return newClassElement(componentType, declaredTypeArguments, visitedTypes, includeTypeAnnotations, isTypeVariable)
                     .toArray();
         }
         if (type instanceof PrimitiveType pt) {
@@ -367,16 +370,16 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             upperBounds = Stream.of(extendsBound);
         }
         List<ClassElement> upperBoundsAsElements = upperBounds
-                .map(tm -> newClassElement(tm, declaredTypeArguments, visitedTypes, includeTypeAnnotations))
+                .map(tm -> newClassElement(tm, declaredTypeArguments, visitedTypes, includeTypeAnnotations, true))
                 .toList();
         List<ClassElement> lowerBoundsAsElements = lowerBounds
-                .map(tm -> newClassElement(tm, declaredTypeArguments, visitedTypes, includeTypeAnnotations))
+                .map(tm -> newClassElement(tm, declaredTypeArguments, visitedTypes, includeTypeAnnotations, true))
                 .toList();
         ClassElement upperType = WildcardElement.findUpperType(upperBoundsAsElements, lowerBoundsAsElements);
         if (upperType.getType().getName().equals("java.lang.Object")) {
             // Not bounded wildcard: <?>
             if (representedTypeParameter != null) {
-                ClassElement definedTypeBound = newClassElement(representedTypeParameter.asType(), declaredTypeArguments, visitedTypes, includeTypeAnnotations);
+                ClassElement definedTypeBound = newClassElement(representedTypeParameter.asType(), declaredTypeArguments, visitedTypes, includeTypeAnnotations, true);
                 // Use originating parameter to extract the bound defined
                 if (definedTypeBound instanceof JavaGenericPlaceholderElement javaGenericPlaceholderElement) {
                     upperType = WildcardElement.findUpperType(javaGenericPlaceholderElement.getBounds(), Collections.emptyList());
@@ -413,7 +416,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 String variableName = typeParameter.getSimpleName().toString();
                 resolved.put(
                         variableName,
-                        newClassElement(typeParameterMirror, declaredElementTypeArguments, visitedTypes, true, false, typeParameter)
+                        newClassElement(typeParameterMirror, declaredElementTypeArguments, visitedTypes, true, true, false, typeParameter)
                 );
             }
         } else {
@@ -424,7 +427,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 String variableName = typeParameter.getSimpleName().toString();
                 resolved.put(
                         variableName,
-                        newClassElement(typeParameter.asType(), declaredElementTypeArguments, visitedTypes, true, isRaw, null)
+                        newClassElement(typeParameter.asType(), declaredElementTypeArguments, visitedTypes, true, true, isRaw, null)
                 );
             }
         }
@@ -454,7 +457,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 ((IntersectionType) upperBound).getBounds() :
                 Collections.singletonList(upperBound);
         boundsUnresolved.stream()
-                .map(tm -> (JavaClassElement) newClassElement(tm, genericsInfo, visitedTypes, includeTypeAnnotations))
+                .map(tm -> (JavaClassElement) newClassElement(tm, genericsInfo, visitedTypes, includeTypeAnnotations, true))
                 .forEach(bounds::add);
         return new JavaGenericPlaceholderElement(tv, bounds, elementAnnotationMetadataFactory, 0, isRawType);
     }

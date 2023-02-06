@@ -59,6 +59,11 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
     }
 
     @Override
+    public boolean isTypeVariable() {
+        return true;
+    }
+
+    @Override
     public Object getNativeType() {
         return wildcardType;
     }
