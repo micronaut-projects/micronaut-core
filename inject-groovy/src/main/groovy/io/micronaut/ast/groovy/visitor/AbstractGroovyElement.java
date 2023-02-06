@@ -346,7 +346,7 @@ public abstract class AbstractGroovyElement implements Element, ElementMutableAn
                 .map(classNode -> {
                     // Strip declared type arguments and replace with an Object to prevent recursion
                     boolean stripTypeArguments = alreadyVisitedPlaceholder;
-                    return (GroovyClassElement) newClassElement(classNode, parentTypeArguments, visitedTypes, isRawType, stripTypeArguments);
+                    return (GroovyClassElement) newClassElement(classNode, parentTypeArguments, visitedTypes, true, isRawType, stripTypeArguments);
                 })
                 .toList();
 
