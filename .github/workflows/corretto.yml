@@ -3,7 +3,10 @@ on:
   push:
     branches:
       - '[1-9]+.[0-9]+.x'
-  workflow_dispatch:
+  pull_request:
+    branches:
+      - master
+      - '[1-9]+.[0-9]+.x'
 jobs:
   build:
     runs-on: ubuntu-latest
