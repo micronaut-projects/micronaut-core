@@ -36,14 +36,14 @@ import java.util.function.Consumer;
 public final class HttpResponseAssertion {
     private final HttpStatus httpStatus;
     private final Map<String, String> headers;
-    private final BodyAssertion bodyAssertion;
+    private final BodyAssertion<?> bodyAssertion;
 
     @Nullable
     private final Consumer<HttpResponse<?>> responseConsumer;
 
     private HttpResponseAssertion(HttpStatus httpStatus,
                                   Map<String, String> headers,
-                                  BodyAssertion bodyAssertion,
+                                  BodyAssertion<?> bodyAssertion,
                                   @Nullable Consumer<HttpResponse<?>> responseConsumer) {
         this.httpStatus = httpStatus;
         this.headers = headers;
@@ -77,7 +77,7 @@ public final class HttpResponseAssertion {
      * @return Expected HTTP Response body
      */
 
-    public BodyAssertion getBody() {
+    public BodyAssertion<?> getBody() {
         return bodyAssertion;
     }
 
@@ -95,7 +95,7 @@ public final class HttpResponseAssertion {
     public static class Builder {
         private HttpStatus httpStatus;
         private Map<String, String> headers;
-        private BodyAssertion bodyAssertion;
+        private BodyAssertion<?> bodyAssertion;
 
         private Consumer<HttpResponse<?>> responseConsumer;
 
@@ -148,7 +148,7 @@ public final class HttpResponseAssertion {
          * @param bodyAssertion Response Body Assertion
          * @return HTTP Response Assertion Builder
          */
-        public Builder body(BodyAssertion bodyAssertion) {
+        public Builder body(BodyAssertion<?> bodyAssertion) {
             this.bodyAssertion = bodyAssertion;
             return this;
         }
