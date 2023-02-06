@@ -89,16 +89,16 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     private String name;
     private String packageName;
     @Nullable
-    // Not null means raw type definition: "List myMethod()"
-    // Null value means a class definition: "class List<T> {}"
-    final List<? extends TypeMirror> typeArguments;
-    @Nullable
     private Map<String, ClassElement> resolvedTypeArguments;
     @Nullable
     private Map<String, Map<String, ClassElement>> resolvedAllTypeArguments;
     @Nullable
     private ClassElement resolvedSuperType;
     private final JavaEnclosedElementsQuery enclosedElementsQuery = new JavaEnclosedElementsQuery();
+    @Nullable
+    // Not null means raw type definition: "List myMethod()"
+    // Null value means a class definition: "class List<T> {}"
+    final List<? extends TypeMirror> typeArguments;
 
     /**
      * @param classElement              The {@link TypeElement}

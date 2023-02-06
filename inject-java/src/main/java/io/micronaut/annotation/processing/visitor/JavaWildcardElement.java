@@ -64,6 +64,11 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
     }
 
     @Override
+    public int hashCode() {
+        return wildcardType.hashCode();
+    }
+
+    @Override
     public boolean equals(Object o) {
         if (this == o) {
             return true;

@@ -85,7 +85,6 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
         return false;
     }
 
-
     @Override
     public boolean isRawType() {
         return rawType;

@@ -201,7 +201,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @NonNull
-    public ClassElement withTypeArguments(@NonNull Collection<ClassElement> typeArguments) {
+    public final ClassElement withTypeArguments(@NonNull Collection<ClassElement> typeArguments) {
         if (typeArguments.isEmpty()) {
             // Allow to eliminate all arguments
             return withTypeArguments(Collections.emptyMap());

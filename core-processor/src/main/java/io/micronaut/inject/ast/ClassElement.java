@@ -718,6 +718,7 @@ public interface ClassElement extends TypedElement {
     default ClassElement withTypeArguments(Map<String, ClassElement> typeArguments) {
         throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support copy constructor");
     }
+
     /**
      * Copies this element and overrides its type arguments.
      * Variation of {@link #withTypeArguments(Map)} that doesn't require type argument names.

@@ -266,7 +266,6 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         return newClassElement(type, declaredElementTypeArguments, new HashSet<>(), true);
     }
 
-
     @NonNull
     private ClassElement newClassElement(TypeMirror type,
                                          Map<String, ClassElement> declaredTypeArguments,
