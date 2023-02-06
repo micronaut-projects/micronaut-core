@@ -91,6 +91,7 @@ public class CorsSimpleRequestTest {
      * @throws IOException may throw the try for resources
      */
     @Test
+    @Tag("multipart")
     void corsSimpleRequestNotAllowedFor127AndAny() throws IOException {
         asserts(SPECNAME,
             Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
@@ -119,6 +120,7 @@ public class CorsSimpleRequestTest {
      * @throws IOException
      */
     @Test
+    @Tag("multipart")
     void corsSimpleRequestAllowedForLocalhostAnd127Origin() throws IOException {
         asserts(SPECNAME,
             Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
@@ -133,6 +135,7 @@ public class CorsSimpleRequestTest {
      * @throws IOException
      */
     @Test
+    @Tag("multipart")
     void corsSimpleRequestFailsForLocalhostAndSpoofed127Origin() throws IOException {
         asserts(SPECNAME,
             Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
@@ -147,6 +150,7 @@ public class CorsSimpleRequestTest {
      * @throws IOException
      */
     @Test
+    @Tag("multipart")
     void corsSimpleRequestAllowedFor127RequestAndLocalhostOrigin() throws IOException {
         asserts(SPECNAME,
             Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
