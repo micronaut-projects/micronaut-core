@@ -33,7 +33,7 @@ import java.util.Collections;
  * @since 1.0
  */
 @Internal
-class JavaParameterElement extends AbstractJavaElement implements ParameterElement {
+final class JavaParameterElement extends AbstractJavaElement implements ParameterElement {
 
     private final JavaClassElement owningType;
     private final MethodElement methodElement;
@@ -90,7 +90,7 @@ class JavaParameterElement extends AbstractJavaElement implements ParameterEleme
     @NonNull
     public ClassElement getType() {
         if (typeElement == null) {
-            this.typeElement = newClassElement(getNativeType().asType(), Collections.emptyMap());
+            typeElement = newClassElement(getNativeType().asType(), Collections.emptyMap());
         }
         return typeElement;
     }
@@ -98,10 +98,10 @@ class JavaParameterElement extends AbstractJavaElement implements ParameterEleme
     @NonNull
     @Override
     public ClassElement getGenericType() {
-        if (this.genericTypeElement == null) {
-            this.genericTypeElement = newClassElement(getNativeType().asType(), methodElement.getDeclaringType().getTypeArguments());
+        if (genericTypeElement == null) {
+            genericTypeElement = newClassElement(getNativeType().asType(), methodElement.getDeclaringType().getTypeArguments());
         }
-        return this.genericTypeElement;
+        return genericTypeElement;
     }
 
     @Override

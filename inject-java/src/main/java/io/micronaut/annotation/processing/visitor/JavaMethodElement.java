@@ -129,24 +129,6 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     }
 
     @Override
-    public boolean overrides(MethodElement overridden) {
-//        if (this.equals(overridden) || isStatic() || overridden.isStatic()) {
-//            return false;
-//        }
-//        if (overridden instanceof JavaMethodElement) {
-//            boolean overrides = visitorContext.getElements().overrides(
-//                executableElement,
-//                ((JavaMethodElement) overridden).executableElement,
-//                owningType.classElement
-//            );
-//            if (overrides) {
-//                return true;
-//            }
-//        }
-        return MethodElement.super.overrides(overridden);
-    }
-
-    @Override
     public boolean hides(MemberElement hidden) {
         if (isStatic() && getDeclaringType().isInterface()) {
             return false;
@@ -157,19 +139,19 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     @NonNull
     @Override
     public ClassElement getGenericReturnType() {
-        if (this.genericReturnType == null) {
-            this.genericReturnType = returnType(getDeclaringType().getTypeArguments());
+        if (genericReturnType == null) {
+            genericReturnType = returnType(getDeclaringType().getTypeArguments());
         }
-        return this.genericReturnType;
+        return genericReturnType;
     }
 
     @Override
     @NonNull
     public ClassElement getReturnType() {
-        if (this.returnType == null) {
-            this.returnType = returnType(Collections.emptyMap());
+        if (returnType == null) {
+            returnType = returnType(Collections.emptyMap());
         }
-        return this.returnType;
+        return returnType;
     }
 
     @Override
