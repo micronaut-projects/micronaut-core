@@ -18,15 +18,13 @@ package io.micronaut.management.endpoint.loggers.impl;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
-import ch.qos.logback.classic.util.ContextInitializer;
-import ch.qos.logback.core.joran.spi.JoranException;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.logging.LogLevel;
-import io.micronaut.logging.LoggingSystemException;
+import io.micronaut.logging.impl.LogbackUtils;
 import io.micronaut.management.endpoint.loggers.LoggerConfiguration;
 import io.micronaut.management.endpoint.loggers.LoggersEndpoint;
 import io.micronaut.management.endpoint.loggers.ManagedLoggingSystem;
@@ -34,9 +32,7 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.slf4j.LoggerFactory;
 
-import java.net.URL;
 import java.util.Collection;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -135,15 +131,6 @@ public class LogbackLoggingSystem implements ManagedLoggingSystem, io.micronaut.
     public void refresh() {
         LoggerContext context = getLoggerContext();
         context.reset();
-        URL resource = getClass().getClassLoader().getResource(logbackXmlLocation);
-        if (Objects.isNull(resource)) {
-            throw new LoggingSystemException("Resource " + logbackXmlLocation + " not found");
-        }
-
-        try {
-            new ContextInitializer(context).configureByResource(resource);
-        } catch (JoranException e) {
-            throw new LoggingSystemException("Error while refreshing Logback", e);
-        }
+        LogbackUtils.configure(getClass().getClassLoader(), context, logbackXmlLocation);
     }
 }
