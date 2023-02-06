@@ -1617,8 +1617,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         private final List<ClassElement> argumentTypes;
         private final List<ClassElement> genericArgumentTypes;
         private final Type returnType;
-        int methodIndex;
         private final List<String> rawTypes;
+        int methodIndex;
 
         public MethodRef(String name, List<ParameterElement> parameterElements, Type returnType) {
             this.name = name;

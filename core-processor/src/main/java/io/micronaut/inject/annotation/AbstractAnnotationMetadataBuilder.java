@@ -582,6 +582,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * Obtain the annotation mappers for the given annotation name.
      *
      * @param annotationName The annotation name
+     * @param <K>            The annotation type
      * @return The mappers
      */
     @NonNull
