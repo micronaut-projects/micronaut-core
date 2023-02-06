@@ -51,7 +51,10 @@ import java.util.stream.Stream;
  */
 @SuppressWarnings("java:S1118")
 public class IOUtils {
-    private static final Logger LOG = LoggerFactory.getLogger(IOUtils.class);
+    // Do NOT introduce a static logger into this class, as it is used
+    // by our features at image build time: this will prevent the native
+    // images from building. If you need a logger, introduce it for debugging
+    // but remove it before committing your changes.
 
     private static final int BUFFER_MAX = 8192;
     private static final String SCHEME_FILE = "file";
@@ -89,15 +92,9 @@ public class IOUtils {
     @Blocking
     @SuppressWarnings({"java:S2095", "java:S1141", "java:S3776"})
     public static void eachFile(@NonNull URI uri, String path, @NonNull Consumer<Path> consumer) {
-        if (LOG.isTraceEnabled()) {
-            LOG.trace("uri: {} path: {}", uri, path);
-        }
         List<Closeable> toClose = new ArrayList<>();
         try {
             Path myPath = resolvePath(uri, path, toClose, IOUtils::loadNestedJarUri);
-            if (LOG.isTraceEnabled()) {
-                LOG.trace("resolve path: {}", myPath);
-            }
             if (myPath != null) {
                 try (Stream<Path> walk = Files.walk(myPath, 1)) {
                     for (Iterator<Path> it = walk.iterator(); it.hasNext();) {
@@ -140,7 +137,9 @@ public class IOUtils {
                 if (!jarUri.startsWith(SCHEME_FILE + COLON)) {
                     // Special case WebLogic classloader
                     // https://github.com/micronaut-projects/micronaut-core/issues/8636
-                    jarUri = SCHEME_FILE + COLON + jarUri;
+                    jarUri = jarUri.startsWith("/") ?
+                        SCHEME_FILE + COLON + jarUri :
+                        SCHEME_FILE + COLON + "/" + jarUri;
                 }
                 // now, add the !/ at the end again so that loadNestedJarUri can handle it:
                 jarUri += "!/";
