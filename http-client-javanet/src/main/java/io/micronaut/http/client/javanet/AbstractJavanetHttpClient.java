@@ -120,8 +120,13 @@ abstract class AbstractJavanetHttpClient {
             .followRedirects(configuration.isFollowRedirects() ? HttpClient.Redirect.NORMAL : HttpClient.Redirect.NEVER)
             .cookieHandler(cookieManager);
 
-        if (configuration.getProxyAddress().isPresent()) {
-            builder = configureProxy(builder, configuration.getProxyAddress().get(), configuration.getProxyUsername().orElse(null), configuration.getProxyPassword().orElse(null));
+        Optional<SocketAddress> proxyAddress = configuration.getProxyAddress();
+        if (proxyAddress.isPresent()) {
+            SocketAddress socketAddress = proxyAddress.get();
+            if (log.isDebugEnabled()) {
+                log.debug("Configuring proxy: {}", socketAddress);
+            }
+            builder = configureProxy(builder, socketAddress, configuration.getProxyUsername().orElse(null), configuration.getProxyPassword().orElse(null));
         }
 
         if (configuration.getSslConfiguration() instanceof ClientSslConfiguration clientSslConfiguration) {
