@@ -385,30 +385,34 @@ public abstract class AbstractGroovyElement implements Element, ElementMutableAn
         } else {
             upperBounds = Arrays.stream(genericsUpperBounds);
         }
-        List<GroovyClassElement> upperBoundsAsElements = upperBounds
-                .map(classNode -> (GroovyClassElement) newClassElement(classNode, parentTypeArguments, visitedTypes, false))
+        List<ClassElement> upperBoundsAsElements = upperBounds
+                .map(classNode -> newClassElement(classNode, parentTypeArguments, visitedTypes, false))
                 .toList();
-        List<GroovyClassElement> lowerBoundsAsElements = lowerBounds
-                .map(classNode -> (GroovyClassElement) newClassElement(classNode, parentTypeArguments, visitedTypes, false))
+        List<ClassElement> lowerBoundsAsElements = lowerBounds
+                .map(classNode ->newClassElement(classNode, parentTypeArguments, visitedTypes, false))
                 .toList();
         if (upperBoundsAsElements.isEmpty()) {
-            upperBoundsAsElements = Collections.singletonList((GroovyClassElement) getObjectClassElement());
+            upperBoundsAsElements = Collections.singletonList(getObjectClassElement());
         }
-        GroovyClassElement upperType = WildcardElement.findUpperType(upperBoundsAsElements, lowerBoundsAsElements);
+        ClassElement upperType = WildcardElement.findUpperType(upperBoundsAsElements, lowerBoundsAsElements);
         if (upperType.getType().getName().equals("java.lang.Object")) {
             // Not bounded wildcard: <?>
             if (redirectType != null && redirectType != genericsType) {
-                GroovyClassElement definedTypeBound = (GroovyClassElement) newClassElement(redirectType, redirectType, parentTypeArguments, visitedTypes, false);
+                ClassElement definedTypeBound = newClassElement(redirectType, redirectType, parentTypeArguments, visitedTypes, false);
                 // Use originating parameter to extract the bound defined
                 if (definedTypeBound instanceof GroovyGenericPlaceholderElement groovyGenericPlaceholderElement) {
                     upperType = WildcardElement.findUpperType(groovyGenericPlaceholderElement.getBounds(), Collections.emptyList());
                 }
             }
         }
+        if (upperType.isPrimitive()) {
+            // TODO: Support primitives for wildcards (? extends byte[])
+            return upperType;
+        }
         return new GroovyWildcardElement(
-                upperType,
-                upperBoundsAsElements,
-                lowerBoundsAsElements,
+                (GroovyClassElement) upperType,
+                upperBoundsAsElements.stream().map(GroovyClassElement.class::cast).toList(),
+                lowerBoundsAsElements.stream().map(GroovyClassElement.class::cast).toList(),
                 elementAnnotationMetadataFactory
         );
     }

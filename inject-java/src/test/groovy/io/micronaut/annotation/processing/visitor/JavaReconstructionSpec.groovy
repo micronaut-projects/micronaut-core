@@ -7,6 +7,7 @@ import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.WildcardElement
 import spock.lang.Unroll
+
 /**
  * These tests are based on a {@link #reconstructTypeSignature} method that looks at {@link ClassElement#getBoundGenericTypes()}
  * to transform a {@link ClassElement} back to its string representation. This way, we can easily check what
@@ -33,16 +34,41 @@ class Test<T> {
         where:
         fieldType << [
                 'String',
+                'byte[]',
+                'byte[][]',
                 'List<String>',
                 'List<T>',
                 'List<T[]>',
+                'List<T[][]>',
                 'List<? extends CharSequence>',
                 'List<? super String>',
                 'List<? extends T[]>',
+                'List<? extends T[][]>',
+                'List<? extends T[][][]>',
                 'List<? extends List<? extends T[]>[]>',
+                'List<? extends List<? extends T[]>[][]>',
+                'List<? extends List<? extends T[][]>[][]>',
                 'List<? extends List>',
                 'List<? extends List<?>>',
         ]
+    }
+
+    def 'field type is wildcard extending byte[]'() {
+        given:
+            def element = buildClassElement("""
+package example;
+
+import java.util.*;
+
+class Test<T> {
+    List<? extends byte[]> field;
+}
+""")
+            def field = element.getFields()[0]
+
+        expect:
+            // Wildcards with arrays not supported yet
+            reconstructTypeSignature(field.genericType) == 'List<byte[]>'
     }
 
     @Unroll("super type is #superType")

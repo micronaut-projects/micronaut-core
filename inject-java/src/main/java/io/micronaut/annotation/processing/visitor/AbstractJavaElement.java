@@ -43,7 +43,6 @@ import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.IntersectionType;
 import javax.lang.model.type.NoType;
 import javax.lang.model.type.PrimitiveType;
-import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.type.TypeVariable;
 import javax.lang.model.type.UnionType;
@@ -333,13 +332,8 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         }
         if (type instanceof ArrayType at) {
             TypeMirror componentType = at.getComponentType();
-            ClassElement arrayType;
-            if (componentType instanceof TypeVariable tv && componentType.getKind() == TypeKind.TYPEVAR) {
-                arrayType = resolveTypeVariable(declaredTypeArguments, visitedTypes, includeTypeAnnotations, tv, isRawTypeParameter);
-            } else {
-                arrayType = newClassElement(componentType, declaredTypeArguments, visitedTypes, includeTypeAnnotations);
-            }
-            return arrayType.toArray();
+            return newClassElement(componentType, declaredTypeArguments, visitedTypes, includeTypeAnnotations)
+                    .toArray();
         }
         if (type instanceof PrimitiveType pt) {
             return PrimitiveElement.valueOf(pt.getKind().name());
@@ -372,29 +366,33 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         } else {
             upperBounds = Stream.of(extendsBound);
         }
-        List<JavaClassElement> upperBoundsAsElements = upperBounds
-                .map(tm -> (JavaClassElement) newClassElement(tm, declaredTypeArguments, visitedTypes, includeTypeAnnotations))
+        List<ClassElement> upperBoundsAsElements = upperBounds
+                .map(tm -> newClassElement(tm, declaredTypeArguments, visitedTypes, includeTypeAnnotations))
                 .toList();
-        List<JavaClassElement> lowerBoundsAsElements = lowerBounds
-                .map(tm -> (JavaClassElement) newClassElement(tm, declaredTypeArguments, visitedTypes, includeTypeAnnotations))
+        List<ClassElement> lowerBoundsAsElements = lowerBounds
+                .map(tm -> newClassElement(tm, declaredTypeArguments, visitedTypes, includeTypeAnnotations))
                 .toList();
-        JavaClassElement upperType = WildcardElement.findUpperType(upperBoundsAsElements, lowerBoundsAsElements);
+        ClassElement upperType = WildcardElement.findUpperType(upperBoundsAsElements, lowerBoundsAsElements);
         if (upperType.getType().getName().equals("java.lang.Object")) {
             // Not bounded wildcard: <?>
             if (representedTypeParameter != null) {
-                JavaClassElement definedTypeBound = (JavaClassElement) newClassElement(representedTypeParameter.asType(), declaredTypeArguments, visitedTypes, includeTypeAnnotations);
+                ClassElement definedTypeBound = newClassElement(representedTypeParameter.asType(), declaredTypeArguments, visitedTypes, includeTypeAnnotations);
                 // Use originating parameter to extract the bound defined
                 if (definedTypeBound instanceof JavaGenericPlaceholderElement javaGenericPlaceholderElement) {
                     upperType = WildcardElement.findUpperType(javaGenericPlaceholderElement.getBounds(), Collections.emptyList());
                 }
             }
         }
+        if (upperType.isPrimitive()) {
+            // TODO: Support primitives for wildcards (? extends byte[])
+            return upperType;
+        }
         return new JavaWildcardElement(
                 elementAnnotationMetadataFactory,
                 wt,
-                upperType,
-                upperBoundsAsElements,
-                lowerBoundsAsElements
+                (JavaClassElement) upperType,
+                upperBoundsAsElements.stream().map(JavaClassElement.class::cast).toList(),
+                lowerBoundsAsElements.stream().map(JavaClassElement.class::cast).toList()
         );
     }
 
