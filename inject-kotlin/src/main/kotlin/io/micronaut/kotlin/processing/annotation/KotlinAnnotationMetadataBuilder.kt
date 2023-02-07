@@ -293,13 +293,13 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
         originatingElement: KSAnnotated
     ): Array<out Any>? {
         var valueType = Any::class.java
-        val collection = annotationValue.map {
+        val collection = annotationValue.mapNotNull {
             val v = readAnnotationValue(originatingElement, it)
             if (v != null) {
                 valueType = v.javaClass
             }
             v
-        }
+        } // annotation values can't be null
         return ArrayUtils.toArray(collection, valueType)
     }
 

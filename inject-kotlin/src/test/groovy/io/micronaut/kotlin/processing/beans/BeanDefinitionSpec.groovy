@@ -2,6 +2,7 @@ package io.micronaut.kotlin.processing.beans
 
 import io.micronaut.annotation.processing.test.KotlinCompiler
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.annotation.Order
@@ -20,26 +21,32 @@ import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 class BeanDefinitionSpec extends Specification {
 
     void "test bean annotated with @MicronautTest"() {
-        given:
-        def definition = KotlinCompiler.buildBeanDefinition('test.MTest', '''
+        when:
+        def context = buildContext('''
 package test
 
-import io.micronaut.test.extensions.junit5.annotation.MicronautTest
-import jakarta.inject.Inject
-import jakarta.inject.Singleton
+import io.micronaut.runtime.EmbeddedApplication
+import io.micronaut.test.extensions.kotest5.annotation.MicronautTest
+import io.kotest.core.spec.style.StringSpec
 
 @MicronautTest
-class MTest {
-    @Inject
-    var f : F? = null
-}
+class ExampleTest(private val application: EmbeddedApplication<*>): StringSpec({
 
-@Singleton
-class F
+        "test the server is running" {
+            assert(application.isRunning)
+        }
+})
 ''')
 
-        expect:
-        definition.injectedMethods.size() == 1
+        then:
+        context != null
+
+        when:
+        getBean(context, 'test.ExampleTest')
+
+        then:
+        def e = thrown(NoSuchBeanException)
+        e.message.contains("Bean of type [test.ExampleTest] is disabled")
     }
 
     void "test jvm field"() {

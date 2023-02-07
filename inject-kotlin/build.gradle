@@ -8,6 +8,7 @@ plugins {
 micronautBuild {
     core {
         usesMicronautTest()
+        usesMicronautTestKotest()
     }
 }
 
@@ -35,6 +36,7 @@ dependencies {
     testImplementation libs.kotlinx.coroutines.jdk8
     testImplementation libs.kotlinx.coroutines.rx2
     testImplementation libs.micronaut.test.junit5
+    testImplementation libs.kotlin.kotest.junit5
 }
 
 afterEvaluate {
