@@ -86,22 +86,22 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private static final String FIELD_BEAN_PROPERTIES_REFERENCES = "$PROPERTIES_REFERENCES";
     private static final String FIELD_BEAN_METHODS_REFERENCES = "$METHODS_REFERENCES";
     private static final Method PROPERTY_INDEX_OF = Method.getMethod(
-            ReflectionUtils.findMethod(BeanIntrospection.class, "propertyIndexOf", String.class).get()
+            ReflectionUtils.getRequiredInternalMethod(BeanIntrospection.class, "propertyIndexOf", String.class)
     );
     private static final Method FIND_PROPERTY_BY_INDEX_METHOD = Method.getMethod(
-            ReflectionUtils.findMethod(AbstractInitializableBeanIntrospection.class, "getPropertyByIndex", int.class).get()
+            ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getPropertyByIndex", int.class)
     );
     private static final Method FIND_INDEXED_PROPERTY_METHOD = Method.getMethod(
-            ReflectionUtils.findMethod(AbstractInitializableBeanIntrospection.class, "findIndexedProperty", Class.class, String.class).get()
+            ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "findIndexedProperty", Class.class, String.class)
     );
     private static final Method GET_INDEXED_PROPERTIES = Method.getMethod(
-            ReflectionUtils.findMethod(AbstractInitializableBeanIntrospection.class, "getIndexedProperties", Class.class).get()
+            ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getIndexedProperties", Class.class)
     );
     private static final Method GET_BP_INDEXED_SUBSET_METHOD = Method.getMethod(
-            ReflectionUtils.findMethod(AbstractInitializableBeanIntrospection.class, "getBeanPropertiesIndexedSubset", int[].class).get()
+            ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getBeanPropertiesIndexedSubset", int[].class)
     );
     private static final Method COLLECTIONS_EMPTY_LIST = Method.getMethod(
-            ReflectionUtils.findMethod(Collections.class, "emptyList").get()
+            ReflectionUtils.getRequiredInternalMethod(Collections.class, "emptyList")
     );
 
     private final ClassWriter referenceWriter;
@@ -970,6 +970,22 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      */
     void visitConstructor(MethodElement constructor) {
         this.constructor = constructor;
+        processAnnotationDefaults(constructor);
+    }
+
+    private void processAnnotationDefaults(MethodElement constructor) {
+        if (constructor != null) {
+            MutableAnnotationMetadata.contributeDefaults(
+                this.annotationMetadata,
+                constructor.getAnnotationMetadata().getTargetAnnotationMetadata()
+            );
+            for (ParameterElement parameter : constructor.getParameters()) {
+                MutableAnnotationMetadata.contributeDefaults(
+                    this.annotationMetadata,
+                    parameter.getAnnotationMetadata().getTargetAnnotationMetadata()
+                );
+            }
+        }
     }
 
     /**
@@ -979,6 +995,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      */
     void visitDefaultConstructor(MethodElement constructor) {
         this.defaultConstructor = constructor;
+        processAnnotationDefaults(constructor);
     }
 
     private static final class ExceptionDispatchTarget implements DispatchWriter.DispatchTarget {

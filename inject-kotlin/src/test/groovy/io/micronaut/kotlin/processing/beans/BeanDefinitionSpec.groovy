@@ -2,6 +2,7 @@ package io.micronaut.kotlin.processing.beans
 
 import io.micronaut.annotation.processing.test.KotlinCompiler
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.annotation.Order
@@ -18,6 +19,35 @@ import spock.lang.Specification
 import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class BeanDefinitionSpec extends Specification {
+
+    void "test bean annotated with @MicronautTest"() {
+        when:
+        def context = buildContext('''
+package test
+
+import io.micronaut.runtime.EmbeddedApplication
+import io.micronaut.test.extensions.kotest5.annotation.MicronautTest
+import io.kotest.core.spec.style.StringSpec
+
+@MicronautTest
+class ExampleTest(private val application: EmbeddedApplication<*>): StringSpec({
+
+        "test the server is running" {
+            assert(application.isRunning)
+        }
+})
+''')
+
+        then:
+        context != null
+
+        when:
+        getBean(context, 'test.ExampleTest')
+
+        then:
+        def e = thrown(NoSuchBeanException)
+        e.message.contains("Bean of type [test.ExampleTest] is disabled")
+    }
 
     void "test jvm field"() {
         given:
