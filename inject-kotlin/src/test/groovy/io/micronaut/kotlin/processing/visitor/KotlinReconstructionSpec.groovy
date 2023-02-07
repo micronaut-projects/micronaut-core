@@ -38,6 +38,7 @@ class Test<T> {
         ]
     }
 
+    @PendingFeature(reason = "Breaks because you can't use kotlin elements outside of a compilation execution")
     @Unroll("super type is #superType")
     def 'super type'() {
         given:

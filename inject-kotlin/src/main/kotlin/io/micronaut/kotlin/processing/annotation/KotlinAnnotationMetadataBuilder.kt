@@ -123,11 +123,21 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
             annotationMirrors.addAll(element.annotations)
         } else if (element is KSPropertyDeclaration) {
             val parent : KSClassDeclaration? = findClassDeclaration(element)
-            if (parent is KSClassDeclaration && parent.classKind == ClassKind.ANNOTATION_CLASS) {
-                annotationMirrors.addAll(element.annotations)
-                val getter = element.getter
-                if (getter != null) {
-                    annotationMirrors.addAll(getter.annotations)
+            if (parent is KSClassDeclaration) {
+                if (parent.classKind == ClassKind.ANNOTATION_CLASS) {
+                    annotationMirrors.addAll(element.annotations)
+                    val getter = element.getter
+                    if (getter != null) {
+                        annotationMirrors.addAll(getter.annotations)
+                    }
+                } else if (parent.modifiers.contains(Modifier.DATA)) {
+                    val parameter = parent.primaryConstructor?.parameters?.find { it.name == element.simpleName }
+                    if (parameter != null) {
+                        annotationMirrors.addAll(parameter.annotations)
+                    }
+                    annotationMirrors.addAll(element.annotations)
+                } else {
+                    annotationMirrors.addAll(element.annotations)
                 }
             } else {
                 annotationMirrors.addAll(element.annotations)
