@@ -185,11 +185,11 @@ public class FilterRunner {
         if (iterator.hasNext()) {
             GenericHttpFilter filter = iterator.next();
             return processRequestFilter(filter, context, suspended)
+                    .flatMap(newContext -> filterRequest0(newContext, iterator, suspended))
                     .onErrorResume(throwable -> {
                         // Un-suspend possibly awaiting filter and exception filtering scenario of the http client
                         return filterResponse(context, iterator, throwable, suspended).map(context::withResponse);
-                    })
-                    .flatMap(newContext -> filterRequest0(newContext, iterator, suspended));
+                    });
         } else {
             return ExecutionFlow.error(new IllegalStateException("Request filters didn't produce any response!"));
         }
@@ -395,9 +395,8 @@ public class FilterRunner {
         FilterArgBinder[] fulfilled = new FilterArgBinder[arguments.length];
         Predicate<FilterMethodContext> filterCondition = FILTER_CONDITION_ALWAYS_TRUE;
         boolean skipOnError = isResponseFilter;
+        boolean filtersException = false;
         Function<FilterContext, FilterContinuationImpl<?>> continuationCreator = null;
-        int continuationArgIndex = -1;
-        int exceptionArgIndex = -1;
         for (int i = 0; i < arguments.length; i++) {
             Argument<?> argument = arguments[i];
             if (argument.getType().isAssignableFrom(HttpRequest.class)) {
@@ -430,13 +429,13 @@ public class FilterRunner {
                         return null;
                     };
                 }
-                exceptionArgIndex = i;
+                filtersException = true;
                 skipOnError = false;
             } else if (argument.getType() == FilterContinuation.class) {
                 if (isResponseFilter) {
                     throw new IllegalArgumentException("Response filters cannot use filter continuations");
                 }
-                if (continuationArgIndex != -1) {
+                if (continuationCreator != null) {
                     throw new IllegalArgumentException("Only one continuation per filter is allowed");
                 }
                 Argument<?> continuationReturnType = argument.getFirstTypeVariable().orElseThrow(() -> new IllegalArgumentException("Continuations must specify generic type"));
@@ -453,8 +452,6 @@ public class FilterRunner {
                 } else {
                     throw new IllegalArgumentException("Unsupported continuation type: " + continuationReturnType);
                 }
-                continuationArgIndex = i;
-
             } else {
                 throw new IllegalArgumentException("Unsupported filter argument type: " + argument);
             }
@@ -464,7 +461,7 @@ public class FilterRunner {
         } else if (filterCondition == FILTER_CONDITION_ALWAYS_TRUE) {
             filterCondition = null;
         }
-        FilterReturnHandler returnHandler = prepareReturnHandler(conversionService, returnType, isResponseFilter, continuationArgIndex != -1, false);
+        FilterReturnHandler returnHandler = prepareReturnHandler(conversionService, returnType, isResponseFilter, continuationCreator != null, false);
         return new FilterMethod<>(
                 order,
                 bean,
@@ -473,8 +470,7 @@ public class FilterRunner {
                 fulfilled,
                 filterCondition,
                 continuationCreator,
-                continuationArgIndex,
-                exceptionArgIndex,
+                filtersException,
                 returnHandler
         );
     }
@@ -540,7 +536,7 @@ public class FilterRunner {
 
                 @Override
                 public ExecutionFlow<FilterContext> handle(FilterContext context, Object returnValue, FilterContinuationImpl<?> continuation) throws Throwable {
-                    if (returnValue == null && nullable) {
+                    if (returnValue == null && !nullable) {
                         return next.handle(context, null, continuation);
                     }
 
@@ -583,8 +579,7 @@ public class FilterRunner {
                            @Nullable
                            Predicate<FilterMethodContext> filterCondition,
                            Function<FilterContext, FilterContinuationImpl<?>> continuationCreator,
-                           int continuationIndex,
-                           int exceptionIndex,
+                           boolean filtersException,
                            FilterReturnHandler returnHandler
     ) implements GenericHttpFilter, Ordered {
 
@@ -595,7 +590,7 @@ public class FilterRunner {
 
         @Override
         public boolean isFiltersException() {
-            return exceptionIndex != -1;
+            return filtersException;
         }
 
         @Override
@@ -952,10 +947,10 @@ public class FilterRunner {
 
         @NotNull
         private ExecutionFlow<FilterContext> asFilterProcessed(FilterContext filterContext,
-                                                             @Nullable
-                                                             HttpResponse<?> newResponse,
-                                                             @Nullable
-                                                             Throwable newFailure) {
+                                                               @Nullable
+                                                               HttpResponse<?> newResponse,
+                                                               @Nullable
+                                                               Throwable newFailure) {
             triggerFilterProcessed(filterContext, newResponse, newFailure);
             return CompletableFutureExecutionFlow.just(filterProcessed);
         }
@@ -1083,6 +1078,7 @@ public class FilterRunner {
     /**
      * {@link FilterContinuationImpl} that is adapted for filters returning a reactive response .
      * Implements the {@link Subscriber} that will subscribe to the method's return value.
+     *
      * @param <T> The published item type
      */
     private static class ReactiveResultAwareReactiveContinuationImpl<T> extends ReactiveContinuationImpl<Publisher<T>>
