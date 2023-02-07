@@ -15,20 +15,14 @@
  */
 package io.micronaut.logging.impl;
 
-import java.net.URL;
-import java.util.Objects;
-
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.LoggerContext;
-import ch.qos.logback.classic.util.ContextInitializer;
-import ch.qos.logback.core.joran.spi.JoranException;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.logging.LoggingSystem;
-import io.micronaut.logging.LoggingSystemException;
 import jakarta.inject.Singleton;
 import org.slf4j.LoggerFactory;
 
@@ -60,16 +54,7 @@ public final class LogbackLoggingSystem implements LoggingSystem {
     public void refresh() {
         LoggerContext context = getLoggerContext();
         context.reset();
-        URL resource = getClass().getClassLoader().getResource(logbackXmlLocation);
-        if (Objects.isNull(resource)) {
-            throw new LoggingSystemException("Resource " + logbackXmlLocation + " not found");
-        }
-
-        try {
-            new ContextInitializer(context).configureByResource(resource);
-        } catch (JoranException e) {
-            throw new LoggingSystemException("Error while refreshing Logback", e);
-        }
+        LogbackUtils.configure(getClass().getClassLoader(), context, logbackXmlLocation);
     }
 
     /**

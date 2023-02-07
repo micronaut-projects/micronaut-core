@@ -72,6 +72,8 @@ include "test-suite-kotlin"
 include "test-suite-kotlin-ksp"
 include "test-suite-graal"
 include "test-suite-groovy"
+include "test-suite-groovy"
+include "test-suite-logback"
 include "test-utils"
 
 // benchmarks
