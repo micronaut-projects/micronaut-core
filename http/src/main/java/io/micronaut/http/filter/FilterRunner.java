@@ -54,7 +54,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -786,18 +785,6 @@ public class FilterRunner {
      * @param <R> Return value of the continuation
      */
     private abstract static class FilterContinuationImpl<R> implements FilterContinuation<R> {
-        /**
-         * This flag checks if the proceed method has been called, to request execute the next filter in chain.
-         */
-        final AtomicBoolean proceedRequested = new AtomicBoolean(false);
-        /**
-         * This flag checks of suspension point of the continuation has been resumed.
-         */
-        final AtomicBoolean suspensionPointResumed = new AtomicBoolean(false);
-        /**
-         * This flag checks of the filter result has been published.
-         */
-        final AtomicBoolean filterResultPublished = new AtomicBoolean(false);
 
         /**
          * Executor to run any downstream reactive code on. Only used by some implementations, e.g.
@@ -832,7 +819,7 @@ public class FilterRunner {
         }
 
         protected final void proceedRequested() {
-            if (proceedRequested.compareAndSet(false, true)) {
+            if (!nextFilterProcessing.isDone()) {
                 nextFilterProcessing.complete(filterContext);
             } else {
                 throw new IllegalStateException("Already subscribed to proceed() publisher, or filter method threw an exception and was cancelled");
@@ -860,7 +847,7 @@ public class FilterRunner {
          * @param throwable     The exception
          */
         public void resume(FilterContext filterContext, Throwable throwable) {
-            if (suspensionPointResumed.compareAndSet(false, true)) {
+            if (!suspensionPoint.isDone()) {
                 if (throwable == null) {
                     suspensionPoint.complete(filterContext);
                 } else {
@@ -922,7 +909,7 @@ public class FilterRunner {
                                               HttpResponse<?> newResponse,
                                               @Nullable
                                               Throwable newFailure) {
-            if (proceedRequested.compareAndSet(false, true)) {
+            if (!nextFilterProcessing.isDone()) {
                 // Publish the error to the nextFilterProcessing as well
                 if (newFailure == null) {
                     nextFilterProcessing.complete(newResponse == null ? filterContext : filterContext.withResponse(newResponse));
@@ -930,7 +917,7 @@ public class FilterRunner {
                     nextFilterProcessing.completeExceptionally(newFailure);
                 }
             }
-            if (filterResultPublished.compareAndSet(false, true)) {
+            if (!filterProcessed.isDone()) {
                 if (newFailure == null) {
                     filterProcessed.complete(newResponse == null ? filterContext : filterContext.withResponse(newResponse));
                 } else {
@@ -1117,7 +1104,7 @@ public class FilterRunner {
 
         @Override
         public void onComplete() {
-            if (!suspensionPointResumed.get()) {
+            if (!suspensionPoint.isDone()) {
                 triggerFilterProcessed(filterContext, null, new IllegalStateException("Publisher did not return response"));
             }
         }
