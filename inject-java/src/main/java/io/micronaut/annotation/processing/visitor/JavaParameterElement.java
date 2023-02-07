@@ -19,13 +19,12 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
 import javax.lang.model.element.VariableElement;
-import javax.lang.model.type.TypeMirror;
-import java.util.Map;
+import java.util.Collections;
 
 /**
  * Implementation of the {@link ParameterElement} interface for Java.
@@ -34,7 +33,7 @@ import java.util.Map;
  * @since 1.0
  */
 @Internal
-class JavaParameterElement extends AbstractJavaElement implements ParameterElement {
+final class JavaParameterElement extends AbstractJavaElement implements ParameterElement {
 
     private final JavaClassElement owningType;
     private final MethodElement methodElement;
@@ -91,8 +90,7 @@ class JavaParameterElement extends AbstractJavaElement implements ParameterEleme
     @NonNull
     public ClassElement getType() {
         if (typeElement == null) {
-            TypeMirror parameterType = getNativeType().asType();
-            this.typeElement = mirrorToClassElement(parameterType, visitorContext);
+            typeElement = newClassElement(getNativeType().asType(), Collections.emptyMap());
         }
         return typeElement;
     }
@@ -100,12 +98,10 @@ class JavaParameterElement extends AbstractJavaElement implements ParameterEleme
     @NonNull
     @Override
     public ClassElement getGenericType() {
-        if (this.genericTypeElement == null) {
-            TypeMirror returnType = getNativeType().asType();
-            Map<String, Map<String, TypeMirror>> declaredGenericInfo = owningType.getGenericTypeInfo();
-            this.genericTypeElement = parameterizedClassElement(returnType, visitorContext, declaredGenericInfo);
+        if (genericTypeElement == null) {
+            genericTypeElement = newClassElement(getNativeType().asType(), methodElement.getDeclaringType().getTypeArguments());
         }
-        return this.genericTypeElement;
+        return genericTypeElement;
     }
 
     @Override

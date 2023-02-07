@@ -26,12 +26,15 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.ElementModifier;
+import io.micronaut.inject.ast.PrimitiveElement;
+import io.micronaut.inject.ast.WildcardElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
-import io.micronaut.inject.ast.ElementModifier;
-import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.annotation.ElementMutableAnnotationMetadataDelegate;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import org.codehaus.groovy.ast.AnnotatedNode;
+import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.GenericsType;
@@ -42,9 +45,10 @@ import org.codehaus.groovy.control.SourceUnit;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -53,11 +57,13 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * Abstract Groovy element.
  *
  * @author Graeme Rocher
+ * @author Denis Stepanov
  * @since 1.1
  */
 
@@ -203,182 +209,295 @@ public abstract class AbstractGroovyElement implements Element, ElementMutableAn
         return hasDeclaredAnnotation(PackageScope.class);
     }
 
-    /**
-     * Align the given generic types.
-     *
-     * @param genericsTypes The generic types
-     * @param redirectTypes The redirect types
-     * @param genericsSpec  The current generics spec
-     * @return The new generic spec
-     */
-    protected Map<String, ClassNode> alignNewGenericsInfo(
-        @NonNull GenericsType[] genericsTypes,
-        @NonNull GenericsType[] redirectTypes,
-        @NonNull Map<String, ClassNode> genericsSpec) {
-        if (redirectTypes == null || redirectTypes.length != genericsTypes.length) {
-            return Collections.emptyMap();
-        } else {
+    @NonNull
+    protected final ClassElement newClassElement(@NonNull ClassNode type, @Nullable Map<String, ClassElement> genericsSpec) {
+        if (genericsSpec == null) {
+            return newClassElement(type);
+        }
+        return newClassElement(type, genericsSpec, new HashSet<>(), false, false);
+    }
 
-            Map<String, ClassNode> newSpec = new HashMap<>(genericsSpec.size());
+    @NonNull
+    protected final ClassElement newClassElement(@NonNull GenericsType genericsType) {
+        return newClassElement(genericsType, genericsType, Collections.emptyMap(), new HashSet<>(), false);
+    }
+
+    @NonNull
+    protected final ClassElement newClassElement(@NonNull ClassNode type) {
+        return newClassElement(type, Collections.emptyMap(), new HashSet<>(), false, false);
+    }
+
+    @NonNull
+    private ClassElement newClassElement(GenericsType genericsType,
+                                         GenericsType redirectType,
+                                         Map<String, ClassElement> parentTypeArguments,
+                                         Set<Object> visitedTypes,
+                                         boolean isRawType) {
+        if (parentTypeArguments == null) {
+            parentTypeArguments = Collections.emptyMap();
+        }
+        if (genericsType.isWildcard()) {
+            return resolveWildcard(genericsType, redirectType, parentTypeArguments, visitedTypes);
+        }
+        if (genericsType.isPlaceholder()) {
+            return resolvePlaceholder(genericsType, redirectType, parentTypeArguments, visitedTypes, isRawType);
+        }
+        return newClassElement(genericsType.getType(), parentTypeArguments, visitedTypes, true, isRawType);
+    }
+
+    @NonNull
+    private ClassElement newClassElement(ClassNode classNode,
+                                         Map<String, ClassElement> parentTypeArguments,
+                                         Set<Object> visitedTypes,
+                                         boolean isTypeVariable,
+                                         boolean isRawTypeParameter) {
+        return newClassElement(classNode, parentTypeArguments, visitedTypes, isTypeVariable, isRawTypeParameter, false);
+    }
+
+    @NonNull
+    private ClassElement newClassElement(ClassNode classNode,
+                                         Map<String, ClassElement> parentTypeArguments,
+                                         Set<Object> visitedTypes,
+                                         boolean isTypeVariable,
+                                         boolean isRawTypeParameter,
+                                         boolean stripTypeArguments) {
+        if (parentTypeArguments == null) {
+            parentTypeArguments = Collections.emptyMap();
+        }
+        if (classNode.isArray()) {
+            ClassNode componentType = classNode.getComponentType();
+            return newClassElement(componentType, parentTypeArguments, visitedTypes, isTypeVariable, isRawTypeParameter)
+                    .toArray();
+        }
+        if (classNode.isGenericsPlaceHolder()) {
+            GenericsType genericsType;
+            GenericsType redirectType;
+            GenericsType[] genericsTypes = classNode.getGenericsTypes();
+            if (ArrayUtils.isNotEmpty(genericsTypes)) {
+                genericsType = genericsTypes[0];
+                GenericsType[] redirectTypes = classNode.redirect().getGenericsTypes();
+                if (ArrayUtils.isNotEmpty(redirectTypes)) {
+                    redirectType = redirectTypes[0];
+                } else {
+                    redirectType = new GenericsType(classNode.redirect());
+                }
+            } else {
+                // Bypass Groovy compiler weirdness
+                genericsType = new GenericsType(classNode.redirect());
+                redirectType = genericsType;
+            }
+            return newClassElement(genericsType, redirectType, parentTypeArguments, visitedTypes, isRawTypeParameter);
+        }
+        if (ClassHelper.isPrimitiveType(classNode)) {
+            return PrimitiveElement.valueOf(classNode.getName());
+        }
+        if (classNode.isEnum()) {
+            return new GroovyEnumElement(visitorContext, classNode, elementAnnotationMetadataFactory);
+        }
+        if (classNode.isAnnotationDefinition()) {
+            return new GroovyAnnotationElement(visitorContext, classNode, elementAnnotationMetadataFactory);
+        }
+        Map<String, ClassElement> newTypeArguments;
+        if (stripTypeArguments) {
+            newTypeArguments = resolveTypeArgumentsToObject(classNode);
+        } else {
+            newTypeArguments = resolveTypeArguments(classNode, parentTypeArguments, visitedTypes);
+        }
+        return new GroovyClassElement(visitorContext, classNode, elementAnnotationMetadataFactory, newTypeArguments, 0, isTypeVariable);
+    }
+
+    private ClassElement resolvePlaceholder(GenericsType genericsType,
+                                            GenericsType redirectType,
+                                            Map<String, ClassElement> parentTypeArguments,
+                                            Set<Object> visitedTypes,
+                                            boolean isRawType) {
+        PlaceholderEntry entry = new PlaceholderEntry(getNativeType(), genericsType.getName());
+        String variableName = genericsType.getName();
+        ClassElement boundVariable = parentTypeArguments.get(variableName);
+        if (boundVariable != null) {
+            if (boundVariable instanceof WildcardElement wildcardElement) {
+                if (wildcardElement.isBounded()) {
+                    return wildcardElement;
+                }
+            } else {
+                return boundVariable;
+            }
+        }
+        List<ClassNode> classNodeBounds = new ArrayList<>();
+        addBounds(genericsType, classNodeBounds);
+        if (genericsType != redirectType) {
+            addBounds(redirectType, classNodeBounds);
+        }
+
+        boolean alreadyVisitedPlaceholder = visitedTypes.contains(entry);
+        if (!alreadyVisitedPlaceholder) {
+            visitedTypes.add(entry);
+        }
+
+        List<GroovyClassElement> bounds = classNodeBounds
+                .stream()
+                .map(classNode -> {
+                    if (alreadyVisitedPlaceholder && classNode.isGenericsPlaceHolder()) {
+                        classNode = classNode.redirect();
+                    }
+                    return classNode;
+                })
+                .filter(classNode -> !alreadyVisitedPlaceholder || !classNode.isGenericsPlaceHolder())
+                .map(classNode -> {
+                    // Strip declared type arguments and replace with an Object to prevent recursion
+                    boolean stripTypeArguments = alreadyVisitedPlaceholder;
+                    return (GroovyClassElement) newClassElement(classNode, parentTypeArguments, visitedTypes, true, isRawType, stripTypeArguments);
+                })
+                .toList();
+
+        if (bounds.isEmpty()) {
+            bounds = Collections.singletonList((GroovyClassElement) getObjectClassElement());
+        }
+        return new GroovyGenericPlaceholderElement(visitorContext, genericsType.getType(), bounds, isRawType);
+    }
+
+    private static void addBounds(GenericsType genericsType, List<ClassNode> classNodeBounds) {
+        if (genericsType.getUpperBounds() != null) {
+            for (ClassNode ub : genericsType.getUpperBounds()) {
+                if (!classNodeBounds.contains(ub)) {
+                    classNodeBounds.add(ub);
+                }
+            }
+        } else {
+            ClassNode type = genericsType.getType();
+            if (!classNodeBounds.contains(type)) {
+                classNodeBounds.add(type);
+            }
+        }
+    }
+
+    private ClassElement getObjectClassElement() {
+        return visitorContext.getClassElement("java.lang.Object").get();
+    }
+
+    private ClassElement resolveWildcard(GenericsType genericsType,
+                                         GenericsType redirectType,
+                                         Map<String, ClassElement> parentTypeArguments,
+                                         Set<Object> visitedTypes) {
+        Stream<ClassNode> lowerBounds = Stream.ofNullable(genericsType.getLowerBound());
+        Stream<ClassNode> upperBounds;
+        ClassNode[] genericsUpperBounds = genericsType.getUpperBounds();
+        if (genericsUpperBounds == null || genericsUpperBounds.length == 0) {
+            upperBounds = Stream.empty();
+        } else {
+            upperBounds = Arrays.stream(genericsUpperBounds);
+        }
+        List<ClassElement> upperBoundsAsElements = upperBounds
+                .map(classNode -> newClassElement(classNode, parentTypeArguments, visitedTypes, true, false))
+                .toList();
+        List<ClassElement> lowerBoundsAsElements = lowerBounds
+                .map(classNode ->newClassElement(classNode, parentTypeArguments, visitedTypes, true, false))
+                .toList();
+        if (upperBoundsAsElements.isEmpty()) {
+            upperBoundsAsElements = Collections.singletonList(getObjectClassElement());
+        }
+        ClassElement upperType = WildcardElement.findUpperType(upperBoundsAsElements, lowerBoundsAsElements);
+        if (upperType.getType().getName().equals("java.lang.Object")) {
+            // Not bounded wildcard: <?>
+            if (redirectType != null && redirectType != genericsType) {
+                ClassElement definedTypeBound = newClassElement(redirectType, redirectType, parentTypeArguments, visitedTypes, false);
+                // Use originating parameter to extract the bound defined
+                if (definedTypeBound instanceof GroovyGenericPlaceholderElement groovyGenericPlaceholderElement) {
+                    upperType = WildcardElement.findUpperType(groovyGenericPlaceholderElement.getBounds(), Collections.emptyList());
+                }
+            }
+        }
+        if (upperType.isPrimitive()) {
+            // TODO: Support primitives for wildcards (? extends byte[])
+            return upperType;
+        }
+        return new GroovyWildcardElement(
+                (GroovyClassElement) upperType,
+                upperBoundsAsElements.stream().map(GroovyClassElement.class::cast).toList(),
+                lowerBoundsAsElements.stream().map(GroovyClassElement.class::cast).toList(),
+                elementAnnotationMetadataFactory
+        );
+    }
+
+    @NonNull
+    protected final Map<String, ClassElement> resolveTypeArguments(MethodNode methodNode,
+                                                                   @Nullable Map<String, ClassElement> parentTypeArguments) {
+        if (parentTypeArguments == null) {
+            parentTypeArguments = Collections.emptyMap();
+        }
+        Set<Object> visitedTypes = new HashSet<>();
+        GenericsType[] genericsTypes = methodNode.getGenericsTypes();
+        if (ArrayUtils.isEmpty(genericsTypes)) {
+            return parentTypeArguments;
+        }
+        Map<String, ClassElement> newTypeArguments = new LinkedHashMap<>(parentTypeArguments);
+        for (GenericsType genericsType : genericsTypes) {
+            String variableName = genericsType.getName();
+            ClassNode classNode;
+            if (genericsType.isPlaceholder()) {
+                ClassNode[] upperBounds = genericsType.getUpperBounds();
+                ClassNode lowerBound = genericsType.getLowerBound();
+                if (ArrayUtils.isNotEmpty(upperBounds)) {
+                    classNode = upperBounds[0];
+                } else if (lowerBound != null) {
+                    classNode = lowerBound;
+                } else {
+                    classNode = ClassHelper.OBJECT_TYPE;
+                }
+            } else {
+                classNode = genericsType.getType();
+            }
+            newTypeArguments.put(
+                    variableName,
+                    newClassElement(classNode, parentTypeArguments, visitedTypes, true, false)
+            );
+        }
+        return newTypeArguments;
+    }
+
+    @NonNull
+    protected final Map<String, ClassElement> resolveTypeArguments(ClassNode classNode,
+                                                                   @Nullable Map<String, ClassElement> parentTypeArguments,
+                                                                   Set<Object> visitedTypes) {
+        GenericsType[] genericsTypes = classNode.getGenericsTypes();
+        GenericsType[] redirectTypes = classNode.redirect().getGenericsTypes();
+        if (redirectTypes == null || redirectTypes.length == 0) {
+            return Collections.emptyMap();
+        }
+        Map<String, ClassElement> resolved = CollectionUtils.newLinkedHashMap(redirectTypes.length);
+        if (genericsTypes != null && genericsTypes.length == redirectTypes.length) {
             for (int i = 0; i < genericsTypes.length; i++) {
                 GenericsType genericsType = genericsTypes[i];
                 GenericsType redirectType = redirectTypes[i];
-                String name = genericsType.getName();
-                if (genericsType.isWildcard()) {
-                    ClassNode[] upperBounds = genericsType.getUpperBounds();
-                    if (ArrayUtils.isNotEmpty(upperBounds)) {
-                        name = upperBounds[0].getUnresolvedName();
-                    } else {
-                        ClassNode lowerBound = genericsType.getLowerBound();
-                        if (lowerBound != null) {
-                            name = lowerBound.getUnresolvedName();
-                        }
-                    }
-                    ClassNode cn = resolveGenericPlaceholder(genericsSpec, name);
-                    toNewGenericSpec(genericsSpec, newSpec, redirectType.getName(), cn);
-                } else {
-                    ClassNode classNode = genericsType.getType();
-                    GenericsType[] typeParameters = classNode.getGenericsTypes();
-
-                    if (ArrayUtils.isNotEmpty(typeParameters)) {
-                        GenericsType[] redirectParameters = classNode.redirect().getGenericsTypes();
-                        if (redirectParameters != null && typeParameters.length == redirectParameters.length) {
-                            List<ClassNode> resolvedTypes = new ArrayList<>(typeParameters.length);
-                            for (int j = 0; j < redirectParameters.length; j++) {
-                                ClassNode type = typeParameters[j].getType();
-                                if (type.isGenericsPlaceHolder()) {
-                                    String unresolvedName = type.getUnresolvedName();
-                                    ClassNode resolvedType = resolveGenericPlaceholder(genericsSpec, unresolvedName);
-                                    if (resolvedType != null) {
-                                        resolvedTypes.add(resolvedType);
-                                    } else {
-                                        resolvedTypes.add(type);
-                                    }
-                                } else {
-                                    resolvedTypes.add(type);
-                                }
-                            }
-
-                            ClassNode plainNodeReference = classNode.getPlainNodeReference();
-                            plainNodeReference.setUsingGenerics(true);
-                            plainNodeReference.setGenericsTypes(resolvedTypes.stream().map(GenericsType::new).toArray(GenericsType[]::new));
-                            newSpec.put(redirectType.getName(), plainNodeReference);
-                        } else {
-                            ClassNode cn = resolveGenericPlaceholder(genericsSpec, name);
-                            if (cn != null) {
-                                newSpec.put(redirectType.getName(), cn);
-                            } else {
-                                newSpec.put(redirectType.getName(), classNode);
-                            }
-                        }
-                    } else {
-                        ClassNode cn = resolveGenericPlaceholder(genericsSpec, name);
-                        toNewGenericSpec(genericsSpec, newSpec, redirectType.getName(), cn);
-                    }
-                }
+                ClassElement classElement = newClassElement(genericsType, redirectType, parentTypeArguments, visitedTypes, false);
+                resolved.put(redirectType.getName(), classElement);
             }
-            return newSpec;
-        }
-    }
-
-    private @Nullable ClassNode resolveGenericPlaceholder(@NonNull Map<String, ClassNode> genericsSpec, String name) {
-        ClassNode classNode = genericsSpec.get(name);
-        while (classNode != null && classNode.isGenericsPlaceHolder()) {
-            ClassNode cn = genericsSpec.get(classNode.getUnresolvedName());
-            if (cn == classNode) {
-                break;
-            }
-            if (cn != null) {
-                classNode = cn;
-            } else {
-                break;
+        } else {
+            boolean isRaw = genericsTypes == null;
+            for (GenericsType redirectType : redirectTypes) {
+                String variableName = redirectType.getName();
+                resolved.put(
+                        variableName,
+                        newClassElement(redirectType, redirectType, parentTypeArguments, visitedTypes, isRaw)
+                );
             }
         }
-        return classNode;
+        return resolved;
     }
 
-    private void toNewGenericSpec(Map<String, ClassNode> genericsSpec, Map<String, ClassNode> newSpec, String name, ClassNode cn) {
-        if (cn != null) {
-
-            if (cn.isGenericsPlaceHolder()) {
-                String n = cn.getUnresolvedName();
-                ClassNode resolved = resolveGenericPlaceholder(genericsSpec, n);
-                if (resolved == cn) {
-                    newSpec.put(name, cn);
-                } else {
-                    toNewGenericSpec(genericsSpec, newSpec, name, resolved);
-                }
-            } else {
-                newSpec.put(name, cn);
-            }
-        }
-    }
-
-    /**
-     * Get a generic element for the given element and data.
-     *
-     * @param sourceUnit   The source unit
-     * @param type         The type
-     * @param rawElement   A raw element to fall back to
-     * @param genericsSpec The generics spec
-     * @return The element, never null.
-     */
     @NonNull
-    protected ClassElement getGenericElement(
-        @NonNull SourceUnit sourceUnit,
-        @NonNull ClassNode type,
-        @NonNull ClassElement rawElement,
-        @NonNull Map<String, ClassNode> genericsSpec) {
-        if (CollectionUtils.isNotEmpty(genericsSpec)) {
-            ClassElement classNode = resolveGenericType(genericsSpec, type);
-            if (classNode != null) {
-                return classNode;
-            } else {
-                GenericsType[] genericsTypes = type.getGenericsTypes();
-                GenericsType[] redirectTypes = type.redirect().getGenericsTypes();
-                if (genericsTypes != null && redirectTypes != null) {
-                    genericsSpec = alignNewGenericsInfo(genericsTypes, redirectTypes, genericsSpec);
-                    return new GroovyClassElement(visitorContext, type, elementAnnotationMetadataFactory, Collections.singletonMap(
-                        type.getName(),
-                        genericsSpec
-                    ), 0);
-                }
-            }
+    protected final Map<String, ClassElement> resolveTypeArgumentsToObject(ClassNode classNode) {
+        GenericsType[] redirectTypes = classNode.redirect().getGenericsTypes();
+        if (redirectTypes == null || redirectTypes.length == 0) {
+            return Collections.emptyMap();
         }
-        return rawElement;
-    }
-
-    private ClassElement resolveGenericType(Map<String, ClassNode> typeGenericInfo, ClassNode returnType) {
-        if (returnType.isGenericsPlaceHolder()) {
-            String unresolvedName = returnType.getUnresolvedName();
-            ClassNode classNode = resolveGenericPlaceholder(typeGenericInfo, unresolvedName);
-            if (classNode != null) {
-                if (classNode.isGenericsPlaceHolder() && classNode != returnType) {
-                    return resolveGenericType(typeGenericInfo, classNode);
-                } else {
-                    return adjustTypeAnnotationMetadata(visitorContext.getElementFactory().newClassElement(
-                        classNode, elementAnnotationMetadataFactory
-                    ));
-                }
-            }
-        } else if (returnType.isArray()) {
-            ClassNode componentType = returnType.getComponentType();
-            if (componentType.isGenericsPlaceHolder()) {
-                String unresolvedName = componentType.getUnresolvedName();
-                ClassNode classNode = resolveGenericPlaceholder(typeGenericInfo, unresolvedName);
-                if (classNode != null) {
-                    if (classNode.isGenericsPlaceHolder() && classNode != returnType) {
-                        return resolveGenericType(typeGenericInfo, classNode);
-                    } else {
-                        ClassNode cn = classNode.makeArray();
-                        return adjustTypeAnnotationMetadata(visitorContext.getElementFactory().newClassElement(
-                            cn, elementAnnotationMetadataFactory
-                        ));
-                    }
-                }
-            }
+        ClassElement objectClassElement = getObjectClassElement();
+        Map<String, ClassElement> resolved = CollectionUtils.newLinkedHashMap(redirectTypes.length);
+        for (GenericsType redirectType : redirectTypes) {
+            String variableName = redirectType.getName();
+            resolved.put(variableName, objectClassElement);
         }
-        return null;
+        return resolved;
     }
 
     @Override
@@ -387,21 +506,6 @@ public abstract class AbstractGroovyElement implements Element, ElementMutableAn
             return Optional.empty();
         }
         return Optional.of(JAVADOC_PATTERN.matcher(annotatedNode.getGroovydoc().getContent()).replaceAll(StringUtils.EMPTY_STRING).trim());
-    }
-
-    /**
-     * The method will replace the annotation metadata with empty value if {@link io.micronaut.inject.visitor.VisitorConfiguration#includeTypeLevelAnnotationsInGenericArguments()}
-     * is false.
-     *
-     * @param classElement The class element to adjust annotation metadata
-     * @return the adjusted element or the same value
-     */
-    @NonNull
-    protected final ClassElement adjustTypeAnnotationMetadata(@NonNull ClassElement classElement) {
-        if (classElement.isPrimitive() || visitorContext.getConfiguration().includeTypeLevelAnnotationsInGenericArguments()) {
-            return classElement;
-        }
-        return classElement.withAnnotationMetadata(AnnotationMetadata.EMPTY_METADATA);
     }
 
     @Override
@@ -469,6 +573,9 @@ public abstract class AbstractGroovyElement implements Element, ElementMutableAn
             modifiers.add(ElementModifier.FINAL);
         }
         return modifiers;
+    }
+
+    record PlaceholderEntry(AnnotatedNode owner, String placeholderName) {
     }
 }
 

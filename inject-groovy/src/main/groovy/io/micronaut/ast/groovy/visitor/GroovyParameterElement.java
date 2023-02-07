@@ -24,6 +24,8 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ParameterElement;
 import org.codehaus.groovy.ast.Parameter;
 
+import java.util.Map;
+
 /**
  * Implementation of {@link ParameterElement} for Groovy.
  *
@@ -83,11 +85,12 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     @Nullable
     @Override
     public ClassElement getGenericType() {
-        if (this.genericType == null) {
-            ClassElement type = getType();
-            this.genericType = methodElement.getGenericElement(parameter.getType(), type);
+        if (genericType == null) {
+            Map<String, ClassElement> parentTypeArguments = getMethodElement().getDeclaringType().getTypeArguments();
+            Map<String, ClassElement> methodTypeArguments = resolveTypeArguments(methodElement.getNativeType(), parentTypeArguments);
+            genericType = newClassElement(parameter.getType(), methodTypeArguments);
         }
-        return this.genericType;
+        return genericType;
     }
 
     @Override
@@ -118,10 +121,10 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     @NonNull
     @Override
     public ClassElement getType() {
-        if (this.typeElement == null) {
-            this.typeElement = visitorContext.getElementFactory().newClassElement(parameter.getType(), elementAnnotationMetadataFactory);
+        if (typeElement == null) {
+            typeElement = newClassElement(parameter.getType());
         }
-        return this.typeElement;
+        return typeElement;
     }
 
 }

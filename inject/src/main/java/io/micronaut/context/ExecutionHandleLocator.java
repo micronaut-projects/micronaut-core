@@ -15,6 +15,7 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
@@ -158,9 +159,7 @@ public interface ExecutionHandleLocator {
      */
     default <T, R> ExecutableMethod<T, R> getExecutableMethod(Class<T> beanType, String method, Class<?>... arguments) throws NoSuchMethodException {
         Optional<ExecutableMethod<T, R>> executableMethod = this.findExecutableMethod(beanType, method, arguments);
-        return executableMethod.orElseThrow(() ->
-            new NoSuchMethodException("No such method [" + method + "(" + Arrays.stream(arguments).map(Class::getName).collect(Collectors.joining(",")) + ") ] for bean [" + beanType.getName() + "]")
-        );
+        return executableMethod.orElseThrow(() -> newNoSuchMethodException(beanType.getName(), method, arguments));
     }
 
     /**
@@ -178,9 +177,7 @@ public interface ExecutionHandleLocator {
     @UsedByGeneratedCode
     default <T, R> ExecutableMethod<T, R> getProxyTargetMethod(Class<T> beanType, String method, Class<?>... arguments) throws NoSuchMethodException {
         Optional<ExecutableMethod<T, R>> executableMethod = this.findProxyTargetMethod(beanType, method, arguments);
-        return executableMethod.orElseThrow(() ->
-            new NoSuchMethodException("No such method [" + method + "(" + Arrays.stream(arguments).map(Class::getName).collect(Collectors.joining(",")) + ") ] for bean [" + beanType.getName() + "]")
-        );
+        return executableMethod.orElseThrow(() -> newNoSuchMethodException(beanType.getName(), method, arguments));
     }
 
     /**
@@ -199,9 +196,7 @@ public interface ExecutionHandleLocator {
     @UsedByGeneratedCode
     default <T, R> ExecutableMethod<T, R> getProxyTargetMethod(Class<T> beanType, Qualifier<T> qualifier, String method, Class<?>... arguments) throws NoSuchMethodException {
         Optional<ExecutableMethod<T, R>> executableMethod = this.findProxyTargetMethod(beanType, qualifier, method, arguments);
-        return executableMethod.orElseThrow(() ->
-                new NoSuchMethodException("No such method [" + method + "(" + Arrays.stream(arguments).map(Class::getName).collect(Collectors.joining(",")) + ") ] for bean [" + beanType.getName() + "]")
-        );
+        return executableMethod.orElseThrow(() -> newNoSuchMethodException(beanType.getName(), method, arguments));
     }
 
     /**
@@ -220,10 +215,8 @@ public interface ExecutionHandleLocator {
      */
     @UsedByGeneratedCode
     default <T, R> ExecutableMethod<T, R> getProxyTargetMethod(Argument<T> beanType, Qualifier<T> qualifier, String method, Class<?>... arguments) throws NoSuchMethodException {
-        Optional<ExecutableMethod<T, R>> executableMethod = this.findProxyTargetMethod(beanType, qualifier, method, arguments);
-        return executableMethod.orElseThrow(() ->
-                new NoSuchMethodException("No such method [" + method + "(" + Arrays.stream(arguments).map(Class::getName).collect(Collectors.joining(",")) + ") ] for bean [" + beanType.getName() + "]")
-        );
+        return this.<T, R>findProxyTargetMethod(beanType, qualifier, method, arguments)
+                .orElseThrow(() -> newNoSuchMethodException(beanType.getName(), method, arguments));
     }
 
     /**
@@ -239,9 +232,8 @@ public interface ExecutionHandleLocator {
      * @throws NoSuchMethodException if the method cannot be found
      */
     default <T, R> MethodExecutionHandle<T, R> getExecutionHandle(Class<T> beanType, String method, Class<?>... arguments) throws NoSuchMethodException {
-        return this.<T, R>findExecutionHandle(beanType, method, arguments).orElseThrow(() ->
-            new NoSuchMethodException("No such method [" + method + "(" + Arrays.stream(arguments).map(Class::getName).collect(Collectors.joining(",")) + ") ] for bean [" + beanType.getName() + "]")
-        );
+        return this.<T, R>findExecutionHandle(beanType, method, arguments)
+                .orElseThrow(() -> newNoSuchMethodException(beanType.getName(), method, arguments));
     }
 
     /**
@@ -256,9 +248,8 @@ public interface ExecutionHandleLocator {
      * @throws NoSuchMethodException if the method cannot be found
      */
     default <T, R> MethodExecutionHandle<T, R> getExecutionHandle(T bean, String method, Class<?>... arguments) throws NoSuchMethodException {
-        return this.<T, R>findExecutionHandle(bean, method, arguments).orElseThrow(() ->
-            new NoSuchMethodException("No such method [" + method + "(" + Arrays.stream(arguments).map(Class::getName).collect(Collectors.joining(",")) + ") ] for bean [" + bean + "]")
-        );
+        return this.<T, R>findExecutionHandle(bean, method, arguments)
+                .orElseThrow(() -> newNoSuchMethodException(bean.toString(), method, arguments));
     }
 
     /**
@@ -269,5 +260,10 @@ public interface ExecutionHandleLocator {
      */
     default MethodExecutionHandle<?, Object> createExecutionHandle(BeanDefinition<?> beanDefinition, ExecutableMethod<Object, ?> method) {
         throw new UnsupportedOperationException("No such method [" + method + "(" + Arrays.stream(method.getArgumentTypes()).map(Class::getName).collect(Collectors.joining(",")) + ") ] for bean [" + beanDefinition.getBeanType() + "]");
+    }
+
+    @NonNull
+    private static NoSuchMethodException newNoSuchMethodException(@NonNull String bean, @NonNull String method, @NonNull Class<?>[] arguments) {
+        return new NoSuchMethodException("No such method [" + method + "(" + Arrays.stream(arguments).map(Class::getName).collect(Collectors.joining(",")) + ")] for bean [" + bean + "]");
     }
 }

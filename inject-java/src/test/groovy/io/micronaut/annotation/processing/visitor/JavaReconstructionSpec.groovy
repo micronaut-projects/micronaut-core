@@ -5,7 +5,7 @@ import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.MethodElement
-import spock.lang.PendingFeature
+import io.micronaut.inject.ast.WildcardElement
 import spock.lang.Unroll
 
 /**
@@ -34,16 +34,41 @@ class Test<T> {
         where:
         fieldType << [
                 'String',
+                'byte[]',
+                'byte[][]',
                 'List<String>',
                 'List<T>',
                 'List<T[]>',
+                'List<T[][]>',
                 'List<? extends CharSequence>',
                 'List<? super String>',
                 'List<? extends T[]>',
+                'List<? extends T[][]>',
+                'List<? extends T[][][]>',
                 'List<? extends List<? extends T[]>[]>',
+                'List<? extends List<? extends T[]>[][]>',
+                'List<? extends List<? extends T[][]>[][]>',
                 'List<? extends List>',
                 'List<? extends List<?>>',
         ]
+    }
+
+    def 'field type is wildcard extending byte[]'() {
+        given:
+            def element = buildClassElement("""
+package example;
+
+import java.util.*;
+
+class Test<T> {
+    List<? extends byte[]> field;
+}
+""")
+            def field = element.getFields()[0]
+
+        expect:
+            // Wildcards with arrays not supported yet
+            reconstructTypeSignature(field.genericType) == 'List<byte[]>'
     }
 
     @Unroll("super type is #superType")
@@ -166,7 +191,6 @@ abstract class Test<A> {
         ]
     }
 
-    @PendingFeature
     @Unroll("field type is #fieldType")
     def 'bound field type'() {
         given:
@@ -225,17 +249,16 @@ class Test<T> {
         fieldType                               | expectedType
         'String'                                | 'String'
         'List<String>'                          | 'List<String>'
-        'List<T>'                               | 'List<T>'
-        'List<T[]>'                             | 'List<T[]>'
+        'List<T>'                               | 'List<String>'
+        'List<T[]>'                             | 'List<String[]>'
         'List<? extends CharSequence>'          | 'List<? extends CharSequence>'
         'List<? super String>'                  | 'List<? super String>'
-        'List<? extends T[]>'                   | 'List<? extends T[]>'
-        'List<? extends List<? extends T[]>[]>' | 'List<? extends List<? extends T[]>[]>'
+        'List<? extends T[]>'                   | 'List<? extends String[]>'
+        'List<? extends List<? extends T[]>[]>' | 'List<? extends List<? extends String[]>[]>'
         'List<? extends List>'                  | 'List<? extends List>'
         'List<? extends List<?>>'               | 'List<? extends List<?>>'
     }
 
-    @PendingFeature
     @Unroll("field type is #fieldType")
     def 'bound field type to other variable'() {
         given:
@@ -294,12 +317,12 @@ class Test<T> {
         fieldType                               | expectedType
         'String'                                | 'String'
         'List<String>'                          | 'List<String>'
-        'List<T>'                               | 'List<T>'
-        'List<T[]>'                             | 'List<T[]>'
+        'List<T>'                               | 'List<U>'
+        'List<T[]>'                             | 'List<U[]>'
         'List<? extends CharSequence>'          | 'List<? extends CharSequence>'
         'List<? super String>'                  | 'List<? super String>'
-        'List<? extends T[]>'                   | 'List<? extends T[]>'
-        'List<? extends List<? extends T[]>[]>' | 'List<? extends List<? extends T[]>[]>'
+        'List<? extends T[]>'                   | 'List<? extends U[]>'
+        'List<? extends List<? extends T[]>[]>' | 'List<? extends List<? extends U[]>[]>'
         'List<? extends List>'                  | 'List<? extends List>'
         'List<? extends List<?>>'               | 'List<? extends List<?>>'
     }
@@ -339,7 +362,6 @@ interface Sup<$decl> {
         'T'  | 'List<? super U>'   | 'Sup<List<? super U>>'
     }
 
-    @PendingFeature
     def 'bound super type'() {
         given:
         def superElement = buildClassElement("""
@@ -351,7 +373,7 @@ class Sub<U> extends Sup<$params> {
 }
 class Sup<$decl> {
 }
-""").withBoundGenericTypes([ClassElement.of(String)])
+""").withTypeArguments([ClassElement.of(String)])
         def interfaceElement = buildClassElement("""
 package example;
 
@@ -361,7 +383,7 @@ class Sub<U> implements Sup<$params> {
 }
 interface Sup<$decl> {
 }
-""").withBoundGenericTypes([ClassElement.of(String)])
+""").withTypeArguments([ClassElement.of(String)])
 
         expect:
         reconstructTypeSignature(superElement.getSuperType().get()) == expected
@@ -386,7 +408,7 @@ class Sub<U> extends Sup<$params> {
 }
 class Sup<$decl> {
 }
-""").withBoundGenericTypes([ClassElement.of(String)])
+""").withTypeArguments([ClassElement.of(String)])
         def interfaceElement = buildClassElement("""
 package example;
 
@@ -396,7 +418,7 @@ class Sub<U> implements Sup<$params> {
 }
 interface Sup<$decl> {
 }
-""").withBoundGenericTypes([ClassElement.of(String)])
+""").withTypeArguments([ClassElement.of(String)])
 
         expect:
         reconstructTypeSignature(superElement.getSuperType().get()) == expected
@@ -405,9 +427,9 @@ interface Sup<$decl> {
         where:
         decl | params              | expected
         'T'  | 'String'            | 'Sup<String>'
-        'T'  | 'List<U>'           | 'Sup<List<U>>'
-        'T'  | 'List<? extends U>' | 'Sup<List<? extends U>>'
-        'T'  | 'List<? super U>'   | 'Sup<List<? super U>>'
+        'T'  | 'List<U>'           | 'Sup<List<String>>'
+        'T'  | 'List<? extends U>' | 'Sup<List<? extends String>>'
+        'T'  | 'List<? super U>'   | 'Sup<List<? super String>>'
     }
 
     @Unroll('declaration is #decl')
@@ -497,12 +519,72 @@ class Test {
 
         expect:
         rawType.boundGenericTypes.isEmpty()
+        rawType.typeArguments["E"].type.name == "java.lang.Object"
+        rawType.typeArguments["E"].isRawType()
+        !rawType.typeArguments["E"].isWildcard()
+        rawType.typeArguments["E"].isGenericPlaceholder()
 
         wildcardType.boundGenericTypes.size() == 1
         wildcardType.boundGenericTypes[0].isWildcard()
         wildcardType.boundGenericTypes[0].getNativeType().class.name == 'com.sun.tools.javac.code.Type$WildcardType'
+        wildcardType.typeArguments["E"].type.name == "java.lang.Object"
+        wildcardType.typeArguments["E"].isWildcard()
+        !wildcardType.typeArguments["E"].isRawType()
 
         objectType.boundGenericTypes.size() == 1
         !objectType.boundGenericTypes[0].isWildcard()
+        objectType.typeArguments["E"].type.name == "java.lang.Object"
+        !objectType.typeArguments["E"].isWildcard()
+        !objectType.typeArguments["E"].isRawType()
+        !objectType.typeArguments["E"].isGenericPlaceholder()
+    }
+
+    def 'distinguish list types 2'() {
+        given:
+        def classElement = buildClassElement("""
+package example;
+
+import java.util.*;
+import java.lang.Number;
+
+class Test {
+    List field1;
+    List<?> field2;
+    List<Object> field3;
+    List<String> field4;
+    List<? extends Number> field5;
+}
+""")
+        def rawType = classElement.fields[0].type
+        def wildcardType = classElement.fields[1].type
+        def objectType = classElement.fields[2].type
+        def stringType = classElement.fields[3].type
+        def numberType = classElement.fields[4].type
+
+        expect:
+        rawType.typeArguments["E"].type.name == "java.lang.Object"
+        rawType.typeArguments["E"].isRawType()
+        !rawType.typeArguments["E"].isWildcard()
+        rawType.typeArguments["E"].isGenericPlaceholder()
+
+        wildcardType.typeArguments["E"].type.name == "java.lang.Object"
+        wildcardType.typeArguments["E"].isWildcard()
+        !((WildcardElement)wildcardType.typeArguments["E"]).isBounded()
+        !wildcardType.typeArguments["E"].isRawType()
+
+        objectType.typeArguments["E"].type.name == "java.lang.Object"
+        !objectType.typeArguments["E"].isWildcard()
+        !objectType.typeArguments["E"].isRawType()
+        !objectType.typeArguments["E"].isGenericPlaceholder()
+
+        stringType.typeArguments["E"].type.name == "java.lang.String"
+        !stringType.typeArguments["E"].isWildcard()
+        !stringType.typeArguments["E"].isRawType()
+        !stringType.typeArguments["E"].isGenericPlaceholder()
+
+        numberType.typeArguments["E"].type.name == "java.lang.Number"
+        numberType.typeArguments["E"].isWildcard()
+        ((WildcardElement)numberType.typeArguments["E"]).isBounded()
+        !numberType.typeArguments["E"].isRawType()
     }
 }

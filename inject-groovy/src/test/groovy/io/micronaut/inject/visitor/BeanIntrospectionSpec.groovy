@@ -2183,4 +2183,99 @@ class Test {
             introspection.beanProperties.size() == 2
     }
 
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2059')
+    void "test annotation metadata doesn't cause stackoverflow"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+public class Test {
+    int num;
+    String str;
+
+    @Creator
+    public <T extends Enum<T>> Test(int num, String str, Class<T> enumClass) {
+        this(num, str + enumClass.getName());
+    }
+
+    public <T extends Enum<T>> Test(int num, String str) {
+        this.num = num;
+        this.str = str;
+    }
+}
+
+
+''')
+        expect:
+            introspection != null
+    }
+
+    void "test annotation metadata doesn't cause stackoverflow 2"() {
+        def bd = buildBeanDefinition('test.SessionFactoryFactory','''\
+package test;
+
+import io.micronaut.aop.interceptors.Mutating
+
+import io.micronaut.context.annotation.Factory
+import io.micronaut.context.annotation.Prototype
+import org.hibernate.SessionFactory
+import org.hibernate.engine.spi.SessionFactoryDelegatingImpl
+
+@Factory
+class SessionFactoryFactory {
+
+    @Mutating("name")
+    @Prototype
+    SessionFactory sessionFactory() {
+        return new SessionFactoryDelegatingImpl(null)
+    }
+}
+
+
+''')
+        expect:
+            bd != null
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/1645")
+    void "test recursive generics 2"() {
+        given:
+            BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
+package test;
+
+@io.micronaut.core.annotation.Introspected
+class Test<T extends B> {
+    private T child;
+    public T getChild() {
+        return child;
+    }
+}
+class B<T extends Test> {}
+
+''')
+        expect:
+            introspection != null
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1607')
+    void "test recursive generics"() {
+        given:
+            BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
+package test;
+
+import io.micronaut.inject.visitor.RecursiveGenerics;
+
+@io.micronaut.core.annotation.Introspected
+class Test extends RecursiveGenerics<Test> {
+
+}
+''')
+
+        expect:
+            introspection != null
+    }
+
+
 }

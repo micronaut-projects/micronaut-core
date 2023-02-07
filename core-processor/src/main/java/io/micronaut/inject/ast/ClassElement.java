@@ -25,6 +25,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 
 import java.lang.reflect.GenericArrayType;
@@ -36,6 +37,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -43,8 +46,9 @@ import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static io.micronaut.inject.writer.BeanDefinitionVisitor.PROXY_SUFFIX;
 
@@ -102,6 +106,16 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     * Is raw type.
+     * @return true if the type is raw
+     * @since 4.0.0
+     */
+    @Experimental
+    default boolean isRawType() {
+        return false;
+    }
+
+    /**
      * Tests whether one type is assignable to another.
      *
      * @param type The type to check
@@ -124,6 +138,7 @@ public interface ClassElement extends TypedElement {
 
     /**
      * Checks whether the bean type is a container type.
+     *
      * @return Whether the type is a container type like {@link Iterable}.
      * @since 4.0.0
      */
@@ -192,7 +207,7 @@ public interface ClassElement extends TypedElement {
 
     /**
      * Find and return a single primary constructor. If more than constructor candidate exists, then return empty unless a
-     * constructor is found that is annotated with either {@link io.micronaut.core.annotation.Creator} or {@link javax.inject.Inject}.
+     * constructor is found that is annotated with either {@link io.micronaut.core.annotation.Creator} or {@link AnnotationUtil#INJECT}.
      *
      * @return The primary constructor if one is present
      */
@@ -213,15 +228,15 @@ public interface ClassElement extends TypedElement {
             return Optional.of(constructors.get(0));
         }
         Optional<ConstructorElement> annotatedConstructor = constructors.stream()
-            .filter(c -> c.hasStereotype(AnnotationUtil.INJECT) || c.hasStereotype(Creator.class))
-            .findFirst();
+                .filter(c -> c.hasStereotype(AnnotationUtil.INJECT) || c.hasStereotype(Creator.class))
+                .findFirst();
         if (annotatedConstructor.isPresent()) {
             return annotatedConstructor.map(c -> c);
         }
         return constructors.stream()
-            .filter(io.micronaut.inject.ast.Element::isPublic)
-            .<MethodElement>map(c -> c)
-            .findFirst();
+                .filter(io.micronaut.inject.ast.Element::isPublic)
+                .<MethodElement>map(c -> c)
+                .findFirst();
     }
 
     /**
@@ -240,8 +255,8 @@ public interface ClassElement extends TypedElement {
             return Optional.empty();
         }
         List<ConstructorElement> constructors = getAccessibleConstructors()
-            .stream()
-            .filter(ctor -> ctor.getParameters().length == 0).toList();
+                .stream()
+                .filter(ctor -> ctor.getParameters().length == 0).toList();
         if (constructors.isEmpty()) {
             return Optional.empty();
         }
@@ -249,9 +264,9 @@ public interface ClassElement extends TypedElement {
             return Optional.of(constructors.get(0));
         }
         return constructors.stream()
-            .filter(Element::isPublic)
-            .<MethodElement>map(c -> c)
-            .findFirst();
+                .filter(Element::isPublic)
+                .<MethodElement>map(c -> c)
+                .findFirst();
 
     }
 
@@ -271,7 +286,7 @@ public interface ClassElement extends TypedElement {
         }
         //Can be multiple static @Creator methods. Prefer one with args here. The no arg method (if present) will
         //be picked up by findDefaultStaticCreator
-        List<MethodElement> withArgs = staticCreators.stream().filter(method -> method.getParameters().length > 0).collect(Collectors.toList());
+        List<MethodElement> withArgs = staticCreators.stream().filter(method -> method.getParameters().length > 0).toList();
         if (withArgs.size() == 1) {
             return Optional.of(withArgs.get(0));
         } else {
@@ -284,13 +299,14 @@ public interface ClassElement extends TypedElement {
      * Find and return a single default static creator. A default static creator is one
      * without arguments that is accessible.
      * *
+     *
      * @return a static creator
      * @since 4.0.0
      */
     default Optional<MethodElement> findDefaultStaticCreator() {
         List<MethodElement> staticCreators = getAccessibleStaticCreators()
-            .stream()
-            .filter(c -> c.getParameters().length == 0).toList();
+                .stream()
+                .filter(c -> c.getParameters().length == 0).toList();
         if (staticCreators.isEmpty()) {
             return Optional.empty();
         }
@@ -309,9 +325,9 @@ public interface ClassElement extends TypedElement {
     @NonNull
     default List<ConstructorElement> getAccessibleConstructors() {
         return getEnclosedElements(ElementQuery.CONSTRUCTORS)
-            .stream()
-            .filter(ctor -> !ctor.isPrivate())
-            .collect(Collectors.toList());
+                .stream()
+                .filter(ctor -> !ctor.isPrivate())
+                .toList();
     }
 
     /**
@@ -325,23 +341,23 @@ public interface ClassElement extends TypedElement {
     @NonNull
     default List<MethodElement> getAccessibleStaticCreators() {
         List<MethodElement> creators = getEnclosedElements(ElementQuery.ALL_METHODS
-            .onlyDeclared()
-            .onlyStatic()
-            .onlyAccessible()
-            .annotated(annotationMetadata -> annotationMetadata.hasStereotype(Creator.class))
-        )
-            .stream()
-            .filter(method -> method.getReturnType().isAssignable(this))
-            .collect(Collectors.toList());
-        if (creators.isEmpty() && isEnum()) {
-            return getEnclosedElements(ElementQuery.ALL_METHODS
-                .named("valueOf")
+                .onlyDeclared()
                 .onlyStatic()
                 .onlyAccessible()
-            )
+                .annotated(annotationMetadata -> annotationMetadata.hasStereotype(Creator.class))
+        )
                 .stream()
                 .filter(method -> method.getReturnType().isAssignable(this))
-                .collect(Collectors.toList());
+                .toList();
+        if (creators.isEmpty() && isEnum()) {
+            return getEnclosedElements(ElementQuery.ALL_METHODS
+                    .named("valueOf")
+                    .onlyStatic()
+                    .onlyAccessible()
+            )
+                    .stream()
+                    .filter(method -> method.getReturnType().isAssignable(this))
+                    .toList();
         }
         return creators;
     }
@@ -540,7 +556,7 @@ public interface ClassElement extends TypedElement {
     @NonNull
     @Experimental
     default ClassElement getRawClassElement() {
-        return withBoundGenericTypes(Collections.emptyList());
+        return withTypeArguments(Collections.emptyList());
     }
 
     /**
@@ -551,11 +567,13 @@ public interface ClassElement extends TypedElement {
      * @param typeArguments The new type arguments.
      * @return A {@link ClassElement} of the same raw class with the new type arguments.
      * @throws UnsupportedOperationException If any of the given type arguments are unsupported.
+     * @deprecated replaced with {@link #withTypeArguments(Collection)} for consistent API.
      */
     @NonNull
     @Experimental
+    @Deprecated(since = "4", forRemoval = true)
     default ClassElement withBoundGenericTypes(@NonNull List<? extends ClassElement> typeArguments) {
-        return this;
+        return withTypeArguments((Collection<ClassElement>) typeArguments);
     }
 
     /**
@@ -577,11 +595,11 @@ public interface ClassElement extends TypedElement {
      */
     @Experimental
     default ClassElement foldBoundGenericTypes(@NonNull Function<ClassElement, ClassElement> fold) {
-        List<ClassElement> typeArgs = getBoundGenericTypes().stream().map(arg -> arg.foldBoundGenericTypes(fold)).collect(Collectors.toList());
+        List<ClassElement> typeArgs = getBoundGenericTypes().stream().map(arg -> arg.foldBoundGenericTypes(fold)).toList();
         if (typeArgs.contains(null)) {
             typeArgs = Collections.emptyList();
         }
-        return fold.apply(withBoundGenericTypes(typeArgs));
+        return fold.apply(withTypeArguments(typeArgs));
     }
 
     /**
@@ -591,8 +609,10 @@ public interface ClassElement extends TypedElement {
      * @return The type arguments for this class element
      * @since 1.1.1
      */
-    default @NonNull Map<String, ClassElement> getTypeArguments(@NonNull String type) {
-        return Collections.emptyMap();
+    @NonNull
+    default Map<String, ClassElement> getTypeArguments(@NonNull String type) {
+        ArgumentUtils.requireNonNull("type", type);
+        return getAllTypeArguments().getOrDefault(type, Collections.emptyMap());
     }
 
     /**
@@ -601,7 +621,8 @@ public interface ClassElement extends TypedElement {
      * @param type The type to retrieve type arguments for
      * @return The type arguments for this class element
      */
-    default @NonNull Map<String, ClassElement> getTypeArguments(@NonNull Class<?> type) {
+    @NonNull
+    default Map<String, ClassElement> getTypeArguments(@NonNull Class<?> type) {
         ArgumentUtils.requireNonNull("type", type);
         return getTypeArguments(type.getName());
     }
@@ -609,7 +630,8 @@ public interface ClassElement extends TypedElement {
     /**
      * @return The type arguments for this class element
      */
-    default @NonNull Map<String, ClassElement> getTypeArguments() {
+    @NonNull
+    default Map<String, ClassElement> getTypeArguments() {
         return Collections.emptyMap();
     }
 
@@ -619,8 +641,15 @@ public interface ClassElement extends TypedElement {
      *
      * @return The type arguments for this class element
      */
-    default @NonNull Map<String, Map<String, ClassElement>> getAllTypeArguments() {
-        return Collections.emptyMap();
+    @NonNull
+    default Map<String, Map<String, ClassElement>> getAllTypeArguments() {
+        Map<String, Map<String, ClassElement>> result = new LinkedHashMap<>();
+        Stream.concat(
+                getInterfaces().stream(),
+                getSuperType().stream()
+        ).map(ClassElement::getAllTypeArguments).forEach(result::putAll);
+        result.put(getName(), getTypeArguments());
+        return result;
     }
 
     /**
@@ -668,8 +697,8 @@ public interface ClassElement extends TypedElement {
      * @param type The type of the bean
      * @return A bean builder
      */
-    default @NonNull
-    BeanElementBuilder addAssociatedBean(@NonNull ClassElement type) {
+    @NonNull
+    default BeanElementBuilder addAssociatedBean(@NonNull ClassElement type) {
         throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support adding associated beans at compilation time");
     }
 
@@ -685,8 +714,36 @@ public interface ClassElement extends TypedElement {
      * @return A new element
      * @since 4.0.0
      */
+    @NonNull
     default ClassElement withTypeArguments(Map<String, ClassElement> typeArguments) {
         throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support copy constructor");
+    }
+
+    /**
+     * Copies this element and overrides its type arguments.
+     * Variation of {@link #withTypeArguments(Map)} that doesn't require type argument names.
+     *
+     * @param typeArguments The type arguments
+     * @return A new element
+     * @since 4.0.0
+     */
+    @NonNull
+    default ClassElement withTypeArguments(@NonNull Collection<ClassElement> typeArguments) {
+        if (typeArguments.isEmpty()) {
+            // Allow to eliminate all arguments
+            return withTypeArguments(Collections.emptyMap());
+        }
+        Set<String> genericNames = getTypeArguments().keySet();
+        if (genericNames.size() != typeArguments.size()) {
+            throw new IllegalStateException("Expected to have: " + genericNames.size() + " type arguments! Got: " + typeArguments.size());
+        }
+        Map<String, ClassElement> boundByName = CollectionUtils.newLinkedHashMap(typeArguments.size());
+        Iterator<String> keys = genericNames.iterator();
+        Iterator<? extends ClassElement> args = typeArguments.iterator();
+        while (keys.hasNext() && args.hasNext()) {
+            boundByName.put(keys.next(), args.next());
+        }
+        return withTypeArguments(boundByName);
     }
 
     /**
@@ -695,9 +752,10 @@ public interface ClassElement extends TypedElement {
      * @param type The type
      * @return The class element
      */
-    static @NonNull ClassElement of(@NonNull Class<?> type) {
+    @NonNull
+    static ClassElement of(@NonNull Class<?> type) {
         return new ReflectClassElement(
-            Objects.requireNonNull(type, "Type cannot be null")
+                Objects.requireNonNull(type, "Type cannot be null")
         );
     }
 
@@ -711,14 +769,13 @@ public interface ClassElement extends TypedElement {
     @NonNull
     static ClassElement of(@NonNull Type type) {
         Objects.requireNonNull(type, "Type cannot be null");
-        if (type instanceof Class) {
-            return new ReflectClassElement((Class<?>) type);
-        } else if (type instanceof TypeVariable<?>) {
-            return new ReflectGenericPlaceholderElement((TypeVariable<?>) type, 0);
-        } else if (type instanceof WildcardType) {
-            return new ReflectWildcardElement((WildcardType) type);
-        } else if (type instanceof ParameterizedType) {
-            ParameterizedType pType = (ParameterizedType) type;
+        if (type instanceof Class<?> aClass) {
+            return new ReflectClassElement(aClass);
+        } else if (type instanceof TypeVariable<?> typeVariable) {
+            return new ReflectGenericPlaceholderElement(typeVariable, 0);
+        } else if (type instanceof WildcardType wildcardType) {
+            return new ReflectWildcardElement(wildcardType);
+        } else if (type instanceof ParameterizedType pType) {
             if (pType.getOwnerType() != null) {
                 throw new UnsupportedOperationException("Owner types are not supported");
             }
@@ -727,12 +784,12 @@ public interface ClassElement extends TypedElement {
                 @Override
                 public List<? extends ClassElement> getBoundGenericTypes() {
                     return Arrays.stream(pType.getActualTypeArguments())
-                        .map(ClassElement::of)
-                        .collect(Collectors.toList());
+                            .map(ClassElement::of)
+                            .toList();
                 }
             };
-        } else if (type instanceof GenericArrayType) {
-            return of(((GenericArrayType) type).getGenericComponentType()).toArray();
+        } else if (type instanceof GenericArrayType genericArrayType) {
+            return of(genericArrayType.getGenericComponentType()).toArray();
         } else {
             throw new IllegalArgumentException("Bad type: " + type.getClass().getName());
         }
@@ -747,14 +804,14 @@ public interface ClassElement extends TypedElement {
      * @return The class element
      * @since 2.4.0
      */
-    static @NonNull ClassElement of(
-        @NonNull Class<?> type,
-        @NonNull AnnotationMetadata annotationMetadata,
-        @NonNull Map<String, ClassElement> typeArguments) {
+    @NonNull
+    static ClassElement of(@NonNull Class<?> type,
+                           @NonNull AnnotationMetadata annotationMetadata,
+                           @NonNull Map<String, ClassElement> typeArguments) {
         Objects.requireNonNull(annotationMetadata, "Annotation metadata cannot be null");
         Objects.requireNonNull(typeArguments, "Type arguments cannot be null");
         return new ReflectClassElement(
-            Objects.requireNonNull(type, "Type cannot be null")
+                Objects.requireNonNull(type, "Type cannot be null")
         ) {
             @Override
             public AnnotationMetadata getAnnotationMetadata() {
@@ -770,8 +827,8 @@ public interface ClassElement extends TypedElement {
             @Override
             public List<? extends ClassElement> getBoundGenericTypes() {
                 return getDeclaredGenericPlaceholders().stream()
-                    .map(tv -> typeArguments.get(tv.getVariableName()))
-                    .collect(Collectors.toList());
+                        .map(tv -> typeArguments.get(tv.getVariableName()))
+                        .toList();
             }
         };
     }
@@ -783,7 +840,8 @@ public interface ClassElement extends TypedElement {
      * @return The class element
      */
     @Internal
-    static @NonNull ClassElement of(@NonNull String typeName) {
+    @NonNull
+    static ClassElement of(@NonNull String typeName) {
         return new SimpleClassElement(typeName);
     }
 
@@ -796,7 +854,8 @@ public interface ClassElement extends TypedElement {
      * @return The class element
      */
     @Internal
-    static @NonNull ClassElement of(@NonNull String typeName, boolean isInterface, @Nullable AnnotationMetadata annotationMetadata) {
+    @NonNull
+    static ClassElement of(@NonNull String typeName, boolean isInterface, @Nullable AnnotationMetadata annotationMetadata) {
         return new SimpleClassElement(typeName, isInterface, annotationMetadata);
     }
 
@@ -810,7 +869,8 @@ public interface ClassElement extends TypedElement {
      * @return The class element
      */
     @Internal
-    static @NonNull ClassElement of(@NonNull String typeName, boolean isInterface, @Nullable AnnotationMetadata annotationMetadata, Map<String, ClassElement> typeArguments) {
+    @NonNull
+    static ClassElement of(@NonNull String typeName, boolean isInterface, @Nullable AnnotationMetadata annotationMetadata, Map<String, ClassElement> typeArguments) {
         return new SimpleClassElement(typeName, isInterface, annotationMetadata);
     }
 }
