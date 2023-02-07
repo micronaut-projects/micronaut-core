@@ -19,6 +19,29 @@ import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class BeanDefinitionSpec extends Specification {
 
+    void "test bean annotated with @MicronautTest"() {
+        given:
+        def definition = KotlinCompiler.buildBeanDefinition('test.MTest', '''
+package test
+
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
+
+@MicronautTest
+class MTest {
+    @Inject
+    var f : F? = null
+}
+
+@Singleton
+class F
+''')
+
+        expect:
+        definition.injectedMethods.size() == 1
+    }
+
     void "test jvm field"() {
         given:
         def definition = KotlinCompiler.buildBeanDefinition('test.JvmFieldTest', '''

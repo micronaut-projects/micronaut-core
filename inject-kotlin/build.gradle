@@ -34,7 +34,7 @@ dependencies {
     testImplementation libs.kotlinx.coroutines.core
     testImplementation libs.kotlinx.coroutines.jdk8
     testImplementation libs.kotlinx.coroutines.rx2
-
+    testImplementation libs.micronaut.test.junit5
 }
 
 afterEvaluate {

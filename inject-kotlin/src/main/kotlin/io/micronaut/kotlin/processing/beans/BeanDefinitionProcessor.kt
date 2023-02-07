@@ -97,12 +97,17 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
         try {
             val outputVisitor = KotlinOutputVisitor(environment)
             val processed = HashSet<String>()
+            var count = 0
             for (beanDefinitionCreator in beanDefinitionMap.values) {
                 for (writer in beanDefinitionCreator.build()) {
                     if (processed.add(writer.beanDefinitionName)) {
                         processBeanDefinitions(writer, outputVisitor, processed)
+                        count++
                     }
                 }
+            }
+            if (count > 0) {
+                environment.logger.info("Created $count bean definitions")
             }
         } catch (e: ProcessingException) {
             handleProcessingException(environment, e)
