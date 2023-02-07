@@ -56,7 +56,6 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
             return if (type.qualifiedName != null) {
                 type.qualifiedName!!.asString()
             } else {
-                println("Failed to get the qualified name of ${annotationMirror.shortName.asString()} annotation")
                 annotationMirror.shortName.asString()
             }
         }
