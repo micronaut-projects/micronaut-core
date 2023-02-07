@@ -67,6 +67,7 @@ abstract class Test<T> : $superType() {
         ]
     }
 
+    @PendingFeature(reason = "Breaks because you can't use kotlin elements outside of a compilation execution")
     @Unroll("super interface is #superType")
     def 'super interface'() {
         given:
