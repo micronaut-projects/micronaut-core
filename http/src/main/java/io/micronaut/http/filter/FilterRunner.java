@@ -377,10 +377,10 @@ public class FilterRunner {
     }
 
     @Internal
-    public static <T> FilterMethod<T> validateFilterMethod(Argument<?>[] arguments,
-                                                           Argument<?> returnType,
-                                                           boolean isResponseFilter) throws IllegalArgumentException {
-        return prepareFilterMethod(ConversionService.SHARED, null, null, arguments, returnType, isResponseFilter, null);
+    public static void validateFilterMethod(Argument<?>[] arguments,
+                                                Argument<?> returnType,
+                                                boolean isResponseFilter) throws IllegalArgumentException {
+        prepareFilterMethod(ConversionService.SHARED, null, null, arguments, returnType, isResponseFilter, null);
     }
 
     @Internal
