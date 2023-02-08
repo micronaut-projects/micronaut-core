@@ -5,7 +5,7 @@ Since Micronaut 2.x, Micronaut's Netty-based HTTP server can be configured to su
 The first step is to set the supported HTTP version in the server configuration:
 
 .Enabling HTTP/2 Support
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:
@@ -17,7 +17,7 @@ With this configuration, Micronaut enables support for the `h2c` protocol (see h
 Since browsers don't support `h2c` and in general https://httpwg.org/specs/rfc7540.html#discover-https[HTTP/2 over TLS] (the `h2` protocol), it is recommended for production that you enable <<https, HTTPS support>>. For development this can be done with:
 
 .Enabling `h2` Protocol Support
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:
