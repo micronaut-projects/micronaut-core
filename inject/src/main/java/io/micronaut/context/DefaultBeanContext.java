@@ -109,6 +109,8 @@ import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
 import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.QualifiedBeanType;
 import io.micronaut.inject.ValidatedBeanDefinition;
+import io.micronaut.inject.provider.AbstractProviderDefinition;
+import io.micronaut.inject.provider.BeanProviderDefinition;
 import io.micronaut.inject.proxy.InterceptedBeanProxy;
 import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.Qualified;
@@ -2408,15 +2410,17 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                                   @NonNull BeanDefinition<T> beanDefinition,
                                                   @NonNull T bean,
                                                   @Nullable Qualifier<T> finalQualifier) {
-        Class<T> beanType = beanDefinition.getBeanType();
-        if (!(bean instanceof BeanCreatedEventListener) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
-            for (Map.Entry<Class<?>, ListenersSupplier<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
-                if (entry.getKey().isAssignableFrom(beanType)) {
-                    BeanKey<T> beanKey = new BeanKey<>(beanDefinition, finalQualifier);
-                    for (BeanCreatedEventListener<?> listener : entry.getValue().get(resolutionContext)) {
-                        bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, beanKey, bean));
-                        if (bean == null) {
-                            throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
+        if (!(beanDefinition instanceof AbstractProviderDefinition<?>)) {
+            Class<T> beanType = beanDefinition.getBeanType();
+            if (!(bean instanceof BeanCreatedEventListener) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
+                for (Map.Entry<Class<?>, ListenersSupplier<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
+                    if (entry.getKey().isAssignableFrom(beanType)) {
+                        BeanKey<T> beanKey = new BeanKey<>(beanDefinition, finalQualifier);
+                        for (BeanCreatedEventListener<?> listener : entry.getValue().get(resolutionContext)) {
+                            bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, beanKey, bean));
+                            if (bean == null) {
+                                throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
+                            }
                         }
                     }
                 }
