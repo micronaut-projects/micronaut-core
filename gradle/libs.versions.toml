@@ -55,6 +55,7 @@ systemlambda = "1.2.1"
 testcontainers = "1.17.5"
 vertx = "3.9.13"
 wiremock = "2.33.2"
+assertj = "3.24.2"
 
 #
 # Versions which start with managed- are managed by Micronaut in the sense
@@ -257,6 +258,8 @@ httpcomponents-client = { module = "org.apache.httpcomponents:httpclient", versi
 httpcomponents-mime = { module = "org.apache.httpcomponents:httpmime", version.ref = "httpcomponents-client" }
 
 wiremock = { module = "com.github.tomakehurst:wiremock-jre8", version.ref = "wiremock" }
+
+assertj-core = { module = "org.assertj:assertj-core", version.ref = "assertj" }
 
 [bundles]
 asm = ["asm", "asm-commons"]
