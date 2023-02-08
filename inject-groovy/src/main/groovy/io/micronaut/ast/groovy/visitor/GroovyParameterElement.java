@@ -20,11 +20,9 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import org.codehaus.groovy.ast.Parameter;
-
-import java.util.Map;
 
 /**
  * Implementation of {@link ParameterElement} for Groovy.
@@ -45,21 +43,23 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
      *
      * @param methodElement             The parent method element
      * @param visitorContext            The visitor context
+     * @param nativeElement             The nativeElement
      * @param parameter                 The parameter
      * @param elementAnnotationMetadata The annotation metadata
      */
     GroovyParameterElement(GroovyMethodElement methodElement,
                            GroovyVisitorContext visitorContext,
+                           GroovyNativeElement nativeElement,
                            Parameter parameter,
                            ElementAnnotationMetadataFactory elementAnnotationMetadata) {
-        super(visitorContext, parameter, elementAnnotationMetadata);
+        super(visitorContext, nativeElement, elementAnnotationMetadata);
         this.parameter = parameter;
         this.methodElement = methodElement;
     }
 
     @Override
     protected AbstractGroovyElement copyConstructor() {
-        return new GroovyParameterElement(methodElement, visitorContext, parameter, elementAnnotationMetadataFactory);
+        return new GroovyParameterElement(methodElement, visitorContext, getNativeType(), parameter, elementAnnotationMetadataFactory);
     }
 
     @Override
@@ -86,9 +86,7 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     @Override
     public ClassElement getGenericType() {
         if (genericType == null) {
-            Map<String, ClassElement> parentTypeArguments = getMethodElement().getDeclaringType().getTypeArguments();
-            Map<String, ClassElement> methodTypeArguments = resolveTypeArguments(methodElement.getNativeType(), parentTypeArguments);
-            genericType = newClassElement(parameter.getType(), methodTypeArguments);
+            genericType = newClassElement(parameter.getType(), methodElement.getTypeArguments());
         }
         return genericType;
     }
@@ -106,11 +104,6 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     @Override
     public boolean isPublic() {
         return true;
-    }
-
-    @Override
-    public Parameter getNativeType() {
-        return parameter;
     }
 
     @Override

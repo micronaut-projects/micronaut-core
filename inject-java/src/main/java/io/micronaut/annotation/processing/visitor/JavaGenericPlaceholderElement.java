@@ -63,6 +63,11 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
     }
 
     @Override
+    public Object getGenericNativeType() {
+        return realTypeVariable;
+    }
+
+    @Override
     public boolean isTypeVariable() {
         return true;
     }
@@ -70,26 +75,6 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
     @Override
     public boolean isRawType() {
         return isRawType;
-    }
-
-    @Override
-    public int hashCode() {
-        return realTypeVariable.hashCode();
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null) {
-            return false;
-        }
-        io.micronaut.inject.ast.Element that = (io.micronaut.inject.ast.Element) o;
-        if (that instanceof JavaGenericPlaceholderElement placeholderElement) {
-            return placeholderElement.realTypeVariable.equals(realTypeVariable);
-        }
-        return false;
     }
 
     @Override

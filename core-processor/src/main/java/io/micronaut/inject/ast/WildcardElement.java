@@ -28,7 +28,8 @@ import java.util.List;
  * @author Jonas Konrad
  */
 @Experimental
-public interface WildcardElement extends ClassElement {
+public interface WildcardElement extends GenericElement {
+
     /**
      * @return The upper bounds of this wildcard. Never empty. To match this wildcard, a type must be assignable to all
      * upper bounds (must extend all upper bounds).

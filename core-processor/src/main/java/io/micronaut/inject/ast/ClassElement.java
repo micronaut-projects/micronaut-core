@@ -458,6 +458,18 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     * Find a method with a name.
+     *
+     * @param name The method name
+     * @return The method
+     * @since 4.0.0
+     */
+    @NonNull
+    default Optional<MethodElement> findMethod(String name) {
+        return getEnclosedElement(ElementQuery.ALL_METHODS.named(name));
+    }
+
+    /**
      * Return the elements that match the given query.
      *
      * @param query The query to use.

@@ -128,49 +128,48 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
     /**
      * @param visitorContext            The visitor context
-     * @param classNode                 The {@link ClassNode}
+     * @param nativeElement             The native element
      * @param annotationMetadataFactory The annotation metadata
      */
     public GroovyClassElement(GroovyVisitorContext visitorContext,
-                              ClassNode classNode,
+                              GroovyNativeElement nativeElement,
                               ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        this(visitorContext, classNode, annotationMetadataFactory, null, 0);
+        this(visitorContext, nativeElement, annotationMetadataFactory, null, 0);
     }
 
     /**
      * @param visitorContext            The visitor context
-     * @param classNode                 The {@link ClassNode}
+     * @param nativeElement             The native element
      * @param annotationMetadataFactory The annotation metadata factory
      * @param resolvedTypeArguments     The resolved type arguments
      * @param arrayDimensions           The number of array dimensions
      */
-    GroovyClassElement(
-            GroovyVisitorContext visitorContext,
-            ClassNode classNode,
-            ElementAnnotationMetadataFactory annotationMetadataFactory,
-            Map<String, ClassElement> resolvedTypeArguments,
-            int arrayDimensions) {
-        this(visitorContext, classNode, annotationMetadataFactory, resolvedTypeArguments, arrayDimensions, false);
+    GroovyClassElement(GroovyVisitorContext visitorContext,
+                       GroovyNativeElement nativeElement,
+                       ElementAnnotationMetadataFactory annotationMetadataFactory,
+                       Map<String, ClassElement> resolvedTypeArguments,
+                       int arrayDimensions) {
+        this(visitorContext, nativeElement, annotationMetadataFactory, resolvedTypeArguments, arrayDimensions, false);
     }
 
     /**
      * @param visitorContext            The visitor context
-     * @param classNode                 The {@link ClassNode}
+     * @param nativeElement             The native element
      * @param annotationMetadataFactory The annotation metadata factory
      * @param resolvedTypeArguments     The resolved type arguments
      * @param arrayDimensions           The number of array dimensions
      * @param isTypeVar                 Is the element a type variable
      */
     GroovyClassElement(GroovyVisitorContext visitorContext,
-                       ClassNode classNode,
+                       GroovyNativeElement nativeElement,
                        ElementAnnotationMetadataFactory annotationMetadataFactory,
                        Map<String, ClassElement> resolvedTypeArguments,
                        int arrayDimensions,
                        boolean isTypeVar) {
-        super(visitorContext, classNode, annotationMetadataFactory);
-        this.classNode = classNode;
+        super(visitorContext, nativeElement, annotationMetadataFactory);
         this.resolvedTypeArguments = resolvedTypeArguments;
         this.arrayDimensions = arrayDimensions;
+        classNode = (ClassNode) nativeElement.annotatedNode();
         if (classNode.isArray()) {
             classNode.setName(classNode.getComponentType().getName());
         }
@@ -179,7 +178,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
     @Override
     protected GroovyClassElement copyConstructor() {
-        return new GroovyClassElement(visitorContext, classNode, elementAnnotationMetadataFactory, resolvedTypeArguments, arrayDimensions, isTypeVar);
+        return new GroovyClassElement(visitorContext, getNativeType(), elementAnnotationMetadataFactory, resolvedTypeArguments, arrayDimensions, isTypeVar);
     }
 
     @Override
@@ -195,7 +194,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
     @Override
     public ClassElement withTypeArguments(Map<String, ClassElement> typeArguments) {
-        GroovyClassElement groovyClassElement = new GroovyClassElement(visitorContext, classNode, elementAnnotationMetadataFactory, resolvedTypeArguments, arrayDimensions);
+        GroovyClassElement groovyClassElement = new GroovyClassElement(visitorContext, getNativeType(), elementAnnotationMetadataFactory, resolvedTypeArguments, arrayDimensions);
         groovyClassElement.resolvedTypeArguments = typeArguments;
         return groovyClassElement;
     }
@@ -335,7 +334,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     @NonNull
     public Map<String, ClassElement> getTypeArguments() {
         if (resolvedTypeArguments == null) {
-            resolvedTypeArguments = resolveTypeArguments(classNode, Collections.emptyMap(), new HashSet<>());
+            resolvedTypeArguments = resolveClassTypeArguments(getNativeType(), classNode, Collections.emptyMap(), new HashSet<>());
         }
         return resolvedTypeArguments;
     }
@@ -474,7 +473,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new GroovyClassElement(visitorContext, classNode, elementAnnotationMetadataFactory, resolvedTypeArguments, arrayDimensions);
+        return new GroovyClassElement(visitorContext, getNativeType(), elementAnnotationMetadataFactory, resolvedTypeArguments, arrayDimensions);
     }
 
     @Override
@@ -549,11 +548,6 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @Override
-    public ClassNode getNativeType() {
-        return classNode;
-    }
-
-    @Override
     public boolean isAssignable(String type) {
         return AstClassUtils.isSubclassOfOrImplementsInterface(classNode, type);
     }
@@ -587,7 +581,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         if (genericsTypes == null) {
             return Collections.emptyList();
         }
-        return Arrays.stream(genericsTypes).map(this::newClassElement).toList();
+        return Arrays.stream(genericsTypes).map(gt -> newClassElement(gt)).toList();
     }
 
     @NonNull
@@ -625,17 +619,22 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         }
 
         @Override
+        protected ClassNode getNativeClassType(ClassElement classElement) {
+            return (ClassNode) ((GroovyClassElement) classElement).getNativeType().annotatedNode();
+        }
+
+        @Override
         protected Set<AnnotatedNode> getExcludedNativeElements(ElementQuery.Result<?> result) {
             if (result.isExcludePropertyElements()) {
                 Set<AnnotatedNode> excluded = new HashSet<>();
                 for (PropertyElement excludePropertyElement : getBeanProperties()) {
                     excludePropertyElement.getReadMethod()
                             .filter(m -> !m.isSynthetic())
-                            .ifPresent(methodElement -> excluded.add((AnnotatedNode) methodElement.getNativeType()));
+                            .ifPresent(methodElement -> excluded.add(((GroovyNativeElement) methodElement.getNativeType()).annotatedNode()));
                     excludePropertyElement.getWriteMethod()
                             .filter(m -> !m.isSynthetic())
-                            .ifPresent(methodElement -> excluded.add((AnnotatedNode) methodElement.getNativeType()));
-                    excludePropertyElement.getField().ifPresent(fieldElement -> excluded.add((AnnotatedNode) fieldElement.getNativeType()));
+                            .ifPresent(methodElement -> excluded.add(((GroovyNativeElement) methodElement.getNativeType()).annotatedNode()));
+                    excludePropertyElement.getField().ifPresent(fieldElement -> excluded.add(((GroovyNativeElement) fieldElement.getNativeType()).annotatedNode()));
                 }
                 return excluded;
             }

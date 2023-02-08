@@ -23,6 +23,7 @@ import io.micronaut.ast.groovy.utils.AstMessageUtils;
 import io.micronaut.ast.groovy.utils.ExtendedParameter;
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ConversionService;
@@ -270,9 +271,16 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     @Override
     protected List<? extends AnnotationNode> getAnnotationsForType(AnnotatedNode element) {
         List<AnnotationNode> annotations = element.getAnnotations();
-        List<AnnotationNode> expanded = new ArrayList<>(annotations.size());
+        List<AnnotationNode> typeAnnotations = element instanceof ClassNode classNode ? classNode.getTypeAnnotations() : Collections.emptyList();
+        List<AnnotationNode> expanded = new ArrayList<>(annotations.size() + typeAnnotations.size());
+        expandAnnotations(annotations, expanded);
+        expandAnnotations(typeAnnotations, expanded);
+        return expanded;
+    }
+
+    private void expandAnnotations(List<AnnotationNode> annotations, List<AnnotationNode> expanded) {
         for (AnnotationNode node : annotations) {
-            Expression value = node.getMember("value");
+            Expression value = node.getMember(AnnotationMetadata.VALUE_MEMBER);
             boolean repeatable = false;
             if (value instanceof ListExpression listExpression) {
                 for (Expression expression : listExpression.getExpressions()) {
@@ -289,7 +297,6 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
                 expanded.add(node);
             }
         }
-        return expanded;
     }
 
     @Override

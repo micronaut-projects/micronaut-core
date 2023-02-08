@@ -45,7 +45,7 @@ final class GroovyWildcardElement extends GroovyClassElement implements Wildcard
                           ElementAnnotationMetadataFactory annotationMetadataFactory) {
         super(
                 upperType.visitorContext,
-                upperType.classNode,
+                upperType.getNativeType(),
             annotationMetadataFactory,
                 upperType.getTypeArguments(),
             0

@@ -15,6 +15,14 @@
  */
 package io.micronaut.ast.groovy.annotation;
 
+import io.micronaut.ast.groovy.utils.ExtendedParameter;
+import io.micronaut.ast.groovy.visitor.GroovyNativeElement;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.PackageElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.annotation.AbstractElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import org.codehaus.groovy.ast.AnnotatedNode;
@@ -35,6 +43,36 @@ public final class GroovyElementAnnotationMetadataFactory extends AbstractElemen
     @Override
     public ElementAnnotationMetadataFactory readOnly() {
         return new GroovyElementAnnotationMetadataFactory(true, (GroovyAnnotationMetadataBuilder) metadataBuilder);
+    }
+
+    @Override
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForPackage(PackageElement packageElement) {
+        GroovyNativeElement groovyNativeElement = (GroovyNativeElement) packageElement.getNativeType();
+        return metadataBuilder.lookupOrBuild(groovyNativeElement, groovyNativeElement.annotatedNode(), true);
+    }
+
+    @Override
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForParameter(ParameterElement parameterElement) {
+        GroovyNativeElement.Parameter parameter = (GroovyNativeElement.Parameter) parameterElement.getNativeType();
+        return metadataBuilder.lookupOrBuild(parameter, new ExtendedParameter(parameter.methodNode(), parameter.annotatedNode()), false);
+    }
+
+    @Override
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForField(FieldElement fieldElement) {
+        GroovyNativeElement groovyNativeElement = (GroovyNativeElement) fieldElement.getNativeType();
+        return metadataBuilder.lookupOrBuild(groovyNativeElement, groovyNativeElement.annotatedNode(), false);
+    }
+
+    @Override
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForMethod(MethodElement methodElement) {
+        GroovyNativeElement groovyNativeElement = (GroovyNativeElement) methodElement.getNativeType();
+        return metadataBuilder.lookupOrBuild(groovyNativeElement, groovyNativeElement.annotatedNode(), false);
+    }
+
+    @Override
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForClass(ClassElement classElement) {
+        GroovyNativeElement groovyNativeElement = (GroovyNativeElement) classElement.getNativeType();
+        return metadataBuilder.lookupOrBuild(groovyNativeElement, groovyNativeElement.annotatedNode(), true);
     }
 
 }
