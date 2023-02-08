@@ -524,6 +524,10 @@ public final class RouteExecutor {
                 }
                 response.body(null);
             }
+            if (response.getContentType().isEmpty()) {
+                MediaType mediaType = resolveDefaultResponseContentType(request, routeInfo);
+                response.contentType(mediaType);
+            }
             applyConfiguredHeaders(response.getHeaders());
             if (routeInfo instanceof RouteMatch) {
                 response.setAttribute(HttpAttributes.ROUTE_MATCH, routeInfo);
