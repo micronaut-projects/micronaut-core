@@ -1,6 +1,6 @@
 By default, when a header has multiple values, multiple headers are sent, each with a single value. It is possible to change the behavior to send a single header with a comma-separated list of values by setting a configuration option.
 
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:

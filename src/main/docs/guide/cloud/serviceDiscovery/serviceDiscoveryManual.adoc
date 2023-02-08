@@ -29,13 +29,13 @@ micronaut:
   http:
     services:
       foo:
-        health-check: true # <1>
-        health-check-interval: 15s # <2>
-        health-check-uri: /health # <3>
+        health-check: true
+        health-check-interval: 15s
+        health-check-uri: /health
 ----
 
-<1> Whether to health check the service
-<2> The interval between checks
-<3> The URI of the health check request
+- `health-check` indicates whether to health check the service
+- `health-check-interval` is the interval between checks
+- `health-check-uri` specifies the endpoint URI of the health check request
 
 Micronaut starts a background thread to check the health status of the service and if any of the configured services respond with an error code, they are removed from the list of available services.

@@ -3,7 +3,7 @@ To allow any request method for a given configuration, don't include the `allowe
 For multiple allowed methods, set the `allowedMethods` key of the configuration to a list of strings.
 
 .Example CORS Configuration
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:
