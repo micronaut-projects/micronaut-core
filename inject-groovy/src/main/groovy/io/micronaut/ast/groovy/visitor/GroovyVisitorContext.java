@@ -64,6 +64,7 @@ import java.util.Set;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class GroovyVisitorContext implements VisitorContext {
     private static final MutableConvertibleValues<Object> VISITOR_ATTRIBUTES = new MutableConvertibleValuesMap<>();
     private final CompilationUnit compilationUnit;
@@ -145,7 +146,7 @@ public class GroovyVisitorContext implements VisitorContext {
         ArgumentUtils.requireNonNull("stereotypes", stereotypes);
 
         if (compilationUnit == null) {
-            return new ClassElement[0];
+            return ClassElement.ZERO_CLASS_ELEMENTS;
         }
 
         ClassPathAnnotationScanner scanner = new ClassPathAnnotationScanner(compilationUnit.getClassLoader());
@@ -179,8 +180,8 @@ public class GroovyVisitorContext implements VisitorContext {
     @Override
     public void info(String message, @Nullable Element element) {
         StringBuilder msg = new StringBuilder("Note: ").append(message);
-        if (element != null) {
-            ASTNode expr = (ASTNode) element.getNativeType();
+        if (element instanceof AbstractGroovyElement abstractGroovyElement) {
+            ASTNode expr = abstractGroovyElement.getNativeType().annotatedNode();
             final String sample = sourceUnit.getSample(expr.getLineNumber(), expr.getColumnNumber(), new Janitor());
             msg.append("\n\n").append(sample);
         }

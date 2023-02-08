@@ -26,6 +26,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
@@ -390,7 +391,12 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         // 2nd argument: the name
         generatorAdapter.push(argumentName);
 
-        AnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(classElement.getAnnotationMetadata());
+        // Persist only type annotations added to the type argument
+        AnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(classElement.getTypeAnnotationMetadata());
+        if (classElement.getClass().getSimpleName().startsWith("Kotlin")) {
+            // Remove after KSP supports type annotations
+            annotationMetadata = MutableAnnotationMetadata.of(classElement.getAnnotationMetadata());
+        }
         boolean hasAnnotationMetadata = !annotationMetadata.isEmpty();
 
         boolean isRecursiveType = false;
@@ -514,7 +520,10 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
             ClassElement classElement = entry.getGenericType();
             String argumentName = entry.getName();
-            AnnotationMetadata annotationMetadata = entry.getAnnotationMetadata();
+            AnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(
+                entry.getAnnotationMetadata(),
+                entry.getType().getTypeAnnotationMetadata()
+            ).merge();
             Map<String, ClassElement> typeArguments = classElement.getTypeArguments();
             pushCreateArgument(
                     declaringElementName,
@@ -554,32 +563,37 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                                           ClassElement argument,
                                           Map<String, Integer> defaults,
                                           Map<String, GeneratorAdapter> loadTypeMethods) {
-        Type type = Type.getType(Argument.class);
-        if (argument.isPrimitive() && !argument.isArray()) {
-            String constantName = argument.getName().toUpperCase(Locale.ENGLISH);
-            // refer to constant for primitives
-            generatorAdapter.getStatic(type, constantName, type);
-        } else {
+        // Persist only type annotations added
+        AnnotationMetadata annotationMetadata = argument.getTypeAnnotationMetadata();
+
+        if (annotationMetadata.isEmpty()) {
+            Type type = Type.getType(Argument.class);
+            if (argument.isPrimitive() && !argument.isArray()) {
+                String constantName = argument.getName().toUpperCase(Locale.ENGLISH);
+                // refer to constant for primitives
+                generatorAdapter.getStatic(type, constantName, type);
+                return;
+            }
             if (!argument.isArray() && String.class.getName().equals(argument.getType().getName())
                     && argument.getName().equals(argument.getType().getName())
                     && argument.getAnnotationMetadata().isEmpty()) {
-                    generatorAdapter.getStatic(type, "STRING", type);
-                    return;
+                generatorAdapter.getStatic(type, "STRING", type);
+                return;
             }
-
-            pushCreateArgument(
-                    declaringTypeName,
-                    owningType,
-                    classWriter,
-                    generatorAdapter,
-                    argument.getName(),
-                    argument,
-                    AnnotationMetadata.EMPTY_METADATA, // Don't store return type annotations, method annotations are returned
-                    argument.getTypeArguments(),
-                    defaults,
-                    loadTypeMethods
-            );
         }
+
+        pushCreateArgument(
+                declaringTypeName,
+                owningType,
+                classWriter,
+                generatorAdapter,
+                argument.getName(),
+                argument,
+                annotationMetadata,
+                argument.getTypeArguments(),
+                defaults,
+                loadTypeMethods
+        );
     }
 
     /**

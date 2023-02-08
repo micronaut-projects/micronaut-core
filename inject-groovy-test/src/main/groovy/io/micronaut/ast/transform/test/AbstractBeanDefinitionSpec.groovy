@@ -22,12 +22,12 @@ import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
 import io.micronaut.ast.groovy.visitor.GroovyElementFactory
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.ApplicationContextConfiguration
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.Qualifier
 import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.beans.BeanIntrospection
-import io.micronaut.core.io.scan.ClassPathResourceLoader
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
@@ -263,11 +263,14 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         context.getBean(context.classLoader.loadClass(className), qualifier)
     }
 
-    protected ApplicationContext buildContext(@Language("groovy") String cls, boolean includeAllBeans = false) {
+    protected ApplicationContext buildContext(@Language("groovy") String cls, boolean includeAllBeans = false, Map properties = [:]) {
         InMemoryByteCodeGroovyClassLoader classLoader = buildClassLoader(cls)
-
-        return new DefaultApplicationContext(
-                ClassPathResourceLoader.defaultLoader(classLoader),"test") {
+        def builder = ApplicationContext.builder()
+        builder.classLoader(classLoader)
+        builder.environments("test")
+        builder.properties(properties)
+        def env = builder.build().environment
+        return new DefaultApplicationContext((ApplicationContextConfiguration) builder) {
             @Override
             protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
                 def references =  classLoader.generatedClasses.keySet()

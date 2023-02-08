@@ -59,25 +59,32 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     private ParameterElement continuationParameter;
     private ClassElement genericReturnType;
     private ClassElement returnType;
+    private Map<String, ClassElement> typeArguments;
+    private Map<String, ClassElement> declaredTypeArguments;
 
     /**
      * @param owningType                The declaring class
-     * @param executableElement         The {@link ExecutableElement}
+     * @param nativeElement             The native element
      * @param annotationMetadataFactory The annotation metadata factory
      * @param visitorContext            The visitor context
      */
     public JavaMethodElement(JavaClassElement owningType,
-                             ExecutableElement executableElement,
+                             JavaNativeElement.Method nativeElement,
                              ElementAnnotationMetadataFactory annotationMetadataFactory,
                              JavaVisitorContext visitorContext) {
-        super(executableElement, annotationMetadataFactory, visitorContext);
-        this.executableElement = executableElement;
+        super(nativeElement, annotationMetadataFactory, visitorContext);
+        this.executableElement = nativeElement.element();
         this.owningType = owningType;
     }
 
     @Override
+    public JavaNativeElement.Method getNativeType() {
+        return (JavaNativeElement.Method) super.getNativeType();
+    }
+
+    @Override
     protected AbstractJavaElement copyThis() {
-        return new JavaMethodElement(owningType, executableElement, elementAnnotationMetadataFactory, visitorContext);
+        return new JavaMethodElement(owningType, getNativeType(), elementAnnotationMetadataFactory, visitorContext);
     }
 
     @Override
@@ -117,7 +124,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
         if (!thrownTypes.isEmpty()) {
             return thrownTypes.stream()
                 .map(tm -> newClassElement(tm, getDeclaringType().getTypeArguments()))
-                    .toArray(ClassElement[]::new);
+                .toArray(ClassElement[]::new);
         }
 
         return ClassElement.ZERO_CLASS_ELEMENTS;
@@ -133,7 +140,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
         if (isStatic() && getDeclaringType().isInterface()) {
             return false;
         }
-        return visitorContext.getElements().hides((Element) getNativeType(), (Element) hidden.getNativeType());
+        return visitorContext.getElements().hides(getNativeType().element(), ((JavaNativeElement.Method) hidden.getNativeType()).element());
     }
 
     @NonNull
@@ -162,6 +169,22 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     }
 
     @Override
+    public Map<String, ClassElement> getTypeArguments() {
+        if (typeArguments == null) {
+            typeArguments = MethodElement.super.getTypeArguments();
+        }
+        return typeArguments;
+    }
+
+    @Override
+    public Map<String, ClassElement> getDeclaredTypeArguments() {
+        if (declaredTypeArguments == null) {
+            declaredTypeArguments = resolveTypeArguments(executableElement, getDeclaringType().getTypeArguments());
+        }
+        return declaredTypeArguments;
+    }
+
+    @Override
     public boolean isSuspend() {
         getParameters();
         return this.continuationParameter != null;
@@ -187,7 +210,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
 
     @Override
     public MethodElement withNewOwningType(ClassElement owningType) {
-        JavaMethodElement javaMethodElement = new JavaMethodElement((JavaClassElement) owningType, executableElement, elementAnnotationMetadataFactory, visitorContext);
+        JavaMethodElement javaMethodElement = new JavaMethodElement((JavaClassElement) owningType, getNativeType(), elementAnnotationMetadataFactory, visitorContext);
         copyValues(javaMethodElement);
         return javaMethodElement;
     }
@@ -211,7 +234,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
      */
     @NonNull
     protected JavaParameterElement newParameterElement(@NonNull MethodElement methodElement, @NonNull VariableElement variableElement) {
-        return new JavaParameterElement(owningType, methodElement, variableElement, elementAnnotationMetadataFactory, visitorContext);
+        return new JavaParameterElement(owningType, methodElement, new JavaNativeElement.Variable(variableElement), elementAnnotationMetadataFactory, visitorContext);
     }
 
     @Override
@@ -254,7 +277,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
             }
         }
         final TypeMirror returnType = executableElement.getReturnType();
-        return newClassElement(returnType, genericInfo);
+        return newClassElement(getNativeType(), returnType, genericInfo);
     }
 
     private static boolean sameType(String type, DeclaredType dt) {
@@ -263,8 +286,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     }
 
     private boolean isSuspend(VariableElement ve) {
-        if (ve != null && ve.asType() instanceof DeclaredType) {
-            DeclaredType dt = (DeclaredType) ve.asType();
+        if (ve != null && ve.asType() instanceof DeclaredType dt) {
             return sameType("kotlin.coroutines.Continuation", dt);
         }
         return false;

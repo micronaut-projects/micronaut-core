@@ -15,7 +15,9 @@
  */
 package io.micronaut.inject.ast;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -38,6 +40,17 @@ public interface GenericElement extends ClassElement {
     @NotNull
     default Object getGenericNativeType() {
         return getNativeType();
+    }
+
+    /**
+     * Returns the type parameter annotations.
+     * Added to this generic element by:
+     * - The declaration of the type variable {@link java.lang.annotation.ElementType#TYPE_PARAMETER}
+     * - The use of the type {@link java.lang.annotation.ElementType#TYPE}
+     * @return the type annotations
+     */
+    default MutableAnnotationMetadataDelegate<AnnotationMetadata> getGenericTypeAnnotationMetadata() {
+        return (MutableAnnotationMetadataDelegate<AnnotationMetadata>) MutableAnnotationMetadataDelegate.EMPTY;
     }
 
 }

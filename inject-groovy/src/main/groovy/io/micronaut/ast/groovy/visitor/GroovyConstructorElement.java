@@ -16,6 +16,7 @@
 package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import org.codehaus.groovy.ast.ConstructorNode;
@@ -26,6 +27,7 @@ import org.codehaus.groovy.ast.ConstructorNode;
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 public class GroovyConstructorElement extends GroovyMethodElement implements ConstructorElement {
     /**
      * @param owningType                The owning class
