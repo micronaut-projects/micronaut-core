@@ -27,7 +27,7 @@ import org.codehaus.groovy.ast.PackageNode;
  * @author Denis Stepanov
  * @since 4.0.0
  */
-public interface GroovyNativeElement {
+public sealed interface GroovyNativeElement {
 
     /**
      * @return The annotated node representing the type.
