@@ -270,6 +270,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             AnnotationMetadata annotationMetadata = buildInternal(includeTypeAnnotations, false, element);
             cachedAnnotationMetadata = new DefaultCachedAnnotationMetadata(annotationMetadata);
         }
+        // Don't use `computeIfAbsent` as it can lead to a concurrent exception because the cache is accessed during in `buildInternal`
         MUTATED_ANNOTATION_METADATA.put(key, cachedAnnotationMetadata);
         return cachedAnnotationMetadata;
 
@@ -658,6 +659,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         if (cachedAnnotationMetadata == null) {
             cachedAnnotationMetadata = new DefaultCachedAnnotationMetadata(annotationMetadataSupplier.get());
         }
+        // Don't use `computeIfAbsent` as it can lead to a concurrent exception because the cache is accessed during in `buildInternal`
         MUTATED_ANNOTATION_METADATA.put(key, cachedAnnotationMetadata);
         return cachedAnnotationMetadata;
     }
