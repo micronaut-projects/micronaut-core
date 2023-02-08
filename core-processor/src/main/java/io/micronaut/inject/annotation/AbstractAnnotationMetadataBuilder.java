@@ -265,10 +265,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The annotation metadata
      */
     public CachedAnnotationMetadata lookupOrBuild(Object key, T element, boolean includeTypeAnnotations) {
-        return MUTATED_ANNOTATION_METADATA.computeIfAbsent(
-            key,
-            metadataKey -> new DefaultCachedAnnotationMetadata(buildInternal(includeTypeAnnotations, false, element))
-        );
+        CachedAnnotationMetadata cachedAnnotationMetadata = MUTATED_ANNOTATION_METADATA.get(key);
+        if (cachedAnnotationMetadata == null) {
+            AnnotationMetadata annotationMetadata = buildInternal(includeTypeAnnotations, false, element);
+            cachedAnnotationMetadata = new DefaultCachedAnnotationMetadata(annotationMetadata);
+        }
+        MUTATED_ANNOTATION_METADATA.put(key, cachedAnnotationMetadata);
+        return cachedAnnotationMetadata;
+
     }
 
     private AnnotationMetadata buildInternal(boolean inheritTypeAnnotations, boolean declaredOnly, T element) {
@@ -649,14 +653,19 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     @NonNull
     private CachedAnnotationMetadata lookupExisting(T[] elements, Supplier<AnnotationMetadata> annotationMetadataSupplier) {
-        return MUTATED_ANNOTATION_METADATA.computeIfAbsent(new MetadataKey<>(elements), metadataKey -> new DefaultCachedAnnotationMetadata(annotationMetadataSupplier.get()));
+        Object key = new MetadataKey<>(elements);
+        CachedAnnotationMetadata cachedAnnotationMetadata = MUTATED_ANNOTATION_METADATA.get(key);
+        if (cachedAnnotationMetadata == null) {
+            cachedAnnotationMetadata = new DefaultCachedAnnotationMetadata(annotationMetadataSupplier.get());
+        }
+        MUTATED_ANNOTATION_METADATA.put(key, cachedAnnotationMetadata);
+        return cachedAnnotationMetadata;
     }
 
     @Nullable
     private void processAnnotationAlias(Map<CharSequence, Object> annotationValues,
                                         Object annotationValue,
                                         AnnotationValue<AliasFor> aliasForAnnotation,
-                                        RetentionPolicy retentionPolicy,
                                         List<ProcessedAnnotation> introducedAnnotations) {
         Optional<String> aliasAnnotation = aliasForAnnotation.stringValue("annotation");
         Optional<String> aliasAnnotationName = aliasForAnnotation.stringValue("annotationName");
@@ -670,7 +679,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 if (annotationValue != null) {
                     introducedAnnotations.add(
                             toProcessedAnnotation(
-                                    AnnotationValue.builder(aliasedAnnotation, retentionPolicy)
+                                    AnnotationValue.builder(aliasedAnnotation, getRetentionPolicy(aliasedAnnotation))
                                             .members(Collections.singletonMap(aliasedMemberName, annotationValue))
                                             .build()
                             )
@@ -693,6 +702,17 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     @NonNull
     protected abstract RetentionPolicy getRetentionPolicy(@NonNull T annotation);
+
+    /**
+     * Gets the retention policy for the given annotation.
+     *
+     * @param annotation The annotation
+     * @return The retention policy
+     */
+    @NonNull
+    public RetentionPolicy getRetentionPolicy(@NonNull String annotation) {
+        return getAnnotationMirror(annotation).map(this::getRetentionPolicy).orElse(RetentionPolicy.RUNTIME);
+    }
 
     private AnnotationMetadata buildInternalMulti(
             List<T> parents,
@@ -878,7 +898,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                        Map<CharSequence, Object> annotationValues,
                                        T annotationMember,
                                        Object annotationValue,
-                                       RetentionPolicy retentionPolicy,
                                        List<ProcessedAnnotation> introducedAnnotations) {
         Optional<AnnotationValue<Aliases>> aliases = getAnnotationValues(originatingElement, annotationMember, Aliases.class);
         if (aliases.isPresent()) {
@@ -887,7 +906,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         annotationValues,
                         annotationValue,
                         av,
-                        retentionPolicy,
                         introducedAnnotations
                 );
             }
@@ -898,7 +916,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         annotationValues,
                         annotationValue,
                         aliasForValues.get(),
-                        retentionPolicy,
                         introducedAnnotations
                 );
             }
@@ -1030,7 +1047,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     Stream.of(
                             // Add repeatable container for possible stereotype annotation retrieval
                             // and additional members defined in the container annotation
-                            toProcessedAnnotation(new AnnotationValue<>(annotationValue.getAnnotationName(), containerValues))
+                            toProcessedAnnotation(new AnnotationValue<>(
+                                    annotationValue.getAnnotationName(),
+                                    containerValues,
+                                    getRetentionPolicy(annotationValue.getAnnotationName())))
                     ),
                     repeatableAnnotations.stream().map(this::toProcessedAnnotation)
             );
@@ -1066,7 +1086,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         newValues,
                         member,
                         value,
-                        annotationValue.getRetentionPolicy(),
                         introducedAnnotations
                 );
             }
