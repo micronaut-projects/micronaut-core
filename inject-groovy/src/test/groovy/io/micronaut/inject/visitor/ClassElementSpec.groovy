@@ -1888,7 +1888,29 @@ class Test<T extends Number> {
 
             ce.findMethod("method10").get().getGenericReturnType().getTypeArguments("test.Test").get("T") == numberType
             ce.findMethod("method10").get().getReturnType().getTypeArguments("test.Test").get("T") == numberType
+    }
 
+    void "test inherit parameter annotation"() {
+        ClassElement ce = buildClassElement('''
+package test;
+import java.util.List;
+
+interface MyApi {
+
+    String get(@io.micronaut.inject.visitor.MyParameter('X-username') String username)
+}
+
+class UserController implements MyApi {
+
+    @Override
+    String get(String username) {
+    }
+
+}
+
+''')
+        expect:
+            ce.findMethod("get").get().getParameters()[0].hasAnnotation(MyParameter)
     }
 
     private void assertListGenericArgument(ClassElement type, Closure cl) {

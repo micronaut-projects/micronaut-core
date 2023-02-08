@@ -15,6 +15,7 @@
  */
 package io.micronaut.ast.groovy.annotation;
 
+import io.micronaut.ast.groovy.utils.ExtendedParameter;
 import io.micronaut.ast.groovy.visitor.GroovyNativeElement;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
@@ -52,8 +53,8 @@ public final class GroovyElementAnnotationMetadataFactory extends AbstractElemen
 
     @Override
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForParameter(ParameterElement parameterElement) {
-        GroovyNativeElement groovyNativeElement = (GroovyNativeElement) parameterElement.getNativeType();
-        return metadataBuilder.lookupOrBuild(groovyNativeElement, groovyNativeElement.annotatedNode(), false);
+        GroovyNativeElement.Parameter parameter = (GroovyNativeElement.Parameter) parameterElement.getNativeType();
+        return metadataBuilder.lookupOrBuild(parameter, new ExtendedParameter(parameter.methodNode(), parameter.annotatedNode()), false);
     }
 
     @Override
