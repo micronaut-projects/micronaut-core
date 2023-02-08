@@ -458,6 +458,18 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     * Find a field with a name.
+     *
+     * @param name The field name
+     * @return The field
+     * @since 4.0.0
+     */
+    @NonNull
+    default Optional<FieldElement> findField(String name) {
+        return getEnclosedElement(ElementQuery.ALL_FIELDS.named(name));
+    }
+
+    /**
      * Find a method with a name.
      *
      * @param name The method name

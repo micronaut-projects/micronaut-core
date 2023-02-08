@@ -1760,6 +1760,30 @@ class Test {
             level3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
     }
 
+    void "test type annotations on a method and a field"() {
+        ClassElement ce = buildClassElement('''
+package test;
+
+class Test {
+    @io.micronaut.visitors.TypeUseRuntimeAnn
+    @io.micronaut.visitors.TypeUseClassAnn
+    String myField;
+
+    @io.micronaut.visitors.TypeUseRuntimeAnn
+    @io.micronaut.visitors.TypeUseClassAnn
+    String myMethod() {
+        return null;
+    }
+}
+''')
+        expect:
+            def field = ce.findField("myField").get()
+            def method = ce.findMethod("myMethod").get()
+
+            field.getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
+            method.getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
+    }
+
     void "test recursive generic type parameter"() {
         given:
             ClassElement ce = buildClassElement('''\
@@ -1780,6 +1804,56 @@ final class TrackedSortedSet<T extends java.lang.Comparable<? super T>> {
             def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
             def nextNextTypeArgument = nextNextTypeArguments.get("T")
             nextNextTypeArgument.name == "java.lang.Object"
+    }
+
+    void "test annotation metadata present on deep type parameters for method 2"() {
+        ClassElement ce = buildClassElement('''
+package test;
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import java.util.List;
+
+class Test {
+    List<List<List<@io.micronaut.visitors.TypeUseRuntimeAnn @io.micronaut.visitors.TypeUseClassAnn String>>> deepList() {
+        return null;
+    }
+}
+''')
+        expect:
+            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("deepList")).get()
+            def theType = method.getGenericReturnType()
+
+            theType.getAnnotationMetadata().getAnnotationNames().size() == 0
+
+            assertListGenericArgument(theType, { ClassElement listArg1 ->
+                assertListGenericArgument(listArg1, { ClassElement listArg2 ->
+                    assertListGenericArgument(listArg2, { ClassElement listArg3 ->
+                        assert listArg3.getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn']
+                    })
+                })
+            })
+
+            def level1 = theType.getTypeArguments()["E"]
+            def level2 = level1.getTypeArguments()["E"]
+            def level3 = level2.getTypeArguments()["E"]
+            level3.getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.visitors.TypeUseRuntimeAnn', 'io.micronaut.visitors.TypeUseClassAnn' ]
+    }
+
+    void "test annotations on recursive generic type parameter 1"() {
+        given:
+            ClassElement ce = buildClassElement('''\
+package test;
+
+final class TrackedSortedSet<T extends @io.micronaut.inject.visitor.TypeUseRuntimeAnn java.lang.Comparable<? super T>> {
+}
+
+''')
+        expect:
+            def typeArguments = ce.getTypeArguments()
+            typeArguments.size() == 1
+            def typeArgument = typeArguments.get("T")
+            typeArgument.name == "java.lang.Comparable"
+            typeArgument.getAnnotationNames().asList() == ['io.micronaut.inject.visitor.TypeUseRuntimeAnn']
     }
 
     void "test recursive generic type parameter 2"() {
