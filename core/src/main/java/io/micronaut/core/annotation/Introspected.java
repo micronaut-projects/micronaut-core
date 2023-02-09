@@ -17,6 +17,7 @@ package io.micronaut.core.annotation;
 
 import java.lang.annotation.*;
 
+import static java.lang.annotation.RetentionPolicy.CLASS;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**

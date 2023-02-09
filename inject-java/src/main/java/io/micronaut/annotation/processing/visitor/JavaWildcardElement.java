@@ -21,6 +21,7 @@ import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.WildcardElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 
 import javax.lang.model.type.WildcardType;
 import java.util.Collection;
@@ -56,6 +57,11 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
         this.upperBound = mostUpper;
         this.upperBounds = upperBounds;
         this.lowerBounds = lowerBounds;
+    }
+
+    @Override
+    public MutableAnnotationMetadataDelegate<?> getAnnotationMetadata() {
+        return upperBound.getAnnotationMetadata();
     }
 
     @Override

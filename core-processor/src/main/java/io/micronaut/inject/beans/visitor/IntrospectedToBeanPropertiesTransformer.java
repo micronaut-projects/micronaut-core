@@ -23,6 +23,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.annotation.TypedAnnotationTransformer;
 import io.micronaut.inject.visitor.VisitorContext;
 
+import java.lang.annotation.RetentionPolicy;
 import java.util.Arrays;
 import java.util.List;
 
@@ -49,7 +50,7 @@ public final class IntrospectedToBeanPropertiesTransformer implements TypedAnnot
         }
         return Arrays.asList(
             annotation,
-            AnnotationValue.builder(BeanProperties.class)
+            AnnotationValue.builder(BeanProperties.class.getName(), RetentionPolicy.CLASS)
                 .member(BeanProperties.MEMBER_ACCESS_KIND, accessKinds)
                 .member(BeanProperties.MEMBER_VISIBILITY, visibilities)
                 .member(BeanProperties.MEMBER_INCLUDES, annotation.stringValues(BeanProperties.MEMBER_INCLUDES))

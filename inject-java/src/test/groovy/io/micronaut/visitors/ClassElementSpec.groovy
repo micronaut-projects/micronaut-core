@@ -2104,6 +2104,89 @@ class MyBean<T extends MyBuilder> {
             nextNextTypeArgument.name == "java.lang.Object"
     }
 
+    void "test how the annotations from the type are propagated"() {
+        given:
+            ClassElement ce = buildClassElement('''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+import java.util.List;
+import io.micronaut.visitors.Book;
+
+@jakarta.inject.Singleton
+class MyBean {
+
+    @Executable
+    public void saveAll(List<Book> books) {
+    }
+
+    @Executable
+    public <T extends Book> void saveAll2(List<? extends T> book) {
+    }
+
+    @Executable
+    public <T extends Book> void saveAll3(List<T> book) {
+    }
+
+    @Executable
+    public void save2(Book book) {
+    }
+
+    @Executable
+    public <T extends Book> void save3(T book) {
+    }
+
+    @Executable
+    public Book get() {
+        return null;
+    }
+}
+
+''')
+        when:
+            def saveAll = ce.findMethod("saveAll").get()
+            def listTypeArgument = saveAll.getParameters()[0].getType().getTypeArguments(List).get("E")
+        then:
+            listTypeArgument.hasAnnotation(MyEntity.class)
+            listTypeArgument.hasAnnotation(Introspected.class)
+
+        when:
+            def saveAll2 = ce.findMethod("saveAll2").get()
+            def listTypeArgument2 = saveAll2.getParameters()[0].getType().getTypeArguments(List).get("E")
+        then:
+            listTypeArgument2.hasAnnotation(MyEntity.class)
+            listTypeArgument2.hasAnnotation(Introspected.class)
+
+        when:
+            def saveAll3 = ce.findMethod("saveAll3").get()
+            def listTypeArgument3 = saveAll3.getParameters()[0].getType().getTypeArguments(List).get("E")
+        then:
+            listTypeArgument3.hasAnnotation(MyEntity.class)
+            listTypeArgument3.hasAnnotation(Introspected.class)
+
+        when:
+            def save2 = ce.findMethod("save2").get()
+            def parameter2 = save2.getParameters()[0].getType()
+        then:
+            parameter2.hasAnnotation(MyEntity.class)
+            parameter2.hasAnnotation(Introspected.class)
+
+        when:
+            def save3 = ce.findMethod("save3").get()
+            def parameter3 = save3.getParameters()[0].getType()
+        then:
+            parameter3.hasAnnotation(MyEntity.class)
+            parameter3.hasAnnotation(Introspected.class)
+
+        when:
+            def get = ce.findMethod("get").get()
+            def returnType = get.getReturnType()
+        then:
+            returnType.hasAnnotation(MyEntity.class)
+            returnType.hasAnnotation(Introspected.class)
+    }
+
     private void assertListGenericArgument(ClassElement type, Closure cl) {
         def arg1 = type.getAllTypeArguments().get(List.class.name).get("E")
         def arg2 = type.getAllTypeArguments().get(Collection.class.name).get("E")
