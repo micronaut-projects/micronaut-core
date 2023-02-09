@@ -76,6 +76,12 @@ public class CorsSimpleRequestTest {
         );
     }
 
+    /**
+     * Test that a simple request is allowed for localhost and origin:any when specifically turned off.
+     * @see <a href="https://github.com/micronaut-projects/micronaut-core/pull/8751">PR-8751</a>
+     *
+     * @throws IOException
+     */
     @Test
     void corsSimpleRequestAllowedForLocalhostAndAnyWhenSpecificallyTurnedOff() throws IOException {
         asserts(SPECNAME,

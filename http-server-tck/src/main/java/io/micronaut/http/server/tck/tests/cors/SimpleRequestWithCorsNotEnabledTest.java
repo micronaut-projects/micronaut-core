@@ -69,6 +69,12 @@ public class SimpleRequestWithCorsNotEnabledTest {
             });
     }
 
+    /**
+     * This test verifies a CORS simple request is allowed when invoked against a Micronaut application running in localhost without cors enabled but with localhost-pass-through switched on.
+     * @see <a href="https://github.com/micronaut-projects/micronaut-core/pull/8751">PR-8751</a>
+     *
+     * @throws IOException
+     */
     @Test
     void corsSimpleRequestAllowedForLocalhostAndAnyWhenConfiguredToAllowIt() throws IOException {
         asserts(SPECNAME,

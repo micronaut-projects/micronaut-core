@@ -684,6 +684,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
 
         /**
          * @return Whether localhost pass-through is enabled. Defaults to {@value #DEFAULT_LOCALHOST_PASS_THROUGH}.
+         * @since 3.8.5
          */
         public boolean isLocalhostPassThrough() {
             return localhostPassThrough;
@@ -722,6 +723,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
          * Setting this to true will allow requests to be made to localhost from any origin.
          *
          * @param localhostPassThrough True if localhost pass-through is enabled
+         * @since 3.8.5
          */
         public void setLocalhostPassThrough(boolean localhostPassThrough) {
             this.localhostPassThrough = localhostPassThrough;
