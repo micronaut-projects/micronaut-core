@@ -105,12 +105,12 @@ public class CorsFilter implements HttpServerFilter {
             if (!validateMethodToMatch(request, corsOriginConfiguration).isPresent()) {
                 return forbidden();
             }
-            if (shouldDenyToPreventDriveByLocalhostAttack(corsOriginConfiguration, request)) {
+            if (!corsConfiguration.isLocalhostPassThrough() && shouldDenyToPreventDriveByLocalhostAttack(corsOriginConfiguration, request)) {
                 LOG.trace("The resolved configuration allows any origin. To prevent drive-by-localhost attacks the request is forbidden");
                 return forbidden();
             }
             return Publishers.then(chain.proceed(request), resp -> decorateResponseWithHeaders(request, resp, corsOriginConfiguration));
-        } else if (shouldDenyToPreventDriveByLocalhostAttack(origin, request)) {
+        } else if (!corsConfiguration.isLocalhostPassThrough() && shouldDenyToPreventDriveByLocalhostAttack(origin, request)) {
             LOG.trace("the request specifies an origin different than localhost. To prevent drive-by-localhost attacks the request is forbidden");
             return forbidden();
         }
