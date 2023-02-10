@@ -4,9 +4,12 @@ import org.junit.platform.suite.api.SelectPackages;
 import org.junit.platform.suite.api.Suite;
 import org.junit.platform.suite.api.SuiteDisplayName;
 
+/**
+ * <a href="https://openjdk.org/groups/net/httpclient/intro.html">Java HTTP Client</a>
+ */
 @Suite
 @SelectPackages("io.micronaut.http.client.tck.tests")
-@SuiteDisplayName("HTTP Client TCK for Java 11 based client")
+@SuiteDisplayName("HTTP Client TCK for the HTTP Client Implementation based on Java HTTP Client")
 public class JavanetHttpMethodTests {
 }
 
