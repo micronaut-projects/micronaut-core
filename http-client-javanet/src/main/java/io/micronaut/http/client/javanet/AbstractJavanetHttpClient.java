@@ -23,7 +23,6 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -32,10 +31,11 @@ import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
-import io.micronaut.http.client.ServiceHttpClientConfiguration;
 import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.context.ContextPathUtils;
 import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.http.ssl.SslConfigurationException;
 import org.slf4j.Logger;
@@ -51,7 +51,6 @@ import java.net.InetSocketAddress;
 import java.net.PasswordAuthentication;
 import java.net.ProxySelector;
 import java.net.SocketAddress;
-import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -175,15 +174,6 @@ abstract class AbstractJavanetHttpClient {
         }
     }
 
-    // TODO: Extract from DefaultHttpClient
-    static void customizeException0(HttpClientConfiguration configuration, String informationalServiceId, HttpClientException exc) {
-        if (informationalServiceId != null) {
-            exc.setServiceId(informationalServiceId);
-        } else if (configuration instanceof ServiceHttpClientConfiguration clientConfiguration) {
-            exc.setServiceId(clientConfiguration.getServiceId());
-        }
-    }
-
     protected <O> HttpResponse<O> getConvertedResponse(java.net.http.HttpResponse<byte[]> httpResponse, @NonNull Argument<O> bodyType) {
         return new HttpResponse<O>() {
             @Override
@@ -256,32 +246,16 @@ abstract class AbstractJavanetHttpClient {
                     HttpCookie newCookie = HttpCookieUtils.of(cookie, request, server);
                     cookieManager.getCookieStore().add(server.getURI(), newCookie);
                 });
-                return server.resolve(prependContextPath(request.getUri()));
+
+                try {
+                    return server.resolve(ContextPathUtils.prepend(request.getUri(), contextPath));
+                } catch (URISyntaxException e) {
+                    throw HttpClientExceptionUtils.populateServiceId(new HttpClientException("Failed to construct the request URI", e), clientId, configuration);
+                }
             })
             .map(uri -> HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry).build());
     }
 
-    /**
-     * @param requestURI The request URI
-     * @return A URI that is prepended with the contextPath, if set
-     */
-    // TODO: Extract from DefaultHttpClient
-    protected URI prependContextPath(URI requestURI) {
-        if (StringUtils.isNotEmpty(contextPath)) {
-            try {
-                return new URI(StringUtils.prependUri(contextPath, requestURI.toString()));
-            } catch (URISyntaxException e) {
-                throw customizeException(new HttpClientException("Failed to construct the request URI", e));
-            }
-        }
-        return requestURI;
-    }
-
-    // TODO: Extract from DefaultHttpClient
-    protected <E extends HttpClientException> E customizeException(E exc) {
-        customizeException0(configuration, clientId, exc);
-        return exc;
-    }
 
     @SuppressWarnings("java:S4830") // This is explicitly to turn security off when isInsecureTrustAllCertificates
     private static class TrustAllTrustManager implements X509TrustManager {

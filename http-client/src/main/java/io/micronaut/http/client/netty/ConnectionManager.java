@@ -24,6 +24,7 @@ import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
@@ -357,7 +358,7 @@ class ConnectionManager {
             sslCtx = sslContext;
             //Allow https requests to be sent if SSL is disabled but a proxy is present
             if (sslCtx == null && !configuration.getProxyAddress().isPresent()) {
-                throw customizeException(new HttpClientException("Cannot send HTTPS request. SSL is disabled"));
+                throw decorate(new HttpClientException("Cannot send HTTPS request. SSL is disabled"));
             }
         } else {
             sslCtx = null;
@@ -485,11 +486,6 @@ class ConnectionManager {
         });
     }
 
-    private <E extends HttpClientException> E customizeException(E exc) {
-        DefaultHttpClient.customizeException0(configuration, informationalServiceId, exc);
-        return exc;
-    }
-
     private Http2FrameCodec makeFrameCodec() {
         Http2FrameCodecBuilder builder = Http2FrameCodecBuilder.forClient();
         configuration.getLogLevel().ifPresent(logLevel -> {
@@ -498,7 +494,7 @@ class ConnectionManager {
                     io.netty.handler.logging.LogLevel.valueOf(logLevel.name());
                 builder.frameLogger(new Http2FrameLogger(nettyLevel, DefaultHttpClient.class));
             } catch (IllegalArgumentException e) {
-                throw customizeException(new HttpClientException("Unsupported log level: " + logLevel));
+                throw decorate(new HttpClientException("Unsupported log level: " + logLevel));
             }
         });
         return builder.build();
@@ -533,7 +529,7 @@ class ConnectionManager {
                     io.netty.handler.logging.LogLevel.valueOf(logLevel.name());
                 ch.pipeline().addLast(new LoggingHandler(DefaultHttpClient.class, nettyLevel));
             } catch (IllegalArgumentException e) {
-                throw customizeException(new HttpClientException("Unsupported log level: " + logLevel));
+                throw decorate(new HttpClientException("Unsupported log level: " + logLevel));
             }
         });
     }
@@ -598,6 +594,10 @@ class ConnectionManager {
         });
     }
 
+    private <E extends HttpClientException> E decorate(E exc) {
+        return HttpClientExceptionUtils.populateServiceId(exc, informationalServiceId, configuration);
+    }
+
     /**
      * Initializer for TLS channels. After ALPN we will proceed either with
      * {@link #initHttp1(Channel)} or {@link #initHttp2(Pool, Channel, NettyClientCustomizer)}.
@@ -645,7 +645,7 @@ class ConnectionManager {
                                 ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
                             } else {
                                 ctx.close();
-                                throw customizeException(new HttpClientException("Unknown Protocol: " + protocol));
+                                throw decorate(new HttpClientException("Unknown Protocol: " + protocol));
                             }
                         }
 
@@ -835,7 +835,7 @@ class ConnectionManager {
                 } else {
                     wrapped = new HttpClientException("Connect Error: " + error.getMessage(), error);
                 }
-                if (pending.tryEmitError(customizeException(wrapped)) == Sinks.EmitResult.OK) {
+                if (pending.tryEmitError(decorate(wrapped)) == Sinks.EmitResult.OK) {
                     // no need to log
                     return;
                 }

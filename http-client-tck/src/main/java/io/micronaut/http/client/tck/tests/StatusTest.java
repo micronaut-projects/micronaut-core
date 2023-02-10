@@ -22,6 +22,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.annotation.Status;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
@@ -69,6 +70,18 @@ public class StatusTest {
     }
 
     @Test
+    void atStatus() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/status/at-status"),
+            (server, request) ->
+                AssertionUtils.assertThrows(server, request,
+                    HttpResponseAssertion.builder()
+                        .status(HttpStatus.I_AM_A_TEAPOT)
+                        .build())
+        );
+    }
+
+    @Test
     void exceptionStatus() throws IOException {
         asserts(SPEC_NAME,
             HttpRequest.GET("/status/exception-status"),
@@ -86,6 +99,11 @@ public class StatusTest {
         @Get("/http-status")
         HttpStatus status() {
             return HttpStatus.I_AM_A_TEAPOT;
+        }
+
+        @Get("/at-status")
+        @Status(HttpStatus.I_AM_A_TEAPOT)
+        void atstatus() {
         }
 
         @Get("/response-status")
