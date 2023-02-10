@@ -51,7 +51,7 @@ public final class AssertionUtils {
                                     @NonNull HttpRequest<?> request,
                                     @NonNull HttpResponseAssertion assertion) {
         Executable e = assertion.getBody() != null ?
-            () -> server.exchange(request, String.class) :
+            () -> server.exchange(request, assertion.getBody().getBodyType()) :
             () -> server.exchange(request);
         HttpClientResponseException thrown = Assertions.assertThrows(HttpClientResponseException.class, e);
         HttpResponse<?> response = thrown.getResponse();
