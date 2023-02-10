@@ -10,6 +10,7 @@ import org.junit.platform.suite.api.SuiteDisplayName;
 @Suite
 @SelectPackages("io.micronaut.http.client.tck.tests")
 @SuiteDisplayName("HTTP Client TCK for the HTTP Client Implementation based on Java HTTP Client")
+@SuppressWarnings("java:S2187") // This runs a suite of tests, but has no tests of its own
 public class JavanetHttpMethodTests {
 }
 
