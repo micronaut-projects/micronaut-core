@@ -103,6 +103,7 @@ class RedirectTest {
     }
 
     @Test
+    @SuppressWarnings("java:S3655")
     void clientRelativeUriRedirectAbsolute() throws IOException {
         try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
              HttpClient client = server.getApplicationContext().createBean(HttpClient.class, server.getURL().get() + "/redirect")) {
@@ -113,6 +114,7 @@ class RedirectTest {
     }
 
     @Test
+    @SuppressWarnings("java:S3655")
     void hostHeaderIsCorrectForRedirect() throws IOException {
         try (ServerUnderTest otherServer = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME, Collections.singletonMap("redirect.server", "true"))) {
             int otherPort = otherServer.getPort().get();
@@ -140,6 +142,7 @@ class RedirectTest {
         );
     }
 
+    @SuppressWarnings("java:S3655")
     private LoadBalancer relativeLoadBalancer(ServerUnderTest server, String path) {
         return new LoadBalancer() {
             @Override
