@@ -105,12 +105,12 @@ public class CorsFilter implements HttpServerFilter {
             if (!validateMethodToMatch(request, corsOriginConfiguration).isPresent()) {
                 return forbidden();
             }
-            if (!corsConfiguration.isLocalhostPassThrough() && shouldDenyToPreventDriveByLocalhostAttack(corsOriginConfiguration, request)) {
+            if (shouldDenyToPreventDriveByLocalhostAttack(corsOriginConfiguration, request)) {
                 LOG.trace("The resolved configuration allows any origin. To prevent drive-by-localhost attacks the request is forbidden");
                 return forbidden();
             }
             return Publishers.then(chain.proceed(request), resp -> decorateResponseWithHeaders(request, resp, corsOriginConfiguration));
-        } else if (!corsConfiguration.isLocalhostPassThrough() && shouldDenyToPreventDriveByLocalhostAttack(origin, request)) {
+        } else if (shouldDenyToPreventDriveByLocalhostAttack(origin, request)) {
             LOG.trace("the request specifies an origin different than localhost. To prevent drive-by-localhost attacks the request is forbidden");
             return forbidden();
         }
@@ -126,6 +126,9 @@ public class CorsFilter implements HttpServerFilter {
      */
     protected boolean shouldDenyToPreventDriveByLocalhostAttack(@NonNull CorsOriginConfiguration corsOriginConfiguration,
                                                                 @NonNull HttpRequest<?> request) {
+        if (corsConfiguration.isLocalhostPassThrough()) {
+            return false;
+        }
         if (httpHostResolver == null) {
             return false;
         }
@@ -148,6 +151,9 @@ public class CorsFilter implements HttpServerFilter {
      */
     protected boolean shouldDenyToPreventDriveByLocalhostAttack(@NonNull String origin,
                                                                 @NonNull HttpRequest<?> request) {
+        if (corsConfiguration.isLocalhostPassThrough()) {
+            return false;
+        }
         if (httpHostResolver == null) {
             return false;
         }
