@@ -32,6 +32,7 @@ import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
+import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.json.JsonMapper;
@@ -131,7 +132,7 @@ public class JavanetHttpClient extends AbstractJavanetHttpClient implements Http
                 LOG.error("Client {} Received HTTP Response: {} {}", clientId, netResponse.statusCode(), netResponse.uri());
                 boolean errorStatus = netResponse.statusCode() >= 400;
                 if (errorStatus) {
-                    throw customizeException(new HttpClientResponseException(HttpStatus.valueOf(netResponse.statusCode()).getReason(), getConvertedResponse(netResponse, bodyType)));
+                    throw HttpClientExceptionUtils.populateServiceId(new HttpClientResponseException(HttpStatus.valueOf(netResponse.statusCode()).getReason(), getConvertedResponse(netResponse, bodyType)), clientId, configuration);
                 }
                 return getConvertedResponse(netResponse, bodyType);
             });

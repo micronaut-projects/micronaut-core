@@ -26,6 +26,7 @@ import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import org.slf4j.Logger;
@@ -73,7 +74,7 @@ public class JavanetBlockingHttpClient extends AbstractJavanetHttpClient impleme
                 if (LOG.isErrorEnabled()) {
                     LOG.error("Client {} Received HTTP Response: {} {}", clientId, httpResponse.statusCode(), httpResponse.uri());
                 }
-                throw customizeException(new HttpClientResponseException(HttpStatus.valueOf(httpResponse.statusCode()).getReason(), getConvertedResponse(httpResponse, bodyType)));
+                throw HttpClientExceptionUtils.populateServiceId(new HttpClientResponseException(HttpStatus.valueOf(httpResponse.statusCode()).getReason(), getConvertedResponse(httpResponse, bodyType)), clientId, configuration);
             }
             return getConvertedResponse(httpResponse, bodyType);
         } catch (IOException | InterruptedException e) {
