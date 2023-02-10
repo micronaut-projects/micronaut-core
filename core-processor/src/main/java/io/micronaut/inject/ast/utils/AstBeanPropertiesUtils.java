@@ -135,7 +135,7 @@ public final class AstBeanPropertiesUtils {
                     // ensure types match
                     ClassElement getterType = value.getter.getGenericReturnType();
                     ClassElement setterType = value.setter.getParameters()[0].getGenericType();
-                    if (!getterType.equals(setterType)) {
+                    if (!getterType.isAssignable(setterType)) {
                         // getter and setter don't match, remove setter
                         value.setter = null;
                         value.type = getterType;
@@ -269,7 +269,7 @@ public final class AstBeanPropertiesUtils {
             beanPropertyData.writeAccessKind = BeanProperties.AccessKind.METHOD;
         }
         if (configuration.isIgnoreSettersWithDifferingType() && beanPropertyData.type != null) {
-            if (setterType != null && !setterType.isAssignable(unwrapType(beanPropertyData.type))) {
+            if (setterType != null && !unwrapType(beanPropertyData.type).isAssignable(setterType)) {
                 beanPropertyData.setter = null; // not a compatible setter
                 beanPropertyData.writeAccessKind = null;
             }

@@ -46,6 +46,53 @@ import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
+    void "test mix getter and setter with interface type"() {
+        def introspection = buildBeanIntrospection('mixed.Pet', '''
+package mixed;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+@Introspected
+class Owner implements IOwner {
+    @Nullable
+    private String name;
+    public String getName() {
+        return name;
+    }
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+interface IOwner {
+    String getName();
+}
+
+@Introspected
+class Pet {
+    private Owner owner;
+    public Owner getOwner() {
+        return owner;
+    }
+    public void setOwner(IOwner owner) {
+        this.owner = (Owner) owner;
+    }
+}
+''')
+        when:
+        def owner = introspection.beanType.classLoader.loadClass('mixed.Owner').newInstance(name:"Fred")
+        def prop = introspection.getRequiredProperty("owner", Object)
+        def pet = introspection.instantiate()
+        prop.set(pet, owner)
+
+        then:'the write method is not considered to match the getter/setter pair'
+        prop.isReadWrite()
+        prop.get(pet).is(owner)
+    }
+
     void "test mix optional getter with setter"() {
         given:
         def introspection = buildBeanIntrospection('mixed.Test', '''
