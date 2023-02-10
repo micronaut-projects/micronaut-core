@@ -5,6 +5,8 @@
 
 * <<virtualThreads, Support for Virtual Threads>>
 
+* <<javanetClient, Additional implementation of the HTTP Client based on Java HTTP Client>>
+
 ==== Injection of Maps
 
 It is now possible to inject a `java.util.Map` of beans where the key is the bean name. The name of the bean is derived from the <<qualifiers, qualifier>> or (if not present) the simple name of the class.
