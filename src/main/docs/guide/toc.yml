@@ -149,6 +149,12 @@ httpServer:
   graphql: GraphQL Support
 httpClient:
   title: The HTTP Client
+  httpClientImplementations:
+    title: HTTP Client Implementations
+    nettyHttpClient: HTTP Client based on Netty
+    javanetClient:
+      title: HTTP Client based on Java HTTP Client
+  lowLevelOrHighLevel: Low-Level and High-Level APIs
   lowLevelHttpClient:
     title: Using the Low-Level HTTP Client
     clientBasics: Sending your first HTTP request
@@ -172,9 +178,6 @@ httpClient:
   clientFilter: HTTP Client Filters
   clientHttp2: HTTP/2 Support
   clientSample: HTTP Client Sample
-  javanetClient:
-    title: Using the JDK HTTP Client
-    unsupportedFeatures: Unsupported Features
 cloud:
   title: Cloud Native Features
   cloudConfiguration:
