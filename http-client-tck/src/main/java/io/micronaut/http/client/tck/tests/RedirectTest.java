@@ -60,7 +60,7 @@ class RedirectTest {
 
     private static final String SPEC_NAME = "RedirectTest";
     private static final String BODY = "It works";
-    private static final BodyAssertion EXPECTED_BODY = BodyAssertion.builder().body(BODY).equals();
+    private static final BodyAssertion<String> EXPECTED_BODY = BodyAssertion.builder().body(BODY).equals();
 
     @Test
     void absoluteRedirection() throws IOException {
