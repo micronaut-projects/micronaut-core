@@ -135,7 +135,7 @@ public final class AstBeanPropertiesUtils {
                     // ensure types match
                     ClassElement getterType = value.getter.getGenericReturnType();
                     ClassElement setterType = value.setter.getParameters()[0].getGenericType();
-                    if (!getterType.isAssignable(setterType)) {
+                    if (isIncompatibleSetterType(setterType, getterType)) {
                         // getter and setter don't match, remove setter
                         value.setter = null;
                         value.type = getterType;
@@ -252,8 +252,9 @@ public final class AstBeanPropertiesUtils {
         BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
         ClassElement paramType = methodElement.getParameters().length == 0 ? PrimitiveElement.BOOLEAN : methodElement.getParameters()[0].getGenericType();
         ClassElement setterType = unwrapType(paramType);
+        ClassElement existingType = beanPropertyData.type != null ? unwrapType(beanPropertyData.type) : null;
         if (setterType != null && beanPropertyData.setter != null) {
-            if (setterType.isAssignable(unwrapType(beanPropertyData.type))) {
+            if (existingType != null && setterType.isAssignable(existingType)) {
                 // Override the setter because the type is higher
                 beanPropertyData.setter = methodElement;
             } else if (beanPropertyData.setter.getDeclaringType().equals(classElement)) {
@@ -269,13 +270,17 @@ public final class AstBeanPropertiesUtils {
             beanPropertyData.writeAccessKind = BeanProperties.AccessKind.METHOD;
         }
         if (configuration.isIgnoreSettersWithDifferingType() && beanPropertyData.type != null) {
-            if (setterType != null && !unwrapType(beanPropertyData.type).isAssignable(setterType)) {
+            if (existingType != null && isIncompatibleSetterType(setterType, existingType)) {
                 beanPropertyData.setter = null; // not a compatible setter
                 beanPropertyData.writeAccessKind = null;
             }
         } else {
             beanPropertyData.type = paramType;
         }
+    }
+
+    private static boolean isIncompatibleSetterType(ClassElement setterType, ClassElement existingType) {
+        return setterType != null && !existingType.isAssignable(setterType) && !setterType.getName().equals(existingType.getName());
     }
 
     private static ClassElement unwrapType(ClassElement type) {
