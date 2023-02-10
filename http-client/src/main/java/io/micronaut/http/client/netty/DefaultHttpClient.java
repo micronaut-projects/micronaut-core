@@ -2203,8 +2203,7 @@ public class DefaultHttpClient implements
                     msg.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
                 }
 
-                boolean convertBodyWithBodyType = msg.status().code() < 400 ||
-                        (!DefaultHttpClient.this.configuration.isExceptionOnErrorStatus() && bodyType.equalsType(errorType));
+                boolean convertBodyWithBodyType = shouldConvertWithBodyType(msg, DefaultHttpClient.this.configuration, bodyType, errorType);
                 FullNettyClientHttpResponse<O> response
                         = new FullNettyClientHttpResponse<>(msg, mediaTypeCodecRegistry, byteBufferFactory, bodyType, convertBodyWithBodyType, conversionService);
 
@@ -2232,6 +2231,17 @@ public class DefaultHttpClient implements
                     }
                 });
             }
+        }
+
+        private static <O, E> boolean shouldConvertWithBodyType(FullHttpResponse msg,
+                                                                HttpClientConfiguration configuration,
+                                                                Argument<O> bodyType,
+                                                                Argument<E> errorType) {
+            if (msg.status().code() < 400) {
+                return true;
+            }
+            return !configuration.isExceptionOnErrorStatus() && bodyType.equalsType(errorType);
+
         }
 
         /**

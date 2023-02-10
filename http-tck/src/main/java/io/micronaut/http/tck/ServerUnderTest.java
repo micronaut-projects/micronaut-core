@@ -63,12 +63,38 @@ public interface ServerUnderTest extends ApplicationContextProvider, Closeable, 
      * Perform an HTTP request for the given request against the server under test and returns the full HTTP response
      * @param request  The {@link HttpRequest} to execute
      * @param bodyType The body type
+     * @param errorType The error type
+     * @param <I>     The request body type
+     * @param <O>     The response body type
+     * @param <E>     The error body type
+     * @return The full {@link HttpResponse} object
+     * @throws HttpClientResponseException when an error status is returned
+     */
+    default <I, O, E> HttpResponse<O> exchange(HttpRequest<I> request, Class<O> bodyType, Class<E> errorType) {
+        return exchange(request, Argument.of(bodyType), Argument.of(errorType));
+    }
+
+    /*
+     * Perform an HTTP request for the given request against the server under test and returns the full HTTP response
+     * @param request  The {@link HttpRequest} to execute
+     * @param bodyType The body type
      * @param <I>     The request body type
      * @param <O>     The response body type
      * @return The full {@link HttpResponse} object
      * @throws HttpClientResponseException when an error status is returned
      */
     <I, O> HttpResponse<O> exchange(HttpRequest<I> request, Argument<O> bodyType);
+
+    /*
+     * Perform an HTTP request for the given request against the server under test and returns the full HTTP response
+     * @param request  The {@link HttpRequest} to execute
+     * @param bodyType The body type
+     * @param <I>     The request body type
+     * @param <O>     The response body type
+     * @return The full {@link HttpResponse} object
+     * @throws HttpClientResponseException when an error status is returned
+     */
+    <I, O, E> HttpResponse<O> exchange(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType);
 
     @NonNull
     default Optional<Integer> getPort() {
