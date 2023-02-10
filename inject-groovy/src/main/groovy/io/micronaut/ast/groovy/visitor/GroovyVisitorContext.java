@@ -194,8 +194,8 @@ public class GroovyVisitorContext implements VisitorContext {
 
     @Override
     public void fail(String message, @Nullable Element element) {
-        if (element instanceof AbstractGroovyElement) {
-            AstMessageUtils.error(sourceUnit, ((AbstractGroovyElement) element).getNativeType(), message);
+        if (element instanceof AbstractGroovyElement abstractGroovyElement) {
+            AstMessageUtils.error(sourceUnit, abstractGroovyElement.getNativeType().annotatedNode(), message);
         } else {
             AstMessageUtils.error(sourceUnit, null, message);
         }
@@ -207,8 +207,8 @@ public class GroovyVisitorContext implements VisitorContext {
 
     @Override
     public void warn(String message, @Nullable Element element) {
-        if (element instanceof AbstractGroovyElement) {
-            AstMessageUtils.warning(sourceUnit, ((AbstractGroovyElement) element).getNativeType(), message);
+        if (element instanceof AbstractGroovyElement abstractGroovyElement) {
+            AstMessageUtils.warning(sourceUnit, abstractGroovyElement.getNativeType().annotatedNode(), message);
         } else {
             AstMessageUtils.warning(sourceUnit, null, message);
         }

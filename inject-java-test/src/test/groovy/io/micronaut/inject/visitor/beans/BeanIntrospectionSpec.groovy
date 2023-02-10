@@ -830,7 +830,6 @@ public record Foo(int x, int y){
         obj.y() == 10
     }
 
-    @Requires({ jvm.isJava14Compatible() })
     void "test serializing records respects json annotations"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('json.test.Foo', '''
@@ -1903,11 +1902,11 @@ public class Test {
     int num;
     String str;
 
+    @Creator
     public <T extends Enum<T>> Test(int num, String str, Class<T> enumClass) {
         this(num, str + enumClass.getName());
     }
 
-    @Creator
     public <T extends Enum<T>> Test(int num, String str) {
         this.num = num;
         this.str = str;
@@ -1920,14 +1919,46 @@ public class Test {
         introspection != null
     }
 
+    void "test annotation metadata present on deep type parameters"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
+package test;
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import java.util.List;
+import java.util.Set;
+
+@Introspected
+public class Test {
+    List<@Size(min=1, max=2) List<@NotEmpty List<@NotNull String>>> deepList;
+    List<List<List<List<List<List<String>>>>>> deepList2;
+
+    Test(List<List<List<String>>> deepList) { this.deepList = deepList; }
+    List<List<List<String>>> getDeepList() { return deepList; }
+    List<List<List<List<List<List<String>>>>>> getDeepList2() { return deepList2; }
+}
+''')
+        expect:
+        introspection != null
+        def property = introspection.getProperty("deepList").get().asArgument()
+        property.getTypeParameters().length == 1
+        def param1 = property.getTypeParameters()[0]
+        param1.getTypeParameters().length == 1
+        def param2 = param1.getTypeParameters()[0]
+        param2.getTypeParameters().length == 1
+        def param3 = param2.getTypeParameters()[0]
+
+        property.getAnnotationMetadata().getAnnotationNames().size() == 0
+        param1.getAnnotationMetadata().getAnnotationNames().size() == 1
+        param1.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.Size$List']
+        param2.getAnnotationMetadata().getAnnotationNames().size() == 1
+        param2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
+        param3.getAnnotationMetadata().getAnnotationNames().size() == 1
+        param3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
+    }
+
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2083')
     void "test class references in constructor arguments"() {
         given:
-//        TraceClassVisitor traceClassVisitor =
-//                new TraceClassVisitor(null, new ASMifier(), new PrintWriter(System.out));
-//        new ClassReader('io.micronaut.inject.visitor.beans.TestConstructorIntrospection')
-//                .accept(traceClassVisitor, ClassReader.EXPAND_FRAMES)
-
         BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
 package test;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
@@ -1951,7 +1982,7 @@ class Test {
     }
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/1645")
-    void "test recusive generics 2"() {
+    void "test recursive generics 2"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
 package test;

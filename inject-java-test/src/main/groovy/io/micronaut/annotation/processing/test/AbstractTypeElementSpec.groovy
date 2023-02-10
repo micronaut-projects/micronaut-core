@@ -571,7 +571,7 @@ class Test {
             def name = freeVar.variableName
             if (typeVarsAsDeclarations) {
                 def bounds = freeVar.bounds
-                if (reconstructTypeSignature(bounds[0]) != 'Object') {
+                if ( reconstructTypeSignature(bounds[0]) != 'Object') {
                     name += bounds.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", " extends ", ""))
                 }
             }
@@ -586,12 +586,13 @@ class Test {
                 return we.upperBounds.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", "? extends ", ""))
             }
         } else {
-            def boundTypeArguments = classElement.getBoundGenericTypes()
-            if (boundTypeArguments.isEmpty()) {
+            def typeArguments = classElement.getTypeArguments().values()
+            if (typeArguments.isEmpty()) {
+                return classElement.getSimpleName()
+            } else if (typeArguments.stream().allMatch { it.isRawType() }) {
                 return classElement.getSimpleName()
             } else {
-                return classElement.getSimpleName() +
-                        boundTypeArguments.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(", ", "<", ">"))
+                return classElement.getSimpleName() + typeArguments.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(", ", "<", ">"))
             }
         }
     }

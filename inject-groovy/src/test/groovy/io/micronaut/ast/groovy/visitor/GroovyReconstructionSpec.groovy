@@ -7,7 +7,6 @@ import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.WildcardElement
-import spock.lang.PendingFeature
 import spock.lang.Unroll
 
 import java.util.stream.Collectors
@@ -52,12 +51,14 @@ class GroovyReconstructionSpec extends AbstractBeanDefinitionSpec {
                 return we.upperBounds.stream().map(GroovyReconstructionSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", "? extends ", ""))
             }
         } else {
-            def boundTypeArguments = classElement.getBoundGenericTypes()
-            if (boundTypeArguments.isEmpty()) {
+            def typeArguments = classElement.getTypeArguments().values()
+            if (typeArguments.isEmpty()) {
+                return classElement.getSimpleName()
+            } else if (typeArguments.stream().allMatch { it.isRawType() }) {
                 return classElement.getSimpleName()
             } else {
                 return classElement.getSimpleName() +
-                        boundTypeArguments.stream().map(GroovyReconstructionSpec::reconstructTypeSignature).collect(Collectors.joining(", ", "<", ">"))
+                        typeArguments.stream().map(GroovyReconstructionSpec::reconstructTypeSignature).collect(Collectors.joining(", ", "<", ">"))
             }
         }
     }
@@ -80,18 +81,43 @@ class Test<T> {
         reconstructTypeSignature(field.genericType) == fieldType
 
         where:
-        fieldType << [
+            fieldType << [
                 'String',
+                'byte[]',
+                'byte[][]',
                 'List<String>',
                 'List<T>',
                 'List<T[]>',
+                'List<T[][]>',
                 'List<? extends CharSequence>',
                 'List<? super String>',
                 'List<? extends T[]>',
+                'List<? extends T[][]>',
+                'List<? extends T[][][]>',
                 'List<? extends List<? extends T[]>[]>',
+                'List<? extends List<? extends T[]>[][]>',
+                'List<? extends List<? extends T[][]>[][]>',
                 'List<? extends List>',
                 'List<? extends List<?>>',
-        ]
+            ]
+    }
+
+    def 'field type is wildcard extending byte[]'() {
+        given:
+        def element = buildClassElement("""
+package example;
+
+import java.util.*;
+
+class Test<T> {
+    List<? extends byte[]> field;
+}
+""")
+        def field = element.getFields()[0]
+
+        expect:
+        // Wildcards with arrays not supported yet
+        reconstructTypeSignature(field.genericType) == 'List<byte[]>'
     }
 
     @Unroll("super type is #superType")
@@ -173,7 +199,7 @@ abstract class Test<A, $decl> {
         decl << [
                 'T',
                 'T extends CharSequence',
-                //'T extends A',
+                'T extends A',
                 'T extends List',
                 'T extends List<?>',
                 'T extends List<T>',
@@ -214,7 +240,6 @@ abstract class Test<A> {
         ]
     }
 
-    @PendingFeature
     @Unroll("field type is #fieldType")
     def 'bound field type'() {
         given:
@@ -223,11 +248,11 @@ package example;
 
 import java.util.*;
 
-class Wrapper {
-    Test<String> test;
-}
 class Test<T> {
     $fieldType field;
+}
+class Wrapper {
+    Test<String> test;
 }
 """)
         def field = element.getFields()[0].genericType.getFields()[0]
@@ -250,7 +275,7 @@ class Test<T> {
     }
 
     @Unroll("field type is #fieldType")
-    def 'bound field type - bound variables not implemented'() {
+    def 'bound field type 2'() {
         given:
         def element = buildClassElement("""
 package example;
@@ -274,17 +299,16 @@ class Wrapper {
         fieldType                               | expectedType
         'String'                                | 'String'
         'List<String>'                          | 'List<String>'
-        'List<T>'                               | 'List<T>'
-        'List<T[]>'                             | 'List<T[]>'
+        'List<T>'                               | 'List<String>'
+        'List<T[]>'                             | 'List<String[]>'
         'List<? extends CharSequence>'          | 'List<? extends CharSequence>'
         'List<? super String>'                  | 'List<? super String>'
-        'List<? extends T[]>'                   | 'List<? extends T[]>'
-        'List<? extends List<? extends T[]>[]>' | 'List<? extends List<? extends T[]>[]>'
+        'List<? extends T[]>'                   | 'List<? extends String[]>'
+        'List<? extends List<? extends T[]>[]>' | 'List<? extends List<? extends String[]>[]>'
         'List<? extends List>'                  | 'List<? extends List>'
         'List<? extends List<?>>'               | 'List<? extends List<?>>'
     }
 
-    @PendingFeature
     @Unroll("field type is #fieldType")
     def 'bound field type to other variable'() {
         given:
@@ -334,7 +358,9 @@ class Wrapper<U> {
     Test<U> test;
 }
 """)
-        def field = element.getEnclosedElement(ElementQuery.ALL_FIELDS.named(s -> s == 'test')).get()
+
+            def get = element.getEnclosedElement(ElementQuery.ALL_FIELDS.named(s -> s == 'test')).get()
+            def field = get
                 .genericType.getEnclosedElement(ElementQuery.ALL_FIELDS.named(s -> s == 'field')).get()
 
         expect:
@@ -344,12 +370,12 @@ class Wrapper<U> {
         fieldType                               | expectedType
         'String'                                | 'String'
         'List<String>'                          | 'List<String>'
-        'List<T>'                               | 'List<T>'
-        'List<T[]>'                             | 'List<T[]>'
+        'List<T>'                               | 'List<U>'
+        'List<T[]>'                             | 'List<U[]>'
         'List<? extends CharSequence>'          | 'List<? extends CharSequence>'
         'List<? super String>'                  | 'List<? super String>'
-        'List<? extends T[]>'                   | 'List<? extends T[]>'
-        'List<? extends List<? extends T[]>[]>' | 'List<? extends List<? extends T[]>[]>'
+        'List<? extends T[]>'                   | 'List<? extends U[]>'
+        'List<? extends List<? extends T[]>[]>' | 'List<? extends List<? extends U[]>[]>'
         'List<? extends List>'                  | 'List<? extends List>'
         'List<? extends List<?>>'               | 'List<? extends List<?>>'
     }
@@ -389,7 +415,6 @@ class Sub<U> implements Sup<$params> {
         'T'  | 'List<? super U>'   | 'Sup<List<? super U>>'
     }
 
-    @PendingFeature
     def 'bound super type'() {
         given:
         def superElement = buildClassElement("""
@@ -401,7 +426,7 @@ class Sup<$decl> {
 }
 class Sub<U> extends Sup<$params> {
 }
-""").withBoundGenericTypes([ClassElement.of(String)])
+""").withTypeArguments([ClassElement.of(String)])
         def interfaceElement = buildClassElement("""
 package example;
 
@@ -411,7 +436,7 @@ interface Sup<$decl> {
 }
 class Sub<U> implements Sup<$params> {
 }
-""").withBoundGenericTypes([ClassElement.of(String)])
+""").withTypeArguments([ClassElement.of(String)])
 
         expect:
         reconstructTypeSignature(superElement.getSuperType().get()) == expected
@@ -425,7 +450,7 @@ class Sub<U> implements Sup<$params> {
         'T'  | 'List<? super U>'   | 'Sup<List<? super String>>'
     }
 
-    def 'bound super type - binding not implemented'() {
+    def 'bound super type 2'() {
         given:
         def superElement = buildClassElement("""
 package example;
@@ -436,7 +461,7 @@ class Sup<$decl> {
 }
 class Sub<U> extends Sup<$params> {
 }
-""").withBoundGenericTypes([ClassElement.of(String)])
+""").withTypeArguments([ClassElement.of(String)])
         def interfaceElement = buildClassElement("""
 package example;
 
@@ -446,7 +471,7 @@ interface Sup<$decl> {
 }
 class Sub<U> implements Sup<$params> {
 }
-""").withBoundGenericTypes([ClassElement.of(String)])
+""").withTypeArguments([ClassElement.of(String)])
 
         expect:
         reconstructTypeSignature(superElement.getSuperType().get()) == expected
@@ -455,9 +480,9 @@ class Sub<U> implements Sup<$params> {
         where:
         decl | params              | expected
         'T'  | 'String'            | 'Sup<String>'
-        'T'  | 'List<U>'           | 'Sup<List<U>>'
-        'T'  | 'List<? extends U>' | 'Sup<List<? extends U>>'
-        'T'  | 'List<? super U>'   | 'Sup<List<? super U>>'
+        'T'  | 'List<U>'           | 'Sup<List<String>>'
+        'T'  | 'List<? extends U>' | 'Sup<List<? extends String>>'
+        'T'  | 'List<? super U>'   | 'Sup<List<? super String>>'
     }
 
     @Unroll('declaration is #decl')

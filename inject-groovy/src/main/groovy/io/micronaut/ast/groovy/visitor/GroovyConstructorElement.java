@@ -30,19 +30,21 @@ public class GroovyConstructorElement extends GroovyMethodElement implements Con
     /**
      * @param owningType                The owning class
      * @param visitorContext            The visitor context
+     * @param nativeElement      The native element
      * @param methodNode                The {@link ConstructorNode}
      * @param annotationMetadataFactory The annotation metadata
      */
     GroovyConstructorElement(GroovyClassElement owningType,
                              GroovyVisitorContext visitorContext,
+                             GroovyNativeElement nativeElement,
                              ConstructorNode methodNode,
                              ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        super(owningType, visitorContext, methodNode, annotationMetadataFactory);
+        super(owningType, visitorContext, nativeElement, methodNode, annotationMetadataFactory);
     }
 
     @Override
     protected AbstractGroovyElement copyConstructor() {
-        return new GroovyConstructorElement(getOwningType(), visitorContext, (ConstructorNode) getNativeType(), elementAnnotationMetadataFactory);
+        return new GroovyConstructorElement(getOwningType(), visitorContext, getNativeType(), (ConstructorNode) getNativeType().annotatedNode(), elementAnnotationMetadataFactory);
     }
 
     @Override

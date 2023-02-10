@@ -26,7 +26,7 @@ class GroovyClassElementSpec extends AbstractClassElementSpec {
     @Override
     protected List<ClassElement> getClassElements() {
         def visitorContext = new GroovyVisitorContext(Mock(SourceUnit), null)
-        return [new GroovyClassElement(visitorContext, ClassHelper.OBJECT_TYPE, null),
-                new GroovyEnumElement(visitorContext, ClassHelper.Enum_Type, null)]
+        return [new GroovyClassElement(visitorContext, new GroovyNativeElement.Class(ClassHelper.OBJECT_TYPE), null),
+                new GroovyEnumElement(visitorContext, new GroovyNativeElement.Class(ClassHelper.Enum_Type), null)]
     }
 }

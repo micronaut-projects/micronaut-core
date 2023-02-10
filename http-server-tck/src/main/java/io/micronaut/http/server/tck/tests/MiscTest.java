@@ -39,7 +39,6 @@ import java.util.Map;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
 
-
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",

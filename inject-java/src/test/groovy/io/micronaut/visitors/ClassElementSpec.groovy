@@ -982,18 +982,6 @@ class Foo {}
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.typeArguments.get("E").name == 'test.Foo'
     }
 
-    // TODO: Investigate why this fails on JDK 11
-    // com.sun.tools.javac.util.PropagatedException: java.lang.IllegalStateException
-    //     at jdk.compiler/com.sun.tools.javac.api.JavacTaskImpl.prepareCompiler(JavacTaskImpl.java:187)
-    //     at jdk.compiler/com.sun.tools.javac.api.JavacTaskImpl.enter(JavacTaskImpl.java:290)
-    //     at jdk.compiler/com.sun.tools.javac.api.JavacTaskImpl.ensureEntered(JavacTaskImpl.java:481)
-    //     at jdk.compiler/com.sun.tools.javac.model.JavacElements.ensureEntered(JavacElements.java:779)
-    //     at jdk.compiler/com.sun.tools.javac.model.JavacElements.doGetTypeElement(JavacElements.java:171)
-    //     at jdk.compiler/com.sun.tools.javac.model.JavacElements.getTypeElement(JavacElements.java:160)
-    //     at jdk.compiler/com.sun.tools.javac.model.JavacElements.getTypeElement(JavacElements.java:87)
-    //     at io.micronaut.annotation.processing.GenericUtils.buildGenericTypeArgumentElementInfo(GenericUtils.java:91)
-    //     at io.micronaut.annotation.processing.visitor.JavaClassElement.getSuperType(JavaClassElement.java:127)
-    @IgnoreIf({ Jvm.current.isJava9Compatible() })
     void "test JavaClassElement.getSuperType() with generic types"() {
         given:
         buildBeanDefinition('test.MyBean', '''
@@ -1698,6 +1686,514 @@ class Pet {
         then:
         returnType.hasAnnotation(Introspected)
         genericReturnType.hasAnnotation(Introspected)
+    }
+
+    void "test annotation metadata present on deep type parameters for field"() {
+        ClassElement ce = buildClassElement('''
+package test;
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import java.util.List;
+
+class Test {
+    List<@Size(min=1, max=2) List<@NotEmpty List<@NotNull String>>> deepList;
+}
+''')
+        expect:
+            def field = ce.getFields().find { it.name == "deepList"}
+            def fieldType = field.getGenericType()
+
+            fieldType.getAnnotationMetadata().getAnnotationNames().size() == 0
+
+            assertListGenericArgument(fieldType, { ClassElement listArg1 ->
+                assert listArg1.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.Size$List']
+                assertListGenericArgument(listArg1, { ClassElement listArg2 ->
+                    assert listArg2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
+                    assertListGenericArgument(listArg2, { ClassElement listArg3 ->
+                        assert listArg3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
+                    })
+                })
+            })
+
+            def level1 = fieldType.getTypeArguments()["E"]
+            level1.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.Size$List']
+            def level2 = level1.getTypeArguments()["E"]
+            level2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
+            def level3 = level2.getTypeArguments()["E"]
+            level3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
+    }
+
+    void "test annotation metadata present on deep type parameters for method"() {
+        ClassElement ce = buildClassElement('''
+package test;
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import java.util.List;
+
+class Test {
+    List<@Size(min=1, max=2) List<@NotEmpty List<@NotNull String>>> deepList() {
+        return null;
+    }
+}
+''')
+        expect:
+            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("deepList")).get()
+            def theType = method.getGenericReturnType()
+
+            theType.getAnnotationMetadata().getAnnotationNames().size() == 0
+
+            assertListGenericArgument(theType, { ClassElement listArg1 ->
+                assert listArg1.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.Size$List']
+                assertListGenericArgument(listArg1, { ClassElement listArg2 ->
+                    assert listArg2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
+                    assertListGenericArgument(listArg2, { ClassElement listArg3 ->
+                        assert listArg3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
+                    })
+                })
+            })
+
+            def level1 = theType.getTypeArguments()["E"]
+            level1.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.Size$List']
+            def level2 = level1.getTypeArguments()["E"]
+            level2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
+            def level3 = level2.getTypeArguments()["E"]
+            level3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
+    }
+
+    void "test recursive generic type parameter"() {
+        given:
+            ClassElement ce = buildClassElement('''\
+package test;
+
+final class TrackedSortedSet<T extends java.lang.Comparable<? super T>> {
+}
+
+''')
+        expect:
+            def typeArguments = ce.getTypeArguments()
+            typeArguments.size() == 1
+            def typeArgument = typeArguments.get("T")
+            typeArgument.name == "java.lang.Comparable"
+            def nextTypeArguments = typeArgument.getTypeArguments()
+            def nextTypeArgument = nextTypeArguments.get("T")
+            nextTypeArgument.name == "java.lang.Comparable"
+            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+            def nextNextTypeArgument = nextNextTypeArguments.get("T")
+            nextNextTypeArgument.name == "java.lang.Object"
+    }
+
+    void "test recursive generic type parameter 2"() {
+        given:
+            ClassElement ce = buildClassElement('''\
+package test;
+
+final class Test<T extends Test> { // Missing argument
+}
+
+''')
+        expect:
+            def typeArguments = ce.getTypeArguments()
+            typeArguments.size() == 1
+            def typeArgument = typeArguments.get("T")
+            typeArgument.name == "test.Test"
+            def nextTypeArguments = typeArgument.getTypeArguments()
+            def nextTypeArgument = nextTypeArguments.get("T")
+            nextTypeArgument.name == "java.lang.Object"
+    }
+
+    void "test recursive generic type parameter 3"() {
+        given:
+            ClassElement ce = buildClassElement('''\
+package test;
+
+final class Test<T extends Test<T>> {
+}
+
+''')
+        expect:
+            def typeArguments = ce.getTypeArguments()
+            typeArguments.size() == 1
+            def typeArgument = typeArguments.get("T")
+            typeArgument.name == "test.Test"
+            def nextTypeArguments = typeArgument.getTypeArguments()
+            def nextTypeArgument = nextTypeArguments.get("T")
+            nextTypeArgument.name == "java.lang.Object"
+    }
+
+    void "test recursive generic type parameter 4"() {
+        given:
+            ClassElement ce = buildClassElement('''\
+package test;
+
+final class Test<T extends Test<?>> {
+}
+
+''')
+        expect:
+            def typeArguments = ce.getTypeArguments()
+            typeArguments.size() == 1
+            def typeArgument = typeArguments.get("T")
+            typeArgument.name == "test.Test"
+            def nextTypeArguments = typeArgument.getTypeArguments()
+            def nextTypeArgument = nextTypeArguments.get("T")
+            nextTypeArgument.name == "java.lang.Object"
+    }
+
+    void "test recursive generic method return"() {
+        given:
+            ClassElement ce = buildClassElement('''\
+package test;
+
+import org.hibernate.SessionFactory;
+import org.hibernate.engine.spi.SessionFactoryDelegatingImpl;
+
+class MyFactory {
+
+    SessionFactory sessionFactory() {
+        return new SessionFactoryDelegatingImpl(null);
+    }
+}
+
+''')
+        expect:
+            def sessionFactoryMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("sessionFactory")).get()
+            def withOptionsMethod = sessionFactoryMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("withOptions")).get()
+            def typeArguments = withOptionsMethod.getReturnType().getTypeArguments()
+            typeArguments.size() == 1
+            def typeArgument = typeArguments.get("T")
+            typeArgument.name == "org.hibernate.SessionBuilder"
+            def nextTypeArguments = typeArgument.getTypeArguments()
+            def nextTypeArgument = nextTypeArguments.get("T")
+            nextTypeArgument.name == "java.lang.Object"
+    }
+
+    void "test recursive generic method return 2"() {
+        given:
+            ClassElement ce = buildClassElement('''\
+package test;
+
+class MyFactory {
+
+    MyBean myBean() {
+        return new MyBean();
+    }
+}
+
+interface MyBuilder<T extends MyBuilder> {
+    T build();
+}
+
+class MyBean {
+
+   MyBuilder<test.MyBuilder> myBuilder() {
+       return null;
+   }
+
+}
+
+''')
+        expect:
+            def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
+            def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
+            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
+            typeArguments.size() == 1
+            def typeArgument = typeArguments.get("T")
+            typeArgument.name == "test.MyBuilder"
+            def nextTypeArguments = typeArgument.getTypeArguments()
+            def nextTypeArgument = nextTypeArguments.get("T")
+            nextTypeArgument.name == "test.MyBuilder"
+            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+            def nextNextTypeArgument = nextNextTypeArguments.get("T")
+            nextNextTypeArgument.name == "java.lang.Object"
+    }
+
+    void "test recursive generic method return 3"() {
+        given:
+            ClassElement ce = buildClassElement('''\
+package test;
+
+class MyFactory {
+
+    MyBean myBean() {
+        return new MyBean();
+    }
+}
+
+interface MyBuilder<T extends MyBuilder> {
+    T build();
+}
+
+class MyBean {
+
+   MyBuilder myBuilder() {
+       return null;
+   }
+
+}
+
+''')
+        expect:
+            def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
+            def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
+            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
+            typeArguments.size() == 1
+            def typeArgument = typeArguments.get("T")
+            typeArgument.name == "test.MyBuilder"
+            def nextTypeArguments = typeArgument.getTypeArguments()
+            def nextTypeArgument = nextTypeArguments.get("T")
+            nextTypeArgument.name == "java.lang.Object"
+    }
+
+    void "test recursive generic method return 4"() {
+        given:
+            ClassElement ce = buildClassElement('''\
+package test;
+
+class MyFactory {
+
+    MyBean myBean() {
+        return new MyBean();
+    }
+}
+
+interface MyBuilder<T extends MyBuilder> {
+    T build();
+}
+
+class MyBean {
+
+   MyBuilder<?> myBuilder() {
+       return null;
+   }
+
+}
+
+''')
+        expect:
+            def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
+            def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
+            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
+            typeArguments.size() == 1
+            def typeArgument = typeArguments.get("T")
+            typeArgument.name == "test.MyBuilder"
+            def nextTypeArguments = typeArgument.getTypeArguments()
+            def nextTypeArgument = nextTypeArguments.get("T")
+            nextTypeArgument.name == "test.MyBuilder"
+            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+            def nextNextTypeArgument = nextNextTypeArguments.get("T")
+            nextNextTypeArgument.name == "java.lang.Object"
+    }
+
+    void "test recursive generic method return 5"() {
+        given:
+            ClassElement ce = buildClassElement('''\
+package test;
+
+class MyFactory {
+
+    MyBean myBean() {
+        return new MyBean();
+    }
+}
+
+interface MyBuilder<T extends MyBuilder> {
+    T build();
+}
+
+class MyBean {
+
+   MyBuilder<? extends MyBuilder> myBuilder() {
+       return null;
+   }
+
+}
+
+''')
+        expect:
+            def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
+            def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
+            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
+            typeArguments.size() == 1
+            def typeArgument = typeArguments.get("T")
+            typeArgument.name == "test.MyBuilder"
+            def nextTypeArguments = typeArgument.getTypeArguments()
+            def nextTypeArgument = nextTypeArguments.get("T")
+            nextTypeArgument.name == "test.MyBuilder"
+            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+            def nextNextTypeArgument = nextNextTypeArguments.get("T")
+            nextNextTypeArgument.name == "java.lang.Object"
+    }
+
+    void "test recursive generic method return 6"() {
+        given:
+            ClassElement ce = buildClassElement('''\
+package test;
+
+class MyFactory {
+
+    MyBean myBean() {
+        return new MyBean();
+    }
+}
+
+interface MyBuilder<T extends MyBuilder> {
+    T build();
+}
+
+class MyBean<T extends MyBuilder> {
+
+   MyBuilder<T> myBuilder() {
+       return null;
+   }
+
+}
+
+''')
+        expect:
+            def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
+            def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
+            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
+            typeArguments.size() == 1
+            def typeArgument = typeArguments.get("T")
+            typeArgument.name == "test.MyBuilder"
+            def nextTypeArguments = typeArgument.getTypeArguments()
+            def nextTypeArgument = nextTypeArguments.get("T")
+            nextTypeArgument.name == "test.MyBuilder"
+            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+            def nextNextTypeArgument = nextNextTypeArguments.get("T")
+            nextNextTypeArgument.name == "java.lang.Object"
+    }
+
+    void "test recursive generic method return 7"() {
+        given:
+            ClassElement ce = buildClassElement('''\
+package test;
+
+class MyFactory {
+
+    MyBean myBean() {
+        return new MyBean();
+    }
+}
+
+interface MyBuilder<T extends MyBuilder> {
+    T build();
+}
+
+class MyBean<T extends MyBuilder> {
+
+   MyBuilder<? extends T> myBuilder() {
+       return null;
+   }
+
+}
+
+''')
+        expect:
+            def myBeanMethod = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("myBean")).get()
+            def myBuilderMethod = myBeanMethod.getReturnType().getEnclosedElement(ElementQuery.ALL_METHODS.named("myBuilder")).get()
+            def typeArguments = myBuilderMethod.getReturnType().getTypeArguments()
+            typeArguments.size() == 1
+            def typeArgument = typeArguments.get("T")
+            typeArgument.name == "test.MyBuilder"
+            def nextTypeArguments = typeArgument.getTypeArguments()
+            def nextTypeArgument = nextTypeArguments.get("T")
+            nextTypeArgument.name == "test.MyBuilder"
+            def nextNextTypeArguments = nextTypeArgument.getTypeArguments()
+            def nextNextTypeArgument = nextNextTypeArguments.get("T")
+            nextNextTypeArgument.name == "java.lang.Object"
+    }
+
+    void "test how the annotations from the type are propagated"() {
+        given:
+            ClassElement ce = buildClassElement('''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+import java.util.List;
+import io.micronaut.visitors.Book;
+
+@jakarta.inject.Singleton
+class MyBean {
+
+    @Executable
+    public void saveAll(List<Book> books) {
+    }
+
+    @Executable
+    public <T extends Book> void saveAll2(List<? extends T> book) {
+    }
+
+    @Executable
+    public <T extends Book> void saveAll3(List<T> book) {
+    }
+
+    @Executable
+    public void save2(Book book) {
+    }
+
+    @Executable
+    public <T extends Book> void save3(T book) {
+    }
+
+    @Executable
+    public Book get() {
+        return null;
+    }
+}
+
+''')
+        when:
+            def saveAll = ce.findMethod("saveAll").get()
+            def listTypeArgument = saveAll.getParameters()[0].getType().getTypeArguments(List).get("E")
+        then:
+            listTypeArgument.hasAnnotation(MyEntity.class)
+            listTypeArgument.hasAnnotation(Introspected.class)
+
+        when:
+            def saveAll2 = ce.findMethod("saveAll2").get()
+            def listTypeArgument2 = saveAll2.getParameters()[0].getType().getTypeArguments(List).get("E")
+        then:
+            listTypeArgument2.hasAnnotation(MyEntity.class)
+            listTypeArgument2.hasAnnotation(Introspected.class)
+
+        when:
+            def saveAll3 = ce.findMethod("saveAll3").get()
+            def listTypeArgument3 = saveAll3.getParameters()[0].getType().getTypeArguments(List).get("E")
+        then:
+            listTypeArgument3.hasAnnotation(MyEntity.class)
+            listTypeArgument3.hasAnnotation(Introspected.class)
+
+        when:
+            def save2 = ce.findMethod("save2").get()
+            def parameter2 = save2.getParameters()[0].getType()
+        then:
+            parameter2.hasAnnotation(MyEntity.class)
+            parameter2.hasAnnotation(Introspected.class)
+
+        when:
+            def save3 = ce.findMethod("save3").get()
+            def parameter3 = save3.getParameters()[0].getType()
+        then:
+            parameter3.hasAnnotation(MyEntity.class)
+            parameter3.hasAnnotation(Introspected.class)
+
+        when:
+            def get = ce.findMethod("get").get()
+            def returnType = get.getReturnType()
+        then:
+            returnType.hasAnnotation(MyEntity.class)
+            returnType.hasAnnotation(Introspected.class)
+    }
+
+    private void assertListGenericArgument(ClassElement type, Closure cl) {
+        def arg1 = type.getAllTypeArguments().get(List.class.name).get("E")
+        def arg2 = type.getAllTypeArguments().get(Collection.class.name).get("E")
+        def arg3 = type.getAllTypeArguments().get(Iterable.class.name).get("T")
+        cl.call(arg1)
+        cl.call(arg2)
+        cl.call(arg3)
     }
 
     private void assertMethodsByName(List<MethodElement> allMethods, String name, List<String> expectedDeclaringTypeSimpleNames) {

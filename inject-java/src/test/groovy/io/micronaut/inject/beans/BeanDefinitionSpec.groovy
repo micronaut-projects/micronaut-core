@@ -3,6 +3,7 @@ package io.micronaut.inject.beans
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Order
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Issue
 
@@ -396,6 +397,29 @@ public class NumberThingManager extends AbstractThingManager<NumberThing<?>> {}
         definition.getTypeArguments("test.AbstractThingManager")[0].getTypeVariables().get("T").getType() == Number.class
     }
 
+    void "test building a bean with generics wildcard extending"() {
+        when:
+        def definition = buildBeanDefinition('test.NumberThingManager', '''
+package test;
+
+import jakarta.inject.Singleton;
+
+interface Thing<T> {}
+
+interface NumberThing<T extends Number & Comparable<T>> extends Thing<T> {}
+
+class AbstractThingManager<T extends Thing<?>> {}
+
+@Singleton
+public class NumberThingManager extends AbstractThingManager<NumberThing<? extends Double>> {}
+''')
+
+        then:
+        noExceptionThrown()
+        definition != null
+        definition.getTypeArguments("test.AbstractThingManager")[0].getTypeVariables().get("T").getType() == Double.class
+    }
+
     void "test a bean definition in a package with uppercase letters"() {
         when:
         def definition = buildBeanDefinition('test.A', 'TestBean', '''
@@ -409,5 +433,63 @@ class TestBean {
         then:
         noExceptionThrown()
         definition != null
+    }
+
+    void "test deep type parameters are created in definition"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test','Test','''
+package test;
+import java.util.List;
+
+@jakarta.inject.Singleton
+public class Test {
+    List<List<List<String>>> deepList;
+    public Test(List<List<List<String>>> deepList) { this.deepList = deepList; }
+}
+        ''')
+
+        expect:
+        definition != null
+        def constructor = definition.getConstructor()
+
+        def param = constructor.getArguments()[0]
+        param.getTypeParameters().length == 1
+        def param1 = param.getTypeParameters()[0]
+        param1.getTypeParameters().length == 1
+        def param2 = param1.getTypeParameters()[0]
+        param2.getTypeParameters().length == 1
+        def param3 = param2.getTypeParameters()[0]
+        param3.getType() == String.class
+    }
+
+    void "test annotation metadata present on deep type parameters of definition"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test','Test','''
+package test;
+import javax.validation.constraints.*;
+import java.util.List;
+
+@jakarta.inject.Singleton
+public class Test {
+    public Test(List<@Size(min=1) List<@NotEmpty List<@NotNull String>>> deepList) { }
+}
+        ''')
+
+        when:
+        definition != null
+        def constructor = definition.getConstructor()
+        def param = constructor.getArguments()[0]
+        def param1 = param.getTypeParameters()[0]
+        def param2 = param1.getTypeParameters()[0]
+        def param3 = param2.getTypeParameters()[0]
+
+        then:
+        param.getAnnotationMetadata().getAnnotationNames().size() == 0
+        param1.getAnnotationMetadata().getAnnotationNames().size() == 1
+        param1.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.Size$List']
+        param2.getAnnotationMetadata().getAnnotationNames().size() == 1
+        param2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
+        param3.getAnnotationMetadata().getAnnotationNames().size() == 1
+        param3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
     }
 }

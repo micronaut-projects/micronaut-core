@@ -20,8 +20,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import org.codehaus.groovy.ast.Parameter;
 
 /**
@@ -43,21 +43,23 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
      *
      * @param methodElement             The parent method element
      * @param visitorContext            The visitor context
+     * @param nativeElement             The nativeElement
      * @param parameter                 The parameter
      * @param elementAnnotationMetadata The annotation metadata
      */
     GroovyParameterElement(GroovyMethodElement methodElement,
                            GroovyVisitorContext visitorContext,
+                           GroovyNativeElement nativeElement,
                            Parameter parameter,
                            ElementAnnotationMetadataFactory elementAnnotationMetadata) {
-        super(visitorContext, parameter, elementAnnotationMetadata);
+        super(visitorContext, nativeElement, elementAnnotationMetadata);
         this.parameter = parameter;
         this.methodElement = methodElement;
     }
 
     @Override
     protected AbstractGroovyElement copyConstructor() {
-        return new GroovyParameterElement(methodElement, visitorContext, parameter, elementAnnotationMetadataFactory);
+        return new GroovyParameterElement(methodElement, visitorContext, getNativeType(), parameter, elementAnnotationMetadataFactory);
     }
 
     @Override
@@ -83,11 +85,10 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     @Nullable
     @Override
     public ClassElement getGenericType() {
-        if (this.genericType == null) {
-            ClassElement type = getType();
-            this.genericType = methodElement.getGenericElement(parameter.getType(), type);
+        if (genericType == null) {
+            genericType = newClassElement(parameter.getType(), methodElement.getTypeArguments());
         }
-        return this.genericType;
+        return genericType;
     }
 
     @Override
@@ -106,11 +107,6 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     }
 
     @Override
-    public Parameter getNativeType() {
-        return parameter;
-    }
-
-    @Override
     public GroovyMethodElement getMethodElement() {
         return methodElement;
     }
@@ -118,10 +114,10 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     @NonNull
     @Override
     public ClassElement getType() {
-        if (this.typeElement == null) {
-            this.typeElement = visitorContext.getElementFactory().newClassElement(parameter.getType(), elementAnnotationMetadataFactory);
+        if (typeElement == null) {
+            typeElement = newClassElement(parameter.getType());
         }
-        return this.typeElement;
+        return typeElement;
     }
 
 }

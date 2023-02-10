@@ -17,9 +17,9 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.EnumElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -66,6 +66,11 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
     }
 
     @Override
+    protected JavaClassElement copyThis() {
+        return new JavaEnumElement(classElement, elementAnnotationMetadataFactory, visitorContext, arrayDimensions);
+    }
+
+    @Override
     public List<String> values() {
         if (values != null) {
             return values;
@@ -107,4 +112,5 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
     public ClassElement withArrayDimensions(int arrayDimensions) {
         return new JavaEnumElement(classElement, elementAnnotationMetadataFactory, visitorContext, arrayDimensions);
     }
+
 }

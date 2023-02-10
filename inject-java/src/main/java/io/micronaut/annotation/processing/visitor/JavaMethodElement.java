@@ -21,12 +21,12 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
@@ -42,7 +42,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * A method element returning data from a {@link ExecutableElement}.
@@ -104,9 +103,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
         final TypeMirror receiverType = executableElement.getReceiverType();
         if (receiverType != null) {
             if (receiverType.getKind() != TypeKind.NONE) {
-                final ClassElement classElement = mirrorToClassElement(receiverType,
-                    visitorContext,
-                    owningType.getGenericTypeInfo());
+                final ClassElement classElement = newClassElement(receiverType, getDeclaringType().getTypeArguments());
                 return Optional.of(classElement);
             }
         }
@@ -119,11 +116,8 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
         final List<? extends TypeMirror> thrownTypes = executableElement.getThrownTypes();
         if (!thrownTypes.isEmpty()) {
             return thrownTypes.stream()
-                .map(tm -> mirrorToClassElement(
-                    tm,
-                    visitorContext,
-                    owningType.getGenericTypeInfo()
-                )).toArray(ClassElement[]::new);
+                .map(tm -> newClassElement(tm, getDeclaringType().getTypeArguments()))
+                    .toArray(ClassElement[]::new);
         }
 
         return ClassElement.ZERO_CLASS_ELEMENTS;
@@ -132,24 +126,6 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     @Override
     public boolean isDefault() {
         return executableElement.isDefault();
-    }
-
-    @Override
-    public boolean overrides(MethodElement overridden) {
-//        if (this.equals(overridden) || isStatic() || overridden.isStatic()) {
-//            return false;
-//        }
-//        if (overridden instanceof JavaMethodElement) {
-//            boolean overrides = visitorContext.getElements().overrides(
-//                executableElement,
-//                ((JavaMethodElement) overridden).executableElement,
-//                owningType.classElement
-//            );
-//            if (overrides) {
-//                return true;
-//            }
-//        }
-        return MethodElement.super.overrides(overridden);
     }
 
     @Override
@@ -163,26 +139,26 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     @NonNull
     @Override
     public ClassElement getGenericReturnType() {
-        if (this.genericReturnType == null) {
-            this.genericReturnType = returnType(owningType.getGenericTypeInfo());
+        if (genericReturnType == null) {
+            genericReturnType = returnType(getDeclaringType().getTypeArguments());
         }
-        return this.genericReturnType;
+        return genericReturnType;
     }
 
     @Override
     @NonNull
     public ClassElement getReturnType() {
-        if (this.returnType == null) {
-            this.returnType = returnType(Collections.emptyMap());
+        if (returnType == null) {
+            returnType = returnType(Collections.emptyMap());
         }
-        return this.returnType;
+        return returnType;
     }
 
     @Override
     public List<? extends GenericPlaceholderElement> getDeclaredTypeVariables() {
         return executableElement.getTypeParameters().stream()
-            .map(tpe -> (GenericPlaceholderElement) mirrorToClassElement(tpe.asType(), visitorContext))
-            .collect(Collectors.toList());
+            .map(tpe -> (GenericPlaceholderElement) newClassElement(tpe.asType(), Collections.emptyMap()))
+            .toList();
     }
 
     @Override
@@ -242,12 +218,13 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     public JavaClassElement getDeclaringType() {
         if (resolvedDeclaringClass == null) {
             Element enclosingElement = executableElement.getEnclosingElement();
-            if (enclosingElement instanceof TypeElement) {
-                TypeElement te = (TypeElement) enclosingElement;
-                if (owningType.getName().equals(te.getQualifiedName().toString())) {
+            if (enclosingElement instanceof TypeElement te) {
+                String typeName = te.getQualifiedName().toString();
+                if (owningType.getName().equals(typeName)) {
                     resolvedDeclaringClass = owningType;
                 } else {
-                    resolvedDeclaringClass = (JavaClassElement) mirrorToClassElement(te.asType(), visitorContext, owningType.getGenericTypeInfo());
+                    Map<String, ClassElement> typeArguments = owningType.getTypeArguments(typeName);
+                    resolvedDeclaringClass = (JavaClassElement) newClassElement(te.asType(), typeArguments);
                 }
             } else {
                 return owningType;
@@ -261,13 +238,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
         return owningType;
     }
 
-    /**
-     * The return type for the given info.
-     *
-     * @param info The info
-     * @return The return type
-     */
-    protected ClassElement returnType(Map<String, Map<String, TypeMirror>> info) {
+    private ClassElement returnType(Map<String, ClassElement> genericInfo) {
         VariableElement varElement = CollectionUtils.last(executableElement.getParameters());
         if (isSuspend(varElement)) {
             DeclaredType dType = (DeclaredType) varElement.asType();
@@ -279,11 +250,11 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
             if ((tm instanceof DeclaredType dt) && sameType("kotlin.Unit", dt)) {
                 return PrimitiveElement.VOID;
             } else {
-                return mirrorToClassElement(tm, visitorContext, info, true);
+                return newClassElement(tm, genericInfo);
             }
         }
         final TypeMirror returnType = executableElement.getReturnType();
-        return mirrorToClassElement(returnType, visitorContext, info, true);
+        return newClassElement(returnType, genericInfo);
     }
 
     private static boolean sameType(String type, DeclaredType dt) {

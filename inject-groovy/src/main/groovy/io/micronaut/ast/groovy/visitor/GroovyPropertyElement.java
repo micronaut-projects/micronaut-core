@@ -24,13 +24,12 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.PropertyElement;
-import org.codehaus.groovy.ast.AnnotatedNode;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
@@ -192,17 +191,17 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
         return (MemberElement) super.withAnnotationMetadata(annotationMetadata);
     }
 
-    private static AnnotatedNode selectNativeType(MethodElement getter,
+    private static GroovyNativeElement selectNativeType(MethodElement getter,
                                                   MethodElement setter,
                                                   FieldElement field) {
         if (getter instanceof AbstractGroovyElement) {
-            return (AnnotatedNode) getter.getNativeType();
+            return (GroovyNativeElement) getter.getNativeType();
         }
         if (setter instanceof AbstractGroovyElement) {
-            return (AnnotatedNode) setter.getNativeType();
+            return (GroovyNativeElement) setter.getNativeType();
         }
         if (field instanceof AbstractGroovyElement) {
-            return (AnnotatedNode) field.getNativeType();
+            return (GroovyNativeElement) field.getNativeType();
         }
         throw new IllegalStateException();
     }

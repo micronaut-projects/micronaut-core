@@ -41,10 +41,11 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
@@ -89,11 +90,12 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
     private final Type thisType;
     private final String beanDefinitionReferenceClassName;
 
-    private final Map<String, Integer> defaultsStorage = new HashMap<>();
     private final Map<String, GeneratorAdapter> loadTypeMethods = new LinkedHashMap<>();
     private final List<String> addedMethods = new ArrayList<>();
 
     private final DispatchWriter methodDispatchWriter;
+
+    private final Set<String> methodNames = new HashSet<>();
 
     public ExecutableMethodsDefinitionWriter(String beanDefinitionClassName,
                                              String beanDefinitionReferenceClassName,
@@ -358,6 +360,42 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
                                         GeneratorAdapter staticInit,
                                         TypedElement declaringType,
                                         MethodElement methodElement) {
+        int index = 1;
+        String prefix = "$metadata$";
+        String methodName =  prefix + methodElement.getName();
+        while (methodNames.contains(methodName)) {
+            methodName = prefix + methodElement.getName() + "$" + (index++);
+        }
+        methodNames.add(methodName);
+
+        Method newMethod = new Method(methodName, Type.getType(AbstractExecutableMethodsDefinition.MethodReference.class), new Type[0]);
+
+        GeneratorAdapter newMethodAdapter = new GeneratorAdapter(classWriter.visitMethod(
+                Opcodes.ACC_PRIVATE | Opcodes.ACC_FINAL | Opcodes.ACC_STATIC,
+                newMethod.getName(),
+                newMethod.getDescriptor(),
+                null,
+                null),
+                ACC_PRIVATE | Opcodes.ACC_FINAL | Opcodes.ACC_STATIC,
+                newMethod.getName(),
+                newMethod.getDescriptor()
+        );
+
+        pushNewMethodReference0(classWriter, newMethodAdapter, declaringType, methodElement, new LinkedHashMap<>());
+
+        newMethodAdapter.returnValue();
+        newMethodAdapter.visitMaxs(DEFAULT_MAX_STACK, 1);
+        newMethodAdapter.visitEnd();
+
+        staticInit.invokeStatic(thisType, newMethod);
+    }
+
+    private void pushNewMethodReference0(ClassWriter classWriter,
+                                         GeneratorAdapter staticInit,
+                                         TypedElement declaringType,
+                                         MethodElement methodElement,
+                                         Map<String, Integer> defaultsStorage) {
+
         staticInit.newInstance(Type.getType(AbstractExecutableMethodsDefinition.MethodReference.class));
         staticInit.dup();
         // 1: declaringType
@@ -366,8 +404,7 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
         // 2: annotationMetadata
         AnnotationMetadata annotationMetadata = methodElement.getTargetAnnotationMetadata();
 
-        if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
-            AnnotationMetadataHierarchy hierarchy = (AnnotationMetadataHierarchy) annotationMetadata;
+        if (annotationMetadata instanceof AnnotationMetadataHierarchy hierarchy) {
             if (hierarchy.size() != 2) {
                 throw new IllegalStateException("Expected the size of 2");
             }
@@ -379,7 +416,7 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
             }
         }
 
-        pushAnnotationMetadata(classWriter, staticInit, annotationMetadata);
+        pushAnnotationMetadata(classWriter, staticInit, annotationMetadata, defaultsStorage);
         // 3: methodName
         staticInit.push(methodElement.getName());
         // 4: return argument
@@ -417,7 +454,10 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
                 boolean.class);
     }
 
-    private void pushAnnotationMetadata(ClassWriter classWriter, GeneratorAdapter staticInit, AnnotationMetadata annotationMetadata) {
+    private void pushAnnotationMetadata(ClassWriter classWriter,
+                                        GeneratorAdapter staticInit,
+                                        AnnotationMetadata annotationMetadata,
+                                        Map<String, Integer> defaultsStorage) {
         if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA || annotationMetadata.isEmpty()) {
             staticInit.push((String) null);
         } else if (annotationMetadata instanceof AnnotationMetadataReference annotationMetadataReference) {

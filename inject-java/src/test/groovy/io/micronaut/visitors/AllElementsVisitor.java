@@ -46,6 +46,10 @@ public class AllElementsVisitor implements TypeElementVisitor<Controller, Object
         visit(element);
         element.getBeanProperties(); // Preload properties for tests otherwise it fails because the compiler is done
         element.getAnnotationMetadata();
+        element.getSuperType().ifPresent(superType -> {
+            superType.getAllTypeArguments();
+            superType.getTypeArguments();
+        });
         VISITED_CLASS_ELEMENTS.add(element);
     }
 

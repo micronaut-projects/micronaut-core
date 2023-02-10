@@ -19,6 +19,7 @@ import jakarta.inject.Singleton;
 
 @Singleton
 public class B {
+
     String name;
 
     public String getName() {

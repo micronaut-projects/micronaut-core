@@ -19,14 +19,16 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
+import java.util.Collections;
+import java.util.Map;
 
 /**
  * A field element returning data from a {@link VariableElement}.
@@ -85,12 +87,8 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
             if (owningType == null) {
                 this.genericType = getType();
             } else {
-                this.genericType = mirrorToClassElement(
-                    variableElement.asType(),
-                    visitorContext,
-                    owningType.getGenericTypeInfo(),
-                    true
-                );
+                ClassElement declaringType = getDeclaringType();
+                this.genericType = newClassElement(variableElement.asType(), declaringType.getTypeArguments());
             }
         }
         return this.genericType;
@@ -115,8 +113,7 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
     @Override
     public ClassElement getType() {
         if (this.typeElement == null) {
-            TypeMirror returnType = variableElement.asType();
-            this.typeElement = mirrorToClassElement(returnType, visitorContext);
+            this.typeElement = newClassElement(variableElement.asType(), Collections.emptyMap());
         }
         return this.typeElement;
     }
@@ -125,12 +122,14 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
     public ClassElement getDeclaringType() {
         if (resolvedDeclaringClass == null) {
             Element enclosingElement = variableElement.getEnclosingElement();
-            if (enclosingElement instanceof TypeElement) {
-                TypeElement te = (TypeElement) enclosingElement;
-                if (owningType.getName().equals(te.getQualifiedName().toString())) {
+            if (enclosingElement instanceof TypeElement te) {
+                String typeName = te.getQualifiedName().toString();
+                if (owningType.getName().equals(typeName)) {
                     resolvedDeclaringClass = owningType;
                 } else {
-                    resolvedDeclaringClass = mirrorToClassElement(te.asType(), visitorContext, owningType.getGenericTypeInfo());
+                    TypeMirror returnType = te.asType();
+                    Map<String, ClassElement> genericsInfo = owningType.getTypeArguments(typeName);
+                    resolvedDeclaringClass = newClassElement(returnType, genericsInfo);
                 }
             } else {
                 return owningType;

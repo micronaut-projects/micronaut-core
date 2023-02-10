@@ -89,6 +89,58 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         throw new IllegalStateException("Unknown element: " + element.getClass() + " with native type: " + element.getNativeType());
     }
 
+    /**
+     * Lookup annotation metadata for the package.
+     * @param packageElement The element
+     * @return The annotation metadata
+     */
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForPackage(PackageElement packageElement) {
+        return metadataBuilder.lookupOrBuildForType((K) packageElement.getNativeType());
+    }
+
+    /**
+     * Lookup annotation metadata for the parameter.
+     * @param parameterElement The element
+     * @return The annotation metadata
+     */
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForParameter(ParameterElement parameterElement) {
+        return metadataBuilder.lookupOrBuildForParameter(
+                (K) parameterElement.getMethodElement().getOwningType().getNativeType(),
+                (K) parameterElement.getMethodElement().getNativeType(),
+                (K) parameterElement.getNativeType()
+        );
+    }
+
+    /**
+     * Lookup annotation metadata for the field.
+     * @param fieldElement The element
+     * @return The annotation metadata
+     */
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForField(FieldElement fieldElement) {
+        return metadataBuilder.lookupOrBuildForField(
+                (K) fieldElement.getOwningType().getNativeType(),
+                (K) fieldElement.getNativeType()
+        );
+    }
+
+    /**
+     * Lookup annotation metadata for the method.
+     * @param methodElement The element
+     * @return The annotation metadata
+     */
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForMethod(MethodElement methodElement) {
+        return metadataBuilder.lookupOrBuildForMethod((K) methodElement.getOwningType().getNativeType(), (K) methodElement.getNativeType());
+    }
+
+    /**
+     * Lookup annotation metadata for the class.
+     * @param classElement The element
+     * @return The annotation metadata
+     */
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForClass(ClassElement classElement) {
+        return metadataBuilder.lookupOrBuildForType((K) classElement.getNativeType());
+    }
+
     @NonNull
     private AbstractElementAnnotationMetadata buildForProperty(@Nullable AnnotationMetadata defaultAnnotationMetadata, @NonNull PropertyElement propertyElement) {
         return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
@@ -112,10 +164,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
 
             @Override
             protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
-                return metadataBuilder.lookupOrBuildForField(
-                    (K) enumConstantElement.getOwningType().getNativeType(),
-                    (K) enumConstantElement.getNativeType()
-                );
+                return lookupForField(enumConstantElement);
             }
 
             @Override
@@ -131,7 +180,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
 
             @Override
             protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
-                return metadataBuilder.lookupOrBuildForType((K) packageElement.getNativeType());
+                return lookupForPackage(packageElement);
             }
 
             @Override
@@ -147,11 +196,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
 
             @Override
             protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
-                return metadataBuilder.lookupOrBuildForParameter(
-                    (K) parameterElement.getMethodElement().getOwningType().getNativeType(),
-                    (K) parameterElement.getMethodElement().getNativeType(),
-                    (K) parameterElement.getNativeType()
-                );
+                return lookupForParameter(parameterElement);
             }
 
             @Override
@@ -168,10 +213,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
 
             @Override
             protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
-                return metadataBuilder.lookupOrBuildForField(
-                    (K) fieldElement.getOwningType().getNativeType(),
-                    (K) fieldElement.getNativeType()
-                );
+                return lookupForField(fieldElement);
             }
 
             @Override
@@ -188,7 +230,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
 
             @Override
             protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
-                return metadataBuilder.lookupOrBuildForMethod((K) methodElement.getOwningType().getNativeType(), (K) methodElement.getNativeType());
+                return lookupForMethod(methodElement);
             }
 
             @Override
@@ -205,10 +247,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
 
             @Override
             protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
-                return metadataBuilder.lookupOrBuildForMethod(
-                    (K) constructorElement.getOwningType().getNativeType(),
-                    (K) constructorElement.getNativeType()
-                );
+                return lookupForMethod(constructorElement);
             }
 
             @Override
@@ -224,7 +263,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
 
             @Override
             protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
-                return metadataBuilder.lookupOrBuildForType((K) classElement.getNativeType());
+                return lookupForClass(classElement);
             }
 
             @Override
@@ -233,6 +272,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
             }
         };
     }
+
 
     /**
      * Abstract implementation of {@link ElementAnnotationMetadata}.
@@ -331,7 +371,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         @SuppressWarnings("java:S1192")
         public <T extends Annotation> AnnotationMetadata annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
             ArgumentUtils.requireNonNull("annotationType", annotationType);
-            AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
+            AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType, metadataBuilder.getRetentionPolicy(annotationType));
             //noinspection ConstantConditions
             if (consumer != null) {
                 consumer.accept(builder);

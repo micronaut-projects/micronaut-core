@@ -17,16 +17,15 @@ package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.FieldElement;
-import org.codehaus.groovy.ast.ClassHelper;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
 
 import java.lang.reflect.Modifier;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -51,7 +50,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
                        GroovyClassElement owningType,
                        FieldNode fieldNode,
                        ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        super(visitorContext, fieldNode, annotationMetadataFactory);
+        super(visitorContext, new GroovyNativeElement.Field(fieldNode, owningType.getNativeType()), annotationMetadataFactory);
         this.owningType = owningType;
         this.fieldNode = fieldNode;
     }
@@ -64,11 +63,6 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     @Override
     public FieldElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
         return (FieldElement) super.withAnnotationMetadata(annotationMetadata);
-    }
-
-    @Override
-    public FieldNode getNativeType() {
-        return fieldNode;
     }
 
     @Override
@@ -88,21 +82,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
 
     @Override
     public ClassElement getGenericField() {
-        if (isPrimitive()) {
-            ClassNode cn = ClassHelper.make(ClassUtils.getPrimitiveType(getType().getName()).orElse(null));
-            if (cn != null) {
-                return new GroovyClassElement(visitorContext, cn, elementAnnotationMetadataFactory) {
-
-                    @Override
-                    public boolean isPrimitive() {
-                        return true;
-                    }
-                };
-            } else {
-                return getGenericType();
-            }
-        }
-        return new GroovyClassElement(visitorContext, (ClassNode) getGenericType().getNativeType(), elementAnnotationMetadataFactory);
+        return newClassElement(fieldNode.getType(), getDeclaringType().getTypeArguments());
     }
 
     @Override
@@ -163,7 +143,12 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     @NonNull
     @Override
     public ClassElement getType() {
-        return visitorContext.getElementFactory().newClassElement(fieldNode.getType(), elementAnnotationMetadataFactory);
+        return newClassElement(fieldNode.getType());
+    }
+
+    @Override
+    public ClassElement getGenericType() {
+        return newClassElement(fieldNode.getType(), getDeclaringType().getTypeArguments());
     }
 
     @Override
@@ -172,6 +157,10 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
         if (declaringClass == null) {
             throw new IllegalStateException("Declaring class could not be established");
         }
-        return (GroovyClassElement) visitorContext.getElementFactory().newClassElement(declaringClass, elementAnnotationMetadataFactory);
+        if (owningType.getNativeType().annotatedNode().equals(declaringClass)) {
+            return owningType;
+        }
+        Map<String, ClassElement> typeArguments = getOwningType().getTypeArguments(declaringClass.getName());
+        return (GroovyClassElement) newClassElement(declaringClass, typeArguments);
     }
 }

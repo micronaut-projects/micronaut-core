@@ -78,7 +78,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private static final Map<String, List<AnnotationMapper<?>>> ANNOTATION_MAPPERS = new HashMap<>(10);
     private static final Map<String, List<AnnotationTransformer<?>>> ANNOTATION_TRANSFORMERS = new HashMap<>(5);
     private static final Map<String, List<AnnotationRemapper>> ANNOTATION_REMAPPERS = new HashMap<>(5);
-    private static final Map<MetadataKey<?>, CachedAnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>(100);
+    private static final Map<Object, CachedAnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>(100);
     private static final Map<String, Set<String>> NON_BINDING_CACHE = new HashMap<>(50);
     private static final Map<String, Map<CharSequence, Object>> ANNOTATION_DEFAULTS = new HashMap<>(20);
 
@@ -254,6 +254,26 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             T element = elements[elements.length - 1];
             return buildInternal(inheritTypeAnnotations, false, element);
         });
+    }
+
+    /**
+     * Lookup or build new annotation metadata.
+     *
+     * @param key                    The cache key
+     * @param element                The type element
+     * @param includeTypeAnnotations Whether to include type level annotations in the metadata for the element
+     * @return The annotation metadata
+     */
+    public CachedAnnotationMetadata lookupOrBuild(Object key, T element, boolean includeTypeAnnotations) {
+        CachedAnnotationMetadata cachedAnnotationMetadata = MUTATED_ANNOTATION_METADATA.get(key);
+        if (cachedAnnotationMetadata == null) {
+            AnnotationMetadata annotationMetadata = buildInternal(includeTypeAnnotations, false, element);
+            cachedAnnotationMetadata = new DefaultCachedAnnotationMetadata(annotationMetadata);
+        }
+        // Don't use `computeIfAbsent` as it can lead to a concurrent exception because the cache is accessed during in `buildInternal`
+        MUTATED_ANNOTATION_METADATA.put(key, cachedAnnotationMetadata);
+        return cachedAnnotationMetadata;
+
     }
 
     private AnnotationMetadata buildInternal(boolean inheritTypeAnnotations, boolean declaredOnly, T element) {
@@ -582,6 +602,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * Obtain the annotation mappers for the given annotation name.
      *
      * @param annotationName The annotation name
+     * @param <K>            The annotation type
      * @return The mappers
      */
     @NonNull
@@ -633,14 +654,20 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     @NonNull
     private CachedAnnotationMetadata lookupExisting(T[] elements, Supplier<AnnotationMetadata> annotationMetadataSupplier) {
-        return MUTATED_ANNOTATION_METADATA.computeIfAbsent(new MetadataKey<>(elements), metadataKey -> new DefaultCachedAnnotationMetadata(annotationMetadataSupplier.get()));
+        Object key = new MetadataKey<>(elements);
+        CachedAnnotationMetadata cachedAnnotationMetadata = MUTATED_ANNOTATION_METADATA.get(key);
+        if (cachedAnnotationMetadata == null) {
+            cachedAnnotationMetadata = new DefaultCachedAnnotationMetadata(annotationMetadataSupplier.get());
+        }
+        // Don't use `computeIfAbsent` as it can lead to a concurrent exception because the cache is accessed during in `buildInternal`
+        MUTATED_ANNOTATION_METADATA.put(key, cachedAnnotationMetadata);
+        return cachedAnnotationMetadata;
     }
 
     @Nullable
     private void processAnnotationAlias(Map<CharSequence, Object> annotationValues,
                                         Object annotationValue,
                                         AnnotationValue<AliasFor> aliasForAnnotation,
-                                        RetentionPolicy retentionPolicy,
                                         List<ProcessedAnnotation> introducedAnnotations) {
         Optional<String> aliasAnnotation = aliasForAnnotation.stringValue("annotation");
         Optional<String> aliasAnnotationName = aliasForAnnotation.stringValue("annotationName");
@@ -654,7 +681,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 if (annotationValue != null) {
                     introducedAnnotations.add(
                             toProcessedAnnotation(
-                                    AnnotationValue.builder(aliasedAnnotation, retentionPolicy)
+                                    AnnotationValue.builder(aliasedAnnotation, getRetentionPolicy(aliasedAnnotation))
                                             .members(Collections.singletonMap(aliasedMemberName, annotationValue))
                                             .build()
                             )
@@ -677,6 +704,17 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     @NonNull
     protected abstract RetentionPolicy getRetentionPolicy(@NonNull T annotation);
+
+    /**
+     * Gets the retention policy for the given annotation.
+     *
+     * @param annotation The annotation
+     * @return The retention policy
+     */
+    @NonNull
+    public RetentionPolicy getRetentionPolicy(@NonNull String annotation) {
+        return getAnnotationMirror(annotation).map(this::getRetentionPolicy).orElse(RetentionPolicy.RUNTIME);
+    }
 
     private AnnotationMetadata buildInternalMulti(
             List<T> parents,
@@ -862,7 +900,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                        Map<CharSequence, Object> annotationValues,
                                        T annotationMember,
                                        Object annotationValue,
-                                       RetentionPolicy retentionPolicy,
                                        List<ProcessedAnnotation> introducedAnnotations) {
         Optional<AnnotationValue<Aliases>> aliases = getAnnotationValues(originatingElement, annotationMember, Aliases.class);
         if (aliases.isPresent()) {
@@ -871,7 +908,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         annotationValues,
                         annotationValue,
                         av,
-                        retentionPolicy,
                         introducedAnnotations
                 );
             }
@@ -882,7 +918,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         annotationValues,
                         annotationValue,
                         aliasForValues.get(),
-                        retentionPolicy,
                         introducedAnnotations
                 );
             }
@@ -1014,7 +1049,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     Stream.of(
                             // Add repeatable container for possible stereotype annotation retrieval
                             // and additional members defined in the container annotation
-                            toProcessedAnnotation(new AnnotationValue<>(annotationValue.getAnnotationName(), containerValues))
+                            toProcessedAnnotation(new AnnotationValue<>(
+                                    annotationValue.getAnnotationName(),
+                                    containerValues,
+                                    getRetentionPolicy(annotationValue.getAnnotationName())))
                     ),
                     repeatableAnnotations.stream().map(this::toProcessedAnnotation)
             );
@@ -1050,7 +1088,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                         newValues,
                         member,
                         value,
-                        annotationValue.getRetentionPolicy(),
                         introducedAnnotations
                 );
             }
