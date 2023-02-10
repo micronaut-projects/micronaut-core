@@ -6,9 +6,8 @@ NOTE: This implementation of the Micronaut HTTP Client is available since Micron
 
 The implementation based on https://openjdk.org/groups/net/httpclient/intro.html[Java HTTP Client] does not support the following features:
 
-* Proxy Support.
+* <<proxyClient,Proxy request>> support (we do support <<proxy,HTTP Proxies>>).
 * Client Filters.
-* Http2.
 * Streaming support.
 * Multipart requests.
 
