@@ -15,20 +15,12 @@
  */
 package io.micronaut.http.client.javanet;
 
-import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.client.AbstractHttpClientFactory;
 import io.micronaut.http.client.HttpClientConfiguration;
-import io.micronaut.http.client.HttpClientFactory;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 
 import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
 
 /**
  * Factory to create {@literal java.net.http.*} HTTP Clients.
@@ -37,61 +29,15 @@ import java.net.URL;
  */
 @Internal
 @Experimental
-public class JavanetHttpClientFactory implements HttpClientFactory {
-
-    final MediaTypeCodecRegistry mediaTypeCodecRegistry;
-    private final ConversionService conversionService;
-
-    // Used by HttpClient.create(...)
-    public JavanetHttpClientFactory() {
-        this(null, ConversionService.SHARED);
-    }
-
-    @Creator
-    public JavanetHttpClientFactory(
-        @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
-        ConversionService conversionService
-    ) {
-        this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
-        this.conversionService = conversionService;
-    }
+public class JavanetHttpClientFactory extends AbstractHttpClientFactory<JavanetHttpClient> {
 
     @Override
-    @NonNull
-    public HttpClient createClient(URL url) {
-        return createJavanetClient(url);
-    }
-
-    @Override
-    @NonNull
-    public HttpClient createClient(URL url, @NonNull HttpClientConfiguration configuration) {
-        return createJavanetClient(url, configuration);
-    }
-
-    private JavanetHttpClient createJavanetClient(URL url) {
-        try {
-            return createJavanetClient(url != null ? url.toURI() : null);
-        } catch (URISyntaxException e) {
-            throw new IllegalArgumentException(e);
-        }
-    }
-
-    @NonNull
-    private JavanetHttpClient createJavanetClient(@Nullable URL url, @NonNull HttpClientConfiguration configuration) {
-        try {
-            return createJavanetClient(url != null ? url.toURI() : null, configuration);
-        } catch (URISyntaxException e) {
-            throw new IllegalArgumentException(e);
-        }
-    }
-
-    @NonNull
-    private JavanetHttpClient createJavanetClient(@Nullable URI uri) {
+    protected JavanetHttpClient createHttpClient(URI uri) {
         return new JavanetHttpClient(uri, conversionService);
     }
 
-    @NonNull
-    private JavanetHttpClient createJavanetClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration) {
+    @Override
+    protected JavanetHttpClient createHttpClient(URI uri, HttpClientConfiguration configuration) {
         return new JavanetHttpClient(uri, configuration, mediaTypeCodecRegistry, conversionService);
     }
 }
