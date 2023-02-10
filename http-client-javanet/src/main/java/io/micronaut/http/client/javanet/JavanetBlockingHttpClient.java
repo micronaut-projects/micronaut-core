@@ -74,9 +74,9 @@ public class JavanetBlockingHttpClient extends AbstractJavanetHttpClient impleme
                 if (LOG.isErrorEnabled()) {
                     LOG.error("Client {} Received HTTP Response: {} {}", clientId, httpResponse.statusCode(), httpResponse.uri());
                 }
-                throw HttpClientExceptionUtils.populateServiceId(new HttpClientResponseException(HttpStatus.valueOf(httpResponse.statusCode()).getReason(), getConvertedResponse(httpResponse, bodyType)), clientId, configuration);
+                throw HttpClientExceptionUtils.populateServiceId(new HttpClientResponseException(HttpStatus.valueOf(httpResponse.statusCode()).getReason(), response(httpResponse, bodyType)), clientId, configuration);
             }
-            return getConvertedResponse(httpResponse, bodyType);
+            return response(httpResponse, bodyType);
         } catch (IOException | InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new HttpClientException("error sending request", e);
