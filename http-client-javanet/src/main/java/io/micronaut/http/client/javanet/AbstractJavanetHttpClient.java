@@ -36,7 +36,6 @@ import io.micronaut.http.client.ServiceHttpClientConfiguration;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
-import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.http.ssl.SslConfigurationException;
 import org.slf4j.Logger;
@@ -253,20 +252,13 @@ abstract class AbstractJavanetHttpClient {
     protected <I> Flux<HttpRequest> mapToHttpRequest(io.micronaut.http.HttpRequest<I> request, Argument<?> bodyType) {
         return Flux.from(loadBalancer.select(getLoadBalancerDiscriminator()))
             .map(server -> {
-                request.getCookies().getAll().forEach(cookie -> cookieConverter(cookie, request, server));
+                request.getCookies().getAll().forEach(cookie -> {
+                    HttpCookie newCookie = HttpCookieUtils.of(cookie, request, server);
+                    cookieManager.getCookieStore().add(server.getURI(), newCookie);
+                });
                 return server.resolve(prependContextPath(request.getUri()));
             })
             .map(uri -> HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry).build());
-    }
-
-    private <I> void cookieConverter(Cookie cookie, io.micronaut.http.HttpRequest<I> request, ServiceInstance server) {
-        HttpCookie newCookie = new HttpCookie(cookie.getName(), cookie.getValue());
-        newCookie.setMaxAge(cookie.getMaxAge());
-        newCookie.setDomain(server.getHost());
-        newCookie.setHttpOnly(cookie.isHttpOnly());
-        newCookie.setSecure(cookie.isSecure());
-        newCookie.setPath(cookie.getPath() == null ? request.getPath() : cookie.getPath());
-        cookieManager.getCookieStore().add(server.getURI(), newCookie);
     }
 
     /**
