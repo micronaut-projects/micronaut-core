@@ -89,7 +89,7 @@ public final class AssertionUtils {
                                               @NonNull HttpRequest<T> request,
                                               @NonNull HttpResponseAssertion assertion) {
         ThrowingSupplier<HttpResponse<?>> executable = assertion.getBody() != null ?
-            () -> server.exchange(request, String.class) :
+            () -> server.exchange(request, assertion.getBody().getBodyType()) :
             () -> server.exchange(request);
         HttpResponse<?> response = Assertions.assertDoesNotThrow(executable);
         assertEquals(assertion.getHttpStatus(), response.getStatus());
