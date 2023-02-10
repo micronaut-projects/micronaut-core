@@ -18,22 +18,16 @@ package io.micronaut.http.client.javanet;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
-import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ContextPathUtils;
 import io.micronaut.http.ssl.ClientSslConfiguration;
@@ -54,8 +48,6 @@ import java.net.SocketAddress;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
@@ -174,63 +166,10 @@ abstract class AbstractJavanetHttpClient {
         }
     }
 
-    protected <O> HttpResponse<O> getConvertedResponse(java.net.http.HttpResponse<byte[]> httpResponse, @NonNull Argument<O> bodyType) {
-        return new HttpResponse<O>() {
-            @Override
-            public HttpStatus getStatus() {
-                return HttpStatus.valueOf(httpResponse.statusCode());
-            }
-
-            @Override
-            public int code() {
-                return httpResponse.statusCode();
-            }
-
-            @Override
-            public String reason() {
-                throw new UnsupportedOperationException("Not implemented yet");
-            }
-
-            @Override
-            public HttpHeaders getHeaders() {
-                return new HttpHeadersAdapter(httpResponse.headers(), conversionService);
-            }
-
-            @Override
-            public MutableConvertibleValues<Object> getAttributes() {
-                return null;
-            }
-
-            @Override
-            public Optional<O> getBody() {
-                return convertBytes(getContentType().orElse(null), httpResponse.body(), bodyType);
-            }
-        };
-    }
-
     protected Object getLoadBalancerDiscriminator() {
         return null;
     }
-
-    private <T> Optional convertBytes(@Nullable MediaType contentType, byte[] bytes, Argument<T> type) {
-        if (type != null && mediaTypeCodecRegistry != null && contentType != null) {
-            if (CharSequence.class.isAssignableFrom(type.getType())) {
-                Charset charset = contentType.getCharset().orElse(StandardCharsets.UTF_8);
-                return Optional.of(new String(bytes, charset));
-            } else if (type.getType() == byte[].class) {
-                return Optional.of(bytes);
-            } else {
-                Optional<MediaTypeCodec> foundCodec = mediaTypeCodecRegistry.findCodec(contentType);
-                if (foundCodec.isPresent()) {
-                    MediaTypeCodec codec = foundCodec.get();
-                    return Optional.of(codec.decode(type, bytes));
-                }
-            }
-        }
-        // last chance, try type conversion
-        return type != null ? conversionService.convert(bytes, ConversionContext.of(type)) : Optional.empty();
-    }
-
+    
     public MediaTypeCodecRegistry getMediaTypeCodecRegistry() {
         return mediaTypeCodecRegistry;
     }
@@ -253,6 +192,11 @@ abstract class AbstractJavanetHttpClient {
                 }
             })
             .map(uri -> HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry).build());
+    }
+
+    @NonNull
+    protected <O> HttpResponse<O> response(@NonNull java.net.http.HttpResponse<byte[]> netResponse, @NonNull Argument<O> bodyType) {
+        return new HttpResponseAdapter<>(netResponse, bodyType, conversionService, mediaTypeCodecRegistry);
     }
 
     @SuppressWarnings("java:S4830") // This is explicitly to turn security off when isInsecureTrustAllCertificates
