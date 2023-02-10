@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2022 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,7 +60,8 @@ class RedirectTest {
 
     private static final String SPEC_NAME = "RedirectTest";
     private static final String BODY = "It works";
-    private static final BodyAssertion EXPECTED_BODY = BodyAssertion.builder().body(BODY).equals();
+    private static final BodyAssertion<String> EXPECTED_BODY = BodyAssertion.builder().body(BODY).equals();
+    private static final String REDIRECT = "redirect";
 
     @Test
     void absoluteRedirection() throws IOException {
@@ -95,7 +96,7 @@ class RedirectTest {
     @Test
     void clientRelativeUriNoSlash() throws IOException {
         try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
-             HttpClient client = server.getApplicationContext().createBean(HttpClient.class, relativeLoadBalancer(server, "redirect"))) {
+             HttpClient client = server.getApplicationContext().createBean(HttpClient.class, relativeLoadBalancer(server, REDIRECT))) {
             var exchange = Flux.from(client.exchange(HttpRequest.GET("direct"), String.class)).blockFirst();
             assertEquals(HttpStatus.OK, exchange.getStatus());
             assertEquals(BODY, exchange.body());
@@ -103,21 +104,23 @@ class RedirectTest {
     }
 
     @Test
+    @SuppressWarnings("java:S3655")
     void clientRelativeUriRedirectAbsolute() throws IOException {
         try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
              HttpClient client = server.getApplicationContext().createBean(HttpClient.class, server.getURL().get() + "/redirect")) {
-            var response = Flux.from(client.exchange(HttpRequest.GET("redirect"), String.class)).blockFirst();
+            var response = Flux.from(client.exchange(HttpRequest.GET(REDIRECT), String.class)).blockFirst();
             assertEquals(HttpStatus.OK, response.getStatus());
             assertEquals(BODY, response.body());
         }
     }
 
     @Test
+    @SuppressWarnings("java:S3655")
     void hostHeaderIsCorrectForRedirect() throws IOException {
         try (ServerUnderTest otherServer = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME, Collections.singletonMap("redirect.server", "true"))) {
             int otherPort = otherServer.getPort().get();
             asserts(SPEC_NAME,
-                HttpRequest.GET("/redirect/redirect-host").header("redirect", "http://localhost:" + otherPort + "/redirect/host-header"),
+                HttpRequest.GET("/redirect/redirect-host").header(REDIRECT, "http://localhost:" + otherPort + "/redirect/host-header"),
                 (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
                     HttpResponseAssertion.builder()
                         .status(HttpStatus.OK)
@@ -140,6 +143,7 @@ class RedirectTest {
         );
     }
 
+    @SuppressWarnings("java:S3655")
     private LoadBalancer relativeLoadBalancer(ServerUnderTest server, String path) {
         return new LoadBalancer() {
             @Override

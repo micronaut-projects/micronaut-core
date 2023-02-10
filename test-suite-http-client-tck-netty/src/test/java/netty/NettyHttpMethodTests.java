@@ -6,6 +6,7 @@ import org.junit.platform.suite.api.SuiteDisplayName;
 
 @Suite
 @SelectPackages("io.micronaut.http.client.tck.tests")
-@SuiteDisplayName("HTTP Client TCK for Netty based client")
+@SuiteDisplayName("HTTP Client TCK for the HTTP Client Implementation based on Netty")
+@SuppressWarnings("java:S2187") // This runs a suite of tests, but has no tests of its own
 public class NettyHttpMethodTests {
 }

@@ -246,7 +246,6 @@ abstract class AbstractJavanetHttpClient {
                     HttpCookie newCookie = HttpCookieUtils.of(cookie, request, server);
                     cookieManager.getCookieStore().add(server.getURI(), newCookie);
                 });
-
                 try {
                     return server.resolve(ContextPathUtils.prepend(request.getUri(), contextPath));
                 } catch (URISyntaxException e) {
@@ -255,7 +254,6 @@ abstract class AbstractJavanetHttpClient {
             })
             .map(uri -> HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry).build());
     }
-
 
     @SuppressWarnings("java:S4830") // This is explicitly to turn security off when isInsecureTrustAllCertificates
     private static class TrustAllTrustManager implements X509TrustManager {
