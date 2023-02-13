@@ -18,13 +18,15 @@ package io.micronaut.logging.impl;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.Configurator;
 import ch.qos.logback.classic.util.ContextInitializer;
-import ch.qos.logback.classic.util.EnvUtil;
 import ch.qos.logback.core.joran.spi.JoranException;
 import ch.qos.logback.core.status.InfoStatus;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.logging.LoggingSystemException;
 
 import java.net.URL;
+import java.util.Iterator;
+import java.util.ServiceLoader;
 import java.util.function.Supplier;
 
 /**
@@ -66,7 +68,7 @@ public final class LogbackUtils {
         @NonNull String logbackXmlLocation,
         Supplier<URL> resourceSupplier
     ) {
-        Configurator configurator = EnvUtil.loadFromServiceLoader(Configurator.class);
+        Configurator configurator = loadFromServiceLoader();
         if (configurator != null) {
             context.getStatusManager().add(new InfoStatus("Using " + configurator.getClass().getName(), context));
             programmaticConfiguration(context, configurator);
@@ -95,5 +97,15 @@ public final class LogbackUtils {
         } catch (Exception e) {
             throw new LoggingSystemException(String.format("Failed to initialize Configurator: %s using ServiceLoader", configurator.getClass().getCanonicalName()), e);
         }
+    }
+
+    /**
+     * Find a Logback Configurator service.
+     * We can't use {@link ch.qos.logback.classic.util.EnvUtil#loadFromServiceLoader} because the class moved in v1.3.0
+     */
+    @Nullable
+    private static Configurator loadFromServiceLoader() {
+        Iterator<Configurator> it = ServiceLoader.load(Configurator.class).iterator();
+        return it.hasNext() ? it.next() : null;
     }
 }
