@@ -98,11 +98,19 @@ class BinaryWebSocketSpec extends Specification {
         then:
         conditions.eventually {
             !bob.session.isOpen()
+        }
+
+        when:
+        fred.send("Damn bob left".bytes)
+
+        then:
+        conditions.eventually {
             fred.replies.contains("[bob] Disconnected!")
             !bob.replies.contains("[bob] Disconnected!")
         }
 
         cleanup:
+        wsClient.close()
         embeddedServer.close()
     }
 
