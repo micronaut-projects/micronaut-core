@@ -132,9 +132,10 @@ public class JavanetHttpClient extends AbstractJavanetHttpClient implements Http
                 LOG.error("Client {} Received HTTP Response: {} {}", clientId, netResponse.statusCode(), netResponse.uri());
                 boolean errorStatus = netResponse.statusCode() >= 400;
                 if (errorStatus && configuration.isExceptionOnErrorStatus()) {
-                    throw HttpClientExceptionUtils.populateServiceId(new HttpClientResponseException(HttpStatus.valueOf(netResponse.statusCode()).getReason(), getConvertedResponse(netResponse, bodyType)), clientId, configuration);
+                    throw HttpClientExceptionUtils.populateServiceId(new HttpClientResponseException(HttpStatus.valueOf(netResponse.statusCode()).getReason(),
+                        response(netResponse, bodyType)), clientId, configuration);
                 }
-                return getConvertedResponse(netResponse, bodyType);
+                return response(netResponse, bodyType);
             });
     }
 
