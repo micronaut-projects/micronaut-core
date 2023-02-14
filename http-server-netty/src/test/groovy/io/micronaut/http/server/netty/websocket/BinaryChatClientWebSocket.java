@@ -33,7 +33,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.Future;
 
 @ClientWebSocket("/binary/chat/{topic}/{username}")
-public abstract class BinaryChatClientWebSocket implements AutoCloseable {
+public abstract class BinaryChatClientWebSocket implements AutoCloseable{
 
     private WebSocketSession session;
     private String topic;
@@ -70,8 +70,9 @@ public abstract class BinaryChatClientWebSocket implements AutoCloseable {
     }
 
     @OnMessage
-    public void onMessage(byte[] message) {
-        System.out.println("Client for " + username + " on topic " + topic + " received message = " + new String(message));
+    public void onMessage(
+            byte[] message) {
+        System.out.println("Client received message = " + new String(message));
         replies.add(new String(message));
     }
 
