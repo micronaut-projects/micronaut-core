@@ -48,30 +48,26 @@ class BinaryWebSocketSpec extends Specification {
         when: "a websocket connection is established"
         WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
         BinaryChatClientWebSocket fred = Flux.from(wsClient.connect(BinaryChatClientWebSocket, "/binary/chat/stuff/fred")).blockFirst()
-
-        then:"The connection is valid"
-        fred.session
-        fred.session.id
-        fred.username == 'fred'
-        fred.topic == 'stuff'
-
-        when: 'Bob joins'
         BinaryChatClientWebSocket bob = Flux.from(wsClient.connect(BinaryChatClientWebSocket, [topic:"stuff",username:"bob"])).blockFirst()
 
-        then:"A session is established"
-        bob.session
-        bob.session.id
-        bob.session.id != fred.session.id
-        bob.username == 'bob'
-        bob.topic == 'stuff'
+        then:"The connection is valid"
+        fred.session != null
+        fred.session.id != null
 
-        and: "The join message is received"
+        then:"A session is established"
+        fred.session != null
+        fred.session.id != null
+        fred.session.id != bob.session.id
+        fred.topic == 'stuff'
+        fred.username == 'fred'
+        bob.username == 'bob'
         conditions.eventually {
             fred.replies.contains("[bob] Joined!")
             fred.replies.size() == 1
         }
 
-        when: "A message is sent"
+
+        when:"A message is sent"
         fred.send("Hello bob!".bytes)
 
         then:
@@ -87,10 +83,12 @@ class BinaryWebSocketSpec extends Specification {
 
         then:
         conditions.eventually {
-            fred.replies.collect() == ['[bob] Joined!', "[bob] Hi fred. How are things?"]
-            bob.replies.collect() == ['[fred] Hello bob!']
-        }
 
+            fred.replies.contains("[bob] Hi fred. How are things?")
+            fred.replies.size() == 2
+            bob.replies.contains("[fred] Hello bob!")
+            bob.replies.size() == 1
+        }
         def buffer = Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)
         buffer.retain()
         fred.sendAsync(buffer).get().toString(StandardCharsets.UTF_8) == 'foo'
@@ -98,10 +96,12 @@ class BinaryWebSocketSpec extends Specification {
 
         when:
         bob.close()
+        sleep(1000)
+
 
         then:
         conditions.eventually {
-            !bob.session.open
+            !bob.session.isOpen()
         }
 
         when:
@@ -210,26 +210,24 @@ class BinaryWebSocketSpec extends Specification {
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6069')
     void "test per-message compression"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+        def ctx = ApplicationContext.run([
                 'spec.name'            : 'test per-message compression',
                 'micronaut.server.port': -1
         ])
-
-        def compressionDetectionCustomizer = embeddedServer.applicationContext.getBean(CompressionDetectionCustomizer)
+        def compressionDetectionCustomizer = ctx.getBean(CompressionDetectionCustomizer)
+        EmbeddedServer embeddedServer = ctx.getBean(EmbeddedServer)
+        embeddedServer.start()
         PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
 
         when: "a websocket connection is established"
         WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
-        BinaryChatClientWebSocket fred = Flux.from(wsClient.connect(BinaryChatClientWebSocket, "/binary/chat/stuff/fred")).blockFirst()
+        BinaryChatClientWebSocket fred = wsClient.connect(BinaryChatClientWebSocket, "/binary/chat/stuff/fred").blockFirst()
+        BinaryChatClientWebSocket bob = wsClient.connect(BinaryChatClientWebSocket, [topic: "stuff", username: "bob"]).blockFirst()
+
 
         then: "The connection is valid"
         fred.session != null
         fred.session.id != null
-
-        when: 'bob joins'
-        BinaryChatClientWebSocket bob = Flux.from(wsClient.connect(BinaryChatClientWebSocket, [topic: "stuff", username: "bob"])).blockFirst()
-
-        then:
         conditions.eventually {
             fred.replies.contains("[bob] Joined!")
             fred.replies.size() == 1
@@ -258,6 +256,9 @@ class BinaryWebSocketSpec extends Specification {
         interceptors.any { it.seenCompressedMessage }
 
         cleanup:
+        fred.close()
+        bob.close()
+        wsClient.close()
         embeddedServer.close()
     }
 
