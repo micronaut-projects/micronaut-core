@@ -62,13 +62,15 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
     public RetryState build() {
         AnnotationValue<Retryable> retry = annotationMetadata.findAnnotation(Retryable.class)
                                                              .orElseThrow(() -> new IllegalStateException("Missing @Retryable annotation"));
-        int attempts = retry.get(ATTEMPTS, Integer.class).orElse(DEFAULT_RETRY_ATTEMPTS);
+        int attempts = retry.intValue(ATTEMPTS).orElse(DEFAULT_RETRY_ATTEMPTS);
         Duration delay = retry.get(DELAY, Duration.class).orElse(Duration.ofSeconds(1));
-        Class<? extends RetryPredicate> predicateClass = retry.get(PREDICATE, Class.class)
-                                                              .orElse(DefaultRetryPredicate.class);
+        @SuppressWarnings("unchecked")
+        Class<? extends RetryPredicate> predicateClass = (Class<? extends RetryPredicate>) retry.classValue(PREDICATE).orElse(DefaultRetryPredicate.class);
         RetryPredicate predicate = createPredicate(predicateClass, retry);
-        Class<? extends Throwable> capturedException = retry.get(CAPTUREDEXCEPTION, Class.class)
-                                                            .orElse(RuntimeException.class);
+        @SuppressWarnings("unchecked")
+        Class<? extends RuntimeException> capturedException = (Class<? extends RuntimeException>) retry
+                                            .classValue(CAPTUREDEXCEPTION)
+                                            .orElse(RuntimeException.class);
 
         return new SimpleRetry(
             attempts,
