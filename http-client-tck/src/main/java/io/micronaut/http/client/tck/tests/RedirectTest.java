@@ -60,7 +60,7 @@ class RedirectTest {
 
     private static final String SPEC_NAME = "RedirectTest";
     private static final String BODY = "It works";
-    private static final BodyAssertion<String> EXPECTED_BODY = BodyAssertion.builder().body(BODY).equals();
+    private static final BodyAssertion<String, String> EXPECTED_BODY = BodyAssertion.builder().body(BODY).equals();
     private static final String REDIRECT = "redirect";
 
     @Test

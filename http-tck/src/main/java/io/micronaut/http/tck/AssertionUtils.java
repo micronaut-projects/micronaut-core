@@ -18,10 +18,12 @@ package io.micronaut.http.tck;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.function.Executable;
@@ -51,7 +53,7 @@ public final class AssertionUtils {
                                     @NonNull HttpRequest<?> request,
                                     @NonNull HttpResponseAssertion assertion) {
         Executable e = assertion.getBody() != null ?
-            () -> server.exchange(request, assertion.getBody().getBodyType()) :
+            () -> server.exchange(request, Argument.of(assertion.getBody().getBodyType()), errorType(assertion)) :
             () -> server.exchange(request);
         HttpClientResponseException thrown = Assertions.assertThrows(HttpClientResponseException.class, e);
         HttpResponse<?> response = thrown.getResponse();
@@ -59,6 +61,18 @@ public final class AssertionUtils {
         assertHeaders(response, assertion.getHeaders());
         assertBody(response, assertion.getBody());
         assertion.getResponseConsumer().ifPresent(httpResponseConsumer -> httpResponseConsumer.accept(response));
+    }
+
+    @Nullable
+    private static Argument errorType(HttpResponseAssertion assertion) {
+        if (assertion.getBody() == null) {
+            return HttpClient.DEFAULT_ERROR_TYPE;
+        }
+        if (assertion.getBody().getErrorType() == null) {
+            return HttpClient.DEFAULT_ERROR_TYPE;
+        }
+        return Argument.of(assertion.getBody().getErrorType());
+
     }
 
     public static void assertThrows(@NonNull ServerUnderTest server,
@@ -89,7 +103,7 @@ public final class AssertionUtils {
                                               @NonNull HttpRequest<T> request,
                                               @NonNull HttpResponseAssertion assertion) {
         ThrowingSupplier<HttpResponse<?>> executable = assertion.getBody() != null ?
-            () -> server.exchange(request, assertion.getBody().getBodyType()) :
+            () -> server.exchange(request, Argument.of(assertion.getBody().getBodyType()), errorType(assertion)) :
             () -> server.exchange(request);
         HttpResponse<?> response = Assertions.assertDoesNotThrow(executable);
         assertEquals(assertion.getHttpStatus(), response.getStatus());
@@ -98,7 +112,7 @@ public final class AssertionUtils {
         assertion.getResponseConsumer().ifPresent(httpResponseConsumer -> httpResponseConsumer.accept(response));
     }
 
-    private static <T> void assertBody(@NonNull HttpResponse<?> response,  @Nullable BodyAssertion<T> bodyAssertion) {
+    private static <T, E> void assertBody(@NonNull HttpResponse<?> response,  @Nullable BodyAssertion<T, E> bodyAssertion) {
         if (bodyAssertion != null) {
             Optional<T> bodyOptional = response.getBody(bodyAssertion.getBodyType());
             assertTrue(bodyOptional.isPresent());
