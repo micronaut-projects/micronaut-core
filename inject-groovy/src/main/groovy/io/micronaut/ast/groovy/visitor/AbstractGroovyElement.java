@@ -357,7 +357,7 @@ public abstract class AbstractGroovyElement implements Element {
                 }
             } else if (resolvedBound instanceof GroovyGenericPlaceholderElement groovyGenericPlaceholderElement) {
                 bounds = groovyGenericPlaceholderElement.getBounds();
-                declaredElement = groovyGenericPlaceholderElement.getDeclaringElement().get();
+                declaredElement = groovyGenericPlaceholderElement.getRequiredDeclaringElement();
                 resolved = groovyGenericPlaceholderElement.getResolvedInternal();
             } else if (resolvedBound instanceof GroovyClassElement resolvedClassElement) {
                 resolved = resolvedClassElement;

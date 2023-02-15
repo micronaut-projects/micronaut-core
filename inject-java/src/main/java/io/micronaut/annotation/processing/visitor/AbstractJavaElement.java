@@ -307,7 +307,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                                          Map<String, ClassElement> declaredTypeArguments,
                                          Set<TypeMirror> visitedTypes,
                                          boolean isTypeVariable) {
-        return newClassElement(owner, type, declaredTypeArguments, visitedTypes, isTypeVariable, false, false, null);
+        return newClassElement(owner, type, declaredTypeArguments, visitedTypes, isTypeVariable, false, null);
     }
 
     @NonNull
@@ -317,7 +317,6 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                                          Set<TypeMirror> visitedTypes,
                                          boolean isTypeVariable,
                                          boolean isRawTypeParameter,
-                                         boolean alwaysFollowTypeVariable,
                                          @Nullable
                                          TypeParameterElement representedTypeParameter) {
         if (declaredTypeArguments == null) {
@@ -461,7 +460,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 String variableName = typeParameter.getSimpleName().toString();
                 resolved.put(
                         variableName,
-                        newClassElement(getNativeType(), typeParameterMirror, parentTypeArguments, visitedTypes, true, false, true, typeParameter)
+                        newClassElement(getNativeType(), typeParameterMirror, parentTypeArguments, visitedTypes, true, false, typeParameter)
                 );
             }
         } else {
@@ -472,7 +471,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 String variableName = typeParameter.getSimpleName().toString();
                 resolved.put(
                         variableName,
-                        newClassElement(getNativeType(), typeParameter.asType(), parentTypeArguments, visitedTypes, true, isRaw, true, null)
+                        newClassElement(getNativeType(), typeParameter.asType(), parentTypeArguments, visitedTypes, true, isRaw, null)
                 );
             }
         }
@@ -496,7 +495,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 }
             } else if (resolvedBound instanceof JavaGenericPlaceholderElement javaGenericPlaceholderElement) {
                 bounds = javaGenericPlaceholderElement.getBounds();
-                declaredElement = javaGenericPlaceholderElement.getDeclaringElement().get();
+                declaredElement = javaGenericPlaceholderElement.getRequiredDeclaringElement();
                 resolved = javaGenericPlaceholderElement.getResolvedInternal();
 
             } else if (resolvedBound instanceof JavaClassElement resolvedClassElement) {

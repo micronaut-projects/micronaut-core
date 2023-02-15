@@ -606,7 +606,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         return visitorContext.getClassElement(getName() + "$Companion", elementAnnotationMetadataFactory)
             .filter(io.micronaut.inject.ast.Element::isStatic)
             .flatMap(typeElement -> typeElement.getEnclosedElements(ElementQuery.ALL_METHODS
-                .annotated(annotationMetadata -> annotationMetadata.hasStereotype(Creator.class))).stream().findFirst()
+                .annotated(am -> am.hasStereotype(Creator.class))).stream().findFirst()
             )
             .filter(method -> !method.isPrivate() && method.getReturnType().equals(this))
             .stream().toList();

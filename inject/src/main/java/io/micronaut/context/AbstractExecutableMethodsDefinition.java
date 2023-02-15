@@ -271,6 +271,22 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             this.isSuspend = isSuspend;
         }
 
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            MethodReference that = (MethodReference) o;
+            return isAbstract == that.isAbstract && isSuspend == that.isSuspend && Objects.equals(declaringType, that.declaringType) && Objects.equals(annotationMetadata, that.annotationMetadata) && Objects.equals(methodName, that.methodName) && Objects.equals(returnArgument, that.returnArgument) && Arrays.equals(arguments, that.arguments);
+        }
+
+        @Override
+        public int hashCode() {
+            return methodName.hashCode();
+        }
     }
 
     /**

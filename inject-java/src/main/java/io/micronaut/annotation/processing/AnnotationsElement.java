@@ -54,22 +54,22 @@ final class AnnotationsElement implements Element {
 
     @Override
     public Set<Modifier> getModifiers() {
-        throw new IllegalStateException("Not supported method");
+        throw notSupportedMethod();
     }
 
     @Override
     public Name getSimpleName() {
-        throw new IllegalStateException("Not supported method");
+        throw notSupportedMethod();
     }
 
     @Override
     public Element getEnclosingElement() {
-        throw new IllegalStateException("Not supported method");
+        throw notSupportedMethod();
     }
 
     @Override
     public List<? extends Element> getEnclosedElements() {
-        throw new IllegalStateException("Not supported method");
+        throw notSupportedMethod();
     }
 
     @Override
@@ -89,7 +89,11 @@ final class AnnotationsElement implements Element {
 
     @Override
     public <R, P> R accept(ElementVisitor<R, P> v, P p) {
-        throw new IllegalStateException("Not supported method");
+        throw notSupportedMethod();
+    }
+
+    private static IllegalStateException notSupportedMethod() {
+        return new IllegalStateException("Not supported method");
     }
 
     @Override

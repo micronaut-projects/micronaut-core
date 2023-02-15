@@ -53,6 +53,14 @@ public interface GenericPlaceholderElement extends GenericElement {
     Optional<Element> getDeclaringElement();
 
     /**
+     * @return The required element declaring this variable, if it can be determined. Must be either a method or a class. Or throws an exception.
+     * @since 4.0.0
+     */
+    default Element getRequiredDeclaringElement() {
+        return getDeclaringElement().orElseThrow(() -> new IllegalStateException("Declared element is not present!"));
+    }
+
+    /**
      * In some cases the class element can be a resolved placeholder.
      * We want to keep the placeholder to reference the type annotations etc.
      *

@@ -634,8 +634,8 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     public ClassElement getType() {
         if (theType == null) {
             GroovyNativeElement nativeType = getNativeType();
-            ClassNode classNode = (ClassNode) nativeType.annotatedNode();
-            ClassNode redirect = classNode.redirect();
+            ClassNode thisClassNode = (ClassNode) nativeType.annotatedNode();
+            ClassNode redirect = thisClassNode.redirect();
             // This should eliminate type annotations
             theType = new GroovyClassElement(visitorContext, new GroovyNativeElement.Class(redirect), elementAnnotationMetadataFactory, resolvedTypeArguments, arrayDimensions, isTypeVar);
         }

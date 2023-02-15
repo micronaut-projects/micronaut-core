@@ -246,8 +246,8 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
                 if (owningType.getName().equals(typeName)) {
                     resolvedDeclaringClass = owningType;
                 } else {
-                    Map<String, ClassElement> typeArguments = owningType.getTypeArguments(typeName);
-                    resolvedDeclaringClass = (JavaClassElement) newClassElement(te.asType(), typeArguments);
+                    Map<String, ClassElement> parentTypeArguments = owningType.getTypeArguments(typeName);
+                    resolvedDeclaringClass = (JavaClassElement) newClassElement(te.asType(), parentTypeArguments);
                 }
             } else {
                 return owningType;

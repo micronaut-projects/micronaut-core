@@ -192,7 +192,7 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
     }
 
     @Nullable
-    public final GroovyClassElement getResolvedInternal() {
+    public GroovyClassElement getResolvedInternal() {
         return resolved;
     }
 }
