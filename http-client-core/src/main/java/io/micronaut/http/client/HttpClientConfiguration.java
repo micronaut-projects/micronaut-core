@@ -379,8 +379,6 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * [not in java.net HttpClient].
-     *
      * @return The default read timeout. Defaults to 10 seconds.
      */
     public Optional<Duration> getReadTimeout() {
