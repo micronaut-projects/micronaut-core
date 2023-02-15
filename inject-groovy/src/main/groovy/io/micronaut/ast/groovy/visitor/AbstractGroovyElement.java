@@ -19,6 +19,7 @@ import groovy.transform.PackageScope;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArrayUtils;
@@ -31,7 +32,6 @@ import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.WildcardElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
-import io.micronaut.inject.ast.annotation.ElementMutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassHelper;
@@ -64,8 +64,8 @@ import java.util.stream.Stream;
  * @author Denis Stepanov
  * @since 1.1
  */
-
-public abstract class AbstractGroovyElement implements Element, ElementMutableAnnotationMetadataDelegate<Element> {
+@Internal
+public abstract class AbstractGroovyElement implements Element {
 
     private static final Pattern JAVADOC_PATTERN = Pattern.compile("(/\\s*\\*\\*)|\\s*\\*|(\\s*[*/])");
 
@@ -95,62 +95,74 @@ public abstract class AbstractGroovyElement implements Element, ElementMutableAn
     }
 
     @Override
-    public <T extends Annotation> Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
-        return ElementMutableAnnotationMetadataDelegate.super.annotate(annotationType, consumer);
-    }
-
-    @Override
-    public Element removeAnnotation(String annotationType) {
-        return ElementMutableAnnotationMetadataDelegate.super.removeAnnotation(annotationType);
-    }
-
-    @Override
-    public <T extends Annotation> Element removeAnnotation(Class<T> annotationType) {
-        return ElementMutableAnnotationMetadataDelegate.super.removeAnnotation(annotationType);
-    }
-
-    @Override
-    public <T extends Annotation> Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
-        return ElementMutableAnnotationMetadataDelegate.super.removeAnnotationIf(predicate);
-    }
-
-    @Override
-    public Element removeStereotype(String annotationType) {
-        return ElementMutableAnnotationMetadataDelegate.super.removeStereotype(annotationType);
-    }
-
-    @Override
-    public <T extends Annotation> Element removeStereotype(Class<T> annotationType) {
-        return ElementMutableAnnotationMetadataDelegate.super.removeStereotype(annotationType);
-    }
-
-    @Override
-    public Element annotate(String annotationType) {
-        return ElementMutableAnnotationMetadataDelegate.super.annotate(annotationType);
-    }
-
-    @Override
-    public <T extends Annotation> Element annotate(Class<T> annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
-        return ElementMutableAnnotationMetadataDelegate.super.annotate(annotationType, consumer);
-    }
-
-    @Override
-    public <T extends Annotation> Element annotate(Class<T> annotationType) {
-        return ElementMutableAnnotationMetadataDelegate.super.annotate(annotationType);
-    }
-
-    @Override
-    public <T extends Annotation> Element annotate(AnnotationValue<T> annotationValue) {
-        return ElementMutableAnnotationMetadataDelegate.super.annotate(annotationValue);
-    }
-
-    @Override
-    public Element getReturnInstance() {
+    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+        getAnnotationMetadataToWrite().annotate(annotationType, consumer);
         return this;
     }
 
     @Override
-    public MutableAnnotationMetadataDelegate<?> getAnnotationMetadata() {
+    public io.micronaut.inject.ast.Element removeAnnotation(String annotationType) {
+        getAnnotationMetadataToWrite().removeAnnotation(annotationType);
+        return this;
+    }
+
+    @Override
+    public <T extends Annotation> io.micronaut.inject.ast.Element removeAnnotation(Class<T> annotationType) {
+        getAnnotationMetadataToWrite().removeAnnotation(annotationType);
+        return this;
+    }
+
+    @Override
+    public <T extends Annotation> io.micronaut.inject.ast.Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
+        getAnnotationMetadataToWrite().removeAnnotationIf(predicate);
+        return this;
+    }
+
+    @Override
+    public io.micronaut.inject.ast.Element removeStereotype(String annotationType) {
+        getAnnotationMetadataToWrite().removeStereotype(annotationType);
+        return this;
+    }
+
+    @Override
+    public <T extends Annotation> io.micronaut.inject.ast.Element removeStereotype(Class<T> annotationType) {
+        getAnnotationMetadataToWrite().removeStereotype(annotationType);
+        return this;
+    }
+
+    @Override
+    public io.micronaut.inject.ast.Element annotate(String annotationType) {
+        getAnnotationMetadataToWrite().annotate(annotationType);
+        return this;
+    }
+
+    @Override
+    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+        getAnnotationMetadataToWrite().annotate(annotationType, consumer);
+        return this;
+    }
+
+    @Override
+    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType) {
+        getAnnotationMetadataToWrite().annotate(annotationType);
+        return this;
+    }
+
+    @Override
+    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(AnnotationValue<T> annotationValue) {
+        getAnnotationMetadataToWrite().annotate(annotationValue);
+        return this;
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return getElementAnnotationMetadata();
+    }
+
+    /**
+     * @return The element annotation metadata
+     */
+    protected ElementAnnotationMetadata getElementAnnotationMetadata() {
         if (elementAnnotationMetadata == null) {
             if (presetAnnotationMetadata == null) {
                 elementAnnotationMetadata = elementAnnotationMetadataFactory.build(this);
@@ -159,6 +171,14 @@ public abstract class AbstractGroovyElement implements Element, ElementMutableAn
             }
         }
         return elementAnnotationMetadata;
+    }
+
+    /**
+     * Get annotation metadata to add or remove annotations.
+     * @return The annotation metadata to write
+     */
+    protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
+        return getElementAnnotationMetadata();
     }
 
     /**
@@ -316,59 +336,76 @@ public abstract class AbstractGroovyElement implements Element, ElementMutableAn
     }
 
     @NonNull
-    private ClassElement resolvePlaceholder(GroovyNativeElement declaredElement,
+    private ClassElement resolvePlaceholder(GroovyNativeElement owner,
                                             AnnotatedNode genericsOwner,
                                             GenericsType genericsType,
                                             GenericsType redirectType,
                                             Map<String, ClassElement> parentTypeArguments,
                                             Set<Object> visitedTypes,
                                             boolean isRawType) {
+        ClassNode placeholderClassNode = genericsType.getType();
         String variableName = genericsType.getName();
-        GroovyNativeElement groovyPlaceholderNativeElement
-            = new GroovyNativeElement.Placeholder(genericsType.getType(), declaredElement, variableName);
-        ClassElement boundVariable = parentTypeArguments.get(variableName);
-        if (boundVariable != null) {
-            if (boundVariable instanceof WildcardElement wildcardElement) {
+
+        ClassElement resolvedBound = parentTypeArguments.get(variableName);
+        List<GroovyClassElement> bounds = null;
+        Element declaredElement = this;
+        GroovyClassElement resolved = null;
+        int arrayDimensions = 0;
+        if (resolvedBound != null) {
+            if (resolvedBound instanceof WildcardElement wildcardElement) {
                 if (wildcardElement.isBounded()) {
                     return wildcardElement;
                 }
+            } else if (resolvedBound instanceof GroovyGenericPlaceholderElement groovyGenericPlaceholderElement) {
+                bounds = groovyGenericPlaceholderElement.getBounds();
+                declaredElement = groovyGenericPlaceholderElement.getRequiredDeclaringElement();
+                resolved = groovyGenericPlaceholderElement.getResolvedInternal();
+                arrayDimensions = groovyGenericPlaceholderElement.getArrayDimensions();
+                isRawType = groovyGenericPlaceholderElement.isRawType();
+            } else if (resolvedBound instanceof GroovyClassElement resolvedClassElement) {
+                resolved = resolvedClassElement;
+                arrayDimensions = resolved.getArrayDimensions();
+                isRawType = resolved.isRawType();
             } else {
-                return boundVariable;
+                // Most likely primitive array
+                return resolvedBound;
             }
         }
-        List<ClassNode> classNodeBounds = new ArrayList<>();
-        addBounds(genericsType, classNodeBounds);
-        if (genericsType != redirectType) {
-            addBounds(redirectType, classNodeBounds);
+        GroovyNativeElement groovyPlaceholderNativeElement = new GroovyNativeElement.Placeholder(placeholderClassNode, owner, variableName);
+        if (bounds == null) {
+            List<ClassNode> classNodeBounds = new ArrayList<>();
+            addBounds(genericsType, classNodeBounds);
+            if (genericsType != redirectType) {
+                addBounds(redirectType, classNodeBounds);
+            }
+
+            PlaceholderEntry placeholderEntry = new PlaceholderEntry(genericsOwner, variableName);
+            boolean alreadyVisitedPlaceholder = visitedTypes.contains(placeholderEntry);
+            if (!alreadyVisitedPlaceholder) {
+                visitedTypes.add(placeholderEntry);
+            }
+            boolean finalIsRawType = isRawType;
+            bounds = classNodeBounds
+                    .stream()
+                    .map(classNode -> {
+                        if (alreadyVisitedPlaceholder && classNode.isGenericsPlaceHolder()) {
+                            classNode = classNode.redirect();
+                        }
+                        return classNode;
+                    })
+                    .filter(classNode -> !alreadyVisitedPlaceholder || !classNode.isGenericsPlaceHolder())
+                    .map(classNode -> {
+                        // Strip declared type arguments and replace with an Object to prevent recursion
+                        boolean stripTypeArguments = alreadyVisitedPlaceholder;
+
+                        return (GroovyClassElement) newClassElement(groovyPlaceholderNativeElement, classNode, parentTypeArguments, visitedTypes, true, finalIsRawType, stripTypeArguments);
+                    })
+                    .toList();
+            if (bounds.isEmpty()) {
+                bounds = Collections.singletonList((GroovyClassElement) getObjectClassElement());
+            }
         }
-
-        PlaceholderEntry placeholderEntry = new PlaceholderEntry(genericsOwner, variableName);
-        boolean alreadyVisitedPlaceholder = visitedTypes.contains(placeholderEntry);
-        if (!alreadyVisitedPlaceholder) {
-            visitedTypes.add(placeholderEntry);
-        }
-
-        List<GroovyClassElement> bounds = classNodeBounds
-            .stream()
-            .map(classNode -> {
-                if (alreadyVisitedPlaceholder && classNode.isGenericsPlaceHolder()) {
-                    classNode = classNode.redirect();
-                }
-                return classNode;
-            })
-            .filter(classNode -> !alreadyVisitedPlaceholder || !classNode.isGenericsPlaceHolder())
-            .map(classNode -> {
-                // Strip declared type arguments and replace with an Object to prevent recursion
-                boolean stripTypeArguments = alreadyVisitedPlaceholder;
-
-                return (GroovyClassElement) newClassElement(groovyPlaceholderNativeElement, classNode, parentTypeArguments, visitedTypes, true, isRawType, stripTypeArguments);
-            })
-            .toList();
-
-        if (bounds.isEmpty()) {
-            bounds = Collections.singletonList((GroovyClassElement) getObjectClassElement());
-        }
-        return new GroovyGenericPlaceholderElement(visitorContext, this, groovyPlaceholderNativeElement, bounds, isRawType, variableName);
+        return new GroovyGenericPlaceholderElement(visitorContext, declaredElement, groovyPlaceholderNativeElement, resolved, bounds, arrayDimensions, isRawType, variableName);
     }
 
     private static void addBounds(GenericsType genericsType, List<ClassNode> classNodeBounds) {
@@ -430,11 +467,9 @@ public abstract class AbstractGroovyElement implements Element, ElementMutableAn
             // TODO: Support primitives for wildcards (? extends byte[])
             return upperType;
         }
+        GroovyNativeElement wildcardNativeElement = new GroovyNativeElement.ClassWithOwner(genericsType.getType(), declaredElement);
         return new GroovyWildcardElement(
-            (GroovyClassElement) upperType,
-            upperBoundsAsElements.stream().map(GroovyClassElement.class::cast).toList(),
-            lowerBoundsAsElements.stream().map(GroovyClassElement.class::cast).toList(),
-            elementAnnotationMetadataFactory
+                wildcardNativeElement, upperBoundsAsElements.stream().map(GroovyClassElement.class::cast).toList(), lowerBoundsAsElements.stream().map(GroovyClassElement.class::cast).toList(), elementAnnotationMetadataFactory, (GroovyClassElement) upperType
         );
     }
 

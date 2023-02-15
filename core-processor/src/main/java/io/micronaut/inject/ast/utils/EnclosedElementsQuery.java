@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
@@ -34,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -53,7 +53,8 @@ import java.util.function.Predicate;
 @Internal
 public abstract class EnclosedElementsQuery<C, N> {
 
-    private final Map<N, Element> elementsCache = new ConcurrentLinkedHashMap.Builder<N, Element>().maximumWeightedCapacity(200).build();
+    private static final int MAX_ITEMS_IN_CACHE = 200;
+    private final Map<N, Element> elementsCache = new LinkedHashMap<>();
 
     /**
      * Get native class element.
@@ -87,14 +88,14 @@ public abstract class EnclosedElementsQuery<C, N> {
         Objects.requireNonNull(query, "Query cannot be null");
         ElementQuery.Result<T> result = query.result();
         Set<N> excludeElements = getExcludedNativeElements(result);
-        Predicate<io.micronaut.inject.ast.Element> filter = element -> {
+        Predicate<T> filter = element -> {
             if (excludeElements.contains(getNativeType(element))) {
                 return false;
             }
             List<Predicate<T>> elementPredicates = result.getElementPredicates();
             if (!elementPredicates.isEmpty()) {
                 for (Predicate<T> elementPredicate : elementPredicates) {
-                    if (!elementPredicate.test((T) element)) {
+                    if (!elementPredicate.test(element)) {
                         return false;
                     }
                 }
@@ -172,10 +173,11 @@ public abstract class EnclosedElementsQuery<C, N> {
             }
             return true;
         };
-        return (List<T>) getAllElements(getNativeClassType(classElement), result.isOnlyDeclared(), (t1, t2) -> reduceElements(t1, t2, result), result)
-            .stream()
-            .filter(filter)
-            .toList();
+        Collection<T> allElements = getAllElements(getNativeClassType(classElement), result.isOnlyDeclared(), (t1, t2) -> reduceElements(t1, t2, result), result);
+        return allElements
+                .stream()
+                .filter(filter)
+                .toList();
     }
 
     private boolean reduceElements(io.micronaut.inject.ast.Element newElement,
@@ -201,26 +203,31 @@ public abstract class EnclosedElementsQuery<C, N> {
         return false;
     }
 
-    private Collection<io.micronaut.inject.ast.Element> getAllElements(C classNode,
-                                                                       boolean onlyDeclared,
-                                                                       BiPredicate<io.micronaut.inject.ast.Element, io.micronaut.inject.ast.Element> reduce,
-                                                                       ElementQuery.Result<?> result) {
-        Set<io.micronaut.inject.ast.Element> elements = new LinkedHashSet<>();
+    private <T extends io.micronaut.inject.ast.Element> Collection<T> getAllElements(C classNode,
+                                                                                     boolean onlyDeclared,
+                                                                                     BiPredicate<T, T> reduce,
+                                                                                     ElementQuery.Result<?> result) {
+        Set<T> elements = new LinkedHashSet<>();
         List<List<N>> hierarchy = new ArrayList<>();
         collectHierarchy(classNode, onlyDeclared, hierarchy, result);
         for (List<N> classElements : hierarchy) {
-            Set<io.micronaut.inject.ast.Element> addedFromClassElements = new LinkedHashSet<>();
+            Set<T> addedFromClassElements = new LinkedHashSet<>();
             classElements:
             for (N element : classElements) {
                 N cacheKey = getCacheKey(element);
-                io.micronaut.inject.ast.Element newElement = elementsCache.computeIfAbsent(cacheKey, e -> this.toAstElement(e, result.getElementType()));
+                T newElement = (T) elementsCache.computeIfAbsent(cacheKey, e -> this.toAstElement(e, result.getElementType()));
+                if (elementsCache.size() == MAX_ITEMS_IN_CACHE) {
+                    Iterator<Map.Entry<N, Element>> iterator = elementsCache.entrySet().iterator();
+                    iterator.next();
+                    iterator.remove();
+                }
                 if (!result.getElementType().isInstance(newElement)) {
                     // dirty cache
                     elementsCache.remove(cacheKey);
-                    newElement = elementsCache.computeIfAbsent(cacheKey, e -> this.toAstElement(e, result.getElementType()));
+                    newElement = (T) elementsCache.computeIfAbsent(cacheKey, e -> this.toAstElement(e, result.getElementType()));
                 }
-                for (Iterator<io.micronaut.inject.ast.Element> iterator = elements.iterator(); iterator.hasNext(); ) {
-                    io.micronaut.inject.ast.Element existingElement = iterator.next();
+                for (Iterator<T> iterator = elements.iterator(); iterator.hasNext(); ) {
+                    T existingElement = iterator.next();
                     if (newElement.equals(existingElement)) {
                         continue;
                     }

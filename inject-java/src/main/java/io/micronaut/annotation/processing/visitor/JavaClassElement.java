@@ -24,6 +24,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
@@ -36,7 +37,9 @@ import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.utils.AstBeanPropertiesUtils;
 import io.micronaut.inject.ast.utils.EnclosedElementsQuery;
 import io.micronaut.inject.processing.JavaModelUtils;
@@ -96,74 +99,62 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     private ClassElement resolvedSuperType;
     private final JavaEnclosedElementsQuery enclosedElementsQuery = new JavaEnclosedElementsQuery();
     @Nullable
+    private ElementAnnotationMetadata elementTypeAnnotationMetadata;
+    @Nullable
+    private ClassElement theType;
+    @Nullable
+    private AnnotationMetadata annotationMetadata;
+    @Nullable
     // Not null means raw type definition: "List myMethod()"
     // Null value means a class definition: "class List<T> {}"
     final List<? extends TypeMirror> typeArguments;
 
     /**
-     * @param classElement              The {@link TypeElement}
+     * @param nativeType                The native type
      * @param annotationMetadataFactory The annotation metadata factory
      * @param visitorContext            The visitor context
      */
     @Internal
-    public JavaClassElement(TypeElement classElement, ElementAnnotationMetadataFactory annotationMetadataFactory, JavaVisitorContext visitorContext) {
-        this(classElement, annotationMetadataFactory, visitorContext, null, null, 0, false);
+    public JavaClassElement(JavaNativeElement.Class nativeType, ElementAnnotationMetadataFactory annotationMetadataFactory, JavaVisitorContext visitorContext) {
+        this(nativeType, annotationMetadataFactory, visitorContext, null, null, 0, false);
     }
 
     /**
-     * @param classElement              The {@link TypeElement}
+     * @param nativeType                The native type
      * @param annotationMetadataFactory The annotation metadata factory
      * @param visitorContext            The visitor context
      * @param typeArguments             The declared type arguments
      * @param resolvedTypeArguments     The resolvedTypeArguments
      */
-    JavaClassElement(TypeElement classElement,
+    JavaClassElement(JavaNativeElement.Class nativeType,
                      ElementAnnotationMetadataFactory annotationMetadataFactory,
                      JavaVisitorContext visitorContext,
                      List<? extends TypeMirror> typeArguments,
                      @Nullable
                      Map<String, ClassElement> resolvedTypeArguments) {
-        this(classElement, annotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, 0, false);
+        this(nativeType, annotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, 0, false);
     }
 
     /**
-     * @param classElement              The {@link TypeElement}
+     * @param nativeType                The native type
      * @param annotationMetadataFactory The annotation metadata factory
      * @param visitorContext            The visitor context
      * @param typeArguments             The declared type arguments
      * @param resolvedTypeArguments     The resolvedTypeArguments
      * @param arrayDimensions           The number of array dimensions
      */
-    JavaClassElement(TypeElement classElement,
+    JavaClassElement(JavaNativeElement.Class nativeType,
                      ElementAnnotationMetadataFactory annotationMetadataFactory,
                      JavaVisitorContext visitorContext,
                      List<? extends TypeMirror> typeArguments,
                      @Nullable
                      Map<String, ClassElement> resolvedTypeArguments,
                      int arrayDimensions) {
-        this(classElement, annotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions, false);
+        this(nativeType, annotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions, false);
     }
 
     /**
-     * @param classElement              The {@link TypeElement}
-     * @param annotationMetadataFactory The annotation metadata factory
-     * @param visitorContext            The visitor context
-     * @param typeArguments             The declared type arguments
-     * @param resolvedTypeArguments     The resolvedTypeArguments
-     * @param isTypeVariable            Is the class element a type variable
-     */
-    JavaClassElement(TypeElement classElement,
-                     ElementAnnotationMetadataFactory annotationMetadataFactory,
-                     JavaVisitorContext visitorContext,
-                     List<? extends TypeMirror> typeArguments,
-                     @Nullable
-                     Map<String, ClassElement> resolvedTypeArguments,
-                     boolean isTypeVariable) {
-        this(classElement, annotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, 0, isTypeVariable);
-    }
-
-    /**
-     * @param classElement              The {@link TypeElement}
+     * @param nativeType                The {@link TypeElement}
      * @param annotationMetadataFactory The annotation metadata factory
      * @param visitorContext            The visitor context
      * @param typeArguments             The declared type arguments
@@ -171,17 +162,16 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
      * @param arrayDimensions           The number of array dimensions
      * @param isTypeVariable            Is the type a type variable
      */
-    JavaClassElement(
-            TypeElement classElement,
-            ElementAnnotationMetadataFactory annotationMetadataFactory,
-            JavaVisitorContext visitorContext,
-            List<? extends TypeMirror> typeArguments,
-            @Nullable
-            Map<String, ClassElement> resolvedTypeArguments,
-            int arrayDimensions,
-            boolean isTypeVariable) {
-        super(classElement, annotationMetadataFactory, visitorContext);
-        this.classElement = classElement;
+    JavaClassElement(JavaNativeElement.Class nativeType,
+                     ElementAnnotationMetadataFactory annotationMetadataFactory,
+                     JavaVisitorContext visitorContext,
+                     List<? extends TypeMirror> typeArguments,
+                     @Nullable
+                     Map<String, ClassElement> resolvedTypeArguments,
+                     int arrayDimensions,
+                     boolean isTypeVariable) {
+        super(nativeType, annotationMetadataFactory, visitorContext);
+        this.classElement = nativeType.element();
         this.typeArguments = typeArguments;
         this.resolvedTypeArguments = resolvedTypeArguments;
         this.arrayDimensions = arrayDimensions;
@@ -189,26 +179,43 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     }
 
     @Override
-    protected JavaClassElement copyThis() {
-        return new JavaClassElement(classElement, elementAnnotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments);
+    public JavaNativeElement.Class getNativeType() {
+        return (JavaNativeElement.Class) super.getNativeType();
     }
 
     @Override
-    protected void copyValues(AbstractJavaElement element) {
-        super.copyValues(element);
-        ((JavaClassElement) element).resolvedTypeArguments = resolvedTypeArguments;
+    protected JavaClassElement copyThis() {
+        return new JavaClassElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions);
     }
 
     @Override
     public ClassElement withTypeArguments(Map<String, ClassElement> newTypeArguments) {
-        JavaClassElement javaClassElement = (JavaClassElement) makeCopy();
-        javaClassElement.resolvedTypeArguments = newTypeArguments;
-        return javaClassElement;
+        return new JavaClassElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, typeArguments, newTypeArguments, arrayDimensions);
     }
 
     @Override
     public ClassElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
         return (ClassElement) super.withAnnotationMetadata(annotationMetadata);
+    }
+
+    @Override
+    protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
+        if (getNativeType().typeMirror() == null) {
+            return super.getAnnotationMetadataToWrite();
+        }
+        return getTypeAnnotationMetadata();
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        if (annotationMetadata == null) {
+            if (getNativeType().typeMirror() == null) {
+                annotationMetadata = super.getAnnotationMetadata();
+            } else {
+                annotationMetadata = new AnnotationMetadataHierarchy(true, super.getAnnotationMetadata(), getTypeAnnotationMetadata());
+            }
+        }
+        return annotationMetadata;
     }
 
     @Override
@@ -229,10 +236,6 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @Override
     public boolean isRecord() {
         return JavaModelUtils.isRecord(classElement);
-    }
-
-    public final TypeElement getNativeTypeElement() {
-        return classElement;
     }
 
     @Override
@@ -285,23 +288,23 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     public List<PropertyElement> getBeanProperties(PropertyElementQuery propertyElementQuery) {
         if (isRecord()) {
             return AstBeanPropertiesUtils.resolveBeanProperties(propertyElementQuery,
-                    this,
-                    this::getRecordMethods,
-                    this::getRecordFields,
-                    true,
-                    Collections.emptySet(),
-                    methodElement -> Optional.empty(),
-                    methodElement -> Optional.empty(),
-                    this::mapToPropertyElement);
+                this,
+                this::getRecordMethods,
+                this::getRecordFields,
+                true,
+                Collections.emptySet(),
+                methodElement -> Optional.empty(),
+                methodElement -> Optional.empty(),
+                this::mapToPropertyElement);
         }
         Function<MethodElement, Optional<String>> customReaderPropertyNameResolver = methodElement -> Optional.empty();
         Function<MethodElement, Optional<String>> customWriterPropertyNameResolver = methodElement -> Optional.empty();
-        if (isKotlinClass(getNativeTypeElement())) {
+        if (isKotlinClass(getNativeType().element())) {
             Set<String> isProperties = getEnclosedElements(ElementQuery.ALL_METHODS)
-                    .stream()
-                    .map(io.micronaut.inject.ast.Element::getName)
-                    .filter(method -> method.startsWith(PREFIX_IS))
-                    .collect(Collectors.toSet());
+                .stream()
+                .map(io.micronaut.inject.ast.Element::getName)
+                .filter(method -> method.startsWith(PREFIX_IS))
+                .collect(Collectors.toSet());
             if (!isProperties.isEmpty()) {
                 customReaderPropertyNameResolver = methodElement -> {
                     String methodName = methodElement.getSimpleName();
@@ -322,34 +325,34 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             }
         }
         return AstBeanPropertiesUtils.resolveBeanProperties(propertyElementQuery,
-                this,
-                () -> getEnclosedElements(ElementQuery.ALL_METHODS),
-                () -> getEnclosedElements(ElementQuery.ALL_FIELDS),
-                false,
-                Collections.emptySet(),
-                customReaderPropertyNameResolver,
-                customWriterPropertyNameResolver,
-                this::mapToPropertyElement);
+            this,
+            () -> getEnclosedElements(ElementQuery.ALL_METHODS),
+            () -> getEnclosedElements(ElementQuery.ALL_FIELDS),
+            false,
+            Collections.emptySet(),
+            customReaderPropertyNameResolver,
+            customWriterPropertyNameResolver,
+            this::mapToPropertyElement);
     }
 
     private JavaPropertyElement mapToPropertyElement(AstBeanPropertiesUtils.BeanPropertyData value) {
         return new JavaPropertyElement(
-                JavaClassElement.this,
-                value.type,
-                value.readAccessKind == null ? null : value.getter,
-                value.writeAccessKind == null ? null : value.setter,
-                value.field,
-                elementAnnotationMetadataFactory,
-                value.propertyName,
-                value.readAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
-                value.writeAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
-                value.isExcluded,
-                visitorContext);
+            JavaClassElement.this,
+            value.type,
+            value.readAccessKind == null ? null : value.getter,
+            value.writeAccessKind == null ? null : value.setter,
+            value.field,
+            elementAnnotationMetadataFactory,
+            value.propertyName,
+            value.readAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.readAccessKind.name()),
+            value.writeAccessKind == null ? PropertyElement.AccessKind.METHOD : PropertyElement.AccessKind.valueOf(value.writeAccessKind.name()),
+            value.isExcluded,
+            visitorContext);
     }
 
     private List<MethodElement> getRecordMethods() {
         List<MethodElement> methodElements = new ArrayList<>();
-        classElement.asType().accept(new SuperclassAwareTypeVisitor<Object, Object>(visitorContext) {
+        classElement.asType().accept(new SuperclassAwareTypeVisitor<>(visitorContext) {
 
             private final Set<String> recordComponents = new HashSet<>();
 
@@ -376,10 +379,14 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             @Override
             protected void accept(DeclaredType type, Element element, Object o) {
                 String name = element.getSimpleName().toString();
-                if (element instanceof ExecutableElement) {
+                if (element instanceof ExecutableElement executableElement) {
                     if (recordComponents.contains(name)) {
                         methodElements.add(
-                                new JavaMethodElement(JavaClassElement.this, (ExecutableElement) element, elementAnnotationMetadataFactory, visitorContext)
+                            new JavaMethodElement(
+                                JavaClassElement.this,
+                                new JavaNativeElement.Method(executableElement),
+                                elementAnnotationMetadataFactory,
+                                visitorContext)
                         );
                     }
                 } else if (element instanceof VariableElement) {
@@ -393,7 +400,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     private List<FieldElement> getRecordFields() {
         List<FieldElement> fieldElements = new ArrayList<>();
-        classElement.asType().accept(new SuperclassAwareTypeVisitor<Object, Object>(visitorContext) {
+        classElement.asType().accept(new SuperclassAwareTypeVisitor<>(visitorContext) {
 
             @Override
             protected boolean isAcceptable(Element element) {
@@ -407,8 +414,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                     List<? extends Element> enclosedElements = element.getEnclosedElements();
                     for (Element enclosedElement : enclosedElements) {
                         if ((JavaModelUtils.isRecordComponent(enclosedElement)
-                                || enclosedElement instanceof ExecutableElement)
-                                && enclosedElement.getKind() != ElementKind.CONSTRUCTOR) {
+                            || enclosedElement instanceof ExecutableElement)
+                            && enclosedElement.getKind() != ElementKind.CONSTRUCTOR) {
                             accept(type, enclosedElement, o);
                         }
                     }
@@ -418,9 +425,13 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
             @Override
             protected void accept(DeclaredType type, Element element, Object o) {
-                if (element instanceof VariableElement) {
+                if (element instanceof VariableElement variableElement) {
                     fieldElements.add(
-                            new JavaFieldElement(JavaClassElement.this, (VariableElement) element, elementAnnotationMetadataFactory, visitorContext)
+                        new JavaFieldElement(
+                            JavaClassElement.this,
+                            new JavaNativeElement.Variable(variableElement),
+                            elementAnnotationMetadataFactory,
+                            visitorContext)
                     );
                 }
             }
@@ -435,17 +446,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     @Override
     public <T extends io.micronaut.inject.ast.Element> List<T> getEnclosedElements(@NonNull ElementQuery<T> query) {
-        ClassElement classElementToInspect;
-        if (this instanceof GenericPlaceholderElement genericPlaceholderElement) {
-            List<? extends ClassElement> bounds = genericPlaceholderElement.getBounds();
-            if (bounds.isEmpty()) {
-                return Collections.emptyList();
-            }
-            classElementToInspect = bounds.get(0);
-        } else {
-            classElementToInspect = this;
-        }
-        return enclosedElementsQuery.getEnclosedElements(classElementToInspect, query);
+        return enclosedElementsQuery.getEnclosedElements(this, query);
     }
 
     @Override
@@ -463,7 +464,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         if (arrayDimensions == this.arrayDimensions) {
             return this;
         }
-        return new JavaClassElement(classElement, elementAnnotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions, false);
+        return new JavaClassElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions, false);
     }
 
     @Override
@@ -498,9 +499,9 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         }
         if (enclosingElement instanceof javax.lang.model.element.PackageElement packageElement) {
             return new JavaPackageElement(
-                    packageElement,
-                    elementAnnotationMetadataFactory,
-                    visitorContext
+                packageElement,
+                elementAnnotationMetadataFactory,
+                visitorContext
             );
         } else {
             return PackageElement.DEFAULT_PACKAGE;
@@ -521,9 +522,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         if (type.isPrimitive()) {
             return isAssignable(type.getName());
         }
-        Object nativeType = type.getNativeType();
-        if (nativeType instanceof TypeElement) {
-            return isAssignable((TypeElement) nativeType);
+        if (type instanceof JavaClassElement javaClassElement) {
+            return isAssignable(javaClassElement.getNativeType().element());
         }
         return isAssignable(type.getName());
     }
@@ -567,8 +567,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             }
             List<ConstructorElement> constructors = getAccessibleConstructors();
             Optional<ConstructorElement> annotatedConstructor = constructors.stream()
-                    .filter(c -> c.hasStereotype(AnnotationUtil.INJECT) || c.hasStereotype(Creator.class))
-                    .findFirst();
+                .filter(c -> c.hasStereotype(AnnotationUtil.INJECT) || c.hasStereotype(Creator.class))
+                .findFirst();
             if (annotatedConstructor.isPresent()) {
                 return annotatedConstructor.map(c -> c);
             }
@@ -581,7 +581,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                     for (int i = 0; i < parameters.length; i++) {
                         ParameterElement parameter = parameters[i];
                         RecordComponentElement rce = recordComponents.get(i);
-                        VariableElement ve = (VariableElement) parameter.getNativeType();
+                        VariableElement ve = ((JavaNativeElement.Variable) parameter.getNativeType()).element();
                         TypeMirror leftType = visitorContext.getTypes().erasure(ve.asType());
                         TypeMirror rightType = visitorContext.getTypes().erasure(rce.asType());
                         if (!leftType.equals(rightType)) {
@@ -604,12 +604,12 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             return staticCreators;
         }
         return visitorContext.getClassElement(getName() + "$Companion", elementAnnotationMetadataFactory)
-                .filter(io.micronaut.inject.ast.Element::isStatic)
-                .flatMap(typeElement -> typeElement.getEnclosedElements(ElementQuery.ALL_METHODS
-                        .annotated(annotationMetadata -> annotationMetadata.hasStereotype(Creator.class))).stream().findFirst()
-                )
-                .filter(method -> !method.isPrivate() && method.getReturnType().equals(this))
-                .stream().toList();
+            .filter(io.micronaut.inject.ast.Element::isStatic)
+            .flatMap(typeElement -> typeElement.getEnclosedElements(ElementQuery.ALL_METHODS
+                .annotated(am -> am.hasStereotype(Creator.class))).stream().findFirst()
+            )
+            .filter(method -> !method.isPrivate() && method.getReturnType().equals(this))
+            .stream().toList();
     }
 
     @Override
@@ -618,8 +618,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             Element enclosingElement = this.classElement.getEnclosingElement();
             if (enclosingElement instanceof TypeElement typeElement) {
                 return Optional.of(visitorContext.getElementFactory().newClassElement(
-                        typeElement,
-                        elementAnnotationMetadataFactory
+                    typeElement,
+                    elementAnnotationMetadataFactory
                 ));
             }
         }
@@ -633,24 +633,24 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             return Collections.emptyList();
         }
         return typeArguments.stream()
-                .map(tm -> newClassElement(tm, getTypeArguments()))
-                .toList();
+            .map(tm -> newClassElement(tm, getTypeArguments()))
+            .toList();
     }
 
     @NonNull
     @Override
     public List<? extends GenericPlaceholderElement> getDeclaredGenericPlaceholders() {
         return classElement.getTypeParameters().stream()
-                // we want the *declared* variables, so we don't pass in our genericsInfo.
-                .map(tpe -> (GenericPlaceholderElement) newClassElement(tpe.asType(), Collections.emptyMap()))
-                .toList();
+            // we want the *declared* variables, so we don't pass in our genericsInfo.
+            .map(tpe -> (GenericPlaceholderElement) newClassElement(tpe.asType(), Collections.emptyMap()))
+            .toList();
     }
 
     @NonNull
     @Override
     public ClassElement getRawClassElement() {
         return visitorContext.getElementFactory().newClassElement(classElement, elementAnnotationMetadataFactory)
-                .withArrayDimensions(getArrayDimensions());
+            .withArrayDimensions(getArrayDimensions());
     }
 
     @NonNull
@@ -677,7 +677,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     @NonNull
     public Map<String, ClassElement> getTypeArguments() {
         if (resolvedTypeArguments == null) {
-            resolvedTypeArguments = resolveTypeArguments(classElement, typeArguments, Collections.emptyMap(), new HashSet<>());
+            resolvedTypeArguments = resolveTypeArguments(classElement, typeArguments);
         }
         return resolvedTypeArguments;
     }
@@ -691,18 +691,50 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         return resolvedAllTypeArguments;
     }
 
+    @Override
+    public ClassElement getType() {
+        if (theType == null) {
+            if (getNativeType().typeMirror() == null) {
+                theType = this;
+            } else {
+                // Strip the type mirror
+                // This should eliminate type annotations
+                theType = new JavaClassElement(new JavaNativeElement.Class(getNativeType().element()), elementAnnotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions);
+            }
+        }
+        return theType;
+    }
+
+    @Override
+    public MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
+        if (elementTypeAnnotationMetadata == null) {
+            elementTypeAnnotationMetadata = elementAnnotationMetadataFactory.buildTypeAnnotations(this);
+        }
+        return elementTypeAnnotationMetadata;
+    }
+
     private final class JavaEnclosedElementsQuery extends EnclosedElementsQuery<TypeElement, Element> {
 
         private List<? extends Element> enclosedElements;
+
+        @Override
+        protected TypeElement getNativeClassType(ClassElement classElement) {
+            return ((JavaClassElement) classElement).getNativeType().element();
+        }
+
+        @Override
+        protected Element getNativeType(io.micronaut.inject.ast.Element element) {
+            return ((AbstractJavaElement) element).getNativeType().element();
+        }
 
         @Override
         protected Set<Element> getExcludedNativeElements(ElementQuery.Result<?> result) {
             if (result.isExcludePropertyElements()) {
                 Set<Element> excludeElements = new HashSet<>();
                 for (PropertyElement excludePropertyElement : getBeanProperties()) {
-                    excludePropertyElement.getReadMethod().ifPresent(methodElement -> excludeElements.add((Element) methodElement.getNativeType()));
-                    excludePropertyElement.getWriteMethod().ifPresent(methodElement -> excludeElements.add((Element) methodElement.getNativeType()));
-                    excludePropertyElement.getField().ifPresent(fieldElement -> excludeElements.add((Element) fieldElement.getNativeType()));
+                    excludePropertyElement.getReadMethod().ifPresent(methodElement -> excludeElements.add(((JavaNativeElement) methodElement.getNativeType()).element()));
+                    excludePropertyElement.getWriteMethod().ifPresent(methodElement -> excludeElements.add(((JavaNativeElement) methodElement.getNativeType()).element()));
+                    excludePropertyElement.getField().ifPresent(methodElement -> excludeElements.add(((JavaNativeElement) methodElement.getNativeType()).element()));
                 }
                 return excludeElements;
             }
@@ -749,7 +781,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         @Override
         protected boolean excludeClass(TypeElement classNode) {
             return classNode.getQualifiedName().toString().equals(Object.class.getName())
-                    || classNode.getQualifiedName().toString().equals(Enum.class.getName());
+                || classNode.getQualifiedName().toString().equals(Enum.class.getName());
         }
 
         @Override
@@ -757,28 +789,28 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
             final JavaElementFactory elementFactory = visitorContext.getElementFactory();
             return switch (enclosedElement.getKind()) {
                 case METHOD -> elementFactory.newMethodElement(
-                        JavaClassElement.this,
-                        (ExecutableElement) enclosedElement,
-                        elementAnnotationMetadataFactory
+                    JavaClassElement.this,
+                    (ExecutableElement) enclosedElement,
+                    elementAnnotationMetadataFactory
                 );
                 case FIELD -> elementFactory.newFieldElement(
-                        JavaClassElement.this,
-                        (VariableElement) enclosedElement,
-                        elementAnnotationMetadataFactory
+                    JavaClassElement.this,
+                    (VariableElement) enclosedElement,
+                    elementAnnotationMetadataFactory
                 );
                 case ENUM_CONSTANT -> elementFactory.newEnumConstantElement(
-                        JavaClassElement.this,
-                        (VariableElement) enclosedElement,
-                        elementAnnotationMetadataFactory
+                    JavaClassElement.this,
+                    (VariableElement) enclosedElement,
+                    elementAnnotationMetadataFactory
                 );
                 case CONSTRUCTOR -> elementFactory.newConstructorElement(
-                        JavaClassElement.this,
-                        (ExecutableElement) enclosedElement,
-                        elementAnnotationMetadataFactory
+                    JavaClassElement.this,
+                    (ExecutableElement) enclosedElement,
+                    elementAnnotationMetadataFactory
                 );
                 case CLASS, ENUM -> elementFactory.newClassElement(
-                        (TypeElement) enclosedElement,
-                        elementAnnotationMetadataFactory
+                    (TypeElement) enclosedElement,
+                    elementAnnotationMetadataFactory
                 );
                 default -> throw new IllegalStateException("Unknown element: " + enclosedElement);
             };

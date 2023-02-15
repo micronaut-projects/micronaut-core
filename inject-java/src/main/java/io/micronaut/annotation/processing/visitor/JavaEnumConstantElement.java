@@ -18,12 +18,11 @@ package io.micronaut.annotation.processing.visitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
-import javax.lang.model.element.VariableElement;
 import java.util.Set;
 
 /**
@@ -34,28 +33,30 @@ import java.util.Set;
 @Internal
 final class JavaEnumConstantElement extends AbstractJavaElement implements EnumConstantElement {
 
-    private final VariableElement variableElement;
     private final JavaEnumElement declaringEnum;
 
     /**
      * @param declaringEnum             The declaring enum element
-     * @param variableElement           The {@link javax.lang.model.element.ExecutableElement}
+     * @param nativeElement             The native element
      * @param annotationMetadataFactory The annotation metadata factory
      * @param visitorContext            The visitor context
      */
     JavaEnumConstantElement(JavaEnumElement declaringEnum,
-                            VariableElement variableElement,
+                            JavaNativeElement.Variable nativeElement,
                             ElementAnnotationMetadataFactory annotationMetadataFactory,
                             JavaVisitorContext visitorContext) {
-        super(variableElement, annotationMetadataFactory, visitorContext);
-
+        super(nativeElement, annotationMetadataFactory, visitorContext);
         this.declaringEnum = declaringEnum;
-        this.variableElement = variableElement;
+    }
+
+    @Override
+    public JavaNativeElement.Variable getNativeType() {
+        return (JavaNativeElement.Variable) super.getNativeType();
     }
 
     @Override
     protected AbstractJavaElement copyThis() {
-        return new JavaEnumConstantElement(declaringEnum, variableElement, elementAnnotationMetadataFactory, visitorContext);
+        return new JavaEnumConstantElement(declaringEnum, getNativeType(), elementAnnotationMetadataFactory, visitorContext);
     }
 
     @Override

@@ -1996,6 +1996,261 @@ class MyBean {
             returnType.hasAnnotation(Introspected.class)
     }
 
+    void "test how the type annotations from the type are propagated"() {
+        given:
+            ClassElement ce = buildClassElement('''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+import java.util.List;
+import io.micronaut.inject.visitor.Book;
+import io.micronaut.inject.visitor.TypeUseRuntimeAnn;
+
+@jakarta.inject.Singleton
+class MyBean {
+
+    @Executable
+    public void saveAll(List<@TypeUseRuntimeAnn Book> books) {
+    }
+
+    @Executable
+    public <@TypeUseRuntimeAnn T extends Book> void saveAll2(List<? extends T> book) {
+    }
+
+    @Executable
+    public <@TypeUseRuntimeAnn T extends Book> void saveAll3(List<T> book) {
+    }
+
+    @Executable
+    public <T extends Book> void saveAll4(List<@TypeUseRuntimeAnn ? extends T> book) {
+    }
+
+    @Executable
+    public <T extends Book> void saveAll5(List<? extends @TypeUseRuntimeAnn T> book) {
+    }
+
+    @Executable
+    public void save2(@TypeUseRuntimeAnn Book book) {
+    }
+
+    @Executable
+    public <@TypeUseRuntimeAnn T extends Book> void save3(T book) {
+    }
+
+    @Executable
+    public <T extends @TypeUseRuntimeAnn Book> void save4(T book) {
+    }
+
+    @Executable
+    public <T extends Book> void save5(@TypeUseRuntimeAnn T book) {
+    }
+
+    @TypeUseRuntimeAnn
+    @Executable
+    public Book get() {
+        return null;
+    }
+}
+
+''')
+        when:
+            def saveAll = ce.findMethod("saveAll").get()
+            def listTypeArgument = saveAll.getParameters()[0].getGenericType().getTypeArguments(List).get("E")
+        then:
+            validateBookArgument(listTypeArgument)
+
+        when:
+            def saveAll2 = ce.findMethod("saveAll2").get()
+            def listTypeArgument2 = saveAll2.getParameters()[0].getGenericType().getTypeArguments(List).get("E")
+        then:
+            validateBookArgument(listTypeArgument2)
+
+//        when:
+//            def saveAll3 = ce.findMethod("saveAll3").get()
+//            def listTypeArgument3 = saveAll3.getParameters()[0].getGenericType().getTypeArguments(List).get("E")
+//        then:
+//            validateBookArgument(listTypeArgument3)
+
+        when:
+            def saveAll4 = ce.findMethod("saveAll4").get()
+            def listTypeArgument4 = saveAll4.getParameters()[0].getGenericType().getTypeArguments(List).get("E")
+        then:
+            validateBookArgument(listTypeArgument4)
+
+//        when:
+//            def saveAll5 = ce.findMethod("saveAll5").get()
+//            def listTypeArgument5 = saveAll5.getParameters()[0].getGenericType().getTypeArguments(List).get("E")
+//        then:
+//            validateBookArgument(listTypeArgument5)
+
+        when:
+            def save2 = ce.findMethod("save2").get()
+            def parameter2 = save2.getParameters()[0].getGenericType()
+        then:
+            validateBookArgument(parameter2)
+
+        when:
+            def save3 = ce.findMethod("save3").get()
+            def parameter3 = save3.getParameters()[0].getGenericType()
+        then:
+            validateBookArgument(parameter3)
+
+        when:
+            def save4 = ce.findMethod("save4").get()
+            def parameter4 = save4.getParameters()[0].getGenericType()
+        then:
+            validateBookArgument(parameter4)
+
+//        when:
+//            def save5 = ce.findMethod("save5").get()
+//            def parameter5 = save5.getParameters()[0].getGenericType()
+//        then:
+//            validateBookArgument(parameter5)
+
+        when:
+            def get = ce.findMethod("get").get()
+            def returnType = get.getGenericReturnType()
+        then:
+            validateBookArgument(returnType)
+    }
+
+    @PendingFeature
+    void "test how the type annotations from the type are propagated - not working case"() {
+        given:
+            ClassElement ce = buildClassElement('''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+import java.util.List;
+import io.micronaut.inject.visitor.Book;
+import io.micronaut.inject.visitor.TypeUseRuntimeAnn;
+
+@jakarta.inject.Singleton
+class MyBean {
+
+    @Executable
+    public <@TypeUseRuntimeAnn T extends Book> void saveAll3(List<T> book) {
+    }
+}
+
+''')
+
+        when:
+            def saveAll3 = ce.findMethod("saveAll3").get()
+            def listTypeArgument3 = saveAll3.getParameters()[0].getGenericType().getTypeArguments(List).get("E")
+        then:
+            validateBookArgument(listTypeArgument3)
+    }
+
+    @PendingFeature
+    void "test how the type annotations from the type are propagated 2"() {
+        given:
+            ClassElement ce = buildClassElement('''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+import java.util.List;
+import io.micronaut.inject.visitor.Book;
+import io.micronaut.inject.visitor.TypeUseRuntimeAnn;
+
+@jakarta.inject.Singleton
+class MyBean {
+
+    @Executable
+    public <T extends Book> void saveAll5(List<? extends @TypeUseRuntimeAnn T> book) {
+    }
+
+    @Executable
+    public <T extends Book> void save5(@TypeUseRuntimeAnn T book) {
+    }
+
+}
+
+''')
+        when:
+            def saveAll5 = ce.findMethod("saveAll5").get()
+            def listTypeArgument5 = saveAll5.getParameters()[0].getGenericType().getTypeArguments(List).get("E")
+        then:
+            validateBookArgument(listTypeArgument5)
+
+        when:
+            def save5 = ce.findMethod("save5").get()
+            def parameter5 = save5.getParameters()[0].getGenericType()
+        then:
+            validateBookArgument(parameter5)
+    }
+
+    void "test interface placeholder"() {
+        ClassElement ce = buildClassElement('''
+package test;
+import java.util.List;
+
+interface Repo<E, ID> extends GenericRepository<E, ID> {
+}
+
+interface GenericRepository<E, ID> {
+}
+
+
+class MyBean {
+    private String name;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+class MyRepo implements Repo<MyBean, Long> {
+}
+
+''')
+
+        when:
+            def repo = ce.getTypeArguments("test.Repo")
+        then:
+            repo.get("E").simpleName == "MyBean"
+            repo.get("E").getMethods().size() == 2
+            repo.get("E").getFields().size() == 1
+        when:
+            def genRepo = ce.getTypeArguments("test.GenericRepository")
+        then:
+            genRepo.get("E").simpleName == "MyBean"
+            genRepo.get("E").getMethods().size() == 2
+            genRepo.get("E").getFields().size() == 1
+        when:
+            def interfaces = ce.getInterfaces()
+        then:
+            interfaces.size() == 1
+            interfaces[0].simpleName == "Repo"
+    }
+
+    void validateBookArgument(ClassElement classElement) {
+        // The class element should have all the annotations present
+        assert classElement.hasAnnotation(TypeUseRuntimeAnn.class)
+        assert classElement.hasAnnotation(MyEntity.class)
+        assert classElement.hasAnnotation(Introspected.class)
+
+        def typeAnnotationMetadata = classElement.getTypeAnnotationMetadata()
+        // The type annotations should have only type annotations
+        assert typeAnnotationMetadata.hasAnnotation(TypeUseRuntimeAnn.class)
+        assert !typeAnnotationMetadata.hasAnnotation(MyEntity.class)
+        assert !typeAnnotationMetadata.hasAnnotation(Introspected.class)
+
+        // Get the actual type -> the type shouldn't have any type annotations
+        def type = classElement.getType()
+        assert !type.hasAnnotation(TypeUseRuntimeAnn.class)
+        assert type.hasAnnotation(MyEntity.class)
+        assert type.hasAnnotation(Introspected.class)
+        assert type.getTypeAnnotationMetadata().isEmpty()
+    }
+
     private void assertListGenericArgument(ClassElement type, Closure cl) {
         def arg1 = type.getAllTypeArguments().get(List.class.name).get("E")
         def arg2 = type.getAllTypeArguments().get(Collection.class.name).get("E")

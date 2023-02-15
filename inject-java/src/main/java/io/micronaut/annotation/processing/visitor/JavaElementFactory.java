@@ -16,6 +16,7 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.annotation.processing.PostponeToNextRoundException;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementFactory;
@@ -41,6 +42,7 @@ import java.util.Objects;
  * @author graemerocher
  * @since 2.3.0
  */
+@Internal
 public class JavaElementFactory implements ElementFactory<Element, TypeElement, ExecutableElement, VariableElement> {
 
     private final JavaVisitorContext visitorContext;
@@ -56,19 +58,19 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
         ElementKind kind = type.getKind();
         return switch (kind) {
             case ENUM -> new JavaEnumElement(
-                    type,
-                    annotationMetadataFactory,
-                    visitorContext
+                new JavaNativeElement.Class(type),
+                annotationMetadataFactory,
+                visitorContext
             );
             case ANNOTATION_TYPE -> new JavaAnnotationElement(
-                    type,
-                    annotationMetadataFactory,
-                    visitorContext
+                new JavaNativeElement.Class(type),
+                annotationMetadataFactory,
+                visitorContext
             );
             default -> new JavaClassElement(
-                    type,
-                    annotationMetadataFactory,
-                    visitorContext
+                new JavaNativeElement.Class(type),
+                annotationMetadataFactory,
+                visitorContext
             );
         };
     }
@@ -90,7 +92,7 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
         ElementKind kind = type.getKind();
         if (kind == ElementKind.ENUM) {
             return new JavaEnumElement(
-                type,
+                new JavaNativeElement.Class(type),
                 annotationMetadataFactory,
                 visitorContext
             ) {
@@ -108,7 +110,7 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
             };
         } else {
             return new JavaClassElement(
-                type,
+                new JavaNativeElement.Class(type),
                 annotationMetadataFactory,
                 visitorContext
             ) {
@@ -136,7 +138,7 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
         failIfPostponeIsNeeded(declaringClass, method);
         return new JavaMethodElement(
             (JavaClassElement) declaringClass,
-            method,
+            new JavaNativeElement.Method(method),
             annotationMetadataFactory,
             visitorContext
         ) {
@@ -163,7 +165,7 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
         failIfPostponeIsNeeded(owningType, method);
         return new JavaMethodElement(
             (JavaClassElement) owningType,
-            method,
+            new JavaNativeElement.Method(method),
             annotationMetadataFactory,
             visitorContext
         );
@@ -178,7 +180,7 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
         failIfPostponeIsNeeded(owningType, constructor);
         return new JavaConstructorElement(
             (JavaClassElement) owningType,
-            constructor,
+            new JavaNativeElement.Method(constructor),
             annotationMetadataFactory,
             visitorContext
         );
@@ -195,7 +197,7 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
         failIfPostponeIsNeeded(owningType, enumConstant);
         return new JavaEnumConstantElement(
             (JavaEnumElement) owningType,
-            enumConstant,
+            new JavaNativeElement.Variable(enumConstant),
             annotationMetadataFactory,
             visitorContext
         );
@@ -209,7 +211,7 @@ public class JavaElementFactory implements ElementFactory<Element, TypeElement, 
         failIfPostponeIsNeeded(owningType, field);
         return new JavaFieldElement(
             (JavaClassElement) owningType,
-            field,
+            new JavaNativeElement.Variable(field),
             annotationMetadataFactory,
             visitorContext
         );

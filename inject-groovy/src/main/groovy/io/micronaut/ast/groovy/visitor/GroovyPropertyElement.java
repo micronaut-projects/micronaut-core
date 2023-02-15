@@ -23,13 +23,12 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
-import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
@@ -59,7 +58,7 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
     @Nullable
     private final FieldElement field;
     private final boolean excluded;
-    private final MutableAnnotationMetadataDelegate<?> annotationMetadata;
+    private final ElementAnnotationMetadata annotationMetadata;
 
     GroovyPropertyElement(GroovyVisitorContext visitorContext,
                           ClassElement owningElement,
@@ -114,7 +113,7 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
                 }).toArray(AnnotationMetadata[]::new)
             );
         }
-        annotationMetadata = new MutableAnnotationMetadataDelegate<Element>() {
+        annotationMetadata = new ElementAnnotationMetadata() {
 
             @Override
             public <T extends Annotation> io.micronaut.inject.ast.Element annotate(AnnotationValue<T> annotationValue) {
@@ -212,7 +211,7 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
     }
 
     @Override
-    public MutableAnnotationMetadataDelegate<?> getAnnotationMetadata() {
+    protected ElementAnnotationMetadata getElementAnnotationMetadata() {
         return annotationMetadata;
     }
 

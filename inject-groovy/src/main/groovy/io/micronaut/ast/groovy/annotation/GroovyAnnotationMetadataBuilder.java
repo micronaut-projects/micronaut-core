@@ -129,7 +129,8 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected boolean isExcludedAnnotation(@NonNull AnnotatedNode element, @NonNull String annotationName) {
-        if (element instanceof ClassNode classNode && classNode.isAnnotationDefinition() && annotationName.startsWith("java.lang.annotation")) {
+        if (element instanceof ClassNode classNode && classNode.isAnnotationDefinition()
+                && (annotationName.startsWith("java.lang.annotation") || annotationName.startsWith("org.codehaus.groovy.transform"))) {
             return false;
         } else {
             return super.isExcludedAnnotation(element, annotationName);
@@ -271,10 +272,8 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     @Override
     protected List<? extends AnnotationNode> getAnnotationsForType(AnnotatedNode element) {
         List<AnnotationNode> annotations = element.getAnnotations();
-        List<AnnotationNode> typeAnnotations = element instanceof ClassNode classNode ? classNode.getTypeAnnotations() : Collections.emptyList();
-        List<AnnotationNode> expanded = new ArrayList<>(annotations.size() + typeAnnotations.size());
+        List<AnnotationNode> expanded = new ArrayList<>(annotations.size());
         expandAnnotations(annotations, expanded);
-        expandAnnotations(typeAnnotations, expanded);
         return expanded;
     }
 

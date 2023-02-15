@@ -26,6 +26,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
@@ -333,12 +334,16 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         generatorAdapter.push(getTypeReference(objectType));
         // 2nd argument: the name
         generatorAdapter.push(argumentName);
-        boolean isTypeVariable = objectType instanceof GenericPlaceholderElement || objectType.isTypeVariable();
-        if (isTypeVariable) {
+
+        if (objectType instanceof GenericPlaceholderElement placeholderElement) {
+            // Persist resolved placeholder for backward compatibility
+            objectType = placeholderElement.getResolved().orElse(placeholderElement);
+        }
+
+        if (objectType instanceof GenericPlaceholderElement || objectType.isTypeVariable()) {
             String variableName = argumentName;
-            if (objectType instanceof GenericPlaceholderElement) {
-                GenericPlaceholderElement gpe = (GenericPlaceholderElement) objectType;
-                variableName = gpe.getVariableName();
+            if (objectType instanceof GenericPlaceholderElement placeholderElement) {
+                variableName = placeholderElement.getVariableName();
             }
             boolean hasVariable = !variableName.equals(argumentName);
             if (hasVariable) {
@@ -390,7 +395,17 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         // 2nd argument: the name
         generatorAdapter.push(argumentName);
 
-        AnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(classElement.getAnnotationMetadata());
+        if (classElement instanceof GenericPlaceholderElement placeholderElement) {
+            // Persist resolved placeholder for backward compatibility
+            classElement = placeholderElement.getResolved().orElse(classElement);
+        }
+
+        // Persist only type annotations added to the type argument
+        AnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(classElement.getTypeAnnotationMetadata());
+        if (classElement.getClass().getSimpleName().startsWith("Kotlin")) {
+            // Remove after KSP supports type annotations
+            annotationMetadata = MutableAnnotationMetadata.of(classElement.getAnnotationMetadata());
+        }
         boolean hasAnnotationMetadata = !annotationMetadata.isEmpty();
 
         boolean isRecursiveType = false;
@@ -404,7 +419,9 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             }
         }
 
-        if (isRecursiveType || !hasAnnotationMetadata && typeArguments.isEmpty()) {
+        boolean typeVariable = classElement.isTypeVariable();
+
+        if (isRecursiveType || !typeVariable && !hasAnnotationMetadata && typeArguments.isEmpty()) {
             invokeInterfaceStaticMethod(
                     generatorAdapter,
                     Argument.class,
@@ -444,7 +461,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         invokeInterfaceStaticMethod(
                 generatorAdapter,
                 Argument.class,
-                classElement.isTypeVariable() ? METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
+                typeVariable ? METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
         );
     }
 
@@ -514,7 +531,10 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
             ClassElement classElement = entry.getGenericType();
             String argumentName = entry.getName();
-            AnnotationMetadata annotationMetadata = entry.getAnnotationMetadata();
+            AnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(
+                entry.getAnnotationMetadata(),
+                entry.getType().getTypeAnnotationMetadata()
+            ).merge();
             Map<String, ClassElement> typeArguments = classElement.getTypeArguments();
             pushCreateArgument(
                     declaringElementName,
@@ -554,32 +574,37 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                                           ClassElement argument,
                                           Map<String, Integer> defaults,
                                           Map<String, GeneratorAdapter> loadTypeMethods) {
-        Type type = Type.getType(Argument.class);
-        if (argument.isPrimitive() && !argument.isArray()) {
-            String constantName = argument.getName().toUpperCase(Locale.ENGLISH);
-            // refer to constant for primitives
-            generatorAdapter.getStatic(type, constantName, type);
-        } else {
+        // Persist only type annotations added
+        AnnotationMetadata annotationMetadata = argument.getTypeAnnotationMetadata();
+
+        if (annotationMetadata.isEmpty()) {
+            Type type = Type.getType(Argument.class);
+            if (argument.isPrimitive() && !argument.isArray()) {
+                String constantName = argument.getName().toUpperCase(Locale.ENGLISH);
+                // refer to constant for primitives
+                generatorAdapter.getStatic(type, constantName, type);
+                return;
+            }
             if (!argument.isArray() && String.class.getName().equals(argument.getType().getName())
                     && argument.getName().equals(argument.getType().getName())
                     && argument.getAnnotationMetadata().isEmpty()) {
-                    generatorAdapter.getStatic(type, "STRING", type);
-                    return;
+                generatorAdapter.getStatic(type, "STRING", type);
+                return;
             }
-
-            pushCreateArgument(
-                    declaringTypeName,
-                    owningType,
-                    classWriter,
-                    generatorAdapter,
-                    argument.getName(),
-                    argument,
-                    AnnotationMetadata.EMPTY_METADATA, // Don't store return type annotations, method annotations are returned
-                    argument.getTypeArguments(),
-                    defaults,
-                    loadTypeMethods
-            );
         }
+
+        pushCreateArgument(
+                declaringTypeName,
+                owningType,
+                classWriter,
+                generatorAdapter,
+                argument.getName(),
+                argument,
+                annotationMetadata,
+                argument.getTypeArguments(),
+                defaults,
+                loadTypeMethods
+        );
     }
 
     /**
@@ -619,8 +644,12 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
         boolean hasAnnotations = !annotationMetadata.isEmpty();
         boolean hasTypeArguments = typeArguments != null && !typeArguments.isEmpty();
+        if (typedElement instanceof GenericPlaceholderElement placeholderElement) {
+            // Persist resolved placeholder for backward compatibility
+            typedElement = placeholderElement.getResolved().orElse(placeholderElement);
+        }
         boolean isGenericPlaceholder = typedElement instanceof GenericPlaceholderElement;
-        boolean isTypeVariable = isGenericPlaceholder || ((typedElement instanceof ClassElement) && ((ClassElement) typedElement).isTypeVariable());
+        boolean isTypeVariable = isGenericPlaceholder || ((typedElement instanceof ClassElement classElement) && classElement.isTypeVariable());
         String variableName = argumentName;
         if (isGenericPlaceholder) {
             variableName = ((GenericPlaceholderElement) typedElement).getVariableName();

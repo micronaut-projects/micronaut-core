@@ -39,15 +39,7 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
     private val beanDefinitionMap = mutableMapOf<String, BeanDefinitionCreator>()
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        val visitorContext = object : KotlinVisitorContext(environment, resolver) {
-            override fun getConfiguration(): VisitorConfiguration {
-                return object : VisitorConfiguration {
-                    override fun includeTypeLevelAnnotationsInGenericArguments(): Boolean {
-                        return false
-                    }
-                }
-            }
-        }
+        val visitorContext = KotlinVisitorContext(environment, resolver)
 
         val elements = resolver.getAllFiles()
             .flatMap { file: KSFile ->
