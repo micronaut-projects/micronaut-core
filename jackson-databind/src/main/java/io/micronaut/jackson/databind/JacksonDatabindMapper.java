@@ -26,17 +26,19 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.jackson.JacksonConfiguration;
 import io.micronaut.jackson.ObjectMapperFactory;
 import io.micronaut.jackson.codec.JacksonFeatures;
+import io.micronaut.jackson.core.parser.JacksonCoreParserFactory;
+import io.micronaut.jackson.core.parser.JacksonCoreProcessor;
 import io.micronaut.jackson.core.tree.JsonNodeTreeCodec;
 import io.micronaut.jackson.core.tree.TreeGenerator;
-import io.micronaut.json.JsonStreamConfig;
-import io.micronaut.json.JsonMapper;
 import io.micronaut.json.JsonFeatures;
-import io.micronaut.jackson.core.parser.JacksonCoreProcessor;
+import io.micronaut.json.JsonMapper;
+import io.micronaut.json.JsonStreamConfig;
 import io.micronaut.json.tree.JsonNode;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -117,6 +119,13 @@ public final class JacksonDatabindMapper implements JsonMapper {
     @Override
     public <T> T readValue(@NonNull byte[] byteArray, @NonNull Argument<T> type) throws IOException {
         return objectMapper.readValue(byteArray, JacksonConfiguration.constructType(type, objectMapper.getTypeFactory()));
+    }
+
+    @Override
+    public <T> T readValue(ByteBuffer<?> byteBuffer, Argument<T> type) throws IOException {
+        try (JsonParser parser = JacksonCoreParserFactory.createJsonParser(objectMapper.getFactory(), byteBuffer)) {
+            return objectMapper.readValue(parser, JacksonConfiguration.constructType(type, objectMapper.getTypeFactory()));
+        }
     }
 
     @Override

@@ -15,9 +15,9 @@
  */
 package io.micronaut.http.server.netty.jackson;
 
+import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.server.HttpServerConfiguration;
@@ -28,11 +28,9 @@ import io.micronaut.json.JsonMapper;
 import io.micronaut.json.tree.JsonNode;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
-import io.netty.buffer.ByteBufUtil;
-import io.netty.util.ReferenceCountUtil;
-import org.reactivestreams.Processor;
-import org.reactivestreams.Subscription;
+import io.netty.buffer.CompositeByteBuf;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.Optional;
 
@@ -47,9 +45,8 @@ import java.util.Optional;
 public class JsonContentProcessor extends AbstractHttpContentProcessor {
 
     private final JsonMapper jsonMapper;
-    private Processor<byte[], JsonNode> jacksonProcessor;
-    private Collection<Object> out;
-    private Throwable failure = null;
+    private JsonCounter counter;
+    private CompositeByteBuf buffer;
 
     /**
      * @param nettyHttpRequest The Netty Http request
@@ -82,87 +79,89 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
                 }
             }
         }
-
-        this.jacksonProcessor = jsonMapper.createReactiveParser(p -> {
-        }, streamArray);
-        this.jacksonProcessor.subscribe(new CompletionAwareSubscriber<>() {
-
-            @Override
-            protected void doOnSubscribe(Subscription jsonSubscription) {
-                jsonSubscription.request(Long.MAX_VALUE);
-            }
-
-            @Override
-            protected void doOnNext(JsonNode message) {
-                if (out == null) {
-                    throw new IllegalStateException("Concurrent access not allowed");
-                }
-                out.add(message);
-            }
-
-            @Override
-            protected void doOnError(Throwable t) {
-                if (out == null) {
-                    throw new IllegalStateException("Concurrent access not allowed");
-                }
-                failure = t;
-            }
-
-            @Override
-            protected void doOnComplete() {
-                if (out == null) {
-                    throw new IllegalStateException("Concurrent access not allowed");
-                }
-            }
-        });
-        this.jacksonProcessor.onSubscribe(new Subscription() {
-            @Override
-            public void request(long n) {
-            }
-
-            @Override
-            public void cancel() {
-                // happens on error, ignore
-            }
-        });
+        counter = JsonCounter.create(streamArray);
         return this;
     }
 
     @Override
     protected void onData(ByteBufHolder message, Collection<Object> out) throws Throwable {
-        if (jacksonProcessor == null) {
+        if (counter == null) {
             resultType(null);
         }
 
-        this.out = out;
         ByteBuf content = message.content();
         try {
-            byte[] bytes = ByteBufUtil.getBytes(content);
-            jacksonProcessor.onNext(bytes);
-        } finally {
-            ReferenceCountUtil.release(content);
-            this.out = null;
+            int end = content.writerIndex();
+            int i = content.readerIndex();
+            JsonCounter.FeedResult feedResult;
+            int bufferStart = -1;
+            if (this.buffer != null) {
+                bufferStart = i;
+            }
+            for (; i < end; i++) {
+                feedResult = counter.feed(content.getByte(i));
+                switch (feedResult) {
+                    case MUST_SKIP -> {
+                        if (bufferStart != -1) {
+                            throw new IllegalStateException("Cannot skip input while buffering");
+                        }
+                    }
+                    case MAY_SKIP -> {
+                    }
+                    case BUFFER -> {
+                        if (bufferStart == -1) {
+                            bufferStart = i;
+                        }
+                    }
+                    case FLUSH_AFTER -> {
+                        if (bufferStart == -1) {
+                            bufferStart = i;
+                        }
+                        flush(out, content.retainedSlice(bufferStart, i - bufferStart + 1));
+                        bufferStart = -1;
+                    }
+                    case FLUSH_BEFORE_AND_SKIP -> {
+                        if (bufferStart == -1) {
+                            bufferStart = i;
+                        }
+                        flush(out, content.retainedSlice(bufferStart, i - bufferStart));
+                        bufferStart = -1;
+                    }
+                }
+            }
+            if (bufferStart != -1) {
+                if (this.buffer == null) {
+                    this.buffer = content.alloc().compositeBuffer();
+                }
+                this.buffer.addComponent(true, content.retainedSlice(bufferStart, i - bufferStart));
+            }
+        } catch (Exception e) {
+            content.release();
+            if (this.buffer != null) {
+                this.buffer.release();
+                this.buffer = null;
+            }
+            throw e;
         }
-        Throwable f = failure;
-        if (f != null) {
-            failure = null;
-            throw f;
+        content.release();
+    }
+
+    private void flush(Collection<Object> out, ByteBuf completedNode) throws IOException {
+        if (this.buffer != null) {
+            completedNode = completedNode == null ? this.buffer : this.buffer.addComponent(true, completedNode);
+            this.buffer = null;
+        }
+        try {
+            out.add(jsonMapper.readValue(NettyByteBufferFactory.DEFAULT.wrap(completedNode), Argument.of(JsonNode.class)));
+        } finally {
+            completedNode.release();
         }
     }
 
     @Override
     public void complete(Collection<Object> out) throws Throwable {
-        if (jacksonProcessor == null) {
-            resultType(null);
-        }
-
-        this.out = out;
-        jacksonProcessor.onComplete();
-        this.out = null;
-        Throwable f = failure;
-        if (f != null) {
-            failure = null;
-            throw f;
+        if (this.buffer != null) {
+            flush(out, null);
         }
     }
 }

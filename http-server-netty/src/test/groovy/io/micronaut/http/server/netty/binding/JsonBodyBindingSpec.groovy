@@ -1,10 +1,10 @@
 package io.micronaut.http.server.netty.binding
 
-import io.micronaut.core.async.annotation.SingleResult
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.core.JsonParseException
 import groovy.json.JsonSlurper
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -72,8 +72,8 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
         then:
         HttpClientResponseException e = thrown()
-        e.message == """Invalid JSON: Unexpected character ('T' (code 84)): expected a valid value (JSON String, Number, Array, Object or token 'null', 'true' or 'false')
- at [Source: UNKNOWN; line: 1, column: 11]"""
+        e.message == """Invalid JSON: Unrecognized token 'The': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')
+ at [Source: (byte[])"{"title":The Stand}"; line: 1, column: 14]"""
         e.response.status == HttpStatus.BAD_REQUEST
 
         when:
