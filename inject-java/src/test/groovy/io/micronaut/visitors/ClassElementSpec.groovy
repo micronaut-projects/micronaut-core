@@ -27,13 +27,11 @@ import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.EnumElement
 import io.micronaut.inject.ast.FieldElement
-import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PackageElement
 import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.inject.ast.PropertyElement
-import io.micronaut.inject.ast.WildcardElement
 import jakarta.inject.Singleton
 import spock.lang.IgnoreIf
 import spock.lang.Issue
@@ -2300,6 +2298,57 @@ class MyBean {
         then:
             returnType.hasAnnotation(MyEntity.class)
             returnType.hasAnnotation(Introspected.class)
+    }
+
+    void "test alias for recursion"() {
+        given:
+            ClassElement ce = buildClassElement('''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+import io.micronaut.test.annotation.MockBean;
+import jakarta.inject.Singleton;
+import jakarta.inject.Inject;
+import java.util.List;
+import java.lang.Integer;
+
+@Singleton
+class MathInnerServiceSpec {
+
+    @Inject
+    MathService mathService;
+
+    @MockBean(MathService.class)
+    static class MyMock implements MathService {
+
+        @Override
+        public Integer compute(Integer num) {
+            return 50;
+        }
+    }
+}
+
+interface MathService {
+
+    Integer compute(Integer num);
+}
+
+
+@Singleton
+class MathServiceImpl implements MathService {
+
+    @Override
+    public Integer compute(Integer num) {
+        return num * 4; // should never be called
+    }
+}
+
+''')
+        when:
+            def replaces = ce.getEnclosedElements(ElementQuery.ALL_INNER_CLASSES).get(0).getAnnotation(Replaces)
+        then:
+            replaces.stringValue("bean").get() == "test.MathService"
     }
 
     void "test how the type annotations from the type are propagated"() {

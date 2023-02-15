@@ -110,7 +110,6 @@ import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.QualifiedBeanType;
 import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.provider.AbstractProviderDefinition;
-import io.micronaut.inject.provider.BeanProviderDefinition;
 import io.micronaut.inject.proxy.InterceptedBeanProxy;
 import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.Qualified;
@@ -2585,7 +2584,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     private <T> boolean checkIfReplaces(BeanDefinition<T> replacingCandidate, BeanDefinition<T> definitionToBeReplaced, AnnotationMetadata annotationMetadata) {
         final AnnotationValue<Replaces> replacesAnnotation = replacingCandidate.getAnnotation(Replaces.class);
-        final Class replacedBeanType = replacesAnnotation.classValue(AnnotationMetadata.VALUE_MEMBER).orElse(getCanonicalBeanType(replacingCandidate));
+        final Class replacedBeanType = replacesAnnotation.classValue(Replaces.MEMBER_BEAN).orElse(getCanonicalBeanType(replacingCandidate));
         final Optional<String> named = replacesAnnotation.stringValue(Replaces.MEMBER_NAMED);
         final Optional<AnnotationClassValue<?>> qualifier = replacesAnnotation.annotationClassValue(Replaces.MEMBER_QUALIFIER);
 

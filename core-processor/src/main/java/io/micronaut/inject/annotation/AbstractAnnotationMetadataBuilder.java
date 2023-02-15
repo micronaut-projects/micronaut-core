@@ -660,9 +660,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                         Object annotationValue,
                                         AnnotationValue<AliasFor> aliasForAnnotation,
                                         List<ProcessedAnnotation> introducedAnnotations) {
-        Optional<String> aliasAnnotation = aliasForAnnotation.stringValue("annotation");
-        Optional<String> aliasAnnotationName = aliasForAnnotation.stringValue("annotationName");
-        Optional<String> aliasMember = aliasForAnnotation.stringValue("member");
+        // Filter out empty values for Groovy
+        Optional<String> aliasAnnotation = aliasForAnnotation.stringValue("annotation").filter(v -> !v.equals(Annotation.class.getName()));
+        Optional<String> aliasAnnotationName = aliasForAnnotation.stringValue("annotationName").filter(v -> !v.isEmpty());
+        Optional<String> aliasMember = aliasForAnnotation.stringValue("member").filter(v -> !v.isEmpty());
 
         if (aliasAnnotation.isPresent() || aliasAnnotationName.isPresent()) {
             if (aliasMember.isPresent()) {
@@ -677,6 +678,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                 .build()
                         )
                     );
+                    introducedAnnotations.add(newAnnotation);
+                    ProcessedAnnotation newNewAnnotation = processAliases(newAnnotation, introducedAnnotations);
+                    if (newNewAnnotation != newAnnotation) {
+                        introducedAnnotations.add(introducedAnnotations.indexOf(newAnnotation), newNewAnnotation);
+                    }
                 }
             }
         } else if (aliasMember.isPresent()) {
