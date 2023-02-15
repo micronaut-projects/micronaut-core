@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -65,9 +66,10 @@ public class JavanetHttpClient extends AbstractJavanetHttpClient implements Http
         MediaTypeCodecRegistry mediaTypeCodecRegistry,
         RequestBinderRegistry requestBinderRegistry,
         String clientId,
-        ConversionService conversionService
+        ConversionService conversionService,
+        JavanetClientSslBuilder sslBuilder
     ) {
-        super(LOG, loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, requestBinderRegistry, clientId, conversionService);
+        super(LOG, loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, requestBinderRegistry, clientId, conversionService, sslBuilder);
     }
 
     public JavanetHttpClient(URI uri, ConversionService conversionService) {
@@ -79,7 +81,8 @@ public class JavanetHttpClient extends AbstractJavanetHttpClient implements Http
             createDefaultMediaTypeRegistry(),
             new DefaultRequestBinderRegistry(conversionService),
             null,
-            conversionService
+            conversionService,
+            new JavanetClientSslBuilder(new ResourceResolver())
         );
     }
 
@@ -97,7 +100,8 @@ public class JavanetHttpClient extends AbstractJavanetHttpClient implements Http
             mediaTypeCodecRegistry,
             new DefaultRequestBinderRegistry(conversionService),
             null,
-            conversionService
+            conversionService,
+            new JavanetClientSslBuilder(new ResourceResolver())
         );
     }
 
@@ -112,7 +116,7 @@ public class JavanetHttpClient extends AbstractJavanetHttpClient implements Http
 
     @Override
     public BlockingHttpClient toBlocking() {
-        return new JavanetBlockingHttpClient(loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, requestBinderRegistry, clientId, conversionService);
+        return new JavanetBlockingHttpClient(loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, requestBinderRegistry, clientId, conversionService, sslBuilder);
     }
 
     @Override

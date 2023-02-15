@@ -20,4 +20,6 @@ dependencies {
 tasks.named<Test>("test") {
     useJUnitPlatform()
     systemProperty("jdk.httpclient.HttpClient.log", "all")
+    // We have to fork the JVM because the JDK HttpClient relies on system properties which are then cached...
+    setForkEvery(1)
 }

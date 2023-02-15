@@ -26,6 +26,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.FilterMatcher;
@@ -237,7 +238,10 @@ public class DefaultJavanetHttpClientRegistry implements AutoCloseable, HttpClie
                 new DefaultRequestBinderRegistry(conversionService)
             ),
             clientId,
-            conversionService
+            conversionService,
+            beanContext.findBean(JavanetClientSslBuilder.class).orElseGet(() ->
+                new JavanetClientSslBuilder(new ResourceResolver())
+            )
         );
     }
 
