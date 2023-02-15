@@ -56,7 +56,6 @@ public class EmbeddedServerUnderTest implements ServerUnderTest {
         return getBlockingHttpClient().exchange(request, bodyType, errorType);
     }
 
-
     @Override
     public ApplicationContext getApplicationContext() {
         return embeddedServer.getApplicationContext();

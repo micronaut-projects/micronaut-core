@@ -17,10 +17,8 @@ package io.micronaut.http.tck;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.http.client.HttpClient;
 
 import java.util.Arrays;
-import java.util.Optional;
 import java.util.function.BiPredicate;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -29,9 +27,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * HTTP Response's body assertions.
  *
  * @param <T> The body type
+ * @param <E> The error type
  */
 @Experimental
-public final class BodyAssertion<T,E> {
+public final class BodyAssertion<T, E> {
 
     private final Class<T> bodyType;
     private final Class<E> errorType;
@@ -80,6 +79,7 @@ public final class BodyAssertion<T,E> {
      * The interface for typed BodyAssertion Builders.
      *
      * @param <T> The body type
+     * @param <E> The error type
      */
     public interface AssertionBuilder<T, E> {
 
@@ -145,7 +145,7 @@ public final class BodyAssertion<T,E> {
     /**
      * Byte Array BodyAssertion Builder.
      */
-    public static class ByteArrayBodyAssertionBuilder extends BodyAssertion.Builder implements BodyAssertion.AssertionBuilder<byte[],byte[]> {
+    public static class ByteArrayBodyAssertionBuilder extends BodyAssertion.Builder implements BodyAssertion.AssertionBuilder<byte[], byte[]> {
 
         private final byte[] body;
 
