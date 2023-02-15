@@ -104,6 +104,7 @@ public class StatusTest {
         @Get("/at-status")
         @Status(HttpStatus.I_AM_A_TEAPOT)
         void atstatus() {
+            // Does nothing, just returns a status
         }
 
         @Get("/response-status")
