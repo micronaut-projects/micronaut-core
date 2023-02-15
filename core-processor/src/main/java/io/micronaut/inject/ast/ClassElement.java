@@ -76,6 +76,8 @@ public interface ClassElement extends TypedElement {
      * @return the type annotations
      * @since 4.0.0
      */
+    @Experimental
+    @NonNull
     default MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
         return (MutableAnnotationMetadataDelegate<AnnotationMetadata>) MutableAnnotationMetadataDelegate.EMPTY;
     }
@@ -471,7 +473,7 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
-     * Find a field with a name.
+     * Find an instance/static field with a name in this class, super class or an interface.
      *
      * @param name The field name
      * @return The field
@@ -484,7 +486,7 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
-     * Return all the methods of this class element.
+     * Find an instance/static method with a name in this class, super class or an interface.
      *
      * @return The methods
      * @since 4.0.0

@@ -56,6 +56,7 @@ public interface GenericPlaceholderElement extends GenericElement {
      * @return The required element declaring this variable, if it can be determined. Must be either a method or a class. Or throws an exception.
      * @since 4.0.0
      */
+    @NonNull
     default Element getRequiredDeclaringElement() {
         return getDeclaringElement().orElseThrow(() -> new IllegalStateException("Declared element is not present!"));
     }

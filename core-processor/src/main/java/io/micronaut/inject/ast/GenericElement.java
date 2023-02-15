@@ -49,6 +49,8 @@ public interface GenericElement extends ClassElement {
      * - The use of the type {@link java.lang.annotation.ElementType#TYPE}
      * @return the type annotations
      */
+    @Experimental
+    @NotNull
     default MutableAnnotationMetadataDelegate<AnnotationMetadata> getGenericTypeAnnotationMetadata() {
         return (MutableAnnotationMetadataDelegate<AnnotationMetadata>) MutableAnnotationMetadataDelegate.EMPTY;
     }

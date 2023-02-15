@@ -39,8 +39,12 @@ public abstract class AbstractMutableAnnotationMetadata<R> implements MutableAnn
      *
      * @return the return instance
      */
+    @NonNull
     protected abstract R getReturnInstance();
 
+    /**
+     * @return The annotation metadata to modify
+     */
     @NonNull
     protected abstract MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite();
 
