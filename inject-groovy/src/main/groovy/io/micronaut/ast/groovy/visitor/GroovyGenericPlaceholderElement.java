@@ -59,9 +59,10 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
                                     @Nullable
                                             GroovyClassElement resolved,
                                     List<GroovyClassElement> bounds,
+                                    int arrayDimensions,
                                     boolean rawType,
                                     String variableName) {
-        this(visitorContext, declaringElement, placeholderNativeElement, variableName, resolved, bounds, selectClassElementRepresentingThisPlaceholder(resolved, bounds), 0, rawType);
+        this(visitorContext, declaringElement, placeholderNativeElement, variableName, resolved, bounds, selectClassElementRepresentingThisPlaceholder(resolved, bounds), arrayDimensions, rawType);
     }
 
     GroovyGenericPlaceholderElement(GroovyVisitorContext visitorContext,
@@ -118,6 +119,11 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
             return resolved;
         }
         return WildcardElement.findUpperType(bounds, bounds);
+    }
+
+    @Override
+    public boolean isTypeVariable() {
+        return getResolved().isEmpty();
     }
 
     @Override

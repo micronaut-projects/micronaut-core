@@ -488,6 +488,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         List<JavaClassElement> bounds = null;
         io.micronaut.inject.ast.Element declaredElement = this;
         JavaClassElement resolved = null;
+        int arrayDimensions = 0;
         if (resolvedBound != null) {
             if (resolvedBound instanceof WildcardElement wildcardElement) {
                 if (wildcardElement.isBounded()) {
@@ -497,9 +498,12 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 bounds = javaGenericPlaceholderElement.getBounds();
                 declaredElement = javaGenericPlaceholderElement.getRequiredDeclaringElement();
                 resolved = javaGenericPlaceholderElement.getResolvedInternal();
-
+                isRawType = javaGenericPlaceholderElement.isRawType();
+                arrayDimensions = javaGenericPlaceholderElement.getArrayDimensions();
             } else if (resolvedBound instanceof JavaClassElement resolvedClassElement) {
                 resolved = resolvedClassElement;
+                isRawType = resolvedClassElement.isRawType();
+                arrayDimensions = resolvedClassElement.getArrayDimensions();
             } else {
                 // Most likely primitive array
                 return resolvedBound;
@@ -516,7 +520,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                     .map(tm -> (JavaClassElement) newClassElement(owner, tm, parentTypeArguments, visitedTypes, true))
                     .forEach(bounds::add);
         }
-        return new JavaGenericPlaceholderElement(new JavaNativeElement.Placeholder(tv.asElement(), tv, getNativeType()), tv, declaredElement, resolved, bounds, elementAnnotationMetadataFactory, 0, isRawType);
+        return new JavaGenericPlaceholderElement(new JavaNativeElement.Placeholder(tv.asElement(), tv, getNativeType()), tv, declaredElement, resolved, bounds, elementAnnotationMetadataFactory, arrayDimensions, isRawType);
     }
 
     private boolean hasModifier(Modifier modifier) {

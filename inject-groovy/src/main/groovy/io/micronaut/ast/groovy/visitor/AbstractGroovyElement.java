@@ -350,6 +350,7 @@ public abstract class AbstractGroovyElement implements Element {
         List<GroovyClassElement> bounds = null;
         Element declaredElement = this;
         GroovyClassElement resolved = null;
+        int arrayDimensions = 0;
         if (resolvedBound != null) {
             if (resolvedBound instanceof WildcardElement wildcardElement) {
                 if (wildcardElement.isBounded()) {
@@ -359,8 +360,12 @@ public abstract class AbstractGroovyElement implements Element {
                 bounds = groovyGenericPlaceholderElement.getBounds();
                 declaredElement = groovyGenericPlaceholderElement.getRequiredDeclaringElement();
                 resolved = groovyGenericPlaceholderElement.getResolvedInternal();
+                arrayDimensions = groovyGenericPlaceholderElement.getArrayDimensions();
+                isRawType = groovyGenericPlaceholderElement.isRawType();
             } else if (resolvedBound instanceof GroovyClassElement resolvedClassElement) {
                 resolved = resolvedClassElement;
+                arrayDimensions = resolved.getArrayDimensions();
+                isRawType = resolved.isRawType();
             } else {
                 // Most likely primitive array
                 return resolvedBound;
@@ -379,6 +384,7 @@ public abstract class AbstractGroovyElement implements Element {
             if (!alreadyVisitedPlaceholder) {
                 visitedTypes.add(placeholderEntry);
             }
+            boolean finalIsRawType = isRawType;
             bounds = classNodeBounds
                     .stream()
                     .map(classNode -> {
@@ -392,14 +398,14 @@ public abstract class AbstractGroovyElement implements Element {
                         // Strip declared type arguments and replace with an Object to prevent recursion
                         boolean stripTypeArguments = alreadyVisitedPlaceholder;
 
-                        return (GroovyClassElement) newClassElement(groovyPlaceholderNativeElement, classNode, parentTypeArguments, visitedTypes, true, isRawType, stripTypeArguments);
+                        return (GroovyClassElement) newClassElement(groovyPlaceholderNativeElement, classNode, parentTypeArguments, visitedTypes, true, finalIsRawType, stripTypeArguments);
                     })
                     .toList();
             if (bounds.isEmpty()) {
                 bounds = Collections.singletonList((GroovyClassElement) getObjectClassElement());
             }
         }
-        return new GroovyGenericPlaceholderElement(visitorContext, declaredElement, groovyPlaceholderNativeElement, resolved, bounds, isRawType, variableName);
+        return new GroovyGenericPlaceholderElement(visitorContext, declaredElement, groovyPlaceholderNativeElement, resolved, bounds, arrayDimensions, isRawType, variableName);
     }
 
     private static void addBounds(GenericsType genericsType, List<ClassNode> classNodeBounds) {

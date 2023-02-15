@@ -3,6 +3,7 @@ package io.micronaut.inject.beans
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Order
+import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Issue
@@ -491,5 +492,84 @@ public class Test {
         param2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
         param3.getAnnotationMetadata().getAnnotationNames().size() == 1
         param3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
+    }
+
+    void "test isTypeVariable"() {
+        given:
+            BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
+package test;
+import javax.validation.constraints.*;
+import java.util.List;
+
+@jakarta.inject.Singleton
+public class Test implements Serde<Object> {
+}
+
+interface Serde<T> extends Serializer<T>, Deserializer<T> {
+}
+
+interface Serializer<T> {
+}
+
+interface Deserializer<T> {
+}
+
+
+        ''')
+
+        when: "Micronaut Serialization use-case"
+            def serdeTypeParam = definition.getTypeArguments("test.Serde")[0]
+            def serializerTypeParam = definition.getTypeArguments("test.Serializer")[0]
+            def deserializerTypeParam = definition.getTypeArguments("test.Deserializer")[0]
+
+        then: "The first is a placeholder"
+            serdeTypeParam.isTypeVariable() //
+            (serdeTypeParam instanceof GenericPlaceholder)
+        and: "threat resolved placeholder as not a type variable"
+            !serializerTypeParam.isTypeVariable()
+            !(serializerTypeParam instanceof GenericPlaceholder)
+            !deserializerTypeParam.isTypeVariable()
+            !(deserializerTypeParam instanceof GenericPlaceholder)
+    }
+
+    void "test isTypeVariable array"() {
+        given:
+            BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
+package test;
+import javax.validation.constraints.*;
+import java.util.List;
+
+@jakarta.inject.Singleton
+public class Test implements Serde<String[]> {
+}
+
+interface Serde<T> extends Serializer<T>, Deserializer<T> {
+}
+
+interface Serializer<T> {
+}
+
+interface Deserializer<T> {
+}
+
+
+        ''')
+
+        when: "Micronaut Serialization use-case"
+            def serdeTypeParam = definition.getTypeArguments("test.Serde")[0]
+            def serializerTypeParam = definition.getTypeArguments("test.Serializer")[0]
+            def deserializerTypeParam = definition.getTypeArguments("test.Deserializer")[0]
+
+        then: "The first is a placeholder"
+            serdeTypeParam.simpleName == "String[]"
+            !serdeTypeParam.isTypeVariable() // Arrays are not resolved as JavaClassElements or placeholders
+            !(serdeTypeParam instanceof GenericPlaceholder)
+        and: "threat resolved placeholder as not a type variable"
+            serializerTypeParam.simpleName == "String[]"
+            !serializerTypeParam.isTypeVariable()
+            !(serializerTypeParam instanceof GenericPlaceholder)
+            deserializerTypeParam.simpleName == "String[]"
+            !deserializerTypeParam.isTypeVariable()
+            !(deserializerTypeParam instanceof GenericPlaceholder)
     }
 }

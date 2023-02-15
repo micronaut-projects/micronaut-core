@@ -287,6 +287,20 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         public int hashCode() {
             return methodName.hashCode();
         }
+
+        @Override
+        public String toString() {
+            final StringBuilder sb = new StringBuilder("MethodReference{");
+            sb.append("declaringType=").append(declaringType);
+            sb.append(", annotationMetadata=").append(annotationMetadata);
+            sb.append(", methodName='").append(methodName).append('\'');
+            sb.append(", returnArgument=").append(returnArgument);
+            sb.append(", arguments=").append(Arrays.toString(arguments));
+            sb.append(", isAbstract=").append(isAbstract);
+            sb.append(", isSuspend=").append(isSuspend);
+            sb.append('}');
+            return sb.toString();
+        }
     }
 
     /**

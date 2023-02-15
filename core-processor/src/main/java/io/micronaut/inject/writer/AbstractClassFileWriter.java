@@ -334,12 +334,17 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         generatorAdapter.push(getTypeReference(objectType));
         // 2nd argument: the name
         generatorAdapter.push(argumentName);
-        boolean isTypeVariable = objectType instanceof GenericPlaceholderElement || objectType.isTypeVariable();
+        boolean isTypeVariable;
+        if (objectType instanceof GenericPlaceholderElement placeholderElement) {
+            isTypeVariable = placeholderElement.getResolved().isEmpty();
+        } else {
+            isTypeVariable = objectType.isTypeVariable();
+        }
+
         if (isTypeVariable) {
             String variableName = argumentName;
-            if (objectType instanceof GenericPlaceholderElement) {
-                GenericPlaceholderElement gpe = (GenericPlaceholderElement) objectType;
-                variableName = gpe.getVariableName();
+            if (objectType instanceof GenericPlaceholderElement placeholderElement) {
+                variableName = placeholderElement.getVariableName();
             }
             boolean hasVariable = !variableName.equals(argumentName);
             if (hasVariable) {
