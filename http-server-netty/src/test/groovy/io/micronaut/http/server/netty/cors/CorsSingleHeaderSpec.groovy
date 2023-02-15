@@ -50,9 +50,9 @@ class CorsSingleHeaderSpec extends Specification {
         optionsResponse.status == HttpStatus.OK
         optionsResponse.header(ACCESS_CONTROL_ALLOW_ORIGIN) == 'foo.com'
         optionsResponse.header(VARY) == ORIGIN
-        optionsHeaderNames.stream().anyMatch {it.contains(ACCESS_CONTROL_ALLOW_HEADERS) }
-        optionsHeaderNames.stream().anyMatch {it.contains(ACCESS_CONTROL_ALLOW_METHODS) }
-        optionsHeaderNames.stream().anyMatch {it.contains(ACCESS_CONTROL_EXPOSE_HEADERS) }
+        optionsHeaderNames.contains(ACCESS_CONTROL_ALLOW_HEADERS)
+        optionsHeaderNames.contains(ACCESS_CONTROL_ALLOW_METHODS)
+        optionsHeaderNames.contains(ACCESS_CONTROL_EXPOSE_HEADERS)
         response.status() == HttpStatus.OK
         response.header(ACCESS_CONTROL_ALLOW_ORIGIN) == 'foo.com'
 

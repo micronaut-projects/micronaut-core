@@ -44,7 +44,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         response.status == HttpStatus.NO_CONTENT
         response.contentLength == -1
         headerNames.size() == 1
-        headerNames.any { it == "connection" }
+        headerNames.contains("connection")
     }
 
     void "test cors request without configuration"() {
@@ -60,7 +60,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         then:
         response.status == HttpStatus.NO_CONTENT
         headerNames.size() == 1
-        headerNames.any { it == "connection" }
+        headerNames.contains("connection")
     }
 
     void "test cors request with a controller that returns map"() {
