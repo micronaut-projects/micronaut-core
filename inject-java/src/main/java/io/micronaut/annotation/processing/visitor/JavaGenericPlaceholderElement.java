@@ -163,7 +163,7 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
 
     @Override
     public boolean isTypeVariable() {
-        return getResolved().isEmpty();
+        return true;
     }
 
     @Override

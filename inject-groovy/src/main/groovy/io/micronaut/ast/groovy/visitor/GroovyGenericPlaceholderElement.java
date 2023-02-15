@@ -123,7 +123,7 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
 
     @Override
     public boolean isTypeVariable() {
-        return getResolved().isEmpty();
+        return true;
     }
 
     @Override

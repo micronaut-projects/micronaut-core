@@ -334,14 +334,13 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         generatorAdapter.push(getTypeReference(objectType));
         // 2nd argument: the name
         generatorAdapter.push(argumentName);
-        boolean isTypeVariable;
+
         if (objectType instanceof GenericPlaceholderElement placeholderElement) {
-            isTypeVariable = placeholderElement.getResolved().isEmpty();
-        } else {
-            isTypeVariable = objectType.isTypeVariable();
+            // Persist resolved placeholder for backward compatibility
+            objectType = placeholderElement.getResolved().orElse(placeholderElement);
         }
 
-        if (isTypeVariable) {
+        if (objectType instanceof GenericPlaceholderElement || objectType.isTypeVariable()) {
             String variableName = argumentName;
             if (objectType instanceof GenericPlaceholderElement placeholderElement) {
                 variableName = placeholderElement.getVariableName();
@@ -415,7 +414,9 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             }
         }
 
-        if (isRecursiveType || !hasAnnotationMetadata && typeArguments.isEmpty()) {
+        boolean typeVariable = classElement.isTypeVariable();
+
+        if (isRecursiveType || !typeVariable && !hasAnnotationMetadata && typeArguments.isEmpty()) {
             invokeInterfaceStaticMethod(
                     generatorAdapter,
                     Argument.class,
@@ -455,7 +456,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         invokeInterfaceStaticMethod(
                 generatorAdapter,
                 Argument.class,
-                classElement.isTypeVariable() ? METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
+                typeVariable ? METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
         );
     }
 
@@ -638,8 +639,12 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
         boolean hasAnnotations = !annotationMetadata.isEmpty();
         boolean hasTypeArguments = typeArguments != null && !typeArguments.isEmpty();
+        if (typedElement instanceof GenericPlaceholderElement placeholderElement) {
+            // Persist resolved placeholder for backward compatibility
+            typedElement = placeholderElement.getResolved().orElse(placeholderElement);
+        }
         boolean isGenericPlaceholder = typedElement instanceof GenericPlaceholderElement;
-        boolean isTypeVariable = isGenericPlaceholder || ((typedElement instanceof ClassElement) && ((ClassElement) typedElement).isTypeVariable());
+        boolean isTypeVariable = isGenericPlaceholder || ((typedElement instanceof ClassElement classElement) && classElement.isTypeVariable());
         String variableName = argumentName;
         if (isGenericPlaceholder) {
             variableName = ((GenericPlaceholderElement) typedElement).getVariableName();
