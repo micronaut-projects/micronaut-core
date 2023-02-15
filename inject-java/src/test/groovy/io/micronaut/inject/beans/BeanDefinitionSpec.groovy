@@ -526,10 +526,10 @@ interface Deserializer<T> {
             serdeTypeParam.isTypeVariable() //
             (serdeTypeParam instanceof GenericPlaceholder)
         and: "threat resolved placeholder as not a type variable"
-            !serializerTypeParam.isTypeVariable()
-            !(serializerTypeParam instanceof GenericPlaceholder)
-            !deserializerTypeParam.isTypeVariable()
-            !(deserializerTypeParam instanceof GenericPlaceholder)
+            serializerTypeParam.isTypeVariable()
+            (serializerTypeParam instanceof GenericPlaceholder)
+            deserializerTypeParam.isTypeVariable()
+            (deserializerTypeParam instanceof GenericPlaceholder)
     }
 
     void "test isTypeVariable array"() {
@@ -559,10 +559,10 @@ interface Deserializer<T> {
             def serdeTypeParam = definition.getTypeArguments("test.Serde")[0]
             def serializerTypeParam = definition.getTypeArguments("test.Serializer")[0]
             def deserializerTypeParam = definition.getTypeArguments("test.Deserializer")[0]
-
+        // Arrays are not resolved as JavaClassElements or placeholders
         then: "The first is a placeholder"
             serdeTypeParam.simpleName == "String[]"
-            !serdeTypeParam.isTypeVariable() // Arrays are not resolved as JavaClassElements or placeholders
+            !serdeTypeParam.isTypeVariable()
             !(serdeTypeParam instanceof GenericPlaceholder)
         and: "threat resolved placeholder as not a type variable"
             serializerTypeParam.simpleName == "String[]"

@@ -395,6 +395,11 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         // 2nd argument: the name
         generatorAdapter.push(argumentName);
 
+        if (classElement instanceof GenericPlaceholderElement placeholderElement) {
+            // Persist resolved placeholder for backward compatibility
+            classElement = placeholderElement.getResolved().orElse(classElement);
+        }
+
         // Persist only type annotations added to the type argument
         AnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(classElement.getTypeAnnotationMetadata());
         if (classElement.getClass().getSimpleName().startsWith("Kotlin")) {
