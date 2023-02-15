@@ -51,6 +51,7 @@ public final class HttpRequestFactory {
         MediaTypeCodecRegistry mediaTypeCodecRegistry
     ) {
         final HttpRequest.Builder builder = HttpRequest.newBuilder().uri(uri);
+        configuration.getReadTimeout().ifPresent(builder::timeout);
         HttpRequest.BodyPublisher bodyPublisher = publisherForRequest(request, bodyType, mediaTypeCodecRegistry);
         builder.method(request.getMethod().toString(), bodyPublisher);
         request.getHeaders().forEach((name, values) -> values.forEach(value -> builder.header(name, value)));
