@@ -15,6 +15,7 @@ dependencies {
     testImplementation(projects.jacksonDatabind)
     testImplementation(projects.httpServerNetty)
     testImplementation(libs.bcpkix)
+    testImplementation(libs.testcontainers.spock)
 }
 
 tasks.named<Test>("test") {
