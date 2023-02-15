@@ -169,7 +169,7 @@ abstract class AbstractJavanetHttpClient {
     protected Object getLoadBalancerDiscriminator() {
         return null;
     }
-    
+
     public MediaTypeCodecRegistry getMediaTypeCodecRegistry() {
         return mediaTypeCodecRegistry;
     }

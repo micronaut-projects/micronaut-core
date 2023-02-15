@@ -318,8 +318,6 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * [not in java.net HttpClient].
-     *
      * @return The client-specific logger name if configured
      */
     public Optional<String> getLoggerName() {
