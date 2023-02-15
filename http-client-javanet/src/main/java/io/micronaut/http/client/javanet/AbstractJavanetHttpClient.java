@@ -33,6 +33,7 @@ import io.micronaut.http.context.ContextPathUtils;
 import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.http.ssl.SslConfigurationException;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
 import javax.net.ssl.SSLContext;
@@ -83,7 +84,7 @@ abstract class AbstractJavanetHttpClient {
         String clientId,
         ConversionService conversionService
     ) {
-        this.log = log;
+        this.log = configuration.getLoggerName().map(LoggerFactory::getLogger).orElse(log);
         this.loadBalancer = loadBalancer;
         this.httpVersion = httpVersion;
         this.configuration = configuration;
