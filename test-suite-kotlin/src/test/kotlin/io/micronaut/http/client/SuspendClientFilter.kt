@@ -19,7 +19,7 @@ class SuspendClientFilter : HttpClientFilter {
         // if request contains filterCheck, then do flow step, else proceed
         return if ((request.body.orElse(null) as? Map<*, *>)?.containsValue(filterCheck) == true) {
             flow { emit(getValue()) }.flatMapMerge {
-                chain.proceed(request.header("myTestHeader", it)).asFlow()
+                chain.proceed(request).asFlow()
             }.asPublisher()
         } else {
             chain.proceed(request)
