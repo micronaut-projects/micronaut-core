@@ -10,7 +10,7 @@ The `micronaut-runtime` module has been split into separate modules depending on
 
 ===== Micronaut Discovery Core
 
-`micronaut-discovery-core` - The base service discovery features are now a separate module. If you application listens for events such as api:discovery.event.ServiceReadyEvent[] or api:discovery.heartbeat.HeartBeatEvent[] this module should be added to the application classpath.
+`micronaut-discovery-core` - The base service discovery features are now a separate module. If you application listens for events such as api:discovery.event.ServiceReadyEvent[] or api:health.HeartBeatEvent[] this module should be added to the application classpath.
 
 dependency::micronaut-discovery[]
 
