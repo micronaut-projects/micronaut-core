@@ -671,12 +671,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 aliasedAnnotation = aliasAnnotation.orElseGet(aliasAnnotationName::get);
                 String aliasedMemberName = aliasMember.get();
                 if (annotationValue != null) {
-                    introducedAnnotations.add(
-                        toProcessedAnnotation(
+                    ProcessedAnnotation newAnnotation = toProcessedAnnotation(
                             AnnotationValue.builder(aliasedAnnotation, getRetentionPolicy(aliasedAnnotation))
-                                .members(Collections.singletonMap(aliasedMemberName, annotationValue))
-                                .build()
-                        )
+                                    .members(Collections.singletonMap(aliasedMemberName, annotationValue))
+                                    .build()
                     );
                     introducedAnnotations.add(newAnnotation);
                     ProcessedAnnotation newNewAnnotation = processAliases(newAnnotation, introducedAnnotations);
