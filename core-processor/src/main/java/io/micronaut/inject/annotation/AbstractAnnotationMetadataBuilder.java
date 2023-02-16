@@ -38,7 +38,6 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.inject.visitor.VisitorContext;
 import jakarta.inject.Qualifier;
-import org.jetbrains.annotations.NotNull;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
@@ -660,10 +659,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                         Object annotationValue,
                                         AnnotationValue<AliasFor> aliasForAnnotation,
                                         List<ProcessedAnnotation> introducedAnnotations) {
-        // Filter out empty values for Groovy
-        Optional<String> aliasAnnotation = aliasForAnnotation.stringValue("annotation").filter(v -> !v.equals(Annotation.class.getName()));
-        Optional<String> aliasAnnotationName = aliasForAnnotation.stringValue("annotationName").filter(v -> !v.isEmpty());
-        Optional<String> aliasMember = aliasForAnnotation.stringValue("member").filter(v -> !v.isEmpty());
+        Optional<String> aliasAnnotation = aliasForAnnotation.stringValue("annotation");
+        Optional<String> aliasAnnotationName = aliasForAnnotation.stringValue("annotationName");
+        Optional<String> aliasMember = aliasForAnnotation.stringValue("member");
 
         if (aliasAnnotation.isPresent() || aliasAnnotationName.isPresent()) {
             if (aliasMember.isPresent()) {
@@ -775,7 +773,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         addAnnotations(annotationMetadata, annotationValues, isDeclared, parentAnnotations);
     }
 
-    @NotNull
+    @NonNull
     private Stream<ProcessedAnnotation> annotationMirrorToAnnotationValue(Stream<? extends A> stream,
                                                                           T element,
                                                                           boolean originatingElementIsSameParent,
@@ -872,8 +870,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         );
     }
 
-    @NotNull
-    private Map<CharSequence, Object> getCachedAnnotationDefaults(String annotationName, T annotationType) {
+    /**
+     * Get the cached annotation defaults.
+     * @param annotationName The annotation name
+     * @param annotationType The annotation type
+     * @return The defaults
+     */
+    @NonNull
+    protected Map<CharSequence, Object> getCachedAnnotationDefaults(String annotationName, T annotationType) {
         Map<CharSequence, Object> defaultValues;
         final Map<CharSequence, Object> defaults = ANNOTATION_DEFAULTS.get(annotationName);
         if (defaults != null) {
