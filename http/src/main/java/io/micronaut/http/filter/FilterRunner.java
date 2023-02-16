@@ -33,7 +33,6 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.inject.ExecutableMethod;
-import org.jetbrains.annotations.NotNull;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -944,7 +943,7 @@ public class FilterRunner {
             }
         }
 
-        @NotNull
+        @NonNull
         private ExecutionFlow<FilterContext> asFilterProcessed(FilterContext filterContext,
                                                                @Nullable
                                                                HttpResponse<?> newResponse,
