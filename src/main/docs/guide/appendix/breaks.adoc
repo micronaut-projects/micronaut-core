@@ -44,8 +44,7 @@ dependency:micronaut-reactor[groupId="io.micronaut.reactor"]
 
 ==== Session Support Moved to Session Module
 
-The Session handling features have been moved to a new `micronaut-session` module.
-If you require session support, you should make your application depend on
+The Session handling features https://micronaut-projects.github.io/micronaut-session/snapshot/guide/[have been moved to its own module]. If you use the HTTP session module, change the maven coordinates from `io.micronaut:micronaut-session` to `io.micronaut.session:micronaut-session`.
 
 dependency:micronaut-session[groupId="io.micronaut.session"]
 
