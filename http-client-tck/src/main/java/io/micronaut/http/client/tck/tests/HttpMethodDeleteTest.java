@@ -29,25 +29,26 @@ import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
+import java.util.Map;
 
+import static io.micronaut.http.tck.ServerUnderTest.BLOCKING_CLIENT_PROPERTY;
 import static io.micronaut.http.tck.TestScenario.asserts;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-@SuppressWarnings({
-    "java:S2259", // The tests will show if it's null
-    "java:S5960", // We're allowed assertions, as these are used in tests only
-    "checkstyle:MissingJavadocType",
-    "checkstyle:DesignForExtension",
-})
 class HttpMethodDeleteTest {
 
     private static final String SPEC_NAME = "HttpMethodDeleteTest";
 
-    @Test
-    void deleteMethodMapping() throws IOException {
-        asserts(SPEC_NAME, HttpRequest.DELETE("/delete"), (server, request) ->
+    @ParameterizedTest(name = "blocking={0}")
+    @ValueSource(booleans = {true, false})
+    void deleteMethodMapping(boolean blocking) throws IOException {
+        asserts(SPEC_NAME,
+            Map.of(BLOCKING_CLIENT_PROPERTY, blocking),
+            HttpRequest.DELETE("/delete"), (server, request) ->
             AssertionUtils.assertDoesNotThrow(server, request,
                 HttpResponseAssertion.builder()
                     .status(HttpStatus.NO_CONTENT)
@@ -63,9 +64,11 @@ class HttpMethodDeleteTest {
         }
     }
 
-    @Test
-    void deleteMethodMappingWithStringResponse() throws IOException {
+    @ParameterizedTest(name = "blocking={0}")
+    @ValueSource(booleans = {true, false})
+    void deleteMethodMappingWithStringResponse(boolean blocking) throws IOException {
         asserts(SPEC_NAME,
+            Map.of(BLOCKING_CLIENT_PROPERTY, blocking),
             HttpRequest.DELETE("/delete/string-response"),
             (server, request) ->
                 AssertionUtils.assertDoesNotThrow(server, request,
@@ -76,9 +79,11 @@ class HttpMethodDeleteTest {
         );
     }
 
-    @Test
-    void deleteMethodMappingWithObjectResponse() throws IOException {
+    @ParameterizedTest(name = "blocking={0}")
+    @ValueSource(booleans = {true, false})
+    void deleteMethodMappingWithObjectResponse(boolean blocking) throws IOException {
         asserts(SPEC_NAME,
+            Map.of(BLOCKING_CLIENT_PROPERTY, blocking),
             HttpRequest.DELETE("/delete/object-response"),
             (server, request) ->
                 AssertionUtils.assertDoesNotThrow(server, request,

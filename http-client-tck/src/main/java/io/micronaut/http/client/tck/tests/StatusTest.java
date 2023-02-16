@@ -29,25 +29,24 @@ import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import jakarta.inject.Singleton;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
+import java.util.Map;
 
+import static io.micronaut.http.tck.ServerUnderTest.BLOCKING_CLIENT_PROPERTY;
 import static io.micronaut.http.tck.TestScenario.asserts;
 
-@SuppressWarnings({
-    "java:S2259", // The tests will show if it's null
-    "java:S5960", // We're allowed assertions, as these are used in tests only
-    "checkstyle:MissingJavadocType",
-    "checkstyle:DesignForExtension",
-})
-public class StatusTest {
+class StatusTest {
 
     private static final String SPEC_NAME = "StatusTest";
 
-    @Test
-    void returnStatus() throws IOException {
+    @ParameterizedTest(name = "blocking={0}")
+    @ValueSource(booleans = {true, false})
+    void returnStatus(boolean blocking) throws IOException {
         asserts(SPEC_NAME,
+            Map.of(BLOCKING_CLIENT_PROPERTY, blocking),
             HttpRequest.GET("/status/http-status"),
             (server, request) ->
                 AssertionUtils.assertThrows(server, request,
@@ -57,9 +56,11 @@ public class StatusTest {
         );
     }
 
-    @Test
-    void responseStatus() throws IOException {
+    @ParameterizedTest(name = "blocking={0}")
+    @ValueSource(booleans = {true, false})
+    void responseStatus(boolean blocking) throws IOException {
         asserts(SPEC_NAME,
+            Map.of(BLOCKING_CLIENT_PROPERTY, blocking),
             HttpRequest.GET("/status/response-status"),
             (server, request) ->
                 AssertionUtils.assertThrows(server, request,
@@ -69,9 +70,11 @@ public class StatusTest {
         );
     }
 
-    @Test
-    void atStatus() throws IOException {
+    @ParameterizedTest(name = "blocking={0}")
+    @ValueSource(booleans = {true, false})
+    void atStatus(boolean blocking) throws IOException {
         asserts(SPEC_NAME,
+            Map.of(BLOCKING_CLIENT_PROPERTY, blocking),
             HttpRequest.GET("/status/at-status"),
             (server, request) ->
                 AssertionUtils.assertThrows(server, request,
@@ -81,9 +84,11 @@ public class StatusTest {
         );
     }
 
-    @Test
-    void exceptionStatus() throws IOException {
+    @ParameterizedTest(name = "blocking={0}")
+    @ValueSource(booleans = {true, false})
+    void exceptionStatus(boolean blocking) throws IOException {
         asserts(SPEC_NAME,
+            Map.of(BLOCKING_CLIENT_PROPERTY, blocking),
             HttpRequest.GET("/status/exception-status"),
             (server, request) ->
                 AssertionUtils.assertThrows(server, request,

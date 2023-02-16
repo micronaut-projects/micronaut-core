@@ -22,25 +22,24 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
+import java.util.Map;
 
+import static io.micronaut.http.tck.ServerUnderTest.BLOCKING_CLIENT_PROPERTY;
 import static io.micronaut.http.tck.TestScenario.asserts;
 
-@SuppressWarnings({
-    "java:S2259", // The tests will show if it's null
-    "java:S5960", // We're allowed assertions, as these are used in tests only
-    "checkstyle:MissingJavadocType",
-    "checkstyle:DesignForExtension",
-})
 class HttpMethodPostTest {
 
     private static final String SPEC_NAME = "HttpMethodPostTest";
 
-    @Test
-    void postBody() throws IOException {
+    @ParameterizedTest(name = "blocking={0}")
+    @ValueSource(booleans = {true, false})
+    void postBody(boolean blocking) throws IOException {
         asserts(SPEC_NAME,
+            Map.of(BLOCKING_CLIENT_PROPERTY, blocking),
             HttpRequest.POST("/post/object-body", new Person("Tim", 49)),
             (server, request) ->
                 AssertionUtils.assertDoesNotThrow(server, request,

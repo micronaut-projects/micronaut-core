@@ -24,21 +24,27 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
-import java.util.Collections;
+import java.util.Map;
 
+import static io.micronaut.http.tck.ServerUnderTest.BLOCKING_CLIENT_PROPERTY;
 import static io.micronaut.http.tck.TestScenario.asserts;
 
 class ExceptionOnErrorStatusTest {
 
     private static final String SPEC_NAME = "ExceptionOnErrorStatusTest";
 
-    @Test
-    void exceptionOnErrorStatus() throws IOException {
+    @ParameterizedTest(name = "blocking={0}")
+    @ValueSource(booleans = {true, false})
+    void exceptionOnErrorStatus(boolean blocking) throws IOException {
         asserts(SPEC_NAME,
-            Collections.singletonMap("micronaut.http.client.exception-on-error-status", StringUtils.FALSE),
+            Map.of(
+                "micronaut.http.client.exception-on-error-status", StringUtils.FALSE,
+                BLOCKING_CLIENT_PROPERTY, blocking
+            ),
             HttpRequest.GET("/unprocessable"),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.UNPROCESSABLE_ENTITY)
