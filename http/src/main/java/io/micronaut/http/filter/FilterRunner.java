@@ -59,7 +59,19 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
+ * The filter runner will start processing the filters in the forward order.
+ * All the request filters are executed till one of them returns a response (bypasses the route execution for controllers or the client invocation),
+ * or the terminal filter will produce the response from the route/client call.
+ * After that, the filters are processed in the opposite order so response filters can be processed,
+ * which can sometimes override the existing response.
+ * There is a special case of response filters that needs to process the response; for those cases,
+ * the filter needs to be suspended, and the next filter in the order needs to be executed.
+ * When the response is committed, the filter will be resumed when it's processed again.
+ * There is a special case for the client filters; those will process the exception,
+ * which needs to be tracked during the response filtering phase.
+ *
  * @author Jonas Konrad
+ * @author Denis Stepanov
  * @since 4.0.0
  */
 @Internal
