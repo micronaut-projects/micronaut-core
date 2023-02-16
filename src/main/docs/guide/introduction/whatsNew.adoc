@@ -1,7 +1,7 @@
 //Micronaut {version} includes the following changes:
 == 4.0.0
 
-=== Kotlin applications via KSP
+=== Experimental Support for Kotlin Symbol Processing (KSP)
 
 Micronaut Framework has offered support for Kotlin via <<kapt, KAPT>>. With version 4.0, Micronaut Framework supports Kotlin also via <<ksp, Kotlin Symbol Processing (KSP) API>>.
 
