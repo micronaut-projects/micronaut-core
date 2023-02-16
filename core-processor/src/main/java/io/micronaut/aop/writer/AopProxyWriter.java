@@ -987,7 +987,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                     buildProxyLookupArgument(proxyConstructorGenerator, targetType);
                     proxyConstructorGenerator.loadArg(qualifierIndex);
 
-                    pushMethodNameAndTypesArguments(proxyConstructorGenerator, methodRef.name, methodRef.argumentTypes);
+                    // Arguments are written as generic types, so we need to look for the method using the generic arguments
+                    pushMethodNameAndTypesArguments(proxyConstructorGenerator, methodRef.name, methodRef.genericArgumentTypes);
                     proxyConstructorGenerator.invokeInterface(
                             Type.getType(ExecutionHandleLocator.class),
                             METHOD_GET_PROXY_TARGET
@@ -1612,16 +1613,18 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * Method Reference class with names and a list of argument types. Used as the targets.
      */
     private static final class MethodRef {
-        protected final String name;
-        protected final List<ClassElement> argumentTypes;
-        protected final Type returnType;
-        int methodIndex;
+        private final String name;
+        private final List<ClassElement> argumentTypes;
+        private final List<ClassElement> genericArgumentTypes;
+        private final Type returnType;
         private final List<String> rawTypes;
+        int methodIndex;
 
-        public MethodRef(String name, List<ParameterElement> argumentTypes, Type returnType) {
+        public MethodRef(String name, List<ParameterElement> parameterElements, Type returnType) {
             this.name = name;
-            this.argumentTypes = argumentTypes.stream().map(ParameterElement::getType).collect(Collectors.toList());
-            this.rawTypes = this.argumentTypes.stream().map(ClassElement::getName).collect(Collectors.toList());
+            this.argumentTypes = parameterElements.stream().map(ParameterElement::getType).toList();
+            this.genericArgumentTypes = parameterElements.stream().map(ParameterElement::getGenericType).toList();
+            this.rawTypes = this.argumentTypes.stream().map(ClassElement::getName).toList();
             this.returnType = returnType;
         }
 

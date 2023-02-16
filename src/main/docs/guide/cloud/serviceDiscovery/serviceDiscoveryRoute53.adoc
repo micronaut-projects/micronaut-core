@@ -14,14 +14,14 @@ Here are the steps:
 4. Add Service ID to your application configuration file like so:
 
 .Sample application.yml
-[source,yaml]
+[configuration]
 ----
 aws:
   route53:
-    registration
-    enabled: true
-    aws-service-id: srv-978fs98fsdf
-    namespace: micronaut.io
+    registration:
+        enabled: true
+        aws-service-id: srv-978fs98fsdf
+        namespace: micronaut.io
 micronaut:
   application:
     name: something
@@ -34,7 +34,7 @@ dependency:io.micronaut.aws:micronaut-aws-route53[]
 6. On the client side, you need the same dependencies and fewer configuration options:
 
 .Sample application.yml
-[source,yaml]
+[configuration]
 ----
 aws:
   route53:
@@ -120,28 +120,28 @@ You will get a service ID and an ARN back from this command if successful. Write
 Add the configuration to make your applications register with Route 53 Auto-discovery:
 
 .Registration Properties
-[source,yaml]
+[configuration]
 ----
 aws:
   route53:
     registration:
       enabled: true
-      aws-service-id=<enter the service id you got after creation on aws cli>
+      aws-service-id: <enter the service id you got after creation on aws cli>
     discovery:
-      namespace-id=<enter the namespace id you got after creating the namespace>
+      namespace-id: <enter the namespace id you got after creating the namespace>
 ----
 
 ==== Discovery Client Configuration
 
 .Discovery Properties
-[source,yaml]
+[configuration]
 ----
 aws:
   route53:
     discovery:
-      client
-      enabled: true
-      aws-service-id: <enter the service id you got after creation on aws cli>
+      client:
+        enabled: true
+        aws-service-id: <enter the service id you got after creation on aws cli>
 ----
 
 You can also call the following methods by getting the bean "Route53AutoNamingClient":

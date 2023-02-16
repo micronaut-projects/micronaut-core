@@ -28,16 +28,15 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.beans.BeanParameterElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
-import org.codehaus.groovy.ast.ClassNode;
 
 import java.lang.annotation.Annotation;
 import java.util.function.BiConsumer;
@@ -229,10 +228,9 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     }
 
     private ClassElement resolveParent(ClassElement parentType, GroovyElementFactory elementFactory) {
-        Object nativeType = parentType.getNativeType();
         ClassElement resolvedParent = parentType;
-        if (nativeType instanceof ClassNode) {
-            resolvedParent = elementFactory.newClassElement((ClassNode) nativeType, elementAnnotationMetadataFactory);
+        if (parentType instanceof GroovyClassElement groovyClassElement) {
+            resolvedParent = elementFactory.newClassElement(groovyClassElement.classNode, elementAnnotationMetadataFactory);
         }
         return resolvedParent;
     }

@@ -15,10 +15,21 @@
  */
 package io.micronaut.ast.groovy.annotation;
 
+import io.micronaut.ast.groovy.visitor.AbstractGroovyElement;
+import io.micronaut.ast.groovy.visitor.GroovyNativeElement;
+import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
+import io.micronaut.inject.ast.WildcardElement;
 import io.micronaut.inject.ast.annotation.AbstractElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.AnnotationNode;
+import org.codehaus.groovy.ast.ClassNode;
+
+import java.util.List;
 
 /**
  * Groovy element annotation metadata factory.
@@ -37,4 +48,35 @@ public final class GroovyElementAnnotationMetadataFactory extends AbstractElemen
         return new GroovyElementAnnotationMetadataFactory(true, (GroovyAnnotationMetadataBuilder) metadataBuilder);
     }
 
+    @Override
+    protected AnnotatedNode getNativeElement(Element element) {
+        return ((AbstractGroovyElement) element).getNativeType().annotatedNode();
+    }
+
+    @Override
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupTypeAnnotationsForClass(ClassElement classElement) {
+        GroovyNativeElement clazz = (GroovyNativeElement) classElement.getNativeType();
+        return metadataBuilder.lookupOrBuild(clazz, getTypeAnnotationsOnly((ClassNode) clazz.annotatedNode()));
+    }
+
+    @Override
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupTypeAnnotationsForGenericPlaceholder(GenericPlaceholderElement placeholderElement) {
+        GroovyNativeElement.Placeholder placeholder = (GroovyNativeElement.Placeholder) placeholderElement.getGenericNativeType();
+        return metadataBuilder.lookupOrBuild(placeholder, getTypeAnnotationsOnly(placeholder.annotatedNode()));
+    }
+
+    @Override
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupTypeAnnotationsForWildcard(WildcardElement wildcardElement) {
+        GroovyNativeElement wildcard = (GroovyNativeElement) wildcardElement.getGenericNativeType();
+        return metadataBuilder.lookupOrBuild(wildcard, getTypeAnnotationsOnly((ClassNode) wildcard.annotatedNode()));
+    }
+
+    private AnnotatedNode getTypeAnnotationsOnly(ClassNode classNode) {
+        AnnotatedNode annotatedNode = new AnnotatedNode();
+        List<AnnotationNode> typeAnnotations = classNode.getTypeAnnotations();
+        if (CollectionUtils.isNotEmpty(typeAnnotations)) {
+            annotatedNode.addAnnotations(typeAnnotations);
+        }
+        return annotatedNode;
+    }
 }

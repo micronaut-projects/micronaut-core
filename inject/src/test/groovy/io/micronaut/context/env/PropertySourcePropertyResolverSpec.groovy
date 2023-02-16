@@ -439,11 +439,11 @@ class PropertySourcePropertyResolverSpec extends Specification {
         ]
         new PropertySourcePropertyResolver(
                 PropertySource.of("test", values)
-        )
+        ).getProperty('random.integer', String).isPresent()
 
         then:
         def ex = thrown(ValueException)
-        ex.message == 'Invalid range: `9999999999` found for type Integer while parsing property: random.integer'
+        ex.message == 'Invalid range: `9999999999` found for type Integer for expression: random.integer(9999999999)'
         ex.cause != null
         ex.cause instanceof NumberFormatException
     }
@@ -455,11 +455,11 @@ class PropertySourcePropertyResolverSpec extends Specification {
         ]
         new PropertySourcePropertyResolver(
                 PropertySource.of("test", values)
-        )
+        ).getProperty('random.long', String).isPresent()
 
         then:
         def ex = thrown(ValueException)
-        ex.message == 'Invalid range: `9999999999999999999` found for type Long while parsing property: random.long'
+        ex.message == 'Invalid range: `9999999999999999999` found for type Long for expression: random.long(9999999999999999999)'
         ex.cause != null
         ex.cause instanceof NumberFormatException
     }
@@ -471,7 +471,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
         ]
         new PropertySourcePropertyResolver(
                 PropertySource.of("test", values)
-        )
+        ).getProperty('random.invalid', String).isPresent()
 
         then:
         thrown(ConfigurationException)

@@ -44,8 +44,13 @@ public class AllElementsVisitor implements TypeElementVisitor<Controller, Object
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
         visit(element);
-        element.getBeanProperties(); // Preload properties for tests otherwise it fails because the compiler is done
+        // Preload annotations and elements for tests otherwise it fails because the compiler is done
+        element.getBeanProperties().forEach(this::initialize);
         element.getAnnotationMetadata();
+        element.getSuperType().ifPresent(superType -> {
+            superType.getAllTypeArguments();
+            superType.getTypeArguments();
+        });
         VISITED_CLASS_ELEMENTS.add(element);
     }
 
@@ -71,9 +76,9 @@ public class AllElementsVisitor implements TypeElementVisitor<Controller, Object
     }
 
     private void initialize(TypedElement typedElement) {
-        typedElement.getAnnotationMetadata();
-        typedElement.getType().getAnnotationMetadata();
-        typedElement.getGenericType().getAnnotationMetadata();
+        typedElement.getAnnotationMetadata().getAnnotationNames();
+        typedElement.getType().getAnnotationMetadata().getAnnotationNames();
+        typedElement.getGenericType().getAnnotationMetadata().getAnnotationNames();
     }
 
     @Override

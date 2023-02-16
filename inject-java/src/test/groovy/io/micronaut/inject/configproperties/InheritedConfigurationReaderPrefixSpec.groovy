@@ -45,7 +45,7 @@ class MyBean  {
             beanDefinition.getInjectedMethods()[0].name == 'setMyValue'
             def metadata = beanDefinition.getInjectedMethods()[0].getAnnotationMetadata()
             metadata.hasAnnotation(Property)
-            metadata.getValue(Property, "name", String).get() == 'endpoints.my-value'
+            metadata.getValue(Property, "name", String).get() == 'simple.my-value'
     }
 
     void "property path is overriding the existing one without base prefix"() {
@@ -99,7 +99,7 @@ class MyBean  {
             beanDefinition.getInjectedMethods()[0].name == 'setMyValue'
             def metadata = beanDefinition.getInjectedMethods()[0].getAnnotationMetadata()
             metadata.hasAnnotation(Property)
-            metadata.getValue(Property, "name", String).get() == 'endpoints.my-value'
+            metadata.getValue(Property, "name", String).get() == 'endpoints.simple.my-value'
     }
 
     void "property path is overriding the existing one"() {

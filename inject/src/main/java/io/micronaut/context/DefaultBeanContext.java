@@ -109,6 +109,8 @@ import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
 import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.QualifiedBeanType;
 import io.micronaut.inject.ValidatedBeanDefinition;
+import io.micronaut.inject.provider.AbstractProviderDefinition;
+import io.micronaut.inject.provider.BeanProviderDefinition;
 import io.micronaut.inject.proxy.InterceptedBeanProxy;
 import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.Qualified;
@@ -2408,15 +2410,17 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                                   @NonNull BeanDefinition<T> beanDefinition,
                                                   @NonNull T bean,
                                                   @Nullable Qualifier<T> finalQualifier) {
-        Class<T> beanType = beanDefinition.getBeanType();
-        if (!(bean instanceof BeanCreatedEventListener) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
-            for (Map.Entry<Class<?>, ListenersSupplier<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
-                if (entry.getKey().isAssignableFrom(beanType)) {
-                    BeanKey<T> beanKey = new BeanKey<>(beanDefinition, finalQualifier);
-                    for (BeanCreatedEventListener<?> listener : entry.getValue().get(resolutionContext)) {
-                        bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, beanKey, bean));
-                        if (bean == null) {
-                            throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
+        if (!(beanDefinition instanceof AbstractProviderDefinition<?>)) {
+            Class<T> beanType = beanDefinition.getBeanType();
+            if (!(bean instanceof BeanCreatedEventListener) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
+                for (Map.Entry<Class<?>, ListenersSupplier<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
+                    if (entry.getKey().isAssignableFrom(beanType)) {
+                        BeanKey<T> beanKey = new BeanKey<>(beanDefinition, finalQualifier);
+                        for (BeanCreatedEventListener<?> listener : entry.getValue().get(resolutionContext)) {
+                            bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, beanKey, bean));
+                            if (bean == null) {
+                                throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
+                            }
                         }
                     }
                 }
@@ -3335,6 +3339,9 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
         reference:
         for (BeanDefinitionProducer beanDefinitionProducer : producers) {
+            if (beanDefinitionProducer.isDisabled()) {
+                continue;
+            }
             BeanDefinitionReference beanDefinitionReference = beanDefinitionProducer.reference;
             for (BeanConfiguration disableConfiguration : configurationsDisabled) {
                 if (disableConfiguration.isWithin(beanDefinitionReference)) {
@@ -4097,7 +4104,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
      * @since 4.0.0
      */
     @Internal
-    final static class BeanDefinitionProducer {
+    static final class BeanDefinitionProducer {
 
         @Nullable
         private volatile BeanDefinitionReference reference;
@@ -4117,11 +4124,13 @@ public class DefaultBeanContext implements InitializableBeanContext {
         }
 
         public boolean isReferenceEnabled(DefaultBeanContext context, @Nullable BeanResolutionContext resolutionContext) {
-            if (reference == null) {
+            BeanDefinitionReference<?> ref = reference;
+            // The reference needs to be assigned to a new variable as it can change between checks
+            if (ref == null) {
                 return false;
             }
             if (referenceEnabled == null) {
-                if (reference.isEnabled(context, resolutionContext)) {
+                if (ref.isEnabled(context, resolutionContext)) {
                     referenceEnabled = true;
                 } else {
                     referenceEnabled = false;
@@ -4135,10 +4144,14 @@ public class DefaultBeanContext implements InitializableBeanContext {
             if (reference == null) {
                 return true;
             }
-            if (referenceEnabled != null && !referenceEnabled) {
+            Boolean refEnabled = referenceEnabled;
+            // The reference needs to be assigned to a new variable as it can change between checks
+            if (refEnabled != null && !refEnabled) {
                 return true;
             }
-            return definitionEnabled != null && !definitionEnabled;
+            Boolean defEnabled = definitionEnabled;
+            // The reference needs to be assigned to a new variable as it can change between checks
+            return defEnabled != null && !defEnabled;
         }
 
         public boolean isDefinitionEnabled(DefaultBeanContext defaultBeanContext) {
@@ -4148,12 +4161,12 @@ public class DefaultBeanContext implements InitializableBeanContext {
         public boolean isDefinitionEnabled(DefaultBeanContext context, @Nullable BeanResolutionContext resolutionContext) {
             if (definitionEnabled == null) {
                 if (isReferenceEnabled(context, resolutionContext)) {
-                    definition = getDefinition(context);
-                    if (definition.isEnabled(context, resolutionContext)) {
+                    BeanDefinition <?> def = getDefinition(context);
+                    if (def.isEnabled(context, resolutionContext)) {
+                        definition = def;
                         definitionEnabled = true;
                     } else {
                         definitionEnabled = false;
-                        definition = null;
                     }
                 } else {
                     definitionEnabled = false;
@@ -4163,31 +4176,40 @@ public class DefaultBeanContext implements InitializableBeanContext {
         }
 
         public <T> BeanDefinitionReference<T> getReference() {
-            if (reference == null || referenceEnabled == null || !referenceEnabled) {
+            // The reference needs to be assigned to a new variable as it can change between checks
+            Boolean refEnabled = referenceEnabled;
+            if (reference == null || refEnabled == null || !refEnabled) {
                 throw new IllegalStateException("The reference is not enabled");
             }
             return reference;
         }
 
         public <T> BeanDefinition<T> getDefinition(BeanContext beanContext) {
-            if (definitionEnabled != null && !definitionEnabled) {
+            // The reference needs to be assigned to a new variable as it can change between checks
+            Boolean defEnabled = definitionEnabled;
+            if (defEnabled != null && !defEnabled) {
                 throw new IllegalStateException("The definition is not enabled");
             }
             try {
-                if (definition == null) {
-                    definition = getReference().load(beanContext);
+                BeanDefinition def = definition;
+                if (def == null) {
+                    def = getReference().load(beanContext);
+                    definition = def;
                 }
-                return definition;
+                return def;
             } catch (Throwable e) {
                 throw new BeanInstantiationException("Bean definition [" + reference.getName() + "] could not be loaded: " + e.getMessage(), e);
             }
         }
 
         public <T> boolean isReferenceCandidateBean(Argument<T> beanType) {
-            return reference != null && reference.isCandidateBean(beanType);
+            // The reference needs to be assigned to a new variable as it can change between checks
+            BeanDefinitionReference ref = reference;
+            return ref != null && ref.isCandidateBean(beanType);
         }
 
         public void disable(BeanDefinitionReference<?> reference) {
+            // The reference needs to be assigned to a new variable as it can change between checks
             BeanDefinitionReference ref = this.reference;
             if (ref != null && ref.equals(reference)) {
                 this.reference = null;

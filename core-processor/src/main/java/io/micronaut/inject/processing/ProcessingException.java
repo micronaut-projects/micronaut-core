@@ -27,11 +27,15 @@ import io.micronaut.inject.ast.Element;
 public final class ProcessingException extends RuntimeException {
 
     private final transient Element originatingElement;
-    private final String message;
 
     public ProcessingException(Element element, String message) {
+        super(message);
         this.originatingElement = element;
-        this.message = message;
+    }
+
+    public ProcessingException(Element originatingElement, String message, Throwable cause) {
+        super(message, cause);
+        this.originatingElement = originatingElement;
     }
 
     @Nullable
@@ -42,8 +46,4 @@ public final class ProcessingException extends RuntimeException {
         return null;
     }
 
-    @Override
-    public String getMessage() {
-        return message;
-    }
 }

@@ -32,7 +32,7 @@ javax-el-impl = "2.2.1-b05"
 jcache = "1.1.1"
 junit5 = "5.9.1"
 junit-platform="1.9.1"
-kotlin = "1.7.20"
+kotlin = "1.8.10"
 kotlin-coroutines = "1.6.4"
 ktor = "1.6.8"
 managed-logback = "1.4.5"
@@ -60,7 +60,7 @@ wiremock = "2.33.2"
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
-managed-groovy = "4.0.6"
+managed-groovy = "4.0.9"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "2.14.0"
 managed-jackson-databind = "2.14.1"
@@ -74,6 +74,7 @@ managed-slf4j = "2.0.4"
 managed-snakeyaml = "1.33"
 managed-validation = "2.0.1.Final"
 managed-java-parser-core = "3.24.9"
+managed-ksp = "1.8.0-1.0.9"
 micronaut-docs = "2.0.0"
 
 [libraries]
@@ -106,8 +107,9 @@ managed-jackson-datatype-jsr310 = { module = "com.fasterxml.jackson.datatype:jac
 managed-jackson-module-afterburner = { module = "com.fasterxml.jackson.module:jackson-module-afterburner", version.ref = "managed-jackson" }
 managed-jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "managed-jackson" }
 managed-jackson-module-parameterNames = { module = "com.fasterxml.jackson.module:jackson-module-parameter-names", version.ref = "managed-jackson" }
+managed-ksp-api = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "managed-ksp" }
+managed-ksp = { module = "com.google.devtools.ksp:symbol-processing", version.ref = "managed-ksp" }
 managed-java-parser-core = { module = "com.github.javaparser:javaparser-symbol-solver-core", version.ref = "managed-java-parser-core" }
-
 managed-methvin-directoryWatcher = { module = "io.methvin:directory-watcher", version.ref = "managed-methvin-directory-watcher" }
 
 managed-netty-buffer = { module = "io.netty:netty-buffer", version.ref = "managed-netty" }

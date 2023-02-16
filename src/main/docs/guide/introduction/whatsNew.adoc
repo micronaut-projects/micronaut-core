@@ -1,17 +1,14 @@
 //Micronaut {version} includes the following changes:
-== 3.8.0
-
-Key features:
-
-- https://www.graalvm.org/release-notes/22_3/[GraalVM 22.3 Support]
-- With Micronaut `3.8.0`, you can use `@RequestBean` annotations with https://docs.oracle.com/en/java/javase/14/language/records.html[Records]. Before `3.8.0`, you could use a POJO as a controller method parameter and annotate the parameter with `@RequestBean` to bind any Bindable value (e.g., `HttpRequest`, `@PathVariable`, `@QueryValue` or `@Header` fields).
-- If you enable CORS from any origin while running your app in localhost (e.g., test or development), since `3.8.0`, the `CorsFilter` returns 403 for non-localhost origins to protect you against drive-by localhost attacks.
-
-Please read the https://micronaut.io/2022/12/27/micronaut-framework-3-8-0-released/[Micronaut Framework 3.8.0 announcement blog post]. You will find a detailed overview of what’s new in Micronaut 3.8.0.
-
 == 4.0.0
 
+=== Apache Groovy 4.0
+
+Micronaut Framework 4.x supports https://groovy-lang.org/releasenotes/groovy-4.0.html[Apache Groovy 4.0].
+
 === Core Changes
+
+
+* <<virtualThreads, Support for Virtual Threads>>
 
 ==== Injection of Maps
 
@@ -24,6 +21,16 @@ When a bean annotated with ann:context.annotation.EachProperty[] or ann:context.
 === Other Dependency Upgrades
 
 - Kotlin 1.7.10
+
+== 3.8.0
+
+Key features:
+
+- https://www.graalvm.org/release-notes/22_3/[GraalVM 22.3 Support]
+- With Micronaut `3.8.0`, you can use `@RequestBean` annotations with https://docs.oracle.com/en/java/javase/14/language/records.html[Records]. Before `3.8.0`, you could use a POJO as a controller method parameter and annotate the parameter with `@RequestBean` to bind any Bindable value (e.g., `HttpRequest`, `@PathVariable`, `@QueryValue` or `@Header` fields).
+- If you enable CORS from any origin while running your app in localhost (e.g., test or development), since `3.8.0`, the `CorsFilter` returns 403 for non-localhost origins to protect you against drive-by localhost attacks.
+
+Please read the https://micronaut.io/2022/12/27/micronaut-framework-3-8-0-released/[Micronaut Framework 3.8.0 announcement blog post]. You will find a detailed overview of what’s new in Micronaut 3.8.0.
 
 == 3.7.0
 

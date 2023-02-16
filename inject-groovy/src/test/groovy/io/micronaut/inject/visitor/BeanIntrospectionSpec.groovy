@@ -12,6 +12,7 @@ import io.micronaut.core.beans.BeanMethod
 import io.micronaut.core.beans.BeanProperty
 import io.micronaut.core.beans.UnsafeBeanProperty
 import io.micronaut.core.reflect.exception.InstantiationException
+import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.introspections.Person
 import spock.lang.Issue
@@ -2181,6 +2182,187 @@ class Test {
 
         then:
             introspection.beanProperties.size() == 2
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2059')
+    void "test annotation metadata doesn't cause stackoverflow"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
+package test;
+
+import io.micronaut.core.annotation.*;
+
+@Introspected
+public class Test {
+    int num;
+    String str;
+
+    @Creator
+    public <T extends Enum<T>> Test(int num, String str, Class<T> enumClass) {
+        this(num, str + enumClass.getName());
+    }
+
+    public <T extends Enum<T>> Test(int num, String str) {
+        this.num = num;
+        this.str = str;
+    }
+}
+
+
+''')
+        expect:
+            introspection != null
+    }
+
+    void "test annotation metadata doesn't cause stackoverflow 2"() {
+        def bd = buildBeanDefinition('test.SessionFactoryFactory','''\
+package test;
+
+import io.micronaut.aop.interceptors.Mutating
+
+import io.micronaut.context.annotation.Factory
+import io.micronaut.context.annotation.Prototype
+import org.hibernate.SessionFactory
+import org.hibernate.engine.spi.SessionFactoryDelegatingImpl
+
+@Factory
+class SessionFactoryFactory {
+
+    @Mutating("name")
+    @Prototype
+    SessionFactory sessionFactory() {
+        return new SessionFactoryDelegatingImpl(null)
+    }
+}
+
+
+''')
+        expect:
+            bd != null
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/1645")
+    void "test recursive generics 2"() {
+        given:
+            BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
+package test;
+
+@io.micronaut.core.annotation.Introspected
+class Test<T extends B> {
+    private T child;
+    public T getChild() {
+        return child;
+    }
+}
+class B<T extends Test> {}
+
+''')
+        expect:
+            introspection != null
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1607')
+    void "test recursive generics"() {
+        given:
+            BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
+package test;
+
+import io.micronaut.inject.visitor.RecursiveGenerics;
+
+@io.micronaut.core.annotation.Introspected
+class Test extends RecursiveGenerics<Test> {
+
+}
+''')
+
+        expect:
+            introspection != null
+    }
+
+    void "test type_use annotations"() {
+        given:
+            def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.*;
+import io.micronaut.inject.visitor.*;
+@Introspected
+class Test {
+    @io.micronaut.inject.visitor.TypeUseRuntimeAnn
+    private String name;
+    @io.micronaut.inject.visitor.TypeUseClassAnn
+    private String secondName;
+    public String getName() {
+        return name;
+    }
+    public void setName(String name) {
+        this.name = name;
+    }
+    public String getSecondName() {
+        return name;
+    }
+    public void setSecondName(String secondName) {
+        this.secondName = secondName;
+    }
+}
+''')
+            def nameField = introspection.getProperty("name").orElse(null)
+            def secondNameField = introspection.getProperty("secondName").orElse(null)
+
+        expect:
+            nameField
+            secondNameField
+
+            nameField.hasStereotype(TypeUseRuntimeAnn)
+            nameField.hasStereotype("io.micronaut.inject.visitor.TypeUseRuntimeAnn")
+            !secondNameField.hasStereotype(TypeUseClassAnn)
+            !secondNameField.hasStereotype("io.micronaut.inject.visitor.TypeUseClassAnn")
+    }
+
+    void "test subtypes"() {
+        given:
+            BeanIntrospection introspection = buildBeanIntrospection('test.Holder', '''
+package test;
+import io.micronaut.core.annotation.Introspected;
+import java.util.List;
+import java.util.Collections;
+
+@Introspected
+class Animal {
+}
+
+@Introspected
+class Cat extends Animal {
+    final public int lives;
+    Cat(int lives) {
+        this.lives = lives;
+    }
+}
+
+@Introspected(accessKind = Introspected.AccessKind.FIELD)
+class Holder<A extends Animal> {
+    public final Animal animalNonGeneric;
+    public final List<Animal> animalsNonGeneric;
+    public final A animal;
+    public final List<A> animals;
+    Holder(A animal) {
+        this.animal = animal;
+        this.animals = Collections.singletonList(animal);
+        this.animalNonGeneric = animal;
+        this.animalsNonGeneric = Collections.singletonList(animal);
+    }
+}
+
+
+        ''')
+
+        expect:
+            def animalListArgument = introspection.getProperty("animals").get().asArgument().getTypeParameters()[0]
+            animalListArgument instanceof GenericPlaceholder
+            animalListArgument.isTypeVariable()
+
+            def animal = introspection.getProperty("animal").get().asArgument()
+            animal instanceof GenericPlaceholder
+            animal.isTypeVariable()
     }
 
 }

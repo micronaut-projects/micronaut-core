@@ -124,11 +124,21 @@ httpServer:
     threadPools:
       title: Configuring Server Thread Pools
       blockingOperations: Blocking Operations
+      virtualThreads: Virtual Threads
       atBlocking: '@Blocking'
     nettyClientPipeline: Configuring the Netty Client Pipeline
     nettyServerPipeline: Configuring the Netty Server Pipeline
     listener: Advanced Listener Configuration
-    cors: Configuring CORS
+    cors:
+      title: Configuring CORS
+      corsConfiguration: CORS via Configuration
+      corsAllowedOrigins: Allowed Origins
+      corsAllowedMethods: Allowed Methods
+      corsAllowedHeaders: Allowed Headers
+      corsExposedHeaders: Exposed Headers
+      corsAllowCredentials: Allow Credentials
+      corsMaxAge: Max Age
+      corsMultipleHeaderValues: Multiple Header Values
     https: Securing the Server with HTTPS
     dualProtocol: Enabling HTTP and HTTPS
     accessLogger: Enabling Access Logger

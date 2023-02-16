@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.processing;
 
+import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.DefaultScope;
@@ -70,6 +71,9 @@ public abstract class BeanDefinitionCreatorFactory {
             if (classElement.hasStereotype("groovy.lang.Singleton")) {
                 throw new ProcessingException(classElement, "Class annotated with groovy.lang.Singleton instead of jakarta.inject.Singleton. Import jakarta.inject.Singleton to use Micronaut Dependency Injection.");
             }
+            if (classElement.isEnum()) {
+                throw new ProcessingException(classElement, "Enum types cannot be defined as beans");
+            }
             return new DeclaredBeanElementCreator(classElement, visitorContext, false);
         }
         return Collections::emptyList;
@@ -110,7 +114,7 @@ public abstract class BeanDefinitionCreatorFactory {
     }
 
     private static boolean isAopProxyType(ClassElement classElement) {
-        return !classElement.isAssignable("io.micronaut.aop.Interceptor") && InterceptedMethodUtil.hasAroundStereotype(classElement.getAnnotationMetadata());
+        return !classElement.isAssignable(Interceptor.class) && InterceptedMethodUtil.hasAroundStereotype(classElement.getAnnotationMetadata());
     }
 
     public static boolean isDeclaredBeanInMetadata(AnnotationMetadata concreteClassMetadata) {

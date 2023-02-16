@@ -199,23 +199,27 @@ public class DefaultMutableConversionService implements MutableConversionService
      */
     @SuppressWarnings({"OptionalIsPresent", "unchecked"})
     private void registerDefaultConverters() {
+        LinkedHashMap<Class<?>, Class<?>> primitiveArrays = new LinkedHashMap<>();
+        primitiveArrays.put(Boolean[].class, boolean[].class);
+        primitiveArrays.put(Byte[].class, byte[].class);
+        primitiveArrays.put(Character[].class, char[].class);
+        primitiveArrays.put(Double[].class, double[].class);
+        primitiveArrays.put(Float[].class, float[].class);
+        primitiveArrays.put(Integer[].class, int[].class);
+        primitiveArrays.put(Long[].class, long[].class);
+        primitiveArrays.put(Short[].class, short[].class);
+
         // primitive array to wrapper array
         @SuppressWarnings("rawtypes")
         Function primitiveArrayToWrapperArray = ArrayUtils::toWrapperArray;
-        addConverter(double[].class, Double[].class, primitiveArrayToWrapperArray);
-        addConverter(byte[].class, Byte[].class, primitiveArrayToWrapperArray);
-        addConverter(short[].class, Short[].class, primitiveArrayToWrapperArray);
-        addConverter(boolean[].class, Boolean[].class, primitiveArrayToWrapperArray);
-        addConverter(int[].class, Integer[].class, primitiveArrayToWrapperArray);
-        addConverter(float[].class, Float[].class, primitiveArrayToWrapperArray);
-        addConverter(double[].class, Double[].class, primitiveArrayToWrapperArray);
-        addConverter(char[].class, Character[].class, primitiveArrayToWrapperArray);
         // wrapper to primitive array converters
         Function<Object[], Object> wrapperArrayToPrimitiveArray = ArrayUtils::toPrimitiveArray;
-        //noinspection rawtypes
-        addConverter(Double[].class, double[].class, (Function) wrapperArrayToPrimitiveArray);
-        //noinspection rawtypes
-        addConverter(Integer[].class, int[].class, (Function) wrapperArrayToPrimitiveArray);
+        for (Map.Entry<Class<?>, Class<?>> e : primitiveArrays.entrySet()) {
+            Class<?> wrapperArray = e.getKey();
+            Class<?> primitiveArray = e.getValue();
+            addConverter(primitiveArray, wrapperArray, primitiveArrayToWrapperArray);
+            addConverter(wrapperArray, primitiveArray, (Function) wrapperArrayToPrimitiveArray);
+        }
 
         // Object -> List
         addConverter(Object.class, List.class, (object, targetType, context) -> {

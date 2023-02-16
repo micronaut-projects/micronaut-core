@@ -16,6 +16,7 @@
 package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import org.codehaus.groovy.ast.ConstructorNode;
@@ -26,23 +27,26 @@ import org.codehaus.groovy.ast.ConstructorNode;
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 public class GroovyConstructorElement extends GroovyMethodElement implements ConstructorElement {
     /**
      * @param owningType                The owning class
      * @param visitorContext            The visitor context
+     * @param nativeElement      The native element
      * @param methodNode                The {@link ConstructorNode}
      * @param annotationMetadataFactory The annotation metadata
      */
     GroovyConstructorElement(GroovyClassElement owningType,
                              GroovyVisitorContext visitorContext,
+                             GroovyNativeElement nativeElement,
                              ConstructorNode methodNode,
                              ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        super(owningType, visitorContext, methodNode, annotationMetadataFactory);
+        super(owningType, visitorContext, nativeElement, methodNode, annotationMetadataFactory);
     }
 
     @Override
     protected AbstractGroovyElement copyConstructor() {
-        return new GroovyConstructorElement(getOwningType(), visitorContext, (ConstructorNode) getNativeType(), elementAnnotationMetadataFactory);
+        return new GroovyConstructorElement(getOwningType(), visitorContext, getNativeType(), (ConstructorNode) getNativeType().annotatedNode(), elementAnnotationMetadataFactory);
     }
 
     @Override

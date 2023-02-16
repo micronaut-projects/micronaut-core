@@ -1,0 +1,67 @@
+plugins {
+    id "io.micronaut.build.internal.convention-library"
+    id "org.jetbrains.kotlin.jvm"
+    id "com.google.devtools.ksp" version "1.8.0-Beta-1.0.8"
+
+}
+
+micronautBuild {
+    core {
+        usesMicronautTest()
+        usesMicronautTestKotest()
+    }
+}
+
+dependencies {
+    api project(":core-processor")
+
+    implementation(libs.managed.ksp.api)
+    if (!JavaVersion.current().isJava9Compatible()) {
+        api files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    }
+    kspTest(project)
+    testImplementation project(":jackson-databind")
+    testImplementation project(":inject-kotlin-test")
+    testImplementation libs.kotlin.stdlib
+    testImplementation project(':http-client')
+    testImplementation libs.managed.jackson.annotations
+    testImplementation libs.managed.validation
+    testImplementation libs.managed.reactor
+    testImplementation libs.hibernate
+    testImplementation project(":validation")
+    testImplementation libs.javax.persistence
+    testImplementation project(":runtime")
+    testImplementation(libs.neo4j.bolt)
+    testImplementation libs.kotlinx.coroutines.core
+    testImplementation libs.kotlinx.coroutines.jdk8
+    testImplementation libs.kotlinx.coroutines.rx2
+    testImplementation libs.micronaut.test.junit5
+    testImplementation libs.kotlin.kotest.junit5
+}
+
+afterEvaluate {
+    sourcesJar {
+        from "$projectDir/src/main/kotlin"
+    }
+}
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
+    kotlinOptions {
+        freeCompilerArgs = ['-Xjvm-default=all']
+    }
+}
+
+tasks.named("compileTestGroovy") {
+    classpath += files(tasks.compileTestKotlin)
+}
+
+tasks.named("test") {
+    classpath += files(tasks.compileTestKotlin)
+//    testLogging {
+//        showStandardStreams = true
+//    }
+    maxHeapSize("1G")
+    forkEvery = 40
+    maxParallelForks = 4
+}
+

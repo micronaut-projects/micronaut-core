@@ -1,9 +1,9 @@
 In the spirit of https://httpd.apache.org/docs/current/mod/mod_log_config.html[apache mod_log_config] and https://tomcat.apache.org/tomcat-10.0-doc/config/valve.html#Access_Logging[Tomcat Access Log Valve], it is possible to enable an access logger for the HTTP server (this works for both HTTP/1 and HTTP/2).
 
-To enable and configure the access logger, in `application.yml` set:
+To enable and configure the access logger, in your configuration file (e.g `application.yml`) set:
 
 .Enabling the access logger
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:
@@ -19,7 +19,7 @@ micronaut:
 If you wish to not log access to certain paths, you can specify regular expression filters in the configuration:
 
 .Filtering the access logs
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:

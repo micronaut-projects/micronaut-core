@@ -98,9 +98,9 @@ public final class AssertionUtils {
         assertion.getResponseConsumer().ifPresent(httpResponseConsumer -> httpResponseConsumer.accept(response));
     }
 
-    private static void assertBody(@NonNull HttpResponse<?> response,  @Nullable BodyAssertion bodyAssertion) {
+    private static <T> void assertBody(@NonNull HttpResponse<?> response,  @Nullable BodyAssertion<T> bodyAssertion) {
         if (bodyAssertion != null) {
-            Optional<String> bodyOptional = response.getBody(String.class);
+            Optional<T> bodyOptional = response.getBody(bodyAssertion.getBodyType());
             assertTrue(bodyOptional.isPresent());
             bodyOptional.ifPresent(bodyAssertion::evaluate);
         }

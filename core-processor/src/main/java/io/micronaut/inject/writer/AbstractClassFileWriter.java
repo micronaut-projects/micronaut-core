@@ -26,9 +26,9 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
@@ -236,8 +236,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             generatorAdapter.visitInsn(ACONST_NULL);
             return;
         }
-        Set<String> visitedTypes = new HashSet<>(5);
-        pushTypeArgumentElements(owningType, owningTypeWriter, generatorAdapter, declaringElementName, types, visitedTypes, defaults, loadTypeMethods);
+        pushTypeArgumentElements(owningType, owningTypeWriter, generatorAdapter, declaringElementName, null, types, new HashSet<>(5), defaults, loadTypeMethods);
     }
 
     private static void pushTypeArgumentElements(
@@ -245,55 +244,60 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             ClassWriter declaringClassWriter,
             GeneratorAdapter generatorAdapter,
             String declaringElementName,
+            @Nullable
+            ClassElement element,
             Map<String, ClassElement> types,
-            Set<String> visitedTypes,
+            Set<Object> visitedTypes,
             Map<String, Integer> defaults,
             Map<String, GeneratorAdapter> loadTypeMethods) {
-        if (visitedTypes.contains(declaringElementName)) {
-            generatorAdapter.getStatic(
-                    TYPE_ARGUMENT,
-                    ZERO_ARGUMENTS_CONSTANT,
-                    TYPE_ARGUMENT_ARRAY
-            );
-        } else {
-            visitedTypes.add(declaringElementName);
-
-            int len = types.size();
-            // Build calls to Argument.create(...)
-            pushNewArray(generatorAdapter, Argument.class, len);
-            int i = 0;
-            for (Map.Entry<String, ClassElement> entry : types.entrySet()) {
-                // the array index
-                generatorAdapter.push(i);
-                String argumentName = entry.getKey();
-                ClassElement classElement = entry.getValue();
-                Type classReference = JavaModelUtils.getTypeReference(classElement);
-                Map<String, ClassElement> typeArguments = classElement.getTypeArguments();
-                if (CollectionUtils.isNotEmpty(typeArguments) || !classElement.getAnnotationMetadata().isEmpty()) {
-                    buildArgumentWithGenerics(
-                            owningType,
-                            declaringClassWriter,
-                            generatorAdapter,
-                            argumentName,
-                            classReference,
-                            classElement,
-                            typeArguments,
-                            visitedTypes,
-                            defaults,
-                            loadTypeMethods
-                    );
-                } else {
-                    buildArgument(generatorAdapter, argumentName, classElement);
-                }
-
-                // store the type reference
-                generatorAdapter.visitInsn(AASTORE);
-                // if we are not at the end of the array duplicate array onto the stack
-                if (i != (len - 1)) {
-                    generatorAdapter.visitInsn(DUP);
-                }
-                i++;
+        if (element == null || element.getClass().getSimpleName().equals("KotlinClassElement")) {
+            if (visitedTypes.contains(declaringElementName)) {
+                generatorAdapter.getStatic(
+                        TYPE_ARGUMENT,
+                        ZERO_ARGUMENTS_CONSTANT,
+                        TYPE_ARGUMENT_ARRAY
+                );
+                return;
+            } else {
+                visitedTypes.add(declaringElementName);
             }
+        }
+
+        int len = types.size();
+        // Build calls to Argument.create(...)
+        pushNewArray(generatorAdapter, Argument.class, len);
+        int i = 0;
+        for (Map.Entry<String, ClassElement> entry : types.entrySet()) {
+            // the array index
+            generatorAdapter.push(i);
+            String argumentName = entry.getKey();
+            ClassElement classElement = entry.getValue();
+            Type classReference = JavaModelUtils.getTypeReference(classElement);
+            Map<String, ClassElement> typeArguments = classElement.getTypeArguments();
+            if (CollectionUtils.isNotEmpty(typeArguments) || !classElement.getAnnotationMetadata().isEmpty()) {
+                buildArgumentWithGenerics(
+                        owningType,
+                        declaringClassWriter,
+                        generatorAdapter,
+                        argumentName,
+                        classReference,
+                        classElement,
+                        typeArguments,
+                        visitedTypes,
+                        defaults,
+                        loadTypeMethods
+                );
+            } else {
+                buildArgument(generatorAdapter, argumentName, classElement);
+            }
+
+            // store the type reference
+            generatorAdapter.visitInsn(AASTORE);
+            // if we are not at the end of the array duplicate array onto the stack
+            if (i != (len - 1)) {
+                generatorAdapter.visitInsn(DUP);
+            }
+            i++;
         }
     }
 
@@ -330,12 +334,16 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         generatorAdapter.push(getTypeReference(objectType));
         // 2nd argument: the name
         generatorAdapter.push(argumentName);
-        boolean isTypeVariable = objectType instanceof GenericPlaceholderElement || objectType.isTypeVariable();
-        if (isTypeVariable) {
+
+        if (objectType instanceof GenericPlaceholderElement placeholderElement) {
+            // Persist resolved placeholder for backward compatibility
+            objectType = placeholderElement.getResolved().orElse(placeholderElement);
+        }
+
+        if (objectType instanceof GenericPlaceholderElement || objectType.isTypeVariable()) {
             String variableName = argumentName;
-            if (objectType instanceof GenericPlaceholderElement) {
-                GenericPlaceholderElement gpe = (GenericPlaceholderElement) objectType;
-                variableName = gpe.getVariableName();
+            if (objectType instanceof GenericPlaceholderElement placeholderElement) {
+                variableName = placeholderElement.getVariableName();
             }
             boolean hasVariable = !variableName.equals(argumentName);
             if (hasVariable) {
@@ -379,7 +387,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             Type typeReference,
             ClassElement classElement,
             Map<String, ClassElement> typeArguments,
-            Set<String> visitedTypes,
+            Set<Object> visitedTypes,
             Map<String, Integer> defaults,
             Map<String, GeneratorAdapter> loadTypeMethods) {
         // 1st argument: the type
@@ -387,10 +395,33 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         // 2nd argument: the name
         generatorAdapter.push(argumentName);
 
-        AnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(classElement.getAnnotationMetadata());
+        if (classElement instanceof GenericPlaceholderElement placeholderElement) {
+            // Persist resolved placeholder for backward compatibility
+            classElement = placeholderElement.getResolved().orElse(classElement);
+        }
+
+        // Persist only type annotations added to the type argument
+        AnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(classElement.getTypeAnnotationMetadata());
+        if (classElement.getClass().getSimpleName().startsWith("Kotlin")) {
+            // Remove after KSP supports type annotations
+            annotationMetadata = MutableAnnotationMetadata.of(classElement.getAnnotationMetadata());
+        }
         boolean hasAnnotationMetadata = !annotationMetadata.isEmpty();
 
-        if (!hasAnnotationMetadata && typeArguments.isEmpty()) {
+        boolean isRecursiveType = false;
+        if (classElement instanceof GenericPlaceholderElement placeholderElement) {
+            // Prevent placeholder recursion
+            Object genericNativeType = placeholderElement.getGenericNativeType();
+            if (visitedTypes.contains(genericNativeType)) {
+                isRecursiveType = true;
+            } else {
+                visitedTypes.add(genericNativeType);
+            }
+        }
+
+        boolean typeVariable = classElement.isTypeVariable();
+
+        if (isRecursiveType || !typeVariable && !hasAnnotationMetadata && typeArguments.isEmpty()) {
             invokeInterfaceStaticMethod(
                     generatorAdapter,
                     Argument.class,
@@ -407,7 +438,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                     owningType,
                     owningClassWriter,
                     generatorAdapter,
-                    (DefaultAnnotationMetadata) annotationMetadata,
+                    (MutableAnnotationMetadata) annotationMetadata,
                     defaults,
                     loadTypeMethods
             );
@@ -419,6 +450,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                 owningClassWriter,
                 generatorAdapter,
                 classElement.getName(),
+                classElement,
                 typeArguments,
                 visitedTypes,
                 defaults,
@@ -429,7 +461,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         invokeInterfaceStaticMethod(
                 generatorAdapter,
                 Argument.class,
-                classElement.isTypeVariable() ? METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
+                typeVariable ? METHOD_CREATE_TYPE_VAR_WITH_ANNOTATION_METADATA_GENERICS : METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
         );
     }
 
@@ -499,7 +531,10 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
             ClassElement classElement = entry.getGenericType();
             String argumentName = entry.getName();
-            AnnotationMetadata annotationMetadata = entry.getAnnotationMetadata();
+            AnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(
+                entry.getAnnotationMetadata(),
+                entry.getType().getTypeAnnotationMetadata()
+            ).merge();
             Map<String, ClassElement> typeArguments = classElement.getTypeArguments();
             pushCreateArgument(
                     declaringElementName,
@@ -539,32 +574,37 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                                           ClassElement argument,
                                           Map<String, Integer> defaults,
                                           Map<String, GeneratorAdapter> loadTypeMethods) {
-        Type type = Type.getType(Argument.class);
-        if (argument.isPrimitive() && !argument.isArray()) {
-            String constantName = argument.getName().toUpperCase(Locale.ENGLISH);
-            // refer to constant for primitives
-            generatorAdapter.getStatic(type, constantName, type);
-        } else {
+        // Persist only type annotations added
+        AnnotationMetadata annotationMetadata = argument.getTypeAnnotationMetadata();
+
+        if (annotationMetadata.isEmpty()) {
+            Type type = Type.getType(Argument.class);
+            if (argument.isPrimitive() && !argument.isArray()) {
+                String constantName = argument.getName().toUpperCase(Locale.ENGLISH);
+                // refer to constant for primitives
+                generatorAdapter.getStatic(type, constantName, type);
+                return;
+            }
             if (!argument.isArray() && String.class.getName().equals(argument.getType().getName())
                     && argument.getName().equals(argument.getType().getName())
                     && argument.getAnnotationMetadata().isEmpty()) {
-                    generatorAdapter.getStatic(type, "STRING", type);
-                    return;
+                generatorAdapter.getStatic(type, "STRING", type);
+                return;
             }
-
-            pushCreateArgument(
-                    declaringTypeName,
-                    owningType,
-                    classWriter,
-                    generatorAdapter,
-                    argument.getName(),
-                    argument,
-                    AnnotationMetadata.EMPTY_METADATA, // Don't store return type annotations, method annotations are returned
-                    argument.getTypeArguments(),
-                    defaults,
-                    loadTypeMethods
-            );
         }
+
+        pushCreateArgument(
+                declaringTypeName,
+                owningType,
+                classWriter,
+                generatorAdapter,
+                argument.getName(),
+                argument,
+                annotationMetadata,
+                argument.getTypeArguments(),
+                defaults,
+                loadTypeMethods
+        );
     }
 
     /**
@@ -604,8 +644,12 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
         boolean hasAnnotations = !annotationMetadata.isEmpty();
         boolean hasTypeArguments = typeArguments != null && !typeArguments.isEmpty();
+        if (typedElement instanceof GenericPlaceholderElement placeholderElement) {
+            // Persist resolved placeholder for backward compatibility
+            typedElement = placeholderElement.getResolved().orElse(placeholderElement);
+        }
         boolean isGenericPlaceholder = typedElement instanceof GenericPlaceholderElement;
-        boolean isTypeVariable = isGenericPlaceholder || ((typedElement instanceof ClassElement) && ((ClassElement) typedElement).isTypeVariable());
+        boolean isTypeVariable = isGenericPlaceholder || ((typedElement instanceof ClassElement classElement) && classElement.isTypeVariable());
         String variableName = argumentName;
         if (isGenericPlaceholder) {
             variableName = ((GenericPlaceholderElement) typedElement).getVariableName();
@@ -631,7 +675,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                     owningType,
                     declaringClassWriter,
                     generatorAdapter,
-                    (DefaultAnnotationMetadata) annotationMetadata,
+                    (MutableAnnotationMetadata) annotationMetadata,
                     defaults,
                     loadTypeMethods
             );
