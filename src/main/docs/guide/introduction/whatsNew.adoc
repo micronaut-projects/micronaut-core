@@ -5,8 +5,12 @@
 
 Micronaut Framework has offered support for Kotlin via <<kapt, KAPT>>. With version 4.0, Micronaut Framework supports Kotlin also via <<ksp, Kotlin Symbol Processing (KSP) API>>.
 
+=== Apache Groovy 4.0
+
+Micronaut Framework 4.x supports https://groovy-lang.org/releasenotes/groovy-4.0.html[Apache Groovy 4.0].
 
 === Core Changes
+
 
 * <<virtualThreads, Support for Virtual Threads>>
 
