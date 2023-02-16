@@ -247,6 +247,7 @@ languageSupport:
   groovy: Micronaut for Groovy
   kotlin:
     title: Micronaut for Kotlin
+    controller: Controller in Kotlin
     kaptintellij: Kotlin, Kapt and IntelliJ
     gradlekapt: Incremental Annotation Processing with Gradle and Kapt
     openandaop: Kotlin and AOP Advice
