@@ -43,39 +43,40 @@ import reactor.core.CoreSubscriber;
 import reactor.core.publisher.Mono;
 import reactor.util.context.Context;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
 
 /**
- * @implNote Legacy filters had a strict execution flow: filter1->chain.proceed->filter2->chain.proceed...
- * This leads to deep call stacks and requires use of reactive flows. The new filter API is more
- * flexible. Filters do not have to accept a chain they call proceed on, they do not have to use
- * reactive types, and so on.<br>
- * {@link FilterRunner} takes advantage of this flexibility to optimize execution of filters. Most
- * importantly, if a filter returns an immediate value (as opposed to a reactive flow),
- * {@link FilterRunner} can execute filters <i>sequentially</i>, instead of in a recursive fashion.<br>
- * The implementation of this is inspired by kotlin coroutines. Filter execution essentially
- * happens in a loop ({@link #workRequest()} and {@link #workResponse()}), but the loop counter is
- * an instance variable ({@link #index}), and the loop can sometimes <i>suspend</i>, e.g. when a
- * filter returns a reactive flow instead of an immediate value. When suspension happens, the loop
- * exits early, and {@link #workRequest()} (or {@link #workResponse()}) will be called again on
- * unsuspend (e.g. when the reactive flow completes).
+ * The filter runner will start processing the filters in the forward order.
+ * All the request filters are executed till one of them returns a response (bypasses the route execution for controllers or the client invocation),
+ * or the terminal filter will produce the response from the route/client call.
+ * After that, the filters are processed in the opposite order so response filters can be processed,
+ * which can sometimes override the existing response.
+ * There is a special case of response filters that needs to process the response; for those cases,
+ * the filter needs to be suspended, and the next filter in the order needs to be executed.
+ * When the response is committed, the filter will be resumed when it's processed again.
+ * There is a special case for the client filters; those will process the exception,
+ * which needs to be tracked during the response filtering phase.
  *
- * @since 4.0.0
  * @author Jonas Konrad
+ * @author Denis Stepanov
+ * @since 4.0.0
  */
 @Internal
 public class FilterRunner {
     private static final Logger LOG = LoggerFactory.getLogger(FilterRunner.class);
-    private static final Predicate<FilterRunner> FILTER_CONDITION_ALWAYS_TRUE = runner -> true;
+    private static final Predicate<FilterMethodContext> FILTER_CONDITION_ALWAYS_TRUE = runner -> true;
 
     private final ConversionService conversionService;
     /**
@@ -84,241 +85,13 @@ public class FilterRunner {
      */
     private final List<GenericHttpFilter> filters;
 
-    /*
-    To understand how this class works, let's first look at it in an "imperative" simplification.
-    Filter processing basically works like this (somewhat pseudocode):
-
-    ```java
-    // these are local variables
-    int filterIndex = 0;
-    Request request = ...;
-    Response response;
-    Throwable failure;
-    // workRequest
-    while (filterIndex < filters.size()) {
-        filter = filters[filterIndex++];
-        if (filter.isBefore()) {
-            try {
-                ret = filter(request);
-                if (ret instanceof Response) {
-                    response = ret;
-                    // cancel request filters, continue with response processing
-                    break;
-                } else if (ret instanceof Request) {
-                    request = ret;
-                }
-                // continue with request filters
-            } catch(e) {
-                failure = e;
-                // cancel request filters, continue with response processing
-                break;
-            }
-        }
-    }
-    // workResponse
-    for (filterIndex > 0) {
-        filter = filters[--filterIndex];
-        if (filter.isAfter()) {
-            try {
-                ret = filter(request, response, failure);
-                if (ret instanceof Response) {
-                    response = ret;
-                }
-                // continue with response filters
-            } catch(e) {
-                failure = e;
-                // continue with response filters
-            }
-        }
-    }
-    if (failure) {
-        throw failure;
-    } else {
-        return response
-    }
-    ```
-
-    This would work fine if all filters were blocking, there was no support for continuations, and
-    all filters could run on the same thread. But to support these features, we sometimes need to,
-    *within* this method, switch threads, or asynchronously wait for a filter to complete.
-
-    The solution to this is to transform this imperative code into a *coroutine*. A coroutine can
-    be *suspended* at any point, and then *resumed* when the necessary condition is met. To
-    implement the coroutine, I chose the same approach kotlin coroutines take. Let's take a look at
-    just the request loop, first in imperative style, with the breaks replaced by returns to make
-    the next steps easier:
-
-    ```java
-    // these are local variables
-    int filterIndex = 0;
-    Request request = ...;
-    Response response;
-    Throwable failure;
-    // workRequest
-    while (filterIndex < filters.size()) {
-        filter = filters[filterIndex++];
-        if (filter.isBefore()) {
-            try {
-                ret = filter(request); // possible suspension point!
-                if (ret instanceof Response) {
-                    // cancel request filters, continue with response processing
-                    workResponse(filterIndex, ret);
-                    return;
-                } else if (ret instanceof Request) {
-                    request = ret;
-                }
-                // continue with request filters
-            } catch(e) {
-                // cancel request filters, continue with response processing
-                workResponse(filterIndex, e);
-                return;
-            }
-        }
-    }
-    // note: this line is never reached, because the last request filter *always* returns the
-    // final response (it's the "terminal filter")
-    ```
-
-    Now, we want to support suspension in the `filter(request)` call: The call could be
-    asynchronous, so we want to be able to delay further loop execution until it finishes. Let's
-    write it down (just the loop):
-
-    ```java
-    while (filterIndex < filters.size()) {
-        filter = filters[filterIndex++];
-        if (filter.isBefore()) {
-            filter(request).then((ret, e) -> {
-                if (e != null) {
-                    // cancel request filters, continue with response processing
-                    workResponse(filterIndex, e);
-                } else {
-                    if (ret instanceof Response) {
-                        // cancel request filters, continue with response processing
-                        workResponse(filterIndex, ret);
-                    } else {
-                        if (ret instanceof Request) request = ret;
-                        PROCEED;
-                    }
-                }
-            });
-            AWAIT;
-        }
-    }
-    ```
-
-    At AWAIT, the loop should wait until PROCEED is reached (if it is reached at all). Now here's
-    the trick: At AWAIT, we will store all the aspects of the control flow of the loop into fields.
-    At PROCEED, we will continue where we left off by calling the loop again. We need to make sure
-    that all the state of the method (i.e. local variables) are in fields instead, and that the
-    point where we return in AWAIT is the same place in the control flow graph as the start of the
-    method.
-
-    ```java
-    // these are fields now!
-    int filterIndex = 0;
-    Request request = ...;
-    Response response;
-    Throwable failure;
-
-    void workRequest() {
-        while (filterIndex < filters.size()) {
-            filter = filters[filterIndex++];
-            if (filter.isBefore()) {
-                filter(request).then((ret, e) -> {
-                    if (e != null) {
-                        // cancel request filters, continue with response processing
-                        failure = e;
-                        workResponse(); // workResponse can access filterIndex directly now
-                    } else {
-                        if (ret instanceof Response) {
-                            // cancel request filters, continue with response processing
-                            response = ret;
-                            workResponse(); // workResponse can access filterIndex directly now
-                        } else {
-                            if (ret instanceof Request) request = ret;
-                            workRequest(); // PROCEED
-                        }
-                    }
-                });
-                return; // AWAIT
-            }
-        }
-    }
-    ```
-
-    One big advantage of this approach is that suspension is entirely optional. If a filter is not
-    asynchronous, we don't need to suspend, and this code has almost no overhead over the
-    imperative approach we started with. Only advanced filters need this suspension mechanism at
-    all.
-
-    Another benefit is that this allows us to implement asynchronous "around" filters, i.e. filters
-    that intercept both the request and response in one method, using a continuation:
-
-    ```java
-    void myFilter(request, continuation) {
-        // modify request
-        response = continuation.proceed();
-        // modify response
-    }
-    ```
-
-    Inside the proceed call we need to do two things. First, we need to resume execution of
-    workRequest, to run the downstream filters. This is possible with the tools we have already.
-    But we also need to ensure that workResponse only continues to the filterIndex of our filter,
-    and at that point we need to return from proceed(). Then, when myFilter returns, we can run the
-    remaining response filters.
-
-    The way we do this is to register a *SuspensionPoint* for the filter. The SuspensionPoint is
-    basically a CompletableFuture, but with some additional data attached (the filterIndex).
-    continuation.proceed() first kicks off downstream processing (calls workRequest()) and then
-    waits for the SuspensionPoint to complete. When workResponse walks backwards through the
-    filters, it will see the SuspensionPoint, and notify it (complete the CompletableFuture). When
-    myFilter finishes modifying the response, the return handler will then trigger the remaining
-    response filters (call workResponse()).
-
-    The same SuspensionPoint mechanism is also adapted to reactive filters fairly easily. In that
-    case, proceed() returns a publisher that completes when the downstream filters are done. The
-    filter in turn returns a publisher, and once *that* completes, we run the remaining response
-    filters.
-     */
-
-    private HttpRequest<?> request;
-    /**
-     * Current response. During {@link #workRequest()} this is null. During {@link #workResponse()},
-     * this field or {@link #failure} must be set (only one or the other may be non-null).
-     */
-    private HttpResponse<?> response;
-    /**
-     * Current failure. During {@link #workRequest()} this is null. During {@link #workResponse()},
-     * this field or {@link #response} must be set (only one or the other may be non-null).
-     */
-    private Throwable failure;
-    /**
-     * Linked list of suspension points. Each suspension point has a
-     * {@link SuspensionPoint#filterIndex} where it should be completed, and
-     * {@link SuspensionPoint#next a reference} to the next suspension point. This field always
-     * contains the "last" suspension point (the one with the highest filterIndex).
-     * <br>
-     * Initially, this field contains a "root" suspension point that is used to signal when all
-     * filters have completed. An {@link ExecutionFlow} that is linked to it is returned by
-     * {@link #run}.
-     */
-    private SuspensionPoint responseSuspensionPoint = new SuspensionPoint(-1, null);
-    /**
-     * Loop index for {@link #workRequest()} and {@link #workResponse()}. This is the index to the
-     * current (or next) filter in {@link #filters}. During {@link #workRequest()} this counts up,
-     * during {@link #workResponse()} this counts down.
-     */
-    private int index;
-    private boolean responseNeedsProcessing = false;
-
-    private Context reactorContext = Context.empty();
+    private Context initialReactorContext = Context.empty();
 
     /**
      * Create a new filter runner, to be used only once.
      *
      * @param conversionService The conversion service
-     * @param filters The filters to run
+     * @param filters           The filters to run
      */
     public FilterRunner(ConversionService conversionService, List<GenericHttpFilter> filters) {
         this.conversionService = conversionService;
@@ -369,34 +142,12 @@ public class FilterRunner {
      * Transform a failure, e.g. by replacing an exception with an error response. Called before
      * every filter.
      *
-     * @param request  The current request
-     * @param failure  The failure
+     * @param request The current request
+     * @param failure The failure
      * @return A flow that will be passed on to the next filter
      */
     protected ExecutionFlow<? extends HttpResponse<?>> processFailure(HttpRequest<?> request, Throwable failure) {
         return ExecutionFlow.error(failure);
-    }
-
-    private boolean processResponse0() {
-        ExecutionFlow<? extends HttpResponse<?>> flow;
-        if (failure == null) {
-            flow = processResponse(request, response);
-        } else {
-            flow = processFailure(request, failure);
-        }
-        ImperativeExecutionFlow<? extends HttpResponse<?>> done = flow.tryComplete();
-        if (done != null) {
-            failure = done.getError();
-            response = done.getValue();
-            return true;
-        } else {
-            flow.onComplete((resp, fail) -> {
-                failure = fail;
-                response = resp;
-                workResponse();
-            });
-            return false;
-        }
     }
 
     /**
@@ -408,7 +159,7 @@ public class FilterRunner {
      * @return This filter runner, for chaining
      */
     public final FilterRunner reactorContext(Context reactorContext) {
-        this.reactorContext = reactorContext;
+        this.initialReactorContext = reactorContext;
         return this;
     }
 
@@ -420,26 +171,72 @@ public class FilterRunner {
      * response
      */
     public final ExecutionFlow<MutableHttpResponse<?>> run(HttpRequest<?> request) {
-        if (this.request != null) {
-            throw new IllegalStateException("Can only process one request");
-        }
-        this.request = request;
-
-        ExecutionFlow<HttpResponse<?>> resultFlow = CompletableFutureExecutionFlow.just(responseSuspensionPoint);
-        workRequest();
-        //noinspection unchecked,rawtypes
-        return (ExecutionFlow) resultFlow;
+        return (ExecutionFlow) filterRequest(new FilterContext(request, initialReactorContext), filters.listIterator(), new HashMap<>());
     }
 
-    private void workRequest() {
-        while (true) {
-            if (!workRequestFilter(filters.get(index++))) {
-                return;
-            }
+    private ExecutionFlow<HttpResponse<?>> filterRequest(FilterContext context,
+                                                         ListIterator<GenericHttpFilter> iterator,
+                                                         Map<GenericHttpFilter, Map.Entry<ExecutionFlow<FilterContext>, FilterContinuationImpl<?>>> suspended) {
+        return filterRequest0(context, iterator, suspended)
+                .flatMap(newContext -> {
+                    if (newContext.response != null) {
+                        return filterResponse(newContext, iterator, null, suspended);
+                    }
+                    return ExecutionFlow.error(new IllegalStateException("Request filters didn't produce any response!"));
+                });
+    }
+
+    private ExecutionFlow<FilterContext> filterRequest0(FilterContext context,
+                                                        ListIterator<GenericHttpFilter> iterator,
+                                                        Map<GenericHttpFilter, Map.Entry<ExecutionFlow<FilterContext>, FilterContinuationImpl<?>>> suspended) {
+        if (context.response != null) {
+            return ExecutionFlow.just(context);
+        }
+        if (iterator.hasNext()) {
+            GenericHttpFilter filter = iterator.next();
+            return processRequestFilter(filter, context, suspended)
+                    .flatMap(newContext -> filterRequest0(newContext, iterator, suspended))
+                    .onErrorResume(throwable -> {
+                        // Un-suspend possibly awaiting filter and exception filtering scenario of the http client
+                        return filterResponse(context, iterator, throwable, suspended).map(context::withResponse);
+                    });
+        } else {
+            return ExecutionFlow.error(new IllegalStateException("Request filters didn't produce any response!"));
         }
     }
 
-    private boolean workRequestFilter(GenericHttpFilter filter) {
+    private ExecutionFlow<HttpResponse<?>> filterResponse(FilterContext context,
+                                                          ListIterator<GenericHttpFilter> iterator,
+                                                          @Nullable
+                                                          Throwable exception,
+                                                          Map<GenericHttpFilter, Map.Entry<ExecutionFlow<FilterContext>, FilterContinuationImpl<?>>> suspended) {
+        if (iterator.hasPrevious()) {
+            // Walk backwards and execute response filters or un-suspend request filters waiting for the response
+            GenericHttpFilter filter = iterator.previous();
+            return processResponseFilter(filter, context, exception, suspended)
+                    .flatMap(newContext -> {
+                        if (context != newContext) {
+                            return processResponse(newContext.request, newContext.response).map(context::withResponse);
+                        }
+                        return ExecutionFlow.just(newContext);
+                    })
+                    .onErrorResume(throwable -> processFailure(context.request, throwable).map(context::withResponse))
+                    .flatMap(newContext -> filterResponse(newContext, iterator, newContext.response == null ? exception : null, suspended));
+        } else if (context.response != null) {
+            return ExecutionFlow.just(context.response);
+        } else if (exception != null) {
+            // This scenario only applies for client filters
+            // Filters didn't remap the exception to any response
+            return ExecutionFlow.error(exception);
+        } else {
+            return ExecutionFlow.error(new IllegalStateException("No response after response filters completed!"));
+        }
+    }
+
+    private ExecutionFlow<FilterContext> processRequestFilter(GenericHttpFilter filter,
+                                                              FilterContext context,
+                                                              Map<GenericHttpFilter, Map.Entry<ExecutionFlow<FilterContext>,
+                                                                      FilterContinuationImpl<?>>> suspended) {
         Executor executeOn;
         if (filter instanceof GenericHttpFilter.Async async) {
             executeOn = async.executor();
@@ -451,234 +248,240 @@ public class FilterRunner {
         if (filter instanceof FilterMethod<?> before) {
             if (before.isResponseFilter) {
                 // skip filter, only used for response
-                return true;
+                return ExecutionFlow.just(context);
             }
+            ExecutionFlow<FilterContext> filterMethodFlow;
+            FilterContinuationImpl<?> continuation = before.isSuspended() ? before.createContinuation(context) : null;
+            FilterMethodContext filterMethodContext = new FilterMethodContext(
+                    context.request,
+                    context.response,
+                    null,
+                    continuation);
             if (executeOn == null) {
                 // possibly continue with next filter
-                return before.invokeBefore(this, null);
+                filterMethodFlow = before.filter(context, filterMethodContext);
             } else {
-                executeOn.execute(() -> {
-                    if (before.invokeBefore(this, executeOn)) {
-                        workRequest();
-                    }
-                });
-                return false;
+                if (continuation != null) {
+                    continuation.completeOn = executeOn;
+                }
+                filterMethodFlow = ExecutionFlow.async(executeOn, () -> before.filter(context, filterMethodContext));
             }
+            if (before.isSuspended()) {
+                if (continuation instanceof ReactiveResultAwareReactiveContinuationImpl<?>) {
+                    // Method consumes reactive continuation and returns reactive result
+                    suspended.put(filter, Map.entry(continuation.filterProcessedFlow(), continuation));
+                } else if (continuation instanceof ReactiveContinuationImpl<?>) {
+                    // Method consumes reactive continuation and doesn't return reactive result
+                    throw new IllegalStateException("Not supported use-case with reactive continuation and non-reactive return type");
+                } else {
+                    // Method consumes blocking continuation
+                    suspended.put(filter, Map.entry(filterMethodFlow, continuation));
+                }
+                // Continue executing other filters while this one is suspended
+                return continuation.nextFilterFlow();
+            }
+            return filterMethodFlow;
         } else if (filter instanceof GenericHttpFilter.AroundLegacy around) {
-            FilterChainImpl chainSuspensionPoint = new FilterChainImpl(index - 1, responseSuspensionPoint);
+            FilterChainImpl chainSuspensionPoint = new FilterChainImpl(conversionService, context);
+            // Legacy `Publisher<HttpResponse> proceed(..)` filters are always suspended
+            suspended.put(around, Map.entry(chainSuspensionPoint.filterProcessedFlow(), chainSuspensionPoint));
             chainSuspensionPoint.completeOn = executeOn;
-            responseSuspensionPoint = chainSuspensionPoint;
             if (executeOn == null) {
                 try {
-                    around.bean().doFilter(request, chainSuspensionPoint).subscribe(chainSuspensionPoint);
+                    around.bean().doFilter(context.request, chainSuspensionPoint).subscribe(chainSuspensionPoint);
                 } catch (Throwable e) {
-                    chainSuspensionPoint.forwardResponse(null, e);
+                    chainSuspensionPoint.triggerFilterProcessed(context, null, e);
                 }
+                return chainSuspensionPoint.nextFilterFlow();
             } else {
-                executeOn.execute(() -> {
+                return ExecutionFlow.async(executeOn, () -> {
                     try {
-                        around.bean().doFilter(request, chainSuspensionPoint).subscribe(chainSuspensionPoint);
+                        around.bean().doFilter(context.request, chainSuspensionPoint).subscribe(chainSuspensionPoint);
                     } catch (Throwable e) {
-                        chainSuspensionPoint.forwardResponse(null, e);
+                        chainSuspensionPoint.triggerFilterProcessed(context, null, e);
                     }
+                    return chainSuspensionPoint.nextFilterFlow();
                 });
             }
-            // suspend
-            return false;
         } else if (filter instanceof GenericHttpFilter.TerminalReactive || filter instanceof GenericHttpFilter.Terminal || filter instanceof GenericHttpFilter.TerminalWithReactorContext) {
             if (executeOn != null) {
-                throw new AssertionError("Async terminal filters not supported");
+                throw new IllegalStateException("Async terminal filters not supported");
             }
-
+            if (filter.isSuspended()) {
+                throw new IllegalStateException("Terminal filters cannot be suspended");
+            }
             ExecutionFlow<? extends HttpResponse<?>> terminalFlow;
             if (filter instanceof GenericHttpFilter.TerminalWithReactorContext t) {
                 try {
-                    terminalFlow = t.execute(request, reactorContext);
+                    terminalFlow = t.execute(context.request, context.reactorContext);
                 } catch (Throwable e) {
                     terminalFlow = ExecutionFlow.error(e);
                 }
             } else if (filter instanceof GenericHttpFilter.Terminal t) {
                 try {
-                    terminalFlow = t.execute(request);
+                    terminalFlow = t.execute(context.request);
                 } catch (Throwable e) {
                     terminalFlow = ExecutionFlow.error(e);
                 }
             } else {
                 terminalFlow = ReactiveExecutionFlow.fromPublisher(Mono.from(((GenericHttpFilter.TerminalReactive) filter).responsePublisher())
-                    .contextWrite(reactorContext));
+                        .contextWrite(context.reactorContext));
             }
-            // this is almost never available immediately, so don't bother with asDone checks
-            terminalFlow.onComplete((resp, fail) -> {
-                response = resp;
-                failure = fail;
-                responseNeedsProcessing = true;
-                index--;
-                workResponse();
-            });
-            // request work is done
-            return false;
+            return terminalFlow.flatMap(response -> ExecutionFlow.just(context.withResponse(response)));
         } else {
             throw new IllegalStateException("Unknown filter type");
         }
     }
 
-    private void workResponse() {
-        while (true) {
-            if (responseNeedsProcessing) {
-                responseNeedsProcessing = false;
-                if (!processResponse0()) {
-                    // suspend
-                    return;
-                }
+    private ExecutionFlow<FilterContext> processResponseFilter(GenericHttpFilter filter,
+                                                               FilterContext filterContext,
+                                                               Throwable exceptionToFilter,
+                                                               Map<GenericHttpFilter, Map.Entry<ExecutionFlow<FilterContext>, FilterContinuationImpl<?>>> suspended) {
+        Executor executeOn;
+        if (filter instanceof GenericHttpFilter.Async async) {
+            executeOn = async.executor();
+            filter = async.actual();
+        } else {
+            executeOn = null;
+        }
+
+        Map.Entry<ExecutionFlow<FilterContext>, FilterContinuationImpl<?>> suspendedFilterData = suspended.get(filter);
+        if (suspendedFilterData != null) {
+            // This filter is suspended and awaiting to receive the response
+            ExecutionFlow<FilterContext> filterProcessedFlow = suspendedFilterData.getKey();
+            FilterContinuationImpl<?> continuation = suspendedFilterData.getValue();
+            // Resume suspended filter
+            continuation.resume(filterContext, exceptionToFilter);
+            // Filter flow might modify the context provided
+            return filterProcessedFlow;
+        }
+
+        if (exceptionToFilter != null && !filter.isFiltersException()) {
+            return ExecutionFlow.just(filterContext);
+        }
+
+        if (filter instanceof FilterMethod<?> after && after.isResponseFilter) {
+            if (after.isSuspended()) {
+                return ExecutionFlow.error(new IllegalStateException("Response filter cannot have a continuation!"));
             }
-
-            index--;
-
-            // if there is a suspension point for this filter, notify the suspension point instead.
-            // we don't need to execute this filter again, it already got called for the request.
-            if (responseSuspensionPoint.filterIndex == index) {
-                SuspensionPoint suspensionPoint = responseSuspensionPoint;
-                responseSuspensionPoint = suspensionPoint.next;
-                boolean completed;
-                if (failure == null) {
-                    completed = suspensionPoint.complete(response);
-                } else {
-                    completed = suspensionPoint.completeExceptionally(failure);
-                }
-                if (!completed) {
-                    if (failure == null) {
-                        LOG.warn("Dropped completion");
-                    } else {
-                        LOG.warn("Dropped completion with exception", failure);
-                    }
-                }
-                return;
-            }
-            GenericHttpFilter filter = filters.get(index);
-
-            Executor executeOn = null;
-            if (filter instanceof GenericHttpFilter.Async async) {
-                executeOn = async.executor();
-                filter = async.actual();
-            }
-
-            if (filter instanceof FilterMethod<?> after && after.isResponseFilter) {
-                if (executeOn == null) {
-                    if (!after.invokeAfter(this)) {
-                        // suspend
-                        return;
-                    }
-                } else {
-                    executeOn.execute(() -> {
-                        if (after.invokeAfter(this)) {
-                            workResponse();
-                        }
-                    });
-                    // suspend
-                    return;
-                }
+            FilterMethodContext filterMethodContext = new FilterMethodContext(
+                    filterContext.request,
+                    filterContext.response,
+                    exceptionToFilter,
+                    null);
+            if (executeOn == null) {
+                return after.filter(filterContext, filterMethodContext);
+            } else {
+                return ExecutionFlow.async(executeOn, () -> after.filter(filterContext, filterMethodContext));
             }
         }
+        return ExecutionFlow.just(filterContext);
     }
 
     @Internal
-    public static <T> FilterMethod<T> prepareFilterMethod(T bean, ExecutableMethod<T, ?> method, boolean isResponseFilter, FilterOrder order) throws IllegalArgumentException {
-        return prepareFilterMethod(bean, method, method.getArguments(), method.getReturnType().asArgument(), isResponseFilter, order);
+    public static <T> FilterMethod<T> prepareFilterMethod(ConversionService conversionService,
+                                                          T bean,
+                                                          ExecutableMethod<T, ?> method,
+                                                          boolean isResponseFilter,
+                                                          FilterOrder order) throws IllegalArgumentException {
+        return prepareFilterMethod(conversionService, bean, method, method.getArguments(), method.getReturnType().asArgument(), isResponseFilter, order);
     }
 
     @Internal
-    public static <T> FilterMethod<T> prepareFilterMethod(T bean, ExecutableMethod<T, ?> method, Argument<?>[] arguments, Argument<?> returnType, boolean isResponseFilter, FilterOrder order) throws IllegalArgumentException {
+    public static void validateFilterMethod(Argument<?>[] arguments,
+                                                Argument<?> returnType,
+                                                boolean isResponseFilter) throws IllegalArgumentException {
+        prepareFilterMethod(ConversionService.SHARED, null, null, arguments, returnType, isResponseFilter, null);
+    }
+
+    @Internal
+    public static <T> FilterMethod<T> prepareFilterMethod(ConversionService conversionService,
+                                                          T bean,
+                                                          ExecutableMethod<T, ?> method,
+                                                          Argument<?>[] arguments,
+                                                          Argument<?> returnType,
+                                                          boolean isResponseFilter,
+                                                          FilterOrder order) throws IllegalArgumentException {
         FilterArgBinder[] fulfilled = new FilterArgBinder[arguments.length];
-        Predicate<FilterRunner> filterCondition = FILTER_CONDITION_ALWAYS_TRUE;
+        Predicate<FilterMethodContext> filterCondition = FILTER_CONDITION_ALWAYS_TRUE;
         boolean skipOnError = isResponseFilter;
-
-        int passedOnContinuationArgIndex = -1;
+        boolean filtersException = false;
+        Function<FilterContext, FilterContinuationImpl<?>> continuationCreator = null;
         for (int i = 0; i < arguments.length; i++) {
             Argument<?> argument = arguments[i];
             if (argument.getType().isAssignableFrom(HttpRequest.class)) {
-                fulfilled[i] = runner -> runner.request;
+                fulfilled[i] = ctx -> ctx.request;
             } else if (argument.getType().isAssignableFrom(MutableHttpRequest.class)) {
-                fulfilled[i] = runner -> {
-                    if (!(runner.request instanceof MutableHttpRequest<?>)) {
-                        runner.request = runner.request.mutate();
+                fulfilled[i] = ctx -> {
+                    HttpRequest<?> request = ctx.request;
+                    if (!(ctx.request instanceof MutableHttpRequest<?>)) {
+                        request = ctx.request.mutate();
                     }
-                    return runner.request;
+                    return request;
                 };
             } else if (argument.getType().isAssignableFrom(MutableHttpResponse.class)) {
                 if (!isResponseFilter) {
                     throw new IllegalArgumentException("Filter is called before the response is known, can't have a response argument");
                 }
-                fulfilled[i] = runner -> runner.response;
+                fulfilled[i] = ctx -> ctx.response;
             } else if (Throwable.class.isAssignableFrom(argument.getType())) {
                 if (!isResponseFilter) {
                     throw new IllegalArgumentException("Request filters cannot handle exceptions");
                 }
                 if (!argument.isNullable()) {
-                    filterCondition = filterCondition.and(runner -> runner.failure != null && argument.isInstance(runner.failure));
-                    fulfilled[i] = runner -> runner.failure;
+                    filterCondition = filterCondition.and(ctx -> ctx.failure != null && argument.isInstance(ctx.failure));
+                    fulfilled[i] = ctx -> ctx.failure;
                 } else {
-                    fulfilled[i] = runner -> {
-                        if (runner.failure != null && argument.isInstance(runner.failure)) {
-                            return runner.failure;
-                        } else {
-                            return null;
+                    fulfilled[i] = ctx -> {
+                        if (ctx.failure != null && argument.isInstance(ctx.failure)) {
+                            return ctx.failure;
                         }
+                        return null;
                     };
                 }
+                filtersException = true;
                 skipOnError = false;
             } else if (argument.getType() == FilterContinuation.class) {
                 if (isResponseFilter) {
                     throw new IllegalArgumentException("Response filters cannot use filter continuations");
                 }
-                if (passedOnContinuationArgIndex != -1) {
+                if (continuationCreator != null) {
                     throw new IllegalArgumentException("Only one continuation per filter is allowed");
                 }
                 Argument<?> continuationReturnType = argument.getFirstTypeVariable().orElseThrow(() -> new IllegalArgumentException("Continuations must specify generic type"));
                 if (isReactive(continuationReturnType) && continuationReturnType.getWrappedType().isAssignableFrom(MutableHttpResponse.class)) {
-                    fulfilled[i] = runner -> {
-                        SuspensionPoint newSuspensionPoint = runner.new ReactiveContinuationImpl<>(
-                            runner.index - 1,
-                            runner.responseSuspensionPoint,
-                            continuationReturnType.getType()
-                        );
-                        // invokeBefore will detect the new suspension point and handle it accordingly
-                        runner.responseSuspensionPoint = newSuspensionPoint;
-                        return newSuspensionPoint;
-                    };
+                    if (isReactive(returnType)) {
+                        continuationCreator = ctx -> new ReactiveResultAwareReactiveContinuationImpl<>(conversionService, ctx);
+                    } else {
+                        continuationCreator = ctx -> new ReactiveContinuationImpl<>(conversionService, ctx, continuationReturnType.getType());
+                    }
+                    fulfilled[i] = ctx -> ctx.continuation;
                 } else if (continuationReturnType.getType().isAssignableFrom(MutableHttpResponse.class)) {
-                    fulfilled[i] = runner -> {
-                        SuspensionPoint newSuspensionPoint = runner.new BlockingContinuationImpl(
-                            runner.index - 1,
-                            runner.responseSuspensionPoint
-                        );
-                        // invokeBefore will detect the new suspension point and handle it accordingly
-                        runner.responseSuspensionPoint = newSuspensionPoint;
-                        return newSuspensionPoint;
-                    };
+                    continuationCreator = BlockingContinuationImpl::new;
+                    fulfilled[i] = ctx -> ctx.continuation;
                 } else {
                     throw new IllegalArgumentException("Unsupported continuation type: " + continuationReturnType);
                 }
-                passedOnContinuationArgIndex = i;
-
             } else {
                 throw new IllegalArgumentException("Unsupported filter argument type: " + argument);
             }
         }
         if (skipOnError) {
-            filterCondition = filterCondition.and(r -> r.failure == null);
-        }
-        if (filterCondition == FILTER_CONDITION_ALWAYS_TRUE) {
+            filterCondition = filterCondition.and(ctx -> ctx.failure == null);
+        } else if (filterCondition == FILTER_CONDITION_ALWAYS_TRUE) {
             filterCondition = null;
         }
+        FilterReturnHandler returnHandler = prepareReturnHandler(conversionService, returnType, isResponseFilter, continuationCreator != null, false);
         return new FilterMethod<>(
-            order,
-            bean,
-            method,
-            isResponseFilter,
-            fulfilled,
-            filterCondition,
-            passedOnContinuationArgIndex,
-            prepareReturnHandler(returnType, isResponseFilter, passedOnContinuationArgIndex != -1, false)
+                order,
+                bean,
+                method,
+                isResponseFilter,
+                fulfilled,
+                filterCondition,
+                continuationCreator,
+                filtersException,
+                returnHandler
         );
     }
 
@@ -687,9 +490,13 @@ public class FilterRunner {
         return continuationReturnType.isReactive() || continuationReturnType.getType() == Publisher.class;
     }
 
-    private static FilterReturnHandler prepareReturnHandler(Argument<?> type, boolean isResponseFilter, boolean hasContinuation, boolean fromOptional) throws IllegalArgumentException {
+    private static FilterReturnHandler prepareReturnHandler(ConversionService conversionService,
+                                                            Argument<?> type,
+                                                            boolean isResponseFilter,
+                                                            boolean hasContinuation,
+                                                            boolean fromOptional) throws IllegalArgumentException {
         if (type.isOptional()) {
-            FilterReturnHandler next = prepareReturnHandler(type.getWrappedType(), isResponseFilter, hasContinuation, true);
+            FilterReturnHandler next = prepareReturnHandler(conversionService, type.getWrappedType(), isResponseFilter, hasContinuation, true);
             return (r, o, c) -> next.handle(r, o == null ? null : ((Optional<?>) o).orElse(null), c);
         }
         if (type.isVoid()) {
@@ -734,200 +541,205 @@ public class FilterRunner {
             }
         }
         if (isReactive(type)) {
-            var next = prepareReturnHandler(type.getWrappedType(), isResponseFilter, hasContinuation, false);
-            return new DelayedFilterReturnHandler(isResponseFilter, next, nullable) {
+            var next = prepareReturnHandler(conversionService, type.getWrappedType(), isResponseFilter, hasContinuation, false);
+            return new FilterReturnHandler() {
+
                 @Override
-                protected ExecutionFlow<?> toFlow(FilterRunner runner, Object o) {
-                    //noinspection unchecked
-                    return ReactiveExecutionFlow.fromPublisher(
-                        Mono.from(Publishers.convertPublisher(runner.conversionService, o, Publisher.class))
-                            .contextWrite(runner.reactorContext));
+                public ExecutionFlow<FilterContext> handle(FilterContext context, Object returnValue, FilterContinuationImpl<?> continuation) throws Throwable {
+                    if (returnValue == null && !nullable) {
+                        return next.handle(context, null, continuation);
+                    }
+
+                    Mono publisher = Mono.from(Publishers.convertPublisher(conversionService, returnValue, Publisher.class))
+                            .contextWrite(context.reactorContext());
+
+                    if (continuation instanceof ReactiveResultAwareReactiveContinuationImpl<?> reactiveContinuation) {
+                        publisher.subscribe(reactiveContinuation);
+                        return reactiveContinuation.nextFilterFlow();
+                    }
+                    return ReactiveExecutionFlow.fromPublisher(publisher).flatMap(v -> {
+                        try {
+                            return next.handle(context, v, continuation);
+                        } catch (Throwable e) {
+                            return ExecutionFlow.error(e);
+                        }
+                    });
                 }
+
             };
         } else if (type.isAsync()) {
-            var next = prepareReturnHandler(type.getWrappedType(), isResponseFilter, hasContinuation, false);
+            var next = prepareReturnHandler(conversionService, type.getWrappedType(), isResponseFilter, hasContinuation, false);
             return new DelayedFilterReturnHandler(isResponseFilter, next, nullable) {
                 @Override
-                protected ExecutionFlow<?> toFlow(FilterRunner runner, Object o) {
+                protected ExecutionFlow<?> toFlow(FilterContext context, Object returnValue, FilterContinuationImpl<?> continuation) {
                     //noinspection unchecked
-                    return CompletableFutureExecutionFlow.just(((CompletionStage<Object>) o).toCompletableFuture());
+                    return CompletableFutureExecutionFlow.just(((CompletionStage<Object>) returnValue).toCompletableFuture());
                 }
             };
         } else {
             throw new IllegalArgumentException("Unsupported filter return type " + type.getType().getName());
         }
-
     }
 
-    record FilterMethod<T>(
-        FilterOrder order,
-        T bean,
-        Executable<T, ?> method,
-        boolean isResponseFilter,
-        FilterArgBinder[] argBinders,
-        @Nullable
-        Predicate<FilterRunner> filterCondition,
-        int passedOnContinuationArgIndex,
-        FilterReturnHandler returnHandler
+    record FilterMethod<T>(FilterOrder order,
+                           T bean,
+                           Executable<T, ?> method,
+                           boolean isResponseFilter,
+                           FilterArgBinder[] argBinders,
+                           @Nullable
+                           Predicate<FilterMethodContext> filterCondition,
+                           Function<FilterContext, FilterContinuationImpl<?>> continuationCreator,
+                           boolean filtersException,
+                           FilterReturnHandler returnHandler
     ) implements GenericHttpFilter, Ordered {
+
+        @Override
+        public boolean isSuspended() {
+            return continuationCreator != null;
+        }
+
+        @Override
+        public boolean isFiltersException() {
+            return filtersException;
+        }
+
         @Override
         public int getOrder() {
             return order.getOrder(bean);
         }
 
-        private boolean invokeBefore(FilterRunner runner, @Nullable Executor completeOn) {
-            FilterContinuationImpl<?> passedOnContinuation = null;
+        public FilterContinuationImpl<?> createContinuation(FilterContext filterContext) {
+            return continuationCreator.apply(filterContext);
+        }
+
+        private ExecutionFlow<FilterContext> filter(FilterContext filterContext,
+                                                    FilterMethodContext methodContext) {
             try {
-                if (filterCondition != null && !filterCondition.test(runner)) {
-                    return true;
+                if (filterCondition != null && !filterCondition.test(methodContext)) {
+                    return ExecutionFlow.just(filterContext);
                 }
-                Object[] args = bindArgs(runner);
-                if (passedOnContinuationArgIndex != -1) {
-                    passedOnContinuation = (FilterContinuationImpl<?>) args[passedOnContinuationArgIndex];
-                    if (completeOn != null) {
-                        passedOnContinuation.completeOn = completeOn;
-                    }
-                }
+                Object[] args = bindArgs(methodContext);
                 Object returnValue = method.invoke(bean, args);
-
-                boolean proceed = returnHandler.handle(runner, returnValue, passedOnContinuation);
-                if (passedOnContinuation != null && proceed) {
-                    throw new AssertionError("handleFilterReturn should never return true if there is a continuation");
-                }
-                return proceed;
+                return returnHandler.handle(filterContext, returnValue, methodContext.continuation);
             } catch (Throwable e) {
-                if (passedOnContinuation == null) {
-                    runner.failure = e;
-                    runner.responseNeedsProcessing = true;
-                    runner.workResponse();
-                } else {
-                    passedOnContinuation.forwardResponse(null, e);
+                if (methodContext.continuation != null) {
+                    return methodContext.continuation.afterMethodExecuted(e);
                 }
-                return false;
+                return ExecutionFlow.error(e);
             }
         }
 
-        private boolean invokeAfter(FilterRunner runner) {
-            try {
-                if (filterCondition != null && !filterCondition.test(runner)) {
-                    return true;
-                }
-                Object returnValue = method.invoke(bean, bindArgs(runner));
-                return returnHandler.handle(runner, returnValue, null);
-            } catch (Throwable e) {
-                runner.failure = e;
-                runner.responseNeedsProcessing = true;
-            }
-            return true;
-        }
-
-        private Object[] bindArgs(FilterRunner runner) {
+        private Object[] bindArgs(FilterMethodContext context) {
             Object[] args = new Object[argBinders.length];
             for (int i = 0; i < args.length; i++) {
-                args[i] = argBinders[i].bind(runner);
+                args[i] = argBinders[i].bind(context);
             }
             return args;
         }
+
+    }
+
+    private record FilterMethodContext(
+            HttpRequest<?> request,
+            @Nullable HttpResponse<?> response,
+            @Nullable Throwable failure,
+            @Nullable FilterContinuationImpl<?> continuation) {
     }
 
     private interface FilterArgBinder {
-        Object bind(FilterRunner runner);
+        Object bind(FilterMethodContext context);
     }
 
     private interface FilterReturnHandler {
         /**
          * Void method that accepts a continuation.
          */
-        FilterReturnHandler VOID_WITH_CONTINUATION = (r, o, c) -> {
-            // use response/failure from other filters
-            c.forwardResponse(r.response, r.failure);
-            return false;
-        };
+        FilterReturnHandler VOID_WITH_CONTINUATION = (filterContext, returnValue, continuation) -> continuation.afterMethodExecuted();
         /**
          * Void method.
          */
-        FilterReturnHandler VOID = (r, o, c) -> true;
+        FilterReturnHandler VOID = (filterContext, returnValue, continuation) -> ExecutionFlow.just(filterContext);
         /**
          * Request handler that returns a response but also accepts a continuation.
          */
-        FilterReturnHandler FROM_REQUEST_RESPONSE_WITH_CONTINUATION = (r, o, c) -> {
-            if (o == null) {
-                // use response/failure from other filters
-                c.forwardResponse(r.response, r.failure);
+        FilterReturnHandler FROM_REQUEST_RESPONSE_WITH_CONTINUATION = (filterContext, returnValue, continuation) -> {
+            if (returnValue == null) {
+                return continuation.afterMethodExecuted();
             } else {
-                c.forwardResponse((HttpResponse<?>) o, null);
+                return continuation.afterMethodExecuted((HttpResponse<?>) returnValue);
             }
-            return false;
         };
         /**
          * Request handler that returns a new request.
          */
-        FilterReturnHandler REQUEST = (r, o, c) -> {
-            r.request = (HttpRequest<?>) Objects.requireNonNull(o, "Returned request must not be null, or mark the method as @Nullable");
-            return true;
-        };
+        FilterReturnHandler REQUEST = (filterContext, returnValue, continuation) -> ExecutionFlow.just(
+                filterContext.withRequest(
+                        (HttpRequest<?>) Objects.requireNonNull(returnValue, "Returned request must not be null, or mark the method as @Nullable")
+                )
+        );
         /**
          * Request handler that returns a new request (nullable).
          */
-        FilterReturnHandler REQUEST_NULLABLE = (r, o, c) -> {
-            if (o == null) {
-                return true;
+        FilterReturnHandler REQUEST_NULLABLE = (filterContext, returnValue, continuation) -> {
+            if (returnValue == null) {
+                return ExecutionFlow.just(filterContext);
             }
-            r.request = (HttpRequest<?>) o;
-            return true;
+            return ExecutionFlow.just(
+                    filterContext.withRequest((HttpRequest<?>) returnValue)
+            );
         };
         /**
          * Request handler that returns a response.
          */
-        FilterReturnHandler FROM_REQUEST_RESPONSE = (r, o, c) -> {
+        FilterReturnHandler FROM_REQUEST_RESPONSE = (filterContext, returnValue, continuation) -> {
             // cancel request pipeline, move immediately to response handling
-            r.response = (HttpResponse<?>) Objects.requireNonNull(o, "Returned response must not be null, or mark the method as @Nullable");
-            r.failure = null;
-            r.responseNeedsProcessing = true;
-            r.workResponse();
-            return false;
+            return ExecutionFlow.just(
+                    filterContext
+                            .withResponse(
+                                    (HttpResponse<?>) Objects.requireNonNull(returnValue, "Returned response must not be null, or mark the method as @Nullable")
+                            )
+            );
         };
         /**
          * Request handler that returns a response (nullable).
          */
-        FilterReturnHandler FROM_REQUEST_RESPONSE_NULLABLE = (r, o, c) -> {
-            if (o == null) {
-                return true;
+        FilterReturnHandler FROM_REQUEST_RESPONSE_NULLABLE = (filterContext, returnValue, continuation) -> {
+            if (returnValue == null) {
+                return ExecutionFlow.just(filterContext);
             }
-
             // cancel request pipeline, move immediately to response handling
-            r.response = (HttpResponse<?>) o;
-            r.failure = null;
-            r.responseNeedsProcessing = true;
-            r.workResponse();
-            return false;
+            return ExecutionFlow.just(
+                    filterContext.withResponse((HttpResponse<?>) returnValue)
+            );
         };
         /**
          * Response handler that returns a new response.
          */
-        FilterReturnHandler FROM_RESPONSE_RESPONSE = (r, o, c) -> {
+        FilterReturnHandler FROM_RESPONSE_RESPONSE = (filterContext, returnValue, continuation) -> {
             // cancel request pipeline, move immediately to response handling
-            r.response = (HttpResponse<?>) Objects.requireNonNull(o, "Returned response must not be null, or mark the method as @Nullable");
-            r.failure = null;
-            r.responseNeedsProcessing = true;
-            return true;
+            return ExecutionFlow.just(
+                    filterContext
+                            .withResponse(
+                                    (HttpResponse<?>) Objects.requireNonNull(returnValue, "Returned response must not be null, or mark the method as @Nullable")
+                            )
+            );
         };
         /**
          * Response handler that returns a new response (nullable).
          */
-        FilterReturnHandler FROM_RESPONSE_RESPONSE_NULLABLE = (r, o, c) -> {
-            if (o == null) {
-                return true;
+        FilterReturnHandler FROM_RESPONSE_RESPONSE_NULLABLE = (filterContext, returnValue, continuation) -> {
+            if (returnValue == null) {
+                return ExecutionFlow.just(filterContext);
             }
-
             // cancel request pipeline, move immediately to response handling
-            r.response = (HttpResponse<?>) o;
-            r.failure = null;
-            r.responseNeedsProcessing = true;
-            return true;
+            return ExecutionFlow.just(
+                    filterContext.withResponse((HttpResponse<?>) returnValue)
+            );
         };
 
-        boolean handle(FilterRunner runner, @Nullable Object o, FilterContinuationImpl<?> passedOnContinuation) throws Throwable;
+        ExecutionFlow<FilterContext> handle(FilterContext context,
+                                            @Nullable Object returnValue,
+                                            @Nullable FilterContinuationImpl<?> passedOnContinuation) throws Throwable;
     }
 
     private abstract static class DelayedFilterReturnHandler implements FilterReturnHandler {
@@ -941,104 +753,50 @@ public class FilterRunner {
             this.nullable = nullable;
         }
 
-        protected abstract ExecutionFlow<?> toFlow(FilterRunner runner, Object o);
+        protected abstract ExecutionFlow<?> toFlow(FilterContext context,
+                                                   Object returnValue,
+                                                   @Nullable FilterContinuationImpl<?> continuation);
 
         @Override
-        public boolean handle(FilterRunner runner, Object o, FilterContinuationImpl<?> passedOnContinuation) throws Throwable {
-            if (o == null && nullable) {
-                return next.handle(runner, null, passedOnContinuation);
+        public ExecutionFlow<FilterContext> handle(FilterContext context,
+                                                   @Nullable Object returnValue,
+                                                   FilterContinuationImpl<?> continuation) throws Throwable {
+            if (returnValue == null && nullable) {
+                return next.handle(context, null, continuation);
             }
 
-            ExecutionFlow<?> delayedFlow = toFlow(runner, Objects.requireNonNull(o, "Returned value must not be null, or mark the method as @Nullable"));
+            ExecutionFlow<?> delayedFlow = toFlow(context,
+                    Objects.requireNonNull(returnValue, "Returned value must not be null, or mark the method as @Nullable"),
+                    continuation
+            );
             ImperativeExecutionFlow<?> doneFlow = delayedFlow.tryComplete();
             if (doneFlow != null) {
                 if (doneFlow.getError() != null) {
                     throw doneFlow.getError();
                 }
-                return next.handle(runner, doneFlow.getValue(), passedOnContinuation);
+                return next.handle(context, doneFlow.getValue(), continuation);
             } else {
-                // suspend until flow completes
-                delayedFlow.onComplete((v, e) -> {
-                    if (e == null) {
-                        try {
-                            if (next.handle(runner, v, passedOnContinuation)) {
-                                if (isResponseFilter) {
-                                    runner.workResponse();
-                                } else {
-                                    runner.workRequest();
-                                }
-                            }
-                            return;
-                        } catch (Throwable t) {
-                            e = t;
-                        }
-                    }
-                    if (passedOnContinuation == null) {
-                        runner.failure = e;
-                        runner.responseNeedsProcessing = true;
-                        runner.workResponse();
-                    } else {
-                        passedOnContinuation.forwardResponse(null, e);
+                return delayedFlow.flatMap(v -> {
+                    try {
+                        return next.handle(context, v, continuation);
+                    } catch (Throwable e) {
+                        return ExecutionFlow.error(e);
                     }
                 });
-                return false;
             }
-        }
-    }
-
-    /**
-     * Some filters are called for the request <i>and</i> the response (e.g. legacy, or "around"
-     * filters), and need to carry state between the two. To achieve this, they are called once for
-     * the request, where they register a SuspensionPoint. The SuspensionPoint is then completed
-     * when the filter is reached for response processing. The filter has a listener on the
-     * SuspensionPoint and handles further processing.<br>
-     * There is also a special suspension point with filter index -1 which manages the flow
-     * returned by {@link #run(HttpRequest)}.
-     */
-    private static class SuspensionPoint extends CompletableFuture<HttpResponse<?>> {
-        /**
-         * The index of the filter this suspension point is associated with.
-         */
-        final int filterIndex;
-        /**
-         * The next suspension point after this one. The invariant is that
-         * {@code this.filterIndex > next.filterIndex}.
-         */
-        @Nullable
-        final SuspensionPoint next;
-
-        SuspensionPoint(int filterIndex, @Nullable SuspensionPoint next) {
-            this.filterIndex = filterIndex;
-            this.next = next;
         }
     }
 
     /**
      * This class implements the "continuation" request filter pattern. It is used by filters that
      * accept a {@link FilterContinuation}, but also by legacy {@link HttpFilter}s.<br>
-     * Continuations give the user the choice when to proceed with filter execution. This adds some
-     * difficulty for concurrency: we must ensure {@link #workRequest()} (or
-     * {@link #workResponse()} in case of errors) is called exactly once. For this purpose, this
-     * class has the {@link #downstreamGuard} flag. It is set to {@link true} when the filter
-     * calls {@link #proceed}, or when the filter throws an exception. Only the first of these
-     * events actually continues working the {@link FilterRunner}, any events that follow are
-     * discarded (logged or throw an exception).
+     * Continuations give the user the choice when to proceed with filter execution.
+     * After the proceed is triggered the filter is essentially suspended and the next filter in the chain should be executed.
      *
      * @param <R> Return value of the continuation
      */
-    private abstract class FilterContinuationImpl<R> extends SuspensionPoint implements FilterContinuation<R> {
-        /**
-         * This flag guards <i>downstream</i> execution, i.e. the call to {@link #workRequest()}
-         * that runs downstream filters. Only the thread that claims this guard may run
-         * {@link #workRequest()}.
-         */
-        final AtomicBoolean downstreamGuard = new AtomicBoolean(false);
-        /**
-         * This flag guards <i>upstream</i> execution, i.e. the call to {@link #workResponse()}
-         * after the downstream has returned the response, or if the downstream pipeline was
-         * aborted (usually because of an error).
-         */
-        final AtomicBoolean upstreamGuard = new AtomicBoolean(false);
+    private abstract static class FilterContinuationImpl<R> implements FilterContinuation<R> {
+
         /**
          * Executor to run any downstream reactive code on. Only used by some implementations, e.g.
          * it doesn't make sense for a blocking continuation.
@@ -1046,63 +804,193 @@ public class FilterRunner {
         @Nullable
         Executor completeOn = null;
 
-        FilterContinuationImpl(int filterIndex, @Nullable SuspensionPoint next) {
-            super(filterIndex, next);
+        FilterContext filterContext;
+
+        /**
+         * The future indicating that the next filter should be executed.
+         */
+        final CompletableFuture<FilterContext> nextFilterProcessing = new CompletableFuture<>();
+        /**
+         * The future representing the suspension point, completing it will resume this filter processing.
+         */
+        final CompletableFuture<FilterContext> suspensionPoint = new CompletableFuture<>();
+        /**
+         * The future representing the filter return value and will be completed when the filter method is finally processed.
+         */
+        final CompletableFuture<FilterContext> filterProcessed = new CompletableFuture<>();
+
+        FilterContinuationImpl(FilterContext filterContext) {
+            this.filterContext = filterContext;
         }
 
         @Override
         public FilterContinuation<R> request(HttpRequest<?> request) {
-            FilterRunner.this.request = Objects.requireNonNull(request, "request");
+            filterContext = filterContext.withRequest(Objects.requireNonNull(request, "request"));
             return this;
         }
 
-        final void triggerDownstreamWorkRequest() {
-            if (downstreamGuard.compareAndSet(false, true)) {
-                workRequest();
+        protected final void proceedRequested() {
+            if (!nextFilterProcessing.isDone()) {
+                nextFilterProcessing.complete(filterContext);
             } else {
                 throw new IllegalStateException("Already subscribed to proceed() publisher, or filter method threw an exception and was cancelled");
             }
         }
 
         /**
+         * The filter is suspended. After this filter is ready returned flow will process a next filter.
+         */
+        public ExecutionFlow<FilterContext> nextFilterFlow() {
+            return CompletableFutureExecutionFlow.just(nextFilterProcessing);
+        }
+
+        /**
+         * The flow to continue after the suspended filter is finished.
+         */
+        public ExecutionFlow<FilterContext> filterProcessedFlow() {
+            return CompletableFutureExecutionFlow.just(filterProcessed);
+        }
+
+        /**
+         * Resume suspended method with a new context.
+         *
+         * @param filterContext The context to resume the suspend method.
+         * @param throwable     The exception
+         */
+        public void resume(FilterContext filterContext, Throwable throwable) {
+            if (!suspensionPoint.isDone()) {
+                if (throwable == null) {
+                    suspensionPoint.complete(filterContext);
+                } else {
+                    suspensionPoint.completeExceptionally(throwable);
+                }
+            } else {
+                if (throwable == null) {
+                    LOG.warn("Two outcomes for one continuation, this one is swallowed: {}", filterContext.response);
+                } else {
+                    LOG.warn("Two outcomes for one continuation, this one is swallowed:", throwable);
+                }
+            }
+        }
+
+        /**
+         * The filter method completed without modifying response / failed status.
+         */
+        private ExecutionFlow<FilterContext> afterMethodExecuted() {
+            return afterMethodExecuted(null, null);
+        }
+
+        /**
+         * The filter method completed with modified response.
+         */
+        private ExecutionFlow<FilterContext> afterMethodExecuted(@NonNull HttpResponse<?> response) {
+            return afterMethodExecuted(response, null);
+        }
+
+        /**
+         * The filter method completed with a failure.
+         */
+        ExecutionFlow<FilterContext> afterMethodExecuted(@NonNull Throwable throwable) {
+            return afterMethodExecuted(null, throwable);
+        }
+
+        /**
          * Forward a given response from this suspension point. If {@link #proceed} was already
          * called, this waits for the downstream filters to finish.
          */
-        final void forwardResponse(HttpResponse<?> response, Throwable failure) {
-            if (downstreamGuard.compareAndSet(false, true)) {
-                // proceed wasn't called, continue directly to response processing
-                // cancel the suspension point, since we don't do more request processing
-                responseSuspensionPoint = next;
-            } else if (!isDone()) {
-                // proceed was called, need to wait for completion to avoid concurrency issues
-                // filters should really not do this: Either return before the proceed call, or
-                // emit it from the returned publisher after proceed() is done
-                whenComplete((resp, err) -> {
-                    if (err == null) {
-                        LOG.warn("Filter method returned early after chain.proceed() had already been called. This can lead to memory leaks, please fix your filter!");
-                    } else {
-                        LOG.warn("Filter method returned early after chain.proceed() had already been called. Downstream handlers also threw an exception, which is being discarded:", err);
-                    }
-                    forwardResponse(response, failure);
-                });
-                return;
-            }
-            // else proceed was called and the continuation was already done. The filter likely
-            // already handled the response, and decided to continue based on it.
-
-            if (!upstreamGuard.compareAndSet(false, true)) {
-                if (failure == null) {
-                    LOG.warn("Two outcomes for one continuation, this one is swallowed: {}", response);
-                } else {
-                    LOG.warn("Two outcomes for one continuation, this one is swallowed:", failure);
+        private ExecutionFlow<FilterContext> afterMethodExecuted(@Nullable HttpResponse<?> newResponse,
+                                                                 @Nullable Throwable newFailure) {
+            FilterContext newFilterContext;
+            if (suspensionPoint.isDone()) {
+                // If the method modifies the response / failure, extend its filter context for downstream
+                // This is blocking scenario
+                try {
+                    newFilterContext = suspensionPoint.get();
+                } catch (Exception e) {
+                    return ExecutionFlow.error(new IllegalStateException("Failed to extract suspension point result", e));
                 }
-                return;
+            } else {
+                newFilterContext = filterContext;
             }
-            FilterRunner.this.response = response;
-            FilterRunner.this.failure = failure;
-            responseNeedsProcessing = true;
-            workResponse();
+            return asFilterProcessed(newFilterContext, newResponse, newFailure);
         }
+
+        protected void triggerFilterProcessed(FilterContext filterContext,
+                                              @Nullable
+                                              HttpResponse<?> newResponse,
+                                              @Nullable
+                                              Throwable newFailure) {
+            if (!nextFilterProcessing.isDone()) {
+                // Publish the error to the nextFilterProcessing as well
+                if (newFailure == null) {
+                    nextFilterProcessing.complete(newResponse == null ? filterContext : filterContext.withResponse(newResponse));
+                } else {
+                    nextFilterProcessing.completeExceptionally(newFailure);
+                }
+            }
+            if (!filterProcessed.isDone()) {
+                if (newFailure == null) {
+                    filterProcessed.complete(newResponse == null ? filterContext : filterContext.withResponse(newResponse));
+                } else {
+                    filterProcessed.completeExceptionally(newFailure);
+                }
+            } else {
+                if (newFailure == null) {
+                    LOG.warn("Two outcomes for one continuation, this one is swallowed: {}", newResponse);
+                } else {
+                    LOG.warn("Two outcomes for one continuation, this one is swallowed:", newFailure);
+                }
+            }
+        }
+
+        @NonNull
+        private ExecutionFlow<FilterContext> asFilterProcessed(FilterContext filterContext,
+                                                               @Nullable
+                                                               HttpResponse<?> newResponse,
+                                                               @Nullable
+                                                               Throwable newFailure) {
+            triggerFilterProcessed(filterContext, newResponse, newFailure);
+            return CompletableFutureExecutionFlow.just(filterProcessed);
+        }
+
+    }
+
+    private record FilterContext(HttpRequest<?> request,
+                                 @Nullable HttpResponse<?> response,
+                                 Context reactorContext) {
+
+        FilterContext(HttpRequest<?> request, Context reactorContext) {
+            this(request, null, reactorContext);
+        }
+
+        public FilterContext withRequest(@NonNull HttpRequest<?> request) {
+            if (this.request == request) {
+                return this;
+            }
+            if (response != null) {
+                throw new IllegalStateException("Cannot modify the request after response is set!");
+            }
+            Objects.requireNonNull(request);
+            return new FilterContext(request, response, reactorContext);
+        }
+
+        public FilterContext withResponse(@NonNull HttpResponse<?> response) {
+            if (this.response == response) {
+                return this;
+            }
+            Objects.requireNonNull(response);
+            // New response should remove the failure
+            return new FilterContext(request, response, reactorContext);
+        }
+
+        public FilterContext withReactorContext(@NonNull Context reactorContext) {
+            if (this.reactorContext == reactorContext) {
+                return this;
+            }
+            Objects.requireNonNull(reactorContext);
+            return new FilterContext(request, response, reactorContext);
+        }
+
     }
 
     /**
@@ -1112,13 +1000,16 @@ public class FilterRunner {
      *
      * @param <R> The reactive type to return (e.g. Publisher, Mono, Flux...)
      */
-    private class ReactiveContinuationImpl<R> extends FilterContinuationImpl<R> implements CorePublisher<HttpResponse<?>>, Subscription, BiConsumer<HttpResponse<?>, Throwable> {
+    private static class ReactiveContinuationImpl<R> extends FilterContinuationImpl<R>
+            implements CorePublisher<HttpResponse<?>>, Subscription, BiConsumer<FilterContext, Throwable> {
+        private final ConversionService conversionService;
         private final Class<R> reactiveType;
         private Subscriber<? super HttpResponse<?>> subscriber = null;
         private boolean addedListener = false;
 
-        ReactiveContinuationImpl(int filterIndex, @Nullable SuspensionPoint next, Class<R> reactiveType) {
-            super(filterIndex, next);
+        ReactiveContinuationImpl(ConversionService conversionService, FilterContext filterContext, Class<R> reactiveType) {
+            super(filterContext);
+            this.conversionService = conversionService;
             this.reactiveType = reactiveType;
         }
 
@@ -1141,10 +1032,10 @@ public class FilterRunner {
             this.subscriber = s;
 
             if (s instanceof CoreSubscriber<?> cs) {
-                FilterRunner.this.reactorContext = cs.currentContext();
+                filterContext = filterContext.withReactorContext(cs.currentContext());
             }
 
-            triggerDownstreamWorkRequest();
+            proceedRequested();
             s.onSubscribe(this);
         }
 
@@ -1153,9 +1044,9 @@ public class FilterRunner {
             if (n > 0 && !addedListener) {
                 addedListener = true;
                 if (completeOn == null) {
-                    whenComplete(this);
+                    suspensionPoint.whenComplete(this);
                 } else {
-                    whenCompleteAsync(this, completeOn);
+                    suspensionPoint.whenCompleteAsync(this, completeOn);
                 }
             }
         }
@@ -1166,10 +1057,12 @@ public class FilterRunner {
         }
 
         @Override
-        public void accept(HttpResponse<?> httpResponse, Throwable throwable) {
+        public void accept(FilterContext filterContext, Throwable throwable) {
+            // Suspension point resumed
             try {
                 if (throwable == null) {
-                    subscriber.onNext(httpResponse);
+                    this.filterContext = filterContext;
+                    subscriber.onNext(filterContext.response);
                     subscriber.onComplete();
                 } else {
                     subscriber.onError(throwable);
@@ -1181,29 +1074,21 @@ public class FilterRunner {
     }
 
     /**
-     * {@link FilterContinuationImpl} that is adapted for legacy filters: Implements
-     * {@link FilterChain}, and also implements the {@link Subscriber} that will subscribe to the
-     * {@link HttpFilter#doFilter} return value.
+     * {@link FilterContinuationImpl} that is adapted for filters returning a reactive response .
+     * Implements the {@link Subscriber} that will subscribe to the method's return value.
+     *
+     * @param <T> The published item type
      */
-    private class FilterChainImpl extends ReactiveContinuationImpl<Publisher<MutableHttpResponse<?>>> implements ClientFilterChain, ServerFilterChain, CoreSubscriber<HttpResponse<?>> {
-        FilterChainImpl(int filterIndex, @Nullable SuspensionPoint next) {
+    private static class ReactiveResultAwareReactiveContinuationImpl<T> extends ReactiveContinuationImpl<Publisher<T>>
+            implements CoreSubscriber<HttpResponse<?>> {
+
+        ReactiveResultAwareReactiveContinuationImpl(ConversionService conversionService, FilterContext filterContext) {
             //noinspection unchecked,rawtypes
-            super(filterIndex, next, (Class) Publisher.class);
+            super(conversionService, filterContext, (Class) Publisher.class);
         }
 
         @Override
-        public Publisher<? extends HttpResponse<?>> proceed(MutableHttpRequest<?> request) {
-            return proceed((HttpRequest<?>) request);
-        }
-
-        @Override
-        public Publisher<MutableHttpResponse<?>> proceed(HttpRequest<?> request) {
-            request(request);
-            return proceed();
-        }
-
-        @Override
-        public Publisher<MutableHttpResponse<?>> proceed() {
+        public Publisher<T> proceed() {
             // HACK: kotlin coroutine context propagation only supports reactor types (see
             // ReactorContextInjector). If we want to support our own type, we would need our own
             // ContextInjector, but that interface is marked as internal.
@@ -1220,18 +1105,18 @@ public class FilterRunner {
 
         @Override
         public void onNext(HttpResponse<?> response) {
-            forwardResponse(response, null);
+            triggerFilterProcessed(filterContext, response, null);
         }
 
         @Override
         public void onError(Throwable t) {
-            forwardResponse(response, t);
+            triggerFilterProcessed(filterContext, null, t);
         }
 
         @Override
         public void onComplete() {
-            if (!upstreamGuard.get()) {
-                forwardResponse(response, new IllegalStateException("Publisher did not return response"));
+            if (!suspensionPoint.isDone()) {
+                triggerFilterProcessed(filterContext, null, new IllegalStateException("Publisher did not return response"));
             }
         }
 
@@ -1239,31 +1124,53 @@ public class FilterRunner {
         @NonNull
         @Override
         public Context currentContext() {
-            return reactorContext;
+            return filterContext.reactorContext;
         }
+    }
+
+    /**
+     * {@link ReactiveResultAwareReactiveContinuationImpl} that is adapted for legacy filters: Implements {@link FilterChain}.
+     */
+    private static final class FilterChainImpl extends ReactiveResultAwareReactiveContinuationImpl<MutableHttpResponse<?>>
+            implements ClientFilterChain, ServerFilterChain {
+        FilterChainImpl(ConversionService conversionService, FilterContext filterContext) {
+            super(conversionService, filterContext);
+        }
+
+        @Override
+        public Publisher<? extends HttpResponse<?>> proceed(MutableHttpRequest<?> request) {
+            return proceed((HttpRequest<?>) request);
+        }
+
+        @Override
+        public Publisher<MutableHttpResponse<?>> proceed(HttpRequest<?> request) {
+            request(request);
+            return proceed();
+        }
+
     }
 
     /**
      * Implementation of {@link FilterContinuation} for blocking calls.
      */
-    private class BlockingContinuationImpl extends FilterContinuationImpl<HttpResponse<?>> {
-        BlockingContinuationImpl(int filterIndex, @Nullable SuspensionPoint next) {
-            super(filterIndex, next);
+    private static final class BlockingContinuationImpl extends FilterContinuationImpl<HttpResponse<?>> {
+        BlockingContinuationImpl(FilterContext filterContext) {
+            super(filterContext);
         }
 
         @Override
         public HttpResponse<?> proceed() {
-            triggerDownstreamWorkRequest();
+            proceedRequested();
 
             boolean interrupted = false;
             while (true) {
                 try {
                     // todo: detect event loop thread
-                    HttpResponse<?> v = get();
+                    filterContext = suspensionPoint.get();
                     if (interrupted) {
                         Thread.currentThread().interrupt();
                     }
-                    return v;
+                    return filterContext.response;
                 } catch (InterruptedException e) {
                     interrupted = true;
                 } catch (ExecutionException e) {
@@ -1277,4 +1184,5 @@ public class FilterRunner {
             }
         }
     }
+
 }

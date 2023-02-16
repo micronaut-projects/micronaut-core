@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
@@ -41,6 +42,10 @@ final class CompletableFutureExecutionFlowImpl implements CompletableFutureExecu
 
     @Override
     public <R> ExecutionFlow<R> flatMap(Function<? super Object, ? extends ExecutionFlow<? extends R>> transformer) {
+        ImperativeExecutionFlow<Object> completedFlow = tryComplete();
+        if (completedFlow != null) {
+            return completedFlow.flatMap(transformer);
+        }
         stage = stage.thenCompose(value -> {
             if (value != null) {
                 return (CompletionStage<Object>) transformer.apply(value).toCompletableFuture();
@@ -58,13 +63,22 @@ final class CompletableFutureExecutionFlowImpl implements CompletableFutureExecu
 
     @Override
     public <R> ExecutionFlow<R> map(Function<? super Object, ? extends R> function) {
-        stage = stage.thenApply(function::apply);
+        stage = stage.thenApply(function);
         return (ExecutionFlow<R>) this;
     }
 
     @Override
     public ExecutionFlow<Object> onErrorResume(Function<? super Throwable, ? extends ExecutionFlow<?>> fallback) {
-        stage = stage.exceptionallyCompose(throwable -> (CompletionStage<Object>) fallback.apply(throwable).toCompletableFuture());
+        ImperativeExecutionFlow<Object> completedFlow = tryComplete();
+        if (completedFlow != null) {
+            return completedFlow.onErrorResume(fallback);
+        }
+        stage = stage.exceptionallyCompose(throwable -> {
+            if (throwable instanceof CompletionException completionException) {
+                throwable = completionException.getCause();
+            }
+            return (CompletionStage<Object>) fallback.apply(throwable).toCompletableFuture();
+        });
         return this;
     }
 
@@ -75,7 +89,15 @@ final class CompletableFutureExecutionFlowImpl implements CompletableFutureExecu
 
     @Override
     public void onComplete(BiConsumer<? super Object, Throwable> fn) {
+        ImperativeExecutionFlow<Object> completedFlow = tryComplete();
+        if (completedFlow != null) {
+            completedFlow.onComplete(fn);
+            return;
+        }
         stage.handle((o, throwable) -> {
+            if (throwable instanceof CompletionException completionException) {
+                throwable = completionException.getCause();
+            }
             fn.accept(o, throwable);
             return null;
         });
@@ -87,8 +109,11 @@ final class CompletableFutureExecutionFlowImpl implements CompletableFutureExecu
         if (stage.isDone()) {
             try {
                 return new ImperativeExecutionFlowImpl(stage.getNow(null), null);
-            } catch (Throwable t) {
-                return new ImperativeExecutionFlowImpl(null, t);
+            } catch (Throwable throwable) {
+                if (throwable instanceof CompletionException completionException) {
+                    throwable = completionException.getCause();
+                }
+                return new ImperativeExecutionFlowImpl(null, throwable);
             }
         } else {
             return null;

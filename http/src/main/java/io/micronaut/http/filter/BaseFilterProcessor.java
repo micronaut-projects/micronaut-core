@@ -78,12 +78,12 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
         if (method.isAnnotationPresent(RequestFilter.class)) {
             FilterMetadata methodLevel = metadata(method, RequestFilter.class);
             FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
-            addFilter(() -> withAsync(combined, FilterRunner.prepareFilterMethod(beanContext.getBean(beanDefinition), method, false, combined.order)), method, combined);
+            addFilter(() -> withAsync(combined, FilterRunner.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, false, combined.order)), method, combined);
         }
         if (method.isAnnotationPresent(ResponseFilter.class)) {
             FilterMetadata methodLevel = metadata(method, ResponseFilter.class);
             FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
-            addFilter(() -> withAsync(combined, FilterRunner.prepareFilterMethod(beanContext.getBean(beanDefinition), method, true, combined.order)), method, combined);
+            addFilter(() -> withAsync(combined, FilterRunner.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, true, combined.order)), method, combined);
         }
     }
 
