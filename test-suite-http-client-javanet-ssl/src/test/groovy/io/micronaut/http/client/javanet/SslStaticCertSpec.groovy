@@ -12,8 +12,9 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import reactor.core.publisher.Flux
 import spock.lang.Shared
+import spock.lang.Specification
 
-class SslStaticCertSpec extends DisabledHostnameVerificationSpec {
+class SslStaticCertSpec extends Specification {
 
     @Shared
     String host = Optional.ofNullable(System.getenv(Environment.HOSTNAME)).orElse(SocketUtils.LOCALHOST)

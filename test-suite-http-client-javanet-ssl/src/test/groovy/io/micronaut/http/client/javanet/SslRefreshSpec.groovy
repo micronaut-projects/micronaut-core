@@ -5,7 +5,6 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.event.ApplicationEventPublisher
 import io.micronaut.core.type.Argument
-import io.micronaut.core.util.StringUtils
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -16,14 +15,12 @@ import io.micronaut.http.server.netty.NettyHttpRequest
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.handler.ssl.SslHandler
-import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
-import spock.util.environment.RestoreSystemProperties
 
 import java.security.cert.X509Certificate
 
-class SslRefreshSpec extends DisabledHostnameVerificationSpec {
+class SslRefreshSpec extends Specification {
 
     @Shared List<String> ciphers = ['TLS_RSA_WITH_AES_128_CBC_SHA',
                                     'TLS_RSA_WITH_AES_256_CBC_SHA',
