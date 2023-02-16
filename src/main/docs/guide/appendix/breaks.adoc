@@ -43,7 +43,7 @@ context.registerBeanDefinition(
 
 ==== WebSocket No Longer Required
 
-`io.micronaut:micronaut-http-server` no longer exposes `micrnoaut-websocket` transitively. If you are using annotations such as ann:websocket.annotation.ServerWebSocket[], you should add the `micronaut-websocket` dependency to your application classpath:
+`io.micronaut:micronaut-http-server` no longer exposes `micronaut-websocket` transitively. If you are using annotations such as ann:websocket.annotation.ServerWebSocket[], you should add the `micronaut-websocket` dependency to your application classpath:
 
 dependency::micronaut-websocket[]
 
