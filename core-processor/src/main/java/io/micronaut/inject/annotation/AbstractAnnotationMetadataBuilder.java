@@ -679,7 +679,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     introducedAnnotations.add(newAnnotation);
                     ProcessedAnnotation newNewAnnotation = processAliases(newAnnotation, introducedAnnotations);
                     if (newNewAnnotation != newAnnotation) {
-                        introducedAnnotations.add(introducedAnnotations.indexOf(newAnnotation), newNewAnnotation);
+                        introducedAnnotations.set(introducedAnnotations.indexOf(newAnnotation), newNewAnnotation);
                     }
                 }
             }

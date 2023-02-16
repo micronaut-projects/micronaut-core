@@ -17,6 +17,7 @@ package io.micronaut.visitors
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.annotation.processing.visitor.JavaClassElement
+import io.micronaut.context.annotation.Replaces
 import io.micronaut.context.exceptions.BeanContextException
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Introspected
