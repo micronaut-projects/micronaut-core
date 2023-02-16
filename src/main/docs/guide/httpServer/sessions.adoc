@@ -24,10 +24,10 @@ compile "io.micronaut:micronaut-session"
 compile "io.micronaut.redis:micronaut-redis-lettuce"
 ----
 
-And enable Redis sessions via configuration in `application.yml`:
+And enable Redis sessions via configuration in your configuration file (e.g `application.yml`):
 
 .Enabling Redis Sessions
-[source,yaml]
+[configuration]
 ----
 redis:
   uri: redis://localhost:6379
@@ -44,10 +44,10 @@ api:session.Session[] resolution can be configured with api:session.http.HttpSes
 
 By default, sessions are resolved using an api:session.http.HttpSessionFilter[] that looks for session identifiers via either an HTTP header (using the `Authorization-Info` or `X-Auth-Token` headers) or via a Cookie named `SESSION`.
 
-You can disable either header resolution or cookie resolution via configuration in `application.yml`:
+You can disable either header resolution or cookie resolution via configuration in your configuration file (e.g `application.yml`):
 
 .Disabling Cookie Resolution
-[source,yaml]
+[configuration]
 ----
 micronaut:
   session:

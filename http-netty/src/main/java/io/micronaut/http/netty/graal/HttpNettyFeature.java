@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.netty.graal;
 
-import com.oracle.svm.core.annotate.AutomaticFeature;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
@@ -32,7 +31,6 @@ import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
  * @since 2.0.0
  */
 @Internal
-@AutomaticFeature
 public class HttpNettyFeature implements Feature {
 
     @Override
