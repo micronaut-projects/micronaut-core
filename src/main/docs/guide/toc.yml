@@ -248,8 +248,8 @@ languageSupport:
   kotlin:
     title: Micronaut for Kotlin
     kaptOrKsp: Kotlin support via KAPT or KSP
-    kapt: kapt compiler plugin
-    ksp: KSP
+    kapt: Kotlin Annotation Processing (KAPT)
+    ksp: Kotlin Symbol Processing (KSP)
     controller: Controller in Kotlin
     kaptintellij: Kotlin, Kapt and IntelliJ
     gradlekapt: Incremental Annotation Processing with Gradle and Kapt
