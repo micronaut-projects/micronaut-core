@@ -27,11 +27,13 @@ import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.EnumElement
 import io.micronaut.inject.ast.FieldElement
+import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PackageElement
 import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.inject.ast.PropertyElement
+import io.micronaut.inject.ast.WildcardElement
 import jakarta.inject.Singleton
 import spock.lang.IgnoreIf
 import spock.lang.Issue
