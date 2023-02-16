@@ -1,0 +1,5 @@
+You can build Micronaut applications with Kotlin and https://kotlinlang.org/docs/ksp-overview.html[KSP]:
+
+____
+Kotlin Symbol Processing (KSP) is an API that you can use to develop lightweight compiler plugins. KSP provides a simplified compiler plugin API that leverages the power of Kotlin while keeping the learning curve at a minimum. Compared to kapt, annotation processors that use KSP can run up to 2 times faster.
+____

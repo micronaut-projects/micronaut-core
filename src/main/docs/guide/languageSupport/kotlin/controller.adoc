@@ -1,6 +1,3 @@
-[source,bash]
-$ ./gradlew run
-
 An example controller written in Kotlin can be seen below:
 
 [source, kotlin]
