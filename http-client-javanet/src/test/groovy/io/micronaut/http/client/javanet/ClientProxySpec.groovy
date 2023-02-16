@@ -13,7 +13,6 @@ import org.testcontainers.containers.wait.strategy.HostPortWaitStrategy
 import org.testcontainers.utility.MountableFile
 import spock.lang.AutoCleanup
 import spock.lang.Requires
-import spock.lang.Retry
 import spock.lang.Specification
 
 @Requires({ DockerClientFactory.instance().isDockerAvailable() })
@@ -28,6 +27,7 @@ class ClientProxySpec extends Specification {
             new GenericContainer('sameersbn/squid:latest')
                     .withCopyFileToContainer(MountableFile.forClasspathResource('/squid.conf'), '/etc/squid/squid.conf')
                     .withExposedPorts(PROXY_PORT)
+                    .withLogConsumer { outputFrame -> print("SQUID::\t${outputFrame.getUtf8String()}") }
                     .waitingFor(new HostPortWaitStrategy())
 
     @AutoCleanup
@@ -91,7 +91,9 @@ class ClientProxySpec extends Specification {
     }
 
     private int getProxyPort() {
-        proxyContainer.getMappedPort(PROXY_PORT)
+        def port = proxyContainer.getMappedPort(PROXY_PORT)
+        println("Proxy port: ${port}")
+        port
     }
 
     private void startServer(Map<String, Object> config) {

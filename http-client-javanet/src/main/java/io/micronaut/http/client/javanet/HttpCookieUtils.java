@@ -16,7 +16,6 @@
 package io.micronaut.http.client.javanet;
 
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.cookie.Cookie;
 
@@ -36,16 +35,16 @@ public final class HttpCookieUtils {
      *
      * @param cookie A Micronaut {@link Cookie}.
      * @param request HTTP Request. If the cookie path is null the {@link HttpRequest#getPath()} is used as the cookie path.
-     * @param server Server Instance {@link ServiceInstance#getHost()} is used as the cookie domain.
+     * @param host The cookie domain.
      * @return A Java HTTP Client {@link HttpCookie}.
      */
     @NonNull
     public static HttpCookie of(@NonNull Cookie cookie,
                                 @NonNull HttpRequest<?> request,
-                                @NonNull ServiceInstance server) {
+                                @NonNull String host) {
         HttpCookie newCookie = new HttpCookie(cookie.getName(), cookie.getValue());
         newCookie.setMaxAge(cookie.getMaxAge());
-        newCookie.setDomain(server.getHost());
+        newCookie.setDomain(host);
         newCookie.setHttpOnly(cookie.isHttpOnly());
         newCookie.setSecure(cookie.isSecure());
         newCookie.setPath(cookie.getPath() == null ? request.getPath() : cookie.getPath());

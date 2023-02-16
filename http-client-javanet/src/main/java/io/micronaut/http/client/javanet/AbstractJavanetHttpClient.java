@@ -22,12 +22,13 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.exceptions.HttpClientException;
-import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
+import io.micronaut.http.client.exceptions.NoHostException;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ContextPathUtils;
 import io.micronaut.http.ssl.ClientSslConfiguration;
@@ -46,6 +47,7 @@ import java.net.InetSocketAddress;
 import java.net.PasswordAuthentication;
 import java.net.ProxySelector;
 import java.net.SocketAddress;
+import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -53,6 +55,8 @@ import java.security.GeneralSecurityException;
 import java.security.cert.CertificateException;
 import java.security.cert.X509Certificate;
 import java.util.Optional;
+
+import static io.micronaut.http.client.exceptions.HttpClientExceptionUtils.populateServiceId;
 
 /*
  * TODO: HttpClient defaults to netty ByteBuffer as a type for exchange which isn't best for here.
@@ -114,9 +118,6 @@ abstract class AbstractJavanetHttpClient {
         Optional<SocketAddress> proxyAddress = configuration.getProxyAddress();
         if (proxyAddress.isPresent()) {
             SocketAddress socketAddress = proxyAddress.get();
-            if (log.isDebugEnabled()) {
-                log.debug("Configuring proxy: {}", socketAddress);
-            }
             builder = configureProxy(builder, socketAddress, configuration.getProxyUsername().orElse(null), configuration.getProxyPassword().orElse(null));
         }
 
@@ -170,7 +171,7 @@ abstract class AbstractJavanetHttpClient {
     protected Object getLoadBalancerDiscriminator() {
         return null;
     }
-    
+
     public MediaTypeCodecRegistry getMediaTypeCodecRegistry() {
         return mediaTypeCodecRegistry;
     }
@@ -180,19 +181,46 @@ abstract class AbstractJavanetHttpClient {
     }
 
     protected <I> Flux<HttpRequest> mapToHttpRequest(io.micronaut.http.HttpRequest<I> request, Argument<?> bodyType) {
-        return Flux.from(loadBalancer.select(getLoadBalancerDiscriminator()))
-            .map(server -> {
+        return resolveRequestUri(request)
+            .map(uri -> {
                 request.getCookies().getAll().forEach(cookie -> {
-                    HttpCookie newCookie = HttpCookieUtils.of(cookie, request, server);
-                    cookieManager.getCookieStore().add(server.getURI(), newCookie);
+                    HttpCookie newCookie = HttpCookieUtils.of(cookie, request, uri.getHost());
+                    cookieManager.getCookieStore().add(uri, newCookie);
                 });
-                try {
-                    return server.resolve(ContextPathUtils.prepend(request.getUri(), contextPath));
-                } catch (URISyntaxException e) {
-                    throw HttpClientExceptionUtils.populateServiceId(new HttpClientException("Failed to construct the request URI", e), clientId, configuration);
+
+                return HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry).build();
+            });
+    }
+
+    private Flux<URI> resolveRequestUri(io.micronaut.http.HttpRequest<?> request) {
+        if (request.getUri().getScheme() != null) {
+            // Full request URI, so use that
+            return Flux.just(request.getUri());
+        }
+
+        // Otherwise, go and look it up via the LoadBalancer
+        return resolveURI(request);
+    }
+
+    private <I> Flux<URI> resolveURI(io.micronaut.http.HttpRequest<I> request) {
+        URI requestURI = request.getUri();
+        if (loadBalancer == null) {
+            return Flux.error(populateServiceId(new NoHostException("Request URI specifies no host to connect to"), clientId, configuration));
+        }
+
+        return Flux.from(loadBalancer.select(getLoadBalancerDiscriminator())).map(server -> {
+                Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
+                if (request instanceof MutableHttpRequest<?> mutableRequest && authInfo.isPresent()) {
+                    mutableRequest.getHeaders().auth(authInfo.get());
                 }
-            })
-            .map(uri -> HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry).build());
+
+                try {
+                    return server.resolve(ContextPathUtils.prepend(requestURI, contextPath));
+                } catch (URISyntaxException e) {
+                    throw populateServiceId(new HttpClientException("Failed to construct the request URI", e), clientId, configuration);
+                }
+            }
+        );
     }
 
     @NonNull
