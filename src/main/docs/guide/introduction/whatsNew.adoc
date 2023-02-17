@@ -22,6 +22,8 @@ When a bean annotated with ann:context.annotation.EachProperty[] or ann:context.
 
 - Kotlin 1.7.10
 
+<<breaks, Breaking changes in Micronaut Framework 4.0>>
+
 == 3.8.0
 
 Key features:
