@@ -153,7 +153,7 @@ abstract class AbstractJavanetHttpClient {
     private void configureSsl(HttpClient.Builder builder, ClientSslConfiguration clientSslConfiguration) {
         sslBuilder.build(clientSslConfiguration).ifPresent(builder::sslContext);
         if (System.getProperty("jdk.internal.httpclient.disableHostnameVerification") != null && log.isWarnEnabled()) {
-            log.warn("The jdk.internal.httpclient.disableHostnameVerification system property is set. This is not recommended for production use.");
+            log.warn("The jdk.internal.httpclient.disableHostnameVerification system property is set. This is not recommended for production use as it prevents proper certificate validation may allow man-in-the-middle attacks.");
         }
         SSLParameters sslParameters = new SSLParameters();
         configuration.getSslConfiguration().getClientAuthentication().ifPresent(a -> {
