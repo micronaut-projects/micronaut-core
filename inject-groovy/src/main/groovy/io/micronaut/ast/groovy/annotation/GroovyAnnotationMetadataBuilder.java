@@ -552,6 +552,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         }
     }
 
+    @SuppressWarnings("java:S1872")
     private Object convertConstantValue(Object value) {
         if (value instanceof ClassNode classNode) {
             return new AnnotationClassValue<>(classNode.getName());

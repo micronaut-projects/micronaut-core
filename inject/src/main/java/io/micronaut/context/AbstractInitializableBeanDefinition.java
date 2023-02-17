@@ -674,12 +674,17 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         if (requiredParametrizedArguments != null) {
             return requiredParametrizedArguments;
         }
-        requiredParametrizedArguments = Arrays.stream(getConstructor().getArguments())
+        ConstructorInjectionPoint<T> ctor = getConstructor();
+        if (ctor != null) {
+            requiredParametrizedArguments = Arrays.stream(ctor.getArguments())
                 .filter(arg -> {
                     Optional<String> qualifierType = arg.getAnnotationMetadata().getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER);
                     return qualifierType.isPresent() && qualifierType.get().equals(Parameter.class.getName());
                 })
                 .toArray(Argument[]::new);
+        } else {
+            requiredParametrizedArguments = Argument.ZERO_ARGUMENTS;
+        }
         return requiredParametrizedArguments;
     }
 

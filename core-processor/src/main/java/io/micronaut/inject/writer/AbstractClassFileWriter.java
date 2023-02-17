@@ -239,6 +239,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         pushTypeArgumentElements(owningType, owningTypeWriter, generatorAdapter, declaringElementName, null, types, new HashSet<>(5), defaults, loadTypeMethods);
     }
 
+    @SuppressWarnings("java:S1872")
     private static void pushTypeArgumentElements(
             Type owningType,
             ClassWriter declaringClassWriter,
