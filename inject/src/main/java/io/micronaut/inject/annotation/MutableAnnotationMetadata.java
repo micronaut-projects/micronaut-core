@@ -562,6 +562,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         sourceRetentionAnnotations.add(annotation);
     }
 
+    @SuppressWarnings("java:S2259")
     private void putValues(String annotation, Map<CharSequence, Object> values, Map<String, Map<CharSequence, Object>> currentAnnotationValues) {
         Map<CharSequence, Object> existing = currentAnnotationValues.get(annotation);
         boolean hasValues = CollectionUtils.isNotEmpty(values);
@@ -638,23 +639,6 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
             this.annotationsByStereotype = annotations;
         }
         return annotations;
-    }
-
-    @Nullable
-    private Object getRawValue(@NonNull String annotation, @NonNull String member) {
-        Object rawValue = null;
-        if (allAnnotations != null && StringUtils.isNotEmpty(annotation)) {
-            Map<CharSequence, Object> values = allAnnotations.get(annotation);
-            if (values != null) {
-                rawValue = values.get(member);
-            } else if (allStereotypes != null) {
-                values = allStereotypes.get(annotation);
-                if (values != null) {
-                    rawValue = values.get(member);
-                }
-            }
-        }
-        return rawValue;
     }
 
     private void addRepeatableInternal(String repeatableAnnotationContainer,

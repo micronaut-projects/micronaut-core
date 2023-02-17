@@ -425,7 +425,8 @@ public abstract class AbstractGroovyElement implements Element {
 
     @NonNull
     private ClassElement getObjectClassElement() {
-        return visitorContext.getClassElement(Object.class).get();
+        return visitorContext.getClassElement(Object.class)
+            .orElseThrow(() -> new IllegalStateException("java.lang.Object element not found"));
     }
 
     @NonNull

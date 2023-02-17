@@ -335,7 +335,8 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 List<? extends TypeMirror> typeMirrorArguments = dt.getTypeArguments();
                 Map<String, ClassElement> resolvedTypeArguments;
                 if (visitedTypes.contains(dt) || typeElement.equals(nativeElement.element())) {
-                    ClassElement objectElement = visitorContext.getClassElement("java.lang.Object").get();
+                    ClassElement objectElement = visitorContext.getClassElement(Object.class.getName())
+                        .orElseThrow(() -> new IllegalStateException("java.lang.Object element not found"));
                     List<? extends TypeParameterElement> typeParameters = typeElement.getTypeParameters();
                     Map<String, ClassElement> resolved = CollectionUtils.newHashMap(typeMirrorArguments.size());
                     for (TypeParameterElement typeParameter : typeParameters) {
@@ -400,7 +401,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         if (extendsBound instanceof IntersectionType it) {
             upperBounds = it.getBounds().stream();
         } else if (extendsBound == null) {
-            upperBounds = Stream.of(visitorContext.getElements().getTypeElement("java.lang.Object").asType());
+            upperBounds = Stream.of(visitorContext.getElements().getTypeElement(Object.class.getName()).asType());
         } else {
             upperBounds = Stream.of(extendsBound);
         }
@@ -411,7 +412,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 .map(tm -> newClassElement(owner, tm, declaredTypeArguments, visitedTypes, true))
                 .toList();
         ClassElement upperType = WildcardElement.findUpperType(upperBoundsAsElements, lowerBoundsAsElements);
-        if (upperType.getType().getName().equals("java.lang.Object")) {
+        if (upperType.getType().getName().equals(Object.class.getName())) {
             // Not bounded wildcard: <?>
             if (representedTypeParameter != null) {
                 ClassElement definedTypeBound = newClassElement(owner, representedTypeParameter.asType(), declaredTypeArguments, visitedTypes, true);
