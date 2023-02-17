@@ -71,6 +71,7 @@ Filter patterns can be defined on the filter class (in the api:http.annotation.S
 
 |`customer/**/*.html`
 |customer/index.html, customer/adam/profile.html, customer/adam/job/description.html
+|===
 
 The other option is regular expression based matching. To use regular expressions, set `patternStyle = FilterPatternStyle.REGEX`. The `pattern` attribute is expected to contain a regular expression which will be expected to match the provided URLs exactly (using link:{jdkapi}/java/util/regex/Matcher.html#matches--[Matcher#matches]).
 
@@ -108,5 +109,6 @@ In principle, downstream filters and controllers can produce exceptions, and res
 
 |`void responseFilter(HttpResponse<?> response, @Nullable Throwable failure)`
 |Always called. `failure` will be `null` if there was no error. If there was an error, `response` will be `null`.
+|===
 
 Whether errors appear as exceptions depends on the context of the filter. For the Micronaut HTTP server, any exception is mapped to a non-exceptional api:http.HttpResponse[] with an error status code. This mapping happens before each filter, so a server filter will never actually see an exception. If you still want to access the original cause of the response, it is stored as the attribute api:http.HttpAttributes#EXCEPTION[].
