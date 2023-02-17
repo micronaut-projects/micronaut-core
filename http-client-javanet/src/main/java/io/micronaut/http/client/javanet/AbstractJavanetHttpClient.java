@@ -32,6 +32,7 @@ import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ContextPathUtils;
 import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.ClientSslConfiguration;
+import io.micronaut.http.ssl.SslConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -156,15 +157,15 @@ abstract class AbstractJavanetHttpClient {
             log.warn("The jdk.internal.httpclient.disableHostnameVerification system property is set. This is not recommended for production use as it prevents proper certificate validation and may allow man-in-the-middle attacks.");
         }
         SSLParameters sslParameters = new SSLParameters();
-        configuration.getSslConfiguration().getClientAuthentication().ifPresent(a -> {
+        clientSslConfiguration.getClientAuthentication().ifPresent(a -> {
             if (a == ClientAuthentication.WANT) {
                 sslParameters.setWantClientAuth(true);
             } else if (a == ClientAuthentication.NEED) {
                 sslParameters.setNeedClientAuth(true);
             }
         });
-        configuration.getSslConfiguration().getProtocols().ifPresent(sslParameters::setProtocols);
-        configuration.getSslConfiguration().getCiphers().ifPresent(sslParameters::setCipherSuites);
+        clientSslConfiguration.getProtocols().ifPresent(sslParameters::setProtocols);
+        clientSslConfiguration.getCiphers().ifPresent(sslParameters::setCipherSuites);
         builder.sslParameters(sslParameters);
     }
 
