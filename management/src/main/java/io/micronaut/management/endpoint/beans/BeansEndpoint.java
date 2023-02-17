@@ -51,10 +51,6 @@ public class BeansEndpoint {
     @Read
     @SingleResult
     public Object getBeans() {
-        List<BeanDefinition<?>> beanDefinitions = beanContext.getAllBeanDefinitions()
-                .stream()
-                .sorted(Comparator.comparing((BeanDefinition<?> bd) -> bd.getClass().getName()))
-                .toList();
-        return beanDefinitionDataCollector.getData(beanDefinitions);
+        return beanDefinitionDataCollector.getData();
     }
 }

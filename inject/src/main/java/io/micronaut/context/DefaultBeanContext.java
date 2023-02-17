@@ -1629,6 +1629,14 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return (Collection<BeanDefinition<?>>) Collections.emptyMap();
     }
 
+    @Override
+    public Collection<DisabledBean<?>> getDisabledBeans() {
+        return disabledBeans.values().stream()
+            .map(producer -> (DisabledBean<?>) producer.reference)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
+    }
+
     @SuppressWarnings("unchecked")
     @NonNull
     @Override
@@ -4098,7 +4106,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     /**
      * The class adds the caching of the enabled decision + the definition instance.
-     * NOTE: The class can be accesed in multiple threads, we do allow for the fields to be possibly intitialized concurrently - multiple times.
+     * NOTE: The class can be accessed in multiple threads, we do allow for the fields to be possibly initialized concurrently - multiple times.
      *
      * @since 4.0.0
      */

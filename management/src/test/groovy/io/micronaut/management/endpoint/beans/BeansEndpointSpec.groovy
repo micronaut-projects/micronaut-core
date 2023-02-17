@@ -47,6 +47,9 @@ class BeansEndpointSpec extends Specification {
         beans["io.micronaut.management.endpoint.beans.\$BeansEndpoint" + BeanDefinitionWriter.CLASS_SUFFIX].dependencies.contains("io.micronaut.management.endpoint.beans.BeanDefinitionDataCollector")
         beans["io.micronaut.management.endpoint.beans.\$BeansEndpoint" + BeanDefinitionWriter.CLASS_SUFFIX].scope == AnnotationUtil.SINGLETON
         beans["io.micronaut.management.endpoint.beans.\$BeansEndpoint" + BeanDefinitionWriter.CLASS_SUFFIX].type == "io.micronaut.management.endpoint.beans.BeansEndpoint"
+        result.disabled.find {
+            it.type == 'io.micronaut.logging.PropertiesLoggingLevelsConfigurer'
+        }.reasons == ["Required property [logger.levels] with value [null] not present"]
 
         cleanup:
         rxClient.close()
