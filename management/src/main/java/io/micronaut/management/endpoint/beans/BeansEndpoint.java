@@ -15,14 +15,9 @@
  */
 package io.micronaut.management.endpoint.beans;
 
-import io.micronaut.context.BeanContext;
 import io.micronaut.core.async.annotation.SingleResult;
-import io.micronaut.inject.BeanDefinition;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
-
-import java.util.Comparator;
-import java.util.List;
 
 /**
  * <p>Exposes an {@link Endpoint} to provide information about the beans of the application.</p>
@@ -33,15 +28,12 @@ import java.util.List;
 @Endpoint("beans")
 public class BeansEndpoint {
 
-    private final BeanContext beanContext;
     private final BeanDefinitionDataCollector<Object> beanDefinitionDataCollector;
 
     /**
-     * @param beanContext                 The {@link BeanContext}
      * @param beanDefinitionDataCollector The {@link BeanDefinitionDataCollector}
      */
-    public BeansEndpoint(BeanContext beanContext, BeanDefinitionDataCollector<Object> beanDefinitionDataCollector) {
-        this.beanContext = beanContext;
+    public BeansEndpoint(BeanDefinitionDataCollector<Object> beanDefinitionDataCollector) {
         this.beanDefinitionDataCollector = beanDefinitionDataCollector;
     }
 

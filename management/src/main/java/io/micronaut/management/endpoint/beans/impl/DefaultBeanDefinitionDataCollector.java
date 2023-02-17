@@ -74,9 +74,7 @@ public class DefaultBeanDefinitionDataCollector implements BeanDefinitionDataCol
      */
     protected Map<String, Map<String, Object>> getBeans(Collection<BeanDefinition<?>> definitions) {
         return definitions.stream()
-            .collect(Collectors.toMap(definition -> definition.getClass().getName(), definition ->
-                beanDefinitionData.getData(definition)
-            ));
+            .collect(Collectors.toMap(definition -> definition.getClass().getName(), beanDefinitionData::getData));
     }
 
     /**
