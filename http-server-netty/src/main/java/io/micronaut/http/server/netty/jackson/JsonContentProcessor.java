@@ -45,7 +45,7 @@ import java.util.Optional;
 public class JsonContentProcessor extends AbstractHttpContentProcessor {
 
     private final JsonMapper jsonMapper;
-    private JsonCounter counter;
+    private final JsonCounter counter = new JsonCounter();
     private CompositeByteBuf buffer;
 
     /**
@@ -63,7 +63,6 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
 
     @Override
     public HttpContentProcessor resultType(Argument<?> type) {
-        boolean streamArray = false;
 
         boolean isJsonStream = nettyHttpRequest.getContentType()
             .map(mediaType -> mediaType.equals(MediaType.APPLICATION_JSON_STREAM_TYPE))
@@ -75,75 +74,54 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
                 Optional<Argument<?>> genericArgument = type.getFirstTypeVariable();
                 if (genericArgument.isPresent() && !Iterable.class.isAssignableFrom(genericArgument.get().getType()) && !isJsonStream) {
                     // if the generic argument is not a iterable type them stream the array into the publisher
-                    streamArray = true;
+                    counter.unwrapTopLevelArray();
                 }
             }
         }
-        counter = JsonCounter.create(streamArray);
         return this;
     }
 
     @Override
     protected void onData(ByteBufHolder message, Collection<Object> out) throws Throwable {
-        if (counter == null) {
-            resultType(null);
-        }
-
         ByteBuf content = message.content();
         try {
-            int end = content.writerIndex();
-            int i = content.readerIndex();
-            JsonCounter.FeedResult feedResult;
-            int bufferStart = -1;
-            if (this.buffer != null) {
-                bufferStart = i;
-            }
-            for (; i < end; i++) {
-                feedResult = counter.feed(content.getByte(i));
-                switch (feedResult) {
-                    case MUST_SKIP -> {
-                        if (bufferStart != -1) {
-                            throw new IllegalStateException("Cannot skip input while buffering");
-                        }
-                    }
-                    case MAY_SKIP -> {
-                    }
-                    case BUFFER -> {
-                        if (bufferStart == -1) {
-                            bufferStart = i;
-                        }
-                    }
-                    case FLUSH_AFTER -> {
-                        if (bufferStart == -1) {
-                            bufferStart = i;
-                        }
-                        flush(out, content.retainedSlice(bufferStart, i - bufferStart + 1));
-                        bufferStart = -1;
-                    }
-                    case FLUSH_BEFORE_AND_SKIP -> {
-                        if (bufferStart == -1) {
-                            bufferStart = i;
-                        }
-                        flush(out, content.retainedSlice(bufferStart, i - bufferStart));
-                        bufferStart = -1;
-                    }
-                }
-            }
-            if (bufferStart != -1) {
-                if (this.buffer == null) {
-                    this.buffer = content.alloc().compositeBuffer();
-                }
-                this.buffer.addComponent(true, content.retainedSlice(bufferStart, i - bufferStart));
-            }
+            countLoop(out, content);
         } catch (Exception e) {
-            content.release();
             if (this.buffer != null) {
                 this.buffer.release();
                 this.buffer = null;
             }
             throw e;
+        } finally {
+            content.release();
         }
-        content.release();
+    }
+
+    private void countLoop(Collection<Object> out, ByteBuf content) throws IOException {
+        long initialPosition = counter.position();
+        long bias = initialPosition - content.readerIndex();
+        while (content.isReadable()) {
+            counter.feed(content);
+            JsonCounter.BufferRegion bufferRegion = counter.pollFlushedRegion();
+            if (bufferRegion != null) {
+                long start = Math.max(initialPosition, bufferRegion.start());
+                flush(out, content.retainedSlice(
+                    Math.toIntExact(start - bias),
+                    Math.toIntExact(bufferRegion.end() - start)
+                ));
+            }
+        }
+        if (counter.isBuffering()) {
+            int currentBufferStart = Math.toIntExact(Math.max(initialPosition, counter.bufferStart()) - bias);
+            bufferForNextRun(content.retainedSlice(currentBufferStart, content.writerIndex() - currentBufferStart));
+        }
+    }
+
+    private void bufferForNextRun(ByteBuf buffer) {
+        if (this.buffer == null) {
+            this.buffer = buffer.alloc().compositeBuffer(100000);
+        }
+        this.buffer.addComponent(true, buffer);
     }
 
     private void flush(Collection<Object> out, ByteBuf completedNode) throws IOException {

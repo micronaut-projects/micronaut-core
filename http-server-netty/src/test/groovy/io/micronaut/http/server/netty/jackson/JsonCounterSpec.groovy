@@ -3,6 +3,8 @@ package io.micronaut.http.server.netty.jackson
 import com.fasterxml.jackson.core.JsonFactory
 import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.core.JsonToken
+import io.netty.buffer.ByteBufUtil
+import io.netty.buffer.Unpooled
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
@@ -36,47 +38,35 @@ class JsonCounterSpec extends Specification {
         toTokens(input)
 
         when:
-        def counter = JsonCounter.create(false)
-        for (byte b : input.getBytes(StandardCharsets.UTF_8)) {
-            counter.feed(b)
-        }
+        def counter = new JsonCounter()
+        counter.feed(Unpooled.wrappedBuffer(input.getBytes(StandardCharsets.UTF_8)))
         then:
-        counter.depth == 0
+        !counter.isBuffering()
+        counter.pollFlushedRegion() == new JsonCounter.BufferRegion(0, input.length())
 
         where:
-        input << ['{}', '[]', '["foo]"]', '{"foo[":"{bar"}']
+        input << ['{}', '[]', '["foo]"]', '{"foo[":"{bar"}', '{"foo":{"bar":"baz"}}']
     }
 
     static List<byte[]> splitUtf8(byte[] s, boolean unwrapTopLevelArray = false, boolean skipOptional = false) {
         def parts = []
-        def current = new ByteArrayOutputStream()
-        def counter = JsonCounter.create(unwrapTopLevelArray)
+        def counter = new JsonCounter()
+        if (unwrapTopLevelArray) {
+            counter.unwrapTopLevelArray()
+        }
         int sectionStart = 0
-        for (int i = 0; i < s.length; i++) {
-            def feedResult = counter.feed(s[i])
-            switch (feedResult) {
-                case JsonCounter.FeedResult.MAY_SKIP:
-                    if (!skipOptional) {
-                        current.write(s[i])
-                    }
-                    break
-                case JsonCounter.FeedResult.BUFFER:
-                    current.write(s[i])
-                    break
-                case JsonCounter.FeedResult.FLUSH_AFTER:
-                    current.write(s[i])
-                    parts.add(current.toByteArray())
-                    current.reset()
-                    break
-                case JsonCounter.FeedResult.FLUSH_BEFORE_AND_SKIP:
-                    parts.add(current.toByteArray())
-                    current.reset()
-                    break
+        def buf = Unpooled.wrappedBuffer(s)
+        def bias = counter.position()
+        while (buf.isReadable()) {
+            counter.feed(buf)
+            def flushedRegion = counter.pollFlushedRegion()
+            if (flushedRegion != null) {
+                parts.add(ByteBufUtil.getBytes(buf.slice((int) (flushedRegion.start() - bias), (int) (flushedRegion.end() - flushedRegion.start()))))
             }
         }
-        def remaining = current.toByteArray()
-        if (remaining.length != 0) {
-            parts.add(remaining)
+        if (counter.isBuffering()) {
+            def start = (int) (counter.bufferStart() - bias)
+            parts.add(ByteBufUtil.getBytes(buf.slice(start, buf.writerIndex() - start)))
         }
         return parts
     }
@@ -106,11 +96,11 @@ class JsonCounterSpec extends Specification {
         '{}{}'     | ['{}', '{}']
         '{}[]'     | ['{}', '[]']
         '"foo"42'  | ['"foo"', '42']
-        '"foo" 42' | ['"foo"', ' 42']
+        '"foo" 42' | ['"foo"', '42']
         //'42"foo"'  | ['42', '"foo"'] unsupported
-        '42 "foo"' | ['42 ', '"foo"']
+        '42 "foo"' | ['42', '"foo"']
         //'42{}'     | ['42', '{}'] unsupported
-        '42 {}'    | ['42 ', '{}']
+        '42 {}'    | ['42', '{}']
     }
 
     def 'split compare with jackson, top level array'(String stream, List<String> expectedParts) {
@@ -144,11 +134,12 @@ class JsonCounterSpec extends Specification {
         '{}{}'          | ['{}', '{}']
         '{}[]'          | ['{}', '[]']
         '"foo"42'       | ['"foo"', '42']
-        '"foo" 42'      | ['"foo"', ' 42']
-        '42 "foo"'      | ['42 ', '"foo"']
-        '42 {}'         | ['42 ', '{}']
-        '42 []'         | ['42 ', '[]']
-        '[1,"foo" ,{}]' | ['1', '"foo"', ' {}']
+        '"foo" 42'      | ['"foo"', '42']
+        '42 "foo"'      | ['42', '"foo"']
+        '42 {}'         | ['42', '{}']
+        '42 []'         | ['42', '[]']
+        '[1,"foo" ,{}]' | ['1', '"foo"', '{}']
+        '[6 ,6]'        | ['6', '6']
     }
 
     def 'illegal inputs'(byte[] input) {
