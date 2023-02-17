@@ -3,6 +3,7 @@ package io.micronaut.http.client.javanet
 import io.micronaut.http.client.DefaultHttpClientConfiguration
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.ssl.ClientSslConfiguration
+import spock.lang.PendingFeature
 import spock.lang.Specification
 
 import javax.net.ssl.SSLHandshakeException
@@ -45,6 +46,31 @@ class SslSpec extends Specification {
                 // 'https://dh1024.badssl.com/', // passes
                 // 'https://dh-small-subgroup.badssl.com/', // passes
                 // 'https://dh-composite.badssl.com/', // times out
+        ]
+    }
+
+    @PendingFeature
+    void 'bad server ssl cert currently unsupported'() {
+        given:
+        def client = HttpClient.create(new URL(url))
+
+        when:
+        client.toBlocking().exchange('/')
+
+        then:
+        def e = thrown RuntimeException
+        e.printStackTrace()
+        e.cause instanceof GeneralSecurityException || e.cause instanceof SSLHandshakeException
+
+        cleanup:
+        client.stop()
+
+        where:
+        url << [
+                'https://pinning-test.badssl.com/', // not implemented
+                'https://dh1024.badssl.com/', // passes
+                'https://dh-small-subgroup.badssl.com/', // passes
+                'https://dh-composite.badssl.com/', // times out
         ]
     }
 
