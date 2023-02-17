@@ -5,7 +5,7 @@ For multiple valid origins, set the `allowedOrigins` key of the configuration to
 Regular expressions are passed to link:{javase}java/util/regex/Pattern.html#compile-java.lang.String-[Pattern#compile] and compared to the request origin with link:{javase}java/util/regex/Matcher.html#matches--[Matcher#matches].
 
 .Example CORS Configuration
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:

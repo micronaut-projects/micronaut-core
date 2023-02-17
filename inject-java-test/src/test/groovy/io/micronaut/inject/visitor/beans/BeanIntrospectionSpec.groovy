@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonClassDescription
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.ObjectMapper
+import groovy.transform.PackageScope
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.annotation.processing.test.JavaParser
@@ -44,6 +45,7 @@ import javax.validation.constraints.Min
 import javax.validation.constraints.NotBlank
 import javax.validation.constraints.Size
 import java.lang.reflect.Field
+import java.time.Instant
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
@@ -121,10 +123,45 @@ class Test {
         def prop = introspection.getRequiredProperty("foo", Optional)
         test.foo = 'value'
 
-        then:'the write method is not considered to match the getter/setter pair'
+        then: 'the write method is not considered to match the getter/setter pair'
         prop.get(test).get() == 'value'
         prop.type == Optional
         prop.isReadOnly()
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/8657")
+    void "test executable method on abstract class with introspection"() {
+        when:
+        def introspection = buildBeanIntrospection('issue8657.Test', '''
+package issue8657;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.inject.visitor.beans.Auditable;
+
+@Introspected
+class Test extends Auditable {
+    private String name;
+    public void setName(String name) {
+        this.name = name;
+    }
+    public String getName() {
+        return name;
+    }
+}
+
+''')
+
+        then:
+        introspection.beanMethods.size() == 1
+
+        when:
+        def bean = introspection.instantiate()
+        def method = introspection.beanMethods.first()
+        method.invoke(bean)
+
+        then:
+        bean.updatedAt != null
     }
 
     void "test generics in arrays don't stack overflow"() {

@@ -261,9 +261,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             });
         }
         ElementQuery<MethodElement> query = ElementQuery.of(MethodElement.class)
-            .onlyAccessible()
-            .modifiers((modifiers) -> !modifiers.contains(ElementModifier.STATIC))
-            .annotated((am) -> am.hasStereotype(Executable.class));
+            .modifiers(modifiers -> !modifiers.contains(ElementModifier.STATIC))
+            .annotated(am -> am.hasStereotype(Executable.class));
         List<MethodElement> executableMethods = ce.getEnclosedElements(query);
         for (MethodElement executableMethod : executableMethods) {
             if (added.contains(executableMethod)) {
