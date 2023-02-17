@@ -31,16 +31,13 @@ import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.json.JsonMapper;
-import io.micronaut.json.tree.JsonArray;
 import io.micronaut.json.tree.JsonNode;
 import jakarta.inject.Inject;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -72,24 +69,19 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
     @Override
     public void register(MutableConversionService conversionService) {
         conversionService.addConverter(
-                JsonArray.class,
-                Object[].class,
-                arrayNodeToObjectConverter()
-        );
-        conversionService.addConverter(
                 JsonNode.class,
                 ConvertibleValues.class,
                 objectNodeToConvertibleValuesConverter()
         );
         conversionService.addConverter(
-                JsonArray.class,
-                Iterable.class,
-                arrayNodeToIterableConverter()
-        );
-        conversionService.addConverter(
                 JsonNode.class,
                 Object.class,
                 jsonNodeToObjectConverter()
+        );
+        conversionService.addConverter(
+                JsonNode.class,
+                Object[].class,
+                (TypeConverter) jsonNodeToObjectConverter()
         );
         conversionService.addConverter(
                 Map.class,
@@ -113,47 +105,6 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
                 return Optional.of(new JsonNodeConvertibleValues<>(object, conversionService));
             } else {
                 // ConvertibleValues only works for objects
-                return Optional.empty();
-            }
-        };
-    }
-
-    /**
-     * @return Converts array nodes to iterables.
-     */
-    public TypeConverter<JsonArray, Iterable> arrayNodeToIterableConverter() {
-        return (node, targetType, context) -> {
-            Collection<Object> results;
-            if (targetType.isAssignableFrom(ArrayList.class)) {
-                results = new ArrayList<>();
-            } else if (targetType.isAssignableFrom(LinkedHashSet.class)) {
-                results = new LinkedHashSet<>();
-            } else {
-                // don't know how to convert to that collection type
-                return Optional.empty();
-            }
-            Map<String, Argument<?>> typeVariables = context.getTypeVariables();
-            Class<?> elementType = typeVariables.isEmpty() ? Map.class : typeVariables.values().iterator().next().getType();
-            for (int i = 0; i < node.size(); i++) {
-                Optional<?> converted = conversionService.convert(node.get(i), elementType, context);
-                converted.ifPresent(results::add);
-            }
-            return Optional.of(results);
-        };
-    }
-
-    /**
-     * @return Converts array nodes to objects.
-     */
-    @Internal
-    public TypeConverter<JsonArray, Object[]> arrayNodeToObjectConverter() {
-        return (node, targetType, context) -> {
-            try {
-                JsonMapper om = this.objectCodec.get();
-                Object[] result = om.readValueFromTree(node, targetType);
-                return Optional.of(result);
-            } catch (IOException e) {
-                context.reject(e);
                 return Optional.empty();
             }
         };
