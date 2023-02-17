@@ -16,6 +16,7 @@
 package io.micronaut.jackson.databind;
 
 import com.fasterxml.jackson.annotation.JsonView;
+import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JavaType;
@@ -39,6 +40,7 @@ import io.micronaut.jackson.core.tree.TreeGenerator;
 import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.JsonStreamConfig;
+import io.micronaut.json.JsonSyntaxException;
 import io.micronaut.json.tree.JsonNode;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -113,18 +115,28 @@ public final class JacksonDatabindMapper implements JsonMapper {
 
     @Override
     public <T> T readValue(@NonNull InputStream inputStream, @NonNull Argument<T> type) throws IOException {
-        return objectMapper.readValue(inputStream, JacksonConfiguration.constructType(type, objectMapper.getTypeFactory()));
+        try {
+            return objectMapper.readValue(inputStream, JacksonConfiguration.constructType(type, objectMapper.getTypeFactory()));
+        } catch (JsonParseException pe) {
+            throw new JsonSyntaxException(pe);
+        }
     }
 
     @Override
     public <T> T readValue(@NonNull byte[] byteArray, @NonNull Argument<T> type) throws IOException {
-        return objectMapper.readValue(byteArray, JacksonConfiguration.constructType(type, objectMapper.getTypeFactory()));
+        try {
+            return objectMapper.readValue(byteArray, JacksonConfiguration.constructType(type, objectMapper.getTypeFactory()));
+        } catch (JsonParseException pe) {
+            throw new JsonSyntaxException(pe);
+        }
     }
 
     @Override
     public <T> T readValue(ByteBuffer<?> byteBuffer, Argument<T> type) throws IOException {
         try (JsonParser parser = JacksonCoreParserFactory.createJsonParser(objectMapper.getFactory(), byteBuffer)) {
             return objectMapper.readValue(parser, JacksonConfiguration.constructType(type, objectMapper.getTypeFactory()));
+        } catch (JsonParseException pe) {
+            throw new JsonSyntaxException(pe);
         }
     }
 

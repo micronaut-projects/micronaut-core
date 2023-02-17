@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.jackson;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.server.HttpServerConfiguration;
@@ -25,6 +26,7 @@ import io.micronaut.http.server.netty.AbstractHttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.json.JsonMapper;
+import io.micronaut.json.convert.LazyJsonNode;
 import io.micronaut.json.tree.JsonNode;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
@@ -129,10 +131,15 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
             completedNode = completedNode == null ? this.buffer : this.buffer.addComponent(true, completedNode);
             this.buffer = null;
         }
-        try {
-            out.add(jsonMapper.readValue(NettyByteBufferFactory.DEFAULT.wrap(completedNode), Argument.of(JsonNode.class)));
-        } finally {
-            completedNode.release();
+        ByteBuffer<ByteBuf> wrapped = NettyByteBufferFactory.DEFAULT.wrap(completedNode);
+        if (configuration.isEagerParsing()) {
+            try {
+                out.add(jsonMapper.readValue(wrapped, Argument.of(JsonNode.class)));
+            } finally {
+                completedNode.release();
+            }
+        } else {
+            out.add(new LazyJsonNode(wrapped));
         }
     }
 

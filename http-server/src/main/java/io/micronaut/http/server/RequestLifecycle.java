@@ -16,6 +16,7 @@
 package io.micronaut.http.server;
 
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.CollectionUtils;
@@ -36,6 +37,7 @@ import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.json.JsonSyntaxException;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.UriRouteMatch;
@@ -161,13 +163,15 @@ public class RequestLifecycle {
         Optional<RouteInfo> previousRequestRouteInfo = request.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class);
         Class<?> declaringType = previousRequestRouteInfo.map(RouteInfo::getDeclaringType).orElse(null);
 
-        final Throwable cause;
-        // top level exceptions returned by CompletableFutures. These always wrap the real exception thrown.
         if ((t instanceof CompletionException || t instanceof ExecutionException) && t.getCause() != null) {
-            cause = t.getCause();
-        } else {
-            cause = t;
+            // top level exceptions returned by CompletableFutures. These always wrap the real exception thrown.
+            t = t.getCause();
         }
+        if (t instanceof ConversionErrorException cee && cee.getCause() instanceof JsonSyntaxException jse) {
+            // with delayed parsing, json syntax errors show up as conversion errors
+            t = jse;
+        }
+        final Throwable cause = t;
 
         RouteMatch<?> errorRoute = routeExecutor.findErrorRoute(cause, declaringType, request);
         if (errorRoute != null) {

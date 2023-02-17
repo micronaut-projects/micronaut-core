@@ -122,7 +122,10 @@ public interface JsonMapper {
      * @return The reactive processor.
      */
     @NonNull
-    Processor<byte[], JsonNode> createReactiveParser(@NonNull Consumer<Processor<byte[], JsonNode>> onSubscribe, boolean streamArray);
+    @Deprecated
+    default Processor<byte[], JsonNode> createReactiveParser(@NonNull Consumer<Processor<byte[], JsonNode>> onSubscribe, boolean streamArray) {
+        throw new UnsupportedOperationException("Reactive parser not supported");
+    }
 
     /**
      * Transform an object value to a json tree.

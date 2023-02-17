@@ -18,7 +18,7 @@ package io.micronaut.json.convert;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.BeanPropertyBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -31,6 +31,7 @@ import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.json.JsonMapper;
+import io.micronaut.json.JsonSyntaxException;
 import io.micronaut.json.tree.JsonNode;
 import jakarta.inject.Inject;
 
@@ -74,14 +75,30 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
                 objectNodeToConvertibleValuesConverter()
         );
         conversionService.addConverter(
+                LazyJsonNode.class,
+                ConvertibleValues.class,
+                unparsedNodeToConvertibleValuesConverter()
+        );
+        conversionService.addConverter(
                 JsonNode.class,
                 Object.class,
                 jsonNodeToObjectConverter()
         );
         conversionService.addConverter(
-                JsonNode.class,
+                LazyJsonNode.class,
+                Object.class,
+                unparsedJsonNodeToObjectConverter()
+        );
+        // need to register the Object[] conversions explicitly because there is also an Object->Object[] converter
+        conversionService.addConverter(
+            JsonNode.class,
+            Object[].class,
+            (TypeConverter) jsonNodeToObjectConverter()
+        );
+        conversionService.addConverter(
+                LazyJsonNode.class,
                 Object[].class,
-                (TypeConverter) jsonNodeToObjectConverter()
+                (TypeConverter) unparsedJsonNodeToObjectConverter()
         );
         conversionService.addConverter(
                 Map.class,
@@ -98,14 +115,40 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
     /**
      * @return A converter that converts object nodes to convertible values
      */
-    @Internal
-    public TypeConverter<JsonNode, ConvertibleValues> objectNodeToConvertibleValuesConverter() {
+    private TypeConverter<JsonNode, ConvertibleValues> objectNodeToConvertibleValuesConverter() {
         return (object, targetType, context) -> {
             if (object.isObject()) {
                 return Optional.of(new JsonNodeConvertibleValues<>(object, conversionService));
             } else {
                 // ConvertibleValues only works for objects
                 return Optional.empty();
+            }
+        };
+    }
+
+    /**
+     * @return A converter that converts object nodes to convertible values
+     */
+    private TypeConverter<LazyJsonNode, ConvertibleValues> unparsedNodeToConvertibleValuesConverter() {
+        return (node, targetType, context) -> {
+            // this is a bit convoluted, only release if we can convert or there is an error
+            try {
+                if (!node.isObject()) {
+                    // ConvertibleValues only works for objects
+                    return Optional.empty();
+                }
+            } catch (JsonSyntaxException e) {
+                node.tryRelease();
+                context.reject(e);
+                return Optional.empty();
+            }
+            try {
+                return Optional.of(new JsonNodeConvertibleValues<>(node.toJsonNode(objectCodec.get()), conversionService));
+            } catch (IOException e) {
+                context.reject(e);
+                return Optional.empty();
+            } finally {
+                node.tryRelease();
             }
         };
     }
@@ -157,7 +200,7 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
     /**
      * @return A converter that converts an object to a json node
      */
-    protected TypeConverter<Object, JsonNode> objectToJsonNodeConverter() {
+    private TypeConverter<Object, JsonNode> objectToJsonNodeConverter() {
         return (object, targetType, context) -> {
             try {
                 return Optional.of(objectCodec.get().writeValueToTree(object));
@@ -168,31 +211,58 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
         };
     }
 
+    @NonNull
+    private static Argument<?> argument(Class<Object> targetType, ConversionContext context) {
+        Argument<?> argument = null;
+        if (context instanceof ArgumentConversionContext) {
+            argument = ((ArgumentConversionContext<?>) context).getArgument();
+            if (targetType != argument.getType()) {
+                argument = null;
+            }
+        }
+        if (argument == null) {
+            argument = Argument.of(targetType);
+        }
+        return argument;
+    }
+
     /**
      * @return The JSON node to object converter
      */
-    protected TypeConverter<JsonNode, Object> jsonNodeToObjectConverter() {
+    private TypeConverter<JsonNode, Object> jsonNodeToObjectConverter() {
         return (node, targetType, context) -> {
             try {
                 if (CharSequence.class.isAssignableFrom(targetType) && node.isObject()) {
                     return Optional.of(new String(objectCodec.get().writeValueAsBytes(node), StandardCharsets.UTF_8));
                 } else {
-                    Argument<?> argument = null;
-                    if (context instanceof ArgumentConversionContext) {
-                        argument = ((ArgumentConversionContext<?>) context).getArgument();
-                        if (targetType != argument.getType()) {
-                            argument = null;
-                        }
-                    }
-                    if (argument == null) {
-                        argument = Argument.of(targetType);
-                    }
-                    JsonMapper om = this.objectCodec.get();
-                    return Optional.ofNullable(om.readValueFromTree(node, argument));
+                    return Optional.ofNullable(this.objectCodec.get().readValueFromTree(node, argument(targetType, context)));
                 }
             } catch (IOException e) {
                 context.reject(e);
                 return Optional.empty();
+            }
+        };
+    }
+
+    /**
+     * @return The JSON node to object converter
+     */
+    private TypeConverter<LazyJsonNode, Object> unparsedJsonNodeToObjectConverter() {
+        return (node, targetType, context) -> {
+            try {
+                JsonMapper mapper = objectCodec.get();
+                if (CharSequence.class.isAssignableFrom(targetType) && node.isObject()) {
+                    // parse once to JsonNode to ensure validity & sanitize the input
+                    byte[] sanitized = mapper.writeValueAsBytes(node.toJsonNode(mapper));
+                    return Optional.of(new String(sanitized, StandardCharsets.UTF_8));
+                } else {
+                    return Optional.ofNullable(node.parse(mapper, argument(targetType, context)));
+                }
+            } catch (IOException e) {
+                context.reject(e);
+                return Optional.empty();
+            } finally {
+                node.tryRelease();
             }
         };
     }

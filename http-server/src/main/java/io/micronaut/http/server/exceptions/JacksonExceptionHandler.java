@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.server.exceptions;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -24,51 +26,50 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.server.exceptions.response.Error;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
-import io.micronaut.json.JsonSyntaxException;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import java.util.Optional;
 
 /**
- * Default exception handler for JSON processing errors.
+ * Default exception handler for jackson processing errors.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Produces
 @Singleton
+@Requires(classes = JsonProcessingException.class)
 @Internal
-public class JsonExceptionHandler implements ExceptionHandler<JsonSyntaxException, Object> {
+public class JacksonExceptionHandler implements ExceptionHandler<JsonProcessingException, Object> {
 
     private final ErrorResponseProcessor<?> responseProcessor;
 
     /**
      * Constructor.
-     *
      * @param responseProcessor Error Response Processor
      */
     @Inject
-    public JsonExceptionHandler(ErrorResponseProcessor<?> responseProcessor) {
+    public JacksonExceptionHandler(ErrorResponseProcessor<?> responseProcessor) {
         this.responseProcessor = responseProcessor;
     }
 
     @Override
-    public Object handle(HttpRequest request, JsonSyntaxException exception) {
+    public Object handle(HttpRequest request, JsonProcessingException exception) {
         MutableHttpResponse<Object> response = HttpResponse.status(HttpStatus.BAD_REQUEST, "Invalid JSON");
         return responseProcessor.processResponse(ErrorContext.builder(request)
-            .cause(exception)
-            .error(new Error() {
-                @Override
-                public String getMessage() {
-                    return "Invalid JSON: " + exception.getMessage();
-                }
+                .cause(exception)
+                .error(new Error() {
+                    @Override
+                    public String getMessage() {
+                        return "Invalid JSON: " + exception.getMessage();
+                    }
 
-                @Override
-                public Optional<String> getTitle() {
-                    return Optional.of("Invalid JSON");
-                }
-            })
-            .build(), response);
+                    @Override
+                    public Optional<String> getTitle() {
+                        return Optional.of("Invalid JSON");
+                    }
+                })
+                .build(), response);
     }
 }

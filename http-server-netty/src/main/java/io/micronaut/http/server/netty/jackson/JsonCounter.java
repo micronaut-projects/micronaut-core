@@ -2,24 +2,65 @@ package io.micronaut.http.server.netty.jackson;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.json.JsonSyntaxException;
 import io.netty.buffer.ByteBuf;
 
+/**
+ * This class takes in JSON data and does simple parsing to detect boundaries between json nodes.
+ * For example, this class can recognize the separation between the two JSON objects in
+ * {@code {"foo":"bar"} {"bar":"baz"}}.<br>
+ * Public for fuzzing.
+ */
 @SuppressWarnings("BooleanMethodIsAlwaysInverted")
 @Internal
 public final class JsonCounter {
+    /**
+     * Total number of bytes consumed.
+     */
     private long position;
+    /**
+     * Depth of nested structures.
+     */
     private int depth;
+    /**
+     * Current state of the parser.
+     */
     private State state = State.BASE;
 
+    /**
+     * {@link #position} of the first byte of the current top-level JSON node.
+     */
     private long bufferStart = -1;
 
+    /**
+     * Whether we are currently unwrapping a top-level array.
+     *
+     * @see #unwrapTopLevelArray()
+     */
     private boolean unwrappingArray;
+    /**
+     * Whether we are currently unwrapping a top-level array, and expect a comma next (or end of
+     * array).
+     *
+     * @see #unwrapTopLevelArray()
+     */
     private boolean allowUnwrappingArrayComma;
 
+    /**
+     * The region of the last complete top-level JSON node we have visited. Polled by the user.
+     */
     @Nullable
     private BufferRegion lastFlushedRegion;
 
-    public void feed(ByteBuf buf) {
+    /**
+     * Parse some input data. If {@code buf} is readable, this method always advances (always
+     * consumes at least one byte).
+     *
+     * @param buf The input buffer
+     * @throws JsonSyntaxException If there is a syntax error in the JSON. Note that not all syntax
+     *                             errors are detected by this class.
+     */
+    public void feed(ByteBuf buf) throws JsonSyntaxException {
         if (!isBuffering()) {
             proceedUntilBuffering(buf);
         }
@@ -28,6 +69,11 @@ public final class JsonCounter {
         }
     }
 
+    /**
+     * Enable top-level array unwrapping: If the input starts with an array, that array's elements
+     * are returned as individual JSON nodes, not the array all at once. <br>
+     * Must be called before any data is processed.
+     */
     public void unwrapTopLevelArray() {
         if (position != 0) {
             throw new IllegalStateException("Already consumed input");
@@ -35,7 +81,10 @@ public final class JsonCounter {
         state = State.BEFORE_UNWRAP_ARRAY;
     }
 
-    private void proceedUntilNonBuffering(ByteBuf buf) {
+    /**
+     * Proceed until {@link #isBuffering()} becomes false.
+     */
+    private void proceedUntilNonBuffering(ByteBuf buf) throws JsonSyntaxException {
         if (buf.hasArray()) {
             int arrayOffset = buf.arrayOffset();
             int newEnd = proceedUntilNonBuffering(buf.array(), arrayOffset + buf.readerIndex(), arrayOffset + buf.writerIndex());
@@ -98,7 +147,10 @@ public final class JsonCounter {
         buf.readerIndex(i);
     }
 
-    private int proceedUntilNonBuffering(byte[] array, int start, int end) {
+    /**
+     * Identical to {@link #proceedUntilNonBuffering(ByteBuf)}, but optimized for an array.
+     */
+    private int proceedUntilNonBuffering(byte[] array, int start, int end) throws JsonSyntaxException {
         assert isBuffering();
 
         int i = start;
@@ -151,7 +203,11 @@ public final class JsonCounter {
         return i;
     }
 
-    private void proceedUntilBuffering(ByteBuf buf) {
+    /**
+     * Consume some input until {@link #isBuffering()}. Sometimes this method returns before that
+     * is the case, to make the implementation simpler.
+     */
+    private void proceedUntilBuffering(ByteBuf buf) throws JsonSyntaxException {
         assert !isBuffering();
         assert depth == 0 : depth;
 
@@ -163,14 +219,14 @@ public final class JsonCounter {
             // top-level array consumed. reject further data
             skipWs(buf, i, end);
             if (i < end) {
-                throw new IllegalArgumentException("Superfluous data after top-level array in streaming mode");
+                throw new JsonSyntaxException("Superfluous data after top-level array in streaming mode");
             }
         } else {
             // normal path
             assert state == State.BASE || state == State.BEFORE_UNWRAP_ARRAY : state;
 
             if (position == 0 && i < end && buf.getByte(i) == (byte) 0xef) {
-                throw new IllegalArgumentException("UTF-8 BOM not allowed");
+                throw new JsonSyntaxException("UTF-8 BOM not allowed");
             }
 
             // if we are unwrapping a top-level array, search for a comma
@@ -195,6 +251,13 @@ public final class JsonCounter {
         buf.readerIndex(i);
     }
 
+    /**
+     * Skip any whitespace characters.
+     *
+     * @param i   The start index
+     * @param end The maximum index
+     * @return The first non-whitespace character index, or {@code end}
+     */
     private static int skipWs(ByteBuf buf, int i, int end) {
         for (; i < end; i++) {
             if (!ws(buf.getByte(i))) {
@@ -204,7 +267,10 @@ public final class JsonCounter {
         return i;
     }
 
-    private void handleNonBufferingBase(byte b) {
+    /**
+     * Handle a special byte (anything but whitespace) in the base state, while not buffering.
+     */
+    private void handleNonBufferingBase(byte b) throws JsonSyntaxException {
         switch (b) {
             case 0 -> failNul();
             case '}' -> failMismatchedBrackets();
@@ -240,11 +306,18 @@ public final class JsonCounter {
         }
     }
 
+    /**
+     * @return {@code true} if this character does not end the top-level scalar
+     */
     private static boolean skipTopLevelScalar(byte b) {
         return !ws(b) && b != '"' && b != '{' && b != '[' && b != ']' && b != '}' && b != ',' && b != 0;
     }
 
-    private void handleTopLevelScalarSpecial(byte b) {
+    /**
+     * Handle a special byte (anything but {@link #skipTopLevelScalar}) in the
+     * {@link State#TOP_LEVEL_SCALAR} state.
+     */
+    private void handleTopLevelScalarSpecial(byte b) throws JsonSyntaxException {
         if (ws(b)) {
             position--;
             flushAfter();
@@ -270,18 +343,27 @@ public final class JsonCounter {
         }
     }
 
-    private void handleEscape(byte b) {
+    /**
+     * Handle a byte in the {@link State#ESCAPE} state.
+     */
+    private void handleEscape(byte b) throws JsonSyntaxException {
         if (b == 0) {
             failNul();
         }
         state = State.STRING;
     }
 
+    /**
+     * @return {@code true} if this character does not end the string
+     */
     private static boolean skipString(byte b) {
         return b != '"' && b != '\\' && b != 0;
     }
 
-    private void handleStringSpecial(byte b) {
+    /**
+     * Handle a special byte (anything but {@link #skipString}) in the {@link State#STRING} state.
+     */
+    private void handleStringSpecial(byte b) throws JsonSyntaxException {
         switch (b) {
             case 0 -> failNul();
             case '"' -> {
@@ -295,11 +377,19 @@ public final class JsonCounter {
         }
     }
 
+    /**
+     * @return {@code true} if this character does not change the state while in {@link State#BASE}
+     * and while not buffering
+     */
     private static boolean skipBufferingBase(byte b) {
         return (b != '"') & (b != '{') & (b != '[') & (b != ']') & (b != '}') & (b != 0);
     }
 
-    private void handleBufferingBaseSpecial(byte b) {
+    /**
+     * Handle a special byte (anything but {@link #skipBufferingBase(byte)}) in the base state,
+     * while buffering.
+     */
+    private void handleBufferingBaseSpecial(byte b) throws JsonSyntaxException {
         switch (b) {
             case 0 -> failNul();
             case '}', ']' -> {
@@ -314,6 +404,10 @@ public final class JsonCounter {
         }
     }
 
+    /**
+     * Flush the current JSON node, starting at {@link #bufferStart}, and ending after
+     * {@link #position}. Disables buffering.
+     */
     private void flushAfter() {
         if (lastFlushedRegion != null) {
             throw new IllegalStateException("Should have cleared last buffer region");
@@ -325,20 +419,47 @@ public final class JsonCounter {
         allowUnwrappingArrayComma = unwrappingArray;
     }
 
+    /**
+     * Check for any new flushed data from the last {@link #feed(ByteBuf)} operation.
+     *
+     * @return The region that contains a JSON node, relative to {@link #position()}, or
+     * {@code null} if the JSON node has not completed yet.
+     */
+    @Nullable
     public BufferRegion pollFlushedRegion() {
         BufferRegion r = lastFlushedRegion;
         lastFlushedRegion = null;
         return r;
     }
 
+    /**
+     * The current position counter of the parser. Increases by exactly one for each byte consumed
+     * by {@link #feed}.
+     *
+     * @return The current position
+     */
     public long position() {
         return position;
     }
 
+    /**
+     * Whether we are currently in the buffering state, i.e. there is a JSON node, but it's not
+     * done yet or we can't know for sure that it's done (e.g. for numbers). This is used to flush
+     * any remaining buffering data when EOF is reached.
+     *
+     * @return {@code true} if we are currently buffering
+     */
     public boolean isBuffering() {
         return bufferStart != -1;
     }
 
+    /**
+     * If we are {@link #isBuffering() buffering}, the start {@link #position()} of the region that
+     * is being buffered.
+     *
+     * @return The buffer region start
+     * @throws IllegalStateException if we aren't buffering
+     */
     public long bufferStart() {
         if (bufferStart == -1) {
             throw new IllegalStateException("Not buffering");
@@ -346,17 +467,17 @@ public final class JsonCounter {
         return bufferStart;
     }
 
-    private static void failNul() {
+    private static void failNul() throws JsonSyntaxException {
         // RFC 4627 allows JSON to be encoded as UTF-8, UTF-16 or UTF-32. It also specifies a
         // charset detection algorithm using 0x00 bytes.
         // Later standards (RFC 8259) only permit UTF-8, but Jackson still allows other
         // charsets. To avoid potential parser differential vulnerabilities, we forbid any 0x00
         // bytes in the input. They never appear in valid UTF-8 JSON.
-        throw new IllegalArgumentException("Input must be legal UTF-8 JSON");
+        throw new JsonSyntaxException("Input must be legal UTF-8 JSON");
     }
 
-    private static void failMismatchedBrackets() {
-        throw new IllegalArgumentException("JSON has mismatched brackets");
+    private static void failMismatchedBrackets() throws JsonSyntaxException {
+        throw new JsonSyntaxException("JSON has mismatched brackets");
     }
 
     private static void failMissingWs() {
@@ -370,13 +491,45 @@ public final class JsonCounter {
     }
 
     private enum State {
+        /**
+         * Default state, anything that's not inside a string, not a top-level scalar (numbers,
+         * booleans, null), and not a special state for {@link #unwrapTopLevelArray() unwrapping}.
+         */
         BASE,
+        /**
+         * State inside a string. Braces are ignored, and escape sequences get special handling.
+         */
         STRING,
+        /**
+         * State inside a "top-level scalar", i.e. a boolean, number or {@code null} that is not
+         * part of an array or object. These are a bit special because unlike strings, which
+         * terminate on {@code "}, and structures, which terminate on a bracket, these terminate on
+         * whitespace.
+         */
         TOP_LEVEL_SCALAR,
+        /**
+         * State just after {@code \} inside a {@link #STRING}. The next byte is ignored, and then
+         * we return to {@link #STRING} state.
+         */
         ESCAPE,
+        /**
+         * Special state for {@link #unwrapTopLevelArray() unwrapping}, before the top-level array.
+         * At this point we don't know if there is a top-level array that we need to unwrap or not.
+         */
         BEFORE_UNWRAP_ARRAY,
+        /**
+         * Special state for {@link #unwrapTopLevelArray() unwrapping}, after the closing brace of
+         * a top-level array. Any further tokens after this are an error.
+         */
         AFTER_UNWRAP_ARRAY,
     }
 
-    public record BufferRegion(long start, long end) {}
+    /**
+     * A region that contains a JSON node. Positions are relative to {@link #position()}.
+     *
+     * @param start First byte position of this node
+     * @param end   Position after the last byte of this node (i.e. it's exclusive)
+     */
+    public record BufferRegion(long start, long end) {
+    }
 }
