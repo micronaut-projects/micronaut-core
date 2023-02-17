@@ -38,7 +38,6 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.inject.visitor.VisitorContext;
 import jakarta.inject.Qualifier;
-import org.jetbrains.annotations.NotNull;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
@@ -670,13 +669,16 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 aliasedAnnotation = aliasAnnotation.orElseGet(aliasAnnotationName::get);
                 String aliasedMemberName = aliasMember.get();
                 if (annotationValue != null) {
-                    introducedAnnotations.add(
-                        toProcessedAnnotation(
+                    ProcessedAnnotation newAnnotation = toProcessedAnnotation(
                             AnnotationValue.builder(aliasedAnnotation, getRetentionPolicy(aliasedAnnotation))
-                                .members(Collections.singletonMap(aliasedMemberName, annotationValue))
-                                .build()
-                        )
+                                    .members(Collections.singletonMap(aliasedMemberName, annotationValue))
+                                    .build()
                     );
+                    introducedAnnotations.add(newAnnotation);
+                    ProcessedAnnotation newNewAnnotation = processAliases(newAnnotation, introducedAnnotations);
+                    if (newNewAnnotation != newAnnotation) {
+                        introducedAnnotations.set(introducedAnnotations.indexOf(newAnnotation), newNewAnnotation);
+                    }
                 }
             }
         } else if (aliasMember.isPresent()) {
@@ -771,7 +773,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         addAnnotations(annotationMetadata, annotationValues, isDeclared, parentAnnotations);
     }
 
-    @NotNull
+    @NonNull
     private Stream<ProcessedAnnotation> annotationMirrorToAnnotationValue(Stream<? extends A> stream,
                                                                           T element,
                                                                           boolean originatingElementIsSameParent,
@@ -868,8 +870,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         );
     }
 
-    @NotNull
-    private Map<CharSequence, Object> getCachedAnnotationDefaults(String annotationName, T annotationType) {
+    /**
+     * Get the cached annotation defaults.
+     * @param annotationName The annotation name
+     * @param annotationType The annotation type
+     * @return The defaults
+     */
+    @NonNull
+    protected Map<CharSequence, Object> getCachedAnnotationDefaults(String annotationName, T annotationType) {
         Map<CharSequence, Object> defaultValues;
         final Map<CharSequence, Object> defaults = ANNOTATION_DEFAULTS.get(annotationName);
         if (defaults != null) {

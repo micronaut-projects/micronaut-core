@@ -17,6 +17,7 @@ package io.micronaut.inject.visitor
 
 import io.micronaut.ast.groovy.TypeElementVisitorStart
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
+import io.micronaut.context.annotation.Replaces
 import io.micronaut.context.exceptions.BeanContextException
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.inject.ast.ClassElement
@@ -1994,6 +1995,56 @@ class MyBean {
         then:
             returnType.hasAnnotation(MyEntity.class)
             returnType.hasAnnotation(Introspected.class)
+    }
+
+    void "test alias for recursion"() {
+        given:
+            ClassElement ce = buildClassElement('''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*
+import io.micronaut.test.annotation.MockBean;
+import jakarta.inject.Singleton;
+import jakarta.inject.Inject;
+import java.util.List;
+import java.lang.Integer;
+
+interface MathService {
+
+    Integer compute(Integer num);
+}
+
+@Singleton
+class MathServiceImpl implements MathService {
+
+    @Override
+    Integer compute(Integer num) {
+        return num * 4 // should never be called
+    }
+}
+
+@Singleton
+class MathInnerServiceSpec {
+
+    @Inject
+    MathService mathService
+
+    @MockBean(MathService)
+    static class MyMock implements MathService {
+
+        @Override
+        Integer compute(Integer num) {
+            return 50
+        }
+    }
+}
+
+''')
+        when:
+            def replaces = ce.getAnnotation(Replaces)
+        then:
+            replaces.stringValue("bean").get() == "test.MathService"
     }
 
     void "test how the type annotations from the type are propagated"() {
