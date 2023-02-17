@@ -9,7 +9,6 @@ jobs:
     strategy:
       matrix:
         java: ['17']
-    container: amazoncorretto:${{ matrix.java }}
     steps:
       # https://github.com/actions/virtual-environments/issues/709
       - name: Free disk space
