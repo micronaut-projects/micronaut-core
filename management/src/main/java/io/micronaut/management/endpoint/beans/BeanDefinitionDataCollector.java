@@ -16,7 +16,6 @@
 package io.micronaut.management.endpoint.beans;
 
 import io.micronaut.inject.BeanDefinition;
-import org.reactivestreams.Publisher;
 
 import java.util.Collection;
 
@@ -34,5 +33,5 @@ public interface BeanDefinitionDataCollector<T> {
      * @return A publisher that returns data representing all of
      * the given bean definitions
      */
-    Publisher<T> getData(Collection<BeanDefinition<?>> beanDefinitions);
+    T getData(Collection<BeanDefinition<?>> beanDefinitions);
 }

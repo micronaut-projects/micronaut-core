@@ -22,11 +22,11 @@ import io.micronaut.management.endpoint.beans.BeanDefinitionDataCollector;
 import io.micronaut.management.endpoint.beans.BeansEndpoint;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
+
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * The default {@link BeanDefinitionDataCollector} implementation. Returns a {@link Map} with
@@ -39,33 +39,30 @@ import java.util.Map;
 @Requires(beans = BeansEndpoint.class)
 public class DefaultBeanDefinitionDataCollector implements BeanDefinitionDataCollector<Map<String, Object>> {
 
-    private BeanDefinitionData beanDefinitionData;
+    private BeanDefinitionData<Map<String, Object>> beanDefinitionData;
 
     /**
      * @param beanDefinitionData The {@link BeanDefinitionData}
      */
-    DefaultBeanDefinitionDataCollector(BeanDefinitionData beanDefinitionData) {
+    DefaultBeanDefinitionDataCollector(BeanDefinitionData<Map<String, Object>> beanDefinitionData) {
         this.beanDefinitionData = beanDefinitionData;
     }
 
     @Override
-    public Publisher<Map<String, Object>> getData(Collection<BeanDefinition<?>> beanDefinitions) {
-        return Mono.from(getBeans(beanDefinitions)).map(beans -> {
-            Map<String, Object> beanData = new LinkedHashMap<>(1);
-            beanData.put("beans", beans);
-            return beanData;
-        });
+    public Map<String, Object> getData(Collection<BeanDefinition<?>> beanDefinitions) {
+        Map<String, Object> beanData = new LinkedHashMap<>(1);
+        beanData.put("beans", getBeans(beanDefinitions));
+        return beanData;
     }
 
     /**
      * @param definitions The bean definitions
      * @return A {@link Publisher} that wraps a Map
      */
-    protected Publisher<Map<String, Object>> getBeans(Collection<BeanDefinition<?>> definitions) {
-        return Flux.fromIterable(definitions)
-                .collectMap(definition -> definition.getClass().getName(),
-                        definition -> {
-                    return beanDefinitionData.getData(definition);
-                });
+    protected Map<String, Map<String, Object>> getBeans(Collection<BeanDefinition<?>> definitions) {
+        return definitions.stream()
+                .collect(Collectors.toMap(definition -> definition.getClass().getName(), definition ->
+                    beanDefinitionData.getData(definition)
+                ));
     }
 }
