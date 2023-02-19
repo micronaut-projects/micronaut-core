@@ -16,84 +16,78 @@
 package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
+import com.google.devtools.ksp.symbol.KSType
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ast.ClassElement
-import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 
-class KotlinFieldElement(declaration: KSPropertyDeclaration,
-                         private val declaringType: ClassElement,
-                         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-                         visitorContext: KotlinVisitorContext
-) : AbstractKotlinElement<KSPropertyDeclaration>(KSPropertyReference(declaration), elementAnnotationMetadataFactory, visitorContext), FieldElement {
+internal class KotlinFieldElement(
+    private val owningType: ClassElement,
+    var declaration: KSPropertyDeclaration,
+    elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
+    visitorContext: KotlinVisitorContext
+) : AbstractKotlinElement<KotlinFieldNativeElement>(
+    KotlinFieldNativeElement(declaration),
+    elementAnnotationMetadataFactory,
+    visitorContext
+), FieldElement {
 
     private val internalName = declaration.simpleName.asString()
-    private val internalType : ClassElement by lazy {
-        visitorContext.elementFactory.newClassElement(declaration.type.resolve())
+    private val internalDeclaringType: ClassElement by lazy {
+        resolveDeclaringType(declaration, owningType)
+    }
+    private val internalKSType: KSType by lazy {
+        declaration.type.resolve()
+    }
+    private val internalType: ClassElement by lazy {
+        newClassElement(nativeType, internalKSType, emptyMap())
+    }
+    private val internalGenericType: ClassElement by lazy {
+        newClassElement(nativeType, internalKSType, declaringType.typeArguments)
     }
 
-    private val internalGenericType : ClassElement by lazy {
-        resolveGeneric(declaration.parent, type, declaringType, visitorContext)
+    override fun isFinal() = declaration.setter == null
+
+    override fun isReflectionRequired() = true // all Kotlin fields are private
+
+    override fun isReflectionRequired(callingType: ClassElement?) =
+        true // all Kotlin fields are private
+
+    override fun isPublic() = if (hasDeclaredAnnotation(JvmField::class.java)) {
+        super.isPublic()
+    } else {
+        false // all Kotlin fields are private
     }
 
-    override fun isFinal(): Boolean {
-        return declaration.setter == null
-    }
+    override fun getType() = internalType
 
-    override fun isReflectionRequired(): Boolean {
-        return true // all Kotlin fields are private
-    }
+    override fun getGenericType() = internalGenericType
 
-    override fun isReflectionRequired(callingType: ClassElement?): Boolean {
-        return true // all Kotlin fields are private
-    }
+    override fun getName() = internalName
 
-    override fun isPublic(): Boolean {
-        return if (hasDeclaredAnnotation(JvmField::class.java)) {
-            super.isPublic()
-        } else {
-            false // all Kotlin fields are private
-        }
-    }
+    override fun isPrimitive() = type.isPrimitive
 
-    override fun getType(): ClassElement {
-        return internalType
-    }
+    override fun isArray() = type.isArray
 
-    override fun getName(): String {
-        return internalName
-    }
+    override fun getArrayDimensions() = type.arrayDimensions
 
-    override fun getGenericType(): ClassElement {
-        return internalGenericType
-    }
+    override fun copyThis() =
+        KotlinFieldElement(
+            owningType,
+            declaration,
+            elementAnnotationMetadataFactory,
+            visitorContext
+        )
 
-    override fun isPrimitive(): Boolean {
-        return type.isPrimitive
-    }
+    override fun isPrivate() = true
 
-    override fun isArray(): Boolean {
-        return type.isArray
-    }
+    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata) =
+        super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as FieldElement
 
-    override fun getArrayDimensions(): Int {
-        return type.arrayDimensions
-    }
+    override fun getOwningType() = owningType
 
-    override fun copyThis(): AbstractKotlinElement<KSPropertyDeclaration> {
-        return KotlinFieldElement(declaration, declaringType, annotationMetadataFactory, visitorContext)
-    }
+    override fun getDeclaringType() = internalDeclaringType
 
-    override fun isPrivate(): Boolean = true
-
-    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): FieldElement {
-        return super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as FieldElement
-    }
-
-    override fun getDeclaringType() = declaringType
-
-    override fun getModifiers(): MutableSet<ElementModifier> {
-        return super<AbstractKotlinElement>.getModifiers()
-    }
+    override fun getModifiers() = super<AbstractKotlinElement>.getModifiers()
 }

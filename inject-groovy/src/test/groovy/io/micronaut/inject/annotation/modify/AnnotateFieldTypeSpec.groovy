@@ -9,6 +9,7 @@ import io.micronaut.inject.visitor.AllElementsVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
 
+// Annotating the field type doesn't add the annotation to the runtime inject field
 class AnnotateFieldTypeSpec extends AbstractBeanDefinitionSpec {
 
     def setup() {
@@ -23,19 +24,19 @@ class AnnotateFieldTypeSpec extends AbstractBeanDefinitionSpec {
     void 'test annotating'() {
         when:
             def definition = buildBeanDefinition('addann.AnnotateFieldTypeClass', '''
-package addann;
+package addann
 
-import io.micronaut.context.annotation.Bean;
-import jakarta.inject.Inject;
+import io.micronaut.context.annotation.Bean
+import jakarta.inject.Inject
 
 @Bean
 class AnnotateFieldTypeClass {
 
     @Inject
-    public MyBean1 myField1;
+    public MyBean1 myField1
 
     @Inject
-    public MyBean1 myField2;
+    public MyBean1 myField2
 
 }
 
@@ -49,20 +50,20 @@ class MyBean1 {
     void 'test annotating 2'() {
         when:
             def definition = buildBeanDefinition('addann.AnnotateFieldTypeClass', '''
-package addann;
+package addann
 
-import io.micronaut.context.annotation.Executable;
-import io.micronaut.context.annotation.Bean;
-import jakarta.inject.Inject;
+import io.micronaut.context.annotation.Executable
+import io.micronaut.context.annotation.Bean
+import jakarta.inject.Inject
 
 @Bean
 class AnnotateFieldTypeClass<T extends MyBean1> {
 
     @Inject
-    public T myField1;
+    public T myField1
 
     @Inject
-    public T myField2;
+    public T myField2
 
 }
 
@@ -76,18 +77,18 @@ class MyBean1 {
     void 'test annotating 3'() {
         when:
             def definition = buildBeanDefinition('addann.AnnotateFieldTypeClass', '''
-package addann;
+package addann
 
-import io.micronaut.context.annotation.Bean;
-import jakarta.inject.Inject;
+import io.micronaut.context.annotation.Bean
+import jakarta.inject.Inject
 
 abstract class BaseAnnotateFieldTypeClass<S> {
 
     @Inject
-    public S myField1;
+    public S myField1
 
     @Inject
-    public S myField2;
+    public S myField2
 
 }
 
@@ -105,18 +106,18 @@ class MyBean1 {
     void 'test annotating 4'() {
         when:
             def definition = buildBeanDefinition('addann.AnnotateFieldTypeClass', '''
-package addann;
+package addann
 
-import io.micronaut.context.annotation.Bean;
-import jakarta.inject.Inject;
+import io.micronaut.context.annotation.Bean
+import jakarta.inject.Inject
 
 abstract class BaseAnnotateFieldTypeClass<S> {
 
     @Inject
-    public S myField1;
+    public S myField1
 
     @Inject
-    public S myField2;
+    public S myField2
 
 }
 
@@ -133,12 +134,12 @@ class MyBean1 {
 
     void validate(BeanDefinition definition) {
         def myField1 = definition.getInjectedFields()[0]
-        myField1.name == "myField1"
-        myField1.asArgument().getAnnotationMetadata().hasAnnotation(MyAnnotation)
+        assert myField1.name == "myField1"
+        assert !myField1.asArgument().getAnnotationMetadata().hasAnnotation(MyAnnotation)
 
         def myField2 = definition.getInjectedFields()[1]
-        myField2.name == "myField2"
-        !myField2.asArgument().getAnnotationMetadata().hasAnnotation(MyAnnotation)
+        assert myField2.name == "myField2"
+        assert !myField2.asArgument().getAnnotationMetadata().hasAnnotation(MyAnnotation)
     }
 
     static class AnnotateFieldTypeVisitor implements TypeElementVisitor<Object, Object> {

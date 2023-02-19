@@ -15,56 +15,43 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
-import com.google.devtools.ksp.KspExperimental
-import com.google.devtools.ksp.getVisibility
-import com.google.devtools.ksp.isJavaPackagePrivate
-import com.google.devtools.ksp.isOpen
+import com.google.devtools.ksp.*
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.core.annotation.AnnotationValue
-import io.micronaut.core.annotation.AnnotationValueBuilder
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.ElementModifier
-import io.micronaut.inject.ast.GenericPlaceholderElement
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata
+import io.micronaut.inject.ast.PrimitiveElement
+import io.micronaut.inject.ast.WildcardElement
+import io.micronaut.inject.ast.annotation.AbstractAnnotationElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
-import io.micronaut.inject.ast.annotation.ElementMutableAnnotationMetadataDelegate
-import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
 import io.micronaut.kotlin.processing.getBinaryName
-import io.micronaut.kotlin.processing.unwrap
+import io.micronaut.kotlin.processing.getClassDeclaration
 import java.util.*
-import java.util.function.Consumer
-import java.util.function.Predicate
 
-abstract class AbstractKotlinElement<T : KSNode>(val declaration: T,
-                                     protected  val annotationMetadataFactory: ElementAnnotationMetadataFactory,
-                                     protected val visitorContext: KotlinVisitorContext) : Element, ElementMutableAnnotationMetadataDelegate<Element> {
+internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
+    private val nativeType: T,
+    annotationMetadataFactory: ElementAnnotationMetadataFactory,
+    protected val visitorContext: KotlinVisitorContext
+) : AbstractAnnotationElement(annotationMetadataFactory) {
 
-    protected var presetAnnotationMetadata: AnnotationMetadata? = null
-    private var elementAnnotationMetadata: ElementAnnotationMetadata? = null
+    private val annotatedInfo = nativeType.element
 
-    override fun getNativeType(): T {
-        return declaration
+    override fun getNativeType(): T = nativeType
+
+    override fun isProtected() = if (annotatedInfo is KSDeclaration) {
+        annotatedInfo.getVisibility() == Visibility.PROTECTED
+    } else {
+        false
     }
 
-    override fun isProtected(): Boolean {
-        return if (declaration is KSDeclaration) {
-            declaration.getVisibility() == Visibility.PROTECTED
-        } else {
-            false
-        }
+    override fun isStatic() = if (annotatedInfo is KSDeclaration) {
+        annotatedInfo.modifiers.contains(Modifier.JAVA_STATIC)
+    } else {
+        false
     }
 
-    override fun isStatic(): Boolean {
-        return if (declaration is KSDeclaration) {
-            declaration.modifiers.contains(Modifier.JAVA_STATIC)
-        } else {
-            false
-        }
-    }
-
-    protected fun makeCopy(): AbstractKotlinElement<T> {
+    private fun makeCopy(): AbstractKotlinElement<T> {
         val element: AbstractKotlinElement<T> = copyThis()
         copyValues(element)
         return element
@@ -81,52 +68,40 @@ abstract class AbstractKotlinElement<T : KSNode>(val declaration: T,
     protected open fun copyValues(element: AbstractKotlinElement<T>) {
         element.presetAnnotationMetadata = presetAnnotationMetadata
     }
+
     override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): Element? {
         val kotlinElement: AbstractKotlinElement<T> = makeCopy()
         kotlinElement.presetAnnotationMetadata = annotationMetadata
         return kotlinElement
     }
 
-    override fun getAnnotationMetadata(): MutableAnnotationMetadataDelegate<*> {
-        if (elementAnnotationMetadata == null) {
-
-            val factory = annotationMetadataFactory
-            if (presetAnnotationMetadata == null) {
-                elementAnnotationMetadata = factory.build(this)
-            } else {
-                elementAnnotationMetadata = factory.build(this, presetAnnotationMetadata)
-            }
-        }
-        return elementAnnotationMetadata!!
+    override fun isPublic() = if (annotatedInfo is KSDeclaration) {
+        annotatedInfo.getVisibility() == Visibility.PUBLIC
+    } else {
+        false
     }
 
-    override fun isPublic(): Boolean {
-        return if (declaration is KSDeclaration) {
-            declaration.getVisibility() == Visibility.PUBLIC
-        } else {
-            false
-        }
+    override fun isPrivate() = if (annotatedInfo is KSDeclaration) {
+        annotatedInfo.getVisibility() == Visibility.PRIVATE
+    } else {
+        false
     }
 
-    override fun isPrivate(): Boolean {
-        return if (declaration is KSDeclaration) {
-            declaration.getVisibility() == Visibility.PRIVATE
-        } else {
-            false
-        }
+    override fun isPackagePrivate() = if (annotatedInfo is KSDeclaration) {
+        annotatedInfo.isJavaPackagePrivate()
+    } else {
+        false
     }
 
-    override fun isFinal(): Boolean {
-        return if (declaration is KSDeclaration) {
-            !declaration.isOpen() || declaration.modifiers.contains(Modifier.FINAL)
-        } else {
-            false
-        }
+    override fun isFinal() = if (annotatedInfo is KSDeclaration) {
+        !annotatedInfo.isOpen() || annotatedInfo.modifiers.contains(Modifier.FINAL)
+    } else {
+        false
     }
 
     override fun isAbstract(): Boolean {
-        return if (declaration is KSModifierListOwner) {
-            declaration.modifiers.contains(Modifier.ABSTRACT)
+        return if (annotatedInfo is KSModifierListOwner) {
+            annotatedInfo.modifiers.contains(Modifier.ABSTRACT)
         } else {
             false
         }
@@ -134,9 +109,8 @@ abstract class AbstractKotlinElement<T : KSNode>(val declaration: T,
 
     @OptIn(KspExperimental::class)
     override fun getModifiers(): MutableSet<ElementModifier> {
-        val dec = declaration.unwrap()
-        if (dec is KSDeclaration) {
-            val javaModifiers = visitorContext.resolver.effectiveJavaModifiers(dec)
+        if (annotatedInfo is KSDeclaration) {
+            val javaModifiers = visitorContext.resolver.effectiveJavaModifiers(annotatedInfo)
             return javaModifiers.mapNotNull {
                 when (it) {
                     Modifier.ABSTRACT -> ElementModifier.ABSTRACT
@@ -158,150 +132,412 @@ abstract class AbstractKotlinElement<T : KSNode>(val declaration: T,
         return super.getModifiers()
     }
 
-    override fun <T : Annotation?> annotate(
-        annotationType: String?,
-        consumer: Consumer<AnnotationValueBuilder<T>>?
-    ): Element {
-        return super<ElementMutableAnnotationMetadataDelegate>.annotate(annotationType, consumer)
-    }
-
-    override fun annotate(annotationType: String?): Element {
-        return super<ElementMutableAnnotationMetadataDelegate>.annotate(annotationType)
-    }
-
-    override fun <T : Annotation?> annotate(
-        annotationType: Class<T>?,
-        consumer: Consumer<AnnotationValueBuilder<T>>?
-    ): Element {
-        return super<ElementMutableAnnotationMetadataDelegate>.annotate(annotationType, consumer)
-    }
-
-    override fun <T : Annotation?> annotate(annotationType: Class<T>?): Element? {
-        return super<ElementMutableAnnotationMetadataDelegate>.annotate(annotationType)
-    }
-    override fun <T : Annotation?> annotate(annotationValue: AnnotationValue<T>?): Element {
-        return super<ElementMutableAnnotationMetadataDelegate>.annotate(annotationValue)
-    }
-
-    override fun removeAnnotation(annotationType: String?): Element {
-        return super<ElementMutableAnnotationMetadataDelegate>.removeAnnotation(annotationType)
-    }
-
-    override fun <T : Annotation?> removeAnnotation(annotationType: Class<T>?): Element {
-        return super<ElementMutableAnnotationMetadataDelegate>.removeAnnotation(annotationType)
-    }
-
-    override fun <T : Annotation?> removeAnnotationIf(predicate: Predicate<AnnotationValue<T>>?): Element {
-        return super<ElementMutableAnnotationMetadataDelegate>.removeAnnotationIf(predicate)
-    }
-
-    override fun removeStereotype(annotationType: String?): Element {
-        return super<ElementMutableAnnotationMetadataDelegate>.removeStereotype(annotationType)
-    }
-
-    override fun <T : Annotation?> removeStereotype(annotationType: Class<T>?): Element {
-        return super<ElementMutableAnnotationMetadataDelegate>.removeStereotype(annotationType)
-    }
-
-    override fun isPackagePrivate(): Boolean {
-        return if (declaration is KSDeclaration) {
-            declaration.isJavaPackagePrivate()
-        } else {
-            false
-        }
-    }
-
     override fun getDocumentation(): Optional<String> {
-        return if (declaration is KSDeclaration) {
-            Optional.ofNullable(declaration.docString)
+        return if (annotatedInfo is KSDeclaration) {
+            Optional.ofNullable(annotatedInfo.docString)
         } else {
             Optional.empty()
         }
     }
 
-    override fun getReturnInstance(): Element {
-        return this
+    protected fun resolveDeclaringType(
+        declaration: KSDeclaration,
+        owningType: ClassElement
+    ): ClassElement {
+        var parent = declaration.parent
+        if (parent is KSPropertyDeclaration) {
+            parent = parent.parent
+        }
+        if (parent is KSFunctionDeclaration) {
+            parent = parent.parent
+        }
+        return if (parent is KSClassDeclaration) {
+            val className = parent.getBinaryName(visitorContext.resolver, visitorContext)
+            if (owningType.name.equals(className)) {
+                owningType
+            } else {
+                val parentTypeArguments = owningType.getTypeArguments(className)
+                newKotlinClassElement(parent, parentTypeArguments)
+            }
+        } else {
+            owningType
+        }
     }
 
-    protected fun resolveGeneric(
-        parent: KSNode?,
-        type: ClassElement,
-        owningClass: ClassElement,
-        visitorContext: KotlinVisitorContext
-    ): ClassElement {
-        var resolvedType = type
-        if (parent is KSDeclaration && owningClass is KotlinClassElement) {
-            if (type is GenericPlaceholderElement) {
+    protected fun resolveTypeArguments(
+        owner: KotlinNativeElement,
+        type: KSDeclaration,
+        parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any> = HashSet()
+    ): Map<String, ClassElement> {
+        val typeArguments = mutableMapOf<String, ClassElement>()
+        val typeParameters = type.typeParameters
+        typeParameters.forEachIndexed { i, typeParameter ->
+            typeArguments[typeParameters[i].name.asString()] =
+                resolveTypeParameter(owner, typeParameter, parentTypeArguments, visitedTypes)
+        }
+        return typeArguments
+    }
 
-                val variableName = type.variableName
-                val genericTypeInfo = owningClass.getGenericTypeInfo()
-                val boundInfo = genericTypeInfo[parent.getBinaryName(visitorContext.resolver, visitorContext)]
-                if (boundInfo != null) {
-                    val ksType = boundInfo[variableName]
-                    if (ksType != null) {
-                        resolvedType = visitorContext.elementFactory.newClassElement(
-                            ksType,
-                            visitorContext.elementAnnotationMetadataFactory,
-                            true
-                        )
-                        if (type.isArray) {
-                            resolvedType = resolvedType.toArray()
-                        }
-                    }
-                }
-            } else if (type.declaredGenericPlaceholders.isNotEmpty() && type is KotlinClassElement) {
-                val genericTypeInfo = owningClass.getGenericTypeInfo()
-                val kotlinType = type.kotlinType
-                val boundInfo = if (parent.qualifiedName != null)  genericTypeInfo[parent.getBinaryName(visitorContext.resolver, visitorContext)] else null
-                resolvedType = if (boundInfo != null) {
-                    val boundArgs = kotlinType.arguments.map { arg ->
-                        resolveTypeArgument(arg, boundInfo, visitorContext)
-                    }.toMutableList()
-                    type.withBoundGenericTypes(boundArgs)
-                } else {
-                    type
-                }
+    protected fun resolveTypeParameter(
+        owner: KotlinNativeElement,
+        typeParameter: KSTypeParameter,
+        parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any> = HashSet()
+    ): ClassElement {
+        val variableName = typeParameter.name.asString()
+        val found = parentTypeArguments[variableName]
+        if (found is PrimitiveElement) {
+            return found
+        }
+        var bound = found as KotlinClassElement?
+        if (bound is WildcardElement && !bound.isBounded) {
+            bound = null
+        }
+        val parent = typeParameter.parent
+        val thisNode = annotatedInfo
+        val declaringElement = if (thisNode == parent) {
+            this
+        } else if (parent is KSClassDeclaration) {
+            newKotlinClassElement(parent, emptyMap(), visitedTypes, true)
+        } else {
+            null
+        }
+        val stripTypeArguments = !visitedTypes.add(typeParameter)
+        val bounds = typeParameter.bounds.map {
+            val argumentType = it.resolve()
+            newKotlinClassElement(
+                owner,
+                argumentType,
+                parentTypeArguments,
+                visitedTypes,
+                stripTypeArguments
+            )
+        }.ifEmpty {
+            mutableListOf(getJavaObjectClassElement()).asSequence()
+        }.toList()
+
+        return KotlinGenericPlaceholderElement(
+            KotlinTypeParameterNativeElement(typeParameter, owner),
+            bound,
+            bounds,
+            declaringElement,
+            elementAnnotationMetadataFactory,
+            visitorContext
+        )
+    }
+
+    private fun getJavaObjectClassElement() =
+        visitorContext.getClassElement(Object::class.java.name).get() as KotlinClassElement
+
+    protected fun resolveTypeArguments(
+        owner: KotlinNativeElement,
+        type: KSType,
+        parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any> = HashSet()
+    ): Map<String, ClassElement> {
+        val typeArguments = mutableMapOf<String, ClassElement>()
+        val typeParameters = type.declaration.typeParameters
+        if (type.arguments.isEmpty()) {
+            typeParameters.forEach {
+                typeArguments[it.name.asString()] =
+                    resolveTypeParameter(owner, it, parentTypeArguments, visitedTypes)
+            }
+        } else {
+            type.arguments.forEachIndexed { i, typeArgument ->
+                val variableName = typeParameters[i].name.asString()
+                typeArguments[variableName] =
+                    resolveTypeArgument(owner, typeArgument, parentTypeArguments, visitedTypes)
             }
         }
-        return resolvedType
+        return typeArguments
+    }
+
+    private fun resolveEmptyTypeArguments(declaration: KSClassDeclaration): Map<String, ClassElement> {
+        val objectElement = getJavaObjectClassElement()
+        val typeArguments = mutableMapOf<String, ClassElement>()
+        val typeParameters = declaration.typeParameters
+        typeParameters.forEach {
+            typeArguments[it.name.asString()] = objectElement
+        }
+        return typeArguments
     }
 
     private fun resolveTypeArgument(
-        arg: KSTypeArgument,
-        boundInfo: Map<String, KSType>,
-        visitorContext: KotlinVisitorContext
+        owner: KotlinNativeElement,
+        typeArgument: KSTypeArgument,
+        parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any>
     ): ClassElement {
-        val n = arg.type?.toString()
-        val resolved = boundInfo[n]
-        return if (resolved != null) {
-            visitorContext.elementFactory.newClassElement(
-                resolved,
-                annotationMetadataFactory,
-                false
+
+        return when (typeArgument.variance) {
+            Variance.STAR, Variance.COVARIANT, Variance.CONTRAVARIANT -> {
+                // example List<*>, IN, OUT
+                val type = typeArgument.type!!
+                val stripTypeArguments = !visitedTypes.add(type)
+                val upperBounds =
+                    resolveUpperBounds(
+                        owner,
+                        typeArgument,
+                        parentTypeArguments,
+                        visitedTypes,
+                        stripTypeArguments
+                    )
+                val lowerBounds = resolveLowerBounds(
+                    owner,
+                    typeArgument,
+                    parentTypeArguments,
+                    visitedTypes,
+                    stripTypeArguments
+                )
+                val upper = WildcardElement.findUpperType(upperBounds, lowerBounds)!!
+                KotlinWildcardElement(
+                    KotlinTypeArgumentNativeElement(typeArgument, owner),
+                    upper,
+                    upperBounds,
+                    lowerBounds,
+                    elementAnnotationMetadataFactory,
+                    visitorContext,
+                    typeArgument.variance == Variance.STAR
+                )
+            }
+
+            // List<String>
+            else -> {
+                resolveTypeArgumentType(owner, typeArgument, parentTypeArguments, visitedTypes)
+            }
+        }
+    }
+
+    private fun resolveLowerBounds(
+        owner: KotlinNativeElement,
+        typeArgument: KSTypeArgument,
+        parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any>,
+        stripTypeArguments: Boolean,
+    ): List<KotlinClassElement?> {
+        return if (typeArgument.variance == Variance.CONTRAVARIANT) {
+            listOf(
+                resolveTypeArgumentType(
+                    owner,
+                    typeArgument,
+                    parentTypeArguments,
+                    visitedTypes,
+                    stripTypeArguments
+                ) as KotlinClassElement
             )
         } else {
-            if (arg.type != null) {
-                val t = arg.type!!.resolve()
-                if (t.arguments.isNotEmpty()) {
-                    visitorContext.elementFactory.newClassElement(
-                        t,
-                        annotationMetadataFactory,
-                        false
-                    ).withBoundGenericTypes(
-                        t.arguments.map {
-                            resolveTypeArgument(it, boundInfo, visitorContext)
-                        }
-                    )
-                } else {
-                    visitorContext.elementFactory.newClassElement(
-                        t,
-                        annotationMetadataFactory,
-                        false
-                    )
-                }
-            } else {
-                visitorContext.getClassElement(Object::class.java.name).get()
+            return emptyList()
+        }
+    }
+
+    private fun resolveUpperBounds(
+        owner: KotlinNativeElement,
+        typeArgument: KSTypeArgument,
+        parentTypeArguments: Map<String, ClassElement> = emptyMap(),
+        visitedTypes: MutableSet<Any>,
+        stripTypeArguments: Boolean
+    ): List<KotlinClassElement?> {
+        return when (typeArgument.variance) {
+            Variance.COVARIANT, Variance.STAR -> {
+                listOf(
+                    resolveTypeArgumentType(
+                        owner,
+                        typeArgument,
+                        parentTypeArguments,
+                        visitedTypes,
+                        stripTypeArguments
+                    ) as KotlinClassElement
+                )
             }
+
+            else -> {
+                val objectType =
+                    visitorContext.resolver.getClassDeclarationByName(Object::class.java.name)!!
+                listOf(
+                    newKotlinClassElement(objectType, parentTypeArguments, visitedTypes)
+                )
+            }
+        }
+    }
+
+    protected fun newKotlinClassElement(
+        declaration: KSClassDeclaration,
+        parentTypeArguments: Map<String, ClassElement> = emptyMap(),
+        visitedTypes: MutableSet<Any> = HashSet(),
+        stripTypeArguments: Boolean = false,
+    ) = newClassElement(
+        null,
+        null,
+        declaration,
+        parentTypeArguments,
+        visitedTypes,
+        false,
+        stripTypeArguments
+    ) as KotlinClassElement
+
+    protected fun newClassElement(
+        declaration: KSClassDeclaration,
+        parentTypeArguments: Map<String, ClassElement> = emptyMap(),
+        visitedTypes: MutableSet<Any> = HashSet(),
+        stripTypeArguments: Boolean = false,
+    ) = newClassElement(
+        null,
+        null,
+        declaration,
+        parentTypeArguments,
+        visitedTypes,
+        true,
+        stripTypeArguments
+    )
+
+    private fun newKotlinClassElement(
+        owner: KotlinNativeElement?,
+        type: KSType,
+        parentTypeArguments: Map<String, ClassElement> = emptyMap(),
+        visitedTypes: MutableSet<Any> = HashSet(),
+        stripTypeArguments: Boolean = false,
+    ) = newClassElement(
+        owner,
+        type,
+        type.declaration.getClassDeclaration(visitorContext),
+        parentTypeArguments,
+        visitedTypes,
+        false,
+        stripTypeArguments
+    ) as KotlinClassElement
+
+    private fun resolveTypeArgumentType(
+        owner: KotlinNativeElement,
+        typeArgument: KSTypeArgument,
+        parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any> = HashSet(),
+        stripTypeArguments: Boolean = false
+    ): ClassElement {
+        val type = typeArgument.type
+        val resolvedType = type!!.resolve()
+        val stripTypeArguments2 = stripTypeArguments || !visitedTypes.add(type)
+
+        val resolved = newTypeArgument(
+            owner,
+            resolvedType,
+            parentTypeArguments,
+            visitedTypes,
+            stripTypeArguments2
+        )
+        if (resolved !is KotlinClassElement || resolved.isGenericPlaceholder) {
+            return resolved
+        }
+
+        return KotlinTypeArgumentElement(
+            KotlinTypeArgumentNativeElement(typeArgument, owner),
+            resolved,
+            visitorContext
+        )
+    }
+
+    protected fun newClassElement(
+        owner: KotlinNativeElement?,
+        type: KSType,
+        parentTypeArguments: Map<String, ClassElement> = emptyMap()
+    ) = newClassElement(
+        owner,
+        type,
+        type.declaration.getClassDeclaration(visitorContext),
+        parentTypeArguments,
+        HashSet()
+    )
+
+    private fun newTypeArgument(
+        owner: KotlinNativeElement?,
+        type: KSType,
+        parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any> = HashSet(),
+        stripTypeArguments: Boolean = false,
+    ) = newClassElement(
+        owner,
+        type,
+        type.declaration.getClassDeclaration(visitorContext),
+        parentTypeArguments,
+        visitedTypes,
+        false,
+        stripTypeArguments
+    )
+
+    private fun newClassElement(
+        owner: KotlinNativeElement?,
+        type: KSType?,
+        declaration: KSClassDeclaration,
+        parentTypeArguments: Map<String, ClassElement>,
+        visitedTypes: MutableSet<Any>,
+        allowPrimitive: Boolean = true,
+        stripTypeArguments: Boolean = false
+    ): ClassElement {
+        if (type != null) {
+            val typeDeclaration = type.declaration
+            if (typeDeclaration is KSTypeParameter) {
+                return resolveTypeParameter(
+                    owner!!,
+                    typeDeclaration,
+                    parentTypeArguments,
+                    visitedTypes
+                )
+            }
+        }
+        val qualifiedName = declaration.qualifiedName!!.asString()
+        val primitiveArray = primitiveArrays[qualifiedName]
+        if (primitiveArray != null) {
+            return primitiveArray
+        }
+        val canBePrimitive =
+            type == null || type.annotations.toList().isEmpty() && !type.isMarkedNullable
+        if (allowPrimitive && canBePrimitive) {
+            val element = primitives[qualifiedName]
+            if (element != null) {
+                return element
+            }
+        }
+        if (type != null && qualifiedName == "kotlin.Array") {
+            val component = type.arguments[0].type!!.resolve()
+            return newTypeArgument(
+                owner,
+                component,
+                parentTypeArguments,
+                visitedTypes,
+                false
+            ).toArray()
+        }
+        val typeArguments = if (stripTypeArguments) {
+            resolveEmptyTypeArguments(declaration)
+        } else if (type == null) {
+            resolveTypeArguments(
+                nativeType,
+                declaration,
+                parentTypeArguments,
+                visitedTypes
+            )
+        } else {
+            resolveTypeArguments(
+                nativeType,
+                type,
+                parentTypeArguments,
+                visitedTypes
+            )
+        }
+        return if (declaration.classKind == ClassKind.ENUM_CLASS) {
+            KotlinEnumElement(
+                KotlinClassNativeElement(declaration, type, owner),
+                elementAnnotationMetadataFactory,
+                visitorContext,
+                typeArguments
+            )
+        } else {
+            KotlinClassElement(
+                KotlinClassNativeElement(declaration, type, owner),
+                elementAnnotationMetadataFactory,
+                typeArguments,
+                visitorContext
+            )
         }
     }
 
@@ -311,18 +547,42 @@ abstract class AbstractKotlinElement<T : KSNode>(val declaration: T,
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-
-        other as AbstractKotlinElement<*>
-
-        if (nativeType != other.nativeType) return false
-
+        if (other !is AbstractKotlinElement<*>) return false
+        if (isAnyOrObject() && other.isAnyOrObject()) return true
+        if (nativeType.element != other.nativeType.element) return false
         return true
     }
 
-    override fun hashCode(): Int {
-        return nativeType.hashCode()
+    private fun isAnyOrObject(): Boolean {
+        return name.equals(Object::class.java.name) || name.equals(Any::class.java.name)
     }
 
+    override fun hashCode(): Int {
+        return nativeType.element.hashCode()
+    }
+
+    companion object {
+        val primitives = mapOf(
+            "kotlin.Boolean" to PrimitiveElement.BOOLEAN,
+            "kotlin.Char" to PrimitiveElement.CHAR,
+            "kotlin.Short" to PrimitiveElement.SHORT,
+            "kotlin.Int" to PrimitiveElement.INT,
+            "kotlin.Long" to PrimitiveElement.LONG,
+            "kotlin.Float" to PrimitiveElement.FLOAT,
+            "kotlin.Double" to PrimitiveElement.DOUBLE,
+            "kotlin.Byte" to PrimitiveElement.BYTE,
+            "kotlin.Unit" to PrimitiveElement.VOID
+        )
+        val primitiveArrays = mapOf(
+            "kotlin.BooleanArray" to PrimitiveElement.BOOLEAN.toArray(),
+            "kotlin.CharArray" to PrimitiveElement.CHAR.toArray(),
+            "kotlin.ShortArray" to PrimitiveElement.SHORT.toArray(),
+            "kotlin.IntArray" to PrimitiveElement.INT.toArray(),
+            "kotlin.LongArray" to PrimitiveElement.LONG.toArray(),
+            "kotlin.FloatArray" to PrimitiveElement.FLOAT.toArray(),
+            "kotlin.DoubleArray" to PrimitiveElement.DOUBLE.toArray(),
+            "kotlin.ByteArray" to PrimitiveElement.BYTE.toArray(),
+        )
+    }
 
 }

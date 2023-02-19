@@ -754,38 +754,38 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         }
 
         @Override
-        protected Element toAstElement(AnnotatedNode enclosedElement, Class<?> elementType) {
+        protected Element toAstElement(AnnotatedNode nativeType, Class<?> elementType) {
             final GroovyElementFactory elementFactory = visitorContext.getElementFactory();
             if (isSource) {
-                if (!(enclosedElement instanceof ConstructorNode) && enclosedElement instanceof MethodNode methodNode) {
+                if (!(nativeType instanceof ConstructorNode) && nativeType instanceof MethodNode methodNode) {
                     return elementFactory.newSourceMethodElement(
                             GroovyClassElement.this,
                             methodNode,
                             elementAnnotationMetadataFactory
                     );
                 }
-                if (enclosedElement instanceof ClassNode cn) {
+                if (nativeType instanceof ClassNode cn) {
                     return elementFactory.newSourceClassElement(
                             cn,
                             elementAnnotationMetadataFactory
                     );
                 }
             }
-            if (enclosedElement instanceof ConstructorNode constructorNode) {
+            if (nativeType instanceof ConstructorNode constructorNode) {
                 return elementFactory.newConstructorElement(
                         GroovyClassElement.this,
                         constructorNode,
                         elementAnnotationMetadataFactory
                 );
             }
-            if (enclosedElement instanceof MethodNode methodNode) {
+            if (nativeType instanceof MethodNode methodNode) {
                 return elementFactory.newMethodElement(
                         GroovyClassElement.this,
                         methodNode,
                         elementAnnotationMetadataFactory
                 );
             }
-            if (enclosedElement instanceof FieldNode fieldNode) {
+            if (nativeType instanceof FieldNode fieldNode) {
                 if (fieldNode.isEnum()) {
                     return elementFactory.newEnumConstantElement(
                             GroovyClassElement.this,
@@ -799,13 +799,13 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                         elementAnnotationMetadataFactory
                 );
             }
-            if (enclosedElement instanceof ClassNode cn) {
+            if (nativeType instanceof ClassNode cn) {
                 return elementFactory.newClassElement(
                         cn,
                         elementAnnotationMetadataFactory
                 );
             }
-            throw new IllegalStateException("Unknown element: " + enclosedElement);
+            throw new IllegalStateException("Unknown element: " + nativeType);
         }
     }
 

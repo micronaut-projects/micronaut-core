@@ -31,6 +31,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.annotation.AbstractAnnotationElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.beans.BeanElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
@@ -494,7 +495,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
             originatingElement,
             type,
             ConfigurationMetadataBuilder.INSTANCE,
-            type instanceof AbstractJavaElement ? ((AbstractJavaElement) type).elementAnnotationMetadataFactory : elementAnnotationMetadataFactory,
+            type instanceof AbstractAnnotationElement ? ((AbstractAnnotationElement) type).getElementAnnotationMetadataFactory() : elementAnnotationMetadataFactory,
             this
         );
     }

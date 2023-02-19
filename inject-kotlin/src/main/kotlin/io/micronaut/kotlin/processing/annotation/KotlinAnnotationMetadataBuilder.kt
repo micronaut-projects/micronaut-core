@@ -40,7 +40,7 @@ import java.lang.annotation.RetentionPolicy
 import java.lang.reflect.Method
 import java.util.*
 
-class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: SymbolProcessorEnvironment,
+internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: SymbolProcessorEnvironment,
                                       private val resolver: Resolver,
                                       private val visitorContext: KotlinVisitorContext): AbstractAnnotationMetadataBuilder<KSAnnotated, KSAnnotation>() {
 
@@ -104,46 +104,45 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
     override fun getAnnotationsForType(element: KSAnnotated): MutableList<out KSAnnotation> {
         val annotationMirrors : MutableList<KSAnnotation> = mutableListOf()
 
-        if (element is KSValueParameter) {
-            // fuse annotations for setter and property
-            val parent = element.parent
-            if (parent is KSPropertySetter) {
-                val property = parent.parent
+        when (element) {
+            is KSValueParameter -> {
+                // fuse annotations for setter and property
+                val parent = element.parent
+                if (parent is KSPropertySetter) {
+                    val property = parent.parent
+                    if (property is KSPropertyDeclaration) {
+                        annotationMirrors.addAll(property.annotations)
+                    }
+                    annotationMirrors.addAll(parent.annotations)
+                }
+                annotationMirrors.addAll(element.annotations)
+            }
+
+            is KSPropertyGetter, is KSPropertySetter -> {
+                val property = element.parent
                 if (property is KSPropertyDeclaration) {
                     annotationMirrors.addAll(property.annotations)
                 }
-                annotationMirrors.addAll(parent.annotations)
-            }
-            annotationMirrors.addAll(element.annotations)
-        } else if (element is KSPropertyGetter || element is KSPropertySetter) {
-            val property = element.parent
-            if (property is KSPropertyDeclaration) {
-                annotationMirrors.addAll(property.annotations)
-            }
-            annotationMirrors.addAll(element.annotations)
-        } else if (element is KSPropertyDeclaration) {
-            val parent : KSClassDeclaration? = findClassDeclaration(element)
-            if (parent is KSClassDeclaration) {
-                if (parent.classKind == ClassKind.ANNOTATION_CLASS) {
-                    annotationMirrors.addAll(element.annotations)
-                    val getter = element.getter
-                    if (getter != null) {
-                        annotationMirrors.addAll(getter.annotations)
-                    }
-                } else if (parent.modifiers.contains(Modifier.DATA)) {
-                    val parameter = parent.primaryConstructor?.parameters?.find { it.name == element.simpleName }
-                    if (parameter != null) {
-                        annotationMirrors.addAll(parameter.annotations)
-                    }
-                    annotationMirrors.addAll(element.annotations)
-                } else {
-                    annotationMirrors.addAll(element.annotations)
-                }
-            } else {
                 annotationMirrors.addAll(element.annotations)
             }
-        } else {
-            annotationMirrors.addAll(element.annotations)
+
+            is KSPropertyDeclaration -> {
+                val parent : KSClassDeclaration? = findClassDeclaration(element)
+                if (parent is KSClassDeclaration) {
+                    if (parent.classKind == ClassKind.ANNOTATION_CLASS) {
+                        annotationMirrors.addAll(element.annotations)
+                        val getter = element.getter
+                        if (getter != null) {
+                            annotationMirrors.addAll(getter.annotations)
+                        }
+                    }
+                }
+                annotationMirrors.addAll(element.annotations)
+            }
+
+            else -> {
+                annotationMirrors.addAll(element.annotations)
+            }
         }
         val expanded : MutableList<KSAnnotation> = mutableListOf()
         for (ann in annotationMirrors) {
@@ -216,31 +215,63 @@ class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: Sy
         if (declaredOnly) {
             return mutableListOf(element)
         }
-        if (element is KSClassDeclaration) {
-            val hierarchy = mutableListOf<KSAnnotated>()
-            hierarchy.add(element)
-            if (element.classKind == ClassKind.ANNOTATION_CLASS) {
+        when (element) {
+
+            is KSValueParameter -> {
+                val parent = element.parent
+                return if (parent is KSFunctionDeclaration) {
+                    if (parent.isConstructor()) {
+                        mutableListOf(element)
+                    } else {
+                        val parameters = parent.parameters
+                        val parameterIndex =
+                            parameters.indexOf(parameters.find { it.name == element.name })
+                        methodsHierarchy(parent)
+                            .map { if (it == parent) element else it.parameters[parameterIndex] }
+                            .toMutableList()
+                    }
+                } else { // Setter
+                    mutableListOf(element)
+                }
+            }
+
+            is KSClassDeclaration -> {
+                val hierarchy = mutableListOf<KSAnnotated>()
+                hierarchy.add(element)
+                if (element.classKind == ClassKind.ANNOTATION_CLASS) {
+                    return hierarchy
+                }
+                populateTypeHierarchy(element, hierarchy)
+                hierarchy.reverse()
                 return hierarchy
             }
-            populateTypeHierarchy(element, hierarchy)
-            hierarchy.reverse()
-            return hierarchy
-        } else if (element is KSFunctionDeclaration) {
-            return if (element.isConstructor()) {
-                mutableListOf(element)
-            } else {
-                val hierarchy = mutableListOf<KSAnnotated>(element)
-                var overidden = element.findOverridee()
-                while (overidden != null) {
-                    hierarchy.add(overidden)
-                    overidden = (overidden as KSFunctionDeclaration).findOverridee()
-                }
-                hierarchy
+
+            is KSFunctionDeclaration -> {
+                val methodsHierarchy = methodsHierarchy(element)
+                val hierarchy = mutableListOf<KSAnnotated>()
+                hierarchy.addAll(methodsHierarchy)
+                return hierarchy
             }
-        } else {
-            return mutableListOf(element)
+
+            else -> {
+                return mutableListOf(element)
+            }
         }
     }
+
+    private fun methodsHierarchy(element: KSFunctionDeclaration): List<KSFunctionDeclaration> =
+        if (element.isConstructor()) {
+            listOf(element)
+        } else {
+            val hierarchy = mutableListOf(element)
+            var overriden = element.findOverridee() as KSFunctionDeclaration?
+            while (overriden != null) {
+                hierarchy.add(overriden)
+                overriden = overriden.findOverridee() as KSFunctionDeclaration?
+            }
+            hierarchy.reverse()
+            hierarchy
+        }
 
     override fun readAnnotationRawValues(
         originatingElement: KSAnnotated,

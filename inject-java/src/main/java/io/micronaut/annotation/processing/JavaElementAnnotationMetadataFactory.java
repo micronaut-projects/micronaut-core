@@ -88,7 +88,7 @@ public final class JavaElementAnnotationMetadataFactory extends AbstractElementA
         if (typeMirror == null) {
             return super.lookupTypeAnnotationsForClass(classElement);
         }
-        return metadataBuilder.lookupOrBuild(clazz, new AnnotationsElement(typeMirror), true);
+        return metadataBuilder.lookupOrBuild(clazz, new AnnotationsElement(typeMirror));
     }
 
     @Override
@@ -107,7 +107,7 @@ public final class JavaElementAnnotationMetadataFactory extends AbstractElementA
     @Override
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupTypeAnnotationsForWildcard(WildcardElement wildcardElement) {
         WildcardType wildcard = (WildcardType) wildcardElement.getGenericNativeType();
-        return metadataBuilder.lookupOrBuild(wildcard, new AnnotationsElement(wildcard), true);
+        return metadataBuilder.lookupOrBuild(wildcard, new AnnotationsElement(wildcard));
     }
 
 }

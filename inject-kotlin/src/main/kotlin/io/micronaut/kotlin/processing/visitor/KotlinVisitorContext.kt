@@ -17,7 +17,6 @@ package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.getClassDeclarationByName
-import com.google.devtools.ksp.getJavaClassByName
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSClassDeclaration
@@ -32,8 +31,8 @@ import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.GeneratedFile
-import io.micronaut.kotlin.processing.annotation.KotlinAnnotationMetadataBuilder
 import io.micronaut.kotlin.processing.KotlinOutputVisitor
+import io.micronaut.kotlin.processing.annotation.KotlinAnnotationMetadataBuilder
 import io.micronaut.kotlin.processing.annotation.KotlinElementAnnotationMetadataFactory
 import java.io.*
 import java.net.URI
@@ -42,8 +41,10 @@ import java.util.*
 import java.util.function.BiConsumer
 
 @OptIn(KspExperimental::class)
-open class KotlinVisitorContext(private val environment: SymbolProcessorEnvironment,
-                                val resolver: Resolver) : VisitorContext {
+internal open class KotlinVisitorContext(
+    private val environment: SymbolProcessorEnvironment,
+    val resolver: Resolver
+) : VisitorContext {
 
     private val visitorAttributes: MutableConvertibleValues<Any>
     private val elementFactory: KotlinElementFactory
@@ -55,10 +56,14 @@ open class KotlinVisitorContext(private val environment: SymbolProcessorEnvironm
         visitorAttributes = MutableConvertibleValuesMap()
         annotationMetadataBuilder = KotlinAnnotationMetadataBuilder(environment, resolver, this)
         elementFactory = KotlinElementFactory(this)
-        elementAnnotationMetadataFactory = KotlinElementAnnotationMetadataFactory(false, annotationMetadataBuilder)
+        elementAnnotationMetadataFactory =
+            KotlinElementAnnotationMetadataFactory(false, annotationMetadataBuilder)
     }
 
-    override fun <T : Any?> get(name: CharSequence?, conversionContext: ArgumentConversionContext<T>?): Optional<T> {
+    override fun <T : Any?> get(
+        name: CharSequence?,
+        conversionContext: ArgumentConversionContext<T>?
+    ): Optional<T> {
         return visitorAttributes.get(name, conversionContext)
     }
 
@@ -90,21 +95,29 @@ open class KotlinVisitorContext(private val environment: SymbolProcessorEnvironm
         if (declaration == null) {
             declaration = resolver.getClassDeclarationByName(name.replace('$', '.'))
         }
-        return Optional.ofNullable(declaration?.asStarProjectedType())
+        return Optional.ofNullable(declaration)
             .map(elementFactory::newClassElement)
     }
 
     @OptIn(KspExperimental::class)
-    override fun getClassElements(aPackage: String, vararg stereotypes: String): Array<ClassElement> {
+    override fun getClassElements(
+        aPackage: String,
+        vararg stereotypes: String
+    ): Array<ClassElement> {
         return resolver.getDeclarationsFromPackage(aPackage)
             .filterIsInstance<KSClassDeclaration>()
             .filter { declaration ->
                 declaration.annotations.any { ann ->
-                    stereotypes.contains(KotlinAnnotationMetadataBuilder.getAnnotationTypeName(ann, this))
+                    stereotypes.contains(
+                        KotlinAnnotationMetadataBuilder.getAnnotationTypeName(
+                            ann,
+                            this
+                        )
+                    )
                 }
             }
             .map { declaration ->
-                elementFactory.newClassElement(declaration.asStarProjectedType())
+                elementFactory.newClassElement(declaration)
             }
             .toList()
             .toTypedArray()
@@ -122,11 +135,18 @@ open class KotlinVisitorContext(private val environment: SymbolProcessorEnvironm
         outputVisitor.visitServiceDescriptor(type, classname)
     }
 
-    override fun visitServiceDescriptor(type: String, classname: String, originatingElement: Element) {
+    override fun visitServiceDescriptor(
+        type: String,
+        classname: String,
+        originatingElement: Element
+    ) {
         outputVisitor.visitServiceDescriptor(type, classname, originatingElement)
     }
 
-    override fun visitMetaInfFile(path: String, vararg originatingElements: Element): Optional<GeneratedFile> {
+    override fun visitMetaInfFile(
+        path: String,
+        vararg originatingElements: Element
+    ): Optional<GeneratedFile> {
         return outputVisitor.visitMetaInfFile(path, *originatingElements)
     }
 
@@ -146,7 +166,7 @@ open class KotlinVisitorContext(private val environment: SymbolProcessorEnvironm
         if (declaration == null) {
             declaration = resolver.getClassDeclarationByName(name.replace('$', '.'))
         }
-        return Optional.ofNullable(declaration?.asStarProjectedType())
+        return Optional.ofNullable(declaration)
             .map { elementFactory.newClassElement(it, annotationMetadataFactory) }
     }
 
@@ -187,23 +207,33 @@ open class KotlinVisitorContext(private val environment: SymbolProcessorEnvironm
         printMessage(message, environment.logger::warn, element)
     }
 
-    private fun printMessage(message: String, logger: BiConsumer<String, KSNode?>, element: Element?) {
+    private fun printMessage(
+        message: String,
+        logger: BiConsumer<String, KSNode?>,
+        element: Element?
+    ) {
         if (element is AbstractKotlinElement<*>) {
-            val el = element.nativeType
+            val el = element.nativeType.element
             printMessage(message, logger, el)
         } else {
             printMessage(message, logger, null as KSNode?)
         }
     }
 
-    private fun printMessage(message: String, logger: BiConsumer<String, KSNode?>, element: KSNode?) {
+    private fun printMessage(
+        message: String,
+        logger: BiConsumer<String, KSNode?>,
+        element: KSNode?
+    ) {
         if (StringUtils.isNotEmpty(message)) {
             logger.accept(message, element)
         }
     }
 
-    class KspGeneratedFile(private val outputStream: OutputStream,
-                           private val path: String) : GeneratedFile {
+    class KspGeneratedFile(
+        private val outputStream: OutputStream,
+        private val path: String
+    ) : GeneratedFile {
 
         private val file = File(path)
 

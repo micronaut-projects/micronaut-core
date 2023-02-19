@@ -15,133 +15,57 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
-import com.google.devtools.ksp.symbol.*
+import com.google.devtools.ksp.symbol.ClassKind
+import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import io.micronaut.core.annotation.AnnotationUtil
-import io.micronaut.inject.ast.*
+import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ConstructorElement
+import io.micronaut.inject.ast.ElementFactory
+import io.micronaut.inject.ast.EnumConstantElement
+import io.micronaut.inject.ast.FieldElement
+import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 
-class KotlinElementFactory(
-    private val visitorContext: KotlinVisitorContext): ElementFactory<Any, KSType, KSFunctionDeclaration, KSPropertyDeclaration> {
-
-    companion object {
-        val primitives = mapOf(
-            "kotlin.Boolean" to PrimitiveElement.BOOLEAN,
-            "kotlin.Char" to PrimitiveElement.CHAR,
-            "kotlin.Short" to PrimitiveElement.SHORT,
-            "kotlin.Int" to PrimitiveElement.INT,
-            "kotlin.Long" to PrimitiveElement.LONG,
-            "kotlin.Float" to PrimitiveElement.FLOAT,
-            "kotlin.Double" to PrimitiveElement.DOUBLE,
-            "kotlin.Byte" to PrimitiveElement.BYTE,
-            "kotlin.Unit" to PrimitiveElement.VOID
-        )
-        val primitiveArrays = mapOf(
-            "kotlin.BooleanArray" to PrimitiveElement.BOOLEAN.toArray(),
-            "kotlin.CharArray" to PrimitiveElement.CHAR.toArray(),
-            "kotlin.ShortArray" to PrimitiveElement.SHORT.toArray(),
-            "kotlin.IntArray" to PrimitiveElement.INT.toArray(),
-            "kotlin.LongArray" to PrimitiveElement.LONG.toArray(),
-            "kotlin.FloatArray" to PrimitiveElement.FLOAT.toArray(),
-            "kotlin.DoubleArray" to PrimitiveElement.DOUBLE.toArray(),
-            "kotlin.ByteArray" to PrimitiveElement.BYTE.toArray(),
-        )
-    }
+internal class KotlinElementFactory(
+    private val visitorContext: KotlinVisitorContext
+) : ElementFactory<Any, KSClassDeclaration, KSFunctionDeclaration, KSPropertyDeclaration> {
 
     fun newClassElement(
-        type: KSType
+        type: KSClassDeclaration
     ): ClassElement {
         return newClassElement(type, visitorContext.elementAnnotationMetadataFactory)
     }
 
     override fun newClassElement(
-        type: KSType,
+        declaration: KSClassDeclaration,
         annotationMetadataFactory: ElementAnnotationMetadataFactory
     ): ClassElement {
-        return newClassElement(
-            type,
-            annotationMetadataFactory,
-            true
-        )
-    }
-
-    override fun newClassElement(
-        type: KSType,
-        annotationMetadataFactory: ElementAnnotationMetadataFactory,
-        resolvedGenerics: Map<String, ClassElement>
-    ): ClassElement {
-        return newClassElement(
-            type,
-            annotationMetadataFactory,
-            true
-        )
-    }
-
-    fun newClassElement(annotated: KSAnnotated,
-                        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-                        allowPrimitive: Boolean): ClassElement {
-        val type = KotlinClassElement.getType(annotated, visitorContext)
-        val declaration = type.declaration
-        val qualifiedName = declaration.qualifiedName!!.asString()
-        val hasNoAnnotations = !annotated.annotations.iterator().hasNext()
-        var element = primitiveArrays[qualifiedName]
-        if (hasNoAnnotations && element != null) {
-            return element
-        }
-        if (qualifiedName == "kotlin.Array") {
-            val component = type.arguments[0].type!!.resolve()
-            val componentElement = newClassElement(component, elementAnnotationMetadataFactory, false)
-            return componentElement.toArray()
-        } else if (declaration is KSTypeParameter) {
-            return KotlinGenericPlaceholderElement(declaration, elementAnnotationMetadataFactory, visitorContext)
-        }
-        if (allowPrimitive && !type.isMarkedNullable) {
-            element = primitives[qualifiedName]
-            if (hasNoAnnotations && element != null ) {
-                return element
-            }
-        }
-        return if (declaration is KSClassDeclaration && declaration.classKind == ClassKind.ENUM_CLASS) {
-            KotlinEnumElement(type, elementAnnotationMetadataFactory, visitorContext)
+        return if (declaration.classKind == ClassKind.ENUM_CLASS) {
+            KotlinEnumElement(
+                KotlinClassNativeElement(declaration),
+                annotationMetadataFactory,
+                visitorContext,
+                null
+            )
         } else {
-            KotlinClassElement(annotated, elementAnnotationMetadataFactory, visitorContext)
-        }
-    }
-
-    fun newClassElement(type: KSType,
-                        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-                        allowPrimitive: Boolean): ClassElement {
-        val declaration = type.declaration
-        val qualifiedName = declaration.qualifiedName!!.asString()
-        val hasNoAnnotations = !type.annotations.iterator().hasNext()
-        var element = primitiveArrays[qualifiedName]
-        if (hasNoAnnotations && element != null) {
-            return element
-        }
-        if (qualifiedName == "kotlin.Array") {
-            val component = type.arguments[0].type!!.resolve()
-            val componentElement = newClassElement(component, elementAnnotationMetadataFactory, false)
-            return componentElement.toArray()
-        } else if (declaration is KSTypeParameter) {
-            return KotlinGenericPlaceholderElement(declaration, elementAnnotationMetadataFactory, visitorContext)
-        }
-        if (allowPrimitive && !type.isMarkedNullable) {
-            element = primitives[qualifiedName]
-            if (hasNoAnnotations && element != null ) {
-                return element
-            }
-        }
-        return if (declaration is KSClassDeclaration && declaration.classKind == ClassKind.ENUM_CLASS) {
-            KotlinEnumElement(type, elementAnnotationMetadataFactory, visitorContext)
-        } else {
-            KotlinClassElement(type, elementAnnotationMetadataFactory, visitorContext)
+            KotlinClassElement(
+                KotlinClassNativeElement(declaration),
+                annotationMetadataFactory,
+                null,
+                visitorContext,
+                0,
+                false
+            )
         }
     }
 
     override fun newSourceClassElement(
-        type: KSType,
+        declaration: KSClassDeclaration,
         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
     ): ClassElement {
-        return newClassElement(type, elementAnnotationMetadataFactory)
+        return newClassElement(declaration, elementAnnotationMetadataFactory)
     }
 
     override fun newSourceMethodElement(
@@ -155,52 +79,21 @@ class KotlinElementFactory(
     }
 
     override fun newMethodElement(
-        declaringClass: ClassElement,
+        owningClass: ClassElement,
         method: KSFunctionDeclaration,
         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
-    ): KotlinMethodElement {
-        val returnType = method.returnType!!.resolve()
-
-        val returnTypeElement = newClassElement(returnType, elementAnnotationMetadataFactory)
+    ): MethodElement {
 
         val kotlinMethodElement = KotlinMethodElement(
+            owningClass,
             method,
-            declaringClass,
-            returnTypeElement,
             elementAnnotationMetadataFactory,
             visitorContext
         )
-        if (returnType.isMarkedNullable && !kotlinMethodElement.returnType.isPrimitive) {
+        if (method.returnType!!.resolve().isMarkedNullable && !kotlinMethodElement.returnType.isPrimitive) {
             kotlinMethodElement.annotate(AnnotationUtil.NULLABLE)
         }
         return kotlinMethodElement
-    }
-
-    fun newMethodElement(
-        declaringClass: ClassElement,
-        propertyElement: KotlinPropertyElement,
-        method: KSPropertyGetter,
-        type: ClassElement,
-        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
-    ): MethodElement {
-        return KotlinMethodElement(propertyElement, method, declaringClass, type, elementAnnotationMetadataFactory, visitorContext)
-    }
-
-    fun newMethodElement(
-        declaringClass: ClassElement,
-        propertyElement: KotlinPropertyElement,
-        method: KSPropertySetter,
-        type: ClassElement,
-        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
-    ): MethodElement {
-        return KotlinMethodElement(
-            type,
-            propertyElement,
-            method,
-            declaringClass,
-            elementAnnotationMetadataFactory,
-            visitorContext
-        )
     }
 
     override fun newConstructorElement(
@@ -208,7 +101,12 @@ class KotlinElementFactory(
         constructor: KSFunctionDeclaration,
         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
     ): ConstructorElement {
-        return KotlinConstructorElement(constructor, owningClass, elementAnnotationMetadataFactory, visitorContext, owningClass)
+        return KotlinConstructorElement(
+            owningClass,
+            constructor,
+            elementAnnotationMetadataFactory,
+            visitorContext
+        )
     }
 
     override fun newFieldElement(
@@ -216,7 +114,12 @@ class KotlinElementFactory(
         field: KSPropertyDeclaration,
         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
     ): FieldElement {
-        return KotlinFieldElement(field, owningClass, elementAnnotationMetadataFactory, visitorContext)
+        return KotlinFieldElement(
+            owningClass,
+            field,
+            elementAnnotationMetadataFactory,
+            visitorContext
+        )
     }
 
     override fun newEnumConstantElement(
