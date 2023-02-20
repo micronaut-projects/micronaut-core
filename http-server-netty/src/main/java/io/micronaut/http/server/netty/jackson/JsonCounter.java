@@ -76,6 +76,25 @@ public final class JsonCounter {
      *                             errors are detected by this class.
      */
     public void feed(ByteBuf buf) throws JsonSyntaxException {
+        if (position < 4) {
+            // RFC 4627 allows JSON to be encoded as UTF-8, UTF-16 or UTF-32. It also specifies a
+            // charset detection algorithm using 0x00 bytes.
+            // Later standards (RFC 8259) only permit UTF-8, but Jackson still allows other
+            // charsets. To avoid potential parser differential vulnerabilities, we forbid any 0x00
+            // bytes in the input. They never appear in valid UTF-8 JSON.
+
+            // If the input is utf-16 or utf-32, one of the first four bytes will be 0. Checking
+            // this separately and only for four bytes allows us to avoid the work in the hot loops
+            // below.
+            int r = buf.readableBytes();
+            if ((r >= 1 && buf.getByte(0) == 0)
+                || (r >= 2 && buf.getByte(1) == 0)
+                || (r >= 3 && buf.getByte(2) == 0)
+                || (r >= 4 && buf.getByte(3) == 0)) {
+
+                throw new JsonSyntaxException("Input must be legal UTF-8 JSON");
+            }
+        }
         if (!isBuffering()) {
             proceedUntilBuffering(buf);
         }
@@ -127,11 +146,7 @@ public final class JsonCounter {
                     position++;
                 }
             } else if (state == State.STRING) {
-                for (; i < end; i++) {
-                    if (!skipString(buf.getByte(i))) {
-                        break;
-                    }
-                }
+                i = skipStringContent(buf, i, end);
                 this.position += i - start;
                 if (i < end) {
                     handleStringSpecial(buf.getByte(i));
@@ -185,11 +200,7 @@ public final class JsonCounter {
                     position++;
                 }
             } else if (state == State.STRING) {
-                for (; i < end; i++) {
-                    if (!skipString(array[i])) {
-                        break;
-                    }
-                }
+                i = skipStringContent(array, i, end);
                 this.position += i - start;
                 if (i < end) {
                     handleStringSpecial(array[i]);
@@ -216,6 +227,76 @@ public final class JsonCounter {
             }
         }
         return i;
+    }
+
+    private static int skipStringContent(byte[] array, int start, int end) {
+        int i = start;
+        while (true) {
+            // forward loop: find a "
+            for (; i < end; i++) {
+                if (array[i] == '"') {
+                    break;
+                }
+            }
+            // count any escape characters e.g. for the input abc\\\\".
+            // this is a bit involved to avoid O(n²) performance
+            boolean escaped = false;
+            for (int j = i - 1; j >= start; j--) {
+                if (array[j] == '\\') {
+                    escaped = !escaped;
+                } else {
+                    break;
+                }
+            }
+            if (!escaped) {
+                // found a closing quote! or hit the end.
+                return i;
+            } else {
+                if (i < end) {
+                    // ignore this quote, iterate further
+                    i++;
+                } else {
+                    // we hit the end of input, but there were also an odd number of escapes before
+                    // it. Handle one of them to update the counter state and such.
+                    return i - 1;
+                }
+            }
+        }
+    }
+
+    private static int skipStringContent(ByteBuf buf, int start, int end) {
+        int i = start;
+        while (true) {
+            // forward loop: find a "
+            for (; i < end; i++) {
+                if (buf.getByte(i) == '"') {
+                    break;
+                }
+            }
+            // count any escape characters e.g. for the input abc\\\\".
+            // this is a bit involved to avoid O(n²) performance
+            boolean escaped = false;
+            for (int j = i - 1; j >= start; j--) {
+                if (buf.getByte(j) == '\\') {
+                    escaped = !escaped;
+                } else {
+                    break;
+                }
+            }
+            if (!escaped) {
+                // found a closing quote! or hit the end.
+                return i;
+            } else {
+                if (i < end) {
+                    // ignore this quote, iterate further
+                    i++;
+                } else {
+                    // we hit the end of input, but there were also an odd number of escapes before
+                    // it. Handle one of them to update the counter state and such.
+                    return i - 1;
+                }
+            }
+        }
     }
 
     /**
@@ -287,7 +368,6 @@ public final class JsonCounter {
      */
     private void handleNonBufferingBase(byte b) throws JsonSyntaxException {
         switch (b) {
-            case 0 -> failNul();
             case '}' -> failMismatchedBrackets();
             case ']' -> {
                 if (unwrappingArray) {
@@ -325,7 +405,7 @@ public final class JsonCounter {
      * @return {@code true} if this character does not end the top-level scalar
      */
     private static boolean skipTopLevelScalar(byte b) {
-        return !ws(b) && b != '"' && b != '{' && b != '[' && b != ']' && b != '}' && b != ',' && b != 0;
+        return !ws(b) && b != '"' && b != '{' && b != '[' && b != ']' && b != '}' && b != ',';
     }
 
     /**
@@ -350,11 +430,7 @@ public final class JsonCounter {
             }
             allowUnwrappingArrayComma = false;
         } else {
-            if (b == 0) {
-                failNul();
-            } else {
-                failMissingWs();
-            }
+            failMissingWs();
         }
     }
 
@@ -362,9 +438,6 @@ public final class JsonCounter {
      * Handle a byte in the {@link State#ESCAPE} state.
      */
     private void handleEscape(byte b) throws JsonSyntaxException {
-        if (b == 0) {
-            failNul();
-        }
         state = State.STRING;
     }
 
@@ -372,7 +445,7 @@ public final class JsonCounter {
      * @return {@code true} if this character does not end the string
      */
     private static boolean skipString(byte b) {
-        return b != '"' && b != '\\' && b != 0;
+        return b != '"' && b != '\\';
     }
 
     /**
@@ -380,7 +453,6 @@ public final class JsonCounter {
      */
     private void handleStringSpecial(byte b) throws JsonSyntaxException {
         switch (b) {
-            case 0 -> failNul();
             case '"' -> {
                 state = State.BASE;
                 if (depth == 0) {
@@ -397,7 +469,7 @@ public final class JsonCounter {
      * and while not buffering
      */
     private static boolean skipBufferingBase(byte b) {
-        return (b != '"') & (b != '{') & (b != '[') & (b != ']') & (b != '}') & (b != 0);
+        return (b != '"') & (b != '{') & (b != '[') & (b != ']') & (b != '}');
     }
 
     /**
@@ -406,7 +478,6 @@ public final class JsonCounter {
      */
     private void handleBufferingBaseSpecial(byte b) throws JsonSyntaxException {
         switch (b) {
-            case 0 -> failNul();
             case '}', ']' -> {
                 depth--;
                 if (depth == 0) {
@@ -482,23 +553,14 @@ public final class JsonCounter {
         return bufferStart;
     }
 
-    private static void failNul() throws JsonSyntaxException {
-        // RFC 4627 allows JSON to be encoded as UTF-8, UTF-16 or UTF-32. It also specifies a
-        // charset detection algorithm using 0x00 bytes.
-        // Later standards (RFC 8259) only permit UTF-8, but Jackson still allows other
-        // charsets. To avoid potential parser differential vulnerabilities, we forbid any 0x00
-        // bytes in the input. They never appear in valid UTF-8 JSON.
-        throw new JsonSyntaxException("Input must be legal UTF-8 JSON");
-    }
-
     private static void failMismatchedBrackets() throws JsonSyntaxException {
         throw new JsonSyntaxException("JSON has mismatched brackets");
     }
 
-    private static void failMissingWs() {
+    private static void failMissingWs() throws JsonSyntaxException {
         // we *could* support this, but jackson doesn't, and this makes the
         // implementation a little easier (we can do with returning a boolean)
-        throw new IllegalArgumentException("After top-level scalars, there must be whitespace before the next node");
+        throw new JsonSyntaxException("After top-level scalars, there must be whitespace before the next node");
     }
 
     private static boolean ws(byte b) {

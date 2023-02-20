@@ -31,6 +31,10 @@ dependencies {
     compileOnly libs.kotlin.stdlib
     compileOnly libs.managed.netty.transport.native.unix.common
 
+    testImplementation 'org.openjdk.jmh:jmh-core:1.36'
+    testAnnotationProcessor 'org.openjdk.jmh:jmh-generator-annprocess:1.36'
+
+
     testCompileOnly project(":inject-groovy")
     testCompileOnly(libs.jetbrains.annotations)
     testAnnotationProcessor project(":inject-java")
