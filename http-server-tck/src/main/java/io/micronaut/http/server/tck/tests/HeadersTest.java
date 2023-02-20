@@ -30,6 +30,11 @@ import java.io.IOException;
 
 import static io.micronaut.http.server.tck.TestScenario.asserts;
 
+@SuppressWarnings({
+    "java:S5960", // We're allowed assertions, as these are used in tests only
+    "checkstyle:MissingJavadocType",
+    "checkstyle:DesignForExtension"
+})
 public class HeadersTest {
     public static final String SPEC_NAME = "HeadersTest";
 
