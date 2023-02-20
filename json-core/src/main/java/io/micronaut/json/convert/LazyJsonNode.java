@@ -57,7 +57,7 @@ public final class LazyJsonNode implements ReferenceCounted {
      * @return The parsed value
      * @throws IOException A {@link JsonSyntaxException} or framework data binding exception
      */
-    <T> T parse(JsonMapper mapper, Argument<T> type) throws IOException {
+    public <T> T parse(JsonMapper mapper, Argument<T> type) throws IOException {
         lock.lock();
         try {
             if (asNode == null) {
