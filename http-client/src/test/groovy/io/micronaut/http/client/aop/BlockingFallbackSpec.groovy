@@ -68,6 +68,7 @@ class BlockingFallbackSpec extends Specification {
     }
 
     @Client('/blocking/fallback/books')
+    @Recoverable
     static interface BookClient extends BookApi {
         @Override
         @Recoverable(api = BookApi)

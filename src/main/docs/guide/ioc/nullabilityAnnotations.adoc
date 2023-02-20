@@ -1,0 +1,21 @@
+In Java, you can use annotations showing whether a variable can or cannot be null. Such annotations aren't part of the standard library, but you can add them separately.
+
+Micronaut framework comes with its own set of annotations to declare nullability; ann:core.annotation.Nullable[] and ann:core.annotation.NonNull[].
+
+**Why does the Micronaut framework add its own set of nullability annotations instead of using one of the existing nullability annotations libraries?**
+
+Throughout the history of the framework, we used other nullability annotation libraries. However, licensing issues made us change nullability annotations several times. To avoid having to change nullability annotations in the future,  we added our own set of nullability annotations in Micronaut Framework 2.4
+
+**Are Micronaut Nullability annotations recognized by Kotlin?**
+
+Yes, Micronaut nullability annotations are mapped at compilation time to `javax.annotation.Nullable` and `javax.annotation.Nonnull`.
+
+**Why should you use nullability annotations in your code?**
+
+It makes your code easier to consume from Kotlin. https://kotlinlang.org/docs/java-interop.html#nullability-annotations[Kotlin recognizes nullability annotations when you're calling Java code from Kotlin code and will treat types according to their annotations].
+
+Moreover, you can use ann:core.annotation.Nullable[] annotation to mark:
+
+* A <<routing, Controller>> method parameter as optional.
+* An injection point as optional. For example, when using constructor injection you can annotate one a constructor parameter as optional by adding the ann:core.annotation.Nullable[] annotation.
+

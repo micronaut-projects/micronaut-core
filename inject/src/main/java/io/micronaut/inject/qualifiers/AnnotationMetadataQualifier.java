@@ -25,6 +25,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.DelegatingBeanDefinition;
@@ -35,7 +36,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -48,7 +48,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-class AnnotationMetadataQualifier<T> implements Qualifier<T> {
+final class AnnotationMetadataQualifier<T> implements Qualifier<T> {
 
     @NonNull
     final String annotationName;
@@ -183,7 +183,7 @@ class AnnotationMetadataQualifier<T> implements Qualifier<T> {
 
     @Override
     public int hashCode() {
-        return Objects.hash(annotationName, qualifierAnn);
+        return ObjectUtils.hash(annotationName, qualifierAnn);
     }
 
     @Override

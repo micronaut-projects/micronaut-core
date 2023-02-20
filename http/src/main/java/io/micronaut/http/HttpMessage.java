@@ -16,6 +16,7 @@
 package io.micronaut.http;
 
 import io.micronaut.core.attr.MutableAttributeHolder;
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -80,8 +81,20 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
      * @return An {@link Optional} of the type or {@link Optional#empty()} if the body cannot be returned as the given type
      */
     default @NonNull <T> Optional<T> getBody(@NonNull Argument<T> type) {
-        ArgumentUtils.requireNonNull("type", type);
-        return getBody().flatMap(b -> ConversionService.SHARED.convert(b, ConversionContext.of(type)));
+        return getBody(ConversionContext.of(type));
+    }
+
+    /**
+     * Return the body, will use the provided conversion context if needed.
+     *
+     * @param conversionContext The body conversion context
+     * @param <T>               The generic type
+     * @return An {@link Optional} of the type or {@link Optional#empty()} if the body cannot be returned as the given type
+     * @since 4.0.0
+     */
+    default @NonNull <T> Optional<T> getBody(@NonNull ArgumentConversionContext<T> conversionContext) {
+        ArgumentUtils.requireNonNull("conversionContext", conversionContext);
+        return getBody().flatMap(b -> ConversionService.SHARED.convert(b, conversionContext));
     }
 
     /**

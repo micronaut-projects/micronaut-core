@@ -33,14 +33,14 @@ import java.util.function.Function;
 class StatusRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
 
     final HttpStatus httpStatus;
-    private final ArrayList<Argument> requiredArguments;
+    private final ArrayList<Argument<?>> requiredArguments;
 
     /**
      * @param httpStatus The HTTP status
      * @param abstractRoute The abstract route
      * @param conversionService The conversion service
      */
-    StatusRouteMatch(HttpStatus httpStatus, DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService<?> conversionService) {
+    StatusRouteMatch(HttpStatus httpStatus, DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService conversionService) {
         super(abstractRoute, conversionService);
         this.httpStatus = httpStatus;
         this.requiredArguments = new ArrayList<>(Arrays.asList(getArguments()));
@@ -52,7 +52,7 @@ class StatusRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
     }
 
     @Override
-    public Collection<Argument> getRequiredArguments() {
+    public Collection<Argument<?>> getRequiredArguments() {
         return requiredArguments;
     }
 
@@ -67,10 +67,10 @@ class StatusRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
     }
 
     @Override
-    protected RouteMatch<R> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments) {
+    protected RouteMatch<R> newFulfilled(Map<String, Object> newVariables, List<Argument<?>> requiredArguments) {
         return new StatusRouteMatch<T, R>(httpStatus, abstractRoute, conversionService) {
             @Override
-            public Collection<Argument> getRequiredArguments() {
+            public Collection<Argument<?>> getRequiredArguments() {
                 return requiredArguments;
             }
 
@@ -84,11 +84,11 @@ class StatusRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
     @Override
     public RouteMatch<R> decorate(Function<RouteMatch<R>, R> executor) {
         Map<String, Object> variables = getVariableValues();
-        Collection<Argument> arguments = getRequiredArguments();
+        Collection<Argument<?>> arguments = getRequiredArguments();
         RouteMatch thisRoute = this;
         return new StatusRouteMatch<T, R>(httpStatus, abstractRoute, conversionService) {
             @Override
-            public Collection<Argument> getRequiredArguments() {
+            public Collection<Argument<?>> getRequiredArguments() {
                 return arguments;
             }
 

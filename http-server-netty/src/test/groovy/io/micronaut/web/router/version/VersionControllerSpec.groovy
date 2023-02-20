@@ -114,8 +114,8 @@ class VersionControllerSpec extends Specification {
         }
 
         private boolean areAllUriRoutesAnnotatedWith(List<UriRouteMatch<Object, Object>> uriRoutes,
-                                                     Class annotationClass,
-                                                     Class annotationValue) {
+                                                     Class<?> annotationClass,
+                                                     Class<?> annotationValue) {
             uriRoutes.every { uriRoute ->
                 AnnotationValue versionAnnotationValue = uriRoute.getAnnotation(annotationClass)
                 if (versionAnnotationValue == null) {

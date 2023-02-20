@@ -34,6 +34,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentValue;
@@ -47,6 +48,7 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.MethodReference;
+import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.annotation.AnnotatedElementValidator;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
 import io.micronaut.validation.validator.constraints.ConstraintValidator;
@@ -81,7 +83,19 @@ import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -104,14 +118,16 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
     private final TraversableResolver traversableResolver;
     private final ExecutionHandleLocator executionHandleLocator;
     private final MessageSource messageSource;
+    private final ConversionService conversionService;
 
     /**
      * Default constructor.
      *
-     * @param configuration The validator configuration
+     * @param configuration     The validator configuration
+     * @param conversionService The conversion service
      */
-    protected DefaultValidator(
-            @NonNull ValidatorConfiguration configuration) {
+    protected DefaultValidator(@NonNull ValidatorConfiguration configuration, ConversionService conversionService) {
+        this.conversionService = conversionService;
         ArgumentUtils.requireNonNull("configuration", configuration);
         this.constraintValidatorRegistry = configuration.getConstraintValidatorRegistry();
         this.clockProvider = configuration.getClockProvider();
@@ -888,7 +904,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             AnnotationMetadata annotationMetadata,
             Object parameterValue,
             boolean isValid) {
-        final Publisher<Object> publisher = Publishers.convertPublisher(parameterValue, Publisher.class);
+        final Publisher<Object> publisher = Publishers.convertPublisher(conversionService, parameterValue, Publisher.class);
         PathImpl copied = new PathImpl(context.currentPath);
         final Flux<Object> finalFlowable = Flux.from(publisher).flatMap(o -> {
             DefaultConstraintValidatorContext newContext =
@@ -913,7 +929,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 }
             } else {
 
-                final Class t = argument.getFirstTypeVariable().map(Argument::getType).orElse(null);
+                final Class<?> t = argument.getFirstTypeVariable().map(Argument::getType).orElse(null);
                 validateParameterInternal(
                         rootClass,
                         object,
@@ -936,7 +952,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
             return Flux.just(o);
         });
-        argumentValues[argumentIndex] = Publishers.convertPublisher(finalFlowable, parameterType);
+        argumentValues[argumentIndex] = Publishers.convertPublisher(conversionService, finalFlowable, parameterType);
     }
 
     private <T> void instrumentCompletionStageArgumentWithValidation(
@@ -974,7 +990,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 }
             } else {
 
-                final Class t = argument.getFirstTypeVariable().map(Argument::getType).orElse(null);
+                final Class<?> t = argument.getFirstTypeVariable().map(Argument::getType).orElse(null);
                 validateParameterInternal(
                         rootClass,
                         object,
@@ -1321,7 +1337,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             DefaultConstraintValidatorContext context,
             Set overallViolations,
             AnnotatedElement cascadeProperty,
-            Class propertyType,
+            Class<?> propertyType,
             Object propertyValue,
             @Nullable DefaultPropertyNode container) {
 
@@ -1419,7 +1435,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             @Nullable T rootBean,
             @NonNull Object object,
             @NonNull AnnotatedElement constrainedProperty,
-            @NonNull Class propertyType,
+            @NonNull Class<?> propertyType,
             @Nullable Object propertyValue,
             DefaultConstraintValidatorContext context,
             Set<ConstraintViolation<Object>> overallViolations,
@@ -1449,7 +1465,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             @Nullable Object object,
             @NonNull DefaultConstraintValidatorContext context,
             @NonNull Set<ConstraintViolation<Object>> overallViolations,
-            @NonNull Class propertyType,
+            @NonNull Class<?> propertyType,
             @NonNull AnnotatedElement constrainedProperty,
             @Nullable Object propertyValue) {
         final AnnotationMetadata annotationMetadata = constrainedProperty.getAnnotationMetadata();
@@ -1499,7 +1515,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             DefaultConstraintValidatorContext context,
             Set<ConstraintViolation<Object>> overallViolations,
             AnnotatedElement constrainedProperty,
-            Class propertyType,
+            Class<?> propertyType,
             @Nullable Object propertyValue,
             Class<? extends Annotation> constraintType) {
         final AnnotationMetadata annotationMetadata = constrainedProperty
@@ -1516,7 +1532,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                         constraints.add(annotationValue);
                     }
                 } else {
-                    final List<Class> constraintGroups = Arrays.asList(classValues);
+                    final List<Class<?>> constraintGroups = Arrays.asList(classValues);
                     if (constraintGroups.contains(group)) {
                         constraints.add(annotationValue);
                     }
@@ -1524,7 +1540,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             }
         }
 
-        @SuppressWarnings("unchecked") final Class<Object> targetType = propertyValue != null ? (Class<Object>) propertyValue.getClass() : propertyType;
+        @SuppressWarnings("unchecked") final Class<Object> targetType = propertyValue != null ? (Class<Object>) propertyValue.getClass() : (Class<Object>) propertyType;
         final ConstraintValidator<? extends Annotation, Object> validator = constraintValidatorRegistry
                 .findConstraintValidator(constraintType, targetType).orElse(null);
         if (validator != null) {
@@ -1560,9 +1576,9 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             variables.put(entry.getKey().toString(),  entry.getValue());
         }
         variables.put("validatedValue", propertyValue);
-        final Map<String, Object> defaultValues = annotationMetadata.getDefaultValues(annotationValue.getAnnotationName());
-        for (Map.Entry<String, Object> entry : defaultValues.entrySet()) {
-            final String n = entry.getKey();
+        final Map<CharSequence, Object> defaultValues = annotationMetadata.getDefaultValues(annotationValue.getAnnotationName());
+        for (Map.Entry<CharSequence, Object> entry : defaultValues.entrySet()) {
+            final String n = entry.getKey().toString();
             if (!variables.containsKey(n)) {
                 final Object v = entry.getValue();
                 if (v != null) {
@@ -1585,7 +1601,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
     @Override
     public <T> Publisher<T> validatePublisher(@NonNull Publisher<T> publisher, Class<?>... groups) {
         ArgumentUtils.requireNonNull("publisher", publisher);
-        final Publisher<T> reactiveSequence = Publishers.convertPublisher(publisher, Publisher.class);
+        final Publisher<T> reactiveSequence = Publishers.convertPublisher(conversionService, publisher, Publisher.class);
         return Flux.from(reactiveSequence).flatMap(object -> {
             final Set<ConstraintViolation<Object>> constraintViolations = validate(object, groups);
             if (!constraintViolations.isEmpty()) {
@@ -1619,7 +1635,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         final boolean hasValid = annotationMetadata.hasStereotype(Valid.class);
         final boolean hasConstraint = annotationMetadata.hasStereotype(Constraint.class);
         final Class<T> parameterType = argument.getType();
-        final Class rootClass = injectionPoint.getDeclaringBean().getBeanType();
+        final Class<?> rootClass = injectionPoint.getDeclaringBean().getBeanType();
         DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(value);
         Set overallViolations = new HashSet<>(5);
         if (hasConstraint) {
@@ -1726,17 +1742,21 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
     @Override
     public <T> void validateBean(@NonNull BeanResolutionContext resolutionContext, @NonNull BeanDefinition<T> definition, @NonNull T bean) throws BeanInstantiationException {
-        final BeanIntrospection<T> introspection = (BeanIntrospection<T>) getBeanIntrospection(bean);
+        Class<T> beanType;
+        if (definition instanceof ProxyBeanDefinition<?> proxyBeanDefinition) {
+            beanType = (Class<T>) proxyBeanDefinition.getTargetType();
+        } else {
+            beanType = definition.getBeanType();
+        }
+        final BeanIntrospection<T> introspection = (BeanIntrospection<T>) getBeanIntrospection(bean, beanType);
         if (introspection != null) {
             Set<ConstraintViolation<T>> errors = validate(introspection, bean);
-            final Class<?> beanType = bean.getClass();
             failOnError(resolutionContext, errors, beanType);
         } else if (bean instanceof Intercepted && definition.hasStereotype(ConfigurationReader.class)) {
             final Collection<ExecutableMethod<T, ?>> executableMethods = definition.getExecutableMethods();
             if (CollectionUtils.isNotEmpty(executableMethods)) {
                 Set<ConstraintViolation<Object>> errors = new HashSet<>();
                 final DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(bean);
-                final Class<T> beanType = definition.getBeanType();
                 final Class<?>[] interfaces = beanType.getInterfaces();
                 if (ArrayUtils.isNotEmpty(interfaces)) {
                     context.addConstructorNode(interfaces[0].getSimpleName());
@@ -1766,6 +1786,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
 
                 failOnError(resolutionContext, errors, beanType);
             }
+        } else {
+            throw new BeanInstantiationException(resolutionContext, "Cannot validate bean [" + beanType.getName() + "]. No bean introspection present. Please add @Introspected.");
         }
     }
 
@@ -1937,7 +1959,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
                 }
 
                 @Override
-                public Class getDeclaringType() {
+                public Class<Object> getDeclaringType() {
                     return null;
                 }
 

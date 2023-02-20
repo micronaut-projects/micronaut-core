@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 public class MockHttpHeaders implements MutableHttpHeaders {
 
     private final Map<CharSequence, List<String>> headers;
+    private ConversionService conversionService = ConversionService.SHARED;
 
     public MockHttpHeaders(Map<CharSequence, List<String>> headers) {
         this.headers = headers;
@@ -88,6 +89,11 @@ public class MockHttpHeaders implements MutableHttpHeaders {
 
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
-        return ConversionService.SHARED.convert(get(name), conversionContext);
+        return conversionService.convert(get(name), conversionContext);
+    }
+
+    @Override
+    public void setConversionService(ConversionService conversionService) {
+        this.conversionService = conversionService;
     }
 }

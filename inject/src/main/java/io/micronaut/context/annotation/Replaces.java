@@ -32,22 +32,27 @@ import java.lang.annotation.RetentionPolicy;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Replaces {
 
+    String MEMBER_NAMED = "named";
+    String MEMBER_FACTORY = "factory";
+    String MEMBER_BEAN = "bean";
+    String MEMBER_QUALIFIER = "qualifier";
+
     /**
      * @return The bean type that this bean replaces
      */
     @AliasFor(member = "bean")
-    Class value() default void.class;
+    Class<?> value() default void.class;
 
     /**
      * @return The bean type that this bean replaces
      */
     @AliasFor(member = "value")
-    Class bean() default void.class;
+    Class<?> bean() default void.class;
 
     /**
      * @return The declaring bean type
      */
-    Class factory() default void.class;
+    Class<?> factory() default void.class;
 
     /**
      * The name of the qualifiers of the bean that should be replaced.

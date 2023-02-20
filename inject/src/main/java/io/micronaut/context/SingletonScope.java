@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 
@@ -106,19 +107,11 @@ final class SingletonScope {
             DefaultBeanContext.BeanKey<T> beanKey = new DefaultBeanContext.BeanKey<>(beanDefinition, qualifier);
             singletonByArgumentAndQualifier.put(beanKey, registration);
         }
-        if (beanDefinition instanceof BeanDefinitionDelegate || beanDefinition instanceof NoInjectionBeanDefinition) {
+        if (beanDefinition instanceof BeanDefinitionDelegate || beanDefinition instanceof RuntimeBeanDefinition<T>) {
             // Special cases when custom bean definitions need to be indexed:
             // BeanDefinitionDelegate - doesn't really exist with a custom qualifier
-            // NoInjectionBeanDefinition - cannot be properly selected from 'beanDefinitionsClasses' when is used with a custom qualifier
             DefaultBeanContext.BeanKey<T> beanKey = new DefaultBeanContext.BeanKey<>(beanDefinition, beanDefinition.getDeclaredQualifier());
             singletonByArgumentAndQualifier.put(beanKey, registration);
-        }
-        if (registration.bean != null && registration.bean.getClass() != beanDefinition.getBeanType()) {
-            // If the actual type differs, allow to inject the actual implementation for cases like:
-            // `MyInterface factoryBean() { new Impl.. }`
-            // This might be something to remove in 4.0
-            DefaultBeanContext.BeanKey<T> concrete = new DefaultBeanContext.BeanKey<>((Class<T>) registration.bean.getClass(), qualifier);
-            singletonByArgumentAndQualifier.put(concrete, registration);
         }
         return registration;
     }
@@ -329,11 +322,10 @@ final class SingletonScope {
     interface BeanDefinitionIdentity {
 
         static BeanDefinitionIdentity of(BeanDefinition<?> beanDefinition) {
-            if (beanDefinition instanceof BeanDefinitionDelegate) {
-                return new BeanDefinitionDelegatedIdentity((BeanDefinitionDelegate<?>) beanDefinition);
-            }
-            if (beanDefinition instanceof NoInjectionBeanDefinition) {
-                return new NoInjectionBeanDefinitionIdentity((NoInjectionBeanDefinition<?>) beanDefinition);
+            if (beanDefinition instanceof BeanDefinitionDelegate<?> definitionDelegate) {
+                return new BeanDefinitionDelegatedIdentity(definitionDelegate);
+            } else if (beanDefinition instanceof RuntimeBeanDefinition<?> runtimeBeanDefinition) {
+                return new RuntimeBeanDefinitionIdentity(runtimeBeanDefinition);
             }
             return new SimpleBeanDefinitionIdentity(beanDefinition);
         }
@@ -365,13 +357,12 @@ final class SingletonScope {
             if (beanDefinitionDelegate.definition.getClass() != that.beanDefinitionDelegate.definition.getClass()) {
                 return false;
             }
-            return Objects.equals(beanDefinitionDelegate.getAttributes(), that.beanDefinitionDelegate.getAttributes())
-                    && Objects.equals(beanDefinitionDelegate.getQualifier(), that.beanDefinitionDelegate.getQualifier());
+            return Objects.equals(beanDefinitionDelegate.getDeclaredQualifier(), that.beanDefinitionDelegate.getDeclaredQualifier());
         }
 
         @Override
         public int hashCode() {
-            return beanDefinitionDelegate.definition.hashCode();
+            return ObjectUtils.hash(beanDefinitionDelegate.getBeanType(), beanDefinitionDelegate.getDeclaredQualifier());
         }
     }
 
@@ -380,11 +371,11 @@ final class SingletonScope {
      *
      * @since 3.5.0
      */
-    static final class NoInjectionBeanDefinitionIdentity implements BeanDefinitionIdentity {
+    static final class RuntimeBeanDefinitionIdentity implements BeanDefinitionIdentity {
 
-        private final NoInjectionBeanDefinition<?> beanDefinition;
+        private final RuntimeBeanDefinition<?> beanDefinition;
 
-        NoInjectionBeanDefinitionIdentity(NoInjectionBeanDefinition<?> beanDefinition) {
+        RuntimeBeanDefinitionIdentity(RuntimeBeanDefinition<?> beanDefinition) {
             this.beanDefinition = beanDefinition;
         }
 
@@ -396,21 +387,16 @@ final class SingletonScope {
             if (o == null || getClass() != o.getClass()) {
                 return false;
             }
-            NoInjectionBeanDefinitionIdentity that = (NoInjectionBeanDefinitionIdentity) o;
+            RuntimeBeanDefinitionIdentity that = (RuntimeBeanDefinitionIdentity) o;
             if (beanDefinition.getBeanType() != that.beanDefinition.getBeanType()) {
                 return false;
             }
-            Qualifier<?> qualifier = beanDefinition.getQualifier();
-            Qualifier<?> thatQualifier = that.beanDefinition.getQualifier();
-            if (qualifier == thatQualifier) {
-                return true;
-            }
-            return qualifier != null && qualifier.equals(thatQualifier);
+            return beanDefinition.getBeanDefinitionName().equals(that.beanDefinition.getBeanDefinitionName());
         }
 
         @Override
         public int hashCode() {
-            return beanDefinition.getBeanType().hashCode();
+            return beanDefinition.getBeanDefinitionName().hashCode();
         }
     }
 

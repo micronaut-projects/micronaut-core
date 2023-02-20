@@ -25,9 +25,9 @@ dependencies {
     api project(":core")
     api project(":http-netty")
     api libs.managed.netty.codec.http
-
     implementation libs.managed.reactor
-
+    compileOnly project(":jackson-databind")
+    compileOnly project(":websocket")
     compileOnly libs.kotlin.stdlib
     compileOnly libs.managed.netty.transport.native.unix.common
 
@@ -37,15 +37,17 @@ dependencies {
     testImplementation project(":inject")
     testImplementation project(":inject-java-test")
     testImplementation project(":http-client")
-    testImplementation libs.managed.spotbugs
+    testImplementation libs.spotbugs
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
         testImplementation libs.bcpkix
     }
-
-    testImplementation(libs.managed.micronaut.xml) {
-        exclude module:'micronaut-inject'
-        exclude module:'micronaut-http'
-    }
+    testImplementation project(":jackson-databind")
+// Add Micronaut Jackson XML after v4 Migration
+//    testImplementation(libs.managed.micronaut.xml) {
+//        exclude module:'micronaut-inject'
+//        exclude module:'micronaut-http'
+//        exclude module:'micronaut-bom'
+//    }
     testImplementation libs.managed.jackson.databind
 
     // http impls for tests
@@ -68,10 +70,11 @@ dependencies {
             classifier = Os.isArch("aarch64") ? "osx-aarch_64" : "osx-x86_64"
         }
     }
-    testImplementation libs.managed.logback
+    testImplementation libs.managed.logback.classic
 
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation libs.junit.jupiter.api
+    testImplementation project(":websocket")
 }
 
 //tasks.withType(Test).configureEach {
@@ -82,3 +85,5 @@ dependencies {
 //}
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
+//compileJava.options.fork = true
+//compileJava.options.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

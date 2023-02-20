@@ -16,6 +16,7 @@
 package io.micronaut.json.convert;
 
 import io.micronaut.context.BeanProvider;
+import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.ArgumentBinder;
@@ -23,6 +24,7 @@ import io.micronaut.core.bind.BeanPropertyBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -32,7 +34,6 @@ import io.micronaut.json.JsonMapper;
 import io.micronaut.json.tree.JsonArray;
 import io.micronaut.json.tree.JsonNode;
 import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -51,16 +52,16 @@ import java.util.Optional;
  * @since 3.1
  */
 @Experimental
-@Singleton
+@Prototype
 public final class JsonConverterRegistrar implements TypeConverterRegistrar {
     private final BeanProvider<JsonMapper> objectCodec;
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
     private final BeanProvider<BeanPropertyBinder> beanPropertyBinder;
 
     @Inject
     public JsonConverterRegistrar(
             BeanProvider<JsonMapper> objectCodec,
-            ConversionService<?> conversionService,
+            ConversionService conversionService,
             BeanProvider<BeanPropertyBinder> beanPropertyBinder
     ) {
         this.objectCodec = objectCodec;
@@ -69,7 +70,7 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
     }
 
     @Override
-    public void register(ConversionService<?> conversionService) {
+    public void register(MutableConversionService conversionService) {
         conversionService.addConverter(
                 JsonArray.class,
                 Object[].class,
@@ -132,7 +133,7 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
                 return Optional.empty();
             }
             Map<String, Argument<?>> typeVariables = context.getTypeVariables();
-            Class elementType = typeVariables.isEmpty() ? Map.class : typeVariables.values().iterator().next().getType();
+            Class<?> elementType = typeVariables.isEmpty() ? Map.class : typeVariables.values().iterator().next().getType();
             for (int i = 0; i < node.size(); i++) {
                 Optional<?> converted = conversionService.convert(node.get(i), elementType, context);
                 converted.ifPresent(results::add);

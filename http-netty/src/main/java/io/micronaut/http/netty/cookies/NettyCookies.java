@@ -45,7 +45,7 @@ public class NettyCookies implements Cookies {
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyCookies.class);
 
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
     private final Map<CharSequence, Cookie> cookies;
 
     /**
@@ -131,5 +131,10 @@ public class NettyCookies implements Cookies {
     @Override
     public Collection<Cookie> values() {
         return Collections.unmodifiableCollection(cookies.values());
+    }
+
+    @Override
+    public ConversionService getConversionService() {
+        return conversionService;
     }
 }

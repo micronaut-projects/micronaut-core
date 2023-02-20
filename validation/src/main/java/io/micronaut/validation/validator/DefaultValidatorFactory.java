@@ -17,6 +17,7 @@ package io.micronaut.validation.validator;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ConversionService;
 import jakarta.inject.Singleton;
 
 import javax.validation.ClockProvider;
@@ -38,15 +39,21 @@ import javax.validation.ValidatorFactory;
 @Singleton
 public class DefaultValidatorFactory implements ValidatorFactory {
 
+    private final ConversionService conversionService;
     private final Validator validator;
     private final ValidatorConfiguration configuration;
 
     /**
      * Default constructor.
-     * @param validator The validator.
-     * @param configuration The configuration.
+     *
+     * @param conversionService The conversion service
+     * @param validator         The validator.
+     * @param configuration     The configuration.
      */
-    protected DefaultValidatorFactory(Validator validator, ValidatorConfiguration configuration) {
+    protected DefaultValidatorFactory(ConversionService conversionService,
+                                      Validator validator,
+                                      ValidatorConfiguration configuration) {
+        this.conversionService = conversionService;
         this.validator = validator;
         this.configuration = configuration;
     }
@@ -58,7 +65,7 @@ public class DefaultValidatorFactory implements ValidatorFactory {
 
     @Override
     public ValidatorContext usingContext() {
-        return new DefaultValidatorConfiguration();
+        return new DefaultValidatorConfiguration(conversionService);
     }
 
     @Override

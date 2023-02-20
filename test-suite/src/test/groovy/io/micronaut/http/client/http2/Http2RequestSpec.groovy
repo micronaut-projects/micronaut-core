@@ -152,6 +152,7 @@ class Http2RequestSpec extends Specification {
                 "micronaut.server.http-version" : "2.0",
                 'micronaut.server.ssl.buildSelfSigned': true,
                 'micronaut.server.ssl.port': -1,
+                "micronaut.http.client.http-version" : "1.1",
                 "micronaut.http.client.log-level" : "TRACE",
                 "micronaut.server.netty.log-level" : "TRACE",
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true
@@ -198,6 +199,7 @@ class Http2RequestSpec extends Specification {
                 "micronaut.server.http-version" : "2.0",
                 'micronaut.server.ssl.buildSelfSigned': true,
                 'micronaut.server.ssl.port': -1,
+                "micronaut.http.client.http-version" : "1.1",
                 "micronaut.http.client.log-level" : "TRACE",
                 "micronaut.server.netty.log-level" : "TRACE"
         ])

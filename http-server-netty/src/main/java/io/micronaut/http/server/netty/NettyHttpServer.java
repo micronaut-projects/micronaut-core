@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.DefaultApplicationContext;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.ApplicationEventPublisher;
@@ -27,9 +28,6 @@ import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.SupplierUtil;
-import io.micronaut.discovery.EmbeddedServerInstance;
-import io.micronaut.discovery.event.ServiceReadyEvent;
-import io.micronaut.discovery.event.ServiceStoppedEvent;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
@@ -127,7 +125,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private boolean shutdownParent = false;
     private EventLoopGroup workerGroup;
     private EventLoopGroup parentGroup;
-    private EmbeddedServerInstance serviceInstance;
     private final Collection<ChannelPipelineListener> pipelineListeners = new ArrayList<>(2);
     @Nullable
     private volatile List<Listener> activeListeners = null;
@@ -164,7 +161,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 .getEventPublisher(HttpRequestTerminatedEvent.class);
         final Supplier<ExecutorService> ioExecutor = SupplierUtil.memoized(() ->
                 nettyEmbeddedServices.getExecutorSelector()
-                        .select(TaskExecutors.IO).orElse(null)
+                        .select(TaskExecutors.BLOCKING).orElse(null)
         );
         this.httpContentProcessorResolver = new DefaultHttpContentProcessorResolver(
                 nettyEmbeddedServices.getApplicationContext(),
@@ -176,7 +173,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 nettyEmbeddedServices,
                 ioExecutor,
                 httpContentProcessorResolver,
-                httpRequestTerminatedEventPublisher
+                httpRequestTerminatedEventPublisher,
+                applicationContext.getConversionService()
         );
         this.hostResolver = new DefaultHttpHostResolver(serverConfiguration, () -> NettyHttpServer.this);
 
@@ -259,9 +257,14 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     @Override
+    @NonNull
     public synchronized NettyEmbeddedServer start() {
         if (!isRunning()) {
             if (isDefault && !applicationContext.isRunning()) {
+                if (applicationContext instanceof DefaultApplicationContext defaultApplicationContext) {
+                    // Stop did remove the existing environment
+                    defaultApplicationContext.setEnvironment(environment);
+                }
                 applicationContext.start();
             }
             //suppress unused
@@ -291,7 +294,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                             .map(l -> l.serverChannel.localAddress())
                             .filter(InetSocketAddress.class::isInstance)
                             .map(addr -> ((InetSocketAddress) addr).getPort())
-                            .collect(Collectors.toList()));
+                            .toList());
                 }
             }
             fireStartupEvents();
@@ -317,10 +320,22 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     @Override
+    @NonNull
     public synchronized NettyEmbeddedServer stop() {
+        return stop(true);
+    }
+
+    @Override
+    @NonNull
+    public NettyEmbeddedServer stopServerOnly() {
+        return stop(false);
+    }
+
+    @NonNull
+    private NettyEmbeddedServer stop(boolean stopApplicationContext) {
         if (isRunning() && workerGroup != null) {
             if (running.compareAndSet(true, false)) {
-                stopInternal();
+                stopInternal(stopApplicationContext);
             }
         }
         return this;
@@ -524,7 +539,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     LOG.error("Error starting Micronaut server: " + e.getMessage(), e);
                 }
             }
-            stopInternal();
+            stopInternal(true);
             throw new ServerStartupException("Unable to start Micronaut server on " + displayAddress(cfg), e);
         }
     }
@@ -562,17 +577,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     private void fireStartupEvents() {
-        Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
         applicationContext.getEventPublisher(ServerStartupEvent.class)
                 .publishEvent(new ServerStartupEvent(this));
-        applicationName.ifPresent(id -> {
-            if (serviceInstance == null) {
-                serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
-            }
-            applicationContext
-                    .getEventPublisher(ServiceReadyEvent.class)
-                    .publishEvent(new ServiceReadyEvent(serviceInstance));
-        });
     }
 
     private void logShutdownErrorIfNecessary(Future<?> future) {
@@ -584,7 +590,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
     }
 
-    private void stopInternal() {
+    private void stopInternal(boolean stopApplicationContext) {
         try {
             if (shutdownParent) {
                 EventLoopGroupConfiguration parent = serverConfiguration.getParent();
@@ -604,11 +610,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             }
             webSocketSessions.close();
             applicationContext.getEventPublisher(ServerShutdownEvent.class).publishEvent(new ServerShutdownEvent(this));
-            if (serviceInstance != null) {
-                applicationContext.getEventPublisher(ServiceStoppedEvent.class)
-                        .publishEvent(new ServiceStoppedEvent(serviceInstance));
-            }
-            if (isDefault && applicationContext.isRunning()) {
+            if (isDefault && applicationContext.isRunning() && stopApplicationContext) {
                 applicationContext.stop();
             }
             serverConfiguration.getMultipart().getLocation().ifPresent(dir -> DiskFileUpload.baseDirectory = null);
@@ -713,14 +715,25 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     /**
      * Builds Embedded Channel.
      *
-     * @param ssl SSL
-     * @return Embedded Channel
+     * @param ssl whether to enable SSL
+     * @return The embedded channel with our server handlers
      */
     @Internal
     public EmbeddedChannel buildEmbeddedChannel(boolean ssl) {
-        EmbeddedChannel embeddedChannel = new EmbeddedChannel();
-        createPipelineBuilder(rootCustomizer).new ConnectionPipeline(embeddedChannel, ssl).initChannel();
-        return embeddedChannel;
+        EmbeddedChannel channel = new EmbeddedChannel();
+        buildEmbeddedChannel(channel, ssl);
+        return channel;
+    }
+
+    /**
+     * Builds Embedded Channel.
+     *
+     * @param prototype The embedded channel to add our handlers to
+     * @param ssl whether to enable SSL
+     */
+    @Internal
+    public void buildEmbeddedChannel(EmbeddedChannel prototype, boolean ssl) {
+        createPipelineBuilder(rootCustomizer).new ConnectionPipeline(prototype, ssl).initChannel();
     }
 
     static Predicate<String> inclusionPredicate(NettyHttpServerConfiguration.AccessLogger config) {
@@ -736,7 +749,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     private class Listener extends ChannelInitializer<Channel> {
         Channel serverChannel;
-        private NettyServerCustomizer listenerCustomizer;
+        NettyServerCustomizer listenerCustomizer;
         NettyHttpServerConfiguration.NettyListenerConfiguration config;
 
         private volatile HttpPipelineBuilder httpPipelineBuilder;

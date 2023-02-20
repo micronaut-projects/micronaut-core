@@ -34,7 +34,7 @@ import java.util.List;
 @Singleton
 class Catalog {
     @Inject
-    public PaymentProcessor paymentProcessor;   
+    public PaymentProcessor paymentProcessor;
 }
 @Singleton
 @Factory

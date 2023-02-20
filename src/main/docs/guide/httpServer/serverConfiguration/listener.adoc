@@ -1,19 +1,22 @@
 Instead of configuring a single port, you can also specify each listener manually.
 
-[source, yaml]
+[configuration]
 ----
 micronaut:
   server:
     netty:
       listeners:
-        httpListener: # listener name can be an arbitrary value
-          host: 127.0.0.1 # optional, by default binds to all interfaces
+        httpListener:
+          host: 127.0.0.1
           port: 8086
           ssl: false
         httpsListener:
           port: 8087
           ssl: true
 ----
+
+- `httpListener` is a listener name, and can be an arbitrary value
+- `host` is optional, and by default binds to all interfaces
 
 WARNING: If you specify listeners manually, other configuration such as `micronaut.server.port` will be ignored.
 
@@ -25,16 +28,18 @@ dependency:netty-transport-native-unix-common[groupId="io.netty",artifactId="net
 
 The server must also be configured to <<serverConfiguration, use native transport>> (epoll or kqueue).
 
-[source, yaml]
+[configuration]
 ----
 micronaut:
   server:
     netty:
       listeners:
-        unixListener: # listener name can be an arbitrary value
+        unixListener:
           family: UNIX
           path: /run/micronaut.socket
           ssl: true
 ----
+
+- `unixListener` is a listener name, and can be an arbitrary value
 
 NOTE: To use an abstract domain socket instead of a normal one, prefix the path with a NUL character, like `"\0/run/micronaut.socket"`

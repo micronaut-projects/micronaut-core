@@ -61,6 +61,16 @@ public interface ApplicationContextBuilder {
     }
 
     /**
+     * Specify whether the default set of property sources should be enabled (default is {@code true}).
+     * @param areEnabled Whether the default property sources are enabled
+     * @return This builder
+     * @since 3.7.0
+     */
+    default @NonNull ApplicationContextBuilder enableDefaultPropertySources(boolean areEnabled) {
+        return this;
+    }
+
+    /**
      * Specifies to eager init the given annotated types.
      *
      * @param annotations The annotation stereotypes
@@ -87,12 +97,30 @@ public interface ApplicationContextBuilder {
     @NonNull ApplicationContextBuilder singletons(@Nullable Object... beans);
 
     /**
-     * Whether to deduce environments.
+     * If set to {@code true} (the default is {@code true}) Micronaut will attempt to automatically deduce the environment
+     * it is running in using environment variables and/or stack trace inspection.
+     *
+     * <p>This method differs from {@link #deduceCloudEnvironment(boolean)} which performs extended network and/or disk probes
+     * to try and automatically establish the Cloud environment.</p>
+     *
+     * <p>This behaviour controls the automatic activation of, for example, the {@link io.micronaut.context.env.Environment#TEST} when running tests.</p>
      *
      * @param deduceEnvironment The boolean
      * @return This builder
      */
     @NonNull ApplicationContextBuilder deduceEnvironment(@Nullable Boolean deduceEnvironment);
+
+    /**
+     * If set to {@code true} (the default value is {@code false}) Micronaut will attempt to automatically deduce the Cloud environment it is running within.
+     *
+     * <p>Enabling this should be done with caution since network probes are required to figure out whether the application is
+     * running in certain clouds like GCP.</p>
+     *
+     * @param deduceEnvironment The boolean
+     * @return This builder
+     * @since 4.0.0
+     */
+    @NonNull ApplicationContextBuilder deduceCloudEnvironment(boolean deduceEnvironment);
 
     /**
      * The environments to use.
@@ -164,7 +192,7 @@ public interface ApplicationContextBuilder {
      * @param mainClass The main class
      * @return This builder
      */
-    @NonNull ApplicationContextBuilder mainClass(@Nullable Class mainClass);
+    @NonNull ApplicationContextBuilder mainClass(@Nullable Class<?> mainClass);
 
     /**
      * The class loader to be used.

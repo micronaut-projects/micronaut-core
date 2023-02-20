@@ -273,20 +273,22 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         )).blockFirst()
 
         then:
-        HttpClientResponseException ex = thrown()
-        ex.response.code() == HttpStatus.BAD_REQUEST.code
-        ex.response.getBody(Map).get()._embedded.errors[0].message.contains("Required argument [HttpRequest request] not specified")
+        response.code() == HttpStatus.OK.code
+        response.body() == 'not found'
     }
 
     void "test request generic type conversion error"() {
         when:
         String json = '[1,2,3]'
-        HttpResponse<String> response = Flux.from(rxClient.exchange(
+        Flux.from(rxClient.exchange(
                 HttpRequest.POST('/json/request-generic', json), String
         )).blockFirst()
 
         then:
-        response.body() == "not found"
+        def e = thrown(HttpClientResponseException)
+        def response = e.response
+        response.getStatus() == HttpStatus.BAD_REQUEST
+        response.body().toString().contains("no int/Int-argument constructor/factory method to deserialize from Number value")
     }
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/5088")

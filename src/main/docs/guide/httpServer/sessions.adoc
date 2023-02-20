@@ -9,25 +9,25 @@ Micronaut includes a `session` module inspired by https://projects.spring.io/spr
 
 To enable support for in-memory sessions you just need the `session` dependency:
 
-dependency:micronaut-session[]
+dependency:micronaut-session[groupId=io.micronaut.session]
 
 === Redis Sessions
 
-To store api:session.Session[] instances in Redis, use the https://micronaut-projects.github.io/micronaut-redis/latest/guide/#sessions[Micronaut Redis] module which includes detailed instructions.
+To store link:{micronautsessionapi}/io/micronaut/session/Session.html[Session] instances in Redis, use the https://micronaut-projects.github.io/micronaut-redis/latest/guide/#sessions[Micronaut Redis] module which includes detailed instructions.
 
 To quickly get up and running with Redis sessions you must also have the `redis-lettuce` dependency in your build:
 
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut:micronaut-session"
-compile "io.micronaut.redis:micronaut-redis-lettuce"
+implementation "io.micronaut-session:micronaut-session"
+implementation "io.micronaut.redis:micronaut-redis-lettuce"
 ----
 
-And enable Redis sessions via configuration in `application.yml`:
+And enable Redis sessions via configuration in your configuration file (e.g `application.yml`):
 
 .Enabling Redis Sessions
-[source,yaml]
+[configuration]
 ----
 redis:
   uri: redis://localhost:6379
@@ -40,14 +40,14 @@ micronaut:
 
 == Configuring Session Resolution
 
-api:session.Session[] resolution can be configured with api:session.http.HttpSessionConfiguration[].
+link:{micronautsessionapi}/io/micronaut/session/Session.html[Session] resolution can be configured with link:{micronautsessionapi}/io/micronaut/session/http/HttpSessionConfiguration.html[HttpSessionConfiguration].
 
-By default, sessions are resolved using an api:session.http.HttpSessionFilter[] that looks for session identifiers via either an HTTP header (using the `Authorization-Info` or `X-Auth-Token` headers) or via a Cookie named `SESSION`.
+By default, sessions are resolved using link:{micronautsessionapi}/io/micronaut/session/http/HttpSessionFilter.html[HttpSessionFilter] that looks for session identifiers via either an HTTP header (using the `Authorization-Info` or `X-Auth-Token` headers) or via a Cookie named `SESSION`.
 
-You can disable either header resolution or cookie resolution via configuration in `application.yml`:
+You can disable either header resolution or cookie resolution via configuration in your configuration file (e.g `application.yml`):
 
 .Disabling Cookie Resolution
-[source,yaml]
+[configuration]
 ----
 micronaut:
   session:
@@ -60,22 +60,22 @@ The above configuration enables header resolution, but disables cookie resolutio
 
 == Working with Sessions
 
-A api:session.Session[] can be retrieved with a parameter of type api:session.Session[] in a controller method. For example consider the following controller:
+A link:{micronautsessionapi}/io/micronaut/session/Session.html[Session] can be retrieved with a parameter of type link:{micronautsessionapi}/io/micronaut/session/Session.html[Session] in a controller method. For example consider the following controller:
 
 snippet::io.micronaut.docs.session.ShoppingController[tags="imports,class,add,endclass", indent=0]
 
-<1> `ShoppingController` declares a api:session.Session[] attribute named `cart`
-<2> The api:session.Session[] is declared as a method parameter
+<1> `ShoppingController` declares a link:{micronautsessionapi}/io/micronaut/session/Session.html[Session] attribute named `cart`
+<2> The link:{micronautsessionapi}/io/micronaut/session/Session.html[Session] is declared as a method parameter
 <3> The `cart` attribute is retrieved
 <4> Otherwise a new `Cart` instance is created and stored in the session
 
-Note that because the api:session.Session[] is declared as a required parameter, to execute the controller action a api:session.Session[] will be created and saved to the api:session.SessionStore[].
+Note that because the link:{micronautsessionapi}/io/micronaut/session/Session.html[Session] is declared as a required parameter, to execute the controller action a link:{micronautsessionapi}/io/micronaut/session/Session.html[Session] will be created and saved to the link:{micronautsessionapi}/io/micronaut/session/SessionStore.html[SessionStore].
 
-If you don't want to create unnecessary sessions, declare the api:session.Session[] as `@Nullable` in which case a session will not be created and saved unnecessarily. For example:
+If you don't want to create unnecessary sessions, declare the link:{micronautsessionapi}/io/micronaut/session/Session.html[Session] as `@Nullable` in which case a session will not be created and saved unnecessarily. For example:
 
 snippet::io.micronaut.docs.session.ShoppingController[tags="clear", indent=0,title="Using @Nullable with Sessions"]
 
-The above method only injects a new api:session.Session[] if one already exists.
+The above method only injects a new link:{micronautsessionapi}/io/micronaut/session/Session.html[Session] if one already exists.
 
 == Session Clients
 
@@ -89,7 +89,7 @@ snippet::io.micronaut.docs.session.ShoppingControllerSpec[tags="view", indent=0]
 <1> A request is made to `/shopping/cart`
 <2> The `AUTHORIZATION_INFO` header is present in the response
 
-You can then pass this `AUTHORIZATION_INFO` in subsequent requests to reuse the existing api:session.Session[]:
+You can then pass this `AUTHORIZATION_INFO` in subsequent requests to reuse the existing link:{micronautsessionapi}/io/micronaut/session/Session.html[Session]:
 
 .Sending the AUTHORIZATION_INFO header
 snippet::io.micronaut.docs.session.ShoppingControllerSpec[tags="add", indent=0]
@@ -99,16 +99,16 @@ snippet::io.micronaut.docs.session.ShoppingControllerSpec[tags="add", indent=0]
 
 == Using @SessionValue
 
-Rather than explicitly injecting the api:session.Session[] into a controller method, you can instead use ann:session.annotation.SessionValue[]. For example:
+Rather than explicitly injecting the link:{micronautsessionapi}/io/micronaut/session/Session.html[Session] into a controller method, you can instead use link:{micronautsessionapi}/io/micronaut/session/annotation/SessionValue.html[@SessionValue]. For example:
 
 snippet::io.micronaut.docs.session.ShoppingController[tags="view", indent=0,title="Using @SessionValue"]
 
-<1> ann:session.annotation.SessionValue[] is declared on the method resulting in the return value being stored in the api:session.Session[]. Note that you must specify the attribute name when used on a return value
-<2> ann:session.annotation.SessionValue[] is used on a `@Nullable` parameter which results in looking up the value from the api:session.Session[] in a non-blocking way and supplying it if present. In the case a value is not specified to ann:session.annotation.SessionValue[] resulting in the parameter name being used to lookup the attribute.
+<1> link:{micronautsessionapi}/io/micronaut/session/annotation/SessionValue.html[@SessionValue] is declared on the method resulting in the return value being stored in the link:{micronautsessionapi}/io/micronaut/session/Session.html[Session]. Note that you must specify the attribute name when used on a return value
+<2> link:{micronautsessionapi}/io/micronaut/session/annotation/SessionValue.html[@SessionValue] is used on a `@Nullable` parameter which results in looking up the value from the link:{micronautsessionapi}/io/micronaut/session/Session.html[Session] in a non-blocking way and supplying it if present. In the case a value is not specified to link:{micronautsessionapi}/io/micronaut/session/annotation/SessionValue.html[@SessionValue] resulting in the parameter name being used to lookup the attribute.
 
 == Session Events
 
-You can register api:context.event.ApplicationEventListener[] beans to listen for api:session.Session[] related events located in the pkg:session.event[] package.
+You can register api:context.event.ApplicationEventListener[] beans to listen for link:{micronautsessionapi}/io/micronaut/session/Session.html[Session] related events located in the link:{micronautsessionapi}/io/micronaut/session/event/package-summary.html[session.event] package.
 
 The following table summarizes the events:
 
@@ -116,16 +116,16 @@ The following table summarizes the events:
 |===
 |Type|Description
 
-|api:session.event.SessionCreatedEvent[]
-|Fired when a api:session.Session[] is created
+|link:{micronautsessionapi}/io/micronaut/session/event/SessionCreatedEvent.html[SessionCreatedEvent]
+|Fired when a link:{micronautsessionapi}/io/micronaut/session/Session.html[Session] is created
 
-|api:session.event.SessionDeletedEvent[]
-|Fired when a api:session.Session[] is deleted
+|link:{micronautsessionapi}/io/micronaut/session/event/SessionDeletedEvent.html[SessionDeletedEvent]
+|Fired when a link:{micronautsessionapi}/io/micronaut/session/Session.html[Session] is deleted
 
-|api:session.event.SessionExpiredEvent[]
-|Fired when a api:session.Session[] expires
+|link:{micronautsessionapi}/io/micronaut/session/event/SessionExpiredEvent.html[SessionExpiredEvent]
+|Fired when a link:{micronautsessionapi}/io/micronaut/session/Session.html[Session] expires
 
-|api:session.event.SessionDestroyedEvent[]
+|link:{micronautsessionapi}/io/micronaut/session/event/SessionDestroyedEvent.html[SessionDestroyedEvent]
 |Parent of both `SessionDeletedEvent` and `SessionExpiredEvent`
 
 |===

@@ -28,6 +28,8 @@ import io.micronaut.core.type.Executable;
  */
 public class ArgumentUtils {
 
+    private static final String MSG_PREFIX_ARGUMENT = "Argument [";
+
     /**
      * Adds a check that the given number is positive.
      *
@@ -53,7 +55,7 @@ public class ArgumentUtils {
      */
     public static <T> T requireNonNull(String name, T value) {
         if (value == null) {
-            throw new NullPointerException("Argument [" + name + "] cannot be null");
+            throw new NullPointerException(MSG_PREFIX_ARGUMENT + name + "] cannot be null");
         }
         return value;
     }
@@ -68,7 +70,7 @@ public class ArgumentUtils {
      */
     public static int requirePositive(String name, int value) {
         if (value < 0) {
-            throw new IllegalArgumentException("Argument [" + name + "] cannot be negative");
+            throw new IllegalArgumentException(MSG_PREFIX_ARGUMENT + name + "] cannot be negative");
         }
         return value;
     }
@@ -106,7 +108,7 @@ public class ArgumentUtils {
             @NonNull Argument<?>[] arguments,
             @NonNull Object[] values) {
         int requiredCount = arguments.length;
-        @SuppressWarnings("ConstantConditions") int actualCount = values == null ? 0 : values.length;
+        @SuppressWarnings("ConstantConditions") int actualCount = ArrayUtils.isEmpty(values) ? 0 : values.length;
         if (requiredCount != actualCount) {
             throw new IllegalArgumentException("Wrong number of arguments to " + (described instanceof Executable ? "method" : "constructor") + ": " + described.getDescription());
         }
@@ -170,7 +172,7 @@ public class ArgumentUtils {
          */
         public void notNull() {
             if (value == null) {
-                throw new NullPointerException("Argument [" + name + "] cannot be null");
+                throw new NullPointerException(MSG_PREFIX_ARGUMENT + name + "] cannot be null");
             }
         }
     }

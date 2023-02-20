@@ -55,7 +55,7 @@ class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements Uri
      */
     DefaultUriRouteMatch(UriMatchInfo matchInfo,
                          DefaultRouteBuilder.DefaultUriRoute uriRoute,
-                         Charset defaultCharset, ConversionService<?> conversionService
+                         Charset defaultCharset, ConversionService conversionService
     ) {
         super(uriRoute, conversionService);
         this.uriRoute = uriRoute;
@@ -67,17 +67,17 @@ class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements Uri
     @Override
     public UriRouteMatch<T, R> decorate(Function<RouteMatch<R>, R> executor) {
         Map<String, Object> variables = getVariableValues();
-        List<Argument> arguments = getRequiredArguments();
-        RouteMatch thisRoute = this;
-        return new DefaultUriRouteMatch<T, R>(matchInfo, uriRoute, defaultCharset, conversionService) {
+        List<Argument<?>> arguments = getRequiredArguments();
+        RouteMatch<R> thisRoute = this;
+        return new DefaultUriRouteMatch<>(matchInfo, uriRoute, defaultCharset, conversionService) {
             @Override
-            public List<Argument> getRequiredArguments() {
+            public List<Argument<?>> getRequiredArguments() {
                 return arguments;
             }
 
             @Override
-            public R execute(Map argumentValues) {
-                return (R) executor.apply(thisRoute);
+            public R execute(Map<String, Object> argumentValues) {
+                return executor.apply(thisRoute);
             }
 
             @Override
@@ -88,11 +88,11 @@ class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements Uri
     }
 
     @Override
-    protected RouteMatch<R> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments) {
+    protected RouteMatch<R> newFulfilled(Map<String, Object> newVariables, List<Argument<?>> requiredArguments) {
         return new DefaultUriRouteMatch<T, R>(matchInfo, uriRoute, defaultCharset, conversionService) {
 
             @Override
-            public List<Argument> getRequiredArguments() {
+            public List<Argument<?>> getRequiredArguments() {
                 return requiredArguments;
             }
 

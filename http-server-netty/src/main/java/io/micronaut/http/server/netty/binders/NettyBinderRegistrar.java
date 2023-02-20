@@ -17,10 +17,10 @@ package io.micronaut.http.server.netty.binders;
 
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanProvider;
+import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.server.HttpServerConfiguration;
@@ -28,7 +28,6 @@ import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.multipart.MultipartBodyArgumentBinder;
 import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Named;
-import jakarta.inject.Singleton;
 
 import java.util.concurrent.ExecutorService;
 
@@ -38,11 +37,11 @@ import java.util.concurrent.ExecutorService;
  * @author graemerocher
  * @since 2.0.0
  */
-@Singleton
+@Prototype
 @Internal
 class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegistry> {
 
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
     private final HttpContentProcessorResolver httpContentProcessorResolver;
     private final BeanLocator beanLocator;
     private final BeanProvider<HttpServerConfiguration> httpServerConfiguration;
@@ -57,13 +56,12 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
      * @param httpServerConfiguration      The server config
      * @param executorService              The executor to offload blocking operations
      */
-    NettyBinderRegistrar(
-            @Nullable ConversionService<?> conversionService,
-            HttpContentProcessorResolver httpContentProcessorResolver,
-            BeanLocator beanLocator,
-            BeanProvider<HttpServerConfiguration> httpServerConfiguration,
-            @Named(TaskExecutors.IO) BeanProvider<ExecutorService> executorService) {
-        this.conversionService = conversionService == null ? ConversionService.SHARED : conversionService;
+    NettyBinderRegistrar(ConversionService conversionService,
+                         HttpContentProcessorResolver httpContentProcessorResolver,
+                         BeanLocator beanLocator,
+                         BeanProvider<HttpServerConfiguration> httpServerConfiguration,
+                         @Named(TaskExecutors.BLOCKING) BeanProvider<ExecutorService> executorService) {
+        this.conversionService = conversionService;
         this.httpContentProcessorResolver = httpContentProcessorResolver;
         this.beanLocator = beanLocator;
         this.httpServerConfiguration = httpServerConfiguration;

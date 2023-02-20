@@ -18,11 +18,13 @@ package io.micronaut.core.convert.value;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.ConversionServiceAware;
 
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -34,10 +36,10 @@ import java.util.stream.Collectors;
  * @param <V> generic value
  * @since 1.0
  */
-public class ConvertibleValuesMap<V> implements ConvertibleValues<V> {
+public class ConvertibleValuesMap<V> implements ConvertibleValues<V>, ConversionServiceAware {
 
     protected final Map<? extends CharSequence, V> map;
-    private final ConversionService<?> conversionService;
+    private ConversionService conversionService;
 
     /**
      * Constructor.
@@ -59,7 +61,7 @@ public class ConvertibleValuesMap<V> implements ConvertibleValues<V> {
      * @param map map of values.
      * @param conversionService conversionService
      */
-    public ConvertibleValuesMap(Map<? extends CharSequence, V> map, ConversionService<?> conversionService) {
+    public ConvertibleValuesMap(Map<? extends CharSequence, V> map, ConversionService conversionService) {
         this.map = map;
         this.conversionService = conversionService;
     }
@@ -103,5 +105,27 @@ public class ConvertibleValuesMap<V> implements ConvertibleValues<V> {
     @SuppressWarnings("unchecked")
     public static <V> ConvertibleValues<V> empty() {
         return EMPTY;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ConvertibleValuesMap<?> that = (ConvertibleValuesMap<?>) o;
+        return map.equals(that.map);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(map);
+    }
+
+    @Override
+    public void setConversionService(ConversionService conversionService) {
+        this.conversionService = conversionService;
     }
 }

@@ -15,8 +15,12 @@
  */
 package io.micronaut.annotation.processing.test;
 
+import org.codehaus.groovy.runtime.IOGroovyMethods;
+
+import javax.tools.JavaFileObject;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.URLStreamHandler;
@@ -24,10 +28,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
-
-import javax.tools.JavaFileObject;
-
-import org.codehaus.groovy.runtime.IOGroovyMethods;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * A custom classloader that loads from JavaFileObject instances.
@@ -62,28 +64,32 @@ final class JavaFileObjectClassLoader extends ClassLoader {
     @Override
     protected Enumeration<URL> findResources(String name) throws IOException {
         String fileName = "/CLASS_OUTPUT/" + name;
-        JavaFileObject generated = files.stream()
-                .filter((JavaFileObject it) -> it.getName().equals(fileName))
-                .findFirst().orElse(null);
-        if (generated == null) {
+        List<JavaFileObject> generated = files.stream()
+                .filter((JavaFileObject it) -> it.getName().startsWith(fileName))
+                .toList();
+        if (generated.isEmpty()) {
             return super.findResources(name);
-        } else {
-            URL url = new URL(null, generated.toUri().toString(), new URLStreamHandler() {
-                @Override
-                protected URLConnection openConnection(URL u) {
-                    return new URLConnection(u) {
-                        @Override
-                        public void connect() {
-                        }
-
-                        @Override
-                        public InputStream getInputStream() throws IOException {
-                            return generated.openInputStream();
-                        }
-                    };
-                }
-            });
-            return Collections.enumeration(Collections.singletonList(url));
         }
+        return Collections.enumeration(generated.stream().map(javaFileObject -> {
+            try {
+                return new URL(null, javaFileObject.toUri().toString(), new URLStreamHandler() {
+                    @Override
+                    protected URLConnection openConnection(URL u) {
+                        return new URLConnection(u) {
+                            @Override
+                            public void connect() {
+                            }
+
+                            @Override
+                            public InputStream getInputStream() throws IOException {
+                                return javaFileObject.openInputStream();
+                            }
+                        };
+                    }
+                });
+            } catch (MalformedURLException e) {
+                throw new RuntimeException(e);
+            }
+        }).collect(Collectors.toList()));
     }
 }

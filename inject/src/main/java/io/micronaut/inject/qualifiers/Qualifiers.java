@@ -28,7 +28,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.BeanType;
 import jakarta.inject.Named;
 
 import java.lang.annotation.Annotation;
@@ -36,6 +36,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * Factory for {@link io.micronaut.context.annotation.Bean} qualifiers.
@@ -59,6 +60,18 @@ public class Qualifiers {
     @SuppressWarnings("unchecked")
     public static <T> Qualifier<T> any() {
         return AnyQualifier.INSTANCE;
+    }
+
+    /**
+     * Allows looking up for beans without any qualifier.
+     *
+     * @param <T> The generic type
+     * @return The none qualifier.
+     * @since 3.8.0
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> Qualifier<T> none() {
+        return NoneQualifier.INSTANCE;
     }
 
     /**
@@ -115,6 +128,41 @@ public class Qualifiers {
     @UsedByGeneratedCode
     public static <T> Qualifier<T> byName(String name) {
         return new NameQualifier<>(null, name);
+    }
+
+    /**
+     * Finds a name in the provided qualifier.
+     *
+     * @return The qualifier
+     * @since 4.0.0
+     */
+    @Nullable
+    public static String findName(@NonNull Qualifier<?> qualifier) {
+        if (qualifier instanceof NameQualifier<?> nameQualifier) {
+            return nameQualifier.getName();
+        }
+        if (qualifier instanceof CompositeQualifier<?> compositeQualifier) {
+            for (Qualifier<?> composite : compositeQualifier.getQualifiers()) {
+                String name = findName(composite);
+                if (name != null) {
+                    return name;
+                }
+            }
+        }
+        return null;
+    }
+
+
+    /**
+     * Qualify by a prefix. Applies starting with logic to the name of the bean..
+     *
+     * @param prefix The name
+     * @param <T>  The component type
+     * @return The qualifier
+     * @since 4.0.0
+     */
+    public static <T> Qualifier<T> byNamePrefix(String prefix) {
+        return new PrefixQualifier<>(prefix);
     }
 
     /**
@@ -258,7 +306,7 @@ public class Qualifiers {
      * @param <T>           The component type
      * @return The qualifier
      */
-    public static <T> Qualifier<T> byTypeArguments(Class... typeArguments) {
+    public static <T> Qualifier<T> byTypeArguments(Class<?>... typeArguments) {
         return new TypeArgumentQualifier<>(typeArguments);
     }
 
@@ -282,7 +330,7 @@ public class Qualifiers {
      * @param <T>           The component type
      * @return The qualifier
      */
-    public static <T> Qualifier<T> byTypeArgumentsClosest(Class... typeArguments) {
+    public static <T> Qualifier<T> byTypeArgumentsClosest(Class<?>... typeArguments) {
         return new ClosestTypeArgumentQualifier<>(typeArguments);
     }
 
@@ -293,7 +341,7 @@ public class Qualifiers {
      * @param <T>           The component type
      * @return The qualifier
      */
-    public static <T> Qualifier<T> byType(Class... typeArguments) {
+    public static <T> Qualifier<T> byType(Class<?>... typeArguments) {
         return new TypeAnnotationQualifier<>(typeArguments);
     }
 
@@ -307,21 +355,6 @@ public class Qualifiers {
     public static @NonNull
     <T> Qualifier<T> byInterceptorBinding(@NonNull AnnotationMetadata annotationMetadata) {
         return new InterceptorBindingQualifier<>(annotationMetadata);
-    }
-
-    /**
-     * Reduces bean definitions by the given interceptor binding.
-     *
-     * @param bindingAnnotationNames The binding annotation names
-     * @param <T>                    The bean type
-     * @return The qualifier
-     * @since 3.0.0
-     * @deprecated Use {@link #byInterceptorBindingValues(java.util.Collection)}
-     */
-    @Deprecated
-    public static @NonNull
-    <T> Qualifier<T> byInterceptorBinding(@NonNull Collection<String> bindingAnnotationNames) {
-        return new InterceptorBindingQualifier<>(bindingAnnotationNames.toArray(StringUtils.EMPTY_STRING_ARRAY));
     }
 
     /**
@@ -381,4 +414,20 @@ public class Qualifiers {
         return null;
     }
 
+    private record PrefixQualifier<T>(String prefix) implements Qualifier<T> {
+        @Override
+        public <B extends BeanType<T>> Stream<B> reduce(Class<T> beanType, Stream<B> candidates) {
+            return candidates.filter(candidate -> {
+                if (!QualifierUtils.matchType(beanType, candidate)) {
+                    return false;
+                }
+                if (QualifierUtils.matchAny(beanType, candidate)) {
+                    return true;
+                }
+
+                String name = candidate.getBeanName().orElse(null);
+                return name != null && name.startsWith(prefix);
+            });
+        }
+    }
 }

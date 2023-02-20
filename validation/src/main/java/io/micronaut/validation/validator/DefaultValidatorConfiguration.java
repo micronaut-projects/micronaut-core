@@ -20,6 +20,7 @@ import io.micronaut.context.MessageSource;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.validation.validator.constraints.ConstraintValidatorRegistry;
 import io.micronaut.validation.validator.constraints.DefaultConstraintValidators;
@@ -48,6 +49,8 @@ import java.lang.annotation.ElementType;
 @ConfigurationProperties(ValidatorConfiguration.PREFIX)
 public class DefaultValidatorConfiguration implements ValidatorConfiguration, Toggleable, ValidatorContext {
 
+    private final ConversionService conversionService;
+
     @Nullable
     private ConstraintValidatorRegistry constraintValidatorRegistry;
 
@@ -67,6 +70,10 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
     private ExecutionHandleLocator executionHandleLocator;
 
     private boolean enabled = true;
+
+    public DefaultValidatorConfiguration(ConversionService conversionService) {
+        this.conversionService = conversionService;
+    }
 
     @Override
     @NonNull
@@ -253,6 +260,6 @@ public class DefaultValidatorConfiguration implements ValidatorConfiguration, To
 
     @Override
     public Validator getValidator() {
-        return new DefaultValidator(this);
+        return new DefaultValidator(this, conversionService);
     }
 }

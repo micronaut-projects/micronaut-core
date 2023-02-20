@@ -45,7 +45,7 @@ public class MutableConvertibleValuesMap<V> extends ConvertibleValuesMap<V> impl
      * @param map               The map
      * @param conversionService The conversion service
      */
-    public MutableConvertibleValuesMap(Map<? extends CharSequence, V> map, ConversionService<?> conversionService) {
+    public MutableConvertibleValuesMap(Map<? extends CharSequence, V> map, ConversionService conversionService) {
         super(map, conversionService);
     }
 

@@ -66,7 +66,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     private static final String MEMBER_SCHEDULER = "scheduler";
 
     private final BeanContext beanContext;
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
     private final Queue<ScheduledFuture<?>> scheduledTasks = new ConcurrentLinkedDeque<>();
     private final TaskExceptionHandler<?, ?> taskExceptionHandler;
 
@@ -76,7 +76,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
      * @param taskExceptionHandler The default task exception handler
      */
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
-    public ScheduledMethodProcessor(BeanContext beanContext, Optional<ConversionService<?>> conversionService, TaskExceptionHandler<?, ?> taskExceptionHandler) {
+    public ScheduledMethodProcessor(BeanContext beanContext, Optional<ConversionService> conversionService, TaskExceptionHandler<?, ?> taskExceptionHandler) {
         this.beanContext = beanContext;
         this.conversionService = conversionService.orElse(ConversionService.SHARED);
         this.taskExceptionHandler = taskExceptionHandler;
@@ -91,9 +91,9 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
 
         List<AnnotationValue<Scheduled>> scheduledAnnotations = method.getAnnotationValuesByType(Scheduled.class);
         for (AnnotationValue<Scheduled> scheduledAnnotation : scheduledAnnotations) {
-            String fixedRate = scheduledAnnotation.get(MEMBER_FIXED_RATE, String.class).orElse(null);
+            String fixedRate = scheduledAnnotation.stringValue(MEMBER_FIXED_RATE).orElse(null);
 
-            String initialDelayStr = scheduledAnnotation.get(MEMBER_INITIAL_DELAY, String.class).orElse(null);
+            String initialDelayStr = scheduledAnnotation.stringValue(MEMBER_INITIAL_DELAY).orElse(null);
             Duration initialDelay = null;
             if (StringUtils.hasText(initialDelayStr)) {
                 initialDelay = conversionService.convert(initialDelayStr, Duration.class).orElseThrow(() ->
@@ -101,11 +101,11 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                 );
             }
 
-            String scheduler = scheduledAnnotation.get(MEMBER_SCHEDULER, String.class).orElse(TaskExecutors.SCHEDULED);
+            String scheduler = scheduledAnnotation.stringValue(MEMBER_SCHEDULER).orElse(TaskExecutors.SCHEDULED);
             Optional<TaskScheduler> optionalTaskScheduler = beanContext
                     .findBean(TaskScheduler.class, Qualifiers.byName(scheduler));
 
-            if (!optionalTaskScheduler.isPresent()) {
+            if (optionalTaskScheduler.isEmpty()) {
                 optionalTaskScheduler = beanContext.findBean(ExecutorService.class, Qualifiers.byName(scheduler))
                         .filter(ScheduledExecutorService.class::isInstance)
                         .map(ScheduledExecutorTaskScheduler::new);
@@ -142,9 +142,9 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                 }
             };
 
-            String cronExpr = scheduledAnnotation.get(MEMBER_CRON, String.class, null);
-            String zoneIdStr = scheduledAnnotation.get(MEMBER_ZONE_ID, String.class, null);
-            String fixedDelay = scheduledAnnotation.get(MEMBER_FIXED_DELAY, String.class).orElse(null);
+            String cronExpr = scheduledAnnotation.stringValue(MEMBER_CRON).orElse(null);
+            String zoneIdStr = scheduledAnnotation.stringValue(MEMBER_ZONE_ID).orElse(null);
+            String fixedDelay = scheduledAnnotation.stringValue(MEMBER_FIXED_DELAY).orElse(null);
 
             if (StringUtils.isNotEmpty(cronExpr)) {
                 if (LOG.isDebugEnabled()) {

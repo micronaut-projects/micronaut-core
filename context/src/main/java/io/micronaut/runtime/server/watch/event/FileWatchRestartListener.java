@@ -19,10 +19,8 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.runtime.EmbeddedApplication;
-import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.scheduling.io.watch.FileWatchConfiguration;
 import io.micronaut.scheduling.io.watch.event.FileChangedEvent;
-import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,18 +46,8 @@ public class FileWatchRestartListener implements ApplicationEventListener<FileCh
      * Default constructor.
      * @param embeddedApplication The embedded application
      */
-    @Inject
     public FileWatchRestartListener(EmbeddedApplication<?> embeddedApplication) {
         this.embeddedApplication = embeddedApplication;
-    }
-
-    /**
-     * @param embeddedServer The embedded server
-     * @deprecated Use {@link #FileWatchRestartListener(EmbeddedApplication)} instead.
-     */
-    @Deprecated
-    public FileWatchRestartListener(EmbeddedServer embeddedServer) {
-        this.embeddedApplication = embeddedServer;
     }
 
     @Override

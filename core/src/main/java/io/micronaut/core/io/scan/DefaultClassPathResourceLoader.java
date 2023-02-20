@@ -40,8 +40,6 @@ import java.util.stream.Stream;
  */
 public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DefaultClassPathResourceLoader.class);
-
     private final ClassLoader classLoader;
     private final String basePath;
     private final URL baseURL;
@@ -129,8 +127,9 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
                                     try {
                                         fileSystem.close();
                                     } catch (IOException e) {
-                                        if (LOG.isDebugEnabled()) {
-                                            LOG.debug("Error shutting down JAR file system [" + fileSystem + "]: " + e.getMessage(), e);
+                                        Logger log = LoggerFactory.getLogger(DefaultClassPathResourceLoader.class);
+                                        if (log.isDebugEnabled()) {
+                                            log.debug("Error shutting down JAR file system [" + fileSystem + "]: " + e.getMessage(), e);
                                         }
                                     }
                                 }
@@ -144,8 +143,9 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
                         return Optional.of(Files.newInputStream(pathObject));
                     }
                 } catch (URISyntaxException | IOException | ProviderNotFoundException e) {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Error establishing whether path is a directory: " + e.getMessage(), e);
+                    Logger log = LoggerFactory.getLogger(DefaultClassPathResourceLoader.class);
+                    if (log.isDebugEnabled()) {
+                        log.debug("Error establishing whether path is a directory: " + e.getMessage(), e);
                     }
                 }
             }
@@ -297,8 +297,9 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
                                     try {
                                         fileSystem.close();
                                     } catch (IOException e) {
-                                        if (LOG.isDebugEnabled()) {
-                                            LOG.debug("Error shutting down JAR file system [" + fileSystem + "]: " + e.getMessage(), e);
+                                        Logger log = LoggerFactory.getLogger(DefaultClassPathResourceLoader.class);
+                                        if (log.isDebugEnabled()) {
+                                            log.debug("Error shutting down JAR file system [" + fileSystem + "]: " + e.getMessage(), e);
                                         }
                                     }
                                 }
@@ -309,8 +310,9 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
                         return pathObject == null || Files.isDirectory(pathObject);
                     }
                 } catch (URISyntaxException | IOException | ProviderNotFoundException e) {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Error establishing whether path is a directory: " + e.getMessage(), e);
+                    Logger log = LoggerFactory.getLogger(DefaultClassPathResourceLoader.class);
+                    if (log.isDebugEnabled()) {
+                        log.debug("Error establishing whether path is a directory: " + e.getMessage(), e);
                     }
                 }
             }

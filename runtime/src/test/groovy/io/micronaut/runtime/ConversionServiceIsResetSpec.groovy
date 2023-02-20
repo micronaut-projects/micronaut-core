@@ -18,6 +18,7 @@ package io.micronaut.runtime
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.convert.ConversionService
+import io.micronaut.core.convert.MutableConversionService
 import io.micronaut.core.convert.TypeConverter
 import spock.lang.Specification
 
@@ -32,7 +33,7 @@ class ConversionServiceIsResetSpec extends Specification {
                     return Optional.of(new B())
                 }
             }
-            ctx.getBean(ConversionService).addConverter(A, B, typeConverter)
+            ctx.getBean(MutableConversionService).addConverter(A, B, typeConverter)
 
         when:
             def result = ctx.getBean(ConversionService).convert(new A(), B)

@@ -15,18 +15,6 @@
  */
 package io.micronaut.inject.qualifiers;
 
-import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -34,9 +22,19 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.BeanType;
+
+import java.lang.annotation.Annotation;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Qualifier used to resolve the interceptor binding when injection method interceptors for AOP.
@@ -53,29 +51,19 @@ public final class InterceptorBindingQualifier<T> implements Qualifier<T> {
     private final Set<Class<?>> supportedInterceptorTypes;
 
     InterceptorBindingQualifier(AnnotationMetadata annotationMetadata) {
-        final List<AnnotationValue<Annotation>> annotationValues = annotationMetadata
-                .findAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER)
-                .map(av -> av.getAnnotations(AnnotationMetadata.VALUE_MEMBER))
-                .orElse(Collections.emptyList());
-        this.supportedAnnotationNames = new HashMap<>(annotationValues.size());
-        for (AnnotationValue<Annotation> annotationValue : annotationValues) {
-            final String name = annotationValue.stringValue().orElse(null);
-            if (name != null) {
-                final AnnotationValue<Annotation> members =
-                        annotationValue.getAnnotation(META_MEMBER_MEMBERS).orElse(null);
-                if (members != null) {
-                    List<AnnotationValue<?>> existing = supportedAnnotationNames
-                            .computeIfAbsent(name, k -> new ArrayList<>(5));
-                    existing.add(members);
-                } else {
-                    supportedAnnotationNames.put(name, null);
-                }
-            }
+        final Collection<AnnotationValue<?>> annotationValues;
+        AnnotationValue<Annotation> av = annotationMetadata.findAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER).orElse(null);
+        if (av == null) {
+            annotationValues = Collections.emptyList();
+        } else {
+            annotationValues = (Collection) av.getAnnotations(AnnotationMetadata.VALUE_MEMBER);
         }
-        this.supportedInterceptorTypes = annotationValues
-                .stream()
-                .flatMap(av -> av.classValue(META_MEMBER_INTERCEPTOR_TYPE).map(Stream::of).orElse(Stream.empty()))
-                .collect(Collectors.toSet());
+        supportedAnnotationNames = findSupportedAnnotations(annotationValues);
+        Set<Class<?>> supportedInterceptorTypes = CollectionUtils.newHashSet(annotationValues.size());
+        for (AnnotationValue<?> annotationValue : annotationValues) {
+            annotationValue.classValue(META_MEMBER_INTERCEPTOR_TYPE).ifPresent(supportedInterceptorTypes::add);
+        }
+        this.supportedInterceptorTypes = supportedInterceptorTypes;
     }
 
     /**
@@ -84,43 +72,30 @@ public final class InterceptorBindingQualifier<T> implements Qualifier<T> {
      */
     InterceptorBindingQualifier(Collection<AnnotationValue<?>> bindingAnnotations) {
         if (CollectionUtils.isNotEmpty(bindingAnnotations)) {
-            this.supportedAnnotationNames = new HashMap<>(bindingAnnotations.size());
-            for (AnnotationValue<?> bindingAnnotation : bindingAnnotations) {
-                final String name = bindingAnnotation.stringValue().orElse(null);
-                if (name != null) {
-                    final AnnotationValue<Annotation> members =
-                            bindingAnnotation.getAnnotation(META_MEMBER_MEMBERS).orElse(null);
-                    if (members != null) {
-                        List<AnnotationValue<?>> existing = supportedAnnotationNames
-                                .computeIfAbsent(name, k -> new ArrayList<>(5));
-                        existing.add(members);
-                    } else {
-                        supportedAnnotationNames.putIfAbsent(name, null);
-                    }
-                }
-            }
+            supportedAnnotationNames = findSupportedAnnotations(bindingAnnotations);
         } else {
             this.supportedAnnotationNames = Collections.emptyMap();
         }
         this.supportedInterceptorTypes = Collections.emptySet();
     }
 
-    /**
-     * Interceptor binding qualifiers.
-     * @param bindingAnnotations The binding annotations
-     * @deprecated Use {@link #InterceptorBindingQualifier(java.util.Collection)} instead
-     */
-    @Deprecated
-    InterceptorBindingQualifier(String[] bindingAnnotations) {
-        if (ArrayUtils.isNotEmpty(bindingAnnotations)) {
-            this.supportedAnnotationNames = new HashMap<>(bindingAnnotations.length);
-            for (String bindingAnnotation : bindingAnnotations) {
-                supportedAnnotationNames.put(bindingAnnotation, null);
+    private static Map<String, List<AnnotationValue<?>>> findSupportedAnnotations(Collection<AnnotationValue<?>> annotationValues) {
+        final Map<String, List<AnnotationValue<?>>> supportedAnnotationNames = CollectionUtils.newHashMap(annotationValues.size());
+        for (AnnotationValue<?> annotationValue : annotationValues) {
+            final String name = annotationValue.stringValue().orElse(null);
+            if (name != null) {
+                final AnnotationValue<?> members =
+                    annotationValue.getAnnotation(META_MEMBER_MEMBERS).orElse(null);
+                if (members != null) {
+                    List<AnnotationValue<?>> existing = supportedAnnotationNames
+                        .computeIfAbsent(name, k -> new ArrayList<>(5));
+                    existing.add(members);
+                } else {
+                    supportedAnnotationNames.put(name, null);
+                }
             }
-        } else {
-            this.supportedAnnotationNames = Collections.emptyMap();
         }
-        this.supportedInterceptorTypes = Collections.emptySet();
+        return supportedAnnotationNames;
     }
 
     @Override
@@ -199,7 +174,7 @@ public final class InterceptorBindingQualifier<T> implements Qualifier<T> {
 
     @Override
     public int hashCode() {
-        return Objects.hash(supportedAnnotationNames, supportedInterceptorTypes);
+        return ObjectUtils.hash(supportedAnnotationNames, supportedInterceptorTypes);
     }
 
     @Override
@@ -221,7 +196,7 @@ public final class InterceptorBindingQualifier<T> implements Qualifier<T> {
             return bindings
                     .stream()
                     .filter(av -> {
-                        if (!av.stringValue().isPresent()) {
+                        if (av.stringValue().isEmpty()) {
                             return false;
                         }
                         if (kind == null) {

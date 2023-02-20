@@ -262,7 +262,7 @@ public final class StringUtils {
                 return str.substring(i);
             }
         }
-        return str;
+        return "";
     }
 
     /**

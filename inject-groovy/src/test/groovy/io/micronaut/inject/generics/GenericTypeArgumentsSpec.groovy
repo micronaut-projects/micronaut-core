@@ -333,4 +333,24 @@ class FactoryReplace {
         expect:
         definition != null
     }
+
+    void "test recusive generic type parameter"() {
+        given:
+            BeanDefinition definition = buildBeanDefinition('test.TrackedSortedSet', '''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+@jakarta.inject.Singleton
+final class TrackedSortedSet<T extends java.lang.Comparable<? super T>> {
+ public TrackedSortedSet(java.util.Collection<? extends T> initial) {
+        super();
+    }
+}
+
+''')
+        expect:
+            definition != null
+    }
 }

@@ -36,8 +36,10 @@ public class AnnotationValueBuilder<T extends Annotation> {
     private final String annotationName;
     private final Map<CharSequence, Object> values = new LinkedHashMap<>(5);
     private final RetentionPolicy retentionPolicy;
-    private final List<AnnotationValue<?>> stereotypes = new ArrayList<>();
-    private final Map<String, Object> defaultValues = new LinkedHashMap<>();
+    @Nullable
+    private List<AnnotationValue<?>> stereotypes;
+    @Nullable
+    private Map<CharSequence, Object> defaultValues;
 
     /**
      * Default constructor.
@@ -81,6 +83,8 @@ public class AnnotationValueBuilder<T extends Annotation> {
     AnnotationValueBuilder(AnnotationValue<T> value, RetentionPolicy retentionPolicy) {
         this.annotationName = value.getAnnotationName();
         this.values.putAll(value.getValues());
+        this.defaultValues = value.getDefaultValues();
+        this.stereotypes = value.getStereotypes();
         this.retentionPolicy = retentionPolicy != null ? retentionPolicy : RetentionPolicy.RUNTIME;
     }
 
@@ -103,6 +107,9 @@ public class AnnotationValueBuilder<T extends Annotation> {
     @NonNull
     public AnnotationValueBuilder<T> stereotype(AnnotationValue<?> annotation) {
         if (annotation != null) {
+            if (stereotypes == null) {
+                stereotypes = new ArrayList<>(10);
+            }
             stereotypes.add(annotation);
         }
         return this;
@@ -115,9 +122,13 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @return This builder
      */
     @NonNull
-    public AnnotationValueBuilder<T> defaultValues(Map<String, Object> defaultValues) {
+    public AnnotationValueBuilder<T> defaultValues(Map<? extends CharSequence, Object> defaultValues) {
         if (defaultValues != null) {
-            this.defaultValues.putAll(defaultValues);
+            if (this.defaultValues == null) {
+                this.defaultValues = new LinkedHashMap<>(defaultValues);
+            } else {
+                this.defaultValues.putAll(defaultValues);
+            }
         }
         return this;
     }
@@ -690,7 +701,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
             for (Map.Entry<CharSequence, Object> entry: members.entrySet()) {
                 Object value = entry.getValue();
                 if (value != null) {
-                    Class clazz = value.getClass();
+                    Class<?> clazz = value.getClass();
                     boolean isArray = clazz.isArray();
                     if (isArray) {
                         clazz = clazz.getComponentType();

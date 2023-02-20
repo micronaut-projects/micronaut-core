@@ -15,18 +15,6 @@
  */
 package io.micronaut.graal.reflect;
 
-import java.io.IOException;
-import java.lang.annotation.RetentionPolicy;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.function.Predicate;
-import java.util.stream.Collectors;
-
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Import;
@@ -52,6 +40,18 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ClassGenerationException;
 import jakarta.inject.Inject;
+
+import java.io.IOException;
+import java.lang.annotation.RetentionPolicy;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * Generates the GraalVM reflect.json file at compilation time.
@@ -141,6 +141,11 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                     .forEach(m -> processMethodElement(m, reflectiveClasses));
             element.getEnclosedElements(ElementQuery.ALL_FIELDS.annotated(ann -> ann.hasAnnotation(ReflectiveAccess.class)))
                     .forEach(m -> processFieldElement(m, reflectiveClasses));
+            if (!element.isInner()) {
+                // Inner classes aren't processed if there is no annotation
+                // We might trigger the visitor twice but the originatingElements check should avoid it
+                element.getEnclosedElements(ElementQuery.ALL_INNER_CLASSES).forEach(c -> visitClass(c, context));
+            }
 
             if (element.hasAnnotation(TypeHint.class)) {
                 final String[] introspectedClasses = element.stringValues(TypeHint.class);

@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.uri;
 
+import io.micronaut.core.util.ObjectUtils;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -150,6 +152,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
      * @return True if it matches
      */
     @Override
+    @SuppressWarnings("java:S2789") // performance optimization
     public Optional<UriMatchInfo> match(String uri) {
         if (uri == null) {
             throw new IllegalArgumentException("Argument 'uri' cannot be null");
@@ -328,9 +331,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
 
         @Override
         public int hashCode() {
-            int result = uri.hashCode();
-            result = 31 * result + variables.hashCode();
-            return result;
+            return ObjectUtils.hash(uri, variableValues);
         }
     }
 

@@ -20,3 +20,5 @@ Micronaut supports the following types of dependency injection:
 * Field injection
 * JavaBean property injection
 * Method parameter injection
+
+NOTE: Classes or particular fields, methods can be excluded by adding an annotation ann:core.annotation.Vetoed[]

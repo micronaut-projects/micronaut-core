@@ -1,4 +1,70 @@
 //Micronaut {version} includes the following changes:
+== 4.0.0
+
+=== Apache Groovy 4.0
+
+Micronaut Framework 4.x supports https://groovy-lang.org/releasenotes/groovy-4.0.html[Apache Groovy 4.0].
+
+=== Core Changes
+
+
+* <<virtualThreads, Support for Virtual Threads>>
+
+==== Injection of Maps
+
+It is now possible to inject a `java.util.Map` of beans where the key is the bean name. The name of the bean is derived from the <<qualifiers, qualifier>> or (if not present) the simple name of the class.
+
+==== Improved Error Messages for Missing Beans
+
+When a bean annotated with ann:context.annotation.EachProperty[] or ann:context.annotation.Bean[] is not found due to missing configuration an error is thrown showing the configuration prefix necessary to resolve the issue.
+
+=== Other Dependency Upgrades
+
+- Kotlin 1.7.10
+
+<<breaks, Breaking changes in Micronaut Framework 4.0>>
+
+== 3.8.0
+
+Key features:
+
+- https://www.graalvm.org/release-notes/22_3/[GraalVM 22.3 Support]
+- With Micronaut `3.8.0`, you can use `@RequestBean` annotations with https://docs.oracle.com/en/java/javase/14/language/records.html[Records]. Before `3.8.0`, you could use a POJO as a controller method parameter and annotate the parameter with `@RequestBean` to bind any Bindable value (e.g., `HttpRequest`, `@PathVariable`, `@QueryValue` or `@Header` fields).
+- If you enable CORS from any origin while running your app in localhost (e.g., test or development), since `3.8.0`, the `CorsFilter` returns 403 for non-localhost origins to protect you against drive-by localhost attacks.
+
+Please read the https://micronaut.io/2022/12/27/micronaut-framework-3-8-0-released/[Micronaut Framework 3.8.0 announcement blog post]. You will find a detailed overview of what’s new in Micronaut 3.8.0.
+
+== 3.7.0
+
+Several improvements:
+
+- If you want complete control of where your application loads configuration from, for example, due to security restrictions, you can disable the default https://docs.micronaut.io/snapshot/guide/#propertySource[`PropertySourceLoader`] implementations by calling `ApplicationContextBuilder::enableDefaultPropertySources(false)` when starting your application.
+
+- Better `java.time` conversion for YAML configuration
+
+- Client SSL inner configuration is https://docs.micronaut.io/latest/guide/#bootstrap[Bootstrap] context compatible.
+
+- https://docs.micronaut.io/snapshot/api/io/micronaut/http/uri/UriBuilder.html[`UriBuilder`] methods `queryParam` and `replaceQueryParam` ignore null values.
+
+- It is possible to stop the Netty server without stopping the Application context.
+
+- You can declare beans at runtime using interfaces.
+
+- You can mark static methods as `@Executable`.
+
+- A big HTTP client refactor.
+
+**Spring integration improvements**
+
+- https://micronaut-projects.github.io/micronaut-spring/latest/guide/[Micronaut Spring] contains improvements for developers who want to use Micronaut modules with a Spring application or consume Spring libraries from a Micronaut application.
+
+**New modules**:
+
+- https://micronaut-projects.github.io/micronaut-object-storage/latest/guide/[Object Storage].
+
+- https://micronaut-projects.github.io/micronaut-crac/latest/guide/[Micronaut CRaC].
+
+Please read the https://micronaut.io/2022/09/21/micronaut-framework-3-7-0-released/[Micronaut Framework 3.7.0 announcement blog post]. You will find a detailed overview of what’s new in Micronaut 3.7.0.
 
 == 3.6.0
 
@@ -28,7 +94,7 @@ public class AppHttpClientFilter implements HttpClientFilter {
 
 This version upgrades https://netty.io[Netty] from 4.1.77 to 4.1.79. Moreover, it contains improvements to the API to https://docs.micronaut.io/snapshot/guide/#nettyClientPipeline[configure the Netty Client Pipeline] and to https://docs.micronaut.io/snapshot/guide/#nettyServerPipeline[configure the Netty Server Pipeline].
 
-=== Improvements to HtttpClientException
+=== Improvements to HttpClientException
 
 If present a `serviceId` field is populated in the `HttpClientException` and shown in the exception message.
 

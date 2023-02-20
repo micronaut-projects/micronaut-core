@@ -25,7 +25,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
-import io.micronaut.inject.BeanFactory;
+import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 
 import java.util.Collections;
@@ -37,7 +37,7 @@ import java.util.Collections;
  * @since 3.0.0
  */
 @Internal
-public final class InterceptorRegistryBean implements BeanDefinition<InterceptorRegistry>, BeanFactory<InterceptorRegistry>, BeanDefinitionReference<InterceptorRegistry> {
+public final class InterceptorRegistryBean implements InstantiatableBeanDefinition<InterceptorRegistry>, BeanDefinitionReference<InterceptorRegistry> {
     public static final AnnotationMetadata ANNOTATION_METADATA;
 
     static {
@@ -77,12 +77,17 @@ public final class InterceptorRegistryBean implements BeanDefinition<Interceptor
     }
 
     @Override
+    public boolean isConfigurationProperties() {
+        return false;
+    }
+
+    @Override
     public boolean isAbstract() {
         return false;
     }
 
     @Override
-    public InterceptorRegistry build(BeanResolutionContext resolutionContext, BeanContext context, BeanDefinition<InterceptorRegistry> definition) throws BeanInstantiationException {
+    public InterceptorRegistry instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException {
         return new DefaultInterceptorRegistry(context);
     }
 

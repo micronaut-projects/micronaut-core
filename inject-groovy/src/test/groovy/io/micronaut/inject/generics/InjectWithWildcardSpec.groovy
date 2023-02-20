@@ -43,15 +43,15 @@ class InjectWithWildcardSpec extends Specification {
     static class WildCardInject {
         // tests injecting field
         @Inject
-        protected ConversionService<?> conversionService
+        protected ConversionService conversionService
 
         // tests injecting constructor
-        WildCardInject(ConversionService<?> conversionService) {
+        WildCardInject(ConversionService conversionService) {
         }
 
         // tests injection method
         @Inject
-        void setConversionService(ConversionService<?> conversionService) {
+        void setConversionService(ConversionService conversionService) {
             this.conversionService = conversionService
         }
     }

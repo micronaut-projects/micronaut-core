@@ -15,9 +15,6 @@
  */
 package io.micronaut.graal.reflect;
 
-import java.io.IOException;
-import java.io.OutputStream;
-
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.graal.GraalReflectionConfigurer;
 import io.micronaut.inject.ast.ClassElement;
@@ -26,6 +23,9 @@ import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
+
+import java.io.IOException;
+import java.io.OutputStream;
 
 /**
  * Generates Runtime executed Graal configuration.
@@ -40,7 +40,7 @@ final class GraalReflectionMetadataWriter extends AbstractAnnotationMetadataWrit
 
     public GraalReflectionMetadataWriter(ClassElement originatingElement,
                                          AnnotationMetadata annotationMetadata) {
-        super(resolveName(originatingElement), originatingElement, annotationMetadata, false);
+        super(resolveName(originatingElement), originatingElement, annotationMetadata, true);
         this.className = targetClassType.getClassName();
         this.classInternalName = targetClassType.getInternalName();
     }

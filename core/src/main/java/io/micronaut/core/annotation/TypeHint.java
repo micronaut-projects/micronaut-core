@@ -34,7 +34,7 @@ public @interface TypeHint {
     /**
      * @return The types to provide a hint
      */
-    Class[] value() default {};
+    Class<?>[] value() default {};
 
     /**
      * Describes the access.

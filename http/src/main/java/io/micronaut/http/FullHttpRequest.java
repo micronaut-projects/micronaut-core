@@ -15,6 +15,10 @@
  */
 package io.micronaut.http;
 
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.ConversionError;
+import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 
 import java.util.Optional;
@@ -42,6 +46,21 @@ public class FullHttpRequest<B> extends HttpRequestWrapper<B> {
 
     @Override
     public Optional<B> getBody() {
-        return super.getBody(bodyType);
+        ArgumentConversionContext<B> conversionContext = ConversionContext.of(bodyType);
+        Optional<B> body = getBody(conversionContext);
+        if (conversionContext.hasErrors()) {
+            Exception cause = null;
+            Optional<ConversionError> lastError = conversionContext.getLastError();
+            if (lastError.isPresent()) {
+                ConversionError conversionError = lastError.get();
+                cause = conversionError.getCause();
+            }
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            } else if (cause != null) {
+                throw new ConversionErrorException(bodyType, cause);
+            }
+        }
+        return body;
     }
 }

@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.netty.binders;
 
-import io.micronaut.core.async.subscriber.TypedSubscriber;
+import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
@@ -26,6 +26,7 @@ import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.netty.HttpContentProcessor;
+import io.micronaut.http.server.netty.HttpContentProcessorAsReactiveProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
@@ -78,10 +79,10 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
             if (nativeRequest instanceof StreamedHttpRequest) {
                 Argument<?> targetType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
 
-                HttpContentProcessor<?> processor = httpContentProcessorResolver.resolve(nettyHttpRequest, targetType);
+                HttpContentProcessor processor = httpContentProcessorResolver.resolve(nettyHttpRequest, targetType);
 
                 //noinspection unchecked
-                return () -> Optional.of(subscriber -> processor.subscribe(new TypedSubscriber<Object>((Argument) context.getArgument()) {
+                return () -> Optional.of(subscriber -> HttpContentProcessorAsReactiveProcessor.asPublisher(processor.resultType(context.getArgument()), nettyHttpRequest).subscribe(new CompletionAwareSubscriber<>() {
 
                     Subscription s;
 
@@ -99,6 +100,7 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                         if (message instanceof ByteBufHolder) {
                             message = ((ByteBufHolder) message).content();
                             if (message instanceof EmptyByteBuf) {
+                                s.request(1);
                                 return;
                             }
                         }

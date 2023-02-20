@@ -16,8 +16,10 @@
 package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.context.BeanProvider;
+import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.naming.NameUtils;
@@ -32,7 +34,6 @@ import io.netty.buffer.ByteBufInputStream;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
-import jakarta.inject.Singleton;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -46,13 +47,13 @@ import java.util.Optional;
  * @author graemerocher
  * @since 1.0
  */
-@Singleton
+@Prototype
 @Internal
 public class NettyConverters implements TypeConverterRegistrar {
 
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
     private final BeanProvider<MediaTypeCodecRegistry> decoderRegistryProvider;
-    private final ChannelOptionFactory channelOptionFactory;
+    private final BeanProvider<ChannelOptionFactory> channelOptionFactory;
 
     /**
      * Default constructor.
@@ -60,24 +61,24 @@ public class NettyConverters implements TypeConverterRegistrar {
      * @param decoderRegistryProvider The decoder registry provider
      * @param channelOptionFactory The decoder channel option factory
      */
-    public NettyConverters(ConversionService<?> conversionService,
+    public NettyConverters(ConversionService conversionService,
                            //Prevent early initialization of the codecs
                            BeanProvider<MediaTypeCodecRegistry> decoderRegistryProvider,
-                           ChannelOptionFactory channelOptionFactory) {
+                           BeanProvider<ChannelOptionFactory> channelOptionFactory) {
         this.conversionService = conversionService;
         this.decoderRegistryProvider = decoderRegistryProvider;
         this.channelOptionFactory = channelOptionFactory;
     }
 
     @Override
-    public void register(ConversionService<?> conversionService) {
+    public void register(MutableConversionService conversionService) {
         conversionService.addConverter(
                 CharSequence.class,
                 ChannelOption.class,
                 (object, targetType, context) -> {
                     String str = object.toString();
                     String name = NameUtils.underscoreSeparate(str).toUpperCase(Locale.ENGLISH);
-                    return Optional.of(channelOptionFactory.channelOption(name));
+                    return Optional.of(channelOptionFactory.get().channelOption(name));
                 }
         );
 
@@ -108,7 +109,7 @@ public class NettyConverters implements TypeConverterRegistrar {
         conversionService.addConverter(
                 String.class,
                 ChannelOption.class,
-                s -> channelOptionFactory.channelOption(NameUtils.environmentName(s))
+                s -> channelOptionFactory.get().channelOption(NameUtils.environmentName(s))
         );
     }
 

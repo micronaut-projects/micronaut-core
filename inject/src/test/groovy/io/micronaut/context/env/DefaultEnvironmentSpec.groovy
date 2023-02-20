@@ -350,7 +350,7 @@ class DefaultEnvironmentSpec extends Specification {
     void "test disable environment deduction via system property"() {
         when:
         System.setProperty(Environment.CLOUD_PLATFORM_PROPERTY, "GOOGLE_COMPUTE")
-        ApplicationContext ctx1 = ApplicationContext.run()
+        ApplicationContext ctx1 = ApplicationContext.builder().deduceCloudEnvironment(true).build().start()
 
         then:
         ctx1.environment.activeNames.contains(Environment.GOOGLE_COMPUTE)

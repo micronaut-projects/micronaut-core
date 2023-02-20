@@ -23,6 +23,11 @@ import io.micronaut.core.io.ResourceLoader;
 public interface FileSystemResourceLoader extends ResourceLoader {
 
     /**
+     * The resource name prefix.
+     */
+    String PREFIX = "file:";
+
+    /**
      * Creation method.
      * @return loader
      */
@@ -38,6 +43,6 @@ public interface FileSystemResourceLoader extends ResourceLoader {
      */
     @Override
     default boolean supportsPrefix(String path) {
-        return path.startsWith("file:");
+        return path.startsWith(PREFIX);
     }
 }

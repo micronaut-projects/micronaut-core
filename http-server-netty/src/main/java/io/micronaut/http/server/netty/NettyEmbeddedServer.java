@@ -46,14 +46,26 @@ public interface NettyEmbeddedServer
     }
 
     @Override
+    @NonNull
     default NettyEmbeddedServer start() {
         return (NettyEmbeddedServer) EmbeddedServer.super.start();
     }
 
     @Override
+    @NonNull
     default NettyEmbeddedServer stop() {
         return (NettyEmbeddedServer) EmbeddedServer.super.stop();
     }
+
+    /**
+     * Stops the Netty instance, but keeps the ApplicationContext running.
+     * This for CRaC checkpointing purposes.
+     *
+     * @return The stopped NettyEmbeddedServer
+     */
+    @SuppressWarnings("unused") // Used by CRaC
+    @NonNull
+    NettyEmbeddedServer stopServerOnly();
 
     @Override
     default void register(@NonNull NettyServerCustomizer customizer) {

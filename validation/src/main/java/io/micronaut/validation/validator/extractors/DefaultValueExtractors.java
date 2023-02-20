@@ -120,8 +120,8 @@ public class DefaultValueExtractors implements ValueExtractorRegistry {
         }
     };
 
-    private final Map<Class, ValueExtractor> valueExtractors;
-    private final Set<Class> unwrapByDefaultTypes = new HashSet<>(5);
+    private final Map<Class<?>, ValueExtractor> valueExtractors;
+    private final Set<Class<?>> unwrapByDefaultTypes = new HashSet<>(5);
 
     /**
      * Default constructor.
@@ -138,7 +138,7 @@ public class DefaultValueExtractors implements ValueExtractorRegistry {
     @Inject
     protected DefaultValueExtractors(@Nullable BeanContext beanContext) {
         BeanWrapper<DefaultValueExtractors> wrapper = BeanWrapper.findWrapper(this).orElse(null);
-        Map<Class, ValueExtractor> extractorMap = new HashMap<>();
+        Map<Class<?>, ValueExtractor> extractorMap = new HashMap<>();
 
         if (beanContext != null && beanContext.containsBean(ValueExtractor.class)) {
             final Collection<BeanRegistration<ValueExtractor>> valueExtractors =
@@ -146,9 +146,9 @@ public class DefaultValueExtractors implements ValueExtractorRegistry {
             if (CollectionUtils.isNotEmpty(valueExtractors)) {
                 for (BeanRegistration<ValueExtractor> reg : valueExtractors) {
                     final ValueExtractor valueExtractor = reg.getBean();
-                    final Class[] typeParameters = reg.getBeanDefinition().getTypeParameters(ValueExtractor.class);
+                    final Class<?>[] typeParameters = reg.getBeanDefinition().getTypeParameters(ValueExtractor.class);
                     if (ArrayUtils.isNotEmpty(typeParameters)) {
-                        final Class targetType = typeParameters[0];
+                        final Class<?> targetType = typeParameters[0];
                         extractorMap.put(targetType, valueExtractor);
                         if (valueExtractor instanceof UnwrapByDefaultValueExtractor || valueExtractor.getClass().isAnnotationPresent(UnwrapByDefault.class)) {
                             unwrapByDefaultTypes.add(targetType);

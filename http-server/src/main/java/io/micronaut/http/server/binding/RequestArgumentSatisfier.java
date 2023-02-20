@@ -73,7 +73,7 @@ public class RequestArgumentSatisfier {
      * @return The route
      */
     public RouteMatch<?> fulfillArgumentRequirements(RouteMatch<?> route, HttpRequest<?> request, boolean satisfyOptionals) {
-        Collection<Argument> requiredArguments = route.getRequiredArguments();
+        Collection<Argument<?>> requiredArguments = route.getRequiredArguments();
         Map<String, Object> argumentValues;
 
         if (requiredArguments.isEmpty()) {
@@ -82,7 +82,7 @@ public class RequestArgumentSatisfier {
         } else {
             argumentValues = new LinkedHashMap<>(requiredArguments.size());
             // Begin try fulfilling the argument requirements
-            for (Argument argument : requiredArguments) {
+            for (Argument<?> argument : requiredArguments) {
                 getValueForArgument(argument, request, satisfyOptionals).ifPresent(value ->
                     argumentValues.put(argument.getName(), value));
             }
@@ -131,7 +131,7 @@ public class RequestArgumentSatisfier {
 
                 if (argument.getType() == Optional.class) {
                     if (bindingResult.isSatisfied() || satisfyOptionals) {
-                        Optional optionalValue = bindingResult.getValue();
+                        Optional<?> optionalValue = bindingResult.getValue();
                         if (optionalValue.isPresent()) {
                             value = optionalValue.get();
                         } else {
@@ -164,7 +164,7 @@ public class RequestArgumentSatisfier {
      * @param conversionContext The conversion context
      * @return The body argument
      */
-    private Object getValueForBlockingBodyArgumentBinder(HttpRequest<?> request, ArgumentBinder argumentBinder, ArgumentConversionContext conversionContext) {
-        return (UnresolvedArgument) () -> argumentBinder.bind(conversionContext, request);
+    private <T> UnresolvedArgument<T> getValueForBlockingBodyArgumentBinder(HttpRequest<?> request, ArgumentBinder<T, HttpRequest<?>> argumentBinder, ArgumentConversionContext<T> conversionContext) {
+        return () -> argumentBinder.bind(conversionContext, request);
     }
 }

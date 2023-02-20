@@ -34,9 +34,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 class MyBean {
     @TestAnn
     void test() {
-        
+
     }
-    
+
 }
 
 @Retention(RUNTIME)
@@ -52,7 +52,7 @@ class TestInterceptor implements Interceptor {
         invoked = true;
         return context.proceed();
     }
-} 
+}
 
 ''')
         def instance = getBean(context, 'mapperbinding.MyBean')
@@ -82,12 +82,12 @@ import io.micronaut.aop.simple.*;
 class MyBean {
     @TestAnn
     void test() {
-        
+
     }
-    
+
     @TestAnn2
     void test2() {
-        
+
     }
 }
 
@@ -111,7 +111,7 @@ class TestInterceptor implements Interceptor {
         invoked = true;
         return context.proceed();
     }
-} 
+}
 
 @InterceptorBean(TestAnn2.class)
 class AnotherInterceptor implements Interceptor {
@@ -121,7 +121,7 @@ class AnotherInterceptor implements Interceptor {
         invoked = true;
         return context.proceed();
     }
-} 
+}
 ''')
         def instance = getBean(context, 'annbinding2.MyBean')
         def interceptor = getBean(context, 'annbinding2.TestInterceptor')
@@ -177,7 +177,7 @@ class TestInterceptor implements Interceptor {
         invoked = true;
         return context.proceed();
     }
-} 
+}
 
 @Singleton
 class AnotherInterceptor implements Interceptor {
@@ -187,7 +187,7 @@ class AnotherInterceptor implements Interceptor {
         invoked = true;
         return context.proceed();
     }
-} 
+}
 ''')
         def instance = getBean(context, 'annbinding1.MyBean')
         def interceptor = getBean(context, 'annbinding1.TestInterceptor')
@@ -234,7 +234,7 @@ class TestInterceptor implements Interceptor {
         invoked = true;
         return context.proceed();
     }
-} 
+}
 
 @Singleton
 class AnotherInterceptor implements Interceptor {
@@ -244,7 +244,7 @@ class AnotherInterceptor implements Interceptor {
         invoked = true;
         return context.proceed();
     }
-} 
+}
 ''')
         def instance = getBean(context, 'justaround.MyBean')
         def interceptor = getBean(context, 'justaround.TestInterceptor')
@@ -397,9 +397,9 @@ class MyBean {
     @TestAnn
     @TestAnn2
     void test() {
-        
+
     }
-    
+
 }
 
 @Retention(RUNTIME)
@@ -422,7 +422,7 @@ class TestInterceptor implements Interceptor {
         invoked = true;
         return context.proceed();
     }
-} 
+}
 
 @InterceptorBean(TestAnn2.class)
 class AnotherInterceptor implements Interceptor {
@@ -432,7 +432,7 @@ class AnotherInterceptor implements Interceptor {
         invoked = true;
         return context.proceed();
     }
-} 
+}
 ''')
         def instance = getBean(context, 'annbinding2.MyBean')
         def interceptor = getBean(context, 'annbinding2.TestInterceptor')
@@ -445,6 +445,225 @@ class AnotherInterceptor implements Interceptor {
         instance instanceof Intercepted
         interceptor.invoked
         anotherInterceptor.invoked
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test multiple interceptor binding'() {
+        given:
+        ApplicationContext context = buildContext('''
+package multiplebinding;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.NonBinding;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import jakarta.inject.Singleton;
+
+@Retention(RUNTIME)
+@InterceptorBinding(kind = InterceptorKind.AROUND)
+@interface Deadly {
+
+}
+
+@Retention(RUNTIME)
+@InterceptorBinding(kind = InterceptorKind.AROUND)
+@interface Fast {
+}
+
+@Retention(RUNTIME)
+@InterceptorBinding(kind = InterceptorKind.AROUND)
+@interface Slow {
+}
+
+@UFO
+@Inherited
+@Retention(RUNTIME)
+@InterceptorBinding(kind = InterceptorKind.AROUND)
+@interface MissileAnn {
+}
+
+@Inherited
+@Retention(RUNTIME)
+@InterceptorBinding(kind = InterceptorKind.AROUND)
+@interface UFO {
+}
+
+@MissileAnn
+interface Missile {
+    void fire();
+}
+
+@Fast
+@Deadly
+@Singleton
+class FastAndDeadlyMissile implements Missile {
+    public void fire() {
+    }
+}
+
+@Deadly
+@Singleton
+class DeadlyMissile implements Missile {
+    public void fire() {
+    }
+}
+
+@Deadly
+@Singleton
+class GuidedMissile implements Missile {
+
+    @Slow
+    public void lockAndFire() {
+    }
+
+    @Fast
+    public void fire() {
+    }
+
+}
+
+@Slow
+@Deadly
+@Singleton
+class SlowMissile implements Missile {
+    public void fire() {
+    }
+}
+
+@Fast
+@Deadly
+@MissileAnn
+@Singleton
+class FastDeadlyInterceptor implements MethodInterceptor<Object, Object> {
+    public boolean intercepted = false;
+
+    @Override public Object intercept(MethodInvocationContext<Object, Object> context) {
+        intercepted = true;
+        return context.proceed();
+    }
+}
+
+@Slow
+@Deadly
+@MissileAnn
+@Singleton
+class SlowDeadlyInterceptor implements MethodInterceptor<Object, Object> {
+    public boolean intercepted = false;
+
+    @Override public Object intercept(MethodInvocationContext<Object, Object> context) {
+        intercepted = true;
+        return context.proceed();
+    }
+}
+
+@Deadly
+@UFO
+@Singleton
+class DeadlyInterceptor implements MethodInterceptor<Object, Object> {
+    public boolean intercepted = false;
+
+    @Override public Object intercept(MethodInvocationContext<Object, Object> context) {
+        intercepted = true;
+        return context.proceed();
+    }
+
+    public void reset() {
+        intercepted = false;
+    }
+}
+
+@UFO
+@Singleton
+class UFOInterceptor implements MethodInterceptor<Object, Object> {
+    public boolean intercepted = false;
+
+    @Override public Object intercept(MethodInvocationContext<Object, Object> context) {
+        intercepted = true;
+        return context.proceed();
+    }
+
+    public void reset() {
+        intercepted = false;
+    }
+}
+
+''')
+        def fastDeadlyInterceptor = getBean(context, 'multiplebinding.FastDeadlyInterceptor')
+        def slowDeadlyInterceptor = getBean(context, 'multiplebinding.SlowDeadlyInterceptor')
+        def deadlyInterceptor = getBean(context, 'multiplebinding.DeadlyInterceptor')
+        def ufoInterceptor = getBean(context, 'multiplebinding.UFOInterceptor')
+
+        when:
+        fastDeadlyInterceptor.intercepted = false
+        slowDeadlyInterceptor.intercepted = false
+        deadlyInterceptor.intercepted = false
+        ufoInterceptor.intercepted = false
+        def guidedMissile = getBean(context, 'multiplebinding.GuidedMissile');
+        guidedMissile.fire()
+
+        then:
+        fastDeadlyInterceptor.intercepted
+        !slowDeadlyInterceptor.intercepted
+        deadlyInterceptor.intercepted
+        ufoInterceptor.intercepted
+
+        when:
+        fastDeadlyInterceptor.intercepted = false
+        slowDeadlyInterceptor.intercepted = false
+        deadlyInterceptor.intercepted = false
+        ufoInterceptor.intercepted = false
+        guidedMissile = getBean(context, 'multiplebinding.GuidedMissile');
+        guidedMissile.lockAndFire()
+
+        then:
+        !fastDeadlyInterceptor.intercepted
+        slowDeadlyInterceptor.intercepted
+        deadlyInterceptor.intercepted
+        ufoInterceptor.intercepted
+
+        when:
+        fastDeadlyInterceptor.intercepted = false
+        slowDeadlyInterceptor.intercepted = false
+        deadlyInterceptor.intercepted = false
+        ufoInterceptor.intercepted = false
+        def fastAndDeadlyMissile = getBean(context, 'multiplebinding.FastAndDeadlyMissile');
+        fastAndDeadlyMissile.fire()
+
+        then:
+        fastDeadlyInterceptor.intercepted
+        !slowDeadlyInterceptor.intercepted
+        deadlyInterceptor.intercepted
+        ufoInterceptor.intercepted
+
+        when:
+        fastDeadlyInterceptor.intercepted = false
+        slowDeadlyInterceptor.intercepted = false
+        deadlyInterceptor.intercepted = false
+        ufoInterceptor.intercepted = false
+        def slowMissile = getBean(context, 'multiplebinding.SlowMissile');
+        slowMissile.fire()
+
+        then:
+        !fastDeadlyInterceptor.intercepted
+        slowDeadlyInterceptor.intercepted
+        deadlyInterceptor.intercepted
+        ufoInterceptor.intercepted
+
+        when:
+        fastDeadlyInterceptor.intercepted = false
+        slowDeadlyInterceptor.intercepted = false
+        deadlyInterceptor.intercepted = false
+        ufoInterceptor.intercepted = false
+        def anyMissile = getBean(context, 'multiplebinding.DeadlyMissile');
+        anyMissile.fire()
+
+        then:
+        !fastDeadlyInterceptor.intercepted
+        !slowDeadlyInterceptor.intercepted
+        deadlyInterceptor.intercepted
+        ufoInterceptor.intercepted
 
         cleanup:
         context.close()
@@ -467,9 +686,9 @@ class MyBean {
     @TestAnn
     @TestAnn2
     void test() {
-        
+
     }
-    
+
 }
 
 @Retention(RUNTIME)
@@ -524,14 +743,17 @@ class MyBean {
 
     @TestAnn
     void test() {
-        
     }
-    
+
     @TestAnn2
     void test2() {
-        
     }
-    
+
+    @TestAnn
+    @TestAnn2
+    void testBoth() {
+    }
+
 }
 
 @Retention(RUNTIME)
@@ -547,7 +769,7 @@ class MyBean {
 }
 
 
-@InterceptorBean([ TestAnn.class, TestAnn2.class ])
+@InterceptorBean([TestAnn.class, TestAnn2.class])
 class TestInterceptor implements Interceptor {
     long count = 0;
     @Override
@@ -564,13 +786,19 @@ class TestInterceptor implements Interceptor {
         instance.test()
 
         then:
-        interceptor.count == 1
+        interceptor.count == 0
 
         when:
         instance.test2()
 
         then:
-        interceptor.count == 2
+        interceptor.count == 0
+
+        when:
+        instance.testBoth()
+
+        then:
+        interceptor.count == 1
 
         cleanup:
         context.close()

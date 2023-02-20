@@ -47,7 +47,7 @@ public interface ExecutionHandle<T, R> extends AnnotationMetadataDelegate {
     /**
      * @return The declaring type
      */
-    Class getDeclaringType();
+    Class<T> getDeclaringType();
 
     /**
      * @return The required argument types.
@@ -85,8 +85,8 @@ public interface ExecutionHandle<T, R> extends AnnotationMetadataDelegate {
             }
 
             @Override
-            public Class getDeclaringType() {
-                return bean.getClass();
+            public Class<T2> getDeclaringType() {
+                return (Class<T2>) bean.getClass();
             }
 
             @Override

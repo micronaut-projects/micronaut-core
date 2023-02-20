@@ -6,7 +6,7 @@ plugins {
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":graal")
-    api project(":inject")
+    api project(":context")
     api project(":core-reactive")
     implementation libs.managed.reactor
     compileOnly libs.kotlinx.coroutines.core
@@ -16,12 +16,14 @@ dependencies {
 
     testCompileOnly project(":inject-groovy")
     testAnnotationProcessor project(":inject-java")
+    testImplementation project(":jackson-databind")
     testImplementation project(":inject")
     testImplementation project(":runtime")
+    testImplementation(libs.managed.logback.classic)
 }
 
 tasks.named("compileKotlin") {
-    kotlinOptions.jvmTarget = "1.8"
+    kotlinOptions.jvmTarget = "17"
 }
 
 //compileJava.options.fork = true

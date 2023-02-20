@@ -54,7 +54,7 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
 
     private final EmbeddedServer embeddedServer;
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
     private final HttpServerConfiguration configuration;
     private final ApplicationEventPublisher<HttpRequestReceivedEvent> httpRequestReceivedEventPublisher;
 
@@ -64,7 +64,7 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
      * @param configuration     The Http server configuration
      * @param httpRequestReceivedEventPublisher The publisher of {@link HttpRequestReceivedEvent}
      */
-    public HttpRequestDecoder(EmbeddedServer embeddedServer, ConversionService<?> conversionService, HttpServerConfiguration configuration, ApplicationEventPublisher<HttpRequestReceivedEvent> httpRequestReceivedEventPublisher) {
+    public HttpRequestDecoder(EmbeddedServer embeddedServer, ConversionService conversionService, HttpServerConfiguration configuration, ApplicationEventPublisher<HttpRequestReceivedEvent> httpRequestReceivedEventPublisher) {
         this.embeddedServer = embeddedServer;
         this.conversionService = conversionService;
         this.configuration = configuration;

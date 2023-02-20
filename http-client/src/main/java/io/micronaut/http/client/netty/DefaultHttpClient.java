@@ -24,17 +24,19 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.ConversionServiceAware;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.order.OrderUtil;
-import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
@@ -48,6 +50,7 @@ import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ProxyRequestOptions;
@@ -81,27 +84,21 @@ import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
-import io.micronaut.http.netty.channel.ChannelPipelineListener;
-import io.micronaut.http.netty.channel.NettyThreadFactory;
-import io.micronaut.http.netty.stream.DefaultHttp2Content;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
-import io.micronaut.http.netty.stream.Http2Content;
 import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
 import io.micronaut.http.netty.stream.JsonSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
-import io.micronaut.http.netty.stream.StreamingInboundHttp2ToHttpAdapter;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriTemplate;
-import io.micronaut.jackson.databind.JacksonDatabindMapper;
+import io.micronaut.http.util.HttpHeadersUtil;
 import io.micronaut.json.JsonMapper;
-import io.micronaut.json.codec.MapperMediaTypeCodec;
 import io.micronaut.json.codec.JsonMediaTypeCodec;
 import io.micronaut.json.codec.JsonStreamMediaTypeCodec;
+import io.micronaut.json.codec.MapperMediaTypeCodec;
 import io.micronaut.json.tree.JsonNode;
 import io.micronaut.runtime.ApplicationConfiguration;
-import io.micronaut.scheduling.instrument.Instrumentation;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.websocket.WebSocketClient;
@@ -109,28 +106,40 @@ import io.micronaut.websocket.annotation.ClientWebSocket;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.context.WebSocketBean;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
-import io.micronaut.websocket.exceptions.WebSocketSessionException;
-import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.EmptyByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.*;
-import io.netty.channel.nio.NioEventLoopGroup;
-import io.netty.channel.pool.AbstractChannelPoolHandler;
-import io.netty.channel.pool.AbstractChannelPoolMap;
-import io.netty.channel.pool.ChannelHealthChecker;
-import io.netty.channel.pool.ChannelPool;
-import io.netty.channel.pool.ChannelPoolMap;
-import io.netty.channel.pool.FixedChannelPool;
-import io.netty.channel.pool.SimpleChannelPool;
-import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFactory;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.MultithreadEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
-import io.netty.handler.codec.LineBasedFrameDecoder;
 import io.netty.handler.codec.TooLongFrameException;
-import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.DefaultHttpContent;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.DefaultLastHttpContent;
+import io.netty.handler.codec.http.EmptyHttpHeaders;
+import io.netty.handler.codec.http.FullHttpMessage;
+import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaderValues;
+import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpScheme;
+import io.netty.handler.codec.http.HttpUtil;
+import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpDataFactory;
@@ -138,27 +147,12 @@ import io.netty.handler.codec.http.multipart.HttpPostRequestEncoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
-import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketClientCompressionHandler;
-import io.netty.handler.codec.http2.*;
-import io.netty.handler.logging.LoggingHandler;
-import io.netty.handler.proxy.HttpProxyHandler;
-import io.netty.handler.proxy.Socks5ProxyHandler;
-import io.netty.handler.ssl.ApplicationProtocolNames;
-import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
-import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedWriteHandler;
-import io.netty.handler.timeout.IdleStateEvent;
-import io.netty.handler.timeout.IdleStateHandler;
-import io.netty.handler.timeout.ReadTimeoutHandler;
-import io.netty.resolver.NoopAddressResolverGroup;
-import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.Promise;
 import org.reactivestreams.Processor;
 import org.reactivestreams.Publisher;
@@ -170,8 +164,6 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Scheduler;
-import reactor.core.scheduler.Schedulers;
 
 import java.io.Closeable;
 import java.io.File;
@@ -179,30 +171,27 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
-import java.net.Proxy;
-import java.net.Proxy.Type;
-import java.net.SocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
-import static io.micronaut.http.client.HttpClientConfiguration.DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS;
-import static io.micronaut.http.client.HttpClientConfiguration.DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS;
-import static io.micronaut.http.netty.channel.ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS;
-import static io.micronaut.http.netty.channel.ChannelPipelineCustomizer.HANDLER_IDLE_STATE;
 import static io.micronaut.scheduling.instrument.InvocationInstrumenter.NOOP;
 
 /**
@@ -225,16 +214,6 @@ public class DefaultHttpClient implements
      * Default logger, use {@link #log} where possible.
      */
     private static final Logger DEFAULT_LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
-    private static final AttributeKey<Http2Stream> STREAM_KEY = AttributeKey.valueOf("micronaut.http2.stream");
-    private static final AttributeKey<NettyClientCustomizer> CHANNEL_CUSTOMIZER_KEY =
-        AttributeKey.valueOf("micronaut.http.customizer");
-    /**
-     * Future on a pooled channel that will be completed when the channel has fully connected (e.g.
-     * TLS handshake has completed). If unset, then no handshake is needed or it has already
-     * completed.
-     */
-    private static final AttributeKey<Future<?>> STREAM_CHANNEL_INITIALIZED =
-        AttributeKey.valueOf("micronaut.http.streamChannelInitialized");
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
 
@@ -259,34 +238,23 @@ public class DefaultHttpClient implements
         REDIRECT_HEADER_BLOCKLIST.add(HttpHeaderNames.CONNECTION, "");
     }
 
-    protected final Bootstrap bootstrap;
-    protected EventLoopGroup group;
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
 
+    ConnectionManager connectionManager;
+
     private final List<HttpFilterResolver.FilterEntry<HttpClientFilter>> clientFilterEntries;
-    private final io.micronaut.http.HttpVersion httpVersion;
-    private final Scheduler scheduler;
     private final LoadBalancer loadBalancer;
     private final HttpClientConfiguration configuration;
     private final String contextPath;
-    private final SslContext sslContext;
-    private final ThreadFactory threadFactory;
-    private final boolean shutdownGroup;
     private final Charset defaultCharset;
-    private final ChannelPoolMap<RequestKey, ChannelPool> poolMap;
     private final Logger log;
-    private final @Nullable
-    Long readTimeoutMillis;
-    private final @Nullable
-    Long connectionTimeAliveMillis;
     private final HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver;
     private final WebSocketBeanRegistry webSocketRegistry;
     private final RequestBinderRegistry requestBinderRegistry;
-    private final Collection<ChannelPipelineListener> pipelineListeners;
-    private final NettyClientCustomizer clientCustomizer;
     private final List<InvocationInstrumenterFactory> invocationInstrumenterFactories;
     private final String informationalServiceId;
+    private final ConversionService conversionService;
 
     /**
      * Construct a client for the given arguments.
@@ -299,6 +267,7 @@ public class DefaultHttpClient implements
      * @param codecRegistry                   The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
      * @param annotationMetadataResolver      The annotation metadata resolver
      * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument netty handlers execution with
+     * @param conversionService               The conversion service
      * @param filters                         The filters to use
      */
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
@@ -309,9 +278,10 @@ public class DefaultHttpClient implements
             MediaTypeCodecRegistry codecRegistry,
             @Nullable AnnotationMetadataResolver annotationMetadataResolver,
             List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
+            ConversionService conversionService,
             HttpClientFilter... filters) {
         this(loadBalancer,
-            configuration.getHttpVersion(),
+            null,
             configuration,
             contextPath,
             new DefaultHttpClientFilterResolver(annotationMetadataResolver, Arrays.asList(filters)),
@@ -320,18 +290,19 @@ public class DefaultHttpClient implements
             nettyClientSslBuilder,
             codecRegistry,
             WebSocketBeanRegistry.EMPTY,
-            new DefaultRequestBinderRegistry(ConversionService.SHARED),
+            new DefaultRequestBinderRegistry(conversionService),
             null,
             NioSocketChannel::new,
-            Collections.emptySet(),
             CompositeNettyClientCustomizer.EMPTY,
-            invocationInstrumenterFactories, null);
+            invocationInstrumenterFactories,
+            null,
+            conversionService);
     }
 
     /**
      * Construct a client for the given arguments.
      *  @param loadBalancer                    The {@link LoadBalancer} to use for selecting servers
-     * @param httpVersion                     The HTTP version to use. Can be null and defaults to {@link io.micronaut.http.HttpVersion#HTTP_1_1}
+     * @param explicitHttpVersion                     The HTTP version to use. Can be null and defaults to {@link io.micronaut.http.HttpVersion#HTTP_1_1}
      * @param configuration                   The {@link HttpClientConfiguration} object
      * @param contextPath                     The base URI to prepend to request uris
      * @param filterResolver                  The http client filter resolver
@@ -343,13 +314,13 @@ public class DefaultHttpClient implements
      * @param requestBinderRegistry           The request binder registry
      * @param eventLoopGroup                  The event loop group to use
      * @param socketChannelFactory            The socket channel factory
-     * @param pipelineListeners               The listeners to call for pipeline customization
      * @param clientCustomizer                The pipeline customizer
      * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument netty handlers execution with
      * @param informationalServiceId          Optional service ID that will be passed to exceptions created by this client
+     * @param conversionService               The conversion service
      */
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
-                             @Nullable io.micronaut.http.HttpVersion httpVersion,
+                             @Nullable HttpVersionSelection explicitHttpVersion,
                              @NonNull HttpClientConfiguration configuration,
                              @Nullable String contextPath,
                              @NonNull HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
@@ -361,10 +332,10 @@ public class DefaultHttpClient implements
                              @NonNull RequestBinderRegistry requestBinderRegistry,
                              @Nullable EventLoopGroup eventLoopGroup,
                              @NonNull ChannelFactory socketChannelFactory,
-                             Collection<ChannelPipelineListener> pipelineListeners,
                              NettyClientCustomizer clientCustomizer,
                              List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
-                             @Nullable String informationalServiceId
+                             @Nullable String informationalServiceId,
+                             ConversionService conversionService
     ) {
         ArgumentUtils.requireNonNull("nettyClientSslBuilder", nettyClientSslBuilder);
         ArgumentUtils.requireNonNull("codecRegistry", codecRegistry);
@@ -374,7 +345,6 @@ public class DefaultHttpClient implements
         ArgumentUtils.requireNonNull("filterResolver", filterResolver);
         ArgumentUtils.requireNonNull("socketChannelFactory", socketChannelFactory);
         this.loadBalancer = loadBalancer;
-        this.httpVersion = httpVersion != null ? httpVersion : configuration.getHttpVersion();
         this.defaultCharset = configuration.getDefaultCharset();
         if (StringUtils.isNotEmpty(contextPath)) {
             if (contextPath.charAt(0) != '/') {
@@ -384,93 +354,11 @@ public class DefaultHttpClient implements
         } else {
             this.contextPath = null;
         }
-        this.bootstrap = new Bootstrap();
         this.configuration = configuration;
-        this.sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration(), this.httpVersion).orElse(null);
-        if (eventLoopGroup != null) {
-            this.group = eventLoopGroup;
-            this.shutdownGroup = false;
-        } else {
-            this.group = createEventLoopGroup(configuration, threadFactory);
-            this.shutdownGroup = true;
-        }
-
-        this.scheduler = Schedulers.fromExecutorService(group);
-        this.threadFactory = threadFactory;
-        this.bootstrap.group(group)
-                .channelFactory(socketChannelFactory)
-                .option(ChannelOption.SO_KEEPALIVE, true);
-
-        Optional<Duration> readTimeout = configuration.getReadTimeout();
-        this.readTimeoutMillis = readTimeout.map(duration -> !duration.isNegative() ? duration.toMillis() : null).orElse(null);
-
-        Optional<Duration> connectTtl = configuration.getConnectTtl();
-        this.connectionTimeAliveMillis = connectTtl.map(duration -> !duration.isNegative() ? duration.toMillis() : null).orElse(null);
-        final ChannelHealthChecker channelHealthChecker = channel -> channel.eventLoop().newSucceededFuture(channel.isActive() && !ConnectTTLHandler.isChannelExpired(channel));
 
         this.invocationInstrumenterFactories =
                 invocationInstrumenterFactories == null ? Collections.emptyList() : invocationInstrumenterFactories;
 
-        HttpClientConfiguration.ConnectionPoolConfiguration connectionPoolConfiguration = configuration.getConnectionPoolConfiguration();
-        // HTTP/2 defaults to keep alive connections so should we should always use a pool
-        if (connectionPoolConfiguration.isEnabled() || this.httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
-            int maxConnections = connectionPoolConfiguration.getMaxConnections();
-            if (maxConnections > -1) {
-                poolMap = new AbstractChannelPoolMap<RequestKey, ChannelPool>() {
-                    @Override
-                    protected ChannelPool newPool(RequestKey key) {
-                        Bootstrap newBootstrap = bootstrap.clone(group);
-                        initBootstrapForProxy(newBootstrap, key.isSecure(), key.getHost(), key.getPort());
-                        newBootstrap.remoteAddress(key.getRemoteAddress());
-
-                        AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
-                        final long acquireTimeoutMillis = connectionPoolConfiguration.getAcquireTimeout().map(Duration::toMillis).orElse(-1L);
-                        return new FixedChannelPool(
-                                newBootstrap,
-                                channelPoolHandler,
-                                channelHealthChecker,
-                                acquireTimeoutMillis > -1 ? FixedChannelPool.AcquireTimeoutAction.FAIL : null,
-                                acquireTimeoutMillis,
-                                maxConnections,
-                                connectionPoolConfiguration.getMaxPendingAcquires()
-
-                        );
-                    }
-                };
-            } else {
-                poolMap = new AbstractChannelPoolMap<RequestKey, ChannelPool>() {
-                    @Override
-                    protected ChannelPool newPool(RequestKey key) {
-                        Bootstrap newBootstrap = bootstrap.clone(group);
-                        initBootstrapForProxy(newBootstrap, key.isSecure(), key.getHost(), key.getPort());
-                        newBootstrap.remoteAddress(key.getRemoteAddress());
-
-                        AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
-                        return new SimpleChannelPool(
-                                newBootstrap,
-                                channelPoolHandler,
-                                channelHealthChecker
-                        );
-                    }
-                };
-            }
-        } else {
-            this.poolMap = null;
-        }
-
-        Optional<Duration> connectTimeout = configuration.getConnectTimeout();
-        connectTimeout.ifPresent(duration -> this.bootstrap.option(
-                ChannelOption.CONNECT_TIMEOUT_MILLIS,
-                (int) duration.toMillis()
-        ));
-
-        for (Map.Entry<String, Object> entry : configuration.getChannelOptions().entrySet()) {
-            Object v = entry.getValue();
-            if (v != null) {
-                String channelOption = entry.getKey();
-                bootstrap.option(ChannelOption.valueOf(channelOption), v);
-            }
-        }
         this.mediaTypeCodecRegistry = codecRegistry;
         this.log = configuration.getLoggerName().map(LoggerFactory::getLogger).orElse(DEFAULT_LOG);
         this.filterResolver = filterResolver;
@@ -483,9 +371,20 @@ public class DefaultHttpClient implements
         }
         this.webSocketRegistry = webSocketBeanRegistry != null ? webSocketBeanRegistry : WebSocketBeanRegistry.EMPTY;
         this.requestBinderRegistry = requestBinderRegistry;
-        this.pipelineListeners = pipelineListeners;
-        this.clientCustomizer = clientCustomizer;
         this.informationalServiceId = informationalServiceId;
+        this.conversionService = conversionService;
+
+        this.connectionManager = new ConnectionManager(
+            log,
+            eventLoopGroup,
+            threadFactory,
+            configuration,
+            explicitHttpVersion,
+            combineFactories(),
+            socketChannelFactory,
+            nettyClientSslBuilder,
+            clientCustomizer,
+            informationalServiceId);
     }
 
     /**
@@ -512,7 +411,7 @@ public class DefaultHttpClient implements
                 new NettyClientSslBuilder(new ResourceResolver()),
                 createDefaultMediaTypeRegistry(),
                 AnnotationMetadataResolver.DEFAULT,
-                Collections.emptyList());
+                Collections.emptyList(), ConversionService.SHARED);
     }
 
     /**
@@ -526,7 +425,12 @@ public class DefaultHttpClient implements
                 new NettyClientSslBuilder(new ResourceResolver()),
                 createDefaultMediaTypeRegistry(),
                 AnnotationMetadataResolver.DEFAULT,
-                invocationInstrumenterFactories);
+                invocationInstrumenterFactories, ConversionService.SHARED);
+    }
+
+    static boolean isAcceptEvents(io.micronaut.http.HttpRequest<?> request) {
+        String acceptHeader = request.getHeaders().get(io.micronaut.http.HttpHeaders.ACCEPT);
+        return acceptHeader != null && acceptHeader.equalsIgnoreCase(MediaType.TEXT_EVENT_STREAM);
     }
 
     /**
@@ -546,65 +450,20 @@ public class DefaultHttpClient implements
     @Override
     public HttpClient start() {
         if (!isRunning()) {
-            this.group = createEventLoopGroup(configuration, threadFactory);
+            connectionManager.start();
         }
         return this;
     }
 
     @Override
     public boolean isRunning() {
-        return !group.isShutdown();
+        return connectionManager.isRunning();
     }
 
     @Override
     public HttpClient stop() {
         if (isRunning()) {
-            if (poolMap instanceof Iterable) {
-                Iterable<Map.Entry<RequestKey, ChannelPool>> i = (Iterable) poolMap;
-                for (Map.Entry<RequestKey, ChannelPool> entry : i) {
-                    ChannelPool cp = entry.getValue();
-                    try {
-                        if (cp instanceof SimpleChannelPool) {
-                            addInstrumentedListener(((SimpleChannelPool) cp).closeAsync(), future -> {
-                                if (!future.isSuccess()) {
-                                    final Throwable cause = future.cause();
-                                    if (cause != null) {
-                                        log.error("Error shutting down HTTP client connection pool: " + cause.getMessage(), cause);
-                                    }
-                                }
-                            });
-                        } else {
-                            cp.close();
-                        }
-                    } catch (Exception cause) {
-                        log.error("Error shutting down HTTP client connection pool: " + cause.getMessage(), cause);
-                    }
-
-                }
-            }
-            if (shutdownGroup) {
-                Duration shutdownTimeout = configuration.getShutdownTimeout()
-                    .orElse(Duration.ofMillis(DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS));
-                Duration shutdownQuietPeriod = configuration.getShutdownQuietPeriod()
-                    .orElse(Duration.ofMillis(DEFAULT_SHUTDOWN_QUIET_PERIOD_MILLISECONDS));
-
-                Future<?> future = this.group.shutdownGracefully(
-                        shutdownQuietPeriod.toMillis(),
-                        shutdownTimeout.toMillis(),
-                        TimeUnit.MILLISECONDS
-                );
-                addInstrumentedListener(future, f -> {
-                    if (!f.isSuccess() && log.isErrorEnabled()) {
-                        Throwable cause = f.cause();
-                        log.error("Error shutting down HTTP client: " + cause.getMessage(), cause);
-                    }
-                });
-                try {
-                    future.await(shutdownTimeout.toMillis());
-                } catch (InterruptedException e) {
-                    // ignore
-                }
-            }
+            connectionManager.shutdown();
         }
         return this;
     }
@@ -638,7 +497,8 @@ public class DefaultHttpClient implements
 
             @Override
             public <I, O, E> io.micronaut.http.HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
-                Flux<HttpResponse<O>> publisher = Flux.from(DefaultHttpClient.this.exchange(request, bodyType, errorType));
+                BlockHint blockHint = BlockHint.willBlockThisThread();
+                Flux<HttpResponse<O>> publisher = Flux.from(DefaultHttpClient.this.exchange(request, bodyType, errorType, blockHint));
                 return publisher.doOnNext(res -> {
                     Optional<ByteBuf> byteBuf = res.getBody(ByteBuf.class);
                     byteBuf.ifPresent(bb -> {
@@ -677,9 +537,15 @@ public class DefaultHttpClient implements
         };
     }
 
+    @NonNull
+    private <I> MutableHttpRequest<?> toMutableRequest(io.micronaut.http.HttpRequest<I> request) {
+        return MutableHttpRequestWrapper.wrapIfNecessary(conversionService, request);
+    }
+
     @SuppressWarnings("SubscriberImplementation")
     @Override
     public <I> Publisher<Event<ByteBuffer<?>>> eventStream(@NonNull io.micronaut.http.HttpRequest<I> request) {
+        setupConversionService(request);
         return eventStreamOrError(request, null);
     }
 
@@ -812,11 +678,13 @@ public class DefaultHttpClient implements
     @Override
     public <I, B> Publisher<Event<B>> eventStream(@NonNull io.micronaut.http.HttpRequest<I> request,
                                                   @NonNull Argument<B> eventType) {
+        setupConversionService(request);
         return eventStream(request, eventType, DEFAULT_ERROR_TYPE);
     }
 
     @Override
     public <I, B> Publisher<Event<B>> eventStream(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<B> eventType, @NonNull Argument<?> errorType) {
+        setupConversionService(request);
         return Flux.from(eventStreamOrError(request, errorType)).map(byteBufferEvent -> {
             ByteBuffer<?> data = byteBufferEvent.getData();
             Optional<MediaTypeCodec> registeredCodec;
@@ -838,14 +706,16 @@ public class DefaultHttpClient implements
 
     @Override
     public <I> Publisher<ByteBuffer<?>> dataStream(@NonNull io.micronaut.http.HttpRequest<I> request) {
+        setupConversionService(request);
         return dataStream(request, DEFAULT_ERROR_TYPE);
     }
 
     @Override
     public <I> Publisher<ByteBuffer<?>> dataStream(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<?> errorType) {
+        setupConversionService(request);
         final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         return new MicronautFlux<>(Flux.from(resolveRequestURI(request))
-                .flatMap(requestURI -> dataStreamImpl(request, errorType, parentRequest, requestURI)))
+                .flatMap(requestURI -> dataStreamImpl(toMutableRequest(request), errorType, parentRequest, requestURI)))
                 .doAfterNext(buffer -> {
                     Object o = buffer.asNativeBuffer();
                     if (o instanceof ByteBuf) {
@@ -864,9 +734,10 @@ public class DefaultHttpClient implements
 
     @Override
     public <I> Publisher<io.micronaut.http.HttpResponse<ByteBuffer<?>>> exchangeStream(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<?> errorType) {
+        setupConversionService(request);
         io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         return new MicronautFlux<>(Flux.from(resolveRequestURI(request))
-                .flatMap(uri -> exchangeStreamImpl(parentRequest, request, errorType, uri)))
+                .flatMap(uri -> exchangeStreamImpl(parentRequest, toMutableRequest(request), errorType, uri)))
                 .doAfterNext(byteBufferHttpResponse -> {
                     ByteBuffer<?> buffer = byteBufferHttpResponse.body();
                     if (buffer instanceof ReferenceCounted) {
@@ -882,9 +753,11 @@ public class DefaultHttpClient implements
 
     @Override
     public <I, O> Publisher<O> jsonStream(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<O> type, @NonNull Argument<?> errorType) {
+        setupConversionService(request);
         final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
+        setupConversionService(parentRequest);
         return Flux.from(resolveRequestURI(request))
-                .flatMap(requestURI -> jsonStreamImpl(parentRequest, request, type, errorType, requestURI));
+                .flatMap(requestURI -> jsonStreamImpl(parentRequest, toMutableRequest(request), type, errorType, requestURI));
     }
 
     @SuppressWarnings("unchecked")
@@ -895,21 +768,34 @@ public class DefaultHttpClient implements
 
     @Override
     public <I, O> Publisher<O> jsonStream(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Class<O> type) {
+        setupConversionService(request);
         return jsonStream(request, io.micronaut.core.type.Argument.of(type));
     }
 
     @Override
     public <I, O, E> Publisher<io.micronaut.http.HttpResponse<O>> exchange(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType) {
+        return exchange(request, bodyType, errorType, null);
+    }
+
+    @NonNull
+    private <I, O, E> Flux<HttpResponse<O>> exchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType, @Nullable BlockHint blockHint) {
+        setupConversionService(request);
         final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         Publisher<URI> uriPublisher = resolveRequestURI(request);
         return Flux.from(uriPublisher)
-                .switchMap(uri -> exchangeImpl(uri, parentRequest, request, bodyType, errorType));
+            .switchMap(uri -> exchangeImpl(uri, parentRequest, toMutableRequest(request), bodyType, errorType, blockHint));
     }
 
     @Override
     public <I, O, E> Publisher<O> retrieve(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
+        setupConversionService(request);
         // mostly same as default impl, but with exception customization
-        return Flux.from(exchange(request, bodyType, errorType)).map(response -> {
+        Flux<HttpResponse<O>> exchange = Flux.from(exchange(request, bodyType, errorType));
+        if (bodyType.getType() == void.class) {
+            // exchange() returns a HttpResponse<Void>, we can't map the Void body properly, so just drop it and complete
+            return (Publisher<O>) exchange.ignoreElements();
+        }
+        return exchange.map(response -> {
             if (bodyType.getType() == HttpStatus.class) {
                 return (O) response.getStatus();
             } else {
@@ -931,6 +817,7 @@ public class DefaultHttpClient implements
 
     @Override
     public <T extends AutoCloseable> Publisher<T> connect(Class<T> clientEndpointType, io.micronaut.http.MutableHttpRequest<?> request) {
+        setupConversionService(request);
         Publisher<URI> uriPublisher = resolveRequestURI(request);
         return Flux.from(uriPublisher)
                 .switchMap(resolvedURI -> connectWebSocket(resolvedURI, request, clientEndpointType, null));
@@ -954,100 +841,53 @@ public class DefaultHttpClient implements
         stop();
     }
 
-    private <T> Flux<T> connectWebSocket(URI uri, MutableHttpRequest<?> request, Class<T> clientEndpointType, WebSocketBean<T> webSocketBean) {
-        Bootstrap bootstrap = this.bootstrap.clone();
+    private <T> Publisher<T> connectWebSocket(URI uri, MutableHttpRequest<?> request, Class<T> clientEndpointType, WebSocketBean<T> webSocketBean) {
+        RequestKey requestKey;
+        try {
+            requestKey = new RequestKey(this, uri);
+        } catch (HttpClientException e) {
+            return Flux.error(e);
+        }
+
         if (webSocketBean == null) {
             webSocketBean = webSocketRegistry.getWebSocket(clientEndpointType);
         }
 
-        WebSocketBean<T> finalWebSocketBean = webSocketBean;
-        return Flux.create(emitter -> {
-            SslContext sslContext = buildSslContext(uri);
-            WebSocketVersion protocolVersion = finalWebSocketBean.getBeanDefinition().enumValue(ClientWebSocket.class, "version", WebSocketVersion.class).orElse(WebSocketVersion.V13);
-            int maxFramePayloadLength = finalWebSocketBean.messageMethod()
-                    .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
-                            .orElse(65536)).orElse(65536);
-            String subprotocol = finalWebSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class, "subprotocol").orElse(StringUtils.EMPTY_STRING);
+        WebSocketVersion protocolVersion = webSocketBean.getBeanDefinition().enumValue(ClientWebSocket.class, "version", WebSocketVersion.class).orElse(WebSocketVersion.V13);
+        int maxFramePayloadLength = webSocketBean.messageMethod()
+            .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
+                .orElse(65536)).orElse(65536);
+        String subprotocol = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class, "subprotocol").orElse(StringUtils.EMPTY_STRING);
+        URI webSocketURL = UriBuilder.of(uri)
+            .scheme(!requestKey.isSecure() ? "ws" : "wss")
+            .host(requestKey.getHost())
+            .port(requestKey.getPort())
+            .build();
 
-            RequestKey requestKey;
-            try {
-                requestKey = new RequestKey(this, uri);
-            } catch (HttpClientException e) {
-                emitter.error(e);
-                return;
-            }
+        MutableHttpHeaders headers = request.getHeaders();
+        HttpHeaders customHeaders = EmptyHttpHeaders.INSTANCE;
+        if (headers instanceof NettyHttpHeaders) {
+            customHeaders = ((NettyHttpHeaders) headers).getNettyHeaders();
+        }
+        if (StringUtils.isNotEmpty(subprotocol)) {
+            customHeaders.add("Sec-WebSocket-Protocol", subprotocol);
+        }
 
-            bootstrap.remoteAddress(requestKey.getHost(), requestKey.getPort());
-            initBootstrapForProxy(bootstrap, sslContext != null, requestKey.getHost(), requestKey.getPort());
-            bootstrap.handler(new HttpClientInitializer(
-                    sslContext,
-                    requestKey.getHost(),
-                    requestKey.getPort(),
-                    false,
-                    false,
-                    false,
-                    null
-            ) {
-                @Override
-                protected void addFinalHandler(ChannelPipeline pipeline) {
-                    pipeline.remove(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER);
-                    ReadTimeoutHandler readTimeoutHandler = pipeline.get(ReadTimeoutHandler.class);
-                    if (readTimeoutHandler != null) {
-                        pipeline.remove(readTimeoutHandler);
-                    }
+        NettyWebSocketClientHandler<T> handler = new NettyWebSocketClientHandler<>(
+            request,
+            webSocketBean,
+            WebSocketClientHandshakerFactory.newHandshaker(
+                webSocketURL, protocolVersion, subprotocol, true, customHeaders, maxFramePayloadLength),
+            requestBinderRegistry,
+            mediaTypeCodecRegistry,
+            conversionService);
 
-                    Optional<Duration> readIdleTime = configuration.getReadIdleTimeout();
-                    if (readIdleTime.isPresent()) {
-                        Duration duration = readIdleTime.get();
-                        if (!duration.isNegative()) {
-                            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new IdleStateHandler(duration.toMillis(), duration.toMillis(), duration.toMillis(), TimeUnit.MILLISECONDS));
-                        }
-                    }
-
-                    final NettyWebSocketClientHandler webSocketHandler;
-                    try {
-                        String scheme =  (sslContext == null) ? "ws" : "wss";
-                        URI webSocketURL = UriBuilder.of(uri)
-                                .scheme(scheme)
-                                .host(host)
-                                .port(port)
-                                .build();
-
-                        MutableHttpHeaders headers = request.getHeaders();
-                        HttpHeaders customHeaders = EmptyHttpHeaders.INSTANCE;
-                        if (headers instanceof NettyHttpHeaders) {
-                            customHeaders = ((NettyHttpHeaders) headers).getNettyHeaders();
-                        }
-                        if (StringUtils.isNotEmpty(subprotocol)) {
-                            customHeaders.add("Sec-WebSocket-Protocol", subprotocol);
-                        }
-
-                        webSocketHandler = new NettyWebSocketClientHandler<>(
-                                request,
-                                finalWebSocketBean,
-                                WebSocketClientHandshakerFactory.newHandshaker(
-                                        webSocketURL, protocolVersion, subprotocol, true, customHeaders, maxFramePayloadLength),
-                                requestBinderRegistry,
-                                mediaTypeCodecRegistry,
-                                emitter);
-                        pipeline.addLast(WebSocketClientCompressionHandler.INSTANCE);
-                        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_WEBSOCKET_CLIENT, webSocketHandler);
-                    } catch (Throwable e) {
-                        emitter.error(new WebSocketSessionException("Error opening WebSocket client session: " + e.getMessage(), e));
-                    }
-                }
-            });
-
-            addInstrumentedListener(bootstrap.connect(), future -> {
-                if (!future.isSuccess()) {
-                    emitter.error(future.cause());
-                }
-            });
-        }, FluxSink.OverflowStrategy.ERROR);
+        return connectionManager.connectForWebsocket(requestKey, handler)
+            .then(handler.getHandshakeCompletedMono());
     }
 
-    private <I> Flux<HttpResponse<ByteBuffer<?>>> exchangeStreamImpl(io.micronaut.http.HttpRequest<Object> parentRequest, io.micronaut.http.HttpRequest<I> request, Argument<?> errorType, URI requestURI) {
-        Flux<HttpResponse<Object>> streamResponsePublisher = Flux.from(buildStreamExchange(parentRequest, request, requestURI, errorType));
+    private <I> Flux<HttpResponse<ByteBuffer<?>>> exchangeStreamImpl(io.micronaut.http.HttpRequest<Object> parentRequest, MutableHttpRequest<I> request, Argument<?> errorType, URI requestURI) {
+        Flux<HttpResponse<?>> streamResponsePublisher = Flux.from(buildStreamExchange(parentRequest, request, requestURI, errorType));
         return streamResponsePublisher.switchMap(response -> {
             StreamedHttpResponse streamedHttpResponse = NettyHttpResponseBuilder.toStreamResponse(response);
             Flux<HttpContent> httpContentReactiveSequence = Flux.from(streamedHttpResponse);
@@ -1061,26 +901,15 @@ public class DefaultHttpClient implements
                             traceBody("Response", byteBuf);
                         }
                         ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
-                        NettyStreamedHttpResponse<ByteBuffer<?>> thisResponse = new NettyStreamedHttpResponse<>(
-                                streamedHttpResponse,
-                                response.status()
-                        );
+                        NettyStreamedHttpResponse<ByteBuffer<?>> thisResponse = new NettyStreamedHttpResponse<>(streamedHttpResponse, conversionService);
                         thisResponse.setBody(byteBuffer);
                         return (HttpResponse<ByteBuffer<?>>) new HttpResponseWrapper<>(thisResponse);
                     });
-        }).doOnTerminate(() -> {
-            final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
-            if (o instanceof Channel) {
-                final Channel c = (Channel) o;
-                if (c.isOpen()) {
-                    c.close();
-                }
-            }
         });
     }
 
-    private <I, O> Flux<O> jsonStreamImpl(io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<I> request, Argument<O> type, Argument<?> errorType, URI requestURI) {
-        Flux<HttpResponse<Object>> streamResponsePublisher =
+    private <I, O> Flux<O> jsonStreamImpl(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<I> request, Argument<O> type, Argument<?> errorType, URI requestURI) {
+        Flux<HttpResponse<?>> streamResponsePublisher =
                 Flux.from(buildStreamExchange(parentRequest, request, requestURI, errorType));
         return streamResponsePublisher.switchMap(response -> {
             if (!(response instanceof NettyStreamedHttpResponse)) {
@@ -1112,19 +941,11 @@ public class DefaultHttpClient implements
             }, streamArray);
             return Flux.from(jsonProcessor)
                     .map(jsonNode -> mediaTypeCodec.decode(type, jsonNode));
-        }).doOnTerminate(() -> {
-            final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
-            if (o instanceof Channel) {
-                final Channel c = (Channel) o;
-                if (c.isOpen()) {
-                    c.close();
-                }
-            }
         });
     }
 
-    private <I> Flux<ByteBuffer<?>> dataStreamImpl(io.micronaut.http.HttpRequest<I> request, Argument<?> errorType, io.micronaut.http.HttpRequest<Object> parentRequest, URI requestURI) {
-        Flux<HttpResponse<Object>> streamResponsePublisher = Flux.from(buildStreamExchange(parentRequest, request, requestURI, errorType));
+    private <I> Flux<ByteBuffer<?>> dataStreamImpl(MutableHttpRequest<I> request, Argument<?> errorType, io.micronaut.http.HttpRequest<Object> parentRequest, URI requestURI) {
+        Flux<HttpResponse<?>> streamResponsePublisher = Flux.from(buildStreamExchange(parentRequest, request, requestURI, errorType));
         Function<HttpContent, ByteBuffer<?>> contentMapper = message -> {
             ByteBuf byteBuf = message.content();
             return byteBufferFactory.wrap(byteBuf);
@@ -1138,15 +959,6 @@ public class DefaultHttpClient implements
                     return httpContentReactiveSequence
                             .filter(message -> !(message.content() instanceof EmptyByteBuf))
                             .map(contentMapper);
-                })
-                .doOnTerminate(() -> {
-                    final Object o = request.getAttribute(NettyClientHttpRequest.CHANNEL).orElse(null);
-                    if (o instanceof Channel) {
-                        final Channel c = (Channel) o;
-                        if (c.isOpen()) {
-                            c.close();
-                        }
-                    }
                 });
     }
 
@@ -1154,14 +966,14 @@ public class DefaultHttpClient implements
      * Implementation of {@link #jsonStream}, {@link #dataStream}, {@link #exchangeStream}.
      */
     @SuppressWarnings("MagicNumber")
-    private  <I> Publisher<MutableHttpResponse<Object>> buildStreamExchange(
+    private  <I> Publisher<MutableHttpResponse<?>> buildStreamExchange(
             @Nullable io.micronaut.http.HttpRequest<?> parentRequest,
-            @NonNull io.micronaut.http.HttpRequest<I> request,
+            @NonNull MutableHttpRequest<I> request,
             @NonNull URI requestURI,
             @Nullable Argument<?> errorType) {
 
-        AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper = new AtomicReference<>(request);
-        Flux<MutableHttpResponse<Object>> streamResponsePublisher = connectAndStream(parentRequest, request, requestURI, buildSslContext(requestURI), requestWrapper, false, true);
+        AtomicReference<MutableHttpRequest<?>> requestWrapper = new AtomicReference<>(request);
+        Flux<MutableHttpResponse<?>> streamResponsePublisher = connectAndStream(parentRequest, request, requestURI, requestWrapper, false, true);
 
         streamResponsePublisher = readBodyOnError(errorType, streamResponsePublisher);
 
@@ -1170,7 +982,7 @@ public class DefaultHttpClient implements
                 applyFilterToResponsePublisher(parentRequest, request, requestURI, requestWrapper, streamResponsePublisher)
         );
 
-        return streamResponsePublisher.subscribeOn(scheduler);
+        return streamResponsePublisher;
     }
 
     @Override
@@ -1181,17 +993,16 @@ public class DefaultHttpClient implements
     @Override
     public Publisher<MutableHttpResponse<?>> proxy(@NonNull io.micronaut.http.HttpRequest<?> request, @NonNull ProxyRequestOptions options) {
         Objects.requireNonNull(options, "options");
+        setupConversionService(request);
         return Flux.from(resolveRequestURI(request))
                 .flatMap(requestURI -> {
-                    io.micronaut.http.MutableHttpRequest<?> httpRequest = request instanceof MutableHttpRequest
-                            ? (io.micronaut.http.MutableHttpRequest<?>) request
-                            : request.mutate();
+                    io.micronaut.http.MutableHttpRequest<?> httpRequest = toMutableRequest(request);
                     if (!options.isRetainHostHeader()) {
                         httpRequest.headers(headers -> headers.remove(HttpHeaderNames.HOST));
                     }
 
-                    AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper = new AtomicReference<>(httpRequest);
-                    Flux<MutableHttpResponse<Object>> proxyResponsePublisher = connectAndStream(request, request, requestURI, buildSslContext(requestURI), requestWrapper, true, false);
+                    AtomicReference<MutableHttpRequest<?>> requestWrapper = new AtomicReference<>(httpRequest);
+                    Flux<MutableHttpResponse<?>> proxyResponsePublisher = connectAndStream(request, request, requestURI, requestWrapper, true, false);
                     // apply filters
                     //noinspection unchecked
                     proxyResponsePublisher = Flux.from(
@@ -1207,156 +1018,122 @@ public class DefaultHttpClient implements
                 });
     }
 
-    private <I> Flux<MutableHttpResponse<Object>> connectAndStream(
+    private void setupConversionService(io.micronaut.http.HttpRequest<?> httpRequest) {
+        if (httpRequest instanceof ConversionServiceAware) {
+            ((ConversionServiceAware) httpRequest).setConversionService(conversionService);
+        }
+    }
+
+    private <I> Flux<MutableHttpResponse<?>> connectAndStream(
             io.micronaut.http.HttpRequest<?> parentRequest,
             io.micronaut.http.HttpRequest<I> request,
             URI requestURI,
-            SslContext sslContext,
-            AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper,
+            AtomicReference<MutableHttpRequest<?>> requestWrapper,
             boolean isProxy,
             boolean failOnError
     ) {
-        return Flux.create(emitter -> {
-            ChannelFuture channelFuture;
-            try {
-                if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
+        RequestKey requestKey;
+        try {
+            requestKey = new RequestKey(this, requestURI);
+        } catch (Exception e) {
+            return Flux.error(e);
+        }
+        return connectionManager.connect(requestKey, null).flatMapMany(poolHandle -> {
+            request.setAttribute(NettyClientHttpRequest.CHANNEL, poolHandle.channel);
 
-                    channelFuture = doConnect(request, requestURI, sslContext, true, isProxy, channelHandlerContext -> {
-                        try {
-                            final Channel channel = channelHandlerContext.channel();
-                            request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
-                            this.streamRequestThroughChannel(
-                                    parentRequest,
-                                    requestWrapper.get(),
-                                    channel,
-                                    failOnError
-                            ).subscribe(new ForwardingSubscriber<>(emitter));
-                        } catch (Exception e) {
-                            emitter.error(e);
+            boolean sse = !isProxy && isAcceptEvents(request);
+            poolHandle.channel.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+                boolean ignoreOneLast = false;
+
+                @Override
+                public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                    if (msg instanceof io.netty.handler.codec.http.HttpResponse &&
+                        ((io.netty.handler.codec.http.HttpResponse) msg).status().equals(HttpResponseStatus.CONTINUE)) {
+                        ignoreOneLast = true;
+                    }
+
+                    super.channelRead(ctx, msg);
+
+                    if (msg instanceof LastHttpContent) {
+                        if (ignoreOneLast) {
+                            ignoreOneLast = false;
+                        } else {
+                            ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM);
+                            ctx.pipeline().remove(this);
                         }
-                    });
-                } else {
-                    channelFuture = doConnect(request, requestURI, sslContext, true, isProxy, null);
-                    addInstrumentedListener(channelFuture,
-                            (ChannelFutureListener) f -> {
-                                if (f.isSuccess()) {
-                                    Channel channel = f.channel();
-                                    request.setAttribute(NettyClientHttpRequest.CHANNEL, channel);
-                                    this.streamRequestThroughChannel(
-                                            parentRequest,
-                                            requestWrapper.get(),
-                                            channel,
-                                            failOnError
-                                    ).subscribe(new ForwardingSubscriber<>(emitter));
-                                } else {
-                                    Throwable cause = f.cause();
-                                    emitter.error(customizeException(new HttpClientException("Connect error:" + cause.getMessage(), cause)));
-                                }
-                            });
+                    }
                 }
-            } catch (HttpClientException e) {
-                emitter.error(e);
-                return;
-            }
 
-            Disposable disposable = buildDisposableChannel(channelFuture);
-            emitter.onDispose(disposable);
-            emitter.onCancel(disposable);
-        }, FluxSink.OverflowStrategy.BUFFER);
+                @Override
+                public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+                    poolHandle.release();
+                }
+            });
+            if (sse) {
+                poolHandle.channel.pipeline().addLast(HttpLineBasedFrameDecoder.NAME, new HttpLineBasedFrameDecoder(configuration.getMaxContentLength(), true, true));
+            }
+            poolHandle.channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, new HttpStreamsClientHandler());
+
+            return this.streamRequestThroughChannel(
+                parentRequest,
+                requestWrapper.get(),
+                poolHandle,
+                failOnError,
+                requestKey.isSecure()
+            );
+        });
     }
 
     /**
      * Implementation of {@link #exchange(io.micronaut.http.HttpRequest, Argument, Argument)} (after URI resolution).
      */
     private <I, O, E> Publisher<? extends io.micronaut.http.HttpResponse<O>> exchangeImpl(
-            URI requestURI,
-            io.micronaut.http.HttpRequest<?> parentRequest,
-            io.micronaut.http.HttpRequest<I> request,
-            @NonNull Argument<O> bodyType,
-            @NonNull Argument<E> errorType) {
-        AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper = new AtomicReference<>(request);
+        URI requestURI,
+        io.micronaut.http.HttpRequest<?> parentRequest,
+        MutableHttpRequest<I> request,
+        @NonNull Argument<O> bodyType,
+        @NonNull Argument<E> errorType,
+        @Nullable BlockHint blockHint) {
+        AtomicReference<MutableHttpRequest<?>> requestWrapper = new AtomicReference<>(request);
 
-        Flux<io.micronaut.http.HttpResponse<O>> responsePublisher = Flux.create(emitter -> {
+        RequestKey requestKey;
+        try {
+            requestKey = new RequestKey(this, requestURI);
+        } catch (HttpClientException e) {
+            return Flux.error(e);
+        }
 
-            boolean multipart = MediaType.MULTIPART_FORM_DATA_TYPE.equals(request.getContentType().orElse(null));
-            if (poolMap != null && !multipart) {
-                try {
-                    RequestKey requestKey = new RequestKey(this, requestURI);
-                    ChannelPool channelPool = poolMap.get(requestKey);
-                    Future<Channel> channelFuture = channelPool.acquire();
-                    addInstrumentedListener(channelFuture, future -> {
-                        if (future.isSuccess()) {
-                            Channel channel = future.get();
-                            Future<?> initFuture = channel.attr(STREAM_CHANNEL_INITIALIZED).get();
-                            if (initFuture == null) {
-                                try {
-                                    sendRequestThroughChannel(
-                                        requestWrapper.get(),
-                                        bodyType,
-                                        errorType,
-                                        emitter,
-                                        channel,
-                                        requestKey.isSecure(),
-                                        channelPool
-                                    );
-                                } catch (Exception e) {
-                                    emitter.error(e);
-                                }
-                            } else {
-                                // we should wait until the handshake completes
-                                addInstrumentedListener(initFuture, f -> {
-                                    try {
-                                        sendRequestThroughChannel(
-                                            requestWrapper.get(),
-                                            bodyType,
-                                            errorType,
-                                            emitter,
-                                            channel,
-                                            requestKey.isSecure(),
-                                            channelPool
-                                        );
-                                    } catch (Exception e) {
-                                        emitter.error(e);
-                                    }
-                                });
-                            }
-                        } else {
-                            Throwable cause = future.cause();
-                            emitter.error(customizeException(new HttpClientException("Connect Error: " + cause.getMessage(), cause)));
-                        }
-                    });
-                } catch (HttpClientException e) {
-                    emitter.error(e);
-                }
-            } else {
-                SslContext sslContext = buildSslContext(requestURI);
-                ChannelFuture connectionFuture = doConnect(request, requestURI, sslContext, false, null);
-                addInstrumentedListener(connectionFuture, future -> {
-                    if (!future.isSuccess()) {
-                        Throwable cause = future.cause();
-                        if (emitter.isCancelled()) {
-                            log.trace("Connection to {} failed, but emitter already cancelled.", requestURI, cause);
-                        } else {
-                            emitter.error(customizeException(new HttpClientException("Connect Error: " + cause.getMessage(), cause)));
-                        }
-                    } else {
-                        try {
-                            sendRequestThroughChannel(
-                                    requestWrapper.get(),
-                                    bodyType,
-                                    errorType,
-                                    emitter,
-                                    connectionFuture.channel(),
-                                    sslContext != null,
-                                    null);
-                        } catch (Exception e) {
-                            emitter.error(e);
+        Mono<ConnectionManager.PoolHandle> handlePublisher = connectionManager.connect(requestKey, blockHint);
+
+        Flux<io.micronaut.http.HttpResponse<O>> responsePublisher = handlePublisher.flatMapMany(poolHandle -> {
+            poolHandle.channel.pipeline()
+                .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR, new HttpObjectAggregator(configuration.getMaxContentLength()) {
+                    @Override
+                    protected void finishAggregation(FullHttpMessage aggregated) throws Exception {
+                        // only set content-length if there's any content
+                        if (!HttpUtil.isContentLengthSet(aggregated) &&
+                            aggregated.content().readableBytes() > 0) {
+                            super.finishAggregation(aggregated);
                         }
                     }
-                });
-            }
+                })
+                .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, new HttpStreamsClientHandler());
 
-        }, FluxSink.OverflowStrategy.ERROR);
+            return Flux.create(emitter -> {
+                try {
+                    sendRequestThroughChannel(
+                        requestWrapper.get(),
+                        bodyType,
+                        errorType,
+                        emitter,
+                        requestKey.isSecure(),
+                        poolHandle
+                    );
+                } catch (Exception e) {
+                    emitter.error(e);
+                }
+            });
+        });
 
         Publisher<io.micronaut.http.HttpResponse<O>> finalPublisher = applyFilterToResponsePublisher(
                 parentRequest,
@@ -1374,7 +1151,7 @@ public class DefaultHttpClient implements
             final Duration rt = readTimeout.get();
             if (!rt.isNegative()) {
                 Duration duration = rt.plus(Duration.ofSeconds(1));
-                finalReactiveSequence = finalReactiveSequence.timeout(duration)
+                finalReactiveSequence = finalReactiveSequence.timeout(duration) // todo: move to CM
                         .onErrorResume(throwable -> {
                             if (throwable instanceof TimeoutException) {
                                 return Flux.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
@@ -1384,22 +1161,6 @@ public class DefaultHttpClient implements
             }
         }
         return finalReactiveSequence;
-    }
-
-    /**
-     * @param channel The channel to close asynchronously
-     */
-    protected void closeChannelAsync(Channel channel) {
-        if (channel.isOpen()) {
-
-            ChannelFuture closeFuture = channel.closeFuture();
-            closeFuture.addListener(f2 -> {
-                if (!f2.isSuccess() && log.isErrorEnabled()) {
-                    Throwable cause = f2.cause();
-                    log.error("Error closing request connection: " + cause.getMessage(), cause);
-                }
-            });
-        }
     }
 
     /**
@@ -1475,238 +1236,21 @@ public class DefaultHttpClient implements
         return null;
     }
 
-    private void initBootstrapForProxy(Bootstrap bootstrap, boolean ssl, String host, int port) {
-        Proxy proxy = configuration.resolveProxy(ssl, host, port);
-        if (proxy.type() != Type.DIRECT) {
-            bootstrap.resolver(NoopAddressResolverGroup.INSTANCE);
-        }
-    }
-
-    /**
-     * Creates an initial connection to the given remote host.
-     *
-     * @param request         The request
-     * @param uri             The URI to connect to
-     * @param sslCtx          The SslContext instance
-     * @param isStream        Is the connection a stream connection
-     * @param contextConsumer The logic to run once the channel is configured correctly
-     * @return A ChannelFuture
-     * @throws HttpClientException If the URI is invalid
-     */
-    protected ChannelFuture doConnect(
-            io.micronaut.http.HttpRequest<?> request,
-            URI uri,
-            @Nullable SslContext sslCtx,
-            boolean isStream,
-            Consumer<ChannelHandlerContext> contextConsumer) throws HttpClientException {
-        return doConnect(request, uri, sslCtx, isStream, false, contextConsumer);
-    }
-
-    /**
-     * Creates an initial connection to the given remote host.
-     *
-     * @param request         The request
-     * @param uri             The URI to connect to
-     * @param sslCtx          The SslContext instance
-     * @param isStream        Is the connection a stream connection
-     * @param isProxy         Is this a streaming proxy
-     * @param contextConsumer The logic to run once the channel is configured correctly
-     * @return A ChannelFuture
-     * @throws HttpClientException If the URI is invalid
-     */
-    protected ChannelFuture doConnect(
-            io.micronaut.http.HttpRequest<?> request,
-            URI uri,
-            @Nullable SslContext sslCtx,
-            boolean isStream,
-            boolean isProxy,
-            Consumer<ChannelHandlerContext> contextConsumer) throws HttpClientException {
-
-        RequestKey requestKey = new RequestKey(this, uri);
-        return doConnect(request, requestKey.getHost(), requestKey.getPort(), sslCtx, isStream, isProxy, contextConsumer);
-    }
-
-    /**
-     * Creates an initial connection to the given remote host.
-     *
-     * @param request         The request
-     * @param host            The host
-     * @param port            The port
-     * @param sslCtx          The SslContext instance
-     * @param isStream        Is the connection a stream connection
-     * @param contextConsumer The logic to run once the channel is configured correctly
-     * @return A ChannelFuture
-     */
-    protected ChannelFuture doConnect(
-            io.micronaut.http.HttpRequest<?> request,
-            String host,
-            int port,
-            @Nullable SslContext sslCtx,
-            boolean isStream,
-            Consumer<ChannelHandlerContext> contextConsumer) {
-        return doConnect(request, host, port, sslCtx, isStream, false, contextConsumer);
-    }
-
-    /**
-     * Creates an initial connection to the given remote host.
-     *
-     * @param request         The request
-     * @param host            The host
-     * @param port            The port
-     * @param sslCtx          The SslContext instance
-     * @param isStream        Is the connection a stream connection
-     * @param isProxy         Is this a streaming proxy
-     * @param contextConsumer The logic to run once the channel is configured correctly
-     * @return A ChannelFuture
-     */
-    protected ChannelFuture doConnect(
-            io.micronaut.http.HttpRequest<?> request,
-            String host,
-            int port,
-            @Nullable SslContext sslCtx,
-            boolean isStream,
-            boolean isProxy,
-            Consumer<ChannelHandlerContext> contextConsumer) {
-        Bootstrap localBootstrap = this.bootstrap.clone();
-        initBootstrapForProxy(localBootstrap, sslCtx != null, host, port);
-        String acceptHeader = request.getHeaders().get(io.micronaut.http.HttpHeaders.ACCEPT);
-        localBootstrap.handler(new HttpClientInitializer(
-                sslCtx,
-                host,
-                port,
-                isStream,
-                isProxy,
-                acceptHeader != null && acceptHeader.equalsIgnoreCase(MediaType.TEXT_EVENT_STREAM), contextConsumer)
-        );
-        return doConnect(localBootstrap, host, port);
-    }
-
-    /**
-     * Creates the {@link NioEventLoopGroup} for this client.
-     *
-     * @param configuration The configuration
-     * @param threadFactory The thread factory
-     * @return The group
-     */
-    protected NioEventLoopGroup createEventLoopGroup(HttpClientConfiguration configuration, ThreadFactory threadFactory) {
-        OptionalInt numOfThreads = configuration.getNumOfThreads();
-        Optional<Class<? extends ThreadFactory>> threadFactoryType = configuration.getThreadFactory();
-        boolean hasThreads = numOfThreads.isPresent();
-        boolean hasFactory = threadFactoryType.isPresent();
-        NioEventLoopGroup group;
-        if (hasThreads && hasFactory) {
-            group = new NioEventLoopGroup(numOfThreads.getAsInt(), InstantiationUtils.instantiate(threadFactoryType.get()));
-        } else if (hasThreads) {
-            if (threadFactory != null) {
-                group = new NioEventLoopGroup(numOfThreads.getAsInt(), threadFactory);
-            } else {
-                group = new NioEventLoopGroup(numOfThreads.getAsInt());
-            }
-        } else {
-            if (threadFactory != null) {
-                group = new NioEventLoopGroup(NettyThreadFactory.DEFAULT_EVENT_LOOP_THREADS, threadFactory);
-            } else {
-
-                group = new NioEventLoopGroup();
-            }
-        }
-        return group;
-    }
-
-    /**
-     * Creates an initial connection with the given bootstrap and remote host.
-     *
-     * @param bootstrap The bootstrap instance
-     * @param host      The host
-     * @param port      The port
-     * @return The ChannelFuture
-     */
-    protected ChannelFuture doConnect(Bootstrap bootstrap, String host, int port) {
-        return bootstrap.connect(host, port);
-    }
-
-    /**
-     * Builds an {@link SslContext} for the given URI if necessary.
-     *
-     * @param uriObject The URI
-     * @return The {@link SslContext} instance
-     */
-    protected SslContext buildSslContext(URI uriObject) {
-        final SslContext sslCtx;
-        if (isSecureScheme(uriObject.getScheme())) {
-            sslCtx = sslContext;
-            //Allow https requests to be sent if SSL is disabled but a proxy is present
-            if (sslCtx == null && !configuration.getProxyAddress().isPresent()) {
-                throw customizeException(new HttpClientException("Cannot send HTTPS request. SSL is disabled"));
-            }
-        } else {
-            sslCtx = null;
-        }
-        return sslCtx;
-    }
-
-    /**
-     * Configures the HTTP proxy for the pipeline.
-     *
-     * @param pipeline The pipeline
-     * @param proxy    The proxy
-     */
-    protected void configureProxy(ChannelPipeline pipeline, Proxy proxy) {
-        configureProxy(pipeline, proxy.type(), proxy.address());
-    }
-
-    /**
-     * Configures the HTTP proxy for the pipeline.
-     *
-     * @param pipeline     The pipeline
-     * @param proxyType    The proxy type
-     * @param proxyAddress The proxy address
-     */
-    protected void configureProxy(ChannelPipeline pipeline, Type proxyType, SocketAddress proxyAddress) {
-        String username = configuration.getProxyUsername().orElse(null);
-        String password = configuration.getProxyPassword().orElse(null);
-
-        if (proxyAddress instanceof InetSocketAddress) {
-            InetSocketAddress isa = (InetSocketAddress) proxyAddress;
-            if (isa.isUnresolved()) {
-                proxyAddress = new InetSocketAddress(isa.getHostString(), isa.getPort());
-            }
-        }
-
-        if (StringUtils.isNotEmpty(username) && StringUtils.isNotEmpty(password)) {
-            switch (proxyType) {
-                case HTTP:
-                    pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_PROXY, new HttpProxyHandler(proxyAddress, username, password));
-                    break;
-                case SOCKS:
-                    pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SOCKS_5_PROXY, new Socks5ProxyHandler(proxyAddress, username, password));
-                    break;
-                default:
-                    // no-op
-            }
-        } else {
-            switch (proxyType) {
-                case HTTP:
-                    pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_PROXY, new HttpProxyHandler(proxyAddress));
-                    break;
-                case SOCKS:
-                    pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SOCKS_5_PROXY, new Socks5ProxyHandler(proxyAddress));
-                    break;
-                default:
-                    // no-op
-            }
-        }
-    }
-
-    private <I, O, R extends io.micronaut.http.HttpResponse<O>> Publisher<R> applyFilterToResponsePublisher(
+    private <I, R extends io.micronaut.http.HttpResponse<?>> Publisher<R> applyFilterToResponsePublisher(
             io.micronaut.http.HttpRequest<?> parentRequest,
             io.micronaut.http.HttpRequest<I> request,
             URI requestURI,
-            AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper,
+            AtomicReference<MutableHttpRequest<?>> requestWrapper,
             Publisher<R> responsePublisher) {
 
         if (request instanceof MutableHttpRequest) {
-            ((MutableHttpRequest<I>) request).uri(requestURI);
+            MutableHttpRequest<I> mutRequest = (MutableHttpRequest<I>) request;
+            mutRequest.uri(requestURI);
+            if (informationalServiceId != null &&
+                !mutRequest.getAttribute(HttpAttributes.SERVICE_ID).isPresent()) {
+
+                mutRequest.setAttribute(HttpAttributes.SERVICE_ID, informationalServiceId);
+            }
 
             List<HttpClientFilter> filters =
                     filterResolver.resolveFilters(request, clientFilterEntries);
@@ -1747,7 +1291,6 @@ public class DefaultHttpClient implements
      * @param permitsBody            Whether permits body
      * @param bodyType               The body type
      * @param onError                Called when the body publisher encounters an error
-     * @param closeChannelAfterWrite Whether to close the channel. For stream requests we don't close the channel until disposed of.
      * @return A {@link NettyRequestWriter}
      * @throws HttpPostRequestEncoder.ErrorDataEncoderException if there is an encoder exception
      */
@@ -1757,8 +1300,7 @@ public class DefaultHttpClient implements
             MediaType requestContentType,
             boolean permitsBody,
             @Nullable Argument<?> bodyType,
-            Consumer<? super Throwable> onError,
-            boolean closeChannelAfterWrite) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+            Consumer<? super Throwable> onError) throws HttpPostRequestEncoder.ErrorDataEncoderException {
 
         io.netty.handler.codec.http.HttpRequest nettyRequest;
         HttpPostRequestEncoder postRequestEncoder = null;
@@ -1786,7 +1328,7 @@ public class DefaultHttpClient implements
                     if (Publishers.isConvertibleToPublisher(bodyValue)) {
                         boolean isSingle = Publishers.isSingle(bodyValue.getClass());
 
-                        Publisher<?> publisher = ConversionService.SHARED.convert(bodyValue, Publisher.class).orElseThrow(() ->
+                        Publisher<?> publisher = conversionService.convert(bodyValue, Publisher.class).orElseThrow(() ->
                                 new IllegalArgumentException("Unconvertible reactive type: " + bodyValue)
                         );
 
@@ -1853,7 +1395,7 @@ public class DefaultHttpClient implements
                         } catch (MalformedURLException e) {
                             //should never happen
                         }
-                        return new NettyRequestWriter(requestURI.getScheme(), nettyRequest, null, closeChannelAfterWrite);
+                        return new NettyRequestWriter(nettyRequest, null);
                     } else if (bodyValue instanceof CharSequence) {
                         bodyContent = charSequenceToByteBuf((CharSequence) bodyValue, requestContentType);
                     } else if (mediaTypeCodecRegistry != null) {
@@ -1868,7 +1410,7 @@ public class DefaultHttpClient implements
                                 .orElse(null);
                     }
                     if (bodyContent == null) {
-                        bodyContent = ConversionService.SHARED.convert(bodyValue, ByteBuf.class).orElseThrow(() ->
+                        bodyContent = conversionService.convert(bodyValue, ByteBuf.class).orElseThrow(() ->
                                 customizeException(new HttpClientException("Body [" + bodyValue + "] cannot be encoded to content type [" + requestContentType + "]. No possible codecs or converters found."))
                         );
                     }
@@ -1889,156 +1431,10 @@ public class DefaultHttpClient implements
         } catch (MalformedURLException e) {
             //should never happen
         }
-        return new NettyRequestWriter(requestURI.getScheme(), nettyRequest, postRequestEncoder, closeChannelAfterWrite);
+        return new NettyRequestWriter(nettyRequest, postRequestEncoder);
     }
 
-    /**
-     * Configures HTTP/2 for the channel when SSL is enabled.
-     *
-     * @param httpClientInitializer The client initializer
-     * @param ch                    The channel
-     * @param sslCtx                The SSL context
-     * @param host                  The host
-     * @param port                  The port
-     * @param connectionHandler     The connection handler
-     */
-    protected void configureHttp2Ssl(
-            HttpClientInitializer httpClientInitializer,
-            @NonNull SocketChannel ch,
-            @NonNull SslContext sslCtx,
-            String host,
-            int port,
-            HttpToHttp2ConnectionHandler connectionHandler) {
-        ChannelPipeline pipeline = ch.pipeline();
-        // Specify Host in SSLContext New Handler to add TLS SNI Extension
-        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslCtx.newHandler(ch.alloc(), host, port));
-        // We must wait for the handshake to finish and the protocol to be negotiated before configuring
-        // the HTTP/2 components of the pipeline.
-        pipeline.addLast(
-                ChannelPipelineCustomizer.HANDLER_HTTP2_PROTOCOL_NEGOTIATOR,
-                new ApplicationProtocolNegotiationHandler(ApplicationProtocolNames.HTTP_2) {
-
-            @Override
-            public void handlerRemoved(ChannelHandlerContext ctx) {
-                // the logic to send the request should only be executed once the HTTP/2
-                // Connection Preface request has been sent. Once the Preface has been sent and
-                // removed then this handler is removed so we invoke the remaining logic once
-                // this handler removed
-                final Consumer<ChannelHandlerContext> contextConsumer =
-                        httpClientInitializer.contextConsumer;
-                if (contextConsumer != null) {
-                    contextConsumer.accept(ctx);
-                }
-            }
-
-            @Override
-            protected void configurePipeline(ChannelHandlerContext ctx, String protocol) {
-                if (ApplicationProtocolNames.HTTP_2.equals(protocol)) {
-                    ChannelPipeline p = ctx.pipeline();
-                    if (httpClientInitializer.stream) {
-                        // stream consumer manages backpressure and reads
-                        ctx.channel().config().setAutoRead(false);
-                    }
-                    p.addLast(
-                            ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS,
-                            new Http2SettingsHandler(ch.newPromise())
-                    );
-                    httpClientInitializer.addEventStreamHandlerIfNecessary(p);
-                    httpClientInitializer.addFinalHandler(p);
-                    for (ChannelPipelineListener pipelineListener : pipelineListeners) {
-                        pipelineListener.onConnect(p);
-                    }
-                } else if (ApplicationProtocolNames.HTTP_1_1.equals(protocol)) {
-                    ChannelPipeline p = ctx.pipeline();
-                    httpClientInitializer.addHttp1Handlers(p);
-                } else {
-                    ctx.close();
-                    throw customizeException(new HttpClientException("Unknown Protocol: " + protocol));
-                }
-                httpClientInitializer.onStreamPipelineBuilt();
-            }
-        });
-
-        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, connectionHandler);
-    }
-
-    /**
-     * Configures HTTP/2 handling for plaintext (non-SSL) connections.
-     *
-     * @param httpClientInitializer The client initializer
-     * @param ch                    The channel
-     * @param connectionHandler     The connection handler
-     */
-    protected void configureHttp2ClearText(
-            HttpClientInitializer httpClientInitializer,
-            @NonNull SocketChannel ch,
-            @NonNull HttpToHttp2ConnectionHandler connectionHandler) {
-        HttpClientCodec sourceCodec = new HttpClientCodec();
-        Http2ClientUpgradeCodec upgradeCodec = new Http2ClientUpgradeCodec(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, connectionHandler);
-        HttpClientUpgradeHandler upgradeHandler = new HttpClientUpgradeHandler(sourceCodec, upgradeCodec, 65536);
-
-        final ChannelPipeline pipeline = ch.pipeline();
-        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, sourceCodec);
-        httpClientInitializer.settingsHandler = new Http2SettingsHandler(ch.newPromise());
-        pipeline.addLast(upgradeHandler);
-        pipeline.addLast(new ChannelInboundHandlerAdapter() {
-            @Override
-            public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-                ctx.fireUserEventTriggered(evt);
-                if (evt instanceof HttpClientUpgradeHandler.UpgradeEvent) {
-                    httpClientInitializer.onStreamPipelineBuilt();
-                    ctx.pipeline().remove(this);
-                }
-            }
-        });
-        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_UPGRADE_REQUEST, new UpgradeRequestHandler(httpClientInitializer) {
-            @Override
-            public void handlerRemoved(ChannelHandlerContext ctx) {
-                final Consumer<ChannelHandlerContext> contextConsumer = httpClientInitializer.contextConsumer;
-                if (contextConsumer != null) {
-                    contextConsumer.accept(ctx);
-                }
-            }
-        });
-    }
-
-    /**
-     * Creates a new {@link HttpToHttp2ConnectionHandlerBuilder} for the given HTTP/2 connection object and config.
-     *
-     * @param connection    The connection
-     * @param configuration The configuration
-     * @param stream        Whether this is a stream request
-     * @return The {@link HttpToHttp2ConnectionHandlerBuilder}
-     */
-    protected @NonNull
-    HttpToHttp2ConnectionHandlerBuilder newHttp2ConnectionHandlerBuilder(
-            @NonNull Http2Connection connection, @NonNull HttpClientConfiguration configuration, boolean stream) {
-        final HttpToHttp2ConnectionHandlerBuilder builder = new HttpToHttp2ConnectionHandlerBuilder();
-        builder.validateHeaders(true);
-        final Http2FrameListener http2ToHttpAdapter;
-
-        if (!stream) {
-            http2ToHttpAdapter = new InboundHttp2ToHttpAdapterBuilder(connection)
-                    .maxContentLength(configuration.getMaxContentLength())
-                    .validateHttpHeaders(true)
-                    .propagateSettings(true)
-                    .build();
-
-        } else {
-            http2ToHttpAdapter = new StreamingInboundHttp2ToHttpAdapter(
-                    connection,
-                    configuration.getMaxContentLength()
-            );
-        }
-        return builder
-                .connection(connection)
-                .frameListener(new DelegatingDecompressorFrameListener(
-                        connection,
-                        http2ToHttpAdapter));
-
-    }
-
-    private Flux<MutableHttpResponse<Object>> readBodyOnError(@Nullable Argument<?> errorType, @NonNull Flux<MutableHttpResponse<Object>> publisher) {
+    private Flux<MutableHttpResponse<?>> readBodyOnError(@Nullable Argument<?> errorType, @NonNull Flux<MutableHttpResponse<?>> publisher) {
         if (errorType != null && errorType != HttpClient.DEFAULT_ERROR_TYPE) {
             return publisher.onErrorResume(clientException -> {
                 if (clientException instanceof HttpClientResponseException) {
@@ -2072,7 +1468,7 @@ public class DefaultHttpClient implements
                                 public void onComplete() {
                                     try {
                                         FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), buffer, nettyResponse.headers(), new DefaultHttpHeaders(true));
-                                        final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, response.status(), mediaTypeCodecRegistry, byteBufferFactory, (Argument<Object>) errorType, true);
+                                        final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, mediaTypeCodecRegistry, byteBufferFactory, (Argument<Object>) errorType, true, conversionService);
                                         fullNettyClientHttpResponse.onComplete();
                                         emitter.error(customizeException(new HttpClientResponseException(
                                             fullHttpResponse.status().reasonPhrase(),
@@ -2120,9 +1516,8 @@ public class DefaultHttpClient implements
             Argument<O> bodyType,
             Argument<E> errorType,
             FluxSink<? super HttpResponse<O>> emitter,
-            Channel channel,
             boolean secure,
-            ChannelPool channelPool) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+            ConnectionManager.PoolHandle poolHandle) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         URI requestURI = finalRequest.getUri();
         MediaType requestContentType = finalRequest
                 .getContentType()
@@ -2141,17 +1536,16 @@ public class DefaultHttpClient implements
                     if (!emitter.isCancelled()) {
                         emitter.error(throwable);
                     }
-                },
-                true
+                }
         );
         HttpRequest nettyRequest = requestWriter.getNettyRequest();
 
         prepareHttpHeaders(
-                requestURI,
-                finalRequest,
-                nettyRequest,
-                permitsBody,
-                poolMap == null
+            poolHandle,
+            requestURI,
+            finalRequest,
+            nettyRequest,
+            permitsBody
         );
 
         if (log.isDebugEnabled()) {
@@ -2162,28 +1556,25 @@ public class DefaultHttpClient implements
             traceRequest(finalRequest, nettyRequest);
         }
 
-        Promise<HttpResponse<O>> responsePromise = channel.eventLoop().newPromise();
-        channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_FULL_HTTP_RESPONSE,
-                new FullHttpResponseHandler<>(responsePromise, channelPool, secure, finalRequest, bodyType, errorType));
-        channel.attr(CHANNEL_CUSTOMIZER_KEY).get().onRequestPipelineBuilt();
+        Promise<HttpResponse<O>> responsePromise = poolHandle.channel.eventLoop().newPromise();
+        poolHandle.channel.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_FULL_HTTP_RESPONSE,
+                new FullHttpResponseHandler<>(responsePromise, poolHandle, secure, finalRequest, bodyType, errorType));
+        poolHandle.notifyRequestPipelineBuilt();
         Publisher<HttpResponse<O>> publisher = new NettyFuturePublisher<>(responsePromise, true);
-        if (bodyType != null && bodyType.isVoid()) {
-            // don't emit response if bodyType is void
-            publisher = Flux.from(publisher).filter(r -> false);
-        }
         publisher.subscribe(new ForwardingSubscriber<>(emitter));
 
-        requestWriter.writeAndClose(channel, channelPool, emitter);
+        requestWriter.write(poolHandle, secure, emitter);
     }
 
-    private Flux<MutableHttpResponse<Object>> streamRequestThroughChannel(
+    private Flux<MutableHttpResponse<?>> streamRequestThroughChannel(
             io.micronaut.http.HttpRequest<?> parentRequest,
-            io.micronaut.http.HttpRequest<?> request,
-            Channel channel,
-            boolean failOnError) {
-        return Flux.<MutableHttpResponse<Object>>create(sink -> {
+            MutableHttpRequest<?> request,
+            ConnectionManager.PoolHandle poolHandle,
+            boolean failOnError,
+            boolean secure) {
+        return Flux.<MutableHttpResponse<?>>create(sink -> {
             try {
-                streamRequestThroughChannel0(parentRequest, request, sink, channel);
+                streamRequestThroughChannel0(parentRequest, request, sink, poolHandle, secure);
             } catch (HttpPostRequestEncoder.ErrorDataEncoderException e) {
                 sink.error(e);
             }
@@ -2196,7 +1587,7 @@ public class DefaultHttpClient implements
     ) {
         boolean errorStatus = response.code() >= 400;
         if (errorStatus && failOnError) {
-            return Flux.error(customizeException(new HttpClientResponseException(response.getStatus().getReason(), response)));
+            return Flux.error(customizeException(new HttpClientResponseException(response.reason(), response)));
         } else {
             return Flux.just(response);
         }
@@ -2204,32 +1595,45 @@ public class DefaultHttpClient implements
 
     private void streamRequestThroughChannel0(
             io.micronaut.http.HttpRequest<?> parentRequest,
-            final io.micronaut.http.HttpRequest<?> finalRequest,
-            FluxSink emitter,
-            Channel channel) throws HttpPostRequestEncoder.ErrorDataEncoderException {
-        NettyRequestWriter requestWriter = prepareRequest(
-                finalRequest,
-                finalRequest.getUri(),
-                emitter,
-                false
+            MutableHttpRequest<?> request,
+            FluxSink<? super MutableHttpResponse<?>> emitter,
+            ConnectionManager.PoolHandle poolHandle,
+            boolean secure) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+        URI requestURI = request.getUri();
+        boolean permitsBody = io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod());
+        NettyRequestWriter requestWriter = buildNettyRequest(
+            request,
+            requestURI,
+            request
+                .getContentType()
+                .orElse(MediaType.APPLICATION_JSON_TYPE),
+            permitsBody,
+            null,
+            throwable -> {
+                if (!emitter.isCancelled()) {
+                    emitter.error(throwable);
+                }
+            }
         );
+        prepareHttpHeaders(poolHandle, requestURI, request, requestWriter.getNettyRequest(), permitsBody);
+
         HttpRequest nettyRequest = requestWriter.getNettyRequest();
-        Promise<HttpResponse<?>> responsePromise = channel.eventLoop().newPromise();
-        ChannelPipeline pipeline = channel.pipeline();
-        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL, new StreamFullHttpResponseHandler(responsePromise, parentRequest, finalRequest));
-        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM, new StreamStreamHttpResponseHandler(responsePromise, parentRequest, finalRequest));
-        channel.attr(CHANNEL_CUSTOMIZER_KEY).get().onRequestPipelineBuilt();
+        Promise<MutableHttpResponse<?>> responsePromise = poolHandle.channel.eventLoop().newPromise();
+        ChannelPipeline pipeline = poolHandle.channel.pipeline();
+        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL, new StreamFullHttpResponseHandler(responsePromise, parentRequest, request));
+        pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM, new StreamStreamHttpResponseHandler(responsePromise, parentRequest, request));
+        poolHandle.notifyRequestPipelineBuilt();
 
         if (log.isDebugEnabled()) {
-            debugRequest(finalRequest.getUri(), nettyRequest);
+            debugRequest(request.getUri(), nettyRequest);
         }
 
         if (log.isTraceEnabled()) {
-            traceRequest(finalRequest, nettyRequest);
+            traceRequest(request, nettyRequest);
         }
 
-        requestWriter.writeAndClose(channel, null, emitter);
-        responsePromise.addListener(future -> {
+        requestWriter.write(poolHandle, secure, emitter);
+        responsePromise.addListener((Future<MutableHttpResponse<?>> future) -> {
             if (future.isSuccess()) {
                 emitter.next(future.getNow());
                 emitter.complete();
@@ -2259,23 +1663,22 @@ public class DefaultHttpClient implements
     }
 
     private <I> void prepareHttpHeaders(
-            URI requestURI,
-            io.micronaut.http.HttpRequest<I> request,
-            io.netty.handler.codec.http.HttpRequest nettyRequest,
-            boolean permitsBody,
-            boolean closeConnection) {
+        ConnectionManager.PoolHandle poolHandle,
+        URI requestURI,
+        io.micronaut.http.HttpRequest<I> request,
+        HttpRequest nettyRequest,
+        boolean permitsBody) {
         HttpHeaders headers = nettyRequest.headers();
 
         if (!headers.contains(HttpHeaderNames.HOST)) {
             headers.set(HttpHeaderNames.HOST, getHostHeader(requestURI));
         }
 
-        // HTTP/2 assumes keep-alive connections
-        if (httpVersion != io.micronaut.http.HttpVersion.HTTP_2_0) {
-            if (closeConnection) {
-                headers.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-            } else {
+        if (!poolHandle.http2) {
+            if (poolHandle.canReturn()) {
                 headers.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+            } else {
+                headers.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
             }
         }
 
@@ -2300,65 +1703,7 @@ public class DefaultHttpClient implements
         }
     }
 
-    /**
-     * Note: caller must ensure this is only called for plaintext HTTP, not TLS HTTP2.
-     */
-    private boolean discardH2cStream(HttpMessage message) {
-        // only applies to h2c
-        if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
-            int streamId = message.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), -1);
-            if (streamId == 1) {
-                // ignore this message
-                if (log.isDebugEnabled()) {
-                    log.debug("Received response on HTTP2 stream 1, the stream used to respond to the initial upgrade request. Ignoring.");
-                }
-                return true;
-            } else {
-                return false;
-            }
-        } else {
-            return false;
-        }
-    }
-
-    private void addReadTimeoutHandler(ChannelPipeline pipeline) {
-        if (readTimeoutMillis != null) {
-            if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
-                Http2SettingsHandler settingsHandler = (Http2SettingsHandler) pipeline.get(HANDLER_HTTP2_SETTINGS);
-                if (settingsHandler != null) {
-                    addInstrumentedListener(settingsHandler.promise, future -> {
-                        if (future.isSuccess()) {
-                            pipeline.addBefore(
-                                    ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION,
-                                    ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT,
-                                    new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS)
-                            );
-                        }
-
-                    });
-                } else {
-                    pipeline.addBefore(
-                            ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION,
-                            ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT,
-                            new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS)
-                    );
-                }
-            } else {
-                pipeline.addBefore(
-                        ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC,
-                        ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT,
-                        new ReadTimeoutHandler(readTimeoutMillis, TimeUnit.MILLISECONDS));
-            }
-        }
-    }
-
-    private void removeReadTimeoutHandler(ChannelPipeline pipeline) {
-        if (readTimeoutMillis != null && pipeline.context(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT) != null) {
-            pipeline.remove(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT);
-        }
-    }
-
-    private ClientFilterChain buildChain(AtomicReference<io.micronaut.http.HttpRequest<?>> requestWrapper, List<HttpClientFilter> filters) {
+    private ClientFilterChain buildChain(AtomicReference<MutableHttpRequest<?>> requestWrapper, List<HttpClientFilter> filters) {
         AtomicInteger integer = new AtomicInteger();
         int len = filters.size();
         return new ClientFilterChain() {
@@ -2366,7 +1711,7 @@ public class DefaultHttpClient implements
             public Publisher<? extends io.micronaut.http.HttpResponse<?>> proceed(MutableHttpRequest<?> request) {
 
                 int pos = integer.incrementAndGet();
-                if (pos > len) {
+                if (pos >= len) {
                     throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
                 }
                 HttpClientFilter httpFilter = filters.get(pos);
@@ -2405,7 +1750,7 @@ public class DefaultHttpClient implements
     }
 
     private void addBodyAttribute(HttpPostRequestEncoder postRequestEncoder, String key, Object value) throws HttpPostRequestEncoder.ErrorDataEncoderException {
-        Optional<String> converted = ConversionService.SHARED.convert(value, String.class);
+        Optional<String> converted = conversionService.convert(value, String.class);
         if (converted.isPresent()) {
             postRequestEncoder.addBodyAttribute(key, converted.get());
         }
@@ -2475,7 +1820,7 @@ public class DefaultHttpClient implements
 
     private void traceRequest(io.micronaut.http.HttpRequest<?> request, io.netty.handler.codec.http.HttpRequest nettyRequest) {
         HttpHeaders headers = nettyRequest.headers();
-        traceHeaders(headers);
+        HttpHeadersUtil.trace(log, headers.names(), headers::getAll);
         if (io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod()) && request.getBody().isPresent() && nettyRequest instanceof FullHttpRequest) {
             FullHttpRequest fullHttpRequest = (FullHttpRequest) nettyRequest;
             ByteBuf content = fullHttpRequest.content();
@@ -2499,193 +1844,13 @@ public class DefaultHttpClient implements
         log.trace("----");
     }
 
-    private void traceHeaders(HttpHeaders headers) {
-        for (String name : headers.names()) {
-            List<String> all = headers.getAll(name);
-            if (all.size() > 1) {
-                for (String value : all) {
-                    log.trace("{}: {}", name, value);
-                }
-            } else if (!all.isEmpty()) {
-                log.trace("{}: {}", name, all.get(0));
-            }
-        }
-    }
-
     private static MediaTypeCodecRegistry createDefaultMediaTypeRegistry() {
-        JsonMapper mapper = new JacksonDatabindMapper();
+        JsonMapper mapper = JsonMapper.createDefault();
         ApplicationConfiguration configuration = new ApplicationConfiguration();
         return MediaTypeCodecRegistry.of(
                 new JsonMediaTypeCodec(mapper, configuration, null),
                 new JsonStreamMediaTypeCodec(mapper, configuration, null)
         );
-    }
-
-    private <I> NettyRequestWriter prepareRequest(
-            io.micronaut.http.HttpRequest<I> request,
-            URI requestURI,
-            FluxSink<HttpResponse<Object>> emitter,
-            boolean closeChannelAfterWrite) throws HttpPostRequestEncoder.ErrorDataEncoderException {
-        MediaType requestContentType = request
-                .getContentType()
-                .orElse(MediaType.APPLICATION_JSON_TYPE);
-
-        boolean permitsBody = io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod());
-
-        if (!(request instanceof MutableHttpRequest)) {
-            throw new IllegalArgumentException("A MutableHttpRequest is required");
-        }
-        MutableHttpRequest clientHttpRequest = (MutableHttpRequest) request;
-        NettyRequestWriter requestWriter = buildNettyRequest(
-                clientHttpRequest,
-                requestURI,
-                requestContentType,
-                permitsBody,
-                null,
-                throwable -> {
-                    if (!emitter.isCancelled()) {
-                        emitter.error(throwable);
-                    }
-                },
-                closeChannelAfterWrite
-        );
-        io.netty.handler.codec.http.HttpRequest nettyRequest = requestWriter.getNettyRequest();
-        prepareHttpHeaders(requestURI, request, nettyRequest, permitsBody, true);
-        return requestWriter;
-    }
-
-    private Disposable buildDisposableChannel(ChannelFuture channelFuture) {
-        return new Disposable() {
-            private AtomicBoolean disposed = new AtomicBoolean(false);
-
-            @Override
-            public void dispose() {
-                if (disposed.compareAndSet(false, true)) {
-                    Channel channel = channelFuture.channel();
-                    if (channel.isOpen()) {
-                        closeChannelAsync(channel);
-                    }
-                }
-            }
-
-            @Override
-            public boolean isDisposed() {
-                return disposed.get();
-            }
-        };
-    }
-
-    private AbstractChannelPoolHandler newPoolHandler(RequestKey key) {
-        return new AbstractChannelPoolHandler() {
-            @Override
-            public void channelCreated(Channel ch) {
-                Promise<?> streamPipelineBuilt = ch.newPromise();
-                ch.attr(STREAM_CHANNEL_INITIALIZED).set(streamPipelineBuilt);
-
-                // make sure the future completes eventually
-                ChannelHandler failureHandler = new ChannelInboundHandlerAdapter() {
-                    @Override
-                    public void handlerRemoved(ChannelHandlerContext ctx) {
-                        streamPipelineBuilt.trySuccess(null);
-                    }
-
-                    @Override
-                    public void channelInactive(ChannelHandlerContext ctx) {
-                        streamPipelineBuilt.trySuccess(null);
-                        ctx.fireChannelInactive();
-                    }
-                };
-                ch.pipeline().addLast(failureHandler);
-
-                ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_INIT, new HttpClientInitializer(
-                        key.isSecure() ? sslContext : null,
-                        key.getHost(),
-                        key.getPort(),
-                        false,
-                        false,
-                        false,
-                        null
-                ) {
-                    @Override
-                    protected void addFinalHandler(ChannelPipeline pipeline) {
-                        // no-op, don't add the stream handler which is not supported
-                        // in the connection pooled scenario
-                    }
-
-                    @Override
-                    void onStreamPipelineBuilt() {
-                        super.onStreamPipelineBuilt();
-                        streamPipelineBuilt.trySuccess(null);
-                        ch.pipeline().remove(failureHandler);
-                        ch.attr(STREAM_CHANNEL_INITIALIZED).set(null);
-                    }
-                });
-
-                if (connectionTimeAliveMillis != null) {
-                    ch.pipeline()
-                            .addLast(
-                                    ChannelPipelineCustomizer.HANDLER_CONNECT_TTL,
-                                    new ConnectTTLHandler(connectionTimeAliveMillis)
-                            );
-                }
-            }
-
-            @Override
-            public void channelReleased(Channel ch) {
-                Duration idleTimeout = configuration.getConnectionPoolIdleTimeout().orElse(Duration.ofNanos(0));
-                ChannelPipeline pipeline = ch.pipeline();
-                if (ch.isOpen()) {
-                    ch.config().setAutoRead(true);
-                    pipeline.addLast(IdlingConnectionHandler.INSTANCE);
-                    if (idleTimeout.toNanos() > 0) {
-                        pipeline.addLast(HANDLER_IDLE_STATE, new IdleStateHandler(idleTimeout.toNanos(), idleTimeout.toNanos(), 0, TimeUnit.NANOSECONDS));
-                        pipeline.addLast(IdleTimeoutHandler.INSTANCE);
-                    }
-                }
-
-                if (ConnectTTLHandler.isChannelExpired(ch) && ch.isOpen() && !ch.eventLoop().isShuttingDown()) {
-                    ch.close();
-                }
-
-                removeReadTimeoutHandler(pipeline);
-            }
-
-            @Override
-            public void channelAcquired(Channel ch) throws Exception {
-                ChannelPipeline pipeline = ch.pipeline();
-                if (pipeline.context(IdlingConnectionHandler.INSTANCE) != null) {
-                    pipeline.remove(IdlingConnectionHandler.INSTANCE);
-                }
-                if (pipeline.context(HANDLER_IDLE_STATE) != null) {
-                    pipeline.remove(HANDLER_IDLE_STATE);
-                }
-                if (pipeline.context(IdleTimeoutHandler.INSTANCE) != null) {
-                    pipeline.remove(IdleTimeoutHandler.INSTANCE);
-                }
-            }
-        };
-    }
-
-    /**
-     * Adds a Netty listener that is instrumented by instrumenters given by managed or provided collection of
-     * the {@link InvocationInstrumenterFactory}.
-     *
-     * @param channelFuture The channel future
-     * @param listener The listener logic
-     * @param <V> the type of value returned by the future
-     * @param <C> the future type
-     * @return a Netty listener that is instrumented
-     */
-    private <V, C extends Future<V>> Future<V> addInstrumentedListener(
-            Future<V> channelFuture, GenericFutureListener<C> listener
-    ) {
-        InvocationInstrumenter instrumenter = combineFactories();
-
-        return channelFuture.addListener(f -> {
-            try (Instrumentation ignored = instrumenter.newInstrumentation()) {
-                listener.operationComplete((C) f);
-            }
-        });
     }
 
     private @NonNull InvocationInstrumenter combineFactories() {
@@ -2695,20 +1860,24 @@ public class DefaultHttpClient implements
         return InvocationInstrumenter.combine(invocationInstrumenterFactories.stream()
                 .map(InvocationInstrumenterFactory::newInvocationInstrumenter)
                 .filter(Objects::nonNull)
-                .collect(Collectors.toList()));
+                .toList());
     }
 
-    private static boolean isSecureScheme(String scheme) {
+    static boolean isSecureScheme(String scheme) {
         return io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(scheme) || SCHEME_WSS.equalsIgnoreCase(scheme);
     }
 
     private <E extends HttpClientException> E customizeException(E exc) {
+        customizeException0(configuration, informationalServiceId, exc);
+        return exc;
+    }
+
+    static void customizeException0(HttpClientConfiguration configuration, String informationalServiceId, HttpClientException exc) {
         if (informationalServiceId != null) {
             exc.setServiceId(informationalServiceId);
         } else if (configuration instanceof ServiceHttpClientConfiguration) {
             exc.setServiceId(((ServiceHttpClientConfiguration) configuration).getServiceId());
         }
-        return exc;
     }
 
     @FunctionalInterface
@@ -2717,332 +1886,9 @@ public class DefaultHttpClient implements
     }
 
     /**
-     * Initializes the HTTP client channel.
-     */
-    protected class HttpClientInitializer extends ChannelInitializer<SocketChannel> {
-
-        final SslContext sslContext;
-        final String host;
-        final int port;
-        final boolean stream;
-        final boolean proxy;
-        final boolean acceptsEvents;
-        Http2SettingsHandler settingsHandler;
-        private final Consumer<ChannelHandlerContext> contextConsumer;
-        private NettyClientCustomizer channelCustomizer;
-
-        /**
-         * @param sslContext      The ssl context
-         * @param host            The host
-         * @param port            The port
-         * @param stream          Whether is stream
-         * @param proxy           Is this a streaming proxy
-         * @param acceptsEvents   Whether an event stream is accepted
-         * @param contextConsumer The context consumer
-         */
-        protected HttpClientInitializer(
-                SslContext sslContext,
-                String host,
-                int port,
-                boolean stream,
-                boolean proxy,
-                boolean acceptsEvents,
-                Consumer<ChannelHandlerContext> contextConsumer) {
-            this.sslContext = sslContext;
-            this.stream = stream;
-            this.host = host;
-            this.port = port;
-            this.proxy = proxy;
-            this.acceptsEvents = acceptsEvents;
-            this.contextConsumer = contextConsumer;
-        }
-
-        /**
-         * @param ch The channel
-         */
-        @Override
-        protected void initChannel(SocketChannel ch) {
-            channelCustomizer = clientCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
-            ch.attr(CHANNEL_CUSTOMIZER_KEY).set(channelCustomizer);
-
-            ChannelPipeline p = ch.pipeline();
-
-            Proxy proxy = configuration.resolveProxy(sslContext != null, host, port);
-            if (!Proxy.NO_PROXY.equals(proxy)) {
-                configureProxy(p, proxy);
-            }
-
-            if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
-                final Http2Connection connection = new DefaultHttp2Connection(false);
-                final HttpToHttp2ConnectionHandlerBuilder builder =
-                        newHttp2ConnectionHandlerBuilder(connection, configuration, stream);
-
-                configuration.getLogLevel().ifPresent(logLevel -> {
-                    try {
-                        final io.netty.handler.logging.LogLevel nettyLevel = io.netty.handler.logging.LogLevel.valueOf(
-                                logLevel.name()
-                        );
-                        builder.frameLogger(new Http2FrameLogger(nettyLevel, DefaultHttpClient.class));
-                    } catch (IllegalArgumentException e) {
-                        throw customizeException(new HttpClientException("Unsupported log level: " + logLevel));
-                    }
-                });
-                HttpToHttp2ConnectionHandler connectionHandler = builder
-                        .build();
-                if (sslContext != null) {
-                    configureHttp2Ssl(this, ch, sslContext, host, port, connectionHandler);
-                } else {
-                    configureHttp2ClearText(this, ch, connectionHandler);
-                }
-                channelCustomizer.onInitialPipelineBuilt();
-            } else {
-                if (stream) {
-                    // for streaming responses we disable auto read
-                    // so that the consumer is in charge of back pressure
-                    ch.config().setAutoRead(false);
-                }
-
-                configuration.getLogLevel().ifPresent(logLevel -> {
-                    try {
-                        final io.netty.handler.logging.LogLevel nettyLevel = io.netty.handler.logging.LogLevel.valueOf(
-                                logLevel.name()
-                        );
-                        p.addLast(new LoggingHandler(DefaultHttpClient.class, nettyLevel));
-                    } catch (IllegalArgumentException e) {
-                        throw customizeException(new HttpClientException("Unsupported log level: " + logLevel));
-                    }
-                });
-
-                if (sslContext != null) {
-                    SslHandler sslHandler = sslContext.newHandler(ch.alloc(), host, port);
-                    sslHandler.setHandshakeTimeoutMillis(configuration.getSslConfiguration().getHandshakeTimeout().toMillis());
-                    p.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslHandler);
-                }
-
-                // Pool connections require alternative timeout handling
-                if (poolMap == null) {
-                    // read timeout settings are not applied to streamed requests.
-                    // instead idle timeout settings are applied.
-                    if (stream) {
-                        Optional<Duration> readIdleTime = configuration.getReadIdleTimeout();
-                        if (readIdleTime.isPresent()) {
-                            Duration duration = readIdleTime.get();
-                            if (!duration.isNegative()) {
-                                p.addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new IdleStateHandler(
-                                        duration.toMillis(),
-                                        duration.toMillis(),
-                                        duration.toMillis(),
-                                        TimeUnit.MILLISECONDS
-                                ));
-                            }
-                        }
-                    }
-                }
-
-                addHttp1Handlers(p);
-                channelCustomizer.onInitialPipelineBuilt();
-                onStreamPipelineBuilt();
-            }
-        }
-
-        /**
-         * Called when the stream pipeline is fully set up (all handshakes completed) and we can
-         * start processing requests.
-         */
-        void onStreamPipelineBuilt() {
-            channelCustomizer.onStreamPipelineBuilt();
-        }
-
-        private void addHttp1Handlers(ChannelPipeline p) {
-            p.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec());
-
-            p.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new HttpContentDecompressor());
-
-            int maxContentLength = configuration.getMaxContentLength();
-
-            if (!stream) {
-                p.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR, new HttpObjectAggregator(maxContentLength) {
-                    @Override
-                    protected void finishAggregation(FullHttpMessage aggregated) throws Exception {
-                        if (!HttpUtil.isContentLengthSet(aggregated)) {
-                            if (aggregated.content().readableBytes() > 0) {
-                                super.finishAggregation(aggregated);
-                            }
-                        }
-                    }
-                });
-            }
-            addEventStreamHandlerIfNecessary(p);
-            addFinalHandler(p);
-            for (ChannelPipelineListener pipelineListener : pipelineListeners) {
-                pipelineListener.onConnect(p);
-            }
-        }
-
-        private void addEventStreamHandlerIfNecessary(ChannelPipeline p) {
-            // if the content type is a SSE event stream we add a decoder
-            // to delimit the content by lines (unless we are proxying the stream)
-            if (acceptsEventStream() && !proxy) {
-                p.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_EVENT_STREAM, new LineBasedFrameDecoder(configuration.getMaxContentLength(), true, true) {
-
-                    @Override
-                    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                        if (msg instanceof HttpContent) {
-                            if (msg instanceof LastHttpContent) {
-                                super.channelRead(ctx, msg);
-                            } else {
-                                Attribute<Http2Stream> streamKey = ctx.channel().attr(STREAM_KEY);
-                                if (msg instanceof Http2Content) {
-                                    streamKey.set(((Http2Content) msg).stream());
-                                }
-                                try {
-                                    super.channelRead(ctx, ((HttpContent) msg).content());
-                                } finally {
-                                    streamKey.set(null);
-                                }
-                            }
-                        } else {
-                            super.channelRead(ctx, msg);
-                        }
-                    }
-                });
-
-                p.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_SSE_CONTENT, new SimpleChannelInboundHandlerInstrumented<ByteBuf>(combineFactories(), false) {
-
-                    @Override
-                    public boolean acceptInboundMessage(Object msg) {
-                        return msg instanceof ByteBuf;
-                    }
-
-                    @Override
-                    protected void channelReadInstrumented(ChannelHandlerContext ctx, ByteBuf msg) {
-                        try {
-                            Attribute<Http2Stream> streamKey = ctx.channel().attr(STREAM_KEY);
-                            Http2Stream http2Stream = streamKey.get();
-                            if (http2Stream != null) {
-                                ctx.fireChannelRead(new DefaultHttp2Content(msg.copy(), http2Stream));
-                            } else {
-                                ctx.fireChannelRead(new DefaultHttpContent(msg.copy()));
-                            }
-                        } finally {
-                            msg.release();
-                        }
-                    }
-                });
-
-            }
-        }
-
-        /**
-         * Allows overriding the final handler added to the pipeline.
-         *
-         * @param pipeline The pipeline
-         */
-        protected void addFinalHandler(ChannelPipeline pipeline) {
-            pipeline.addLast(
-                    ChannelPipelineCustomizer.HANDLER_HTTP_STREAM,
-                    new HttpStreamsClientHandler() {
-                @Override
-                public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-                    if (evt instanceof IdleStateEvent) {
-                        // close the connection if it is idle for too long
-                        ctx.close();
-                    }
-                    super.userEventTriggered(ctx, evt);
-                }
-
-                @Override
-                protected boolean isValidInMessage(Object msg) {
-                    // ignore data on stream 1, that is the response to our initial upgrade request
-                    return super.isValidInMessage(msg) && (sslContext != null || !discardH2cStream((HttpMessage) msg));
-                }
-            });
-        }
-
-        private boolean acceptsEventStream() {
-            return this.acceptsEvents;
-        }
-    }
-
-    /**
-     * Reads the first {@link Http2Settings} object and notifies a {@link io.netty.channel.ChannelPromise}.
-     */
-    private final class Http2SettingsHandler extends
-            SimpleChannelInboundHandlerInstrumented<Http2Settings> {
-        private final ChannelPromise promise;
-
-        /**
-         * Create new instance.
-         *
-         * @param promise Promise object used to notify when first settings are received
-         */
-        Http2SettingsHandler(ChannelPromise promise) {
-            super(combineFactories());
-            this.promise = promise;
-        }
-
-        @Override
-        protected void channelReadInstrumented(ChannelHandlerContext ctx, Http2Settings msg) {
-            promise.setSuccess();
-
-            // Only care about the first settings message
-            ctx.pipeline().remove(this);
-        }
-    }
-
-    /**
-     * A handler that triggers the cleartext upgrade to HTTP/2 by sending an initial HTTP request.
-     */
-    private class UpgradeRequestHandler extends ChannelInboundHandlerAdapter {
-
-        private final HttpClientInitializer initializer;
-        private final Http2SettingsHandler settingsHandler;
-
-        /**
-         * Default constructor.
-         *
-         * @param initializer The initializer
-         */
-        public UpgradeRequestHandler(HttpClientInitializer initializer) {
-            this.initializer = initializer;
-            this.settingsHandler = initializer.settingsHandler;
-        }
-
-        /**
-         * @return The settings handler
-         */
-        public Http2SettingsHandler getSettingsHandler() {
-            return settingsHandler;
-        }
-
-        @Override
-        public void channelActive(ChannelHandlerContext ctx) {
-            // Done with this handler, remove it from the pipeline.
-            final ChannelPipeline pipeline = ctx.pipeline();
-
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS, initializer.settingsHandler);
-            DefaultFullHttpRequest upgradeRequest =
-                    new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/", Unpooled.EMPTY_BUFFER);
-
-            // Set HOST header as the remote peer may require it.
-            InetSocketAddress remote = (InetSocketAddress) ctx.channel().remoteAddress();
-            String hostString = remote.getHostString();
-            if (hostString == null) {
-                hostString = remote.getAddress().getHostAddress();
-            }
-            upgradeRequest.headers().set(HttpHeaderNames.HOST, hostString + ':' + remote.getPort());
-            ctx.writeAndFlush(upgradeRequest);
-
-            ctx.fireChannelActive();
-            pipeline.remove(this);
-            initializer.addFinalHandler(pipeline);
-        }
-    }
-
-    /**
      * Key used for connection pooling and determining host/port.
      */
-    private static final class RequestKey {
+    static final class RequestKey {
         private final String host;
         private final int port;
         private final boolean secure;
@@ -3114,104 +1960,57 @@ public class DefaultHttpClient implements
 
         @Override
         public int hashCode() {
-            return Objects.hash(host, port, secure);
+            return ObjectUtils.hash(host, port, secure);
         }
     }
 
     /**
      * A Netty request writer.
      */
-    protected class NettyRequestWriter {
+    private class NettyRequestWriter {
 
         private final HttpRequest nettyRequest;
         private final HttpPostRequestEncoder encoder;
-        private final String scheme;
-        private final boolean closeChannelAfterWrite;
 
         /**
-         * @param scheme                 The scheme
          * @param nettyRequest           The Netty request
          * @param encoder                The encoder
-         * @param closeChannelAfterWrite Whether to close the after write
          */
-        NettyRequestWriter(String scheme, HttpRequest nettyRequest, HttpPostRequestEncoder encoder, boolean closeChannelAfterWrite) {
+        NettyRequestWriter(HttpRequest nettyRequest, HttpPostRequestEncoder encoder) {
             this.nettyRequest = nettyRequest;
             this.encoder = encoder;
-            this.scheme = scheme;
-            this.closeChannelAfterWrite = closeChannelAfterWrite;
         }
 
         /**
-         * @param channel     The channel
-         * @param channelPool The channel pool
+         * @param poolHandle  The pool handle
+         * @param isSecure    Is the connection secure
          * @param emitter     The emitter
          */
-        protected void writeAndClose(Channel channel, ChannelPool channelPool, FluxSink<?> emitter) {
-            final ChannelPipeline pipeline = channel.pipeline();
-            if (httpVersion == io.micronaut.http.HttpVersion.HTTP_2_0) {
-                final boolean isSecure = sslContext != null && isSecureScheme(scheme);
+        protected void write(ConnectionManager.PoolHandle poolHandle, boolean isSecure, FluxSink<?> emitter) {
+            if (poolHandle.http2) {
+                // todo: move to ConnectionManager, DefaultHttpClient shouldn't care about the scheme
                 if (isSecure) {
                     nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTPS);
                 } else {
                     nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTP);
                 }
-
-                // for HTTP/2 over cleartext we have to wait for the protocol upgrade to complete
-                // so we get the Http2SettingsHandler and await receiving the Http2Settings object
-                // which indicates the protocol negotiation has completed successfully
-                final UpgradeRequestHandler upgradeRequestHandler =
-                        (UpgradeRequestHandler) pipeline.get(ChannelPipelineCustomizer.HANDLER_HTTP2_UPGRADE_REQUEST);
-                final Http2SettingsHandler settingsHandler;
-                if (upgradeRequestHandler != null) {
-                    settingsHandler = upgradeRequestHandler.getSettingsHandler();
-                } else {
-                    // upgrade request already received to handler must have been removed
-                    // therefore the Http2SettingsHandler is in the pipeline
-                    settingsHandler = (Http2SettingsHandler) pipeline.get(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS);
-                }
-                // if the settings handler is null and no longer in the pipeline, fall through
-                // since this means the HTTP/2 clear text upgrade completed, otherwise
-                // add a listener to the future that writes once the upgrade completes
-                if (settingsHandler != null) {
-                    addInstrumentedListener(settingsHandler.promise, future -> {
-                        if (future.isSuccess()) {
-                            processRequestWrite(channel, channelPool, emitter, pipeline);
-                        } else {
-                            throw customizeException(new HttpClientException("HTTP/2 clear text upgrade failed to complete", future.cause()));
-                        }
-                    });
-                    return;
-                }
             }
-            processRequestWrite(channel, channelPool, emitter, pipeline);
-        }
 
-        private void processRequestWrite(Channel channel, ChannelPool channelPool, FluxSink<?> emitter, ChannelPipeline pipeline) {
-            ChannelFuture channelFuture;
+            Channel channel = poolHandle.channel;
+            ChannelFuture writeFuture;
             if (encoder != null && encoder.isChunked()) {
                 channel.attr(AttributeKey.valueOf(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK)).set(true);
-                pipeline.addAfter(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK, new ChunkedWriteHandler());
+                channel.pipeline().addAfter(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK, new ChunkedWriteHandler());
                 channel.write(nettyRequest);
-                channelFuture = channel.writeAndFlush(encoder);
+                writeFuture = channel.writeAndFlush(encoder);
             } else {
-                channelFuture = channel.writeAndFlush(nettyRequest);
+                writeFuture = channel.writeAndFlush(nettyRequest);
             }
 
-            if (channelPool != null) {
-                closeChannelIfNecessary(channel, emitter, channelFuture, false);
-            } else {
-                closeChannelIfNecessary(channel, emitter, channelFuture, closeChannelAfterWrite);
-            }
-        }
-
-        private void closeChannelIfNecessary(
-                Channel channel,
-                FluxSink<?> emitter,
-                ChannelFuture channelFuture,
-                boolean closeChannelAfterWrite) {
-            addInstrumentedListener(channelFuture, f -> {
+            connectionManager.addInstrumentedListener(writeFuture, f -> {
                 try {
                     if (!f.isSuccess()) {
+                        poolHandle.taint();
                         if (!emitter.isCancelled()) {
                             emitter.error(f.cause());
                         }
@@ -3224,9 +2023,6 @@ public class DefaultHttpClient implements
                         encoder.cleanFiles();
                     }
                     channel.attr(AttributeKey.valueOf(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK)).set(null);
-                    if (closeChannelAfterWrite) {
-                        closeChannelAsync(channel);
-                    }
                 }
             });
         }
@@ -3250,12 +2046,12 @@ public class DefaultHttpClient implements
     }
 
     private abstract class BaseHttpResponseHandler<R extends io.netty.handler.codec.http.HttpResponse, O> extends SimpleChannelInboundHandlerInstrumented<R> {
-        private final Promise<O> responsePromise;
+        private final Promise<? super O> responsePromise;
         private final io.micronaut.http.HttpRequest<?> parentRequest;
         private final io.micronaut.http.HttpRequest<?> finalRequest;
 
-        public BaseHttpResponseHandler(Promise<O> responsePromise, io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<?> finalRequest) {
-            super(combineFactories());
+        public BaseHttpResponseHandler(Promise<? super O> responsePromise, io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<?> finalRequest) {
+            super(connectionManager.instrumenter);
             this.responsePromise = responsePromise;
             this.parentRequest = parentRequest;
             this.finalRequest = finalRequest;
@@ -3316,22 +2112,13 @@ public class DefaultHttpClient implements
                 return;
             }
 
-            HttpResponseStatus status = msg.status();
-            int statusCode = status.code();
-            HttpStatus httpStatus;
-            try {
-                httpStatus = HttpStatus.valueOf(statusCode);
-            } catch (IllegalArgumentException e) {
-                responsePromise.tryFailure(e);
-                return;
-            }
-
             HttpHeaders headers = msg.headers();
             if (log.isTraceEnabled()) {
                 log.trace("HTTP Client Response Received ({}) for Request: {} {}", msg.status(), finalRequest.getMethodName(), finalRequest.getUri());
-                traceHeaders(headers);
+                HttpHeadersUtil.trace(log, headers.names(), headers::getAll);
             }
-            buildResponse(responsePromise, msg, httpStatus);
+            buildResponse(responsePromise, msg);
+            removeHandler(ctx);
         }
 
         private void setRedirectHeaders(@Nullable io.micronaut.http.HttpRequest<?> request, MutableHttpRequest<Object> redirectRequest) {
@@ -3351,22 +2138,22 @@ public class DefaultHttpClient implements
             }
         }
 
+        protected abstract void removeHandler(ChannelHandlerContext ctx);
+
         protected abstract Function<URI, Publisher<? extends O>> makeRedirectHandler(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<Object> redirectRequest);
 
-        protected abstract void buildResponse(Promise<? super O> promise, R msg, HttpStatus httpStatus);
+        protected abstract void buildResponse(Promise<? super O> promise, R msg);
     }
 
     private class FullHttpResponseHandler<O> extends BaseHttpResponseHandler<FullHttpResponse, HttpResponse<O>> {
         private final boolean secure;
         private final Argument<O> bodyType;
         private final Argument<?> errorType;
-        private final ChannelPool channelPool;
-
-        private boolean keepAlive = true;
+        private final ConnectionManager.PoolHandle poolHandle;
 
         public FullHttpResponseHandler(
                 Promise<HttpResponse<O>> responsePromise,
-                ChannelPool channelPool,
+                ConnectionManager.PoolHandle poolHandle,
                 boolean secure,
                 io.micronaut.http.HttpRequest<?> request,
                 Argument<O> bodyType,
@@ -3375,17 +2162,17 @@ public class DefaultHttpClient implements
             this.secure = secure;
             this.bodyType = bodyType;
             this.errorType = errorType;
-            this.channelPool = channelPool;
+            this.poolHandle = poolHandle;
         }
 
         @Override
         public boolean acceptInboundMessage(Object msg) {
-            return msg instanceof FullHttpResponse && (secure || !discardH2cStream((HttpMessage) msg));
+            return msg instanceof FullHttpResponse;
         }
 
         @Override
         protected Function<URI, Publisher<? extends HttpResponse<O>>> makeRedirectHandler(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<Object> redirectRequest) {
-            return uri -> exchangeImpl(uri, parentRequest, redirectRequest, bodyType, errorType);
+            return uri -> exchangeImpl(uri, parentRequest, redirectRequest, bodyType, errorType, null);
         }
 
         @Override
@@ -3407,28 +2194,33 @@ public class DefaultHttpClient implements
                     }
                 }
                 if (!HttpUtil.isKeepAlive(fullResponse)) {
-                    keepAlive = false;
+                    poolHandle.taint();
                 }
                 channelHandlerContext.pipeline().remove(this);
             }
         }
 
         @Override
-        protected void buildResponse(Promise<? super HttpResponse<O>> promise, FullHttpResponse msg, HttpStatus httpStatus) {
+        protected void removeHandler(ChannelHandlerContext ctx) {
+            // done in channelReadInstrumented
+        }
+
+        @Override
+        protected void buildResponse(Promise<? super HttpResponse<O>> promise, FullHttpResponse msg) {
             try {
                 if (log.isTraceEnabled()) {
                     traceBody("Response", msg.content());
                 }
 
-                if (httpStatus == HttpStatus.NO_CONTENT) {
+                if (msg.status().equals(HttpResponseStatus.NO_CONTENT)) {
                     // normalize the NO_CONTENT header, since http content aggregator adds it even if not present in the response
                     msg.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
                 }
 
-                boolean convertBodyWithBodyType = httpStatus.getCode() < 400 ||
+                boolean convertBodyWithBodyType = msg.status().code() < 400 ||
                         (!DefaultHttpClient.this.configuration.isExceptionOnErrorStatus() && bodyType.equalsType(errorType));
                 FullNettyClientHttpResponse<O> response
-                        = new FullNettyClientHttpResponse<>(msg, httpStatus, mediaTypeCodecRegistry, byteBufferFactory, bodyType, convertBodyWithBodyType);
+                        = new FullNettyClientHttpResponse<>(msg, mediaTypeCodecRegistry, byteBufferFactory, bodyType, convertBodyWithBodyType, conversionService);
 
                 if (convertBodyWithBodyType) {
                     promise.trySuccess(response);
@@ -3442,13 +2234,13 @@ public class DefaultHttpClient implements
                         response.onComplete();
                     } catch (Exception t) {
                         response.onComplete();
-                        promise.tryFailure(makeErrorBodyParseError(msg, httpStatus, t));
+                        promise.tryFailure(makeErrorBodyParseError(msg, t));
                     }
                 }
             } catch (HttpClientResponseException t) {
                 promise.tryFailure(t);
             } catch (Exception t) {
-                makeNormalBodyParseError(msg, httpStatus, t, cause -> {
+                makeNormalBodyParseError(msg, t, cause -> {
                     if (!promise.tryFailure(cause) && log.isWarnEnabled()) {
                         log.warn("Exception fired after handler completed: " + t.getMessage(), t);
                     }
@@ -3480,14 +2272,14 @@ public class DefaultHttpClient implements
         /**
          * Create a {@link HttpClientResponseException} if parsing of the HTTP error body failed.
          */
-        private HttpClientResponseException makeErrorBodyParseError(FullHttpResponse fullResponse, HttpStatus httpStatus, Throwable t) {
+        private HttpClientResponseException makeErrorBodyParseError(FullHttpResponse fullResponse, Throwable t) {
             FullNettyClientHttpResponse<Object> errorResponse = new FullNettyClientHttpResponse<>(
                     fullResponse,
-                    httpStatus,
                     mediaTypeCodecRegistry,
                     byteBufferFactory,
                     null,
-                    false
+                    false,
+                    conversionService
             );
             // this onComplete call disables further parsing by HttpClientResponseException
             errorResponse.onComplete();
@@ -3499,14 +2291,14 @@ public class DefaultHttpClient implements
             ));
         }
 
-        private void makeNormalBodyParseError(FullHttpResponse fullResponse, HttpStatus httpStatus, Throwable t, Consumer<HttpClientResponseException> forward) {
+        private void makeNormalBodyParseError(FullHttpResponse fullResponse, Throwable t, Consumer<HttpClientResponseException> forward) {
             FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(
                     fullResponse,
-                    httpStatus,
                     mediaTypeCodecRegistry,
                     byteBufferFactory,
                     null,
-                    false
+                    false,
+                    conversionService
             );
             HttpClientResponseException clientResponseError = customizeException(new HttpClientResponseException(
                 "Error decoding HTTP response body: " + t.getMessage(),
@@ -3528,37 +2320,29 @@ public class DefaultHttpClient implements
 
         @Override
         public void handlerRemoved(ChannelHandlerContext ctx) {
-            if (channelPool != null) {
-                removeReadTimeoutHandler(ctx.pipeline());
-                final Channel ch = ctx.channel();
-                if (!keepAlive) {
-                    ch.closeFuture().addListener((future ->
-                            channelPool.release(ch)
-                    ));
-                } else {
-                    channelPool.release(ch);
-                }
-            } else {
-                // just close it to prevent any future reads without a handler registered
-                ctx.close();
+            ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR);
+            try {
+                ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK);
+            } catch (NoSuchElementException ignored) {
             }
-        }
-
-        @Override
-        public void handlerAdded(ChannelHandlerContext ctx) {
-            addReadTimeoutHandler(ctx.pipeline());
+            ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM);
+            poolHandle.release();
         }
 
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             super.exceptionCaught(ctx, cause);
-            keepAlive = false;
+            poolHandle.taint();
             ctx.pipeline().remove(this);
         }
     }
 
-    private class StreamFullHttpResponseHandler extends BaseHttpResponseHandler<FullHttpResponse, HttpResponse<?>> {
-        public StreamFullHttpResponseHandler(Promise<HttpResponse<?>> responsePromise, io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<?> finalRequest) {
+    private class StreamFullHttpResponseHandler extends BaseHttpResponseHandler<FullHttpResponse, MutableHttpResponse<?>> {
+        public StreamFullHttpResponseHandler(
+            Promise<? super MutableHttpResponse<?>> responsePromise,
+            io.micronaut.http.HttpRequest<?> parentRequest,
+            io.micronaut.http.HttpRequest<?> finalRequest) {
+
             super(responsePromise, parentRequest, finalRequest);
         }
 
@@ -3568,7 +2352,13 @@ public class DefaultHttpClient implements
         }
 
         @Override
-        protected void buildResponse(Promise<? super HttpResponse<?>> promise, FullHttpResponse msg, HttpStatus httpStatus) {
+        protected void removeHandler(ChannelHandlerContext ctx) {
+            ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL);
+            ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM);
+        }
+
+        @Override
+        protected void buildResponse(Promise<? super MutableHttpResponse<?>> promise, FullHttpResponse msg) {
             Publisher<HttpContent> bodyPublisher;
             if (msg.content() instanceof EmptyByteBuf) {
                 bodyPublisher = Publishers.empty();
@@ -3581,29 +2371,21 @@ public class DefaultHttpClient implements
                     msg.headers(),
                     bodyPublisher
             );
-            promise.trySuccess(new NettyStreamedHttpResponse<>(nettyResponse, httpStatus));
+            promise.trySuccess(new NettyStreamedHttpResponse<>(nettyResponse, conversionService));
         }
 
         @Override
-        public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
-            super.handlerAdded(ctx);
-            addReadTimeoutHandler(ctx.pipeline());
-        }
-
-        @Override
-        public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-            super.handlerRemoved(ctx);
-            removeReadTimeoutHandler(ctx.pipeline());
-        }
-
-        @Override
-        protected Function<URI, Publisher<? extends HttpResponse<?>>> makeRedirectHandler(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<Object> redirectRequest) {
+        protected Function<URI, Publisher<? extends MutableHttpResponse<?>>> makeRedirectHandler(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<Object> redirectRequest) {
             return uri -> buildStreamExchange(parentRequest, redirectRequest, uri, null);
         }
     }
 
-    private class StreamStreamHttpResponseHandler extends BaseHttpResponseHandler<StreamedHttpResponse, HttpResponse<?>> {
-        public StreamStreamHttpResponseHandler(Promise<HttpResponse<?>> responsePromise, io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<?> finalRequest) {
+    private class StreamStreamHttpResponseHandler extends BaseHttpResponseHandler<StreamedHttpResponse, MutableHttpResponse<?>> {
+        public StreamStreamHttpResponseHandler(
+            Promise<? super MutableHttpResponse<?>> responsePromise,
+            io.micronaut.http.HttpRequest<?> parentRequest,
+            io.micronaut.http.HttpRequest<?> finalRequest) {
+
             super(responsePromise, parentRequest, finalRequest);
         }
 
@@ -3612,13 +2394,18 @@ public class DefaultHttpClient implements
             return msg instanceof StreamedHttpResponse;
         }
 
-        @Override
-        protected void buildResponse(Promise<? super HttpResponse<?>> promise, StreamedHttpResponse msg, HttpStatus httpStatus) {
-            promise.trySuccess(new NettyStreamedHttpResponse<>(msg, httpStatus));
+        protected void removeHandler(ChannelHandlerContext ctx) {
+            ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL);
+            ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM);
         }
 
         @Override
-        protected Function<URI, Publisher<? extends HttpResponse<?>>> makeRedirectHandler(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<Object> redirectRequest) {
+        protected void buildResponse(Promise<? super MutableHttpResponse<?>> promise, StreamedHttpResponse msg) {
+            promise.trySuccess(new NettyStreamedHttpResponse<>(msg, conversionService));
+        }
+
+        @Override
+        protected Function<URI, Publisher<? extends MutableHttpResponse<?>>> makeRedirectHandler(io.micronaut.http.HttpRequest<?> parentRequest, MutableHttpRequest<Object> redirectRequest) {
             return uri -> buildStreamExchange(parentRequest, redirectRequest, uri, null);
         }
     }

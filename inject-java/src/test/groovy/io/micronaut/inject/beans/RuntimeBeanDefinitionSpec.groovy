@@ -101,6 +101,7 @@ import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 
 @Singleton
 class Foo {
+    @Inject @Named("test2") public Bazz bazz;
     @Inject public Bar bar;
     @Inject @Named("another") public Bar another;
 }
@@ -164,6 +165,18 @@ class RegistrarC {
                   new Stuff()
           )
         );
+        registry.registerBeanDefinition(
+          RuntimeBeanDefinition.builder(
+                  Bazz.class,
+                  () -> new BazzImpl(1)
+          ).named("test").build()
+        );
+        registry.registerBeanDefinition(
+          RuntimeBeanDefinition.builder(
+                  Bazz.class,
+                  () -> new BazzImpl(2)
+          ).named("test2").build()
+        );
     }
 }
 
@@ -178,10 +191,20 @@ class Bar {
 class Baz {}
 
 class Stuff {}
+
+interface Bazz {}
+class BazzImpl implements Bazz  {
+    public final int num;
+    BazzImpl(int num) {
+        this.num = num;
+    }
+}
 ''')
         def foo = getBean(context, 'registerref.Foo')
         expect:
         foo.bar != null
+        foo.bazz != null
+        foo.bazz.num == 2
         foo.bar.name == 'primary'
         foo.another.name == 'another'
 

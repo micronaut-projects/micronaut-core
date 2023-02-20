@@ -15,17 +15,17 @@
  */
 package io.micronaut.inject.qualifiers;
 
+import io.micronaut.context.Qualifier;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.util.ObjectUtils;
+import io.micronaut.inject.BeanType;
+
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 import java.util.stream.Stream;
-
-import io.micronaut.context.Qualifier;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.inject.BeanType;
 
 /**
  * A qualifier for repeatable annotations.
@@ -80,6 +80,6 @@ final class RepeatableAnnotationQualifier<T> implements Qualifier<T> {
 
     @Override
     public int hashCode() {
-        return Objects.hash(repeatableValues, repeatableName);
+        return ObjectUtils.hash(repeatableValues, repeatableName);
     }
 }

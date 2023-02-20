@@ -1,10 +1,130 @@
 This section documents breaking changes between Micronaut versions
 
+== 4.0.0
+
+=== Core Changes
+
+==== Further Micronaut Modularization
+
+The `micronaut-runtime` module has been split into separate modules depending on the application's use case:
+
+===== Micronaut Discovery Core
+
+`micronaut-discovery-core` - The base service discovery features are now a separate module. If you application listens for events such as api:discovery.event.ServiceReadyEvent[] or api:health.HeartBeatEvent[] this module should be added to the application classpath.
+
+dependency::micronaut-discovery[]
+
+===== Micronaut Retry
+
+`micronaut-retry` - The retry implementation including annotations such as ann:retry.annotation.Retryable[] is now a separate module that can be optionally included in a Micronaut application.
+
+In addition, since `micronaut-retry` is now optional declarative clients annotated with ann:http.client.annotation.Client[] no longer invoke fallbacks by default. To restore the previous behaviour add `micronaut-retry` to your classpath and annotate any declarative clients with ann:retry.annotation.Recoverable[].
+
+To use the Retry functionality, add the following dependency:
+
+dependency::micronaut-retry[]
+
+==== Calling `registerSingleton(bean)` no longer overrides existing beans
+
+If you call `registerSingleton(bean)` on the api:context.BeanContext[] this will no longer override existing beans if the type and qualifier match, instead two beans will now exist which may lead to a api:context.exceptions.NonUniqueBeanException[].
+
+If you require replacing an existing bean you must formalize the replacement using the api:context.RuntimeBeanDefinition[] API, for example:
+
+[source,java]
+----
+context.registerBeanDefinition(
+    RuntimeBeanDefinition.builder(Codec.class, ()-> new OverridingCodec())
+            .singleton(true)
+            // the type of the bean to replace
+            .replaces(ToBeReplacedCodec.class)
+            .build()
+);
+----
+
+==== WebSocket No Longer Required
+
+`io.micronaut:micronaut-http-server` no longer exposes `micronaut-websocket` transitively. If you are using annotations such as ann:websocket.annotation.ServerWebSocket[], you should add the `micronaut-websocket` dependency to your application classpath:
+
+dependency::micronaut-websocket[]
+
+==== Reactor Instrumentation Moved to Reactor Module
+
+The instrumentation features for Reactor have been moved to the `micronaut-reactor` module. If you require instrumentation of reactive code paths (for distributed tracing for example) you should make sure your application depends on `micronaut-reactor`:
+
+dependency:micronaut-reactor[groupId="io.micronaut.reactor"]
+
+==== Session Support Moved to Session Module
+
+The Session handling features https://micronaut-projects.github.io/micronaut-session/snapshot/guide/[have been moved to its own module]. If you use the HTTP session module, change the maven coordinates from `io.micronaut:micronaut-session` to `io.micronaut.session:micronaut-session`.
+
+dependency:micronaut-session[groupId="io.micronaut.session"]
+
+==== Kotlin Flow Support Moved to Kotlin Module
+
+Support for the Kotlin `Flow` type has been moved to the `micronaut-kotlin` module. If your application uses Kotlin `Flow` you should ensure the `micronaut-kotlin-runtime` module is on your application classpath:
+
+dependency:micronaut-kotlin-runtime[groupId="io.micronaut.kotlin"]
+
+==== Compilation Time API Split into new module
+
+In order to keep the runtime small all types and interfaces that are used at compilation time only (like the `io.micronaut.inject.ast` API) have been moved into a separate module:
+
+dependency:micronaut-core-processor[]
+
+If you are using types and interfaces from this module you should take care to split the compilation time and runtime logic of your module into separate modules.
+
+==== ASM No Longer Shaded
+
+https://asm.ow2.io/[ASM] is no longer shaded into the `io.micronaut.asm` package. If you depend on this library you should directly depend on the latest version of ASM.
+
+==== Caffeine No Longer Shaded
+
+https://github.com/ben-manes/caffeine[Caffeine] is no longer shaded into the `io.micronaut.caffeine` package. If you depend on this library you should directly depend on the latest version of Caffeine.
+
+==== Environment Deduction Disabled by Default
+
+In previous versions of the Micronaut framework probes were used to attempt to deduce the running environment and establish whether the application was running in the Cloud. These probes involved network calls which resulted in issues with startup performance and security concerns. These probes have been disabled by default and can be re-enabled as necessary by calling `ApplicationContextBuilder.deduceCloudEnvironment(true)` if your application still requires this functionality.
+
+==== Update to Groovy 4
+
+Micronaut now uses Groovy 4.
+This means that Groovy 4 is now the minimum version required to run Groovy Micronaut applications.
+There have been several core differences in Groovy parsing and behavior for version 4 which can be found in the breaking changes section of the https://groovy-lang.org/releasenotes/groovy-4.0.html[4.0.0 release notes].
+
+==== SnakeYAML no longer a direct dependency
+
+SnakeYAML is no longer a direct dependency, if you need YAML configuration you should add SnakeYAML to your classpath explicitly
+
+==== `javax.annotation` no longer a directory dependency
+
+The `javax.annotation` library is no longer a directory dependency. Any references to types in the `javax.anotation` package should be changed to `jakarta.annotation`
+
+==== Kotlin base version updated to 1.7.20
+
+Kotlin has been updated to 1.7.20, which may cause issues when compiling or linking to Kotlin libraries.
+
+==== Bean Introspection changes
+
+Before, when both METHOD and FIELD were set as the access kind, the bean introspection would choose the same access type to get and set the property value. In Micronaut 4, the accessors can be of different kinds: a field to get and a method to set, and vice versa.
+
+==== Annotations with retention CLASS are excluded at runtime
+
+Annotations with the retention CLASS are not available in the annotation metadata at the runtime.
+
+==== Interceptors with multiple interceptor bindings annotations
+
+Interceptors with multiple interceptor bindings annotations now require the same set of annotations to be present at the intercepted point. In the Micronaut 3 an interceptor with multiple binding annotations would need at least one of the binding annotations to be present at the intercepted point.
+
+==== `ConversionService` and `ConversionService.SHARED` is no longer mutable
+
+New type converters can be added to api:core.convert.MutableConversionService[] retrieved from the bean context or by declaring a bean of type api:core.convert.TypeConverter[].
+To register a type converter into `ConversionService.SHARED`, the registration needs to be done via the service loader.
+
 == 3.3.0
 
 - The <<environmentEndpoint, environmental endpoint>> is now disabled by default. To enable it, you must update your endpoint config:
 
-[source,yaml]
+[configuration]
 ----
 endpoints:
   env:

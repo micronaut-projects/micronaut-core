@@ -390,7 +390,7 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
 
                         wrapper.getProperty(property.getName(), ConstraintValidator.class).ifPresent(constraintValidator -> {
                             if (len == 2) {
-                                final Class targetType = ReflectionUtils.getWrapperType(typeParameters[1].getType());
+                                final Class<?> targetType = ReflectionUtils.getWrapperType(typeParameters[1].getType());
                                 final ValidatorKey key = new ValidatorKey(typeParameters[0].getType(), targetType);
                                 validatorMap.put(key, constraintValidator);
                             } else if (len == 1) {
@@ -433,7 +433,7 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
         ArgumentUtils.requireNonNull("constraintType", constraintType);
         ArgumentUtils.requireNonNull("targetType", targetType);
         final ValidatorKey key = new ValidatorKey(constraintType, targetType);
-        targetType = ReflectionUtils.getWrapperType(targetType);
+        targetType = (Class<T>) ReflectionUtils.getWrapperType(targetType);
         ConstraintValidator constraintValidator = localValidators.get(key);
         if (constraintValidator != null) {
             return Optional.of(constraintValidator);
@@ -447,7 +447,7 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
                         ReflectionUtils.getWrapperType(targetType)
                 );
                 Class<T> finalTargetType = targetType;
-                final Class[] finalTypeArguments = {constraintType, finalTargetType};
+                final Class<?>[] finalTypeArguments = {constraintType, finalTargetType};
                 final Optional<ConstraintValidator> local = localValidators.entrySet().stream().filter(entry -> {
                             final ValidatorKey k = entry.getKey();
                     return TypeArgumentQualifier.areTypesCompatible(
@@ -460,8 +460,9 @@ public class DefaultConstraintValidators implements ConstraintValidatorRegistry 
                     validatorCache.put(key, local.get());
                     return (Optional) local;
                 } else if (beanContext != null) {
-                    final ConstraintValidator cv = beanContext
-                            .findBean(ConstraintValidator.class, qualifier).orElse(ConstraintValidator.VALID);
+                    Optional<ConstraintValidator> bean = beanContext
+                        .findBean(ConstraintValidator.class, qualifier);
+                    final ConstraintValidator cv = bean.orElse(ConstraintValidator.VALID);
                     validatorCache.put(key, cv);
                     if (cv != ConstraintValidator.VALID) {
                         return Optional.of(cv);

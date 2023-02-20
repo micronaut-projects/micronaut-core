@@ -23,16 +23,36 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.*;
+import io.micronaut.http.FullHttpRequest;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpParameters;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.PushCapableHttpRequest;
 import io.micronaut.http.annotation.Body;
-import io.micronaut.http.bind.binders.*;
+import io.micronaut.http.bind.binders.AnnotatedRequestArgumentBinder;
+import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
+import io.micronaut.http.bind.binders.CookieAnnotationBinder;
+import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
+import io.micronaut.http.bind.binders.HeaderAnnotationBinder;
+import io.micronaut.http.bind.binders.ParameterAnnotationBinder;
+import io.micronaut.http.bind.binders.PartAnnotationBinder;
+import io.micronaut.http.bind.binders.PathVariableAnnotationBinder;
+import io.micronaut.http.bind.binders.RequestArgumentBinder;
+import io.micronaut.http.bind.binders.RequestAttributeAnnotationBinder;
+import io.micronaut.http.bind.binders.RequestBeanAnnotationBinder;
+import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+
 import java.lang.annotation.Annotation;
-import java.util.*;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static io.micronaut.core.util.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
 
@@ -50,7 +70,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
     private final Map<Class<? extends Annotation>, RequestArgumentBinder> byAnnotation = new LinkedHashMap<>();
     private final Map<TypeAndAnnotation, RequestArgumentBinder> byTypeAndAnnotation = new LinkedHashMap<>();
     private final Map<Integer, RequestArgumentBinder> byType = new LinkedHashMap<>();
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
     private final Map<TypeAndAnnotation, Optional<RequestArgumentBinder>> argumentBinderCache =
         new ConcurrentLinkedHashMap.Builder<TypeAndAnnotation, Optional<RequestArgumentBinder>>().maximumWeightedCapacity(CACHE_MAX_SIZE).build();
 
@@ -66,7 +86,8 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
      * @param conversionService The conversion service
      * @param binders           The request argument binders
      */
-    @Inject public DefaultRequestBinderRegistry(ConversionService conversionService, List<RequestArgumentBinder> binders) {
+    @Inject
+    public DefaultRequestBinderRegistry(ConversionService conversionService, List<RequestArgumentBinder> binders) {
         this.conversionService = conversionService;
 
         if (CollectionUtils.isNotEmpty(binders)) {
@@ -75,23 +96,19 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
             }
         }
 
-        registerDefaultConverters(conversionService);
         registerDefaultAnnotationBinders(byAnnotation);
 
         byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (RequestArgumentBinder<HttpHeaders>) (argument, source) -> () -> Optional.of(source.getHeaders()));
-        byType.put(Argument.of(HttpRequest.class).typeHashCode(), (RequestArgumentBinder<HttpRequest>) (argument, source) -> {
-            Optional<Argument<?>> typeVariable = argument.getFirstTypeVariable()
+        byType.put(Argument.of(HttpRequest.class).typeHashCode(), (RequestArgumentBinder<HttpRequest<?>>) (argument, source) -> {
+            if (HttpMethod.permitsRequestBody(source.getMethod())) {
+                Optional<Argument<?>> typeVariable = argument.getFirstTypeVariable()
                     .filter(arg -> arg.getType() != Object.class)
                     .filter(arg -> arg.getType() != Void.class);
-            if (typeVariable.isPresent() && HttpMethod.permitsRequestBody(source.getMethod())) {
-                if (source.getBody().isPresent()) {
+                if (typeVariable.isPresent()) {
                     return () -> Optional.of(new FullHttpRequest(source, typeVariable.get()));
-                } else {
-                    return ArgumentBinder.BindingResult.UNSATISFIED;
                 }
-            } else {
-                return () -> Optional.of(source);
             }
+            return () -> Optional.of(source);
         });
         byType.put(Argument.of(PushCapableHttpRequest.class).typeHashCode(), (RequestArgumentBinder<PushCapableHttpRequest>) (argument, source) -> {
             if (source instanceof PushCapableHttpRequest) {
@@ -214,30 +231,6 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
     }
 
     /**
-     * Registers a default converter.
-     *
-     * @param conversionService The conversion service
-     */
-    protected void registerDefaultConverters(ConversionService<?> conversionService) {
-        conversionService.addConverter(
-            CharSequence.class,
-            MediaType.class, (object, targetType, context) -> {
-                    if (StringUtils.isEmpty(object)) {
-                        return Optional.empty();
-                    } else {
-                        final String str = object.toString();
-                        try {
-                            return Optional.of(MediaType.of(str));
-                        } catch (IllegalArgumentException e) {
-                            context.reject(e);
-                            return Optional.empty();
-                        }
-                    }
-                });
-
-    }
-
-    /**
      * @param byAnnotation The request argument binder
      */
     protected void registerDefaultAnnotationBinders(Map<Class<? extends Annotation>, RequestArgumentBinder> byAnnotation) {
@@ -261,6 +254,9 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
 
         RequestBeanAnnotationBinder<Object> requestBeanAnnotationBinder = new RequestBeanAnnotationBinder<>(this, conversionService);
         byAnnotation.put(requestBeanAnnotationBinder.getAnnotationType(), requestBeanAnnotationBinder);
+
+        PartAnnotationBinder<Object> partAnnotationBinder = new PartAnnotationBinder<>(conversionService);
+        byAnnotation.put(partAnnotationBinder.getAnnotationType(), partAnnotationBinder);
 
         if (KOTLIN_COROUTINES_SUPPORTED) {
             ContinuationArgumentBinder continuationArgumentBinder = new ContinuationArgumentBinder();

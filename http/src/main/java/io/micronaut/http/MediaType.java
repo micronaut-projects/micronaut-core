@@ -22,6 +22,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ImmutableArgumentConversionContext;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
@@ -823,8 +824,9 @@ public class MediaType implements CharSequence {
     public static Optional<MediaType> fromType(Class<?> type) {
         Produces producesAnn = type.getAnnotation(Produces.class);
         if (producesAnn != null) {
-            for (String mimeType : producesAnn.value()) {
-                return Optional.of(MediaType.of(mimeType));
+            String[] value = producesAnn.value();
+            if (ArrayUtils.isNotEmpty(value)) {
+                return Optional.of(MediaType.of(value[0]));
             }
         }
         return Optional.empty();
@@ -838,9 +840,12 @@ public class MediaType implements CharSequence {
      */
     public static Optional<MediaType> forExtension(String extension) {
         if (StringUtils.isNotEmpty(extension)) {
-            String type = getMediaTypeFileExtensions().get(extension);
-            if (type != null) {
-                return Optional.of(new MediaType(type, extension));
+            Map<String, String> extensions = getMediaTypeFileExtensions();
+            if (extensions != null) {
+                String type = extensions.get(extension);
+                if (type != null) {
+                    return Optional.of(new MediaType(type, extension));
+                }
             }
         }
         return Optional.empty();

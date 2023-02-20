@@ -33,6 +33,7 @@ import io.netty.channel.ChannelOption;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import jakarta.inject.Inject;
+import jakarta.inject.Named;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,7 +112,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * The default configuration for boolean flag indicating whether to add connection header `keep-alive` to responses with HttpStatus > 499.
      */
     @SuppressWarnings("WeakerAccess")
-    public static final boolean DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR = false;
+    public static final boolean DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR = true;
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServerConfiguration.class);
 
@@ -624,6 +625,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          */
         @Deprecated
         public void setPushEnabled(Boolean enabled) {
+            // deprecated
         }
 
         /**
@@ -792,6 +794,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * Configuration for Netty worker.
      */
     @ConfigurationProperties("worker")
+    @Named("netty-server-worker-event-loop")
     public static class Worker extends EventLoopConfig {
         /**
          * Default constructor.
@@ -806,6 +809,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     @ConfigurationProperties(Parent.NAME)
     @Requires(missingProperty = EventLoopGroupConfiguration.EVENT_LOOPS + ".parent")
+    @Named("netty-server-parent-event-loop")
     public static class Parent extends EventLoopConfig {
 
         public static final String NAME = "parent";

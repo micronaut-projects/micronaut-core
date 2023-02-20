@@ -37,7 +37,7 @@ class Listener extends AbstractListener {
         thrown(ClassNotFoundException)
 
         when:
-        Class clazz = context.classLoader.loadClass('test.Listener')
+        Class<?> clazz = context.classLoader.loadClass('test.Listener')
         Object bean = context.getBean(clazz)
 
         then:

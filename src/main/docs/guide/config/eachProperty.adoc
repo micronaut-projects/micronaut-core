@@ -1,6 +1,6 @@
 The link:{api}/io/micronaut/context/annotation/ConfigurationProperties.html[@ConfigurationProperties] annotation is great for a single configuration class, but sometimes you want multiple instances, each with its own distinct configuration. That is where link:{api}/io/micronaut/context/annotation/EachProperty.html[EachProperty] comes in.
 
-The ann:context.annotation.EachProperty[] annotation creates a `ConfigurationProperties` bean for each sub-property within the given property. As an example consider the following class:
+The ann:context.annotation.EachProperty[] annotation creates a `ConfigurationProperties` bean for each sub-property within the given name. As an example consider the following class:
 
 snippet::io.micronaut.docs.config.env.DataSourceConfiguration[tags="eachProperty", indent=0, title="Using @EachProperty"]
 

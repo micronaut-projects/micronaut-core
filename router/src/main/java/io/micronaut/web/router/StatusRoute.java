@@ -58,7 +58,7 @@ public interface StatusRoute extends MethodBasedRoute {
      * @param <T>    The matched route
      * @return The route match
      */
-    <T> Optional<RouteMatch<T>> match(Class originatingClass, HttpStatus status);
+    <T> Optional<RouteMatch<T>> match(Class<?> originatingClass, HttpStatus status);
 
     @Override
     StatusRoute consumes(MediaType... mediaType);

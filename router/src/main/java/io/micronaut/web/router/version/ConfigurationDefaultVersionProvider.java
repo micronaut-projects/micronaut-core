@@ -19,6 +19,8 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.exceptions.ConfigurationException;
 import jakarta.inject.Singleton;
 
+import java.util.Optional;
+
 /**
  * Implementation of {@link DefaultVersionProvider} which uses configuration.
  * If value micronaut.router.versioning.default-version is present, this bean is loaded and returns that value.
@@ -38,10 +40,12 @@ public class ConfigurationDefaultVersionProvider implements DefaultVersionProvid
      * @param routesVersioningConfiguration Routes Versioning Configuration.
      */
     public ConfigurationDefaultVersionProvider(RoutesVersioningConfiguration routesVersioningConfiguration) {
-        if (!routesVersioningConfiguration.getDefaultVersion().isPresent()) {
+        Optional<String> dv = routesVersioningConfiguration.getDefaultVersion();
+        if (dv.isPresent()) {
+            this.defaultVersion = dv.get();
+        } else {
             throw new ConfigurationException("this bean should not be loaded if " + RoutesVersioningConfiguration.PREFIX + ".default-version" + "is null");
         }
-        this.defaultVersion = routesVersioningConfiguration.getDefaultVersion().get();
     }
 
     @Override

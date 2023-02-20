@@ -19,6 +19,27 @@ package io.micronaut.annotation.processing;
  * Exception to indicate postponing processing to next round.
  */
 public final class PostponeToNextRoundException extends RuntimeException {
+
+    private final transient Object errorElement;
+    private final String path;
+
+    /**
+     * @param originatingElement Teh originating element
+     * @param path               The originating element path
+     */
+    public PostponeToNextRoundException(Object originatingElement, String path) {
+        this.errorElement = originatingElement;
+        this.path = path;
+    }
+
+    public Object getErrorElement() {
+        return errorElement;
+    }
+
+    public String getPath() {
+        return path;
+    }
+
     @Override
     public synchronized Throwable fillInStackTrace() {
         // no-op: flow control exception

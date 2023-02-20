@@ -10,30 +10,26 @@ micronautBuild {
 }
 
 dependencies {
-    api project(":inject")
-    api project(':aop')
+    api project(":core-processor")
     api libs.managed.groovy
 //    testImplementation 'javax.validation:validation-api:1.1.0.Final'
     testImplementation project(":context")
     testImplementation libs.javax.inject
-    testImplementation libs.managed.spotbugs
+    testImplementation libs.spotbugs
     testImplementation libs.hibernate
     testImplementation libs.hibernate.validator
     testRuntimeOnly libs.javax.el.impl
     testRuntimeOnly libs.javax.el
     testImplementation project(":http-server-netty")
     testImplementation project(":http-client")
+    testImplementation project(":jackson-databind")
     testImplementation project(":inject-test-utils")
     testImplementation project(":inject-groovy-test")
     testImplementation project(":validation")
-    testImplementation(libs.managed.neo4j.bolt) {
-        version {
-            require "1.4.5"
-        }
-    }
+    testImplementation(libs.neo4j.bolt)
     testImplementation libs.managed.groovy.json
     testImplementation libs.blaze.persistence.core
-
+    testImplementation libs.managed.snakeyaml
     testImplementation libs.managed.reactor
 
     functionalTestImplementation(testFixtures(project(":test-suite")))

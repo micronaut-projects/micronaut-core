@@ -17,7 +17,7 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
@@ -76,6 +76,7 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpReque
     private URI uri;
     private Object body;
     private NettyHttpParameters httpParameters;
+    private ConversionService conversionService = ConversionService.SHARED;
 
     /**
      * This constructor is actually required for the case of non-standard http methods.
@@ -174,8 +175,8 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpReque
     }
 
     @Override
-    public <T> Optional<T> getBody(Argument<T> type) {
-        return getBody().flatMap(b -> ConversionService.SHARED.convert(b, ConversionContext.of(type)));
+    public <T> Optional<T> getBody(ArgumentConversionContext<T> conversionContext) {
+        return getBody().flatMap(b -> conversionService.convert(b, conversionContext));
     }
 
     @Override
@@ -217,7 +218,7 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpReque
     private NettyHttpParameters decodeParameters(URI uri) {
         QueryStringDecoder queryStringDecoder = createDecoder(uri);
         return new NettyHttpParameters(queryStringDecoder.parameters(),
-                ConversionService.SHARED,
+                conversionService,
                 (name, value) -> {
                     UriBuilder newUri = UriBuilder.of(getUri());
                     newUri.replaceQueryParam(name.toString(), value.toArray());
@@ -326,5 +327,10 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpReque
     @Override
     public boolean isStream() {
         return body instanceof Publisher;
+    }
+
+    @Override
+    public void setConversionService(ConversionService conversionService) {
+        this.conversionService = conversionService;
     }
 }
