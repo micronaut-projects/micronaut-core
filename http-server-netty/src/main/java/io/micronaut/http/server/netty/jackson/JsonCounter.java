@@ -26,7 +26,7 @@ import io.netty.buffer.ByteBuf;
  * {@code {"foo":"bar"} {"bar":"baz"}}.<br>
  * Public for fuzzing.
  */
-@SuppressWarnings("BooleanMethodIsAlwaysInverted")
+@SuppressWarnings({"BooleanMethodIsAlwaysInverted", "InnerAssignment"})
 @Internal
 public final class JsonCounter {
     /**
