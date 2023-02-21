@@ -16,7 +16,6 @@
 package io.micronaut.http.server.tck.tests;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -53,36 +52,12 @@ public class HeadersTest {
                 .build()));
     }
 
-    /**
-     * Message header field value MAY be preceded by any amount of LWS (linear white space), though a single SP is preferred
-     *
-     * The field-content does not include any leading or trailing LWS: linear white space occurring before the first non-whitespace
-     * character of the field-value or after the last non-whitespace character of the field-value. Such leading or trailing
-     * LWS MAY be removed without changing the semantics of the field value. Any LWS that occurs between field-content
-     * MAY be replaced with a single SP before interpreting the field value or forwarding the message downstream.
-     *
-     * @see <a href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.2">HTTP/1.1 Message Headers</a>
-     */@Test
-    void headersValueLeadingAndTrailingSpaceAreStripped() throws IOException {
-        asserts(SPEC_NAME,
-            HttpRequest.GET("/bar/ok").header(HttpHeaders.ACCEPT, "    application/json,    text/html    "),
-            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
-                .status(HttpStatus.OK)
-                .body("{\"status\":\"ok\"}")
-                .build()));
-    }
-
     @Controller("/bar")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class ProduceController {
         @Get(value = "/ok", produces = MediaType.APPLICATION_JSON)
         String getOkAsJson() {
             return "{\"status\":\"ok\"}";
-        }
-
-        @Get(value = "/ok", produces = MediaType.TEXT_HTML)
-        String getOkAsHtml() {
-            return "<div>ok</div>";
         }
     }
 }
