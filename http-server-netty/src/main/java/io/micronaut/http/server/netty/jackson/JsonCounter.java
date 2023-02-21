@@ -133,13 +133,6 @@ public final class JsonCounter {
      * Proceed until {@link #isBuffering()} becomes false.
      */
     private void proceedUntilNonBuffering(ByteBuf buf) throws JsonSyntaxException {
-        if (buf.hasArray()) {
-            int arrayOffset = buf.arrayOffset();
-            int newEnd = proceedUntilNonBuffering(buf.array(), arrayOffset + buf.readerIndex(), arrayOffset + buf.writerIndex());
-            buf.readerIndex(newEnd - arrayOffset);
-            return;
-        }
-
         assert isBuffering();
         int end = buf.writerIndex();
 
@@ -160,7 +153,11 @@ public final class JsonCounter {
                     position++;
                 }
             } else if (state == State.STRING) {
-                i = skipStringContent(buf, i, end);
+                for (; i < end; i++) {
+                    if (!skipString(buf.getByte(i))) {
+                        break;
+                    }
+                }
                 this.position += i - start;
                 if (i < end) {
                     handleStringSpecial(buf.getByte(i));
@@ -192,131 +189,6 @@ public final class JsonCounter {
             }
         }
         buf.readerIndex(i);
-    }
-
-    /**
-     * Identical to {@link #proceedUntilNonBuffering(ByteBuf)}, but optimized for an array.
-     */
-    private int proceedUntilNonBuffering(byte[] array, int start, int end) throws JsonSyntaxException {
-        assert isBuffering();
-
-        int i = start;
-        while (i < end && bufferStart != -1) {
-            start = i;
-            if (state == State.BASE) {
-                assert depth > 0 : depth;
-                for (; i < end; i++) {
-                    if (!skipBufferingBase(array[i])) {
-                        break;
-                    }
-                }
-                this.position += i - start;
-                if (i < end) {
-                    handleBufferingBaseSpecial(array[i]);
-                    i++;
-                    position++;
-                }
-            } else if (state == State.STRING) {
-                i = skipStringContent(array, i, end);
-                this.position += i - start;
-                if (i < end) {
-                    handleStringSpecial(array[i]);
-                    i++;
-                    position++;
-                }
-            } else if (state == State.ESCAPE) {
-                handleEscape(array[i]);
-                i++;
-                position++;
-            } else if (state == State.TOP_LEVEL_SCALAR) {
-                assert depth == 0 : depth;
-                for (; i < end; i++) {
-                    if (!skipTopLevelScalar(array[i])) {
-                        break;
-                    }
-                }
-                this.position += i - start;
-                if (i < end) {
-                    handleTopLevelScalarSpecial(array[i]);
-                    i++;
-                    position++;
-                }
-            } else if (state == State.BUFFER_ALL) {
-                i = end;
-                position += i - start;
-            }
-        }
-        return i;
-    }
-
-    private static int skipStringContent(byte[] array, int start, int end) {
-        int i = start;
-        while (true) {
-            // forward loop: find a "
-            for (; i < end; i++) {
-                if (array[i] == '"') {
-                    break;
-                }
-            }
-            // count any escape characters e.g. for the input abc\\\\".
-            // this is a bit involved to avoid O(n²) performance
-            boolean escaped = false;
-            for (int j = i - 1; j >= start; j--) {
-                if (array[j] == '\\') {
-                    escaped = !escaped;
-                } else {
-                    break;
-                }
-            }
-            if (!escaped) {
-                // found a closing quote! or hit the end.
-                return i;
-            } else {
-                if (i < end) {
-                    // ignore this quote, iterate further
-                    i++;
-                } else {
-                    // we hit the end of input, but there were also an odd number of escapes before
-                    // it. Handle one of them to update the counter state and such.
-                    return i - 1;
-                }
-            }
-        }
-    }
-
-    private static int skipStringContent(ByteBuf buf, int start, int end) {
-        int i = start;
-        while (true) {
-            // forward loop: find a "
-            for (; i < end; i++) {
-                if (buf.getByte(i) == '"') {
-                    break;
-                }
-            }
-            // count any escape characters e.g. for the input abc\\\\".
-            // this is a bit involved to avoid O(n²) performance
-            boolean escaped = false;
-            for (int j = i - 1; j >= start; j--) {
-                if (buf.getByte(j) == '\\') {
-                    escaped = !escaped;
-                } else {
-                    break;
-                }
-            }
-            if (!escaped) {
-                // found a closing quote! or hit the end.
-                return i;
-            } else {
-                if (i < end) {
-                    // ignore this quote, iterate further
-                    i++;
-                } else {
-                    // we hit the end of input, but there were also an odd number of escapes before
-                    // it. Handle one of them to update the counter state and such.
-                    return i - 1;
-                }
-            }
-        }
     }
 
     /**
