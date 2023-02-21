@@ -61,6 +61,14 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
             JsonMapper jsonMapper) {
         super(nettyHttpRequest, configuration);
         this.jsonMapper = jsonMapper;
+
+        if (nettyHttpRequest.getContentType()
+            .map(mediaType -> mediaType.equals(MediaType.APPLICATION_JSON_TYPE))
+            .orElse(false)) {
+
+            // if the content type is application/json, we can only have one root-level value
+            counter.noTokenization();
+        }
     }
 
     @Override

@@ -106,13 +106,27 @@ public final class JsonCounter {
     /**
      * Enable top-level array unwrapping: If the input starts with an array, that array's elements
      * are returned as individual JSON nodes, not the array all at once. <br>
-     * Must be called before any data is processed.
+     * Must be called before any data is processed, but can be called after
+     * {@link #noTokenization()}.
      */
     public void unwrapTopLevelArray() {
         if (position != 0) {
             throw new IllegalStateException("Already consumed input");
         }
         state = State.BEFORE_UNWRAP_ARRAY;
+        bufferStart = -1;
+    }
+
+    /**
+     * Do not perform any tokenization, assume that there is only one root-level value. There is
+     * still some basic validation (ensuring the input isn't utf-16 or utf-32).
+     */
+    public void noTokenization() {
+        if (position != 0) {
+            throw new IllegalStateException("Already consumed input");
+        }
+        state = State.BUFFER_ALL;
+        bufferStart = 0;
     }
 
     /**
@@ -170,6 +184,9 @@ public final class JsonCounter {
                     i++;
                     position++;
                 }
+            } else if (state == State.BUFFER_ALL) {
+                i = end;
+                position += i - start;
             } else {
                 throw new AssertionError(state);
             }
@@ -224,6 +241,9 @@ public final class JsonCounter {
                     i++;
                     position++;
                 }
+            } else if (state == State.BUFFER_ALL) {
+                i = end;
+                position += i - start;
             }
         }
         return i;
@@ -599,6 +619,11 @@ public final class JsonCounter {
          * a top-level array. Any further tokens after this are an error.
          */
         AFTER_UNWRAP_ARRAY,
+        /**
+         * Special state for {@link #noTokenization()}. The input is not visited at all, we just
+         * assume everything is part of one root-level token and buffer it all.
+         */
+        BUFFER_ALL,
     }
 
     /**
