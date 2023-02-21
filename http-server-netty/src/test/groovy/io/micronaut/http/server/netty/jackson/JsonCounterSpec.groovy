@@ -3,6 +3,7 @@ package io.micronaut.http.server.netty.jackson
 import com.fasterxml.jackson.core.JsonFactory
 import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.core.JsonToken
+import io.micronaut.json.JsonSyntaxException
 import io.netty.buffer.ByteBufUtil
 import io.netty.buffer.Unpooled
 import spock.lang.Specification
@@ -146,19 +147,19 @@ class JsonCounterSpec extends Specification {
         when:
         splitUtf8(input, false, false)
         then:
-        thrown IllegalArgumentException
+        thrown JsonSyntaxException
         when:
         splitUtf8(input, true, false)
         then:
-        thrown IllegalArgumentException
+        thrown JsonSyntaxException
         when:
         splitUtf8(input, false, true)
         then:
-        thrown IllegalArgumentException
+        thrown JsonSyntaxException
         when:
         splitUtf8(input, true, true)
         then:
-        thrown IllegalArgumentException
+        thrown JsonSyntaxException
 
         where:
         input << [
@@ -177,11 +178,11 @@ class JsonCounterSpec extends Specification {
         when:
         splitUtf8(input, true, false)
         then:
-        thrown IllegalArgumentException
+        thrown JsonSyntaxException
         when:
         splitUtf8(input, true, true)
         then:
-        thrown IllegalArgumentException
+        thrown JsonSyntaxException
 
         where:
         input << [
