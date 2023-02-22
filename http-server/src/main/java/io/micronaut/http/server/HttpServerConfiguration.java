@@ -116,12 +116,6 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_HTTP_TO_HTTPS_REDIRECT = false;
 
-    /**
-     * The default value for eager parsing.
-     */
-    @SuppressWarnings("WeakerAccess")
-    public static final boolean DEFAULT_EAGER_PARSING = false;
-
     private Integer port;
     private String host;
     private Integer readTimeout;
@@ -144,7 +138,6 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     private final ApplicationConfiguration applicationConfiguration;
     private Charset defaultCharset;
     private ThreadSelection threadSelection = ThreadSelection.MANUAL;
-    private boolean eagerParsing = DEFAULT_EAGER_PARSING;
 
     /**
      * Default constructor.
@@ -511,24 +504,6 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
      */
     public void setHttpToHttpsRedirect(boolean httpToHttpsRedirect) {
         this.httpToHttpsRedirect = httpToHttpsRedirect;
-    }
-
-    /**
-     * Parse incoming JSON data eagerly, before route binding.
-     *
-     * @return Whether to parse incoming JSON data eagerly before route binding
-     */
-    public boolean isEagerParsing() {
-        return eagerParsing;
-    }
-
-    /**
-     * Parse incoming JSON data eagerly, before route binding.
-     *
-     * @param eagerParsing Whether to parse incoming JSON data eagerly before route binding
-     */
-    public void setEagerParsing(boolean eagerParsing) {
-        this.eagerParsing = eagerParsing;
     }
 
     /**

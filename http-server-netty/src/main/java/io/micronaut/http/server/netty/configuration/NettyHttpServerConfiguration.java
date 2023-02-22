@@ -114,6 +114,12 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR = true;
 
+    /**
+     * The default value for eager parsing.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_EAGER_PARSING = false;
+
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServerConfiguration.class);
 
     private final List<ChannelPipelineListener> pipelineCustomizers;
@@ -140,6 +146,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private boolean keepAliveOnServerError = DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR;
     private String pcapLoggingPathPattern = null;
     private List<NettyListenerConfiguration> listeners = null;
+    private boolean eagerParsing = DEFAULT_EAGER_PARSING;
 
     /**
      * Default empty constructor.
@@ -562,6 +569,24 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setListeners(List<NettyListenerConfiguration> listeners) {
         this.listeners = listeners;
+    }
+
+    /**
+     * Parse incoming JSON data eagerly, before route binding.
+     *
+     * @return Whether to parse incoming JSON data eagerly before route binding
+     */
+    public boolean isEagerParsing() {
+        return eagerParsing;
+    }
+
+    /**
+     * Parse incoming JSON data eagerly, before route binding.
+     *
+     * @param eagerParsing Whether to parse incoming JSON data eagerly before route binding
+     */
+    public void setEagerParsing(boolean eagerParsing) {
+        this.eagerParsing = eagerParsing;
     }
 
     /**

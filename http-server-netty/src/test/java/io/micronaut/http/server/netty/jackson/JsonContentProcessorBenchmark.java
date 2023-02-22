@@ -4,11 +4,12 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.JsonSyntaxException;
 import io.micronaut.json.convert.LazyJsonNode;
+import io.micronaut.json.tree.JsonNode;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.DefaultByteBufHolder;
 import io.netty.buffer.PooledByteBufAllocator;
@@ -24,8 +25,6 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.Setup;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
-import org.openjdk.jmh.profile.AsyncProfiler;
-import org.openjdk.jmh.profile.LinuxPerfAsmProfiler;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
 
@@ -92,7 +91,7 @@ public class JsonContentProcessorBenchmark {
 
         JsonMapper jsonMapper;
         NettyHttpRequest<?> request;
-        HttpServerConfiguration configuration;
+        NettyHttpServerConfiguration configuration;
 
         @Setup
         public void setUp() throws IOException {
@@ -105,7 +104,7 @@ public class JsonContentProcessorBenchmark {
             }
 
             jsonMapper = ApplicationContext.run().getBean(JsonMapper.class);
-            configuration = new HttpServerConfiguration();
+            configuration = new NettyHttpServerConfiguration();
             EmbeddedChannel ch = new EmbeddedChannel();
             ch.pipeline().addLast(new ChannelHandlerAdapter() {
             });

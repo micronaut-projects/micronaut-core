@@ -21,10 +21,10 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.AbstractHttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.convert.LazyJsonNode;
 import io.micronaut.json.tree.JsonNode;
@@ -57,7 +57,7 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
      */
     public JsonContentProcessor(
             NettyHttpRequest<?> nettyHttpRequest,
-            HttpServerConfiguration configuration,
+            NettyHttpServerConfiguration configuration,
             JsonMapper jsonMapper) {
         super(nettyHttpRequest, configuration);
         this.jsonMapper = jsonMapper;
@@ -141,7 +141,7 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
             this.buffer = null;
         }
         ByteBuffer<ByteBuf> wrapped = NettyByteBufferFactory.DEFAULT.wrap(completedNode);
-        if (configuration.isEagerParsing()) {
+        if (((NettyHttpServerConfiguration) configuration).isEagerParsing()) {
             try {
                 out.add(jsonMapper.readValue(wrapped, Argument.of(JsonNode.class)));
             } finally {
