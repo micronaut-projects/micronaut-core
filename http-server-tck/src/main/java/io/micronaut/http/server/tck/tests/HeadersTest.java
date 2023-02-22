@@ -38,7 +38,6 @@ import static io.micronaut.http.server.tck.TestScenario.asserts;
 public class HeadersTest {
     public static final String SPEC_NAME = "HeadersTest";
 
-
     /**
      * Message header field names are case-insensitive
      *
@@ -69,6 +68,7 @@ public class HeadersTest {
         String getOkAsJson() {
             return "{\"status\":\"ok\"}";
         }
+
         @Get(value = "/bar", produces = MediaType.APPLICATION_JSON)
         String getFooAsJson(@Header("Foo") String foo) {
             return "{\"status\":\"" + foo + "\"}";
