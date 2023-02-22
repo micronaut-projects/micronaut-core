@@ -19,6 +19,9 @@ import java.io.IOException;
 
 /**
  * Exception thrown when there is a syntax error in JSON (e.g. mismatched braces).
+ *
+ * @since 4.0.0
+ * @author Jonas Konrad
  */
 public final class JsonSyntaxException extends IOException {
     /**
@@ -27,6 +30,7 @@ public final class JsonSyntaxException extends IOException {
      * @param cause The framework exception
      */
     public JsonSyntaxException(Throwable cause) {
+        // copy the message so it's shown properly to the user
         super(cause.getMessage(), cause);
     }
 

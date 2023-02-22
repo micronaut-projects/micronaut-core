@@ -62,9 +62,7 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
         super(nettyHttpRequest, configuration);
         this.jsonMapper = jsonMapper;
 
-        if (nettyHttpRequest.getContentType()
-            .map(mediaType -> mediaType.equals(MediaType.APPLICATION_JSON_TYPE))
-            .orElse(false)) {
+        if (hasContentType(MediaType.APPLICATION_JSON_TYPE)) {
 
             // if the content type is application/json, we can only have one root-level value
             counter.noTokenization();
@@ -74,9 +72,7 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
     @Override
     public HttpContentProcessor resultType(Argument<?> type) {
 
-        boolean isJsonStream = nettyHttpRequest.getContentType()
-            .map(mediaType -> mediaType.equals(MediaType.APPLICATION_JSON_STREAM_TYPE))
-            .orElse(false);
+        boolean isJsonStream = hasContentType(MediaType.APPLICATION_JSON_STREAM_TYPE);
 
         if (type != null) {
             Class<?> targetType = type.getType();
@@ -89,6 +85,11 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
             }
         }
         return this;
+    }
+
+    private boolean hasContentType(MediaType expected) {
+        Optional<MediaType> actual = nettyHttpRequest.getContentType();
+        return actual.isPresent() && actual.get().equals(expected);
     }
 
     @Override
@@ -130,7 +131,7 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
     private void bufferForNextRun(ByteBuf buffer) {
         if (this.buffer == null) {
             // number of components should not be too small to avoid unnecessary consolidation
-            this.buffer = buffer.alloc().compositeBuffer(4096);
+            this.buffer = buffer.alloc().compositeBuffer(((NettyHttpServerConfiguration) configuration).getJsonBufferMaxComponents());
         }
         this.buffer.addComponent(true, buffer);
     }

@@ -16,19 +16,10 @@
 package io.micronaut.http.server.exceptions;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.server.exceptions.response.Error;
-import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.json.JsonSyntaxException;
-import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-
-import java.util.Optional;
 
 /**
  * Default exception handler for JSON processing errors.
@@ -39,36 +30,13 @@ import java.util.Optional;
 @Produces
 @Singleton
 @Internal
-public class JsonExceptionHandler implements ExceptionHandler<JsonSyntaxException, Object> {
-
-    private final ErrorResponseProcessor<?> responseProcessor;
-
+public final class JsonExceptionHandler extends BaseJsonExceptionHandler<JsonSyntaxException> implements ExceptionHandler<JsonSyntaxException, Object> {
     /**
      * Constructor.
      *
      * @param responseProcessor Error Response Processor
      */
-    @Inject
     public JsonExceptionHandler(ErrorResponseProcessor<?> responseProcessor) {
-        this.responseProcessor = responseProcessor;
-    }
-
-    @Override
-    public Object handle(HttpRequest request, JsonSyntaxException exception) {
-        MutableHttpResponse<Object> response = HttpResponse.status(HttpStatus.BAD_REQUEST, "Invalid JSON");
-        return responseProcessor.processResponse(ErrorContext.builder(request)
-            .cause(exception)
-            .error(new Error() {
-                @Override
-                public String getMessage() {
-                    return "Invalid JSON: " + exception.getMessage();
-                }
-
-                @Override
-                public Optional<String> getTitle() {
-                    return Optional.of("Invalid JSON");
-                }
-            })
-            .build(), response);
+        super(responseProcessor);
     }
 }

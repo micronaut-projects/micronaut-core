@@ -81,6 +81,7 @@ final class NettyFeature implements Feature {
             } catch (NoSuchMethodException ignored) {
             }
         }
+        RuntimeReflection.register(access.findClassByName("io.netty.buffer.ByteBuf"));
     }
 
     private void registerClasses(BeforeAnalysisAccess access, String... classes) {

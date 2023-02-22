@@ -30,9 +30,12 @@ import java.io.InputStream;
  * Helper class for implementing
  * {@link io.micronaut.json.JsonMapper#readValue(ByteBuffer, Argument)} with optimizations for
  * netty ByteBufs.
+ *
+ * @author Jonas Konrad
+ * @since 4.0.0
  */
 @Internal
-public class JacksonCoreParserFactory {
+public final class JacksonCoreParserFactory {
     private static final boolean HAS_NETTY_BUFFER;
 
     private JacksonCoreParserFactory() {
@@ -49,6 +52,14 @@ public class JacksonCoreParserFactory {
         HAS_NETTY_BUFFER = hasNettyBuffer;
     }
 
+    /**
+     * Create a jackson {@link JsonParser} for the given input bytes.
+     *
+     * @param factory The jackson {@link JsonFactory} for parse features
+     * @param buffer  The input data
+     * @return The created parser
+     * @throws IOException On failure of jackson createParser methods
+     */
     public static JsonParser createJsonParser(JsonFactory factory, ByteBuffer<?> buffer) throws IOException {
         if (!HAS_NETTY_BUFFER || !(buffer.asNativeBuffer() instanceof ByteBuf byteBuf)) {
             return factory.createParser(buffer.toByteArray());
