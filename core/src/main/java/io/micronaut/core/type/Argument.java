@@ -549,7 +549,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      */
     @NonNull
     static <T> Argument<List<T>> listOf(@NonNull Class<T> type) {
-        return listOf(Argument.ofTypeVariable(type, "E"));
+        return listOf(Argument.of(type, "E"));
     }
 
     /**
@@ -575,7 +575,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      */
     @NonNull
     static <T> Argument<Set<T>> setOf(@NonNull Class<T> type) {
-        return setOf(Argument.ofTypeVariable(type, "E"));
+        return setOf(Argument.of(type, "E"));
     }
 
     /**
@@ -603,7 +603,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      */
     @NonNull
     static <K, V> Argument<Map<K, V>> mapOf(@NonNull Class<K> keyType, @NonNull Class<V> valueType) {
-        return mapOf(Argument.ofTypeVariable(keyType, "K"), Argument.ofTypeVariable(valueType, "V"));
+        return mapOf(Argument.of(keyType, "K"), Argument.of(valueType, "V"));
     }
 
     /**
@@ -632,7 +632,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      */
     @NonNull
     static <T> Argument<Optional<T>> optionalOf(@NonNull Class<T> optionalValueClass) {
-        return optionalOf(Argument.ofTypeVariable(optionalValueClass, "T"));
+        return optionalOf(Argument.of(optionalValueClass, "T"));
     }
 
     /**
