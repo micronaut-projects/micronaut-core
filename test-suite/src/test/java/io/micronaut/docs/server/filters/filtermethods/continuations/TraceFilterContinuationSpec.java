@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.server.filters;
+package io.micronaut.docs.server.filters.filtermethods.continuations;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.Environment;
@@ -22,46 +22,32 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.AfterClass;
-import org.junit.BeforeClass;
 import org.junit.Test;
+
 import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 
-public class TraceFilterSpec {
-    private static EmbeddedServer server;
-    private static HttpClient client;
-
-    @BeforeClass
-    public static void setupServer() {
+public class TraceFilterContinuationSpec {
+    @Test
+    public void testTraceFilterWithContinuations() {
         Map<String, Object> map = new HashMap<>();
         map.put("spec.name", HelloControllerSpec.class.getSimpleName());
-        map.put("spec.filter", "TraceFilter");
+        map.put("spec.filter", "TraceFilterContinuation");
         map.put("spec.lang", "java");
 
-        server = ApplicationContext.run(EmbeddedServer.class, map, Environment.TEST);
-        client = server
-                .getApplicationContext()
-                .createBean(HttpClient.class, server.getURL());
-    }
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer.class, map, Environment.TEST);
+        HttpClient client = server
+            .getApplicationContext()
+            .createBean(HttpClient.class, server.getURL());
 
-    @AfterClass
-    public static void stopServer() {
-        if(server != null) {
-            server.stop();
-        }
-        if(client != null) {
-            client.stop();
-        }
-    }
-
-    @Test
-    public void testTraceFilter() {
         HttpResponse response = client.toBlocking().exchange(HttpRequest.GET("/hello"));
 
         assertEquals("true", response.getHeaders().get("X-Trace-Enabled"));
+
+        server.stop();
+        client.stop();
     }
 }
 

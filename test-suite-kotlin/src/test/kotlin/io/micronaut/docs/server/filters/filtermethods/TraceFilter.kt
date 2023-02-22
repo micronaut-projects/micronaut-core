@@ -13,32 +13,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.server.filters
+package io.micronaut.docs.server.filters.filtermethods
 
 // tag::imports[]
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MutableHttpResponse
-import io.micronaut.http.annotation.Filter
-import io.micronaut.http.filter.HttpServerFilter
-import io.micronaut.http.filter.ServerFilterChain
-import org.reactivestreams.Publisher
+import io.micronaut.http.annotation.RequestFilter
+import io.micronaut.http.annotation.ResponseFilter
+import io.micronaut.http.annotation.ServerFilter
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.annotation.ExecuteOn
 // end::imports[]
 
-@Requires(property = "spec.filter", value = "TraceFilter")
+@Requires(property = "spec.filter", value = "TraceFilterMethods")
 // tag::clazz[]
-@Filter("/hello/**") // <1>
-class TraceFilter( // <2>
-    private val traceService: TraceService)// <3>
-    : HttpServerFilter {
+@ServerFilter("/hello/**") // <1>
+class TraceFilter(private val traceService: TraceService) { // <2>
 
-    override fun doFilter(request: HttpRequest<*>,
-                          chain: ServerFilterChain): Publisher<MutableHttpResponse<*>> {
-        return traceService.trace(request) // <4>
-            .switchMap { aBoolean -> chain.proceed(request) } // <5>
-            .doOnNext { res ->
-                res.headers.add("X-Trace-Enabled", "true") // <6>
-            }
+    @RequestFilter
+    @ExecuteOn(TaskExecutors.BLOCKING) // <3>
+    fun filterRequest(request: HttpRequest<*>) {
+        traceService.trace(request) // <4>
+    }
+
+    @ResponseFilter // <5>
+    fun filterResponse(res: MutableHttpResponse<*>) {
+        res.headers.add("X-Trace-Enabled", "true")
     }
 }
 // end::clazz[]
