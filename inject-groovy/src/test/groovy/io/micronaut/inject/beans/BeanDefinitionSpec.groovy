@@ -268,13 +268,13 @@ interface Deserializer<T> {
             def deserializerTypeParam = definition.getTypeArguments("test.Deserializer")[0]
 
         then: "The first is a placeholder"
-            serdeTypeParam.isTypeVariable() //
-            (serdeTypeParam instanceof GenericPlaceholder)
+            !serdeTypeParam.isTypeVariable() //
+            !(serdeTypeParam instanceof GenericPlaceholder)
         and:
-            serializerTypeParam.isTypeVariable()
-            (serializerTypeParam instanceof GenericPlaceholder)
-            deserializerTypeParam.isTypeVariable()
-            (deserializerTypeParam instanceof GenericPlaceholder)
+            !serializerTypeParam.isTypeVariable()
+            !(serializerTypeParam instanceof GenericPlaceholder)
+            !deserializerTypeParam.isTypeVariable()
+            !(deserializerTypeParam instanceof GenericPlaceholder)
     }
 
     void "test isTypeVariable array"() {
