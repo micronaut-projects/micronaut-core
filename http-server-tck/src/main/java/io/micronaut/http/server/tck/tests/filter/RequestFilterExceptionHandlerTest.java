@@ -15,7 +15,6 @@ import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.http.server.tck.AssertionUtils;
-import io.micronaut.http.server.tck.HttpResponseAssertion;
 import io.micronaut.http.server.tck.ServerUnderTest;
 import io.micronaut.http.server.tck.TestScenario;
 import jakarta.inject.Singleton;
@@ -32,13 +31,7 @@ public class RequestFilterExceptionHandlerTest {
     @Test
     public void exceptionHandlerTest() throws IOException {
         assertion(HttpRequest.GET("/foo"),
-            throwsStatus(HttpStatus.UNPROCESSABLE_ENTITY));
-    }
-
-    private static BiConsumer<ServerUnderTest, HttpRequest<?>> throwsStatus(HttpStatus status) {
-        return (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
-            .status(status)
-            .build());
+            AssertionUtils.assertThrowsStatus(HttpStatus.UNPROCESSABLE_ENTITY));
     }
 
     private static void assertion(HttpRequest<?> request, BiConsumer<ServerUnderTest, HttpRequest<?>> assertion) throws IOException {
