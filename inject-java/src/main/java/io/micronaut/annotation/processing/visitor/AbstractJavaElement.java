@@ -461,7 +461,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 String variableName = typeParameter.getSimpleName().toString();
                 resolved.put(
                         variableName,
-                        newClassElement(getNativeType(), typeParameterMirror, parentTypeArguments, visitedTypes, true, false, typeParameter)
+                        newClassElement(getNativeType(), typeParameterMirror, parentTypeArguments, visitedTypes, typeParameterMirror instanceof TypeVariable, false, typeParameter)
                 );
             }
         } else {

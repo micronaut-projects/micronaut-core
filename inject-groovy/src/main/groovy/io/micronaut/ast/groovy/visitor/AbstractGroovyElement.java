@@ -263,7 +263,7 @@ public abstract class AbstractGroovyElement implements Element {
         if (genericsType.isPlaceholder()) {
             return resolvePlaceholder(declaredElement, genericsOwner, genericsType, redirectType, parentTypeArguments, visitedTypes, isRawType);
         }
-        return newClassElement(declaredElement, genericsType.getType(), parentTypeArguments, visitedTypes, true, isRawType);
+        return newClassElement(declaredElement, genericsType.getType(), parentTypeArguments, visitedTypes, genericsType.isPlaceholder(), isRawType);
     }
 
     @NonNull
