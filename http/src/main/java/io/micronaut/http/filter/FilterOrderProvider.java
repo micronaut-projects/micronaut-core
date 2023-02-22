@@ -23,7 +23,9 @@ import io.micronaut.core.order.Ordered;
  *
  * @author James Kleeh
  * @since 1.0
+ * @deprecated Deprecated without replacement. This class is unused and will be removed in 4.0.0.
  */
+@Deprecated
 public interface FilterOrderProvider extends Ordered {
 
 }
