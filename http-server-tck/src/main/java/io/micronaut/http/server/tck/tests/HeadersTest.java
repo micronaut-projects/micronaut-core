@@ -21,6 +21,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Header;
 import io.micronaut.http.server.tck.AssertionUtils;
 import io.micronaut.http.server.tck.HttpResponseAssertion;
 import org.junit.jupiter.api.Test;
@@ -42,22 +43,35 @@ public class HeadersTest {
      * Message header field names are case-insensitive
      *
      * @see <a href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.2">HTTP/1.1 Message Headers</a>
-     */@Test
+     */
+    @Test
     void headersAreCaseInsensitiveAsPerMessageHeadersSpecification() throws IOException {
+        // standard header name with mixed case
         asserts(SPEC_NAME,
-            HttpRequest.GET("/bar/ok").header("aCcEpT", MediaType.APPLICATION_JSON),
+            HttpRequest.GET("/foo/ok").header("aCcEpT", MediaType.APPLICATION_JSON),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("{\"status\":\"ok\"}")
+                .build()));
+        // custom header name with mixed case
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/foo/bar").header("fOO",  "ok"),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("{\"status\":\"ok\"}")
                 .build()));
     }
 
-    @Controller("/bar")
+    @Controller("/foo")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class ProduceController {
         @Get(value = "/ok", produces = MediaType.APPLICATION_JSON)
         String getOkAsJson() {
             return "{\"status\":\"ok\"}";
+        }
+        @Get(value = "/bar", produces = MediaType.APPLICATION_JSON)
+        String getFooAsJson(@Header("Foo") String foo) {
+            return "{\"status\":\"" + foo + "\"}";
         }
     }
 }
