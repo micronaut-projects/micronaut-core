@@ -129,7 +129,8 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
 
     private void bufferForNextRun(ByteBuf buffer) {
         if (this.buffer == null) {
-            this.buffer = buffer.alloc().compositeBuffer(100000);
+            // number of components should not be too small to avoid unnecessary consolidation
+            this.buffer = buffer.alloc().compositeBuffer(4096);
         }
         this.buffer.addComponent(true, buffer);
     }
