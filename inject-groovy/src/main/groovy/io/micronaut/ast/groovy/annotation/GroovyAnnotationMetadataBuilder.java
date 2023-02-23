@@ -31,7 +31,6 @@ import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.annotation.AnnotatedElementValidator;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -129,7 +128,8 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected boolean isExcludedAnnotation(@NonNull AnnotatedNode element, @NonNull String annotationName) {
-        if (element instanceof ClassNode classNode && classNode.isAnnotationDefinition() && annotationName.startsWith("java.lang.annotation")) {
+        if (element instanceof ClassNode classNode && classNode.isAnnotationDefinition()
+                && (annotationName.startsWith("java.lang.annotation") || annotationName.startsWith("org.codehaus.groovy.transform"))) {
             return false;
         } else {
             return super.isExcludedAnnotation(element, annotationName);
@@ -271,10 +271,8 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     @Override
     protected List<? extends AnnotationNode> getAnnotationsForType(AnnotatedNode element) {
         List<AnnotationNode> annotations = element.getAnnotations();
-        List<AnnotationNode> typeAnnotations = element instanceof ClassNode classNode ? classNode.getTypeAnnotations() : Collections.emptyList();
-        List<AnnotationNode> expanded = new ArrayList<>(annotations.size() + typeAnnotations.size());
+        List<AnnotationNode> expanded = new ArrayList<>(annotations.size());
         expandAnnotations(annotations, expanded);
-        expandAnnotations(typeAnnotations, expanded);
         return expanded;
     }
 
@@ -377,9 +375,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
                 if (expression instanceof ConstantExpression constantExpression) {
                     final Object v = constantExpression.getValue();
                     if (v instanceof String s) {
-                        if (StringUtils.isNotEmpty(s)) {
-                            defaultValues.put(method, new ConstantExpression(v));
-                        }
+                        defaultValues.put(method, new ConstantExpression(s));
                     } else if (v != null) {
                         defaultValues.put(method, expression);
                     }
@@ -556,6 +552,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         }
     }
 
+    @SuppressWarnings("java:S1872")
     private Object convertConstantValue(Object value) {
         if (value instanceof ClassNode classNode) {
             return new AnnotationClassValue<>(classNode.getName());
@@ -598,7 +595,8 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     @Override
     protected <K extends Annotation> Optional<AnnotationValue<K>> getAnnotationValues(AnnotatedNode originatingElement, AnnotatedNode member, Class<K> annotationType) {
         if (member != null) {
-            final List<AnnotationNode> anns = member.getAnnotations(ClassHelper.make(annotationType));
+            ClassNode annotationTypeNode = ClassHelper.make(annotationType);
+            final List<AnnotationNode> anns = member.getAnnotations(annotationTypeNode);
             if (CollectionUtils.isNotEmpty(anns)) {
                 AnnotationNode ann = anns.get(0);
                 Map<CharSequence, Object> converted = new LinkedHashMap<>();
@@ -608,6 +606,17 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
                     Expression value = entry.getValue();
                     AnnotatedNode annotationMember = annotationNode.getMethod(key, new Parameter[0]);
                     readAnnotationRawValues(originatingElement, annotationType.getName(), annotationMember, key, value, converted);
+                }
+                Map<CharSequence, Object> annotationDefaults = getCachedAnnotationDefaults(annotationType.getName(), annotationTypeNode);
+                if (!annotationDefaults.isEmpty()) {
+                    Iterator<Map.Entry<CharSequence, Object>> i = converted.entrySet().iterator();
+                    while (i.hasNext()) {
+                        Map.Entry<CharSequence, Object> next = i.next();
+                        Object v = annotationDefaults.get(next.getKey());
+                        if (v != null && v.equals(next.getValue())) {
+                            i.remove();
+                        }
+                    }
                 }
                 return Optional.of(AnnotationValue.builder(annotationType).members(converted).build());
             }

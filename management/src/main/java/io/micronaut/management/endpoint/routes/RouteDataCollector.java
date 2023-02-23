@@ -16,8 +16,6 @@
 package io.micronaut.management.endpoint.routes;
 
 import io.micronaut.web.router.UriRoute;
-import org.reactivestreams.Publisher;
-
 import java.util.stream.Stream;
 
 /**
@@ -34,5 +32,5 @@ public interface RouteDataCollector<T> {
      * @return A publisher that returns data representing all of
      * the given routes.
      */
-    Publisher<T> getData(Stream<UriRoute> routes);
+    T getData(Stream<UriRoute> routes);
 }

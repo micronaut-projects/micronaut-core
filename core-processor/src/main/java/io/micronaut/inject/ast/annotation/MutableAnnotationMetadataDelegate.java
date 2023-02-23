@@ -36,6 +36,12 @@ import java.util.function.Predicate;
 public interface MutableAnnotationMetadataDelegate<R> extends AnnotationMetadataDelegate {
 
     /**
+     * The empty metadata.
+     */
+    MutableAnnotationMetadataDelegate<?> EMPTY = new MutableAnnotationMetadataDelegate<>() {
+    };
+
+    /**
      * Annotate this element with the given annotation type. If the annotation is already present then
      * any values populated by the builder will be merged/overridden with the existing values.
      *

@@ -17,7 +17,9 @@ package io.micronaut.inject.ast.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.GenericElement;
 
 /**
  * Element's annotation metadata factory.
@@ -35,6 +37,24 @@ public interface ElementAnnotationMetadataFactory {
      */
     @NonNull
     ElementAnnotationMetadata build(@NonNull Element element);
+
+    /**
+     * Build new class element type annotation metadata from the class element.
+     *
+     * @param element The element
+     * @return the element's metadata
+     */
+    @NonNull
+    ElementAnnotationMetadata buildTypeAnnotations(@NonNull ClassElement element);
+
+    /**
+     * Build new generic element type annotation metadata from the class element.
+     *
+     * @param element The element
+     * @return the element's metadata
+     */
+    @NonNull
+    ElementAnnotationMetadata buildGenericTypeAnnotations(@NonNull GenericElement element);
 
     /**
      * Build new element annotation metadata from the element with preloaded annotations.

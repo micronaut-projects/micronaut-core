@@ -45,7 +45,9 @@ import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.utils.AstBeanPropertiesUtils;
 import io.micronaut.inject.ast.utils.EnclosedElementsQuery;
 import org.codehaus.groovy.ast.AnnotatedNode;
@@ -123,8 +125,14 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     private final boolean isTypeVar;
     private List<PropertyElement> properties;
     private List<PropertyElement> nativeProperties;
+    @Nullable
+    private ElementAnnotationMetadata elementTypeAnnotationMetadata;
+    @Nullable
+    private ClassElement theType;
     private final GroovyEnclosedElementsQuery groovyEnclosedElementsQuery = new GroovyEnclosedElementsQuery(false);
     private final GroovyEnclosedElementsQuery groovySourceEnclosedElementsQuery = new GroovyEnclosedElementsQuery(true);
+    @Nullable
+    private AnnotationMetadata annotationMetadata;
 
     /**
      * @param visitorContext            The visitor context
@@ -182,9 +190,23 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @Override
-    protected void copyValues(AbstractGroovyElement element) {
-        super.copyValues(element);
-        ((GroovyClassElement) element).resolvedTypeArguments = resolvedTypeArguments;
+    public AnnotationMetadata getAnnotationMetadata() {
+        if (annotationMetadata == null) {
+            if (getNativeType() instanceof GroovyNativeElement.ClassWithOwner) {
+                annotationMetadata = new AnnotationMetadataHierarchy(true, super.getAnnotationMetadata(), getTypeAnnotationMetadata());
+            } else {
+                annotationMetadata = super.getAnnotationMetadata();
+            }
+        }
+        return annotationMetadata;
+    }
+
+    @Override
+    protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
+        if (getNativeType() instanceof GroovyNativeElement.ClassWithOwner) {
+            return getTypeAnnotationMetadata();
+        }
+        return super.getAnnotationMetadataToWrite();
     }
 
     @Override
@@ -194,9 +216,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
     @Override
     public ClassElement withTypeArguments(Map<String, ClassElement> typeArguments) {
-        GroovyClassElement groovyClassElement = new GroovyClassElement(visitorContext, getNativeType(), elementAnnotationMetadataFactory, resolvedTypeArguments, arrayDimensions);
-        groovyClassElement.resolvedTypeArguments = typeArguments;
-        return groovyClassElement;
+        return new GroovyClassElement(visitorContext, getNativeType(), elementAnnotationMetadataFactory, typeArguments, arrayDimensions);
     }
 
     @NonNull
@@ -278,7 +298,10 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     public Collection<ClassElement> getInterfaces() {
         final ClassNode[] interfaces = classNode.getInterfaces();
         if (ArrayUtils.isNotEmpty(interfaces)) {
-            return Arrays.stream(interfaces).map(inf -> newClassElement(inf, getTypeArguments())).toList();
+            return Arrays.stream(interfaces)
+                    .filter(inf -> !inf.getName().equals("groovy.lang.GroovyObject"))
+                    .map(inf -> newClassElement(inf, getTypeArguments()))
+                    .toList();
         }
         return Collections.emptyList();
     }
@@ -605,6 +628,26 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
             }
         }
         return propertyElements;
+    }
+
+    @Override
+    public ClassElement getType() {
+        if (theType == null) {
+            GroovyNativeElement nativeType = getNativeType();
+            ClassNode thisClassNode = (ClassNode) nativeType.annotatedNode();
+            ClassNode redirect = thisClassNode.redirect();
+            // This should eliminate type annotations
+            theType = new GroovyClassElement(visitorContext, new GroovyNativeElement.Class(redirect), elementAnnotationMetadataFactory, resolvedTypeArguments, arrayDimensions, isTypeVar);
+        }
+        return theType;
+    }
+
+    @Override
+    public MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
+        if (elementTypeAnnotationMetadata == null) {
+            elementTypeAnnotationMetadata = elementAnnotationMetadataFactory.buildTypeAnnotations(this);
+        }
+        return elementTypeAnnotationMetadata;
     }
 
     /**

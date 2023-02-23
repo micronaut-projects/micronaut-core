@@ -110,7 +110,6 @@ import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.QualifiedBeanType;
 import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.provider.AbstractProviderDefinition;
-import io.micronaut.inject.provider.BeanProviderDefinition;
 import io.micronaut.inject.proxy.InterceptedBeanProxy;
 import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.Qualified;

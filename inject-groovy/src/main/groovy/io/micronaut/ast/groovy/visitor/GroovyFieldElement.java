@@ -16,6 +16,7 @@
 package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementModifier;
@@ -35,6 +36,7 @@ import java.util.Set;
  * @author James Kleeh
  * @since 1.0
  */
+@Internal
 public class GroovyFieldElement extends AbstractGroovyElement implements FieldElement {
 
     private final GroovyClassElement owningType;

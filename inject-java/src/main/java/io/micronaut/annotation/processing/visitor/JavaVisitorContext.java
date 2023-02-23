@@ -76,7 +76,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-public class JavaVisitorContext implements VisitorContext, BeanElementVisitorContext {
+public final class JavaVisitorContext implements VisitorContext, BeanElementVisitorContext {
 
     private final Messager messager;
     private final Elements elements;
@@ -262,8 +262,8 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
             if (element instanceof BeanElement) {
                 element = ((BeanElement) element).getDeclaringClass();
             }
-            if (element instanceof AbstractJavaElement) {
-                Element el = (Element) element.getNativeType();
+            if (element instanceof AbstractJavaElement abstractJavaElement) {
+                Element el = abstractJavaElement.getNativeType().element();
                 messager.printMessage(kind, message, el);
             } else {
                 messager.printMessage(kind, message);

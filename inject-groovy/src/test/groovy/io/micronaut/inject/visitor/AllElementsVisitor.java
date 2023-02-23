@@ -22,6 +22,7 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.TypedElement;
+import org.junit.jupiter.api.Assertions;
 
 import java.util.*;
 
@@ -65,6 +66,8 @@ public class AllElementsVisitor implements TypeElementVisitor<Controller, Object
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
         visit(element);
+        Assertions.assertTrue(context.getClassElement(Object.class.getName()).isPresent());
+        Assertions.assertTrue(context.getClassElement(Object.class).isPresent());
         element.getBeanProperties(); // Preload properties for tests otherwise it fails because the compiler is done
         element.getAnnotationMetadata();
         VISITED_CLASS_ELEMENTS.add(element);

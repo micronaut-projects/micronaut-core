@@ -23,7 +23,6 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
-import javax.lang.model.element.VariableElement;
 import java.util.Collections;
 
 /**
@@ -37,7 +36,6 @@ final class JavaParameterElement extends AbstractJavaElement implements Paramete
 
     private final JavaClassElement owningType;
     private final MethodElement methodElement;
-    private final VariableElement variableElement;
     private ClassElement typeElement;
     private ClassElement genericTypeElement;
 
@@ -46,24 +44,28 @@ final class JavaParameterElement extends AbstractJavaElement implements Paramete
      *
      * @param owningType                The owning class
      * @param methodElement             The method element
-     * @param element                   The variable element
+     * @param nativeElement             The native element
      * @param annotationMetadataFactory The annotation metadata factory
      * @param visitorContext            The visitor context
      */
     JavaParameterElement(JavaClassElement owningType,
                          MethodElement methodElement,
-                         VariableElement element,
+                         JavaNativeElement.Variable nativeElement,
                          ElementAnnotationMetadataFactory annotationMetadataFactory,
                          JavaVisitorContext visitorContext) {
-        super(element, annotationMetadataFactory, visitorContext);
+        super(nativeElement, annotationMetadataFactory, visitorContext);
         this.owningType = owningType;
         this.methodElement = methodElement;
-        this.variableElement = element;
+    }
+
+    @Override
+    public JavaNativeElement.Variable getNativeType() {
+        return (JavaNativeElement.Variable) super.getNativeType();
     }
 
     @Override
     protected AbstractJavaElement copyThis() {
-        return new JavaParameterElement(owningType, methodElement, variableElement, elementAnnotationMetadataFactory, visitorContext);
+        return new JavaParameterElement(owningType, methodElement, getNativeType(), elementAnnotationMetadataFactory, visitorContext);
     }
 
     @Override
@@ -90,7 +92,7 @@ final class JavaParameterElement extends AbstractJavaElement implements Paramete
     @NonNull
     public ClassElement getType() {
         if (typeElement == null) {
-            typeElement = newClassElement(getNativeType().asType(), Collections.emptyMap());
+            typeElement = newClassElement(getNativeType(), getNativeType().element().asType(), Collections.emptyMap());
         }
         return typeElement;
     }
@@ -99,7 +101,7 @@ final class JavaParameterElement extends AbstractJavaElement implements Paramete
     @Override
     public ClassElement getGenericType() {
         if (genericTypeElement == null) {
-            genericTypeElement = newClassElement(getNativeType().asType(), methodElement.getDeclaringType().getTypeArguments());
+            genericTypeElement = newClassElement(getNativeType(), getNativeType().element().asType(), methodElement.getTypeArguments());
         }
         return genericTypeElement;
     }
@@ -107,11 +109,6 @@ final class JavaParameterElement extends AbstractJavaElement implements Paramete
     @Override
     public MethodElement getMethodElement() {
         return methodElement;
-    }
-
-    @Override
-    public VariableElement getNativeType() {
-        return (VariableElement) super.getNativeType();
     }
 
 }

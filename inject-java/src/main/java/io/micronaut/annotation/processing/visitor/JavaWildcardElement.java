@@ -15,14 +15,21 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.WildcardElement;
+import io.micronaut.inject.ast.annotation.AbstractElementAnnotationMetadata;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 
 import javax.lang.model.type.WildcardType;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.function.Function;
@@ -39,6 +46,9 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
     private final JavaClassElement upperBound;
     private final List<JavaClassElement> upperBounds;
     private final List<JavaClassElement> lowerBounds;
+    private final ElementAnnotationMetadata typeAnnotationMetadata;
+    @Nullable
+    private ElementAnnotationMetadata genericTypeAnnotationMetadata;
 
     JavaWildcardElement(ElementAnnotationMetadataFactory elementAnnotationMetadataFactory,
                         @NonNull WildcardType wildcardType,
@@ -46,7 +56,7 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
                         @NonNull List<JavaClassElement> upperBounds,
                         @NonNull List<JavaClassElement> lowerBounds) {
         super(
-                mostUpper.classElement,
+                mostUpper.getNativeType(),
                 elementAnnotationMetadataFactory,
                 mostUpper.visitorContext,
                 mostUpper.typeArguments,
@@ -56,36 +66,65 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
         this.upperBound = mostUpper;
         this.upperBounds = upperBounds;
         this.lowerBounds = lowerBounds;
+        typeAnnotationMetadata = new AbstractElementAnnotationMetadata() {
+
+            AnnotationMetadata annotationMetadata;
+
+            public AnnotationMetadata getReturnInstance() {
+                return getAnnotationMetadata();
+            }
+
+            @Override
+            protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
+                return getGenericTypeAnnotationMetadata();
+            }
+
+            @Override
+            public AnnotationMetadata getAnnotationMetadata() {
+                if (annotationMetadata == null) {
+                    List<AnnotationMetadata> allAnnotationMetadata = new ArrayList<>();
+                    getLowerBounds().forEach(ce -> allAnnotationMetadata.add(ce.getTypeAnnotationMetadata()));
+                    getUpperBounds().forEach(ce -> allAnnotationMetadata.add(ce.getTypeAnnotationMetadata()));
+                    allAnnotationMetadata.add(JavaWildcardElement.super.getTypeAnnotationMetadata());
+                    allAnnotationMetadata.add(getGenericTypeAnnotationMetadata());
+                    annotationMetadata = new AnnotationMetadataHierarchy(true, allAnnotationMetadata.toArray(AnnotationMetadata[]::new));
+                }
+                return annotationMetadata;
+            }
+        };
+    }
+
+    @Override
+    public MutableAnnotationMetadataDelegate<AnnotationMetadata> getGenericTypeAnnotationMetadata() {
+        if (genericTypeAnnotationMetadata == null) {
+            genericTypeAnnotationMetadata = elementAnnotationMetadataFactory.buildGenericTypeAnnotations(this);
+        }
+        return genericTypeAnnotationMetadata;
+    }
+
+    @Override
+    protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
+        return getGenericTypeAnnotationMetadata();
+    }
+
+    @Override
+    public MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
+        return typeAnnotationMetadata;
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return new AnnotationMetadataHierarchy(true, super.getAnnotationMetadata(), getGenericTypeAnnotationMetadata());
+    }
+
+    @Override
+    public Object getGenericNativeType() {
+        return wildcardType;
     }
 
     @Override
     public boolean isTypeVariable() {
         return true;
-    }
-
-    @Override
-    public Object getNativeType() {
-        return wildcardType;
-    }
-
-    @Override
-    public int hashCode() {
-        return wildcardType.hashCode();
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null) {
-            return false;
-        }
-        io.micronaut.inject.ast.Element that = (io.micronaut.inject.ast.Element) o;
-        if (that instanceof JavaWildcardElement wildcardElement) {
-            return wildcardElement.wildcardType.equals(wildcardType);
-        }
-        return false;
     }
 
     @NonNull

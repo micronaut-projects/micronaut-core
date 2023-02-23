@@ -1,4 +1,4 @@
-To enable processing of CORS requests, modify your configuration. For example with `application.yml`:
+To enable processing of CORS requests, modify your configuration in the application configuration file:
 
 .CORS Configuration Example
 [configuration]

@@ -15,6 +15,7 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.EnumElement;
@@ -31,6 +32,7 @@ import java.util.List;
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 class GroovyEnumElement extends GroovyClassElement implements EnumElement {
 
     protected List<EnumConstantElement> enumConstants;

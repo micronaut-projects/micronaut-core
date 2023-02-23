@@ -15,6 +15,7 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.AnnotationElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
@@ -24,6 +25,7 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
  * @since 3.1.0
  * @author graemerocher
  */
+@Internal
 final class GroovyAnnotationElement extends GroovyClassElement implements AnnotationElement {
 
     public GroovyAnnotationElement(GroovyVisitorContext visitorContext,

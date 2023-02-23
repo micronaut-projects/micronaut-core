@@ -41,39 +41,44 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
 
     private final VariableElement variableElement;
     private JavaClassElement owningType;
-    private ClassElement typeElement;
+    private ClassElement type;
     private ClassElement genericType;
     private ClassElement resolvedDeclaringClass;
 
     /**
-     * @param variableElement           The {@link VariableElement}
+     * @param nativeElement             The native element
      * @param annotationMetadataFactory The annotation metadata factory
      * @param visitorContext            The visitor context
      */
-    JavaFieldElement(VariableElement variableElement,
+    JavaFieldElement(JavaNativeElement.Variable nativeElement,
                      ElementAnnotationMetadataFactory annotationMetadataFactory,
                      JavaVisitorContext visitorContext) {
-        super(variableElement, annotationMetadataFactory, visitorContext);
-        this.variableElement = variableElement;
+        super(nativeElement, annotationMetadataFactory, visitorContext);
+        this.variableElement = nativeElement.element();
     }
 
     /**
      * @param owningType                The declaring element
-     * @param variableElement           The {@link VariableElement}
+     * @param nativeElement             The native element
      * @param annotationMetadataFactory The annotation metadata factory
      * @param visitorContext            The visitor context
      */
     JavaFieldElement(JavaClassElement owningType,
-                     VariableElement variableElement,
+                     JavaNativeElement.Variable nativeElement,
                      ElementAnnotationMetadataFactory annotationMetadataFactory,
                      JavaVisitorContext visitorContext) {
-        this(variableElement, annotationMetadataFactory, visitorContext);
+        this(nativeElement, annotationMetadataFactory, visitorContext);
         this.owningType = owningType;
     }
 
     @Override
+    public JavaNativeElement.Variable getNativeType() {
+        return (JavaNativeElement.Variable) super.getNativeType();
+    }
+
+    @Override
     protected AbstractJavaElement copyThis() {
-        return new JavaFieldElement(owningType, variableElement, elementAnnotationMetadataFactory, visitorContext);
+        return new JavaFieldElement(owningType, getNativeType(), elementAnnotationMetadataFactory, visitorContext);
     }
 
     @Override
@@ -81,15 +86,19 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
         return (FieldElement) super.withAnnotationMetadata(annotationMetadata);
     }
 
+    @NonNull
+    @Override
+    public ClassElement getType() {
+        if (type == null) {
+            type = newClassElement(getNativeType(), variableElement.asType(), Collections.emptyMap());
+        }
+        return type;
+    }
+
     @Override
     public ClassElement getGenericType() {
-        if (this.genericType == null) {
-            if (owningType == null) {
-                this.genericType = getType();
-            } else {
-                ClassElement declaringType = getDeclaringType();
-                this.genericType = newClassElement(variableElement.asType(), declaringType.getTypeArguments());
-            }
+        if (genericType == null) {
+            genericType = newClassElement(getNativeType(), variableElement.asType(), getDeclaringType().getTypeArguments());
         }
         return this.genericType;
     }
@@ -107,15 +116,6 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
     @Override
     public int getArrayDimensions() {
         return getType().getArrayDimensions();
-    }
-
-    @NonNull
-    @Override
-    public ClassElement getType() {
-        if (this.typeElement == null) {
-            this.typeElement = newClassElement(variableElement.asType(), Collections.emptyMap());
-        }
-        return this.typeElement;
     }
 
     @Override
@@ -143,7 +143,7 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
         if (isStatic() && getDeclaringType().isInterface()) {
             return false;
         }
-        return visitorContext.getElements().hides((Element) getNativeType(), (Element) hidden.getNativeType());
+        return visitorContext.getElements().hides(getNativeType().element(), ((JavaNativeElement.Variable) hidden.getNativeType()).element());
     }
 
     @Override

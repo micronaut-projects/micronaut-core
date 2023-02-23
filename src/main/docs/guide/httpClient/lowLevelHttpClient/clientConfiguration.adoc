@@ -99,9 +99,12 @@ micronaut:
           - http://foo2
         pool:
           max-concurrent-http1-connections: 50
+          enabled: true
+          max-connections: 50
 ----
-
 - Limit maximum concurrent HTTP/1.1 connections
+- `max-concurrent-http1-connections` limits the maximum concurrent HTTP/1.1 connections to 50.
+- `pool` enables the pool and sets the maximum number of connections for it
 
 See the API for link:{api}/io/micronaut/http/client/HttpClientConfiguration.ConnectionPoolConfiguration.html[ConnectionPoolConfiguration] for details on available pool configuration options.
 
