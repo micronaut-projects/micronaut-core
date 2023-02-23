@@ -16,6 +16,7 @@
 package io.micronaut.core.io.service;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.IOUtils;
 import org.graalvm.nativeimage.ImageSingletons;
 
@@ -83,7 +84,7 @@ final class ServiceScanner<S> {
      */
     @SuppressWarnings("java:S3398")
     private static Set<String> computeMicronautServiceTypeNames(URI uri, String path) {
-        final StaticServiceDefinitions ssd = ImageSingletons.contains(StaticServiceDefinitions.class) ? ImageSingletons.lookup(StaticServiceDefinitions.class) : null;
+        final StaticServiceDefinitions ssd = findStaticServiceDefinitions();
         if (ssd != null) {
             return ssd.serviceTypeMap.getOrDefault(
                 path,
@@ -104,6 +105,26 @@ final class ServiceScanner<S> {
             };
             IOUtils.eachFile(uri, path, consumer);
             return typeNames;
+        }
+    }
+
+    @Nullable
+    private static StaticServiceDefinitions findStaticServiceDefinitions() {
+        if (hasImageSingletons()) {
+            return ImageSingletons.contains(StaticServiceDefinitions.class) ? ImageSingletons.lookup(StaticServiceDefinitions.class) : null;
+        } else {
+            return null;
+        }
+    }
+
+    @SuppressWarnings("java:S1181")
+    private static boolean hasImageSingletons() {
+        try {
+            //noinspection ConstantValue
+            return ImageSingletons.class != null;
+        } catch (Throwable e) {
+            // not present or not a GraalVM JDK
+            return false;
         }
     }
 
