@@ -28,7 +28,6 @@ import io.micronaut.context.annotation.Context
 import io.micronaut.inject.processing.BeanDefinitionCreator
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
 import io.micronaut.inject.processing.ProcessingException
-import io.micronaut.inject.visitor.VisitorConfiguration
 import io.micronaut.inject.writer.BeanConfigurationWriter
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
@@ -98,17 +97,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
-        GroovyVisitorContext groovyVisitorContext = new GroovyVisitorContext(source, unit) {
-            @Override
-            VisitorConfiguration getConfiguration() {
-                new VisitorConfiguration() {
-                    @Override
-                    boolean includeTypeLevelAnnotationsInGenericArguments() {
-                        return false
-                    }
-                }
-            }
-        }
+        GroovyVisitorContext groovyVisitorContext = new GroovyVisitorContext(source, unit)
         def elementAnnotationMetadataFactory = groovyVisitorContext
                 .getElementAnnotationMetadataFactory()
                 .readOnly()

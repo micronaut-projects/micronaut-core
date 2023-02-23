@@ -1,7 +1,12 @@
 //Micronaut {version} includes the following changes:
 == 4.0.0
 
+=== Apache Groovy 4.0
+
+Micronaut Framework 4.x supports https://groovy-lang.org/releasenotes/groovy-4.0.html[Apache Groovy 4.0].
+
 === Core Changes
+
 
 * <<virtualThreads, Support for Virtual Threads>>
 
@@ -18,6 +23,8 @@ When a bean annotated with ann:context.annotation.EachProperty[] or ann:context.
 === Other Dependency Upgrades
 
 - Kotlin 1.7.10
+
+<<breaks, Breaking changes in Micronaut Framework 4.0>>
 
 == 3.8.0
 

@@ -16,7 +16,9 @@
 package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementModifier;
@@ -34,7 +36,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * A method element returning data from a {@link MethodNode}.
@@ -42,6 +43,7 @@ import java.util.stream.Collectors;
  * @author James Kleeh
  * @since 1.0
  */
+@Internal
 public class GroovyMethodElement extends AbstractGroovyElement implements MethodElement {
 
     protected ParameterElement[] parameters;
@@ -50,6 +52,10 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     private ClassElement declaringType;
     private Map<String, ClassElement> declaredTypeArguments;
     private Map<String, ClassElement> typeArguments;
+    @Nullable
+    private ClassElement returnType;
+    @Nullable
+    private ClassElement genericReturnType;
 
     /**
      * @param owningType         The owning type
@@ -66,10 +72,6 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
         super(visitorContext, nativeElement, annotationMetadata);
         this.methodNode = methodNode;
         this.owningType = owningType;
-    }
-
-    public final MethodNode getMethodNode() {
-        return methodNode;
     }
 
     @Override
@@ -244,7 +246,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
         }
         return Arrays.stream(genericsTypes)
                 .map(gt -> (GenericPlaceholderElement) newClassElement(gt))
-                .collect(Collectors.toList());
+                .toList();
     }
 
 }

@@ -16,6 +16,7 @@
 package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaClassElement;
+import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.Context;
@@ -33,7 +34,6 @@ import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.BeanElementVisitor;
-import io.micronaut.inject.visitor.VisitorConfiguration;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
@@ -131,18 +131,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             filer,
             visitorAttributes,
             getVisitorKind()
-        ) {
-            @NonNull
-            @Override
-            public VisitorConfiguration getConfiguration() {
-                return new VisitorConfiguration() {
-                    @Override
-                    public boolean includeTypeLevelAnnotationsInGenericArguments() {
-                        return false;
-                    }
-                };
-            }
-        };
+        );
     }
 
     @Override
@@ -235,7 +224,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 }
                             }
                         } catch (ProcessingException ex) {
-                            error((Element) ex.getOriginatingElement(), ex.getMessage());
+                            error(((JavaNativeElement) ex.getOriginatingElement()).element(), ex.getMessage());
                         } catch (PostponeToNextRoundException e) {
                             processed.remove(className);
                             postponed.put(className, e);

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonClassDescription
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.ObjectMapper
+import groovy.transform.PackageScope
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.annotation.processing.test.JavaParser
@@ -24,6 +25,7 @@ import io.micronaut.core.convert.TypeConverter
 import io.micronaut.core.reflect.InstantiationUtils
 import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
+import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
@@ -43,8 +45,56 @@ import javax.validation.constraints.Min
 import javax.validation.constraints.NotBlank
 import javax.validation.constraints.Size
 import java.lang.reflect.Field
+import java.time.Instant
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+
+    void "test mix getter and setter with interface type"() {
+        def introspection = buildBeanIntrospection('mixed.Pet', '''
+package mixed;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+@Introspected
+class Owner implements IOwner {
+    @Nullable
+    private String name;
+    public String getName() {
+        return name;
+    }
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+interface IOwner {
+    String getName();
+}
+
+@Introspected
+class Pet {
+    private Owner owner;
+    public Owner getOwner() {
+        return owner;
+    }
+    public void setOwner(IOwner owner) {
+        this.owner = (Owner) owner;
+    }
+}
+''')
+        when:
+        def owner = introspection.beanType.classLoader.loadClass('mixed.Owner').newInstance(name:"Fred")
+        def prop = introspection.getRequiredProperty("owner", Object)
+        def pet = introspection.instantiate()
+        prop.set(pet, owner)
+
+        then:'the write method is not considered to match the getter/setter pair'
+        prop.isReadWrite()
+        prop.get(pet).is(owner)
+    }
 
     void "test mix optional getter with setter"() {
         given:
@@ -73,10 +123,45 @@ class Test {
         def prop = introspection.getRequiredProperty("foo", Optional)
         test.foo = 'value'
 
-        then:'the write method is not considered to match the getter/setter pair'
+        then: 'the write method is not considered to match the getter/setter pair'
         prop.get(test).get() == 'value'
         prop.type == Optional
         prop.isReadOnly()
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/8657")
+    void "test executable method on abstract class with introspection"() {
+        when:
+        def introspection = buildBeanIntrospection('issue8657.Test', '''
+package issue8657;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.inject.visitor.beans.Auditable;
+
+@Introspected
+class Test extends Auditable {
+    private String name;
+    public void setName(String name) {
+        this.name = name;
+    }
+    public String getName() {
+        return name;
+    }
+}
+
+''')
+
+        then:
+        introspection.beanMethods.size() == 1
+
+        when:
+        def bean = introspection.instantiate()
+        def method = introspection.beanMethods.first()
+        method.invoke(bean)
+
+        then:
+        bean.updatedAt != null
     }
 
     void "test generics in arrays don't stack overflow"() {
@@ -4475,6 +4560,93 @@ class Book {
         then:
         property.name == "authors"
         property.asArgument().getTypeParameters()[0].annotationMetadata.hasStereotype("javax.validation.Valid")
+    }
+
+    void "test type_use annotations"() {
+        given:
+            def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.*;
+import io.micronaut.inject.visitor.*;
+@Introspected
+class Test {
+    @io.micronaut.inject.visitor.beans.TypeUseRuntimeAnn
+    private String name;
+    @io.micronaut.inject.visitor.beans.TypeUseClassAnn
+    private String secondName;
+    public String getName() {
+        return name;
+    }
+    public void setName(String name) {
+        this.name = name;
+    }
+    public String getSecondName() {
+        return name;
+    }
+    public void setSecondName(String secondName) {
+        this.secondName = secondName;
+    }
+}
+''')
+            def nameField = introspection.getProperty("name").orElse(null)
+            def secondNameField = introspection.getProperty("secondName").orElse(null)
+
+        expect:
+            nameField
+            secondNameField
+
+            nameField.hasStereotype(TypeUseRuntimeAnn)
+            nameField.hasStereotype("io.micronaut.inject.visitor.beans.TypeUseRuntimeAnn")
+            !secondNameField.hasStereotype(TypeUseClassAnn)
+            !secondNameField.hasStereotype("io.micronaut.inject.visitor.beans.TypeUseClassAnn")
+    }
+
+    void "test subtypes"() {
+        given:
+            BeanIntrospection introspection = buildBeanIntrospection('test.Holder', '''
+package test;
+import io.micronaut.core.annotation.Introspected;
+import java.util.List;
+import java.util.Collections;
+
+@Introspected
+class Animal {
+}
+
+@Introspected
+class Cat extends Animal {
+    final public int lives;
+    Cat(int lives) {
+        this.lives = lives;
+    }
+}
+
+@Introspected(accessKind = Introspected.AccessKind.FIELD)
+class Holder<A extends Animal> {
+    public final Animal animalNonGeneric;
+    public final List<Animal> animalsNonGeneric;
+    public final A animal;
+    public final List<A> animals;
+    Holder(A animal) {
+        this.animal = animal;
+        this.animals = Collections.singletonList(animal);
+        this.animalNonGeneric = animal;
+        this.animalsNonGeneric = Collections.singletonList(animal);
+    }
+}
+
+
+        ''')
+
+        expect:
+            def animalListArgument = introspection.getProperty("animals").get().asArgument().getTypeParameters()[0]
+            animalListArgument instanceof GenericPlaceholder
+            animalListArgument.isTypeVariable()
+
+            def animal = introspection.getProperty("animal").get().asArgument()
+            animal instanceof GenericPlaceholder
+            animal.isTypeVariable()
     }
 
     @Override

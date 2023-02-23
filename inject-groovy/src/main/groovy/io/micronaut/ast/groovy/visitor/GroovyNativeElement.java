@@ -15,6 +15,7 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
+import io.micronaut.core.annotation.Internal;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
@@ -27,6 +28,7 @@ import org.codehaus.groovy.ast.PackageNode;
  * @author Denis Stepanov
  * @since 4.0.0
  */
+@Internal
 public sealed interface GroovyNativeElement {
 
     /**

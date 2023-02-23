@@ -32,13 +32,15 @@ class GroovyReconstructionSpec extends AbstractBeanDefinitionSpec {
         if (classElement.isArray()) {
             return reconstructTypeSignature(classElement.fromArray()) + "[]"
         } else if (classElement.isGenericPlaceholder()) {
-            def freeVar = (GenericPlaceholderElement) classElement
-            def name = freeVar.variableName
+            def genericPlaceholderElement = (GenericPlaceholderElement) classElement
+            def name = genericPlaceholderElement.variableName
             if (typeVarsAsDeclarations) {
-                def bounds = freeVar.bounds
+                def bounds = genericPlaceholderElement.bounds
                 if (reconstructTypeSignature(bounds[0]) != 'Object') {
                     name += bounds.stream().map(GroovyReconstructionSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", " extends ", ""))
                 }
+            } else if (genericPlaceholderElement.resolved) {
+                return reconstructTypeSignature(genericPlaceholderElement.resolved.get())
             }
             return name
         } else if (classElement.isWildcard()) {
@@ -333,12 +335,12 @@ class Wrapper<U> {
         fieldType                               | expectedType
         'String'                                | 'String'
         'List<String>'                          | 'List<String>'
-        'List<T>'                               | 'List<U>'
-        'List<T[]>'                             | 'List<U[]>'
+        'List<T>'                               | 'List<T>'
+        'List<T[]>'                             | 'List<T[]>'
         'List<? extends CharSequence>'          | 'List<? extends CharSequence>'
         'List<? super String>'                  | 'List<? super String>'
-        'List<? extends T[]>'                   | 'List<? extends U[]>'
-        'List<? extends List<? extends T[]>[]>' | 'List<? extends List<? extends U[]>[]>'
+        'List<? extends T[]>'                   | 'List<? extends T[]>'
+        'List<? extends List<? extends T[]>[]>' | 'List<? extends List<? extends T[]>[]>'
         'List<? extends List>'                  | 'List<? extends List>'
         'List<? extends List<?>>'               | 'List<? extends List<?>>'
     }
@@ -370,12 +372,12 @@ class Wrapper<U> {
         fieldType                               | expectedType
         'String'                                | 'String'
         'List<String>'                          | 'List<String>'
-        'List<T>'                               | 'List<U>'
-        'List<T[]>'                             | 'List<U[]>'
+        'List<T>'                               | 'List<T>'
+        'List<T[]>'                             | 'List<T[]>'
         'List<? extends CharSequence>'          | 'List<? extends CharSequence>'
         'List<? super String>'                  | 'List<? super String>'
-        'List<? extends T[]>'                   | 'List<? extends U[]>'
-        'List<? extends List<? extends T[]>[]>' | 'List<? extends List<? extends U[]>[]>'
+        'List<? extends T[]>'                   | 'List<? extends T[]>'
+        'List<? extends List<? extends T[]>[]>' | 'List<? extends List<? extends T[]>[]>'
         'List<? extends List>'                  | 'List<? extends List>'
         'List<? extends List<?>>'               | 'List<? extends List<?>>'
     }
@@ -548,5 +550,103 @@ class Test<T> {
         'Map<Object, T>'    | 'Map'
         'List<? extends T>' | 'List'
         'List<? super T>'   | 'List'
+    }
+
+    def 'distinguish base list type'() {
+        given:
+            def classElement = buildClassElement("""
+package example;
+
+import java.util.*;
+import java.lang.Number;
+
+abstract class Base<T> {
+    List field1;
+    List<?> field2;
+    List<Object> field3;
+    List<T> field4;
+}
+
+class Test extends Base<String> {
+}
+
+""")
+            def rawType = classElement.fields[0].type
+            def wildcardType = classElement.fields[1].type
+            def objectType = classElement.fields[2].type
+            def genericType = classElement.fields[3].type
+
+        expect:
+            rawType.typeArguments["E"].type.name == "java.lang.Object"
+            rawType.typeArguments["E"].isRawType()
+            !rawType.typeArguments["E"].isWildcard()
+            rawType.typeArguments["E"].isGenericPlaceholder()
+
+            wildcardType.typeArguments["E"].type.name == "java.lang.Object"
+            wildcardType.typeArguments["E"].isWildcard()
+            !((WildcardElement)wildcardType.typeArguments["E"]).isBounded()
+            !wildcardType.typeArguments["E"].isRawType()
+
+            objectType.typeArguments["E"].type.name == "java.lang.Object"
+            !objectType.typeArguments["E"].isWildcard()
+            !objectType.typeArguments["E"].isRawType()
+            !objectType.typeArguments["E"].isGenericPlaceholder()
+
+            genericType.typeArguments["E"].type.name == "java.lang.Object"
+            !genericType.typeArguments["E"].isWildcard()
+            !genericType.typeArguments["E"].isRawType()
+            genericType.typeArguments["E"].isGenericPlaceholder()
+            (genericType.typeArguments["E"] as GenericPlaceholderElement).getResolved().isEmpty()
+    }
+
+    def 'distinguish base list generic type'() {
+        given:
+            def classElement = buildClassElement("""
+package example;
+
+import java.util.*;
+import java.lang.Number;
+
+abstract class Base<T> {
+    List field1;
+    List<?> field2;
+    List<Object> field3;
+    List<T> field4;
+}
+
+class Test extends Base<String> {
+}
+
+""")
+            def rawType = classElement.fields[0].genericType
+            def wildcardType = classElement.fields[1].genericType
+            def objectType = classElement.fields[2].genericType
+            def genericType = classElement.fields[3].genericType
+
+        expect:
+            rawType.typeArguments["E"].type.name == "java.lang.Object"
+            rawType.typeArguments["E"].isRawType()
+            !rawType.typeArguments["E"].isWildcard()
+            rawType.typeArguments["E"].isGenericPlaceholder()
+
+            wildcardType.typeArguments["E"].type.name == "java.lang.Object"
+            wildcardType.typeArguments["E"].isWildcard()
+            !((WildcardElement)wildcardType.typeArguments["E"]).isBounded()
+            !wildcardType.typeArguments["E"].isRawType()
+
+            objectType.typeArguments["E"].type.name == "java.lang.Object"
+            !objectType.typeArguments["E"].isWildcard()
+            !objectType.typeArguments["E"].isRawType()
+            !objectType.typeArguments["E"].isGenericPlaceholder()
+
+            genericType.typeArguments["E"].type.name == "java.lang.String"
+            !genericType.typeArguments["E"].isWildcard()
+            !genericType.typeArguments["E"].isRawType()
+            genericType.typeArguments["E"].isGenericPlaceholder()
+            def resolved = (genericType.typeArguments["E"] as GenericPlaceholderElement).getResolved().get()
+            resolved.name == "java.lang.String"
+            !resolved.isWildcard()
+            !resolved.isRawType()
+            !resolved.isGenericPlaceholder()
     }
 }

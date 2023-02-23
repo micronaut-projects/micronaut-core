@@ -11,4 +11,3 @@ micronaut:
 ----
 
 The above configuration creates a fixed thread pool with 75 threads.
-

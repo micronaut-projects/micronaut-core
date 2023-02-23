@@ -350,9 +350,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final org.objectweb.asm.commons.Method METHOD_OPTIONAL_OF = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredMethod(Optional.class, "of", Object.class)
     );
+    private static final String METHOD_NAME_INSTANTIATE = "instantiate";
     private static final org.objectweb.asm.commons.Method METHOD_BEAN_CONSTRUCTOR_INSTANTIATE = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredMethod(
             BeanConstructor.class,
-            "instantiate",
+        METHOD_NAME_INSTANTIATE,
             Object[].class
     ));
     private static final String METHOD_DESCRIPTOR_CONSTRUCTOR_INSTANTIATE = getMethodDescriptor(Object.class, Arrays.asList(
@@ -3272,7 +3273,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                 org.objectweb.asm.commons.Method.getMethod(
                                         ReflectionUtils.getRequiredInternalMethod(
                                                 InstantiationUtils.class,
-                                                "instantiate",
+                                            METHOD_NAME_INSTANTIATE,
                                                 Class.class,
                                                 Class[].class,
                                                 Object[].class
@@ -3360,7 +3361,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         generatorAdapter.visitMethodInsn(
                 INVOKESTATIC,
                 "io/micronaut/aop/chain/ConstructorInterceptorChain",
-                "instantiate",
+            METHOD_NAME_INSTANTIATE,
                 METHOD_DESCRIPTOR_CONSTRUCTOR_INSTANTIATE,
                 false
         );
@@ -3964,7 +3965,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             );
         }
 
-        String methodName = isParametrized ? "doInstantiate" : "instantiate";
+        String methodName = isParametrized ? "doInstantiate" : METHOD_NAME_INSTANTIATE;
         this.buildMethodVisitor = new GeneratorAdapter(classWriter.visitMethod(
                 ACC_PUBLIC,
                 methodName,

@@ -53,6 +53,7 @@ public class CorsSimpleRequestTest {
 
     private static final String SPECNAME = "CorsSimpleRequestTest";
     private static final String PROPERTY_MICRONAUT_SERVER_CORS_ENABLED = "micronaut.server.cors.enabled";
+    private static final String PROPERTY_MICRONAUT_SERVER_CORS_LOCALHOST_PASS_THROUGH = "micronaut.server.cors.localhost-pass-through";
 
     /**
      * @see <a href="https://github.com/micronaut-projects/micronaut-core/security/advisories/GHSA-583g-g682-crxf">GHSA-583g-g682-crxf</a>
@@ -74,6 +75,24 @@ public class CorsSimpleRequestTest {
             Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
             createRequest("https://foo.com"),
             CorsSimpleRequestTest::isForbidden
+        );
+    }
+
+    /**
+     * Test that a simple request is allowed for localhost and origin:any when specifically turned off.
+     * @see <a href="https://github.com/micronaut-projects/micronaut-core/pull/8751">PR-8751</a>
+     *
+     * @throws IOException
+     */
+    @Test
+    void corsSimpleRequestAllowedForLocalhostAndAnyWhenSpecificallyTurnedOff() throws IOException {
+        asserts(SPECNAME,
+            CollectionUtils.mapOf(
+                PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE,
+                PROPERTY_MICRONAUT_SERVER_CORS_LOCALHOST_PASS_THROUGH, StringUtils.TRUE
+            ),
+            createRequest("https://foo.com"),
+            CorsSimpleRequestTest::isSuccessful
         );
     }
 

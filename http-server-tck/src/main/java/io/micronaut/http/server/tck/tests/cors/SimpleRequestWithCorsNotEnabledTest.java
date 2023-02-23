@@ -18,6 +18,7 @@ package io.micronaut.http.server.tck.tests.cors;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Controller;
@@ -43,7 +44,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
     "checkstyle:MissingJavadocType",
 })
 public class SimpleRequestWithCorsNotEnabledTest {
+
     private static final String SPECNAME = "SimpleRequestWithCorsNotEnabledTest";
+    private static final String PROPERTY_MICRONAUT_SERVER_CORS_LOCALHOST_PASS_THROUGH = "micronaut.server.cors.localhost-pass-through";
 
     /**
      * @see <a href="https://github.com/micronaut-projects/micronaut-core/security/advisories/GHSA-583g-g682-crxf">GHSA-583g-g682-crxf</a>
@@ -64,6 +67,27 @@ public class SimpleRequestWithCorsNotEnabledTest {
                     .build());
                 assertEquals(0, refreshCounter.getRefreshCount());
             });
+    }
+
+    /**
+     * This test verifies a CORS simple request is allowed when invoked against a Micronaut application running in localhost without cors enabled but with localhost-pass-through switched on.
+     * @see <a href="https://github.com/micronaut-projects/micronaut-core/pull/8751">PR-8751</a>
+     *
+     * @throws IOException
+     */
+    @Test
+    void corsSimpleRequestAllowedForLocalhostAndAnyWhenConfiguredToAllowIt() throws IOException {
+        asserts(SPECNAME,
+            Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_LOCALHOST_PASS_THROUGH, StringUtils.TRUE),
+            createRequest("https://sdelamo.github.io"),
+            (server, request) -> {
+                RefreshCounter refreshCounter = server.getApplicationContext().getBean(RefreshCounter.class);
+                assertEquals(0, refreshCounter.getRefreshCount());
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .build());
+                assertEquals(1, refreshCounter.getRefreshCount());
+        });
     }
 
     /**
