@@ -110,7 +110,18 @@ httpServer:
   serverIO: Writing Response Data
   uploads: File Uploads
   transfers: File Transfers
-  filters: HTTP Filters
+  filters:
+    title: HTTP Filters
+    filterPatterns: Filter Patterns
+    filtermethods:
+      title: Filter Methods
+      filtermethodsexample: Server Filter with Filter Methods
+      errorStates: Error States
+      continuations: Continuations
+    httpServerFilter:
+      title: HttpServerFilter
+      httpServerFilterExample: HttpServerFilter Example
+      httpServerFilterErrorStates: HttpServerFilter Error States
   sessions: HTTP Sessions
   sse: Server Sent Events
   websocket:

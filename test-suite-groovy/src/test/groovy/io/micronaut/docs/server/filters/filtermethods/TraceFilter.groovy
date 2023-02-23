@@ -13,17 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.server.filters
-
-import io.micronaut.context.annotation.Requires
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.MutableHttpResponse
+package io.micronaut.docs.server.filters.filtermethods
 
 // tag::imports[]
-
+import io.micronaut.http.HttpRequest
+import io.micronaut.context.annotation.Requires
+import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.RequestFilter
+import io.micronaut.http.annotation.ResponseFilter
 import io.micronaut.http.annotation.ServerFilter
-import io.micronaut.http.filter.FilterContinuation
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
 
@@ -33,25 +31,26 @@ import io.micronaut.scheduling.annotation.ExecuteOn
  * @author Graeme Rocher
  * @since 1.0
  */
-@Requires(property = "spec.filter", value = "TraceFilter2")
-@ServerFilter("/hello/**")
-class TraceFilter2 {
+@Requires(property = "spec.filter", value = "TraceFilterMethods")
+// tag::clazz[]
+@ServerFilter("/hello/**") // <1>
+class TraceFilter {
 
     private final TraceService traceService
 
-    TraceFilter2(TraceService traceService) {
+    TraceFilter(TraceService traceService) { // <2>
         this.traceService = traceService
     }
 
-    // tag::doFilter[]
     @RequestFilter
-    @ExecuteOn(TaskExecutors.BLOCKING) // <4>
-    void filterRequest(HttpRequest<?> request, FilterContinuation<MutableHttpResponse<?>> continuation) { // <1>
-        traceService.trace(request)
-        MutableHttpResponse<?> res = continuation.proceed(); // <2>
-        res.headers.add("X-Trace-Enabled", "true") // <3>
+    @ExecuteOn(TaskExecutors.BLOCKING) // <3>
+    void filterRequest(HttpRequest<?> request) {
+        traceService.trace(request) // <4>
     }
-    // end::doFilter[]
-// tag::endclass[]
+
+    @ResponseFilter // <5>
+    void filterResponse(MutableHttpResponse<?> res) {
+        res.headers.add("X-Trace-Enabled", "true")
+    }
 }
-// end::endclass[]
+// end::clazz[]

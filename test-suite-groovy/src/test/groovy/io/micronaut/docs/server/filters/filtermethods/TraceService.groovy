@@ -13,32 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.server.filters
+package io.micronaut.docs.server.filters.filtermethods
 
 // tag::imports[]
-import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+
 import jakarta.inject.Singleton
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
+
 // end::imports[]
 
 // tag::class[]
 @Singleton
 class TraceService {
+    private static final Logger LOG = LoggerFactory.getLogger(TraceService.class)
 
-    private val LOG = LoggerFactory.getLogger(TraceService::class.java)
-
-    internal fun trace(request: HttpRequest<*>): Flux<Boolean> {
-        return Mono.fromCallable {
-            // <1>
-            LOG.debug("Tracing request: {}", request.uri)
-            // trace logic here, potentially performing I/O <2>
-            true
-        }.subscribeOn(Schedulers.boundedElastic()) // <3>
-            .flux()
+    void trace(HttpRequest<?> request) {
+        LOG.debug('Tracing request: {}', request.uri)
+        // trace logic here, potentially performing I/O <2>
     }
 }
 // end::class[]

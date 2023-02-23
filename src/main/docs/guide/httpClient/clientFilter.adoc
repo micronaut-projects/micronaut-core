@@ -1,6 +1,6 @@
 Often, you need to include the same HTTP headers or URL parameters in a set of requests against a third-party API or when calling another Microservice.
 
-To simplify this, you can define api:http.annotation.ClientFilter[] classes that are applied to all matching HTTP client requests. The details of how filters worked are described in the <<filter, server filter documentation>>. Here we will only show some client filters.
+To simplify this, you can define api:http.annotation.ClientFilter[] classes that are applied to all matching HTTP client requests. The details of how filters worked are described in the <<filters, server filter documentation>>. Here we will only show some client filters.
 
 As an example, say you want to build a client to communicate with the https://bintray.com/docs/api/[Bintray REST API]. It would be tedious to specify authentication for every single HTTP call.
 
