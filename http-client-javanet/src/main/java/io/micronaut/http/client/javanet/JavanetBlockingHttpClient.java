@@ -54,9 +54,10 @@ public class JavanetBlockingHttpClient extends AbstractJavanetHttpClient impleme
         MediaTypeCodecRegistry mediaTypeCodecRegistry,
         RequestBinderRegistry requestBinderRegistry,
         String clientId,
-        ConversionService conversionService
+        ConversionService conversionService,
+        JavanetClientSslBuilder sslBuilder
     ) {
-        super(LOG, loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, requestBinderRegistry, clientId, conversionService);
+        super(LOG, loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, requestBinderRegistry, clientId, conversionService, sslBuilder);
     }
 
     @Override

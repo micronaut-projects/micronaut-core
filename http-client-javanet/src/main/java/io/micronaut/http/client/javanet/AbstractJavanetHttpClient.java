@@ -30,15 +30,14 @@ import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ContextPathUtils;
+import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.ClientSslConfiguration;
-import io.micronaut.http.ssl.SslConfigurationException;
+import io.micronaut.http.ssl.SslConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.TrustManager;
-import javax.net.ssl.X509TrustManager;
+import javax.net.ssl.SSLParameters;
 import java.net.Authenticator;
 import java.net.CookieManager;
 import java.net.HttpCookie;
@@ -49,9 +48,6 @@ import java.net.SocketAddress;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
-import java.security.GeneralSecurityException;
-import java.security.cert.CertificateException;
-import java.security.cert.X509Certificate;
 import java.util.Optional;
 
 /*
@@ -70,6 +66,7 @@ abstract class AbstractJavanetHttpClient {
     protected final String clientId;
     protected final ConversionService conversionService;
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
+    protected final JavanetClientSslBuilder sslBuilder;
 
     private final Logger log;
 
@@ -82,7 +79,8 @@ abstract class AbstractJavanetHttpClient {
         MediaTypeCodecRegistry mediaTypeCodecRegistry,
         RequestBinderRegistry requestBinderRegistry,
         String clientId,
-        ConversionService conversionService
+        ConversionService conversionService,
+        JavanetClientSslBuilder sslBuilder
     ) {
         this.log = configuration.getLoggerName().map(LoggerFactory::getLogger).orElse(log);
         this.loadBalancer = loadBalancer;
@@ -93,6 +91,7 @@ abstract class AbstractJavanetHttpClient {
         this.clientId = clientId;
         this.conversionService = conversionService;
         this.cookieManager = new CookieManager();
+        this.sslBuilder = sslBuilder;
 
         if (StringUtils.isNotEmpty(contextPath)) {
             if (contextPath.charAt(0) != '/') {
@@ -121,7 +120,7 @@ abstract class AbstractJavanetHttpClient {
         }
 
         if (configuration.getSslConfiguration() instanceof ClientSslConfiguration clientSslConfiguration) {
-            builder = builder.sslContext(configureSsl(clientSslConfiguration));
+            configureSsl(builder, clientSslConfiguration);
         }
 
         this.client = builder.build();
@@ -152,25 +151,28 @@ abstract class AbstractJavanetHttpClient {
         return builder;
     }
 
-    private SSLContext configureSsl(ClientSslConfiguration clientSslConfiguration) {
-        try {
-            SSLContext sslContext = SSLContext.getInstance("TLS");
-            if (clientSslConfiguration.isInsecureTrustAllCertificates()) {
-                TrustManager[] trustAllCerts = new TrustManager[]{new TrustAllTrustManager()};
-                sslContext.init(null, trustAllCerts, null);
-            } else {
-                sslContext = SSLContext.getDefault();
-            }
-            return sslContext;
-        } catch (GeneralSecurityException e) {
-            throw new SslConfigurationException(e);
+    private void configureSsl(HttpClient.Builder builder, ClientSslConfiguration clientSslConfiguration) {
+        sslBuilder.build(clientSslConfiguration).ifPresent(builder::sslContext);
+        if (System.getProperty("jdk.internal.httpclient.disableHostnameVerification") != null && log.isWarnEnabled()) {
+            log.warn("The jdk.internal.httpclient.disableHostnameVerification system property is set. This is not recommended for production use as it prevents proper certificate validation and may allow man-in-the-middle attacks.");
         }
+        SSLParameters sslParameters = new SSLParameters();
+        clientSslConfiguration.getClientAuthentication().ifPresent(a -> {
+            if (a == ClientAuthentication.WANT) {
+                sslParameters.setWantClientAuth(true);
+            } else if (a == ClientAuthentication.NEED) {
+                sslParameters.setNeedClientAuth(true);
+            }
+        });
+        clientSslConfiguration.getProtocols().ifPresent(sslParameters::setProtocols);
+        clientSslConfiguration.getCiphers().ifPresent(sslParameters::setCipherSuites);
+        builder.sslParameters(sslParameters);
     }
 
     protected Object getLoadBalancerDiscriminator() {
         return null;
     }
-    
+
     public MediaTypeCodecRegistry getMediaTypeCodecRegistry() {
         return mediaTypeCodecRegistry;
     }
@@ -198,24 +200,5 @@ abstract class AbstractJavanetHttpClient {
     @NonNull
     protected <O> HttpResponse<O> response(@NonNull java.net.http.HttpResponse<byte[]> netResponse, @NonNull Argument<O> bodyType) {
         return new HttpResponseAdapter<>(netResponse, bodyType, conversionService, mediaTypeCodecRegistry);
-    }
-
-    @SuppressWarnings("java:S4830") // This is explicitly to turn security off when isInsecureTrustAllCertificates
-    private static class TrustAllTrustManager implements X509TrustManager {
-
-        @Override
-        public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException {
-            // trust everything
-        }
-
-        @Override
-        public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException {
-            // trust everything
-        }
-
-        @Override
-        public X509Certificate[] getAcceptedIssuers() {
-            return new X509Certificate[0];
-        }
     }
 }
