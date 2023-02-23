@@ -34,6 +34,13 @@ import java.util.Optional;
 @Experimental
 public interface ServerUnderTest extends ApplicationContextProvider, Closeable, AutoCloseable {
 
+    /**
+     * The property name used to signify we want to use a non-blocking client.
+     *
+     * This is used as the implementation varies for the javanet client.
+     */
+    String BLOCKING_CLIENT_PROPERTY = "use.blocking.client";
+
     /*
      * Perform an HTTP request for the given request against the server under test and returns the the full HTTP response
      * @param request  The {@link HttpRequest} to execute

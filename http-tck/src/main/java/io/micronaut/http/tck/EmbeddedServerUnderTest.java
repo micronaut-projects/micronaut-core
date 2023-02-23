@@ -24,6 +24,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
+import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.net.URL;
@@ -38,22 +39,32 @@ import java.util.Optional;
 @Experimental
 public class EmbeddedServerUnderTest implements ServerUnderTest {
 
-    private EmbeddedServer embeddedServer;
+    private final boolean isBlockingClient;
+    private final EmbeddedServer embeddedServer;
     private HttpClient httpClient;
     private BlockingHttpClient client;
 
     public EmbeddedServerUnderTest(@NonNull Map<String, Object> properties) {
         this.embeddedServer = ApplicationContext.run(EmbeddedServer.class, properties);
+        this.isBlockingClient = (boolean) properties.getOrDefault(BLOCKING_CLIENT_PROPERTY, true);
     }
 
     @Override
     public <I, O> HttpResponse<O> exchange(HttpRequest<I> request, Argument<O> bodyType) {
-        return getBlockingHttpClient().exchange(request, bodyType);
+        if (isBlockingClient) {
+            return getBlockingHttpClient().exchange(request, bodyType);
+        } else {
+            return Flux.from(getHttpClient().exchange(request, bodyType)).blockFirst();
+        }
     }
 
     @Override
     public <I, O, E> HttpResponse<O> exchange(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
-        return getBlockingHttpClient().exchange(request, bodyType, errorType);
+        if (isBlockingClient) {
+            return getBlockingHttpClient().exchange(request, bodyType, errorType);
+        } else {
+            return Flux.from(getHttpClient().exchange(request, bodyType, errorType)).blockFirst();
+        }
     }
 
     @Override

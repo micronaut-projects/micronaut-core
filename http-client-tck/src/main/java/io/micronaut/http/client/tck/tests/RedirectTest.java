@@ -38,6 +38,8 @@ import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
@@ -45,16 +47,17 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
 import java.util.Collections;
+import java.util.Map;
 import java.util.Optional;
 
+import static io.micronaut.http.tck.ServerUnderTest.BLOCKING_CLIENT_PROPERTY;
 import static io.micronaut.http.tck.TestScenario.asserts;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @SuppressWarnings({
     "java:S2259", // The tests will show if it's null
     "java:S5960", // We're allowed assertions, as these are used in tests only
-    "checkstyle:MissingJavadocType",
-    "checkstyle:DesignForExtension",
+    "java:S1192", // It's more readable without the constant
 })
 class RedirectTest {
 
@@ -63,9 +66,11 @@ class RedirectTest {
     private static final BodyAssertion<String, String> EXPECTED_BODY = BodyAssertion.builder().body(BODY).equals();
     private static final String REDIRECT = "redirect";
 
-    @Test
-    void absoluteRedirection() throws IOException {
+    @ParameterizedTest(name = "blocking={0}")
+    @ValueSource(booleans = {true, false})
+    void absoluteRedirection(boolean blocking) throws IOException {
         asserts(SPEC_NAME,
+            Map.of(BLOCKING_CLIENT_PROPERTY, blocking),
             HttpRequest.GET("/redirect/redirect"),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
                 HttpResponseAssertion.builder()
@@ -94,10 +99,30 @@ class RedirectTest {
     }
 
     @Test
+    void blockingClientRelativeUriDirect() throws IOException {
+        try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
+            HttpClient client = server.getApplicationContext().createBean(HttpClient.class, relativeLoadBalancer(server, "/redirect"))) {
+            var exchange = client.toBlocking().exchange(HttpRequest.GET("direct"), String.class);
+            assertEquals(HttpStatus.OK, exchange.getStatus());
+            assertEquals(BODY, exchange.body());
+        }
+    }
+
+    @Test
     void clientRelativeUriNoSlash() throws IOException {
         try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
              HttpClient client = server.getApplicationContext().createBean(HttpClient.class, relativeLoadBalancer(server, REDIRECT))) {
             var exchange = Flux.from(client.exchange(HttpRequest.GET("direct"), String.class)).blockFirst();
+            assertEquals(HttpStatus.OK, exchange.getStatus());
+            assertEquals(BODY, exchange.body());
+        }
+    }
+
+    @Test
+    void blockingClientRelativeUriNoSlash() throws IOException {
+        try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
+             HttpClient client = server.getApplicationContext().createBean(HttpClient.class, relativeLoadBalancer(server, REDIRECT))) {
+            var exchange = client.toBlocking().exchange(HttpRequest.GET("direct"), String.class);
             assertEquals(HttpStatus.OK, exchange.getStatus());
             assertEquals(BODY, exchange.body());
         }
@@ -116,10 +141,23 @@ class RedirectTest {
 
     @Test
     @SuppressWarnings("java:S3655")
-    void hostHeaderIsCorrectForRedirect() throws IOException {
+    void blockingClientRelativeUriRedirectAbsolute() throws IOException {
+        try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
+             HttpClient client = server.getApplicationContext().createBean(HttpClient.class, server.getURL().get() + "/redirect")) {
+            var response = client.toBlocking().exchange(HttpRequest.GET(REDIRECT), String.class);
+            assertEquals(HttpStatus.OK, response.getStatus());
+            assertEquals(BODY, response.body());
+        }
+    }
+
+    @ParameterizedTest(name = "blocking={0}")
+    @ValueSource(booleans = {true, false})
+    @SuppressWarnings("java:S3655")
+    void hostHeaderIsCorrectForRedirect(boolean blocking) throws IOException {
         try (ServerUnderTest otherServer = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME, Collections.singletonMap("redirect.server", "true"))) {
             int otherPort = otherServer.getPort().get();
             asserts(SPEC_NAME,
+                Map.of(BLOCKING_CLIENT_PROPERTY, blocking),
                 HttpRequest.GET("/redirect/redirect-host").header(REDIRECT, "http://localhost:" + otherPort + "/redirect/host-header"),
                 (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
                     HttpResponseAssertion.builder()

@@ -24,22 +24,30 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.IOException;
 import java.net.URI;
-import java.util.Collections;
+import java.util.Map;
 
+import static io.micronaut.http.tck.ServerUnderTest.BLOCKING_CLIENT_PROPERTY;
 import static io.micronaut.http.tck.TestScenario.asserts;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-public class DontFollowRedirectsTest {
+class DontFollowRedirectsTest {
+
     private static final String SPEC_NAME = "DisableRedirectTest";
 
-    @Test
-    void dontFollowRedirects() throws IOException {
+    @ParameterizedTest(name = "blocking={0}")
+    @ValueSource(booleans = {true, false})
+    void dontFollowRedirects(boolean blocking) throws IOException {
         asserts(SPEC_NAME,
-            Collections.singletonMap("micronaut.http.client.follow-redirects", StringUtils.FALSE),
+            Map.of(
+                "micronaut.http.client.follow-redirects", StringUtils.FALSE,
+                BLOCKING_CLIENT_PROPERTY, blocking
+            ),
             HttpRequest.GET("/redirect/redirect"),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.SEE_OTHER)
