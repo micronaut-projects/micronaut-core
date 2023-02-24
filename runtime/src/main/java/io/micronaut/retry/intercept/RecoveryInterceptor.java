@@ -78,10 +78,6 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
         }
         InterceptedMethod interceptedMethod = InterceptedMethod.of(context);
         try {
-            if (context.isSuspend()) {
-
-            }
-
             switch (interceptedMethod.resultType()) {
                 case PUBLISHER:
                     return interceptedMethod.handleResult(
