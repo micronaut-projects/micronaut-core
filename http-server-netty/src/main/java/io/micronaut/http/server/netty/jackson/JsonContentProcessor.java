@@ -15,24 +15,24 @@
  */
 package io.micronaut.http.server.netty.jackson;
 
+import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.AbstractHttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.json.JsonMapper;
+import io.micronaut.json.convert.LazyJsonNode;
 import io.micronaut.json.tree.JsonNode;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
-import io.netty.buffer.ByteBufUtil;
-import io.netty.util.ReferenceCountUtil;
-import org.reactivestreams.Processor;
-import org.reactivestreams.Subscription;
+import io.netty.buffer.CompositeByteBuf;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.Optional;
 
@@ -47,9 +47,8 @@ import java.util.Optional;
 public class JsonContentProcessor extends AbstractHttpContentProcessor {
 
     private final JsonMapper jsonMapper;
-    private Processor<byte[], JsonNode> jacksonProcessor;
-    private Collection<Object> out;
-    private Throwable failure = null;
+    private final JsonCounter counter = new JsonCounter();
+    private CompositeByteBuf buffer;
 
     /**
      * @param nettyHttpRequest The Netty Http request
@@ -58,19 +57,22 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
      */
     public JsonContentProcessor(
             NettyHttpRequest<?> nettyHttpRequest,
-            HttpServerConfiguration configuration,
+            NettyHttpServerConfiguration configuration,
             JsonMapper jsonMapper) {
         super(nettyHttpRequest, configuration);
         this.jsonMapper = jsonMapper;
+
+        if (hasContentType(MediaType.APPLICATION_JSON_TYPE)) {
+
+            // if the content type is application/json, we can only have one root-level value
+            counter.noTokenization();
+        }
     }
 
     @Override
     public HttpContentProcessor resultType(Argument<?> type) {
-        boolean streamArray = false;
 
-        boolean isJsonStream = nettyHttpRequest.getContentType()
-            .map(mediaType -> mediaType.equals(MediaType.APPLICATION_JSON_STREAM_TYPE))
-            .orElse(false);
+        boolean isJsonStream = hasContentType(MediaType.APPLICATION_JSON_STREAM_TYPE);
 
         if (type != null) {
             Class<?> targetType = type.getType();
@@ -78,91 +80,83 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
                 Optional<Argument<?>> genericArgument = type.getFirstTypeVariable();
                 if (genericArgument.isPresent() && !Iterable.class.isAssignableFrom(genericArgument.get().getType()) && !isJsonStream) {
                     // if the generic argument is not a iterable type them stream the array into the publisher
-                    streamArray = true;
+                    counter.unwrapTopLevelArray();
                 }
             }
         }
-
-        this.jacksonProcessor = jsonMapper.createReactiveParser(p -> {
-        }, streamArray);
-        this.jacksonProcessor.subscribe(new CompletionAwareSubscriber<>() {
-
-            @Override
-            protected void doOnSubscribe(Subscription jsonSubscription) {
-                jsonSubscription.request(Long.MAX_VALUE);
-            }
-
-            @Override
-            protected void doOnNext(JsonNode message) {
-                if (out == null) {
-                    throw new IllegalStateException("Concurrent access not allowed");
-                }
-                out.add(message);
-            }
-
-            @Override
-            protected void doOnError(Throwable t) {
-                if (out == null) {
-                    throw new IllegalStateException("Concurrent access not allowed");
-                }
-                failure = t;
-            }
-
-            @Override
-            protected void doOnComplete() {
-                if (out == null) {
-                    throw new IllegalStateException("Concurrent access not allowed");
-                }
-            }
-        });
-        this.jacksonProcessor.onSubscribe(new Subscription() {
-            @Override
-            public void request(long n) {
-            }
-
-            @Override
-            public void cancel() {
-                // happens on error, ignore
-            }
-        });
         return this;
+    }
+
+    private boolean hasContentType(MediaType expected) {
+        Optional<MediaType> actual = nettyHttpRequest.getContentType();
+        return actual.isPresent() && actual.get().equals(expected);
     }
 
     @Override
     protected void onData(ByteBufHolder message, Collection<Object> out) throws Throwable {
-        if (jacksonProcessor == null) {
-            resultType(null);
-        }
-
-        this.out = out;
         ByteBuf content = message.content();
         try {
-            byte[] bytes = ByteBufUtil.getBytes(content);
-            jacksonProcessor.onNext(bytes);
+            countLoop(out, content);
+        } catch (Exception e) {
+            if (this.buffer != null) {
+                this.buffer.release();
+                this.buffer = null;
+            }
+            throw e;
         } finally {
-            ReferenceCountUtil.release(content);
-            this.out = null;
+            content.release();
         }
-        Throwable f = failure;
-        if (f != null) {
-            failure = null;
-            throw f;
+    }
+
+    private void countLoop(Collection<Object> out, ByteBuf content) throws IOException {
+        long initialPosition = counter.position();
+        long bias = initialPosition - content.readerIndex();
+        while (content.isReadable()) {
+            counter.feed(content);
+            JsonCounter.BufferRegion bufferRegion = counter.pollFlushedRegion();
+            if (bufferRegion != null) {
+                long start = Math.max(initialPosition, bufferRegion.start());
+                flush(out, content.retainedSlice(
+                    Math.toIntExact(start - bias),
+                    Math.toIntExact(bufferRegion.end() - start)
+                ));
+            }
+        }
+        if (counter.isBuffering()) {
+            int currentBufferStart = Math.toIntExact(Math.max(initialPosition, counter.bufferStart()) - bias);
+            bufferForNextRun(content.retainedSlice(currentBufferStart, content.writerIndex() - currentBufferStart));
+        }
+    }
+
+    private void bufferForNextRun(ByteBuf buffer) {
+        if (this.buffer == null) {
+            // number of components should not be too small to avoid unnecessary consolidation
+            this.buffer = buffer.alloc().compositeBuffer(((NettyHttpServerConfiguration) configuration).getJsonBufferMaxComponents());
+        }
+        this.buffer.addComponent(true, buffer);
+    }
+
+    private void flush(Collection<Object> out, ByteBuf completedNode) throws IOException {
+        if (this.buffer != null) {
+            completedNode = completedNode == null ? this.buffer : this.buffer.addComponent(true, completedNode);
+            this.buffer = null;
+        }
+        ByteBuffer<ByteBuf> wrapped = NettyByteBufferFactory.DEFAULT.wrap(completedNode);
+        if (((NettyHttpServerConfiguration) configuration).isEagerParsing()) {
+            try {
+                out.add(jsonMapper.readValue(wrapped, Argument.of(JsonNode.class)));
+            } finally {
+                completedNode.release();
+            }
+        } else {
+            out.add(new LazyJsonNode(wrapped));
         }
     }
 
     @Override
     public void complete(Collection<Object> out) throws Throwable {
-        if (jacksonProcessor == null) {
-            resultType(null);
-        }
-
-        this.out = out;
-        jacksonProcessor.onComplete();
-        this.out = null;
-        Throwable f = failure;
-        if (f != null) {
-            failure = null;
-            throw f;
+        if (this.buffer != null) {
+            flush(out, null);
         }
     }
 }

@@ -15,28 +15,30 @@
  */
 package io.micronaut.http.server.exceptions;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
-import io.micronaut.json.JsonSyntaxException;
 import jakarta.inject.Singleton;
 
 /**
- * Default exception handler for JSON processing errors.
+ * Default exception handler for jackson processing errors.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Produces
 @Singleton
+@Requires(classes = JsonProcessingException.class)
 @Internal
-public final class JsonExceptionHandler extends BaseJsonExceptionHandler<JsonSyntaxException> implements ExceptionHandler<JsonSyntaxException, Object> {
+public final class JacksonExceptionHandler extends BaseJsonExceptionHandler<JsonProcessingException> implements ExceptionHandler<JsonProcessingException, Object> {
     /**
      * Constructor.
      *
      * @param responseProcessor Error Response Processor
      */
-    public JsonExceptionHandler(ErrorResponseProcessor<?> responseProcessor) {
+    public JacksonExceptionHandler(ErrorResponseProcessor<?> responseProcessor) {
         super(responseProcessor);
     }
 }
