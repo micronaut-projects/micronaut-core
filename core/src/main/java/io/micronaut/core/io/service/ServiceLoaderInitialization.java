@@ -13,16 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.graal;
+package io.micronaut.core.io.service;
 
-import com.oracle.svm.core.annotate.Substitute;
-import com.oracle.svm.core.annotate.TargetClass;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.beans.BeanInfo;
+import io.micronaut.core.graal.GraalReflectionConfigurer;
 import io.micronaut.core.io.IOUtils;
-import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.io.service.ServiceScanner.StaticServiceDefinitions;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.util.ArrayUtils;
 import org.graalvm.nativeimage.ImageSingletons;
@@ -43,13 +41,10 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -67,7 +62,7 @@ final class ServiceLoaderFeature implements Feature {
         configureForReflection(access);
 
         StaticServiceDefinitions staticServiceDefinitions = buildStaticServiceDefinitions(access);
-        final Collection<Set<String>> allTypeNames = staticServiceDefinitions.serviceTypeMap.values();
+        final Collection<Set<String>> allTypeNames = staticServiceDefinitions.serviceTypeMap().values();
         for (Set<String> typeNameSet : allTypeNames) {
             Iterator<String> i = typeNameSet.iterator();
             serviceLoop: while (i.hasNext()) {
@@ -119,7 +114,7 @@ final class ServiceLoaderFeature implements Feature {
 
     @NonNull
     private StaticServiceDefinitions buildStaticServiceDefinitions(BeforeAnalysisAccess access) {
-        StaticServiceDefinitions staticServiceDefinitions = new StaticServiceDefinitions();
+        StaticServiceDefinitions staticServiceDefinitions = new StaticServiceDefinitions(null);
         final String path = "META-INF/micronaut/";
         try {
             final Enumeration<URL> micronautResources = access.getApplicationClassLoader().getResources(path);
@@ -160,7 +155,7 @@ final class ServiceLoaderFeature implements Feature {
                             servicePath,
                             serviceTypePath -> {
                                 if (Files.isRegularFile(serviceTypePath)) {
-                                    final Set<String> serviceTypeNames = staticServiceDefinitions.serviceTypeMap
+                                    final Set<String> serviceTypeNames = staticServiceDefinitions.serviceTypeMap()
                                             .computeIfAbsent(servicePath,
                                                              key -> new HashSet<>());
                                     final String serviceTypeName = serviceTypePath.getFileName().toString();
@@ -215,24 +210,4 @@ final class ServiceLoaderFeature implements Feature {
     }
 }
 
-@Internal
-final class StaticServiceDefinitions {
-    final Map<String, Set<String>> serviceTypeMap = new HashMap<>();
-}
 
-@SuppressWarnings("unused")
-@TargetClass(className = "io.micronaut.core.io.service.ServiceScanner")
-@Internal
-final class ServiceLoaderInitialization {
-    private ServiceLoaderInitialization() {
-    }
-
-    @Substitute
-    private static Set<String> computeMicronautServiceTypeNames(URI uri, String path) {
-        final StaticServiceDefinitions ssd = ImageSingletons.lookup(StaticServiceDefinitions.class);
-        return ssd.serviceTypeMap.getOrDefault(
-                path,
-                Collections.emptySet()
-        );
-    }
-}
