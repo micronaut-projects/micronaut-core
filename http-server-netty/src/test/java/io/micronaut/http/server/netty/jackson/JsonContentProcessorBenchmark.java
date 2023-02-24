@@ -57,8 +57,8 @@ public class JsonContentProcessorBenchmark {
             .forks(1)
             .warmupIterations(3)
             .measurementIterations(5)
-            .addProfiler(LinuxPerfAsmProfiler.class)
-            .addProfiler(AsyncProfiler.class, "libPath=/home/yawkat/bin/async-profiler-2.9-linux-x64/build/libasyncProfiler.so;output=flamegraph")
+            //.addProfiler(LinuxPerfAsmProfiler.class)
+            //.addProfiler(AsyncProfiler.class, "libPath=/home/yawkat/bin/async-profiler-2.9-linux-x64/build/libasyncProfiler.so;output=flamegraph")
             .build()).run();
     }
 
