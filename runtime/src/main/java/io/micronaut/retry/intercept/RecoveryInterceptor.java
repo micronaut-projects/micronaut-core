@@ -78,15 +78,25 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
         }
         InterceptedMethod interceptedMethod = InterceptedMethod.of(context);
         try {
+            if (context.isSuspend()) {
+
+            }
+
             switch (interceptedMethod.resultType()) {
                 case PUBLISHER:
                     return interceptedMethod.handleResult(
                             fallbackForReactiveType(context, interceptedMethod.interceptResultAsPublisher())
                     );
                 case COMPLETION_STAGE:
-                    return interceptedMethod.handleResult(
+                    if (context.isSuspend()) {
+                        return interceptedMethod.handleResult(
+                            fallbackForSuspend(context, interceptedMethod.interceptResultAsCompletionStage())
+                        );
+                    } else {
+                        return interceptedMethod.handleResult(
                             fallbackForFuture(context, interceptedMethod.interceptResultAsCompletionStage())
-                    );
+                        );
+                    }
                 case SYNCHRONOUS:
                     try {
                         return context.proceed();
@@ -184,6 +194,32 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
                         newFuture.completeExceptionally(throwable);
                     }
 
+                } else {
+                    newFuture.completeExceptionally(throwable);
+                }
+            }
+        });
+
+        return newFuture;
+    }
+
+    private CompletionStage<?> fallbackForSuspend(MethodInvocationContext<Object, Object> context, CompletionStage<?> result) {
+        CompletableFuture<Object> newFuture = new CompletableFuture<>();
+        result.whenComplete((o, throwable) -> {
+            if (throwable == null) {
+                newFuture.complete(o);
+            } else {
+                Optional<? extends MethodExecutionHandle<?, Object>> fallbackMethod = findFallbackMethod(context);
+                if (fallbackMethod.isPresent()) {
+                    MethodExecutionHandle<?, Object> fallbackHandle = fallbackMethod.get();
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Type [{}] resolved fallback: {}", context.getTarget().getClass(), fallbackHandle);
+                    }
+                    try {
+                        newFuture.complete(fallbackHandle.invoke(context.getParameterValues()));
+                    } catch (Throwable t) {
+                        newFuture.completeExceptionally(t);
+                    }
                 } else {
                     newFuture.completeExceptionally(throwable);
                 }
