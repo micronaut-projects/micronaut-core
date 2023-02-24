@@ -110,11 +110,8 @@ final class ServiceScanner<S> {
 
     @Nullable
     private static StaticServiceDefinitions findStaticServiceDefinitions() {
-        if (hasImageSingletons()) {
-            return ImageSingletons.contains(StaticServiceDefinitions.class) ? ImageSingletons.lookup(StaticServiceDefinitions.class) : null;
-        } else {
-            return null;
-        }
+        return hasImageSingletons() && ImageSingletons.contains(StaticServiceDefinitions.class) ?
+            ImageSingletons.lookup(StaticServiceDefinitions.class) : null;
     }
 
     @SuppressWarnings("java:S1181")
