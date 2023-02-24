@@ -1115,6 +1115,9 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         @SuppressWarnings("unchecked")
         final Class<T> rootBeanClass = (Class<T>) rootBean.getClass();
         for (BeanProperty<Object, Object> constrainedProperty : constrainedProperties) {
+            if (constrainedProperty.isWriteOnly()) {
+                continue;
+            }
             final Object propertyValue = constrainedProperty.get(object);
             //noinspection unchecked
             validateConstrainedPropertyInternal(
