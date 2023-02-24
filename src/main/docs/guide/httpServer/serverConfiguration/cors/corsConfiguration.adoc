@@ -1,7 +1,7 @@
-To enable processing of CORS requests, modify your configuration. For example with `application.yml`:
+To enable processing of CORS requests, modify your configuration in the application configuration file:
 
 .CORS Configuration Example
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:
@@ -14,7 +14,7 @@ By only enabling CORS processing, a "wide open" strategy is adopted that allows 
 To change the settings for all origins or a specific origin, change the configuration to provide one or more "configurations". By providing any configuration, the default "wide open" configuration is not configured.
 
 .CORS Configurations
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:

@@ -23,14 +23,14 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.FieldElement;
-import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 
-import javax.lang.model.element.Element;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.List;
@@ -59,7 +59,7 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
     @Nullable
     private final FieldElement field;
     private final boolean excluded;
-    private final MutableAnnotationMetadataDelegate<?> annotationMetadata;
+    private final ElementAnnotationMetadata annotationMetadata;
 
     JavaPropertyElement(ClassElement owningElement,
                         ClassElement type,
@@ -82,15 +82,31 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
         this.writeAccessKind = writeAccessKind;
         this.owningElement = owningElement;
         this.excluded = excluded;
-        List<MemberElement> elements = new ArrayList<>(3);
+        List<MutableAnnotationMetadataDelegate<?>> elements = new ArrayList<>(3);
         if (setter != null) {
             elements.add(setter);
+            ParameterElement[] parameters = setter.getParameters();
+            if (parameters.length > 0) {
+                ParameterElement parameter = parameters[0];
+                MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = parameter.getType().getTypeAnnotationMetadata();
+                if (!typeAnnotationMetadata.isEmpty()) {
+                    elements.add(typeAnnotationMetadata);
+                }
+            }
         }
         if (field != null) {
             elements.add(field);
+            MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = field.getType().getTypeAnnotationMetadata();
+            if (!typeAnnotationMetadata.isEmpty()) {
+                elements.add(typeAnnotationMetadata);
+            }
         }
         if (getter != null) {
             elements.add(getter);
+            MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = getter.getReturnType().getTypeAnnotationMetadata();
+            if (!typeAnnotationMetadata.isEmpty()) {
+                elements.add(typeAnnotationMetadata);
+            }
         }
         // The instance AnnotationMetadata of each element can change after a modification
         // Set annotation metadata as actual elements so the changes are reflected
@@ -101,12 +117,12 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
             propertyAnnotationMetadata = new AnnotationMetadataHierarchy(
                 true,
                 elements.stream().map(e -> {
-                    if (e instanceof MethodElement) {
+                    if (e instanceof MethodElement methodElement) {
                         return new AnnotationMetadataDelegate() {
                             @Override
                             public AnnotationMetadata getAnnotationMetadata() {
                                 // Exclude type metadata
-                                return e.getAnnotationMetadata().getDeclaredMetadata();
+                                return methodElement.getAnnotationMetadata().getDeclaredMetadata();
                             }
                         };
                     }
@@ -114,60 +130,60 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
                 }).toArray(AnnotationMetadata[]::new)
             );
         }
-        annotationMetadata = new MutableAnnotationMetadataDelegate<Object>() {
+        annotationMetadata = new ElementAnnotationMetadata() {
 
             @Override
             public <T extends Annotation> io.micronaut.inject.ast.Element annotate(AnnotationValue<T> annotationValue) {
-                for (MemberElement memberElement : elements) {
-                    memberElement.annotate(annotationValue);
+                for (MutableAnnotationMetadataDelegate<?> am : elements) {
+                    am.annotate(annotationValue);
                 }
                 return JavaPropertyElement.this;
             }
 
             @Override
             public <T extends Annotation> io.micronaut.inject.ast.Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
-                for (MemberElement memberElement : elements) {
-                    memberElement.annotate(annotationType, consumer);
+                for (MutableAnnotationMetadataDelegate<?> am : elements) {
+                    am.annotate(annotationType, consumer);
                 }
                 return JavaPropertyElement.this;
             }
 
             @Override
             public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType) {
-                for (MemberElement memberElement : elements) {
-                    memberElement.annotate(annotationType);
+                for (MutableAnnotationMetadataDelegate<?> am : elements) {
+                    am.annotate(annotationType);
                 }
                 return JavaPropertyElement.this;
             }
 
             @Override
             public io.micronaut.inject.ast.Element annotate(String annotationType) {
-                for (MemberElement memberElement : elements) {
-                    memberElement.annotate(annotationType);
+                for (MutableAnnotationMetadataDelegate<?> am : elements) {
+                    am.annotate(annotationType);
                 }
                 return JavaPropertyElement.this;
             }
 
             @Override
             public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
-                for (MemberElement memberElement : elements) {
-                    memberElement.annotate(annotationType, consumer);
+                for (MutableAnnotationMetadataDelegate<?> am : elements) {
+                    am.annotate(annotationType, consumer);
                 }
                 return JavaPropertyElement.this;
             }
 
             @Override
             public io.micronaut.inject.ast.Element removeAnnotation(String annotationType) {
-                for (MemberElement memberElement : elements) {
-                    memberElement.removeAnnotation(annotationType);
+                for (MutableAnnotationMetadataDelegate<?> am : elements) {
+                    am.removeAnnotation(annotationType);
                 }
                 return JavaPropertyElement.this;
             }
 
             @Override
             public <T extends Annotation> io.micronaut.inject.ast.Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
-                for (MemberElement memberElement : elements) {
-                    memberElement.removeAnnotationIf(predicate);
+                for (MutableAnnotationMetadataDelegate<?> am : elements) {
+                    am.removeAnnotationIf(predicate);
                 }
                 return JavaPropertyElement.this;
             }
@@ -189,17 +205,17 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
         return (PropertyElement) super.withAnnotationMetadata(annotationMetadata);
     }
 
-    private static Element selectNativeType(MethodElement getter,
+    private static JavaNativeElement selectNativeType(MethodElement getter,
                                             MethodElement setter,
                                             FieldElement field) {
         if (getter != null) {
-            return (Element) getter.getNativeType();
+            return (JavaNativeElement) getter.getNativeType();
         }
         if (setter != null) {
-            return (Element) setter.getNativeType();
+            return (JavaNativeElement) setter.getNativeType();
         }
         if (field != null) {
-            return (Element) field.getNativeType();
+            return (JavaNativeElement) field.getNativeType();
         }
         throw new IllegalStateException();
     }
@@ -210,7 +226,7 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
     }
 
     @Override
-    public MutableAnnotationMetadataDelegate<?> getAnnotationMetadata() {
+    public ElementAnnotationMetadata getElementAnnotationMetadata() {
         return annotationMetadata;
     }
 

@@ -1,7 +1,6 @@
 package io.micronaut.kotlin.processing.beans
 
 import io.micronaut.annotation.processing.test.KotlinCompiler
-import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Introspected
@@ -10,13 +9,16 @@ import io.micronaut.core.bind.annotation.Bindable
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.HttpMethodMapping
 import io.micronaut.http.client.annotation.Client
-import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.lang.PendingFeature
 import spock.lang.Specification
 
-import static io.micronaut.annotation.processing.test.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.buildBeanDefinition
+import static io.micronaut.annotation.processing.test.KotlinCompiler.buildBeanDefinitionReference
+import static io.micronaut.annotation.processing.test.KotlinCompiler.buildContext
+import static io.micronaut.annotation.processing.test.KotlinCompiler.getBean
+import static io.micronaut.annotation.processing.test.KotlinCompiler.getBeanDefinition
 
 class BeanDefinitionSpec extends Specification {
 
@@ -252,7 +254,7 @@ class RepeatedTest {
 ''')
         expect:
         definition.getRequiredMethod("test").getAnnotationValuesByType(Header).size() == 4
-        definition.getRequiredMethod("test").getAnnotationNamesByStereotype(Bindable).size() == 2
+        definition.getRequiredMethod("test").getAnnotationNamesByStereotype(Bindable) == [Header.class.name]
     }
 
     void "test repeated annotations"() {

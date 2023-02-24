@@ -57,7 +57,7 @@ dependencies {
 
 tasks.withType(Test).configureEach {
     forkEvery = 100
-    maxParallelForks = 2
+    maxParallelForks = 4
     useJUnitPlatform()
 }
 

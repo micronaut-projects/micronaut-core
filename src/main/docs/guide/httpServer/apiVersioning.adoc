@@ -26,22 +26,22 @@ By default Micronaut has two strategies for resolving the version based on an HT
 micronaut:
   router:
     versioning:
-      enabled: true <1>
+      enabled: true
       parameter:
-        enabled: false # <2>
-        names: 'v,api-version' # <3>
+        enabled: false
+        names: 'v,api-version'
       header:
-        enabled: true # <4>
-        names: # <5>
+        enabled: true
+        names:
           - 'X-API-VERSION'
           - 'Accept-Version'
 ----
 
-<1> Enables versioning
-<2> Enables or disables parameter-based versioning
-<3> Specify the parameter names as a comma-separated list
-<4> Enables or disables header-based versioning
-<5> Specify the header names as a list
+- This example enables versioning
+- `parameter.enabled` enables or disables parameter-based versioning
+- `parameter.names` specifies the parameter names as a comma-separated list
+- `header.enabled` enables or disables header-based versioning
+- `header.names` specifies the header names as a list
 
 If this is not enough you can also implement the api:web.router.version.resolution.RequestVersionResolver[] interface which receives the api:http.HttpRequest[] and can implement any strategy you choose.
 
@@ -56,10 +56,10 @@ micronaut:
   router:
     versioning:
       enabled: true
-      default-version: 3 <1>
+      default-version: 3
 ----
 
-<1> Sets the default version
+- This example enables versioning and sets the default version
 
 A route is *not* matched if the following conditions are met:
 

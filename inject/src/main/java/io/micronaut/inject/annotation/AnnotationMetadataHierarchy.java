@@ -33,6 +33,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -424,20 +425,20 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     @NonNull
     @Override
     public List<String> getAnnotationNamesByStereotype(@Nullable String stereotype) {
-        List<String> list = new ArrayList<>();
+        Set<String> list = new LinkedHashSet<>();
         for (AnnotationMetadata am : hierarchy) {
             list.addAll(am.getAnnotationNamesByStereotype(stereotype));
         }
-        return list;
+        return new ArrayList<>(list);
     }
 
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByStereotype(String stereotype) {
-        List<AnnotationValue<T>> list = new ArrayList<>();
+        Set<AnnotationValue<T>> list = new LinkedHashSet<>();
         for (AnnotationMetadata am : hierarchy) {
             list.addAll(am.getAnnotationValuesByStereotype(stereotype));
         }
-        return list;
+        return new ArrayList<>(list);
     }
 
     @NonNull

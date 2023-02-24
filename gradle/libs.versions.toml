@@ -9,8 +9,7 @@ compile-testing = "0.19"
 geb = "7.0"
 gorm = "7.3.2"
 # be sure to update graal version in gradle.properties as well
-# Intentionally pin to 22.0.0.2 see https://github.com/micronaut-projects/micronaut-kafka/pull/564 and https://github.com/micronaut-projects/micronaut-core/pull/7663
-graal-svm = "22.0.0.2"
+graal-svm = "22.3.1"
 h2 = "2.1.210"
 hibernate = "5.5.9.Final"
 hibernate-validator = "6.1.6.Final"
@@ -60,13 +59,13 @@ wiremock = "2.33.2"
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
-managed-groovy = "4.0.6"
+managed-groovy = "4.0.9"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "2.14.0"
 managed-jackson-databind = "2.14.1"
 managed-maven-native-plugin = "0.9.13"
 managed-methvin-directory-watcher = "0.16.1"
-managed-netty = "4.1.86.Final"
+managed-netty = "4.1.87.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
 managed-reactor = "3.4.24"

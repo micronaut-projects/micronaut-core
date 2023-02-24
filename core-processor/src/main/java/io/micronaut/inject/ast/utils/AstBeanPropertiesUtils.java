@@ -153,14 +153,14 @@ public final class AstBeanPropertiesUtils {
                 // and it has more type arguments annotations - use it as the property type
                 if (value.field != null
                     && value.field.getType().equals(value.type)
-                    && countGenericTypeAnnotations(value.field.getType()) > countGenericTypeAnnotations(value.type.getType())) {
+                    && hasMoreAnnotations(value.field.getType(), value.type)) {
                     value.type = value.field.getGenericType();
                 }
                 // In a case when the getter's type is the same as the selected property type,
                 // and it has more type arguments annotations - use it as the property type
                 if (value.getter != null
                     && value.getter.getGenericReturnType().equals(value.type)
-                    && countGenericTypeAnnotations(value.getter.getGenericReturnType()) > countGenericTypeAnnotations(value.type.getType())) {
+                    && hasMoreAnnotations(value.getter.getGenericReturnType(), value.type)) {
                     value.type = value.getter.getGenericReturnType();
                 }
                 if (value.readAccessKind != null || value.writeAccessKind != null) {
@@ -177,6 +177,11 @@ public final class AstBeanPropertiesUtils {
             return beanProperties;
         }
         return Collections.emptyList();
+    }
+
+    private static boolean hasMoreAnnotations(ClassElement c1, ClassElement c2) {
+        return countGenericTypeAnnotations(c1) > countGenericTypeAnnotations(c2.getType())
+            || c1.getTypeAnnotationMetadata().getAnnotationNames().size() > c2.getTypeAnnotationMetadata().getAnnotationNames().size();
     }
 
     private static boolean isFieldInRole(FieldElement fieldElement) {
