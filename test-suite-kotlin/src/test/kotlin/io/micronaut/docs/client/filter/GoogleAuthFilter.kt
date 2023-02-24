@@ -9,6 +9,8 @@ import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.annotation.ClientFilter
 import io.micronaut.http.annotation.RequestFilter
 import io.micronaut.http.client.HttpClient
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.annotation.ExecuteOn
 import java.net.URLEncoder
 
 @Requires(env = [Environment.GOOGLE_COMPUTE])
@@ -17,6 +19,7 @@ class GoogleAuthFilter (
     private val authClientProvider: BeanProvider<HttpClient>) { // <1>
 
     @RequestFilter
+    @ExecuteOn(TaskExecutors.BLOCKING)
     fun filter(request: MutableHttpRequest<*>) {
         val authURI = encodeURI(request)
         val t = authClientProvider.get().toBlocking().retrieve(HttpRequest.GET<Any>(authURI)

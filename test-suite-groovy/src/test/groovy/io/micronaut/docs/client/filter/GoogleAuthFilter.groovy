@@ -2,14 +2,16 @@ package io.micronaut.docs.client.filter
 
 import io.micronaut.context.BeanProvider
 import io.micronaut.context.annotation.Requires
+import io.micronaut.context.env.Environment
 
 //tag::class[]
 
-import io.micronaut.context.env.Environment
 import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.annotation.ClientFilter
 import io.micronaut.http.annotation.RequestFilter
 import io.micronaut.http.client.HttpClient
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.annotation.ExecuteOn
 
 @Requires(env = Environment.GOOGLE_COMPUTE)
 @ClientFilter(patterns = "/google-auth/api/**")
@@ -22,6 +24,7 @@ class GoogleAuthFilter {
     }
 
     @RequestFilter
+    @ExecuteOn(TaskExecutors.BLOCKING)
     void filter(MutableHttpRequest<?> request) {
         String authURI = encodeURI(request)
         String token = authClientProvider.get().toBlocking().retrieve(HttpRequest.GET(authURI).header( // <2>

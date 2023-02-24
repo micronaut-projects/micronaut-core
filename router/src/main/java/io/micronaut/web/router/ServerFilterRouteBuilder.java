@@ -33,7 +33,6 @@ import io.micronaut.inject.ExecutableMethod;
 import jakarta.inject.Singleton;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.function.Supplier;
 
 /**
@@ -92,8 +91,10 @@ public class ServerFilterRouteBuilder extends DefaultRouteBuilder implements Exe
 
             private void applyMetadata(FilterRoute route, FilterMetadata metadata) {
                 route.patternStyle(metadata.patternStyle());
-                // todo: handle missing patterns
-                for (String pattern : Objects.requireNonNull(metadata.patterns(), "patterns")) {
+                if (metadata.patterns() == null || metadata.patterns().isEmpty()) {
+                    throw new IllegalArgumentException("A filter pattern is required");
+                }
+                for (String pattern : metadata.patterns()) {
                     route.pattern(pattern);
                 }
                 if (metadata.methods() != null) {
