@@ -39,7 +39,7 @@ import reactor.core.publisher.Flux;
  * @since 2.1
  */
 @Singleton
-@Requires(beans = HealthEndpoint.class)
+@Requires(beans = { HealthEndpoint.class, ServiceReadyHealthIndicatorConfiguration.class })
 @Readiness
 public class ServiceReadyHealthIndicator implements HealthIndicator {
 
