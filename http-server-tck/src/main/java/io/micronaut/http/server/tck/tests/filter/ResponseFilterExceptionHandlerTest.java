@@ -40,6 +40,11 @@ import java.util.function.BiConsumer;
 
 import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
 
+@SuppressWarnings({
+    "java:S5960", // We're allowed assertions, as these are used in tests only
+    "checkstyle:MissingJavadocType",
+    "checkstyle:DesignForExtension"
+})
 public class ResponseFilterExceptionHandlerTest {
     private static final String SPEC_NAME = "ResponseFilterExceptionHandlerTest";
 
