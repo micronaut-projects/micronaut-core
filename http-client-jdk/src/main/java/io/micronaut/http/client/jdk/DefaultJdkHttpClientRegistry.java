@@ -47,6 +47,8 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.codec.MapperMediaTypeCodec;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -61,6 +63,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Internal
 @Experimental
 public class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpClientRegistry<HttpClient> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultJdkHttpClientRegistry.class);
 
     private final Map<ClientKey, HttpClient> clients = new ConcurrentHashMap<>(10);
     private final BeanContext beanContext;
@@ -264,12 +268,26 @@ public class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpClientRe
 
     @Override
     public void disposeClient(AnnotationMetadata annotationMetadata) {
-        //TODO
+        final ClientKey key = getClientKey(annotationMetadata);
+        HttpClient client = clients.get(key);
+        if (client != null && client.isRunning()) {
+            client.close();
+            clients.remove(key);
+        }
     }
 
     @Override
     public void close() throws Exception {
-        //TODO
+        for (HttpClient httpClient : clients.values()) {
+            try {
+                httpClient.close();
+            } catch (Throwable e) {
+                if (LOG.isWarnEnabled()) {
+                    LOG.warn("Error shutting down HTTP client: " + e.getMessage(), e);
+                }
+            }
+        }
+        clients.clear();
     }
 
     /**
