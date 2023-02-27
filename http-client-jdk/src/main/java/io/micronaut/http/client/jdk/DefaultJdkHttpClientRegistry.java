@@ -258,12 +258,20 @@ public class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpClientRe
 
     @Override
     public HttpClient getClient(HttpVersionSelection httpVersion, String clientId, String path) {
-        throw new UnsupportedOperationException("unimplemented");
+        final ClientKey key = new ClientKey(
+            httpVersion,
+            clientId,
+            null,
+            path,
+            null,
+            null
+        );
+        return getClient(key);
     }
 
     @Override
     public HttpClient resolveClient(InjectionPoint<?> injectionPoint, LoadBalancer loadBalancer, HttpClientConfiguration configuration, BeanContext beanContext) {
-        throw new UnsupportedOperationException("unimplemented");
+        return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
     }
 
     @Override
