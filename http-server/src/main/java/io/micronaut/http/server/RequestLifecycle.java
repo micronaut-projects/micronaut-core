@@ -28,9 +28,8 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.context.ServerRequestContext;
-import io.micronaut.http.filter.HttpFilter;
-import io.micronaut.http.filter.ServerFilterChain;
-import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
+import io.micronaut.http.filter.FilterRunner;
+import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
@@ -41,10 +40,8 @@ import io.micronaut.json.JsonSyntaxException;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.UriRouteMatch;
-import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Mono;
 import reactor.util.context.Context;
 
 import java.util.ArrayList;
@@ -58,7 +55,6 @@ import java.util.Set;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 /**
@@ -266,45 +262,30 @@ public class RequestLifecycle {
      */
     protected final ExecutionFlow<MutableHttpResponse<?>> runWithFilters(Supplier<ExecutionFlow<MutableHttpResponse<?>>> downstream) {
         ServerRequestContext.set(request);
-        List<HttpFilter> httpFilters = routeExecutor.router.findFilters(request);
-        if (httpFilters.isEmpty()) {
-            return downstream.get();
-        }
-        List<HttpFilter> filters = new ArrayList<>(httpFilters);
-        AtomicInteger integer = new AtomicInteger();
-        int len = filters.size();
+        List<GenericHttpFilter> httpFilters = routeExecutor.router.findFilters(request);
 
-        ServerFilterChain filterChain = new ServerFilterChain() {
+        List<GenericHttpFilter> filters = new ArrayList<>(httpFilters.size() + 1);
+        filters.addAll(httpFilters);
+        filters.add((GenericHttpFilter.TerminalWithReactorContext) (request, context) -> {
+            this.request = request;
+            this.context = context;
+            return downstream.get();
+        });
+        FilterRunner filterRunner = new FilterRunner(routeExecutor.beanContext.getConversionService(), filters) {
             @Override
-            public Publisher<MutableHttpResponse<?>> proceed(io.micronaut.http.HttpRequest<?> request) {
-                int pos = integer.incrementAndGet();
-                if (pos > len) {
-                    throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
-                }
-                if (pos == len) {
-                    return Mono.deferContextual(ctx -> {
-                        context = Context.of(ctx);
-                        return Mono.from(ReactiveExecutionFlow.fromFlow(downstream.get()).toPublisher());
-                    });
-                }
-                HttpFilter httpFilter = filters.get(pos);
+            protected ExecutionFlow<? extends HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response) {
                 RequestLifecycle.this.request = request;
-                return ReactiveExecutionFlow.fromFlow(triggerFilter(httpFilter, this)).toPublisher();
+                return handleStatusException((MutableHttpResponse<?>) response)
+                    .onErrorResume(throwable -> onErrorNoFilter(throwable));
+            }
+
+            @Override
+            protected ExecutionFlow<? extends HttpResponse<?>> processFailure(HttpRequest<?> request, Throwable failure) {
+                RequestLifecycle.this.request = request;
+                return onErrorNoFilter(failure);
             }
         };
-        return triggerFilter(filters.get(0), filterChain);
-    }
-
-    private ExecutionFlow<MutableHttpResponse<?>> triggerFilter(HttpFilter httpFilter, ServerFilterChain filterChain) {
-        try {
-            Publisher<MutableHttpResponse<?>> publisher = (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(request, filterChain);
-            publisher = Mono.from(publisher).contextWrite(context);
-            return ReactiveExecutionFlow.fromPublisher(publisher)
-                .flatMap(this::handleStatusException)
-                .onErrorResume(this::onErrorNoFilter);
-        } catch (Throwable t) {
-            return onErrorNoFilter(t);
-        }
+        return filterRunner.run(request);
     }
 
     private ExecutionFlow<MutableHttpResponse<?>> handleStatusException(MutableHttpResponse<?> response) {

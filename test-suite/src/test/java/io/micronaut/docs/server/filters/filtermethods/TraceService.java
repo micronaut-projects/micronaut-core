@@ -13,17 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.filter;
+package io.micronaut.docs.server.filters.filtermethods;
 
-import io.micronaut.core.order.Ordered;
+// tag::imports[]
 
-/**
- * Describes a bean that contains an order to define the
- * order of a client or server filter.
- *
- * @author James Kleeh
- * @since 1.0
- */
-public interface FilterOrderProvider extends Ordered {
+import io.micronaut.http.HttpRequest;
+import jakarta.inject.Singleton;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+// end::imports[]
 
+// tag::class[]
+@Singleton
+public class TraceService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(TraceService.class);
+
+    public void trace(HttpRequest<?> request) {
+        LOG.debug("Tracing request: {}", request.getUri());
+        // trace logic here, potentially performing I/O <1>
+    }
 }
+// end::class[]

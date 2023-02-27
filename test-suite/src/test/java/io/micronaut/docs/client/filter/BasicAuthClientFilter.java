@@ -16,22 +16,20 @@
 package io.micronaut.docs.client.filter;
 
 //tag::class[]
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.filter.ClientFilterChain;
-import io.micronaut.http.filter.HttpClientFilter;
-import org.reactivestreams.Publisher;
 
+import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.annotation.ClientFilter;
+import io.micronaut.http.annotation.RequestFilter;
 import jakarta.inject.Singleton;
 
 @BasicAuth // <1>
 @Singleton // <2>
-public class BasicAuthClientFilter implements HttpClientFilter {
+@ClientFilter
+public class BasicAuthClientFilter {
 
-    @Override
-    public Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request,
-                                                         ClientFilterChain chain) {
-        return chain.proceed(request.basicAuth("user", "pass"));
+    @RequestFilter
+    public void filter(MutableHttpRequest<?> request) {
+        request.basicAuth("user", "pass");
     }
 }
 //end::class[]

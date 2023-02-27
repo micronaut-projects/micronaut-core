@@ -16,12 +16,14 @@
 package io.micronaut.http.reactive.execution;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import reactor.core.Fuseable;
 import reactor.core.publisher.Mono;
 
 import java.util.Map;
@@ -111,6 +113,19 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
         });
     }
 
+    @Nullable
+    @Override
+    public ImperativeExecutionFlow<Object> tryComplete() {
+        if (value instanceof Fuseable.ScalarCallable<?> callable) {
+            try {
+                return (ImperativeExecutionFlow<Object>) ExecutionFlow.<Object>just(callable.call());
+            } catch (Exception e) {
+                return (ImperativeExecutionFlow<Object>) ExecutionFlow.error(e);
+            }
+        }
+        return null;
+    }
+
     static <R> Mono<Object> toMono(ExecutionFlow<R> next) {
         if (next instanceof ReactorExecutionFlowImpl reactiveFlowImpl) {
             return reactiveFlowImpl.value;
@@ -137,6 +152,10 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
             return m;
         }
         throw new IllegalStateException();
+    }
+
+    static <R> Mono<Object> toMono(Supplier<ExecutionFlow<R>> next) {
+        return Mono.defer(() -> toMono(next.get()));
     }
 
     @Override

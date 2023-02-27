@@ -17,6 +17,8 @@ package io.micronaut.web.router;
 
 import io.micronaut.context.BeanLocator;
 import io.micronaut.core.annotation.Indexed;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.MethodConvention;
 import io.micronaut.core.naming.conventions.PropertyConvention;
@@ -31,11 +33,8 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ProxyBeanDefinition;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import java.util.List;
 import java.util.Set;
-import java.util.function.Supplier;
 
 /**
  * <p>An interface for classes capable of building HTTP routing information.</p>
@@ -81,15 +80,6 @@ public interface RouteBuilder {
      * @return The URI naming strategy
      */
     UriNamingStrategy getUriNamingStrategy();
-
-    /**
-     * Add a filter.
-     *
-     * @param pathPattern The path pattern for the filter
-     * @param filter      The filter itself
-     * @return The {@link FilterRoute}
-     */
-    FilterRoute addFilter(String pathPattern, Supplier<HttpFilter> filter);
 
     /**
      * Add a filter.

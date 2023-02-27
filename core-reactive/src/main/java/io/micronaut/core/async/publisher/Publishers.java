@@ -18,7 +18,6 @@ package io.micronaut.core.async.publisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.TypeHint;
-import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.optim.StaticOptimizations;
@@ -28,7 +27,7 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -38,6 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 /**
  * Utilities for working with raw {@link Publisher} instances. Designed for internal use by Micronaut and
@@ -50,15 +50,12 @@ import java.util.function.Supplier;
 @TypeHint(Publishers.class)
 public class Publishers {
 
-    @SuppressWarnings("ConstantName")
     private static final List<Class<?>> REACTIVE_TYPES;
-    @SuppressWarnings("ConstantName")
     private static final List<Class<?>> SINGLE_TYPES;
-
     private static final List<Class<?>> COMPLETABLE_TYPES;
 
     static {
-        List<Class<?>> reactiveTypes ;
+        List<Class<?>> reactiveTypes;
         List<Class<?>> singleTypes;
         List<Class<?>> completableTypes;
         ClassLoader classLoader = Publishers.class.getClassLoader();
@@ -72,27 +69,11 @@ public class Publishers {
             reactiveTypes = new ArrayList<>(3);
             singleTypes = new ArrayList<>(3);
             completableTypes = new ArrayList<>(3);
-            singleTypes.add(CompletableFuturePublisher.class);
-            singleTypes.add(JustPublisher.class);
-            completableTypes.add(Completable.class);
-            List<String> typeNames = Arrays.asList(
-                    "io.reactivex.Observable",
-                    "reactor.core.publisher.Flux",
-                    "kotlinx.coroutines.flow.Flow",
-                    "io.reactivex.rxjava3.core.Flowable",
-                    "io.reactivex.rxjava3.core.Observable"
-            );
-            for (String name : typeNames) {
+            for (String name : getNonSpecificReactiveTypeNames()) {
                 Optional<Class<?>> aClass = ClassUtils.forName(name, classLoader);
                 aClass.ifPresent(reactiveTypes::add);
             }
-            for (String name : Arrays.asList(
-                    "io.reactivex.Single",
-                    "reactor.core.publisher.Mono",
-                    "io.reactivex.Maybe",
-                    "io.reactivex.rxjava3.core.Single",
-                    "io.reactivex.rxjava3.core.Maybe"
-            )) {
+            for (String name : getSingleTypeNames()) {
                 Optional<Class<?>> aClass = ClassUtils.forName(name, classLoader);
                 aClass.ifPresent(aClass1 -> {
                     singleTypes.add(aClass1);
@@ -100,7 +81,7 @@ public class Publishers {
                 });
             }
 
-            for (String name : Arrays.asList("io.reactivex.Completable", "io.reactivex.rxjava3.core.Completable")) {
+            for (String name : getCompletableTypeNames()) {
                 Optional<Class<?>> aClass = ClassUtils.forName(name, classLoader);
                 aClass.ifPresent(aClass1 -> {
                     completableTypes.add(aClass1);
@@ -111,6 +92,49 @@ public class Publishers {
         REACTIVE_TYPES = reactiveTypes;
         SINGLE_TYPES = singleTypes;
         COMPLETABLE_TYPES = completableTypes;
+    }
+
+    @NonNull
+    private static List<String> getSingleTypeNames() {
+        return List.of(
+            "io.micronaut.core.async.publisher.CompletableFuturePublisher",
+            "io.micronaut.core.async.publisher.Publishers$JustPublisher",
+            "io.reactivex.Single",
+            "reactor.core.publisher.Mono",
+            "io.reactivex.Maybe",
+            "io.reactivex.rxjava3.core.Single",
+            "io.reactivex.rxjava3.core.Maybe"
+        );
+    }
+
+    @NonNull
+    private static List<String> getCompletableTypeNames() {
+        return List.of(
+            "io.reactivex.Completable",
+            "io.reactivex.rxjava3.core.Completable",
+            "io.micronaut.core.async.subscriber.Completable"
+        );
+    }
+
+    @NonNull
+    private static List<String> getNonSpecificReactiveTypeNames() {
+        return List.of(
+            "io.reactivex.Observable",
+            "reactor.core.publisher.Flux",
+            "kotlinx.coroutines.flow.Flow",
+            "io.reactivex.rxjava3.core.Flowable",
+            "io.reactivex.rxjava3.core.Observable"
+        );
+    }
+
+    @NonNull
+    public static List<String> getReactiveTypeNames() {
+        return Stream.of(
+            getNonSpecificReactiveTypeNames(),
+            getSingleTypeNames(),
+            getCompletableTypeNames(),
+            List.of("org.reactivestreams.Publisher")
+        ).flatMap(Collection::stream).toList();
     }
 
     /**
@@ -152,7 +176,7 @@ public class Publishers {
      * @return A list of known reactive types.
      */
     public static List<Class<?>> getKnownReactiveTypes() {
-        return Collections.unmodifiableList(new ArrayList<>(REACTIVE_TYPES));
+        return List.copyOf(REACTIVE_TYPES);
     }
 
     /**
@@ -469,8 +493,8 @@ public class Publishers {
         if (publisherType.isInstance(object)) {
             return (T) object;
         }
-        if (object instanceof CompletableFuture) {
-            @SuppressWarnings("unchecked") Publisher<T> futurePublisher = Publishers.fromCompletableFuture(() -> ((CompletableFuture) object));
+        if (object instanceof CompletableFuture cf && !(object instanceof Publisher<?>)) {
+            @SuppressWarnings("unchecked") Publisher<T> futurePublisher = Publishers.fromCompletableFuture(() -> cf);
             return conversionService.convert(futurePublisher, publisherType)
                     .orElseThrow(() -> unconvertibleError(object, publisherType));
         }

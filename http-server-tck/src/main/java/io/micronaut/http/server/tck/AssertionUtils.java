@@ -29,6 +29,7 @@ import org.junit.jupiter.api.function.ThrowingSupplier;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -45,6 +46,12 @@ public final class AssertionUtils {
 
     private AssertionUtils() {
 
+    }
+
+    public static BiConsumer<ServerUnderTest, HttpRequest<?>> assertThrowsStatus(@NonNull HttpStatus status) {
+        return (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+            .status(status)
+            .build());
     }
 
     public static void assertThrows(@NonNull ServerUnderTest server,
