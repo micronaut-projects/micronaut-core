@@ -28,6 +28,8 @@ import java.net.URL;
 
 /**
  * Abstract class implementation of {@link HttpClientFactory}.
+ *
+ * @param <T> The type of {@link HttpClient} created by this factory
  * @author Sergio del Amo
  * @since 4.0.0
  */

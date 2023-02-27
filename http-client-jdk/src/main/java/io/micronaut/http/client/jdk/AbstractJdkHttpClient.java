@@ -31,6 +31,7 @@ import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.NoHostException;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ContextPathUtils;
+import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.ClientSslConfiguration;
 import org.slf4j.Logger;
@@ -185,12 +186,24 @@ abstract class AbstractJdkHttpClient {
         return resolveRequestUri(request)
             .map(uri -> {
                 request.getCookies().getAll().forEach(cookie -> {
-                    HttpCookie newCookie = HttpCookieUtils.of(cookie, request, uri.getHost());
+                    HttpCookie newCookie = toJdkCookie(cookie, request, uri.getHost());
                     cookieManager.getCookieStore().add(uri, newCookie);
                 });
 
                 return HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry).build();
             });
+    }
+
+    private static HttpCookie toJdkCookie(@NonNull Cookie cookie,
+                         @NonNull io.micronaut.http.HttpRequest<?> request,
+                         @NonNull String host) {
+        HttpCookie newCookie = new HttpCookie(cookie.getName(), cookie.getValue());
+        newCookie.setMaxAge(cookie.getMaxAge());
+        newCookie.setDomain(host);
+        newCookie.setHttpOnly(cookie.isHttpOnly());
+        newCookie.setSecure(cookie.isSecure());
+        newCookie.setPath(cookie.getPath() == null ? request.getPath() : cookie.getPath());
+        return newCookie;
     }
 
     private Flux<URI> resolveRequestUri(io.micronaut.http.HttpRequest<?> request) {
