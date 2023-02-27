@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.jdk;
 
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -63,6 +64,8 @@ import static io.micronaut.http.client.exceptions.HttpClientExceptionUtils.popul
  */
 @Experimental
 abstract class AbstractJdkHttpClient {
+
+    public static final String H2C_ERROR_MESSAGE = "H2C is not supported by the JDK HTTP client";
 
     protected final LoadBalancer loadBalancer;
     protected final HttpVersionSelection httpVersion;
@@ -127,6 +130,10 @@ abstract class AbstractJdkHttpClient {
 
         HttpClient.Builder builder = HttpClient.newBuilder();
         configuration.getConnectTimeout().ifPresent(builder::connectTimeout);
+
+        if (configuration.getPlaintextMode() == HttpVersionSelection.PlaintextMode.H2C) {
+            throw new ConfigurationException(H2C_ERROR_MESSAGE);
+        }
 
         builder
             .version(httpVersion != null && httpVersion.isAlpn() ? HttpClient.Version.HTTP_2 : HttpClient.Version.HTTP_1_1)
