@@ -60,7 +60,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @BootstrapContextCompatible
 @Internal
 @Experimental
-public class DefaultJavanetHttpClientRegistry implements AutoCloseable, HttpClientRegistry<HttpClient> {
+public class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpClientRegistry<HttpClient> {
 
     private final Map<ClientKey, HttpClient> clients = new ConcurrentHashMap<>(10);
     private final BeanContext beanContext;
@@ -70,7 +70,7 @@ public class DefaultJavanetHttpClientRegistry implements AutoCloseable, HttpClie
     @Nullable
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
 
-    public DefaultJavanetHttpClientRegistry(
+    public DefaultJdkHttpClientRegistry(
         BeanContext beanContext,
         LoadBalancerResolver loadBalancerResolver, HttpClientConfiguration defaultHttpClientConfiguration,
         JsonMapper jsonMapper,
