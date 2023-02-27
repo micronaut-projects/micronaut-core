@@ -131,7 +131,7 @@ public class JdkHttpClient extends AbstractJdkHttpClient implements HttpClient {
                 }
                 return client.sendAsync(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
             })
-            .flatMap(Mono::fromFuture)
+            .flatMap(Mono::fromCompletionStage)
             .map(netResponse -> {
                 LOG.error("Client {} Received HTTP Response: {} {}", clientId, netResponse.statusCode(), netResponse.uri());
                 boolean errorStatus = netResponse.statusCode() >= 400;
