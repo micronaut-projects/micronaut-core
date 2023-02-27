@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.client;
 
-import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -39,12 +38,6 @@ public abstract class AbstractHttpClientFactory<T extends HttpClient> implements
     protected final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected final ConversionService conversionService;
 
-    // Used by HttpClient.create(...)
-    protected AbstractHttpClientFactory() {
-        this(null, ConversionService.SHARED);
-    }
-
-    @Creator
     protected AbstractHttpClientFactory(
         @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
         ConversionService conversionService
