@@ -58,6 +58,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Factory to create {@literal java.net.http.*} HTTP Clients.
+ *
+ * @author Sergio del Amo
+ * @author Tim Yates
+ * @since 4.0.0
  */
 @Factory
 @BootstrapContextCompatible

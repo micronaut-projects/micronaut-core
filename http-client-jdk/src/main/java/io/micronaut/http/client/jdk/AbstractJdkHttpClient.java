@@ -54,8 +54,12 @@ import java.util.Optional;
 
 import static io.micronaut.http.client.exceptions.HttpClientExceptionUtils.populateServiceId;
 
-/*
- * TODO: HttpClient defaults to netty ByteBuffer as a type for exchange which isn't best for here.
+/**
+ * Abstract implementation of {@link JdkHttpClient} that provides common functionality.
+ *
+ * @author Sergio del Amo
+ * @author Tim Yates
+ * @since 4.0.0
  */
 @Experimental
 abstract class AbstractJdkHttpClient {
@@ -69,11 +73,22 @@ abstract class AbstractJdkHttpClient {
     protected final RequestBinderRegistry requestBinderRegistry;
     protected final String clientId;
     protected final ConversionService conversionService;
-    protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected final JdkClientSslBuilder sslBuilder;
-
     private final Logger log;
+    protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
 
+    /**
+     * @param log                    the logger to use
+     * @param loadBalancer           The {@link LoadBalancer} to use for selecting servers
+     * @param httpVersion            The {@link HttpVersionSelection} to prefer
+     * @param configuration          The {@link HttpClientConfiguration} to use
+     * @param contextPath            The base URI to prepend to request uris
+     * @param mediaTypeCodecRegistry The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
+     * @param requestBinderRegistry  The request binder registry
+     * @param clientId               The client id
+     * @param conversionService      The {@link ConversionService}
+     * @param sslBuilder             The {@link JdkClientSslBuilder} for creating an {@link javax.net.ssl.SSLContext}
+     */
     protected AbstractJdkHttpClient(
         Logger log,
         LoadBalancer loadBalancer,
@@ -127,6 +142,18 @@ abstract class AbstractJdkHttpClient {
         this.client = builder.build();
     }
 
+    private static HttpCookie toJdkCookie(@NonNull Cookie cookie,
+                                          @NonNull io.micronaut.http.HttpRequest<?> request,
+                                          @NonNull String host) {
+        HttpCookie newCookie = new HttpCookie(cookie.getName(), cookie.getValue());
+        newCookie.setMaxAge(cookie.getMaxAge());
+        newCookie.setDomain(host);
+        newCookie.setHttpOnly(cookie.isHttpOnly());
+        newCookie.setSecure(cookie.isSecure());
+        newCookie.setPath(cookie.getPath() == null ? request.getPath() : cookie.getPath());
+        return newCookie;
+    }
+
     private HttpClient.Builder configureProxy(
         @NonNull HttpClient.Builder builder,
         @NonNull SocketAddress address,
@@ -170,14 +197,28 @@ abstract class AbstractJdkHttpClient {
         builder.sslParameters(sslParameters);
     }
 
+    /**
+     * @return The {@link MediaTypeCodecRegistry}
+     */
     public MediaTypeCodecRegistry getMediaTypeCodecRegistry() {
         return mediaTypeCodecRegistry;
     }
 
+    /**
+     * @param mediaTypeCodecRegistry The {@link MediaTypeCodecRegistry}
+     */
     public void setMediaTypeCodecRegistry(MediaTypeCodecRegistry mediaTypeCodecRegistry) {
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
     }
 
+    /**
+     * Convert the Micronaut request to a JDK request.
+     *
+     * @param request  The Micronaut request object
+     * @param bodyType The body type
+     * @param <I>      The body type
+     * @return A JDK request object
+     */
     protected <I> Flux<HttpRequest> mapToHttpRequest(io.micronaut.http.HttpRequest<I> request, Argument<?> bodyType) {
         return resolveRequestUri(request)
             .map(uri -> {
@@ -188,18 +229,6 @@ abstract class AbstractJdkHttpClient {
 
                 return HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry).build();
             });
-    }
-
-    private static HttpCookie toJdkCookie(@NonNull Cookie cookie,
-                         @NonNull io.micronaut.http.HttpRequest<?> request,
-                         @NonNull String host) {
-        HttpCookie newCookie = new HttpCookie(cookie.getName(), cookie.getValue());
-        newCookie.setMaxAge(cookie.getMaxAge());
-        newCookie.setDomain(host);
-        newCookie.setHttpOnly(cookie.isHttpOnly());
-        newCookie.setSecure(cookie.isSecure());
-        newCookie.setPath(cookie.getPath() == null ? request.getPath() : cookie.getPath());
-        return newCookie;
     }
 
     private Flux<URI> resolveRequestUri(io.micronaut.http.HttpRequest<?> request) {
@@ -233,6 +262,14 @@ abstract class AbstractJdkHttpClient {
         );
     }
 
+    /**
+     * Convert the JDK response to a Micronaut response.
+     *
+     * @param netResponse The JDK response
+     * @param bodyType    The body type
+     * @param <O>         The body type
+     * @return A Micronaut response
+     */
     @NonNull
     protected <O> HttpResponse<O> response(@NonNull java.net.http.HttpResponse<byte[]> netResponse, @NonNull Argument<O> bodyType) {
         return new HttpResponseAdapter<>(netResponse, bodyType, conversionService, mediaTypeCodecRegistry);
