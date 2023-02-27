@@ -170,10 +170,6 @@ abstract class AbstractJdkHttpClient {
         builder.sslParameters(sslParameters);
     }
 
-    protected Object getLoadBalancerDiscriminator() {
-        return null;
-    }
-
     public MediaTypeCodecRegistry getMediaTypeCodecRegistry() {
         return mediaTypeCodecRegistry;
     }
@@ -222,7 +218,7 @@ abstract class AbstractJdkHttpClient {
             return Flux.error(populateServiceId(new NoHostException("Request URI specifies no host to connect to"), clientId, configuration));
         }
 
-        return Flux.from(loadBalancer.select(getLoadBalancerDiscriminator())).map(server -> {
+        return Flux.from(loadBalancer.select(request)).map(server -> {
                 Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
                 if (request instanceof MutableHttpRequest<?> mutableRequest && authInfo.isPresent()) {
                     mutableRequest.getHeaders().auth(authInfo.get());
