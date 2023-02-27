@@ -78,9 +78,11 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
                 throw HttpClientExceptionUtils.populateServiceId(new HttpClientResponseException(HttpStatus.valueOf(httpResponse.statusCode()).getReason(), response(httpResponse, bodyType)), clientId, configuration);
             }
             return response(httpResponse, bodyType);
-        } catch (IOException | InterruptedException e) {
+        } catch (IOException e) {
+            throw new HttpClientException("Error sending request: " + e.getMessage(), e);
+        } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new HttpClientException("error sending request", e);
+            throw new HttpClientException("Error sending request: " + e.getMessage(), e);
         }
     }
 
