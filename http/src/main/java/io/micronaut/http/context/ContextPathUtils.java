@@ -28,9 +28,10 @@ import java.net.URISyntaxException;
  * @since 4.0.0
  */
 public final class ContextPathUtils {
-    private ContextPathUtils() {
 
+    private ContextPathUtils() {
     }
+
     @NonNull
     public static URI prepend(@NonNull URI requestURI, @Nullable ServerContextPathProvider serverContextPathProvider) throws URISyntaxException {
         return prepend(requestURI, serverContextPathProvider.getContextPath());
