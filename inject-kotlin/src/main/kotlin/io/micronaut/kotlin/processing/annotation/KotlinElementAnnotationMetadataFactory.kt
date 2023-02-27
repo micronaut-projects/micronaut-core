@@ -72,7 +72,7 @@ internal class KotlinElementAnnotationMetadataFactory(
     private fun buildTypeAnnotationsForTypeArgument(
         element: KotlinTypeArgumentElement
     ): AbstractElementAnnotationMetadata {
-        return object : AbstractElementAnnotationMetadata(null) {
+        return object : AbstractElementAnnotationMetadata() {
 
             override fun lookup(): CachedAnnotationMetadata {
                 if (element.genericNativeType.owner == null) {

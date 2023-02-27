@@ -415,6 +415,12 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         }
         AtomicReference<AnnotationMetadataProvider> ref = new AtomicReference<>();
         if (conf.getAccessKinds().contains(BeanProperties.AccessKind.METHOD) && nativeProps.remove(value.propertyName)) {
+            AnnotationMetadataProvider methodAnnotationMetadataProvider = new AnnotationMetadataProvider() {
+                @Override
+                public AnnotationMetadata getAnnotationMetadata() {
+                    return ref.get().getAnnotationMetadata();
+                }
+            };
             AnnotationMetadataProvider annotationMetadataProvider = new AnnotationMetadataProvider() {
                 @Override
                 public AnnotationMetadata getAnnotationMetadata() {
@@ -432,6 +438,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                 value.getter = MethodElement.of(
                         this,
                         value.field.getDeclaringType(),
+                        methodAnnotationMetadataProvider,
                         annotationMetadataProvider,
                         visitorContext.getAnnotationMetadataBuilder(),
                         value.field.getGenericType(),
@@ -449,6 +456,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                 value.setter = MethodElement.of(
                         this,
                         value.field.getDeclaringType(),
+                        methodAnnotationMetadataProvider,
                         annotationMetadataProvider,
                         visitorContext.getAnnotationMetadataBuilder(),
                         PrimitiveElement.VOID,
@@ -456,7 +464,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                         NameUtils.setterNameFor(value.propertyName),
                         value.field.isStatic(),
                         value.field.isFinal(),
-                        ParameterElement.of(value.field.getGenericType(), value.propertyName, annotationMetadataProvider, visitorContext.getAnnotationMetadataBuilder())
+                        ParameterElement.of(value.field.getGenericType(), value.propertyName, methodAnnotationMetadataProvider, visitorContext.getAnnotationMetadataBuilder())
                 );
                 value.writeAccessKind = BeanProperties.AccessKind.METHOD;
             } else if (nativePropertiesOnly) {

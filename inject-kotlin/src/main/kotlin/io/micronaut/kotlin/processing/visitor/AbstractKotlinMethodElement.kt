@@ -21,12 +21,19 @@ import com.google.devtools.ksp.symbol.KSPropertySetter
 import com.google.devtools.ksp.symbol.Modifier
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.util.ArrayUtils
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ConstructorElement
 import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.ParameterElement
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
+import io.micronaut.inject.ast.annotation.MethodElementAnnotationMetadata
+import io.micronaut.inject.ast.annotation.MethodElementAnnotationsHelper
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
+import io.micronaut.inject.ast.annotation.MutatedMethodElementAnnotationMetadata
 
 internal abstract class AbstractKotlinMethodElement<T : KotlinNativeElement>(
     private val nativeType: T,
@@ -41,6 +48,19 @@ internal abstract class AbstractKotlinMethodElement<T : KotlinNativeElement>(
     abstract val internalReturnType: ClassElement
     abstract val internalGenericReturnType: ClassElement
     abstract val resolvedParameters: List<ParameterElement>
+
+    private val methodHelper by lazy {
+        MethodElementAnnotationsHelper(this, annotationMetadataFactory)
+    }
+
+    override fun getMethodAnnotationMetadata(): ElementAnnotationMetadata =
+        methodHelper.getMethodAnnotationMetadata(presetAnnotationMetadata)
+
+    override fun getAnnotationMetadataToWrite(): MutableAnnotationMetadataDelegate<*> =
+        methodHelper.getMethodAnnotationMetadata(presetAnnotationMetadata)
+
+    override fun getAnnotationMetadata(): AnnotationMetadata =
+        methodHelper.getAnnotationMetadata(presetAnnotationMetadata)
 
     override fun getModifiers() = super<AbstractKotlinElement>.getModifiers()
 

@@ -26,6 +26,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 
 import java.lang.annotation.Annotation;
@@ -45,6 +46,25 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 public interface MethodElement extends MemberElement {
+
+    /**
+     * Returns the method annotations.
+     * The method will only return annotations defined on a method or inherited from the super methods,
+     * while {@link #getAnnotationMetadata()} for a method combines the class and the method annotations.
+     * NOTE: For a constructor {@link #getAnnotationMetadata()} will not combine the class annotations.
+     *
+     * @return The method annotation metadata
+     * @since 4.0.0
+     */
+    @NonNull
+    default MutableAnnotationMetadataDelegate<AnnotationMetadata> getMethodAnnotationMetadata() {
+        return new MutableAnnotationMetadataDelegate<>() {
+            @Override
+            public AnnotationMetadata getAnnotationMetadata() {
+                return MethodElement.this.getAnnotationMetadata();
+            }
+        };
+    }
 
     /**
      * @return The return type of the method
@@ -414,22 +434,24 @@ public interface MethodElement extends MemberElement {
     /**
      * Creates a {@link MethodElement} for the given parameters.
      *
-     * @param owningType                 The owing type
-     * @param declaringType              The declaring type
-     * @param annotationMetadataProvider The annotation metadata provider
-     * @param metadataBuilder            The metadata builder
-     * @param returnType                 The return type
-     * @param genericReturnType          The generic return type
-     * @param name                       The name
-     * @param isStatic                   Is static
-     * @param isFinal                    Is final
-     * @param parameterElements          The parameter elements
+     * @param owningType                       The owing type
+     * @param declaringType                    The declaring type
+     * @param methodAnnotationMetadataProvider The method annotation metadata provider
+     * @param annotationMetadataProvider       The annotation metadata provider
+     * @param metadataBuilder                  The metadata builder
+     * @param returnType                       The return type
+     * @param genericReturnType                The generic return type
+     * @param name                             The name
+     * @param isStatic                         Is static
+     * @param isFinal                          Is final
+     * @param parameterElements                The parameter elements
      * @return The method element
      * @since 4.0.0
      */
     static @NonNull MethodElement of(
         @NonNull ClassElement owningType,
         @NonNull ClassElement declaringType,
+        @NonNull AnnotationMetadataProvider methodAnnotationMetadataProvider,
         @NonNull AnnotationMetadataProvider annotationMetadataProvider,
         @NonNull AbstractAnnotationMetadataBuilder<?, ?> metadataBuilder,
         @NonNull ClassElement returnType,
@@ -469,6 +491,7 @@ public interface MethodElement extends MemberElement {
                 return MethodElement.of(
                     owningType,
                     declaringType,
+                    methodAnnotationMetadataProvider,
                     annotationMetadataProvider,
                     metadataBuilder,
                     returnType,
@@ -478,6 +501,18 @@ public interface MethodElement extends MemberElement {
                     isFinal,
                     newParameters
                 );
+            }
+
+            @Override
+            public MutableAnnotationMetadataDelegate<AnnotationMetadata> getMethodAnnotationMetadata() {
+                return new MutableAnnotationMetadataDelegate<AnnotationMetadata>() {
+
+                    @Override
+                    public AnnotationMetadata getAnnotationMetadata() {
+                        return methodAnnotationMetadataProvider.getAnnotationMetadata();
+                    }
+
+                };
             }
 
             @NonNull
@@ -584,7 +619,7 @@ public interface MethodElement extends MemberElement {
 
             @Override
             public MethodElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
-                return MethodElement.of(owningType, declaringType, new AnnotationMetadataProvider() {
+                return MethodElement.of(owningType, declaringType, methodAnnotationMetadataProvider, new AnnotationMetadataProvider() {
                         @Override
                         public AnnotationMetadata getAnnotationMetadata() {
                             return annotationMetadata;
