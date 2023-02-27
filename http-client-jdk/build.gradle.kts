@@ -9,8 +9,8 @@ micronautBuild {
 }
 
 dependencies {
-    annotationProcessor(project(":inject-java"))
-    implementation(project(":http-client-core"))
+    annotationProcessor(projects.injectJava)
+    api(projects.httpClientCore)
     implementation(libs.managed.reactor)
     testImplementation(projects.jacksonDatabind)
     testImplementation(projects.httpServerNetty)

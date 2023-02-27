@@ -1,4 +1,4 @@
-package io.micronaut.http.client.javanet
+package io.micronaut.http.client.jdk
 
 import groovy.transform.Canonical
 import groovy.transform.ToString
