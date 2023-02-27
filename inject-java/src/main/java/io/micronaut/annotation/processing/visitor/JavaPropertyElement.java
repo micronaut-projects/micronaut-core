@@ -16,27 +16,17 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationMetadataDelegate;
-import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
-import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
+import io.micronaut.inject.ast.annotation.PropertyElementAnnotationMetadata;
 
-import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 /**
  * Models a {@link PropertyElement} for Java.
@@ -82,117 +72,7 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
         this.writeAccessKind = writeAccessKind;
         this.owningElement = owningElement;
         this.excluded = excluded;
-        List<MutableAnnotationMetadataDelegate<?>> elements = new ArrayList<>(3);
-        if (setter != null) {
-            elements.add(setter);
-            ParameterElement[] parameters = setter.getParameters();
-            if (parameters.length > 0) {
-                ParameterElement parameter = parameters[0];
-                MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = parameter.getType().getTypeAnnotationMetadata();
-                if (!typeAnnotationMetadata.isEmpty()) {
-                    elements.add(typeAnnotationMetadata);
-                }
-            }
-        }
-        if (field != null) {
-            elements.add(field);
-            MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = field.getType().getTypeAnnotationMetadata();
-            if (!typeAnnotationMetadata.isEmpty()) {
-                elements.add(typeAnnotationMetadata);
-            }
-        }
-        if (getter != null) {
-            elements.add(getter);
-            MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = getter.getReturnType().getTypeAnnotationMetadata();
-            if (!typeAnnotationMetadata.isEmpty()) {
-                elements.add(typeAnnotationMetadata);
-            }
-        }
-        // The instance AnnotationMetadata of each element can change after a modification
-        // Set annotation metadata as actual elements so the changes are reflected
-        AnnotationMetadata propertyAnnotationMetadata;
-        if (elements.size() == 1) {
-            propertyAnnotationMetadata = elements.iterator().next();
-        } else {
-            propertyAnnotationMetadata = new AnnotationMetadataHierarchy(
-                true,
-                elements.stream().map(e -> {
-                    if (e instanceof MethodElement methodElement) {
-                        return new AnnotationMetadataDelegate() {
-                            @Override
-                            public AnnotationMetadata getAnnotationMetadata() {
-                                // Exclude type metadata
-                                return methodElement.getAnnotationMetadata().getDeclaredMetadata();
-                            }
-                        };
-                    }
-                    return e;
-                }).toArray(AnnotationMetadata[]::new)
-            );
-        }
-        annotationMetadata = new ElementAnnotationMetadata() {
-
-            @Override
-            public <T extends Annotation> io.micronaut.inject.ast.Element annotate(AnnotationValue<T> annotationValue) {
-                for (MutableAnnotationMetadataDelegate<?> am : elements) {
-                    am.annotate(annotationValue);
-                }
-                return JavaPropertyElement.this;
-            }
-
-            @Override
-            public <T extends Annotation> io.micronaut.inject.ast.Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
-                for (MutableAnnotationMetadataDelegate<?> am : elements) {
-                    am.annotate(annotationType, consumer);
-                }
-                return JavaPropertyElement.this;
-            }
-
-            @Override
-            public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType) {
-                for (MutableAnnotationMetadataDelegate<?> am : elements) {
-                    am.annotate(annotationType);
-                }
-                return JavaPropertyElement.this;
-            }
-
-            @Override
-            public io.micronaut.inject.ast.Element annotate(String annotationType) {
-                for (MutableAnnotationMetadataDelegate<?> am : elements) {
-                    am.annotate(annotationType);
-                }
-                return JavaPropertyElement.this;
-            }
-
-            @Override
-            public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
-                for (MutableAnnotationMetadataDelegate<?> am : elements) {
-                    am.annotate(annotationType, consumer);
-                }
-                return JavaPropertyElement.this;
-            }
-
-            @Override
-            public io.micronaut.inject.ast.Element removeAnnotation(String annotationType) {
-                for (MutableAnnotationMetadataDelegate<?> am : elements) {
-                    am.removeAnnotation(annotationType);
-                }
-                return JavaPropertyElement.this;
-            }
-
-            @Override
-            public <T extends Annotation> io.micronaut.inject.ast.Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
-                for (MutableAnnotationMetadataDelegate<?> am : elements) {
-                    am.removeAnnotationIf(predicate);
-                }
-                return JavaPropertyElement.this;
-            }
-
-            @Override
-            public AnnotationMetadata getAnnotationMetadata() {
-                return propertyAnnotationMetadata;
-            }
-        };
+        this.annotationMetadata = new PropertyElementAnnotationMetadata(this, getter, setter, field, null, false);
     }
 
     @Override
@@ -206,8 +86,8 @@ final class JavaPropertyElement extends AbstractJavaElement implements PropertyE
     }
 
     private static JavaNativeElement selectNativeType(MethodElement getter,
-                                            MethodElement setter,
-                                            FieldElement field) {
+                                                      MethodElement setter,
+                                                      FieldElement field) {
         if (getter != null) {
             return (JavaNativeElement) getter.getNativeType();
         }

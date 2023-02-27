@@ -24,15 +24,17 @@ import io.micronaut.core.reflect.GenericTypeUtils
 import io.micronaut.inject.visitor.TypeElementVisitor
 import java.util.*
 
-class LoadedVisitor(val visitor: TypeElementVisitor<*, *>,
-                    val visitorContext: KotlinVisitorContext): Ordered {
+internal class LoadedVisitor(
+    val visitor: TypeElementVisitor<*, *>,
+    val visitorContext: KotlinVisitorContext
+) : Ordered {
 
     companion object {
         const val ANY = "kotlin.Any"
     }
 
-    var classAnnotation: String = ANY
-    var elementAnnotation: String = ANY
+    private var classAnnotation: String = ANY
+    private var elementAnnotation: String = ANY
 
     init {
         val javaClass = visitor.javaClass
@@ -47,7 +49,8 @@ class LoadedVisitor(val visitor: TypeElementVisitor<*, *>,
                     it.declaration.qualifiedName?.asString() == tevClassName
                 }!!
             classAnnotation = getType(reference.arguments[0].type!!.resolve(), visitor.classType)
-            elementAnnotation = getType(reference.arguments[1].type!!.resolve(), visitor.elementType)
+            elementAnnotation =
+                getType(reference.arguments[1].type!!.resolve(), visitor.elementType)
         } else {
             val classes = GenericTypeUtils.resolveInterfaceTypeArguments(
                 javaClass,
@@ -101,7 +104,8 @@ class LoadedVisitor(val visitor: TypeElementVisitor<*, *>,
         if (classAnnotation == "java.lang.Object") {
             return true
         }
-        val annotationMetadata = visitorContext.annotationMetadataBuilder.buildDeclared(classDeclaration)
+        val annotationMetadata =
+            visitorContext.annotationMetadataBuilder.buildDeclared(classDeclaration)
         return annotationMetadata.hasStereotype(classAnnotation)
     }
 

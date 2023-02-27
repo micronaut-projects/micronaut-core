@@ -108,8 +108,8 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
         final ClassNode[] exceptions = methodNode.getExceptions();
         if (ArrayUtils.isNotEmpty(exceptions)) {
             return Arrays.stream(exceptions)
-                    .map(cn -> newClassElement(cn, getDeclaringType().getTypeArguments()))
-                    .toArray(ClassElement[]::new);
+                .map(cn -> newClassElement(cn, getDeclaringType().getTypeArguments()))
+                .toArray(ClassElement[]::new);
         }
         return ClassElement.ZERO_CLASS_ELEMENTS;
     }
@@ -192,13 +192,19 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     @NonNull
     @Override
     public ClassElement getGenericReturnType() {
-        return newClassElement(methodNode.getReturnType(), getTypeArguments());
+        if (genericReturnType == null) {
+            genericReturnType = newClassElement(methodNode.getReturnType(), getTypeArguments());
+        }
+        return genericReturnType;
     }
 
     @Override
     @NonNull
     public ClassElement getReturnType() {
-        return newClassElement(methodNode.getReturnType());
+        if (returnType == null) {
+            returnType = newClassElement(methodNode.getReturnType());
+        }
+        return returnType;
     }
 
     @Override
@@ -212,11 +218,11 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
 
     private GroovyParameterElement newParameter(Parameter parameter) {
         return new GroovyParameterElement(
-                this,
-                visitorContext,
-                new GroovyNativeElement.Parameter(parameter, methodNode),
-                parameter,
-                elementAnnotationMetadataFactory
+            this,
+            visitorContext,
+            new GroovyNativeElement.Parameter(parameter, methodNode),
+            parameter,
+            elementAnnotationMetadataFactory
         );
     }
 
@@ -245,8 +251,8 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
             return Collections.emptyList();
         }
         return Arrays.stream(genericsTypes)
-                .map(gt -> (GenericPlaceholderElement) newClassElement(gt))
-                .toList();
+            .map(gt -> (GenericPlaceholderElement) newClassElement(gt))
+            .toList();
     }
 
 }

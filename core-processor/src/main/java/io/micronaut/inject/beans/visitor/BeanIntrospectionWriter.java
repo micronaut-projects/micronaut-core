@@ -1149,7 +1149,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                         if (writeDispatch instanceof DispatchWriter.MethodDispatchTarget) {
                             MethodElement writeMethod = ((DispatchWriter.MethodDispatchTarget) writeDispatch).getMethodElement();
                             ClassElement writeReturnType = invokeMethod(writer, writeMethod);
-                            if (!writeReturnType.getName().equals("void")) {
+                            if (!writeReturnType.isVoid()) {
                                 writer.pop();
                             }
                         } else if (writeDispatch instanceof DispatchWriter.FieldSetDispatchTarget) {

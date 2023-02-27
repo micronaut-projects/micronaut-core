@@ -84,7 +84,6 @@ import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
-import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.beans.BeanElement;
@@ -1441,7 +1440,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                         declaringTypeRef.getInternalName(), methodElement.getName(),
                         methodDescriptor, isInterface);
 
-                if (methodElement.getReturnType() != PrimitiveElement.VOID) {
+                if (!methodElement.getReturnType().isVoid()) {
                     injectMethodVisitor.pop();
                 }
 
@@ -2058,7 +2057,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                         new org.objectweb.asm.commons.Method(methodName, methodDescriptor));
             }
 
-            if (returnType != PrimitiveElement.VOID) {
+            if (!returnType.isVoid()) {
                 injectMethodVisitor.pop();
             }
             injectMethodVisitor.visitJumpInsn(GOTO, tryEnd);
@@ -2435,7 +2434,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             injectMethodVisitor.visitMethodInsn(isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL,
                     declaringTypeRef.getInternalName(), methodName,
                     methodDescriptor, isInterface);
-            if (isConfigurationProperties && returnType != PrimitiveElement.VOID) {
+            if (isConfigurationProperties && !returnType.isVoid()) {
                 injectMethodVisitor.pop();
             }
         } else {

@@ -15,7 +15,6 @@
  */
 package io.micronaut.annotation.processing.test
 
-
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.Qualifier
 import io.micronaut.core.annotation.Experimental
@@ -30,6 +29,7 @@ import org.intellij.lang.annotations.Language
 import spock.lang.Specification
 
 import java.util.function.Consumer
+import java.util.function.Function
 import java.util.stream.Collectors
 
 class AbstractKotlinCompilerSpec extends Specification {
@@ -98,6 +98,21 @@ class AbstractKotlinCompilerSpec extends Specification {
         return true
     }
 
+    /**
+     * Builds a class element for the given source code.
+     * @param cls The source
+     * @return The class element
+     */
+    ClassElement buildClassElementTransformed(String className, @Language("kotlin") String cls, @NonNull Function<ClassElement, ClassElement> processor) {
+        List<ClassElement> elements = []
+        KotlinCompiler.compile(className, cls,  {
+            if (it.name == className) {
+                elements.add(processor.apply(it))
+            }
+        })
+        return elements.first()
+    }
+
     Object getBean(ApplicationContext context, String className, Qualifier qualifier = null) {
         context.getBean(context.classLoader.loadClass(className), qualifier)
     }
@@ -130,32 +145,42 @@ class AbstractKotlinCompilerSpec extends Specification {
         if (classElement.isArray()) {
             return "Array<" + reconstructTypeSignature(classElement.fromArray()) + ">"
         } else if (classElement.isGenericPlaceholder()) {
-            def freeVar = (GenericPlaceholderElement) classElement
-            def name = freeVar.variableName
+            def genericPlaceholderElement = classElement as GenericPlaceholderElement
+            def name = genericPlaceholderElement.variableName
             if (typeVarsAsDeclarations) {
-                def bounds = freeVar.bounds
+                def bounds = genericPlaceholderElement.bounds
                 if (reconstructTypeSignature(bounds[0]) != 'Object') {
-                    name += bounds.stream().map(AbstractKotlinCompilerSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", " out ", ""))
+                    name += bounds.stream().map(AbstractKotlinCompilerSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", " : ", ""))
                 }
+            } else if (genericPlaceholderElement.resolved) {
+                return reconstructTypeSignature(genericPlaceholderElement.resolved.get())
             }
             return name
         } else if (classElement.isWildcard()) {
-            def we = (WildcardElement) classElement
+            def we = classElement as WildcardElement
+            if (we.isRawType()) {
+                return "*"
+            }
             if (!we.lowerBounds.isEmpty()) {
                 return we.lowerBounds.stream().map(AbstractKotlinCompilerSpec::reconstructTypeSignature).collect(Collectors.joining(" | ", "in ", ""))
-            } else if (we.upperBounds.size() == 1 && reconstructTypeSignature(we.upperBounds.get(0)) == "Object") {
-                return "*"
             } else {
                 return we.upperBounds.stream().map(AbstractKotlinCompilerSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", "out ", ""))
             }
         } else {
-            def boundTypeArguments = classElement.getBoundGenericTypes()
-            if (boundTypeArguments.isEmpty()) {
-                return classElement.getSimpleName()
+            def typeArguments = classElement.getTypeArguments().values()
+            def simpleName = getSimpleName(classElement)
+            if (typeArguments.isEmpty()) {
+                return simpleName
             } else {
-                return classElement.getSimpleName() +
-                        boundTypeArguments.stream().map(AbstractKotlinCompilerSpec::reconstructTypeSignature).collect(Collectors.joining(", ", "<", ">"))
+                return simpleName + typeArguments.stream().map(AbstractKotlinCompilerSpec::reconstructTypeSignature).collect(Collectors.joining(", ", "<", ">"))
             }
         }
+    }
+
+    private static String getSimpleName(ClassElement classElement) {
+        if (classElement.getName() == Object.class.name) {
+            return "Any"
+        }
+        classElement.getSimpleName()
     }
 }

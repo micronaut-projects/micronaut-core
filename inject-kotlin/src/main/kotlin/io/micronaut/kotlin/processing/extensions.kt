@@ -19,15 +19,11 @@ import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.getJavaClassByName
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
-import io.micronaut.inject.ast.Element
-import io.micronaut.kotlin.processing.visitor.AbstractKotlinElement
-import io.micronaut.kotlin.processing.visitor.KSAnnotatedReference
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
-import java.lang.StringBuilder
 
 @OptIn(KspExperimental::class)
-fun KSDeclaration.getBinaryName(resolver: Resolver, visitorContext: KotlinVisitorContext): String {
-    var declaration = unwrap() as KSDeclaration
+internal fun KSDeclaration.getBinaryName(resolver: Resolver, visitorContext: KotlinVisitorContext): String {
+    var declaration = this
     if (declaration is KSFunctionDeclaration) {
         val parent = declaration.parentDeclaration
         if (parent != null) {
@@ -60,23 +56,7 @@ private fun computeName(declaration: KSDeclaration): String {
     return className.toString()
 }
 
-fun KSNode.unwrap() : KSNode {
-    return if (this is KSAnnotatedReference) {
-        this.node
-    } else {
-        this
-    }
-}
-
-fun Element.kspNode() : Any {
-    return if (this is AbstractKotlinElement<*>) {
-        this.nativeType.unwrap()
-    } else {
-        this.nativeType
-    }
-}
-
-fun KSPropertySetter.getVisibility(): Visibility {
+internal fun KSPropertySetter.getVisibility(): Visibility {
     val modifierSet = try {
         this.modifiers
     } catch (e: IllegalStateException) {
@@ -95,7 +75,7 @@ fun KSPropertySetter.getVisibility(): Visibility {
 }
 
 @OptIn(KspExperimental::class)
-fun KSAnnotated.getClassDeclaration(visitorContext: KotlinVisitorContext) : KSClassDeclaration {
+internal fun KSAnnotated.getClassDeclaration(visitorContext: KotlinVisitorContext) : KSClassDeclaration {
     when (this) {
         is KSType -> {
             return this.declaration.getClassDeclaration(visitorContext)

@@ -15,12 +15,11 @@ import io.micronaut.core.convert.TypeConverter
 import io.micronaut.core.reflect.InstantiationUtils
 import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
+import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.inject.ExecutableMethod
-import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.beans.visitor.MappedSuperClassIntrospectionMapper
 import io.micronaut.kotlin.processing.elementapi.SomeEnum
 import io.micronaut.kotlin.processing.elementapi.TestClass
-import spock.lang.Specification
 
 import javax.persistence.Column
 import javax.persistence.Entity
@@ -117,7 +116,7 @@ class Test {
     void 'test favor field access'() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
-package fieldaccess;
+package fieldaccess
 
 import io.micronaut.core.annotation.*
 
@@ -132,7 +131,7 @@ class Test {
         }
     var invoked = false
 }
-''');
+''')
         when:
         def properties = introspection.getBeanProperties()
         def instance = introspection.instantiate()
@@ -163,7 +162,7 @@ open class Test(val two: Integer?) {  // read-only
     protected var four: String? = null // not included since protected
     private var five: String? = null // not included since private
 }
-''');
+''')
         when:
         def properties = introspection.getBeanProperties()
 
@@ -702,9 +701,9 @@ fun interface Foo {
     void "test bean introspection with property with static creator method on interface with generic type arguments"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
-package test;
+package test
 
-import io.micronaut.core.annotation.Creator;
+import io.micronaut.core.annotation.Creator
 
 @io.micronaut.core.annotation.Introspected
 fun interface Foo<T> {
@@ -851,8 +850,8 @@ class Book(val title: String) {
         BeanIntrospector introspector = BeanIntrospector.SHARED
         Field introspectionMapField = introspector.getClass().getDeclaredField("introspectionMap")
         introspectionMapField.setAccessible(true)
-        introspectionMapField.set(introspector, new HashMap<String, BeanIntrospectionReference<Object>>());
-        Map map = (Map) introspectionMapField.get(introspector)
+        introspectionMapField.set(introspector, new HashMap<String, BeanIntrospectionReference<Object>>())
+            Map map = (Map) introspectionMapField.get(introspector)
         map.put(reference.getName(), reference)
 
         and:
@@ -913,8 +912,8 @@ class Book {
         BeanIntrospector introspector = BeanIntrospector.SHARED
         Field introspectionMapField = introspector.getClass().getDeclaredField("introspectionMap")
         introspectionMapField.setAccessible(true)
-        introspectionMapField.set(introspector, new HashMap<String, BeanIntrospectionReference<Object>>());
-        Map map = (Map) introspectionMapField.get(introspector)
+        introspectionMapField.set(introspector, new HashMap<String, BeanIntrospectionReference<Object>>())
+            Map map = (Map) introspectionMapField.get(introspector)
         map.put(reference.getName(), reference)
 
         and:
@@ -956,8 +955,8 @@ class Book {
         BeanIntrospector introspector = BeanIntrospector.SHARED
         Field introspectionMapField = introspector.getClass().getDeclaredField("introspectionMap")
         introspectionMapField.setAccessible(true)
-        introspectionMapField.set(introspector, new HashMap<String, BeanIntrospectionReference<Object>>());
-        Map map = (Map) introspectionMapField.get(introspector)
+        introspectionMapField.set(introspector, new HashMap<String, BeanIntrospectionReference<Object>>())
+            Map map = (Map) introspectionMapField.get(introspector)
         map.put(reference.getName(), reference)
 
         and:
@@ -1155,7 +1154,7 @@ class Test(
 
     @Version
     fun getAnotherVersion(): Long? {
-        return v;
+        return v
     }
 
     fun setAnotherVersion(v: Long) {
@@ -1937,13 +1936,12 @@ abstract class Test {
     void "test class loading is not shared between the introspection and the ref"() {
         when:
         BeanIntrospection beanIntrospection = buildBeanIntrospection("test.Test", """
-package test;
+package test
 
-import io.micronaut.core.annotation.Introspected;
-import java.util.Set;
+import io.micronaut.core.annotation.Introspected
+import java.util.Set
 
-@Introspected(excludedAnnotations = [Deprecated::class])
-public class Test {
+@Introspected(excludedAnnotations = [Deprecated::class]) class Test {
     var authors: Set<Author>? = null
 }
 
@@ -2062,8 +2060,7 @@ import io.micronaut.context.annotation.Executable
 @Introspected(classes = [MyInterface::class])
 class Test
 
-@JsonClassDescription
-public interface MyInterface {
+@JsonClassDescription interface MyInterface {
     fun getName(): String
 
     @Executable
@@ -2115,5 +2112,59 @@ class MyImpl: MyInterface {
         introspection.getBeanType().isInterface()
         introspection.beanProperties.size() == 0
         introspection.beanMethods.size() == 1
+    }
+
+    void "test type_use annotations"() {
+        given:
+            def introspection = buildBeanIntrospection('test.Test', '''
+package test
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.kotlin.processing.visitor.*
+
+@Introspected
+class Test(val name:  @TypeUseRuntimeAnn String, val secondName: @TypeUseClassAnn String)
+''')
+            def nameField = introspection.getProperty("name").orElse(null)
+            def secondNameField = introspection.getProperty("secondName").orElse(null)
+
+        expect:
+            nameField
+            secondNameField
+
+            nameField.hasStereotype(TypeUseRuntimeAnn.name)
+            !secondNameField.hasStereotype(TypeUseClassAnn.name)
+    }
+
+    void "test subtypes"() {
+        given:
+            BeanIntrospection introspection = buildBeanIntrospection('test.Holder', '''
+package test
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+open class Animal
+@Introspected
+class Cat(val lives: Int) : Animal()
+
+@Introspected
+class Holder<A : Animal>(
+    var animalNonGeneric: Animal,
+    var animalsNonGeneric: List<Animal>,
+    var animal: A,
+    var animals: List<A>
+) {
+
+    constructor(animal: A) : this(animal, listOf(animal), animal, listOf(animal))
+}
+        ''')
+
+        expect:
+            def animalListArgument = introspection.getProperty("animals").get().asArgument().getTypeParameters()[0]
+            animalListArgument instanceof GenericPlaceholder
+            animalListArgument.isTypeVariable()
+
+            def animal = introspection.getProperty("animal").get().asArgument()
+            animal instanceof GenericPlaceholder
+            animal.isTypeVariable()
     }
 }

@@ -37,7 +37,8 @@ dependencies {
 
 tasks.named("test") {
     exclude '**/*$_closure*'
-
+    forkEvery = 100
+    maxParallelForks = 4
     systemProperty "groovy.attach.groovydoc", true
 }
 

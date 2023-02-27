@@ -16,12 +16,8 @@
 package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationMetadataDelegate;
-import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
@@ -29,13 +25,9 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.PropertyElementAnnotationMetadata;
 
-import java.lang.annotation.Annotation;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 /**
  * Implementation of {@link PropertyElement} for Groovy.
@@ -81,102 +73,7 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
         this.writeAccessKind = writeAccessKind;
         this.owningElement = owningElement;
         this.excluded = excluded;
-        List<MemberElement> elements = new ArrayList<>(3);
-        if (getter instanceof AbstractGroovyElement) {
-            elements.add(getter);
-        }
-        if (setter instanceof AbstractGroovyElement) {
-            elements.add(setter);
-        }
-        if (field instanceof AbstractGroovyElement) {
-            elements.add(field);
-        }
-        // The instance AnnotationMetadata of each element can change after a modification
-        // Set annotation metadata as actual elements so the changes are reflected
-        AnnotationMetadata propertyAnnotationMetadata;
-        if (elements.size() == 1) {
-            propertyAnnotationMetadata = elements.iterator().next();
-        } else {
-            propertyAnnotationMetadata = new AnnotationMetadataHierarchy(
-                true,
-                elements.stream().map(e -> {
-                    if (e instanceof MethodElement) {
-                        return new AnnotationMetadataDelegate() {
-                            @Override
-                            public AnnotationMetadata getAnnotationMetadata() {
-                                // Exclude type metadata
-                                return e.getAnnotationMetadata().getDeclaredMetadata();
-                            }
-                        };
-                    }
-                    return e;
-                }).toArray(AnnotationMetadata[]::new)
-            );
-        }
-        annotationMetadata = new ElementAnnotationMetadata() {
-
-            @Override
-            public <T extends Annotation> io.micronaut.inject.ast.Element annotate(AnnotationValue<T> annotationValue) {
-                for (MemberElement memberElement : elements) {
-                    memberElement.annotate(annotationValue);
-                }
-                return GroovyPropertyElement.this;
-            }
-
-            @Override
-            public <T extends Annotation> io.micronaut.inject.ast.Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
-                for (MemberElement memberElement : elements) {
-                    memberElement.annotate(annotationType, consumer);
-                }
-                return GroovyPropertyElement.this;
-            }
-
-            @Override
-            public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType) {
-                for (MemberElement memberElement : elements) {
-                    memberElement.annotate(annotationType);
-                }
-                return GroovyPropertyElement.this;
-            }
-
-            @Override
-            public io.micronaut.inject.ast.Element annotate(String annotationType) {
-                for (MemberElement memberElement : elements) {
-                    memberElement.annotate(annotationType);
-                }
-                return GroovyPropertyElement.this;
-            }
-
-            @Override
-            public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
-                for (MemberElement memberElement : elements) {
-                    memberElement.annotate(annotationType, consumer);
-                }
-                return GroovyPropertyElement.this;
-            }
-
-            @Override
-            public io.micronaut.inject.ast.Element removeAnnotation(String annotationType) {
-                for (MemberElement memberElement : elements) {
-                    memberElement.removeAnnotation(annotationType);
-                }
-                return GroovyPropertyElement.this;
-            }
-
-            @Override
-            public <T extends Annotation> io.micronaut.inject.ast.Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
-                for (MemberElement memberElement : elements) {
-                    memberElement.removeAnnotationIf(predicate);
-                }
-                return GroovyPropertyElement.this;
-            }
-
-            @Override
-            public AnnotationMetadata getAnnotationMetadata() {
-                return propertyAnnotationMetadata;
-            }
-
-        };
+        this.annotationMetadata = new PropertyElementAnnotationMetadata(this, getter, setter, field, null,false);
     }
 
     @Override
@@ -287,26 +184,18 @@ final class GroovyPropertyElement extends AbstractGroovyElement implements Prope
 
     @Override
     public boolean isReadOnly() {
-        switch (writeAccessKind) {
-            case METHOD:
-                return setter == null;
-            case FIELD:
-                return field == null || field.isFinal();
-            default:
-                throw new IllegalStateException();
-        }
+        return switch (writeAccessKind) {
+            case METHOD -> setter == null;
+            case FIELD -> field == null || field.isFinal();
+        };
     }
 
     @Override
     public boolean isWriteOnly() {
-        switch (readAccessKind) {
-            case METHOD:
-                return getter == null;
-            case FIELD:
-                return field == null;
-            default:
-                throw new IllegalStateException();
-        }
+        return switch (readAccessKind) {
+            case METHOD -> getter == null;
+            case FIELD -> field == null;
+        };
     }
 
     @Override
