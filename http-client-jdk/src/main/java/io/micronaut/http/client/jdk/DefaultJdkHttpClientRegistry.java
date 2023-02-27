@@ -16,6 +16,7 @@
 package io.micronaut.http.client.jdk;
 
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Factory;
@@ -73,18 +74,32 @@ public class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpClientRe
     private final JsonMapper jsonMapper;
     @Nullable
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
+    private final BeanProvider<RequestBinderRegistry> requestBinderRegistryProvider;
+    private final JdkClientSslBuilder jdkClientSslBuilder;
 
     public DefaultJdkHttpClientRegistry(
         BeanContext beanContext,
         LoadBalancerResolver loadBalancerResolver, HttpClientConfiguration defaultHttpClientConfiguration,
         JsonMapper jsonMapper,
-        @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry
+        @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
+        BeanProvider<RequestBinderRegistry> requestBinderRegistryProvider,
+        BeanProvider<JdkClientSslBuilder> sslBuilderBeanProvider
     ) {
         this.beanContext = beanContext;
         this.loadBalancerResolver = loadBalancerResolver;
         this.defaultHttpClientConfiguration = defaultHttpClientConfiguration;
         this.jsonMapper = jsonMapper;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
+        this.requestBinderRegistryProvider = requestBinderRegistryProvider;
+        this.jdkClientSslBuilder = sslBuilderBeanProvider.orElse(new JdkClientSslBuilder(new ResourceResolver()));
+    }
+
+    private static MediaTypeCodec createNewJsonCodec(BeanContext beanContext, JsonFeatures jsonFeatures) {
+        return getJsonCodec(beanContext).cloneWithFeatures(jsonFeatures);
+    }
+
+    private static MapperMediaTypeCodec getJsonCodec(BeanContext beanContext) {
+        return beanContext.getBean(MapperMediaTypeCodec.class, Qualifiers.byName(MapperMediaTypeCodec.REGULAR_JSON_MEDIA_TYPE_CODEC_NAME));
     }
 
     /**
@@ -113,7 +128,7 @@ public class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpClientRe
         @Nullable LoadBalancer loadBalancer,
         @Nullable HttpClientConfiguration configuration,
         BeanContext beanContext
-        ) {
+    ) {
         if (loadBalancer != null) {
             if (configuration == null) {
                 configuration = defaultHttpClientConfiguration;
@@ -237,23 +252,11 @@ public class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpClientRe
             configuration,
             contextPath,
             mediaTypeCodecRegistry,
-            beanContext.findBean(RequestBinderRegistry.class).orElseGet(() ->
-                new DefaultRequestBinderRegistry(conversionService)
-            ),
+            requestBinderRegistryProvider.orElse(new DefaultRequestBinderRegistry(conversionService)),
             clientId,
             conversionService,
-            beanContext.findBean(JdkClientSslBuilder.class).orElseGet(() ->
-                new JdkClientSslBuilder(new ResourceResolver())
-            )
+            jdkClientSslBuilder
         );
-    }
-
-    private static MediaTypeCodec createNewJsonCodec(BeanContext beanContext, JsonFeatures jsonFeatures) {
-        return getJsonCodec(beanContext).cloneWithFeatures(jsonFeatures);
-    }
-
-    private static MapperMediaTypeCodec getJsonCodec(BeanContext beanContext) {
-        return beanContext.getBean(MapperMediaTypeCodec.class, Qualifiers.byName(MapperMediaTypeCodec.REGULAR_JSON_MEDIA_TYPE_CODEC_NAME));
     }
 
     @Override
@@ -300,14 +303,22 @@ public class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpClientRe
 
     /**
      * Client key.
+     *
+     * @param httpVersion        The HTTP version
+     * @param clientId           The client ID
+     * @param filterAnnotations  The filter annotations
+     * @param path               The path
+     * @param configurationClass The configuration class
+     * @param jsonFeatures       The JSON features
      */
     @Internal
-    private record ClientKey (
+    private record ClientKey(
         HttpVersionSelection httpVersion,
         String clientId,
         List<String> filterAnnotations,
         String path,
         Class<?> configurationClass,
         JsonFeatures jsonFeatures
-    ) {}
+    ) {
+    }
 }
