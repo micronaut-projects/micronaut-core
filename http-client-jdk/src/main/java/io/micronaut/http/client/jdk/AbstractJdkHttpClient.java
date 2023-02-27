@@ -112,6 +112,10 @@ abstract class AbstractJdkHttpClient {
         this.cookieManager = new CookieManager();
         this.sslBuilder = sslBuilder;
 
+        if (System.getProperty("jdk.internal.httpclient.disableHostnameVerification") != null && log.isWarnEnabled()) {
+            log.warn("The jdk.internal.httpclient.disableHostnameVerification system property is set. This is not recommended for production use as it prevents proper certificate validation and may allow man-in-the-middle attacks.");
+        }
+
         if (StringUtils.isNotEmpty(contextPath)) {
             if (contextPath.charAt(0) != '/') {
                 contextPath = '/' + contextPath;
@@ -181,9 +185,6 @@ abstract class AbstractJdkHttpClient {
 
     private void configureSsl(HttpClient.Builder builder, ClientSslConfiguration clientSslConfiguration) {
         sslBuilder.build(clientSslConfiguration).ifPresent(builder::sslContext);
-        if (System.getProperty("jdk.internal.httpclient.disableHostnameVerification") != null && log.isWarnEnabled()) {
-            log.warn("The jdk.internal.httpclient.disableHostnameVerification system property is set. This is not recommended for production use as it prevents proper certificate validation and may allow man-in-the-middle attacks.");
-        }
         SSLParameters sslParameters = new SSLParameters();
         clientSslConfiguration.getClientAuthentication().ifPresent(a -> {
             if (a == ClientAuthentication.WANT) {
