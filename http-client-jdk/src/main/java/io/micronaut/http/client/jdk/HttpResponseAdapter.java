@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
+import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
@@ -39,10 +40,12 @@ import java.util.Optional;
  * @param <O> Body Type
  */
 public class HttpResponseAdapter<O> implements HttpResponse<O> {
+
     private final java.net.http.HttpResponse<byte[]> httpResponse;
     @NonNull
     private final Argument<O> bodyType;
     private final ConversionService conversionService;
+    private final MutableConvertibleValues<Object> attributes = new MutableConvertibleValuesMap<>();
 
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
 
@@ -68,7 +71,7 @@ public class HttpResponseAdapter<O> implements HttpResponse<O> {
 
     @Override
     public String reason() {
-        throw new UnsupportedOperationException("Not implemented yet");
+        return getStatus().getReason();
     }
 
     @Override
@@ -78,7 +81,7 @@ public class HttpResponseAdapter<O> implements HttpResponse<O> {
 
     @Override
     public MutableConvertibleValues<Object> getAttributes() {
-        return null;
+        return attributes;
     }
 
     @Override
