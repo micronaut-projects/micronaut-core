@@ -51,9 +51,20 @@ public abstract class AbstractHttpClientFactory<T extends HttpClient> implements
         this.conversionService = conversionService;
     }
 
+    /**
+     * Creates a new {@link HttpClient} instance for a given URI.
+     * @param uri The URI
+     * @return The client
+     */
     @NonNull
     protected abstract T createHttpClient(@Nullable URI uri);
 
+    /**
+     * Creates a new {@link HttpClient} instance for a given URI and configuration.
+     * @param uri The URI
+     * @param configuration The configuration
+     * @return The client
+     */
     @NonNull
     protected abstract T createHttpClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration);
 
