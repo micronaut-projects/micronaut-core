@@ -643,18 +643,6 @@ internal open class KotlinClassElement(
             return emptySet()
         }
 
-//        override fun getCacheKey(element: KSNode): KSNode {
-//            return when (element) {
-//                is KSFunctionDeclaration -> KSFunctionReference(element)
-//                is KSPropertyDeclaration -> KSPropertyReference(element)
-//                is KSClassDeclaration -> KSClassReference(element)
-//                is KSValueParameter -> KSValueParameterReference(element)
-//                is KSPropertyGetter -> KSPropertyGetterReference(element)
-//                is KSPropertySetter -> KSPropertySetterReference(element)
-//                else -> element
-//            }
-//        }
-
         override fun getSuperClass(classNode: KSClassDeclaration): KSClassDeclaration? {
             val superTypes = classNode.superTypes
             for (superclass in superTypes) {
