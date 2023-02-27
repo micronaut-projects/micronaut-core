@@ -67,7 +67,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @BootstrapContextCompatible
 @Internal
 @Experimental
-public class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpClientRegistry<HttpClient> {
+public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpClientRegistry<HttpClient> {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultJdkHttpClientRegistry.class);
 
