@@ -51,7 +51,6 @@ import io.micronaut.json.codec.MapperMediaTypeCodec;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -277,49 +276,12 @@ public class DefaultJavanetHttpClientRegistry implements AutoCloseable, HttpClie
      * Client key.
      */
     @Internal
-    private static final class ClientKey {
-        final HttpVersionSelection httpVersion;
-        final String clientId;
-        final List<String> filterAnnotations;
-        final String path;
-        final Class<?> configurationClass;
-        final JsonFeatures jsonFeatures;
-
-        ClientKey(
-            HttpVersionSelection httpVersion,
-            String clientId,
-            List<String> filterAnnotations,
-            String path,
-            Class<?> configurationClass,
-            JsonFeatures jsonFeatures) {
-            this.httpVersion = httpVersion;
-            this.clientId = clientId;
-            this.filterAnnotations = filterAnnotations;
-            this.path = path;
-            this.configurationClass = configurationClass;
-            this.jsonFeatures = jsonFeatures;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) {
-                return true;
-            }
-            if (o == null || getClass() != o.getClass()) {
-                return false;
-            }
-            ClientKey clientKey = (ClientKey) o;
-            return httpVersion == clientKey.httpVersion &&
-                Objects.equals(clientId, clientKey.clientId) &&
-                Objects.equals(filterAnnotations, clientKey.filterAnnotations) &&
-                Objects.equals(path, clientKey.path) &&
-                Objects.equals(configurationClass, clientKey.configurationClass) &&
-                Objects.equals(jsonFeatures, clientKey.jsonFeatures);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(httpVersion, clientId, filterAnnotations, path, configurationClass, jsonFeatures);
-        }
-    }
+    private record ClientKey (
+        HttpVersionSelection httpVersion,
+        String clientId,
+        List<String> filterAnnotations,
+        String path,
+        Class<?> configurationClass,
+        JsonFeatures jsonFeatures
+    ) {}
 }
