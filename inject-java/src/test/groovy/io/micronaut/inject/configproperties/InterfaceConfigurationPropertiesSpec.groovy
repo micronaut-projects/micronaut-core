@@ -19,15 +19,21 @@ class InterfaceConfigurationPropertiesSpec extends AbstractTypeElementSpec {
 package test;
 
 import io.micronaut.context.annotation.*;
+import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.util.Toggleable;
 import java.time.Duration;
 
 @ConfigurationProperties("foo.bar")
-interface MyConfig {
+interface MyConfig extends Toggleable {
     @javax.validation.constraints.NotBlank
     String getHost();
 
     @javax.validation.constraints.Min(10L)
     int getServerPort();
+
+    @Bindable(defaultValue = "true")
+    @Override
+    boolean isEnabled();
 }
 
 ''')
@@ -46,6 +52,7 @@ interface MyConfig {
         then:
         config.host == 'test'
         config.serverPort == 9999
+        config.enabled
 
         cleanup:
         context.close()

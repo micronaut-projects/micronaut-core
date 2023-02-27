@@ -240,6 +240,15 @@ public interface MethodElement extends MemberElement {
         if (this.equals(overridden) || isStatic() || overridden.isStatic()) {
             return false;
         }
+        ClassElement thisType = getDeclaringType();
+        ClassElement thatType = overridden.getDeclaringType();
+        if (thisType.getName().equals(thatType.getName())) {
+            return false;
+        }
+        if (!thisType.isAssignable(thatType)) {
+            // not a parent class
+            return false;
+        }
         MethodElement newMethod = this;
         if (newMethod.isAbstract() && !newMethod.isDefault() && (!overridden.isAbstract() || overridden.isDefault())) {
             return false;
