@@ -9,6 +9,7 @@ Micronaut Framework 4.x supports https://groovy-lang.org/releasenotes/groovy-4.0
 
 
 * <<virtualThreads, Support for Virtual Threads>>
+* <<filtermethods, Filter Methods>>
 
 * <<javanetClient, Additional implementation of the HTTP Client based on Java HTTP Client>>
 

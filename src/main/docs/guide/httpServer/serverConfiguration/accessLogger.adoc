@@ -41,7 +41,6 @@ micronaut:
 - optionally specify a `logger-name`, which defaults to `HTTP_ACCESS_LOGGER`
 - optionally specify a `log-format`, which defaults to the Common Log Format
 
-
 ==== Logback Configuration
 
 In addition to enabling the access logger, you must add a logger for the specified or default logger name. For instance using the default logger name for logback:

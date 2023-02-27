@@ -75,6 +75,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
@@ -1038,9 +1039,19 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                                                              String cliProperty) {
         MethodReference methodRef = methodInjection[methodIndex];
         Argument<?> argument = methodRef.arguments[argIndex];
-        try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+        try (BeanResolutionContext.Path path = resolutionContext.getPath()
                 .pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments)) {
-            return resolvePropertyValue(resolutionContext, context, argument, propertyValue, cliProperty, false);
+            Object val = resolvePropertyValue(resolutionContext, context, argument, propertyValue, cliProperty, false);
+            if (this instanceof ValidatedBeanDefinition validatedBeanDefinition) {
+                validatedBeanDefinition.validateBeanArgument(
+                    resolutionContext,
+                    Objects.requireNonNull(path.peek()).getInjectionPoint(),
+                    argument,
+                    argIndex,
+                    val
+                );
+            }
+            return val;
         }
     }
 
@@ -1088,9 +1099,19 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                                                      Argument<?> argument,
                                                      String propertyValue,
                                                      String cliProperty) {
-        try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+        try (BeanResolutionContext.Path path = resolutionContext.getPath()
                 .pushMethodArgumentResolve(this, setterName, argument, new Argument[]{argument})) {
-            return resolvePropertyValue(resolutionContext, context, argument, propertyValue, cliProperty, false);
+            Object val = resolvePropertyValue(resolutionContext, context, argument, propertyValue, cliProperty, false);
+            if (this instanceof ValidatedBeanDefinition validatedBeanDefinition) {
+                validatedBeanDefinition.validateBeanArgument(
+                    resolutionContext,
+                    Objects.requireNonNull(path.peek()).getInjectionPoint(),
+                    argument,
+                    0,
+                    val
+                );
+            }
+            return val;
         }
     }
 
