@@ -85,6 +85,7 @@ public class CorsSimpleRequestTest {
      * @throws IOException
      */
     @Test
+    @Tag("multipart")
     void corsSimpleRequestAllowedForLocalhostAndAnyWhenSpecificallyTurnedOff() throws IOException {
         asserts(SPECNAME,
             CollectionUtils.mapOf(
