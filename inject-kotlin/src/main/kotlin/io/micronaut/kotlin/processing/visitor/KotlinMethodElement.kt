@@ -53,7 +53,7 @@ internal open class KotlinMethodElement(
     }
 
     override val internalDeclaredTypeArguments: Map<String, ClassElement> by lazy {
-        resolveTypeArguments(nativeType, declaration, emptyMap())
+        resolveTypeArguments(nativeType, declaration, declaringType.typeArguments)
     }
 
     override val resolvedParameters: List<ParameterElement> by lazy {

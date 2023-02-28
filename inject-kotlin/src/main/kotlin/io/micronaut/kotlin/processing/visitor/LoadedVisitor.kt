@@ -50,15 +50,15 @@ internal class LoadedVisitor(
                     it.declaration.qualifiedName?.asString() == tevClassName
                 } ?: throw ProcessingException(
                 visitorContext.elementFactory.newClassElement(declaration),
-                "The visitor doesn't implement $tevClassName"
+                "The visitor [$declaration] doesn't implement $tevClassName"
             )
             val classArgument = reference.arguments[0].type ?: throw ProcessingException(
                 visitorContext.elementFactory.newClassElement(declaration),
-                "Cannot determine the class type argument of the visitor"
+                "Cannot determine the class type argument of the visitor: $declaration"
             )
             val elementArgument = reference.arguments[1].type ?: throw ProcessingException(
                 visitorContext.elementFactory.newClassElement(declaration),
-                "Cannot determine the element type argument of the visitor"
+                "Cannot determine the element type argument of the visitor: $declaration"
             )
             classAnnotation = getType(classArgument.resolve(), visitor.classType)
             elementAnnotation = getType(elementArgument.resolve(), visitor.elementType)

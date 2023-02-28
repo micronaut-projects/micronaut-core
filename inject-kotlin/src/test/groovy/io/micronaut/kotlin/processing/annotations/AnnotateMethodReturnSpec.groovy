@@ -245,6 +245,7 @@ class MyBean1(var name: String)
         }
 
         private static void validateBeanType(ClassElement bean) {
+            assert bean.isAssignable("addann.MyBean1")
             assert bean.getAnnotationMetadata().isEmpty()
             assert bean.getTypeAnnotationMetadata().isEmpty()
             assert bean.getMethods().size() == 0
