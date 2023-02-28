@@ -7,10 +7,9 @@ import spock.lang.Specification
 class ServiceReadyHealthIndicatorSpec extends Specification {
     void "bean of type ServiceReadyHealthIndicatorConfiguration does not exist if you set endpoints.health.service.enabled=false"() {
         given:
-        ApplicationContext applicationContext = ApplicationContext.run(['endpoints.health.service.enabled': 'false'])
+        ApplicationContext applicationContext = ApplicationContext.run([(ServiceReadyHealthIndicator.ENABLED): 'false'])
 
         expect:
-        !applicationContext.containsBean(HealthEndpoint.ServiceReadyHealthIndicatorConfiguration)
         !applicationContext.containsBean(ServiceReadyHealthIndicator)
 
         cleanup:
@@ -22,7 +21,6 @@ class ServiceReadyHealthIndicatorSpec extends Specification {
         ApplicationContext applicationContext = ApplicationContext.run()
 
         expect:
-        applicationContext.containsBean(HealthEndpoint.ServiceReadyHealthIndicatorConfiguration)
         applicationContext.containsBean(ServiceReadyHealthIndicator)
 
         cleanup:
