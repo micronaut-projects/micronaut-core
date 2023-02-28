@@ -523,7 +523,7 @@ public interface MethodElement extends MemberElement {
                         return getMethodAnnotationMetadata0();
                     }
                 };
-            };
+            }
 
             private AnnotationMetadata getMethodAnnotationMetadata0() {
                 if (methodAnnotationMetadata == null) {
