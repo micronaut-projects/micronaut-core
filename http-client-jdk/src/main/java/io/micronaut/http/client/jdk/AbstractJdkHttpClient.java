@@ -133,12 +133,19 @@ abstract class AbstractJdkHttpClient {
         HttpClient.Builder builder = HttpClient.newBuilder();
         configuration.getConnectTimeout().ifPresent(builder::connectTimeout);
 
-        if (configuration.getPlaintextMode() == HttpVersionSelection.PlaintextMode.H2C) {
+        HttpVersionSelection httpVersionSelection = HttpVersionSelection.forClientConfiguration(configuration);
+
+        if (httpVersionSelection.getPlaintextMode() == HttpVersionSelection.PlaintextMode.H2C) {
             throw new ConfigurationException(H2C_ERROR_MESSAGE);
         }
 
+        if (httpVersionSelection.isAlpn() && httpVersionSelection.isHttp2CipherSuites()) {
+            builder.version(HttpClient.Version.HTTP_2);
+        } else {
+            builder.version(HttpClient.Version.HTTP_1_1);
+        }
+
         builder
-            .version(httpVersion != null && httpVersion.isAlpn() ? HttpClient.Version.HTTP_2 : HttpClient.Version.HTTP_1_1)
             .followRedirects(configuration.isFollowRedirects() ? HttpClient.Redirect.NORMAL : HttpClient.Redirect.NEVER)
             .cookieHandler(cookieManager);
 
