@@ -26,7 +26,10 @@ import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PrimitiveElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.MethodElementAnnotationsHelper;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
@@ -61,6 +64,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     private ClassElement returnType;
     private Map<String, ClassElement> typeArguments;
     private Map<String, ClassElement> declaredTypeArguments;
+    private final MethodElementAnnotationsHelper helper;
 
     /**
      * @param owningType                The declaring class
@@ -75,6 +79,22 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
         super(nativeElement, annotationMetadataFactory, visitorContext);
         this.executableElement = nativeElement.element();
         this.owningType = owningType;
+        this.helper = new MethodElementAnnotationsHelper(this, annotationMetadataFactory);
+    }
+
+    @Override
+    protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
+        return helper.getMethodAnnotationMetadata(presetAnnotationMetadata);
+    }
+
+    @Override
+    public ElementAnnotationMetadata getMethodAnnotationMetadata() {
+        return helper.getMethodAnnotationMetadata(presetAnnotationMetadata);
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return helper.getAnnotationMetadata(presetAnnotationMetadata);
     }
 
     @Override

@@ -64,7 +64,7 @@ public abstract class AbstractAnnotationElement implements io.micronaut.inject.a
             if (presetAnnotationMetadata == null) {
                 elementAnnotationMetadata = elementAnnotationMetadataFactory.build(this);
             } else {
-                elementAnnotationMetadata = elementAnnotationMetadataFactory.build(this, presetAnnotationMetadata);
+                elementAnnotationMetadata = elementAnnotationMetadataFactory.buildMutable(presetAnnotationMetadata);
             }
         }
         return elementAnnotationMetadata;

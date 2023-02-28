@@ -465,22 +465,38 @@ internal open class KotlinClassElement(
 
     @OptIn(KspExperimental::class)
     override fun isAssignable(type: String): Boolean {
-        var ksType = visitorContext.resolver.getClassDeclarationByName(type)?.asStarProjectedType()
-        if (ksType != null) {
-            if (ksType.isAssignableFrom(kotlinType)) {
+        val otherDeclaration = visitorContext.resolver.getClassDeclarationByName(type)
+        if (otherDeclaration != null) {
+            if (declaration == otherDeclaration) {
                 return true
             }
-            val kotlinName = visitorContext.resolver.mapJavaNameToKotlin(
-                visitorContext.resolver.getKSNameFromString(type)
+            val thisFullName = declaration.getBinaryName(
+                visitorContext.resolver,
+                visitorContext
             )
-            if (kotlinName != null) {
-                ksType =
-                    visitorContext.resolver.getKotlinClassByName(kotlinName)?.asStarProjectedType()
-                if (ksType != null && kotlinType.starProjection().isAssignableFrom(ksType)) {
-                    return true
-                }
+            val otherFullName = otherDeclaration.getBinaryName(
+                visitorContext.resolver,
+                visitorContext
+            )
+            if (thisFullName == otherFullName) {
+                return true
             }
-            return false
+            val otherKotlinType = otherDeclaration.asStarProjectedType()
+            if (otherKotlinType == kotlinType) {
+                return true
+            }
+            if (otherKotlinType.isAssignableFrom(kotlinType)) {
+                return true
+            }
+        }
+        val kotlinName = visitorContext.resolver.mapJavaNameToKotlin(
+            visitorContext.resolver.getKSNameFromString(type)
+        )
+        if (kotlinName != null) {
+            val kotlinClassByName = visitorContext.resolver.getKotlinClassByName(kotlinName)
+            if (kotlinClassByName != null && kotlinType.starProjection().isAssignableFrom(kotlinClassByName.asStarProjectedType())) {
+                return true
+            }
         }
         return false
     }

@@ -21,6 +21,7 @@ import com.google.devtools.ksp.symbol.KSType
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.order.Ordered
 import io.micronaut.core.reflect.GenericTypeUtils
+import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.visitor.TypeElementVisitor
 import java.util.*
 
@@ -47,10 +48,20 @@ internal class LoadedVisitor(
                 .map { it.resolve() }
                 .find {
                     it.declaration.qualifiedName?.asString() == tevClassName
-                }!!
-            classAnnotation = getType(reference.arguments[0].type!!.resolve(), visitor.classType)
-            elementAnnotation =
-                getType(reference.arguments[1].type!!.resolve(), visitor.elementType)
+                } ?: throw ProcessingException(
+                visitorContext.elementFactory.newClassElement(declaration),
+                "The visitor [$declaration] doesn't implement $tevClassName"
+            )
+            val classArgument = reference.arguments[0].type ?: throw ProcessingException(
+                visitorContext.elementFactory.newClassElement(declaration),
+                "Cannot determine the class type argument of the visitor: $declaration"
+            )
+            val elementArgument = reference.arguments[1].type ?: throw ProcessingException(
+                visitorContext.elementFactory.newClassElement(declaration),
+                "Cannot determine the element type argument of the visitor: $declaration"
+            )
+            classAnnotation = getType(classArgument.resolve(), visitor.classType)
+            elementAnnotation = getType(elementArgument.resolve(), visitor.elementType)
         } else {
             val classes = GenericTypeUtils.resolveInterfaceTypeArguments(
                 javaClass,

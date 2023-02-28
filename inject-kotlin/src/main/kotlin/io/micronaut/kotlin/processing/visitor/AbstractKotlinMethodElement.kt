@@ -26,7 +26,10 @@ import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.ParameterElement
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
+import io.micronaut.inject.ast.annotation.MethodElementAnnotationsHelper
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
 
 internal abstract class AbstractKotlinMethodElement<T : KotlinNativeElement>(
     private val nativeType: T,
@@ -41,6 +44,19 @@ internal abstract class AbstractKotlinMethodElement<T : KotlinNativeElement>(
     abstract val internalReturnType: ClassElement
     abstract val internalGenericReturnType: ClassElement
     abstract val resolvedParameters: List<ParameterElement>
+
+    private val methodHelper by lazy {
+        MethodElementAnnotationsHelper(this, annotationMetadataFactory)
+    }
+
+    override fun getMethodAnnotationMetadata(): ElementAnnotationMetadata =
+        methodHelper.getMethodAnnotationMetadata(presetAnnotationMetadata)
+
+    override fun getAnnotationMetadataToWrite(): MutableAnnotationMetadataDelegate<*> =
+        methodHelper.getMethodAnnotationMetadata(presetAnnotationMetadata)
+
+    override fun getAnnotationMetadata(): AnnotationMetadata =
+        methodHelper.getAnnotationMetadata(presetAnnotationMetadata)
 
     override fun getModifiers() = super<AbstractKotlinElement>.getModifiers()
 

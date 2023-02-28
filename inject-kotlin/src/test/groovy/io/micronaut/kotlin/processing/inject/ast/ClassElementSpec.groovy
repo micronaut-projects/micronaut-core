@@ -1,6 +1,5 @@
 package io.micronaut.kotlin.processing.inject.ast
 
-
 import io.micronaut.annotation.processing.test.AbstractKotlinCompilerSpec
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Introspected
@@ -1639,8 +1638,10 @@ package test
 import io.micronaut.context.annotation.Prototype
 import java.util.List
 
-class MyRepo : Repo<MyBean, Long>
-interface Repo<E, ID> : GenericRepository<E, ID>
+interface MyRepo : Repo<MyBean, Long>
+interface Repo<E, ID> : GenericRepository<E, ID> {
+    fun save(ent: E)
+}
 interface GenericRepository<E, ID>
 @Prototype
 class MyBean {
@@ -1657,10 +1658,178 @@ class MyBean {
             repo.get("E").getMethods().size() == 0
             repo.get("E").getFields().size() == 1
             repo.get("E").getFields().get(0).name == "name"
+            def element = ce.findMethod("save").get().getParameters()[0]
+            element.getGenericType().simpleName == "MyBean"
+            element.getType().simpleName == "Object"
         when:
             def genRepo = ce.getTypeArguments("test.GenericRepository")
         then:
             genRepo.get("E").simpleName == "MyBean"
+            genRepo.get("E").getSyntheticBeanProperties().size() == 1
+            genRepo.get("E").getMethods().size() == 0
+            genRepo.get("E").getFields().get(0).name == "name"
+    }
+
+    void "test interface placeholder 2"() {
+        ClassElement ce = buildClassElement('test.MyRepoX', '''
+package test
+import io.micronaut.context.annotation.Prototype
+import java.util.List
+
+interface MyRepoX : RepoX<MyBeanX, Long>
+interface RepoX<E, ID> : GenericRepository<E, ID> {
+    fun <S : E> save(ent: S)
+}
+interface GenericRepository<E, ID>
+@Prototype
+class MyBeanX {
+    var name: String? = null
+}
+
+''')
+
+        when:
+            def repo = ce.getTypeArguments("test.RepoX")
+        then:
+            repo.get("E").simpleName == "MyBeanX"
+            repo.get("E").getSyntheticBeanProperties().size() == 1
+            repo.get("E").getMethods().size() == 0
+            repo.get("E").getFields().size() == 1
+            repo.get("E").getFields().get(0).name == "name"
+            def element = ce.findMethod("save").get().getParameters()[0]
+            element.getGenericType().simpleName == "MyBeanX"
+            element.getType().simpleName == "Object"
+            element.getGenericType().isAssignable("test.MyBeanX")
+        when:
+            def genRepo = ce.getTypeArguments("test.GenericRepository")
+        then:
+            genRepo.get("E").simpleName == "MyBeanX"
+            genRepo.get("E").getSyntheticBeanProperties().size() == 1
+            genRepo.get("E").getMethods().size() == 0
+            genRepo.get("E").getFields().get(0).name == "name"
+    }
+
+    void "test abstract placeholder"() {
+        ClassElement ce = buildClassElement('test.MyRepo2', '''
+package test
+import io.micronaut.context.annotation.Prototype
+import java.util.List
+
+abstract class MyRepo2 : Repo<MyBean, Long>
+interface Repo<E, ID> : GenericRepository<E, ID> {
+    fun save(ent: E)
+}
+interface GenericRepository<E, ID>
+@Prototype
+@io.micronaut.kotlin.processing.inject.ast.MyEntity
+class MyBean {
+    var name: String? = null
+}
+
+''')
+
+        when:
+            def repo = ce.getTypeArguments("test.Repo")
+        then:
+            repo.get("E").simpleName == "MyBean"
+            repo.get("E").hasAnnotation(MyEntity)
+            repo.get("E").getSyntheticBeanProperties().size() == 1
+            repo.get("E").getMethods().size() == 0
+            repo.get("E").getFields().size() == 1
+            repo.get("E").getFields().get(0).name == "name"
+
+            def element = ce.findMethod("save").get().getParameters()[0]
+            element.getGenericType().simpleName == "MyBean"
+            element.getType().simpleName == "Object"
+        when:
+            def genRepo = ce.getTypeArguments("test.GenericRepository")
+        then:
+            genRepo.get("E").simpleName == "MyBean"
+            genRepo.get("E").hasAnnotation(MyEntity)
+            genRepo.get("E").getSyntheticBeanProperties().size() == 1
+            genRepo.get("E").getMethods().size() == 0
+            genRepo.get("E").getFields().get(0).name == "name"
+    }
+
+    void "test abstract placeholder 2"() {
+        ClassElement ce = buildClassElement('test.MyRepo2', '''
+package test
+import io.micronaut.context.annotation.Prototype
+import java.util.List
+
+abstract class MyRepo2 : Repo<MyBean, Long>()
+abstract class Repo<E, ID> : GenericRepository<E, ID> {
+    abstract fun save(ent: E)
+}
+interface GenericRepository<E, ID>
+@Prototype
+@io.micronaut.kotlin.processing.inject.ast.MyEntity
+class MyBean {
+    var name: String? = null
+}
+
+''')
+
+        when:
+            def repo = ce.getTypeArguments("test.Repo")
+        then:
+            repo.get("E").simpleName == "MyBean"
+            repo.get("E").hasAnnotation(MyEntity)
+            repo.get("E").getSyntheticBeanProperties().size() == 1
+            repo.get("E").getMethods().size() == 0
+            repo.get("E").getFields().size() == 1
+            repo.get("E").getFields().get(0).name == "name"
+
+            def element = ce.findMethod("save").get().getParameters()[0]
+            element.getGenericType().simpleName == "MyBean"
+            element.getType().simpleName == "Object"
+        when:
+            def genRepo = ce.getTypeArguments("test.GenericRepository")
+        then:
+            genRepo.get("E").simpleName == "MyBean"
+            genRepo.get("E").hasAnnotation(MyEntity)
+            genRepo.get("E").getSyntheticBeanProperties().size() == 1
+            genRepo.get("E").getMethods().size() == 0
+            genRepo.get("E").getFields().get(0).name == "name"
+    }
+
+    void "test abstract placeholder 3"() {
+        ClassElement ce = buildClassElement('test.MyRepo2', '''
+package test
+import io.micronaut.context.annotation.Prototype
+import java.util.List
+
+abstract class MyRepo2 : Repo<MyBean, Long>()
+abstract class Repo<E, ID> : GenericRepository<E, ID> {
+    abstract fun <S : E> save(ent: S)
+}
+interface GenericRepository<E, ID>
+@Prototype
+@io.micronaut.kotlin.processing.inject.ast.MyEntity
+class MyBean {
+    var name: String? = null
+}
+
+''')
+
+        when:
+            def repo = ce.getTypeArguments("test.Repo")
+        then:
+            repo.get("E").simpleName == "MyBean"
+            repo.get("E").hasAnnotation(MyEntity)
+            repo.get("E").getSyntheticBeanProperties().size() == 1
+            repo.get("E").getMethods().size() == 0
+            repo.get("E").getFields().size() == 1
+            repo.get("E").getFields().get(0).name == "name"
+
+            def element = ce.findMethod("save").get().getParameters()[0]
+            element.getGenericType().simpleName == "MyBean"
+            element.getType().simpleName == "Object"
+        when:
+            def genRepo = ce.getTypeArguments("test.GenericRepository")
+        then:
+            genRepo.get("E").simpleName == "MyBean"
+            genRepo.get("E").hasAnnotation(MyEntity)
             genRepo.get("E").getSyntheticBeanProperties().size() == 1
             genRepo.get("E").getMethods().size() == 0
             genRepo.get("E").getFields().get(0).name == "name"

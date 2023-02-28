@@ -4,3 +4,4 @@ io.micronaut.kotlin.processing.annotations.AnnotateFieldTypeSpec$AnnotateFieldTy
 io.micronaut.kotlin.processing.annotations.AnnotateMethodParameterSpec$AnnotateMethodParameterVisitor
 io.micronaut.kotlin.processing.annotations.AnnotateMethodReturnSpec$AnnotateMethodReturnVisitor
 io.micronaut.kotlin.processing.annotations.AnnotateMethodSpec$AnnotationMethodVisitor
+io.micronaut.kotlin.processing.annotations.AnnotatePropertySpec$AnnotatePropertyVisitor

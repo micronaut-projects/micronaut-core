@@ -25,7 +25,10 @@ import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.MethodElementAnnotationsHelper;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.ast.MethodNode;
@@ -56,6 +59,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     private ClassElement returnType;
     @Nullable
     private ClassElement genericReturnType;
+    private final MethodElementAnnotationsHelper helper;
 
     /**
      * @param owningType         The owning type
@@ -72,6 +76,22 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
         super(visitorContext, nativeElement, annotationMetadata);
         this.methodNode = methodNode;
         this.owningType = owningType;
+        this.helper = new MethodElementAnnotationsHelper(this, annotationMetadata);
+    }
+
+    @Override
+    protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
+        return helper.getMethodAnnotationMetadata(presetAnnotationMetadata);
+    }
+
+    @Override
+    public ElementAnnotationMetadata getMethodAnnotationMetadata() {
+        return helper.getMethodAnnotationMetadata(presetAnnotationMetadata);
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return helper.getAnnotationMetadata(presetAnnotationMetadata);
     }
 
     @Override
