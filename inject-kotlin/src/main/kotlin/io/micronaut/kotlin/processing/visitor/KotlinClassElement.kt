@@ -494,10 +494,8 @@ internal open class KotlinClassElement(
         )
         if (kotlinName != null) {
             val kotlinClassByName = visitorContext.resolver.getKotlinClassByName(kotlinName)
-            if (kotlinClassByName != null) {
-                if (kotlinType.starProjection().isAssignableFrom(kotlinClassByName.asStarProjectedType())) {
-                    return true
-                }
+            if (kotlinClassByName != null && kotlinType.starProjection().isAssignableFrom(kotlinClassByName.asStarProjectedType())) {
+                return true
             }
         }
         return false
