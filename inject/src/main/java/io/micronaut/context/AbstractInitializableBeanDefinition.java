@@ -462,9 +462,11 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         }
         if (methodInjection != null) {
             for (MethodReference methodReference : methodInjection) {
-                if (methodReference.arguments != null && methodReference.arguments.length > 0) {
-                    for (Argument<?> argument : methodReference.arguments) {
-                        argumentConsumer.accept(argument);
+                if (methodReference.annotationMetadata.hasDeclaredAnnotation(AnnotationUtil.INJECT)) {
+                    if (methodReference.arguments != null && methodReference.arguments.length > 0) {
+                        for (Argument<?> argument : methodReference.arguments) {
+                            argumentConsumer.accept(argument);
+                        }
                     }
                 }
             }

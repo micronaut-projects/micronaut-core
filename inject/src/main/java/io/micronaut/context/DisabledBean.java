@@ -15,7 +15,6 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
@@ -32,8 +31,7 @@ import java.util.List;
  * @param reasons The reasons the bean is disabled
  * @param <T> The bean type
  */
-@Internal
-record DisabledBean<T>(
+public record DisabledBean<T>(
     @NonNull Argument<T> type,
     @Nullable Qualifier<T> qualifier,
     @NonNull List<String> reasons)

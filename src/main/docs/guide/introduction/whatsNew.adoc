@@ -19,6 +19,12 @@ It is now possible to inject a `java.util.Map` of beans where the key is the bea
 
 When a bean annotated with ann:context.annotation.EachProperty[] or ann:context.annotation.Bean[] is not found due to missing configuration an error is thrown showing the configuration prefix necessary to resolve the issue.
 
+==== Tracking of Disabled Beans
+
+Beans that are disabled via <<conditionalBeans, Bean Requirements>> are now tracked and an appropriate error thrown if a bean has been disabled.
+
+The disabled beans are also now visible via the <<beansEndpoint, Beans Endpoint>> in the <<management, Management module>> aiding in understanding the state of your application configuration.
+
 === Other Dependency Upgrades
 
 - Kotlin 1.7.10
