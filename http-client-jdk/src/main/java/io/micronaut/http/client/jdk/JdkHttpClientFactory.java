@@ -17,11 +17,9 @@ package io.micronaut.http.client.jdk;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.client.AbstractHttpClientFactory;
 import io.micronaut.http.client.HttpClientConfiguration;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 
 import java.net.URI;
 
@@ -34,8 +32,8 @@ import java.net.URI;
 @Experimental
 public class JdkHttpClientFactory extends AbstractHttpClientFactory<JdkHttpClient> {
 
-    public JdkHttpClientFactory(@Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry, ConversionService conversionService) {
-        super(mediaTypeCodecRegistry, conversionService);
+    public JdkHttpClientFactory() {
+        super(null, ConversionService.SHARED);
     }
 
     @Override
