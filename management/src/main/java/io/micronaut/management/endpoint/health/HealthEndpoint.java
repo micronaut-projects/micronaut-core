@@ -16,8 +16,11 @@
 package io.micronaut.management.endpoint.health;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.annotation.SingleResult;
+import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.Toggleable;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.management.endpoint.EndpointConfiguration;
@@ -238,4 +241,37 @@ public class HealthEndpoint {
             }
         }
     }
+
+    @Requires(property = ServiceReadyHealthIndicatorConfiguration.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
+    @ConfigurationProperties("service")
+    public static class ServiceReadyHealthIndicatorConfiguration implements Toggleable {
+        public static final String PREFIX = HealthEndpoint.PREFIX + ".service";
+
+        /**
+         * The default enable value.
+         */
+        @SuppressWarnings("WeakerAccess")
+        public static final boolean DEFAULT_ENABLED = true;
+
+        private boolean enabled = DEFAULT_ENABLED;
+
+        /**
+         * Whether {@link io.micronaut.management.health.indicator.service.ServiceReadyHealthIndicator} is enabled. Default is {@value #DEFAULT_ENABLED}.
+         * @return {@code true} Whether {@link io.micronaut.management.health.indicator.service.ServiceReadyHealthIndicator} is enabled.
+         */
+        @Override
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        /**
+         * Whether {@link io.micronaut.management.health.indicator.service.ServiceReadyHealthIndicator} is enabled. Default is {@value #DEFAULT_ENABLED}.
+         *
+         * @param enabled Whether {@link io.micronaut.management.health.indicator.service.ServiceReadyHealthIndicator} is enabled.
+         */
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+    }
+
 }
