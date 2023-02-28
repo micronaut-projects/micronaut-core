@@ -17,6 +17,7 @@ package io.micronaut.http.client.jdk;
 
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
@@ -62,6 +63,7 @@ import static io.micronaut.http.client.exceptions.HttpClientExceptionUtils.popul
  * @author Tim Yates
  * @since 4.0.0
  */
+@Internal
 @Experimental
 abstract class AbstractJdkHttpClient {
 

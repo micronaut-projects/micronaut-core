@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.client.jdk;
 
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionContext;
@@ -39,6 +41,8 @@ import java.util.Optional;
  * @since 4.0.0
  * @param <O> Body Type
  */
+@Internal
+@Experimental
 public class HttpResponseAdapter<O> implements HttpResponse<O> {
 
     private final java.net.http.HttpResponse<byte[]> httpResponse;
