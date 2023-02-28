@@ -29,7 +29,6 @@ import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
-import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
@@ -44,8 +43,6 @@ import java.net.http.HttpResponse;
 @Experimental
 public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements BlockingHttpClient {
 
-    private static final Logger LOG = LoggerFactory.getLogger(JdkBlockingHttpClient.class);
-
     public JdkBlockingHttpClient(
         LoadBalancer loadBalancer,
         HttpVersionSelection httpVersion,
@@ -57,7 +54,18 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
         ConversionService conversionService,
         JdkClientSslBuilder sslBuilder
     ) {
-        super(LOG, loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, requestBinderRegistry, clientId, conversionService, sslBuilder);
+        super(
+            configuration.getLoggerName().map(LoggerFactory::getLogger).orElseGet(() -> LoggerFactory.getLogger(JdkBlockingHttpClient.class)),
+            loadBalancer,
+            httpVersion,
+            configuration,
+            contextPath,
+            mediaTypeCodecRegistry,
+            requestBinderRegistry,
+            clientId,
+            conversionService,
+            sslBuilder
+        );
     }
 
     @Override
@@ -66,14 +74,14 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
                                               Argument<E> errorType) {
         var httpRequest = mapToHttpRequest(request, bodyType).blockFirst();
         try {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
+            if (log.isDebugEnabled()) {
+                log.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
             }
             HttpResponse<byte[]> httpResponse = client.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
             boolean errorStatus = httpResponse.statusCode() >= 400;
             if (errorStatus && configuration.isExceptionOnErrorStatus()) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Client {} Received HTTP Response: {} {}", clientId, httpResponse.statusCode(), httpResponse.uri());
+                if (log.isErrorEnabled()) {
+                    log.error("Client {} Received HTTP Response: {} {}", clientId, httpResponse.statusCode(), httpResponse.uri());
                 }
                 throw HttpClientExceptionUtils.populateServiceId(new HttpClientResponseException(HttpStatus.valueOf(httpResponse.statusCode()).getReason(), response(httpResponse, bodyType)), clientId, configuration);
             }

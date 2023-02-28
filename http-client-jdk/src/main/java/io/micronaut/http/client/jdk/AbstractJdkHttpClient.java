@@ -77,7 +77,7 @@ abstract class AbstractJdkHttpClient {
     protected final String clientId;
     protected final ConversionService conversionService;
     protected final JdkClientSslBuilder sslBuilder;
-    private final Logger log;
+    protected final Logger log;
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
 
     /**

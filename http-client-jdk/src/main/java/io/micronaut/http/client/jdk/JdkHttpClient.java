@@ -41,7 +41,6 @@ import io.micronaut.json.codec.JsonMediaTypeCodec;
 import io.micronaut.json.codec.JsonStreamMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
 import org.reactivestreams.Publisher;
-import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Mono;
 
@@ -56,8 +55,6 @@ import java.net.URI;
 @Experimental
 public class JdkHttpClient extends AbstractJdkHttpClient implements HttpClient {
 
-    private static final Logger LOG = LoggerFactory.getLogger(JdkHttpClient.class);
-
     public JdkHttpClient(
         @Nullable LoadBalancer loadBalancer,
         HttpVersionSelection httpVersion,
@@ -69,7 +66,18 @@ public class JdkHttpClient extends AbstractJdkHttpClient implements HttpClient {
         ConversionService conversionService,
         JdkClientSslBuilder sslBuilder
     ) {
-        super(LOG, loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, requestBinderRegistry, clientId, conversionService, sslBuilder);
+        super(
+            configuration.getLoggerName().map(LoggerFactory::getLogger).orElseGet(() -> LoggerFactory.getLogger(JdkHttpClient.class)),
+            loadBalancer,
+            httpVersion,
+            configuration,
+            contextPath,
+            mediaTypeCodecRegistry,
+            requestBinderRegistry,
+            clientId,
+            conversionService,
+            sslBuilder
+        );
     }
 
     public JdkHttpClient(URI uri, ConversionService conversionService) {
@@ -123,17 +131,17 @@ public class JdkHttpClient extends AbstractJdkHttpClient implements HttpClient {
     public <I, O, E> Publisher<HttpResponse<O>> exchange(@NonNull HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType) {
         return mapToHttpRequest(request, bodyType)
             .map(httpRequest -> {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
+                if (log.isDebugEnabled()) {
+                    log.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
                 }
-                if (LOG.isTraceEnabled()) {
-                    httpRequest.headers().map().forEach((k, v) -> LOG.trace("Client {} Sending HTTP Request Header: {}={}", clientId, k, v));
+                if (log.isTraceEnabled()) {
+                    httpRequest.headers().map().forEach((k, v) -> log.trace("Client {} Sending HTTP Request Header: {}={}", clientId, k, v));
                 }
                 return client.sendAsync(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
             })
             .flatMap(Mono::fromCompletionStage)
             .map(netResponse -> {
-                LOG.error("Client {} Received HTTP Response: {} {}", clientId, netResponse.statusCode(), netResponse.uri());
+                log.error("Client {} Received HTTP Response: {} {}", clientId, netResponse.statusCode(), netResponse.uri());
                 boolean errorStatus = netResponse.statusCode() >= 400;
                 if (errorStatus && configuration.isExceptionOnErrorStatus()) {
                     throw HttpClientExceptionUtils.populateServiceId(new HttpClientResponseException(HttpStatus.valueOf(netResponse.statusCode()).getReason(),
