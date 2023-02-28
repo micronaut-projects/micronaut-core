@@ -1676,7 +1676,7 @@ package test
 import io.micronaut.context.annotation.Prototype
 import java.util.List
 
-interface MyRepoX : Repo<MyBeanX, Long>
+interface MyRepoX : RepoX<MyBeanX, Long>
 interface RepoX<E, ID> : GenericRepository<E, ID> {
     fun <S : E> save(ent: S)
 }
