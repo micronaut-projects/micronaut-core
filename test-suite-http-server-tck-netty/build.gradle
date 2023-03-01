@@ -1,5 +1,5 @@
 plugins {
-    id("io.micronaut.build.internal.common")
+    id("io.micronaut.build.internal.convention-base")
     id("org.graalvm.buildtools.native")
 }
 
