@@ -20,22 +20,34 @@ dependencies {
         api files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
     kspTest(project)
+    kspTest platform(libs.test.boms.micronaut.validation)
+    kspTest (libs.micronaut.validation.processor) {
+        exclude group: 'io.micronaut'
+    }
+
     testImplementation project(":jackson-databind")
     testImplementation project(":inject-kotlin-test")
     testImplementation libs.kotlin.stdlib
     testImplementation project(':http-client')
     testImplementation libs.managed.jackson.annotations
-    testImplementation libs.managed.validation
     testImplementation libs.managed.reactor
     testImplementation libs.hibernate
-    testImplementation project(":validation")
+    testImplementation platform(libs.test.boms.micronaut.validation)
+    testImplementation (libs.micronaut.validation) {
+        exclude group: 'io.micronaut'
+    }
+    testImplementation (libs.micronaut.validation.processor) {
+        exclude group: 'io.micronaut'
+    }
     testImplementation libs.javax.persistence
     testImplementation project(":runtime")
     testImplementation(libs.neo4j.bolt)
     testImplementation libs.kotlinx.coroutines.core
     testImplementation libs.kotlinx.coroutines.jdk8
     testImplementation libs.kotlinx.coroutines.rx2
-    testImplementation libs.micronaut.test.junit5
+    testImplementation (libs.micronaut.test.junit5) {
+        exclude group: 'io.micronaut'
+    }
     testImplementation libs.kotlin.kotest.junit5
 }
 

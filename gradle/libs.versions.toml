@@ -44,6 +44,7 @@ micronaut-sql = "4.7.2"
 micronaut-test = "4.0.0-SNAPSHOT"
 micronaut-serde = "2.0.0-SNAPSHOT"
 micronaut-tracing = "5.0.0-SNAPSHOT"
+micronaut-validation = "4.0.0-SNAPSHOT"
 micrometer = "1.10.2"
 neo4j-java-driver = "1.4.5"
 selenium = "4.7.2"
@@ -71,7 +72,6 @@ managed-reactive-streams = "1.0.4"
 managed-reactor = "3.4.24"
 managed-slf4j = "2.0.4"
 managed-snakeyaml = "1.33"
-managed-validation = "2.0.1.Final"
 managed-java-parser-core = "3.24.9"
 managed-ksp = "1.8.0-1.0.9"
 micronaut-docs = "2.0.0"
@@ -81,6 +81,7 @@ micronaut-docs = "2.0.0"
 test-boms-micronaut-aws = { module = "io.micronaut.aws:micronaut-aws-bom", version.ref = "micronaut-aws" }
 test-boms-micronaut-sql = { module = "io.micronaut.sql:micronaut-sql-bom", version.ref = "micronaut-sql" }
 test-boms-micronaut-tracing = { module = "io.micronaut.tracing:micronaut-tracing-bom", version.ref = "micronaut-tracing" }
+test-boms-micronaut-validation = { module = "io.micronaut.validation:micronaut-validation-bom", version.ref = "micronaut-validation" }
 
 boms-groovy = { module = "org.apache.groovy:groovy-bom", version.ref = "managed-groovy" }
 boms-netty = { module = "io.netty:netty-bom", version.ref = "managed-netty" }
@@ -130,8 +131,6 @@ managed-slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "manag
 managed-logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "managed-logback" }
 
 managed-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "managed-snakeyaml" }
-
-managed-validation = { module = "javax.validation:validation-api", version.ref = "managed-validation" }
 
 #
 # Other libraries are used by Micronaut but will not appear in the BOM
@@ -247,6 +246,9 @@ systemlambda = { module = "com.github.stefanbirkner:system-lambda", version.ref 
 
 micronaut-tracing-jaeger = { module = "io.micronaut.tracing:micronaut-tracing-jaeger" }
 micronaut-tracing-zipkin = { module = "io.micronaut.tracing:micronaut-tracing-zipkin" }
+
+micronaut-validation = { module = "io.micronaut.validation:micronaut-validation" }
+micronaut-validation-processor = { module = "io.micronaut.validation:micronaut-validation-processor" }
 
 testcontainers-spock = { module = "org.testcontainers:spock", version.ref = "testcontainers" }
 
