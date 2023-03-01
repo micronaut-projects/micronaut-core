@@ -22,13 +22,18 @@ dependencies {
     implementation project(":graal")
     implementation project(":http-server-netty")
     implementation project(":http-client")
-    implementation project(":validation")
+    implementation platform(libs.test.boms.micronaut.validation)
+    implementation(libs.micronaut.validation) {
+        exclude group: 'io.micronaut'
+    }
     implementation project(":inject-java")
 
     testAnnotationProcessor libs.bundles.asm
     testAnnotationProcessor project(":inject-java")
-    testImplementation(libs.micronaut.serde.jackson)
-    testImplementation libs.micronaut.test.junit5
+    testImplementation (libs.micronaut.serde.jackson)
+    testImplementation (libs.micronaut.test.junit5) {
+        exclude group: 'io.micronaut'
+    }
 }
 
 tasks.withType(Test).configureEach {
