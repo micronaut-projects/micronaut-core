@@ -1436,9 +1436,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
                 Type declaringTypeRef = JavaModelUtils.getTypeReference(declaringType);
                 String methodDescriptor = getMethodDescriptor(methodElement.getReturnType(), Arrays.asList(methodElement.getParameters()));
-                injectMethodVisitor.visitMethodInsn(isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL,
+                boolean isDeclaringTypeInterface = declaringType.getType().isInterface();
+                injectMethodVisitor.visitMethodInsn(isDeclaringTypeInterface ? INVOKEINTERFACE : INVOKEVIRTUAL,
                         declaringTypeRef.getInternalName(), methodElement.getName(),
-                        methodDescriptor, isInterface);
+                        methodDescriptor, isDeclaringTypeInterface);
 
                 if (!methodElement.getReturnType().isVoid()) {
                     injectMethodVisitor.pop();
