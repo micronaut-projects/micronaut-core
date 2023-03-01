@@ -5,5 +5,3 @@ io.micronaut.context.visitor.ExecutableVisitor
 io.micronaut.context.visitor.ValidationVisitor
 io.micronaut.context.visitor.InternalApiTypeElementVisitor
 io.micronaut.context.visitor.ConfigurationReaderVisitor
-io.micronaut.scheduling.async.validation.AsyncTypeElementVisitor
-
