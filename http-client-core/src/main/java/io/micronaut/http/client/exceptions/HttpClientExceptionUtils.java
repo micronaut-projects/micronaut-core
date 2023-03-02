@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.exceptions;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.ServiceHttpClientConfiguration;
@@ -24,6 +25,7 @@ import io.micronaut.http.client.ServiceHttpClientConfiguration;
  * @author Sergio del Amo
  * @since 4.0.0
  */
+@Internal
 public final class HttpClientExceptionUtils {
 
     private HttpClientExceptionUtils() {
