@@ -36,6 +36,7 @@ import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ClassGenerationException;
 
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -83,14 +84,14 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
     private void processIntrospected(ClassElement element, VisitorContext context, AnnotationValue<Introspected> introspected) {
         final String[] packages = introspected.stringValues("packages");
-        final AnnotationClassValue[] classes = introspected.get("classes", AnnotationClassValue[].class, new AnnotationClassValue[0]);
+        final AnnotationClassValue<?>[] classes = introspected.get("classes", AnnotationClassValue[].class, new AnnotationClassValue[0]);
         final boolean metadata = introspected.booleanValue("annotationMetadata").orElse(true);
         final Set<String> includedAnnotations = CollectionUtils.setOf(introspected.stringValues("includedAnnotations"));
-        final Set<AnnotationValue> indexedAnnotations = CollectionUtils.setOf(introspected.get("indexed", AnnotationValue[].class, new AnnotationValue[0]));
+        final Set<AnnotationValue<Annotation>> indexedAnnotations = CollectionUtils.setOf(introspected.get("indexed", AnnotationValue[].class, new AnnotationValue[0]));
 
         if (ArrayUtils.isNotEmpty(classes)) {
             AtomicInteger index = new AtomicInteger(0);
-            for (AnnotationClassValue aClass : classes) {
+            for (AnnotationClassValue<?> aClass : classes) {
                 context.getClassElement(aClass.getName()).ifPresent(ce -> {
                     if (ce.isPublic() && !isIntrospected(context, ce)) {
                         final AnnotationMetadata typeMetadata = ce.getAnnotationMetadata();
@@ -170,7 +171,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     }
 
     private void processElement(boolean metadata,
-                                Set<AnnotationValue> indexedAnnotations,
+                                Set<AnnotationValue<Annotation>> indexedAnnotations,
                                 ClassElement ce,
                                 BeanIntrospectionWriter writer) {
         PropertyElementQuery query = PropertyElementQuery.of(ce).ignoreSettersWithDifferingType(true);
