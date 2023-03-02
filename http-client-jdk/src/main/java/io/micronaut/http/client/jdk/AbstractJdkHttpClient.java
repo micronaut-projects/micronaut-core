@@ -38,7 +38,7 @@ import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.ClientSslConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import javax.net.ssl.SSLParameters;
 import java.net.Authenticator;
@@ -236,7 +236,7 @@ abstract class AbstractJdkHttpClient {
      * @param <I>      The body type
      * @return A JDK request object
      */
-    protected <I> Flux<HttpRequest> mapToHttpRequest(io.micronaut.http.HttpRequest<I> request, Argument<?> bodyType) {
+    protected <I> Mono<HttpRequest> mapToHttpRequest(io.micronaut.http.HttpRequest<I> request, Argument<?> bodyType) {
         return resolveRequestUri(request)
             .map(uri -> {
                 request.getCookies().getAll().forEach(cookie -> {
@@ -248,23 +248,23 @@ abstract class AbstractJdkHttpClient {
             });
     }
 
-    private Flux<URI> resolveRequestUri(io.micronaut.http.HttpRequest<?> request) {
+    private Mono<URI> resolveRequestUri(io.micronaut.http.HttpRequest<?> request) {
         if (request.getUri().getScheme() != null) {
             // Full request URI, so use that
-            return Flux.just(request.getUri());
+            return Mono.just(request.getUri());
         }
 
         // Otherwise, go and look it up via the LoadBalancer
         return resolveURI(request);
     }
 
-    private <I> Flux<URI> resolveURI(io.micronaut.http.HttpRequest<I> request) {
+    private <I> Mono<URI> resolveURI(io.micronaut.http.HttpRequest<I> request) {
         URI requestURI = request.getUri();
         if (loadBalancer == null) {
-            return Flux.error(populateServiceId(new NoHostException("Request URI specifies no host to connect to"), clientId, configuration));
+            return Mono.error(populateServiceId(new NoHostException("Request URI specifies no host to connect to"), clientId, configuration));
         }
 
-        return Flux.from(loadBalancer.select(request)).map(server -> {
+        return Mono.from(loadBalancer.select(request)).map(server -> {
                 Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
                 if (request instanceof MutableHttpRequest<?> mutableRequest && authInfo.isPresent()) {
                     mutableRequest.getHeaders().auth(authInfo.get());

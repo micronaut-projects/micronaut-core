@@ -72,7 +72,7 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
     public <I, O, E> io.micronaut.http.HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request,
                                               Argument<O> bodyType,
                                               Argument<E> errorType) {
-        var httpRequest = mapToHttpRequest(request, bodyType).blockFirst();
+        var httpRequest = mapToHttpRequest(request, bodyType).block();
         try {
             if (log.isDebugEnabled()) {
                 log.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
