@@ -1,6 +1,6 @@
 To use an implementation based on https://openjdk.org/groups/net/httpclient/intro.html[Java HTTP Client], add the following dependency to your build:
 
-dependency:micronaut-http-client-javanet[]
+dependency:micronaut-http-client-jdk[]
 
 NOTE: This implementation of the Micronaut HTTP Client is available since Micronaut Framework 4.0.
 

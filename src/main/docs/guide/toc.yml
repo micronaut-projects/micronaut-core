@@ -163,8 +163,8 @@ httpClient:
   httpClientImplementations:
     title: HTTP Client Implementations
     nettyHttpClient: HTTP Client based on Netty
-    javanetClient:
-      title: HTTP Client based on Java HTTP Client
+    jdkHttpClient:
+      title: HTTP Client based on the Java HTTP Client
   lowLevelOrHighLevel: Low-Level and High-Level APIs
   lowLevelHttpClient:
     title: Using the Low-Level HTTP Client
