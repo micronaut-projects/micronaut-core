@@ -1,6 +1,17 @@
 plugins {
-    id("io.micronaut.build.internal.convention-base")
+    id "java"
     id("org.graalvm.buildtools.native")
+}
+
+
+repositories {
+    mavenCentral()
+    maven {
+        url "https://s01.oss.sonatype.org/content/repositories/snapshots/"
+        mavenContent {
+            snapshotsOnly()
+        }
+    }
 }
 
 micronautBuild {
@@ -56,6 +67,7 @@ graalvmNative {
     }
     binaries {
         all {
+            resources.autodetect()
             openGraalModules.each { module ->
                 jvmArgs.add("--add-exports=" + module + "=ALL-UNNAMED")
             }
