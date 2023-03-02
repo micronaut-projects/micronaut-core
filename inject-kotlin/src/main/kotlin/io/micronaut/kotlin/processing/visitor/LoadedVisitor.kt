@@ -48,48 +48,52 @@ internal class LoadedVisitor(
                 .map { it.resolve() }
                 .find {
                     it.declaration.qualifiedName?.asString() == tevClassName
-                } ?: throw ProcessingException(
-                visitorContext.elementFactory.newClassElement(declaration),
-                "The visitor [$declaration] doesn't implement $tevClassName"
-            )
-            val classArgument = reference.arguments[0].type ?: throw ProcessingException(
-                visitorContext.elementFactory.newClassElement(declaration),
-                "Cannot determine the class type argument of the visitor: $declaration"
-            )
-            val elementArgument = reference.arguments[1].type ?: throw ProcessingException(
-                visitorContext.elementFactory.newClassElement(declaration),
-                "Cannot determine the element type argument of the visitor: $declaration"
-            )
-            classAnnotation = getType(classArgument.resolve(), visitor.classType)
-            elementAnnotation = getType(elementArgument.resolve(), visitor.elementType)
-        } else {
-            val classes = GenericTypeUtils.resolveInterfaceTypeArguments(
-                javaClass,
-                TypeElementVisitor::class.java
-            )
-            if (classes != null && classes.size == 2) {
-                val classGeneric = classes[0]
-                classAnnotation = if (classGeneric == Any::class.java) {
-                    visitor.classType
-                } else {
-                    classGeneric.name
-                }
-                val elementGeneric = classes[1]
-                elementAnnotation = if (elementGeneric == Any::class.java) {
-                    visitor.elementType
-                } else {
-                    elementGeneric.name
-                }
-            } else {
-                classAnnotation = Any::class.java.name
-                elementAnnotation = Any::class.java.name
             }
+            if (reference == null) {
+                resolveFromClassDeclaration(javaClass)
+            } else {
+
+                val classArgument = reference.arguments[0].type
+                val elementArgument = reference.arguments[1].type
+                if (classArgument != null && elementArgument != null) {
+                    classAnnotation = getType(classArgument.resolve(), visitor.classType)
+                    elementAnnotation = getType(elementArgument.resolve(), visitor.elementType)
+                } else {
+                    resolveFromClassDeclaration(javaClass)
+                }
+            }
+        } else {
+            resolveFromClassDeclaration(javaClass)
         }
         if (classAnnotation == ANY) {
             classAnnotation = Object::class.java.name
         }
         if (elementAnnotation == ANY) {
             elementAnnotation = Object::class.java.name
+        }
+    }
+
+    private fun resolveFromClassDeclaration(javaClass: Class<TypeElementVisitor<*, *>>) {
+        val classes = GenericTypeUtils.resolveInterfaceTypeArguments(
+            javaClass,
+            TypeElementVisitor::class.java
+        )
+        if (classes != null && classes.size == 2) {
+            val classGeneric = classes[0]
+            classAnnotation = if (classGeneric == Any::class.java) {
+                visitor.classType
+            } else {
+                classGeneric.name
+            }
+            val elementGeneric = classes[1]
+            elementAnnotation = if (elementGeneric == Any::class.java) {
+                visitor.elementType
+            } else {
+                elementGeneric.name
+            }
+        } else {
+            classAnnotation = Any::class.java.name
+            elementAnnotation = Any::class.java.name
         }
     }
 
