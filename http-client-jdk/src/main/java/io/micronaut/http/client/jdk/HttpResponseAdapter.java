@@ -103,8 +103,7 @@ public class HttpResponseAdapter<O> implements HttpResponse<O> {
             } else {
                 Optional<MediaTypeCodec> foundCodec = mediaTypeCodecRegistry.findCodec(contentType);
                 if (foundCodec.isPresent()) {
-                    MediaTypeCodec codec = foundCodec.get();
-                    return Optional.of(codec.decode(type, bytes));
+                    return foundCodec.map(codec -> codec.decode(type, bytes));
                 }
             }
         }
