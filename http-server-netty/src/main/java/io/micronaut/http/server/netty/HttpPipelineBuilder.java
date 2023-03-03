@@ -160,13 +160,20 @@ final class HttpPipelineBuilder {
 
         @Nullable
         private final SslHandler sslHandler;
+        private final boolean https;
 
         private final NettyServerCustomizer connectionCustomizer;
 
-        ConnectionPipeline(Channel channel, boolean ssl) {
+        /**
+         * @param channel The channel of this connection
+         * @param tls     Whether to add a TLS handler
+         * @param https   Whether this connection is HTTPS (usually same as {@code tls}, except for HTTP/3)
+         */
+        ConnectionPipeline(Channel channel, boolean tls, boolean https) {
             this.channel = channel;
             this.pipeline = channel.pipeline();
-            this.sslHandler = ssl ? sslContext.newHandler(channel.alloc()) : null;
+            this.sslHandler = tls ? sslContext.newHandler(channel.alloc()) : null;
+            this.https = https;
             this.connectionCustomizer = serverCustomizer.specializeForChannel(channel, NettyServerCustomizer.ChannelRole.CONNECTION);
         }
 
@@ -250,11 +257,10 @@ final class HttpPipelineBuilder {
 
             pipeline.addLast(Http3.newQuicServerCodecBuilder()
                 .sslContext(quicSslContext)
-                // todo
-                .initialMaxData(10000000)
-                .initialMaxStreamDataBidirectionalLocal(1000000)
-                .initialMaxStreamDataBidirectionalRemote(1000000)
-                .initialMaxStreamsBidirectional(100)
+                .initialMaxData(server.getServerConfiguration().getHttp3().getInitialMaxData())
+                .initialMaxStreamDataBidirectionalLocal(server.getServerConfiguration().getHttp3().getInitialMaxStreamDataBidirectionalLocal())
+                .initialMaxStreamDataBidirectionalRemote(server.getServerConfiguration().getHttp3().getInitialMaxStreamDataBidirectionalRemote())
+                .initialMaxStreamsBidirectional(server.getServerConfiguration().getHttp3().getInitialMaxStreamsBidirectional())
                 .tokenHandler(QuicTokenHandlerImpl.create(channel.alloc()))
                 .handler(new ChannelInitializer<Channel>() {
                     @Override
@@ -263,7 +269,7 @@ final class HttpPipelineBuilder {
                         ch.pipeline().addLast(new Http3ServerConnectionHandler(new ChannelInitializer<QuicStreamChannel>() {
                             @Override
                             protected void initChannel(@NonNull QuicStreamChannel ch) throws Exception {
-                                StreamPipeline streamPipeline = new StreamPipeline(ch, ssl, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
+                                StreamPipeline streamPipeline = new StreamPipeline(ch, sslHandler, https, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
                                 streamPipeline.insertHttp3FrameHandlers();
                                 streamPipeline.streamCustomizer.onStreamPipelineBuilt();
                             }
@@ -317,7 +323,7 @@ final class HttpPipelineBuilder {
 
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_SERVER_CODEC, createServerCodec());
 
-            new StreamPipeline(channel, sslHandler, connectionCustomizer).insertHttp1DownstreamHandlers();
+            new StreamPipeline(channel, sslHandler, https, connectionCustomizer).insertHttp1DownstreamHandlers();
 
             connectionCustomizer.onInitialPipelineBuilt();
             connectionCustomizer.onStreamPipelineBuilt();
@@ -334,7 +340,7 @@ final class HttpPipelineBuilder {
             pipeline.addLast(new Http2MultiplexHandler(new ChannelInitializer<Channel>() {
                 @Override
                 protected void initChannel(@NonNull Channel ch) {
-                    StreamPipeline streamPipeline = new StreamPipeline(ch, sslHandler, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
+                    StreamPipeline streamPipeline = new StreamPipeline(ch, sslHandler, https, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
                     streamPipeline.insertHttp2FrameHandlers();
                     streamPipeline.streamCustomizer.onStreamPipelineBuilt();
                 }
@@ -417,7 +423,7 @@ final class HttpPipelineBuilder {
                     return new Http2ServerUpgradeCodec(connectionHandler, new Http2MultiplexHandler(new ChannelInitializer<Http2StreamChannel>() {
                         @Override
                         protected void initChannel(@NonNull Http2StreamChannel ch) {
-                            StreamPipeline streamPipeline = new StreamPipeline(ch, sslHandler, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
+                            StreamPipeline streamPipeline = new StreamPipeline(ch, sslHandler, https, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
                             streamPipeline.insertHttp2FrameHandlers();
                             streamPipeline.streamCustomizer.onStreamPipelineBuilt();
                         }
@@ -456,7 +462,7 @@ final class HttpPipelineBuilder {
 
                     // reconfigure for http1
                     // note: we have to reuse the serverCodec in case it still has some data buffered
-                    new StreamPipeline(channel, sslHandler, connectionCustomizer).insertHttp1DownstreamHandlers();
+                    new StreamPipeline(channel, sslHandler, https, connectionCustomizer).insertHttp1DownstreamHandlers();
                     connectionCustomizer.onStreamPipelineBuilt();
                     onRequestPipelineBuilt();
                     cp.fireChannelRead(ReferenceCountUtil.retain(msg));
@@ -483,18 +489,20 @@ final class HttpPipelineBuilder {
         private final ChannelPipeline pipeline;
         @Nullable
         private final SslHandler sslHandler;
+        private final boolean https;
 
         private final NettyServerCustomizer streamCustomizer;
 
-        private StreamPipeline(Channel channel, @Nullable SslHandler sslHandler, NettyServerCustomizer streamCustomizer) {
+        private StreamPipeline(Channel channel, @Nullable SslHandler sslHandler, boolean https, NettyServerCustomizer streamCustomizer) {
             this.channel = channel;
             this.pipeline = channel.pipeline();
             this.sslHandler = sslHandler;
+            this.https = https;
             this.streamCustomizer = streamCustomizer;
         }
 
         void initializeChildPipelineForPushPromise(Channel childChannel) {
-            StreamPipeline promisePipeline = new StreamPipeline(childChannel, sslHandler, streamCustomizer.specializeForChannel(childChannel, NettyServerCustomizer.ChannelRole.PUSH_PROMISE_STREAM));
+            StreamPipeline promisePipeline = new StreamPipeline(childChannel, sslHandler, https, streamCustomizer.specializeForChannel(childChannel, NettyServerCustomizer.ChannelRole.PUSH_PROMISE_STREAM));
             promisePipeline.insertHttp2FrameHandlers();
             promisePipeline.streamCustomizer.onStreamPipelineBuilt();
         }
@@ -546,7 +554,7 @@ final class HttpPipelineBuilder {
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, new HttpStreamsServerHandler());
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK, new ChunkedWriteHandler());
             pipeline.addLast(HttpRequestDecoder.ID, requestDecoder);
-            if (server.getServerConfiguration().isDualProtocol() && server.getServerConfiguration().isHttpToHttpsRedirect() && sslHandler == null) {
+            if (server.getServerConfiguration().isDualProtocol() && server.getServerConfiguration().isHttpToHttpsRedirect() && !https) {
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_TO_HTTPS_REDIRECT, new HttpToHttpsRedirectHandler(sslConfiguration, hostResolver));
             }
             if (sslHandler != null) {
@@ -574,7 +582,7 @@ final class HttpPipelineBuilder {
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_FLOW_CONTROL, new FlowControlHandler());
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_KEEP_ALIVE, new HttpServerKeepAliveHandler());
 
-            insertMicronautHandlers(!ssl);
+            insertMicronautHandlers(sslHandler == null && !https);
         }
 
         /**

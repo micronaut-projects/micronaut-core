@@ -747,7 +747,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      */
     @Internal
     public void buildEmbeddedChannel(EmbeddedChannel prototype, boolean ssl) {
-        createPipelineBuilder(rootCustomizer, false).new ConnectionPipeline(prototype, ssl).initChannel();
+        createPipelineBuilder(rootCustomizer, false).new ConnectionPipeline(prototype, ssl, ssl).initChannel();
     }
 
     static Predicate<String> inclusionPredicate(NettyHttpServerConfiguration.AccessLogger config) {
@@ -787,7 +787,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         @Override
         protected void initChannel(@NonNull Channel ch) throws Exception {
-            httpPipelineBuilder.new ConnectionPipeline(ch, config.isSsl()).initChannel();
+            httpPipelineBuilder.new ConnectionPipeline(ch, config.isSsl(), config.isSsl()).initChannel();
         }
     }
 
@@ -800,7 +800,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         protected void initChannel(Channel ch) throws Exception {
             // udp does not have connection channels
             setServerChannel(ch);
-            httpPipelineBuilder.new ConnectionPipeline(ch, true).initHttp3Channel();
+            httpPipelineBuilder.new ConnectionPipeline(ch, false, true).initHttp3Channel();
         }
     }
 

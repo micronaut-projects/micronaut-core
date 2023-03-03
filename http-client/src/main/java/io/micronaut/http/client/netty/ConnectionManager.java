@@ -1444,18 +1444,12 @@ class ConnectionManager {
                     } else {
                         hf.headers().scheme(HttpScheme.HTTP.name());
                     }
-                    // todo https://github.com/netty/netty-incubator-codec-http3/pull/213
-                    if (requestKey.getPort() == 443) {
-                        hf.headers().authority(requestKey.getHost());
-                    } else {
-                        hf.headers().authority(requestKey.getHost() + ":" + requestKey.getPort());
-                    }
                 }
             }
 
             @Override
             void addTimeoutHandlers() {
-                //addTimeoutHandlers(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION); todo
+                addTimeoutHandlers(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION);
             }
 
             @Override

@@ -130,6 +130,38 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_JSON_BUFFER_MAX_COMPONENTS = 4096;
+    /**
+     * Default value for {@link Http3Settings#getInitialMaxData()}.
+     *
+     * @since 4.0.0
+     */
+    @Experimental
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_HTTP3_INITIAL_MAX_DATA = 10000000;
+    /**
+     * Default value for {@link Http3Settings#getInitialMaxStreamDataBidirectionalLocal()}.
+     *
+     * @since 4.0.0
+     */
+    @Experimental
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_HTTP3_INITIAL_MAX_STREAM_DATA_BIDIRECTIONAL_LOCAL = 1000000;
+    /**
+     * Default value for {@link Http3Settings#getInitialMaxStreamDataBidirectionalRemote()}.
+     *
+     * @since 4.0.0
+     */
+    @Experimental
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_HTTP3_INITIAL_MAX_STREAM_DATA_BIDIRECTIONAL_REMOTE = 1000000;
+    /**
+     * Default value for {@link Http3Settings#getInitialMaxStreamsBidirectional()}.
+     *
+     * @since 4.0.0
+     */
+    @Experimental
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_HTTP3_INITIAL_MAX_STREAMS_BIDIRECTIONAL = 100;
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServerConfiguration.class);
 
@@ -154,6 +186,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private String fallbackProtocol = ApplicationProtocolNames.HTTP_1_1;
     private AccessLogger accessLogger;
     private Http2Settings http2Settings = new Http2Settings();
+    private Http3Settings http3Settings = new Http3Settings();
     private boolean keepAliveOnServerError = DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR;
     private String pcapLoggingPathPattern = null;
     private List<NettyListenerConfiguration> listeners = null;
@@ -217,6 +250,26 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     public void setHttp2(Http2Settings http2) {
         if (http2 != null) {
             this.http2Settings = http2;
+        }
+    }
+
+    /**
+     * Returns the Http3Settings.
+     * @return The Http3Settings.
+     */
+    @Experimental
+    public Http3Settings getHttp3() {
+        return http3Settings;
+    }
+
+    /**
+     * Sets the Http3Settings.
+     * @param http3Settings The Http3Settings.
+     */
+    @Experimental
+    public void setHttp3Settings(Http3Settings http3Settings) {
+        if (http3Settings != null) {
+            this.http3Settings = http3Settings;
         }
     }
 
@@ -774,6 +827,87 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
             if (value != null) {
                 settings.maxHeaderListSize(value);
             }
+        }
+    }
+
+    @ConfigurationProperties("http3")
+    @Experimental
+    public static final class Http3Settings {
+        private int initialMaxData = DEFAULT_HTTP3_INITIAL_MAX_DATA;
+        private int initialMaxStreamDataBidirectionalLocal = DEFAULT_HTTP3_INITIAL_MAX_STREAM_DATA_BIDIRECTIONAL_LOCAL;
+        private int initialMaxStreamDataBidirectionalRemote = DEFAULT_HTTP3_INITIAL_MAX_STREAM_DATA_BIDIRECTIONAL_REMOTE;
+        private int initialMaxStreamsBidirectional = DEFAULT_HTTP3_INITIAL_MAX_STREAMS_BIDIRECTIONAL;
+
+        /**
+         * QUIC initial_max_data setting, see RFC 9000.
+         *
+         * @return The initial_max_data setting
+         */
+        public int getInitialMaxData() {
+            return initialMaxData;
+        }
+
+        /**
+         * QUIC initial_max_data setting, see RFC 9000.
+         *
+         * @param initialMaxData The initial_max_data setting
+         */
+        public void setInitialMaxData(int initialMaxData) {
+            this.initialMaxData = initialMaxData;
+        }
+
+        /**
+         * QUIC initial_max_stream_data_bidi_local setting, see RFC 9000.
+         *
+         * @return The initial_max_stream_data_bidi_local setting
+         */
+        public int getInitialMaxStreamDataBidirectionalLocal() {
+            return initialMaxStreamDataBidirectionalLocal;
+        }
+
+        /**
+         * QUIC initial_max_stream_data_bidi_local setting, see RFC 9000.
+         *
+         * @param initialMaxStreamDataBidirectionalLocal The initial_max_stream_data_bidi_local setting
+         */
+        public void setInitialMaxStreamDataBidirectionalLocal(int initialMaxStreamDataBidirectionalLocal) {
+            this.initialMaxStreamDataBidirectionalLocal = initialMaxStreamDataBidirectionalLocal;
+        }
+
+        /**
+         * QUIC initial_max_stream_data_bidi_remote setting, see RFC 9000.
+         *
+         * @return The initial_max_stream_data_bidi_remote setting
+         */
+        public int getInitialMaxStreamDataBidirectionalRemote() {
+            return initialMaxStreamDataBidirectionalRemote;
+        }
+
+        /**
+         * QUIC initial_max_stream_data_bidi_remote setting, see RFC 9000.
+         *
+         * @param initialMaxStreamDataBidirectionalRemote The initial_max_stream_data_bidi_remote setting
+         */
+        public void setInitialMaxStreamDataBidirectionalRemote(int initialMaxStreamDataBidirectionalRemote) {
+            this.initialMaxStreamDataBidirectionalRemote = initialMaxStreamDataBidirectionalRemote;
+        }
+
+        /**
+         * QUIC initial_max_streams_bidi setting, see RFC 9000.
+         *
+         * @return The initial_max_streams_bidi setting
+         */
+        public int getInitialMaxStreamsBidirectional() {
+            return initialMaxStreamsBidirectional;
+        }
+
+        /**
+         * QUIC initial_max_streams_bidi setting, see RFC 9000.
+         *
+         * @param initialMaxStreamsBidirectional The initial_max_streams_bidi setting
+         */
+        public void setInitialMaxStreamsBidirectional(int initialMaxStreamsBidirectional) {
+            this.initialMaxStreamsBidirectional = initialMaxStreamsBidirectional;
         }
     }
 
