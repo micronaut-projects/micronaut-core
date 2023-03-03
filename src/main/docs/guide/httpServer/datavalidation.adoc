@@ -1,12 +1,8 @@
 It is easy to validate incoming data with Micronaut controllers using <<validation, Validation Advice>>.
 
-Micronaut provides native support for the `javax.validation` annotations with the `micronaut-validation` dependency:
+https://micronaut-projects.github.io/micronaut-validation/snapshot/guide/[Micronaut Validation] provides native support for the `javax.validation` annotations.
 
-dependency::micronaut-validation[]
-
-Or full https://beanvalidation.org/2.0/spec/[JSR 380] compliance with the `micronaut-hibernate-validator` dependency:
-
-dependency:micronaut-hibernate-validator[groupId="io.micronaut.beanvalidation"]
+NOTE: https://micronaut-projects.github.io/micronaut-validation/snapshot/guide/[Micronaut Validation] is not 100% compliant with https://beanvalidation.org/2.0/spec/[JSR 380]. If you need 100% compliance, try https://micronaut-projects.github.io/micronaut-hibernate-validator/snapshot/guide/[Micronaut Hibernate Validator].
 
 We can validate parameters using `javax.validation` annotations and the api:validation.Validated[] annotation at the class level.
 

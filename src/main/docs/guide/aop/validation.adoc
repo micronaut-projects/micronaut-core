@@ -2,12 +2,6 @@ Validation advice is one of the most common advice types you are likely to want 
 
 Validation advice is built on https://beanvalidation.org/2.0/spec/[Bean Validation JSR 380], a specification of the Java API for bean validation which ensures that the properties of a bean meet specific criteria, using `javax.validation` annotations such as `@NotNull`, `@Min`, and `@Max`.
 
-Micronaut provides native support for the `javax.validation` annotations with the `micronaut-validation` dependency:
+https://micronaut-projects.github.io/micronaut-validation/snapshot/guide/[Micronaut Validation] provides native support for the `javax.validation` annotations.
 
-dependency::micronaut-validation[]
-
-Or full https://beanvalidation.org/2.0/spec/[JSR 380] compliance with the `micronaut-hibernate-validator` dependency:
-
-dependency::micronaut-hibernate-validator[]
-
-See the section on <<beanValidation, Bean Validation>> for more information on how to apply validation rules to your bean classes.
+NOTE: https://micronaut-projects.github.io/micronaut-validation/snapshot/guide/[Micronaut Validation] is not 100% compliant with https://beanvalidation.org/2.0/spec/[JSR 380]. If you need 100% compliance, try https://micronaut-projects.github.io/micronaut-hibernate-validator/snapshot/guide/[Micronaut Hibernate Validator].

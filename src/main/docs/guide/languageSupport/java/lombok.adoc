@@ -41,8 +41,8 @@ Or if using Maven:
     <version>${micronaut.version}</version>
   </path>
     <path>
-    <groupId>io.micronaut</groupId>
-    <artifactId>micronaut-validation</artifactId>
+    <groupId>io.micronaut.validation</groupId>
+    <artifactId>micronaut-validation-processor</artifactId>
     <version>${micronaut.version}</version>
   </path>
 </annotationProcessorPaths>
