@@ -15,24 +15,30 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.stream.Stream;
 
-import static javax.lang.model.element.Modifier.*;
+import static javax.lang.model.element.Modifier.ABSTRACT;
+import static javax.lang.model.element.Modifier.STATIC;
 import static javax.lang.model.type.TypeKind.NONE;
 
 /**
@@ -61,6 +67,30 @@ public class ModelUtils {
      */
     public Types getTypeUtils() {
         return typeUtils;
+    }
+
+    /**
+     * Resolves type elements from the provided annotated elements.
+     *
+     * @param annotatedElements The elements to process
+     * @return the type elements
+     */
+    public Stream<TypeElement> resolveTypeElements(Set<? extends Element> annotatedElements) {
+        return annotatedElements
+            .stream()
+            .map(element -> {
+                if (element instanceof ExecutableElement executableElement) {
+                    return executableElement.getEnclosingElement();
+                }
+                if (element instanceof VariableElement variableElement) {
+                    return variableElement.getEnclosingElement();
+                }
+                return element;
+            })
+            .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element) || JavaModelUtils.isRecord(element))
+            .map(this::classElementFor)
+            .filter(Objects::nonNull)
+            .filter(element -> element.getAnnotation(Generated.class) == null);
     }
 
     /**
