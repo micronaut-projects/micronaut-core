@@ -30,19 +30,19 @@ import java.net.URI;
  */
 @Internal
 @Experimental
-public class JdkHttpClientFactory extends AbstractHttpClientFactory<JdkHttpClient> {
+public class JdkHttpClientFactory extends AbstractHttpClientFactory<DefaultJdkHttpClient> {
 
     public JdkHttpClientFactory() {
         super(null, ConversionService.SHARED);
     }
 
     @Override
-    protected JdkHttpClient createHttpClient(URI uri) {
-        return new JdkHttpClient(uri, conversionService);
+    protected DefaultJdkHttpClient createHttpClient(URI uri) {
+        return new DefaultJdkHttpClient(uri, conversionService);
     }
 
     @Override
-    protected JdkHttpClient createHttpClient(URI uri, HttpClientConfiguration configuration) {
-        return new JdkHttpClient(uri, configuration, mediaTypeCodecRegistry, conversionService);
+    protected DefaultJdkHttpClient createHttpClient(URI uri, HttpClientConfiguration configuration) {
+        return new DefaultJdkHttpClient(uri, configuration, mediaTypeCodecRegistry, conversionService);
     }
 }

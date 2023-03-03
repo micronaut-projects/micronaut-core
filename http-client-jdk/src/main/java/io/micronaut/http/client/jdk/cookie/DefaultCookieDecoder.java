@@ -13,17 +13,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client.jdk;
+package io.micronaut.http.client.jdk.cookie;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.http.client.HttpClient;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.cookie.Cookies;
+import jakarta.inject.Singleton;
+
+import java.util.Optional;
 
 /**
- * Marker interface for {@link io.micronaut.http.client.HttpClient} implementations that use the {@literal java.net.http.*} HTTP Client.
+ * Default implementation of {@link CookieDecoder} that returns the cookies from the request.
  *
  * @since 4.0.0
  * @author Tim Yates
  */
+@Singleton
 @Experimental
-public interface JdkHttpClient extends HttpClient {
+@Internal
+public class DefaultCookieDecoder implements CookieDecoder {
+
+    @Override
+    public Optional<Cookies> decode(HttpRequest<?> request) {
+        return Optional.of(request.getCookies());
+    }
+
+    @Override
+    public int getOrder() {
+        return NettyCookieDecoder.ORDER + 1;
+    }
 }

@@ -11,6 +11,7 @@ micronautBuild {
 dependencies {
     annotationProcessor(projects.injectJava)
     api(projects.httpClientCore)
+    compileOnly(projects.httpClient)
     implementation(libs.managed.reactor)
     testImplementation(projects.jacksonDatabind)
     testImplementation(projects.httpServerNetty)

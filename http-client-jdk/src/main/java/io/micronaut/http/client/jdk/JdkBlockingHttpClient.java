@@ -28,6 +28,7 @@ import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.client.jdk.cookie.CookieDecoder;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import org.slf4j.LoggerFactory;
 
@@ -52,7 +53,8 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
         RequestBinderRegistry requestBinderRegistry,
         String clientId,
         ConversionService conversionService,
-        JdkClientSslBuilder sslBuilder
+        JdkClientSslBuilder sslBuilder,
+        CookieDecoder cookieDecoder
     ) {
         super(
             configuration.getLoggerName().map(LoggerFactory::getLogger).orElseGet(() -> LoggerFactory.getLogger(JdkBlockingHttpClient.class)),
@@ -64,7 +66,8 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
             requestBinderRegistry,
             clientId,
             conversionService,
-            sslBuilder
+            sslBuilder,
+            cookieDecoder
         );
     }
 

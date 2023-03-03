@@ -26,6 +26,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.Order;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.util.StringUtils;
@@ -41,6 +42,9 @@ import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.client.jdk.cookie.CompositeCookieDecoder;
+import io.micronaut.http.client.jdk.cookie.CookieDecoder;
+import io.micronaut.http.client.jdk.cookie.DefaultCookieDecoder;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.inject.InjectionPoint;
@@ -65,13 +69,14 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Factory
 @BootstrapContextCompatible
+@Order(2) // If both this and the netty client are present, netty is the default.
 @Internal
 @Experimental
 public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpClientRegistry<HttpClient> {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultJdkHttpClientRegistry.class);
 
-    private final Map<ClientKey, HttpClient> clients = new ConcurrentHashMap<>(10);
+    private final Map<ClientKey, DefaultJdkHttpClient> clients = new ConcurrentHashMap<>(10);
     private final BeanContext beanContext;
     private final LoadBalancerResolver loadBalancerResolver;
     private final HttpClientConfiguration defaultHttpClientConfiguration;
@@ -80,6 +85,7 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final BeanProvider<RequestBinderRegistry> requestBinderRegistryProvider;
     private final JdkClientSslBuilder jdkClientSslBuilder;
+    private final CookieDecoder cookieDecoder;
 
     public DefaultJdkHttpClientRegistry(
         BeanContext beanContext,
@@ -87,7 +93,8 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
         JsonMapper jsonMapper,
         @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
         BeanProvider<RequestBinderRegistry> requestBinderRegistryProvider,
-        BeanProvider<JdkClientSslBuilder> sslBuilderBeanProvider
+        BeanProvider<JdkClientSslBuilder> sslBuilderBeanProvider,
+        BeanProvider<CookieDecoder> cookieDecoderBeanProvider
     ) {
         this.beanContext = beanContext;
         this.loadBalancerResolver = loadBalancerResolver;
@@ -96,6 +103,7 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.requestBinderRegistryProvider = requestBinderRegistryProvider;
         this.jdkClientSslBuilder = sslBuilderBeanProvider.orElse(new JdkClientSslBuilder(new ResourceResolver()));
+        this.cookieDecoder = cookieDecoderBeanProvider.orElse(new CompositeCookieDecoder(List.of(new DefaultCookieDecoder())));
     }
 
     private static MediaTypeCodec createNewJsonCodec(BeanContext beanContext, JsonFeatures jsonFeatures) {
@@ -118,7 +126,8 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
     @Bean
     @BootstrapContextCompatible
     @Primary
-    protected HttpClient httpClient(
+    @Order(2) // If both this and the netty client are present, netty is the default.
+    protected DefaultJdkHttpClient httpClient(
         @Nullable InjectionPoint<?> injectionPoint,
         @Parameter @Nullable LoadBalancer loadBalancer,
         @Parameter @Nullable HttpClientConfiguration configuration,
@@ -127,7 +136,7 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
         return resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext);
     }
 
-    private HttpClient resolveDefaultHttpClient(
+    private DefaultJdkHttpClient resolveDefaultHttpClient(
         @Nullable InjectionPoint<?> injectionPoint,
         @Nullable LoadBalancer loadBalancer,
         @Nullable HttpClientConfiguration configuration,
@@ -151,7 +160,7 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
     }
 
     @Override
-    public HttpClient getClient(AnnotationMetadata annotationMetadata) {
+    public DefaultJdkHttpClient getClient(AnnotationMetadata annotationMetadata) {
         final ClientKey key = getClientKey(annotationMetadata);
         return getClient(key);
     }
@@ -169,14 +178,14 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
         return new ClientKey(httpVersionSelection, clientId, filterAnnotation, path, configurationClass, jsonFeatures);
     }
 
-    private HttpClient getClient(ClientKey key) {
+    private DefaultJdkHttpClient getClient(ClientKey key) {
         return clients.computeIfAbsent(key, clientKey -> {
-            HttpClient clientBean = null;
+            DefaultJdkHttpClient clientBean = null;
             final String clientId = clientKey.clientId;
             final Class<?> configurationClass = clientKey.configurationClass;
 
             if (clientId != null) {
-                clientBean = this.beanContext.findBean(HttpClient.class, Qualifiers.byName(clientId)).orElse(null);
+                clientBean = (DefaultJdkHttpClient) this.beanContext.findBean(HttpClient.class, Qualifiers.byName(clientId)).orElse(null);
             }
 
             if (configurationClass != null && !HttpClientConfiguration.class.isAssignableFrom(configurationClass)) {
@@ -219,7 +228,7 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
                 }
             }
 
-            JdkHttpClient client = buildClient(loadBalancer, clientKey.httpVersion, configuration, clientId, contextPath, beanContext);
+            DefaultJdkHttpClient client = buildClient(loadBalancer, clientKey.httpVersion, configuration, clientId, contextPath, beanContext);
 
             final JsonFeatures jsonFeatures = clientKey.jsonFeatures;
             if (jsonFeatures != null) {
@@ -241,7 +250,7 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
         });
     }
 
-    private JdkHttpClient buildClient(
+    private DefaultJdkHttpClient buildClient(
         LoadBalancer loadBalancer,
         HttpVersionSelection httpVersion,
         HttpClientConfiguration configuration,
@@ -250,7 +259,7 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
         BeanContext beanContext
     ) {
         ConversionService conversionService = beanContext.getBean(ConversionService.class);
-        return new JdkHttpClient(
+        return new DefaultJdkHttpClient(
             loadBalancer,
             httpVersion,
             configuration,
@@ -259,7 +268,8 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
             requestBinderRegistryProvider.orElse(new DefaultRequestBinderRegistry(conversionService)),
             clientId,
             conversionService,
-            jdkClientSslBuilder
+            jdkClientSslBuilder,
+            cookieDecoder
         );
     }
 

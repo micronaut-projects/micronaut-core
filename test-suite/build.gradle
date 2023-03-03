@@ -38,6 +38,7 @@ dependencies {
     testImplementation project(":http-server-netty")
     testImplementation project(":jackson-databind")
     testImplementation project(":http-client")
+    testImplementation project(":http-client-jdk")
     testImplementation project(":validation")
     testImplementation project(":inject-groovy")
     testImplementation project(":inject-java")

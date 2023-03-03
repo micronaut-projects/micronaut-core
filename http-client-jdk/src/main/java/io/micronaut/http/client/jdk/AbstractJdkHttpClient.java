@@ -31,6 +31,7 @@ import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.NoHostException;
+import io.micronaut.http.client.jdk.cookie.CookieDecoder;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ContextPathUtils;
 import io.micronaut.http.cookie.Cookie;
@@ -57,7 +58,7 @@ import java.util.Optional;
 import static io.micronaut.http.client.exceptions.HttpClientExceptionUtils.populateServiceId;
 
 /**
- * Abstract implementation of {@link JdkHttpClient} that provides common functionality.
+ * Abstract implementation of {@link DefaultJdkHttpClient} that provides common functionality.
  *
  * @author Sergio del Amo
  * @author Tim Yates
@@ -80,6 +81,7 @@ abstract class AbstractJdkHttpClient {
     protected final ConversionService conversionService;
     protected final JdkClientSslBuilder sslBuilder;
     protected final Logger log;
+    protected final CookieDecoder cookieDecoder;
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
 
     /**
@@ -104,8 +106,10 @@ abstract class AbstractJdkHttpClient {
         RequestBinderRegistry requestBinderRegistry,
         String clientId,
         ConversionService conversionService,
-        JdkClientSslBuilder sslBuilder
+        JdkClientSslBuilder sslBuilder,
+        CookieDecoder cookieDecoder
     ) {
+        this.cookieDecoder = cookieDecoder;
         this.log = configuration.getLoggerName().map(LoggerFactory::getLogger).orElse(log);
         this.loadBalancer = loadBalancer;
         this.httpVersion = httpVersion;
@@ -239,10 +243,10 @@ abstract class AbstractJdkHttpClient {
     protected <I> Mono<HttpRequest> mapToHttpRequest(io.micronaut.http.HttpRequest<I> request, Argument<?> bodyType) {
         return resolveRequestUri(request)
             .map(uri -> {
-                request.getCookies().getAll().forEach(cookie -> {
+                cookieDecoder.decode(request).ifPresent(cookies -> cookies.getAll().forEach(cookie -> {
                     HttpCookie newCookie = toJdkCookie(cookie, request, uri.getHost());
                     cookieManager.getCookieStore().add(uri, newCookie);
-                });
+                }));
 
                 return HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry).build();
             });
