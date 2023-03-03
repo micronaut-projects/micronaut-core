@@ -17,6 +17,7 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaClassElement;
 import io.micronaut.annotation.processing.visitor.JavaElementFactory;
+import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import io.micronaut.annotation.processing.visitor.LoadedVisitor;
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Requires;
@@ -251,20 +252,25 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 // Micronaut Data use-case: EntityMapper with a higher priority needs to process entities first
                 // before RepositoryMapper is going to process repositories and read entities
 
+                List<JavaClassElement> javaClassElements = elements.stream()
+                    .map(typeElement -> elementFactory.newSourceClassElement(typeElement, elementAnnotationMetadataFactory))
+                    .toList();
+
                 for (LoadedVisitor loadedVisitor : loadedVisitors) {
-                    for (TypeElement typeElement : elements) {
+                    for (JavaClassElement javaClassElement : javaClassElements) {
                         try {
-                            JavaClassElement javaClassElement = elementFactory.newSourceClassElement(
-                                typeElement,
-                                elementAnnotationMetadataFactory
-                            );
                             if (!loadedVisitor.matchesClass(javaClassElement)) {
                                 continue;
                             }
+                            TypeElement typeElement = javaClassElement.getNativeType().element();
                             String className = typeElement.getQualifiedName().toString();
                             typeElement.accept(new ElementVisitor(javaClassElement, typeElement, Collections.singletonList(loadedVisitor)), className);
                         } catch (ProcessingException e) {
-                            error((Element) e.getOriginatingElement(), e.getMessage());
+                            JavaNativeElement originatingElement = (JavaNativeElement) e.getOriginatingElement();
+                            if (originatingElement == null) {
+                                originatingElement = javaClassElement.getNativeType();
+                            }
+                            error(originatingElement.element(), e.getMessage());
                         } catch (PostponeToNextRoundException e) {
                             // Ignore
                             continue;
@@ -392,7 +398,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         @Override
         public Object visitType(TypeElement classElement, Object o) {
-            if (!classElement.equals(javaClassElement.getNativeTypeElement())) {
+            if (!classElement.equals(javaClassElement.getNativeType().element())) {
                 javaClassElement = javaVisitorContext.getElementFactory().newSourceClassElement(
                     classElement,
                     javaVisitorContext.getElementAnnotationMetadataFactory()

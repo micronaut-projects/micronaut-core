@@ -21,18 +21,21 @@ import com.google.devtools.ksp.symbol.KSType
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.order.Ordered
 import io.micronaut.core.reflect.GenericTypeUtils
+import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.visitor.TypeElementVisitor
 import java.util.*
 
-class LoadedVisitor(val visitor: TypeElementVisitor<*, *>,
-                    val visitorContext: KotlinVisitorContext): Ordered {
+internal class LoadedVisitor(
+    val visitor: TypeElementVisitor<*, *>,
+    val visitorContext: KotlinVisitorContext
+) : Ordered {
 
     companion object {
         const val ANY = "kotlin.Any"
     }
 
-    var classAnnotation: String = ANY
-    var elementAnnotation: String = ANY
+    private var classAnnotation: String = ANY
+    private var elementAnnotation: String = ANY
 
     init {
         val javaClass = visitor.javaClass
@@ -45,37 +48,52 @@ class LoadedVisitor(val visitor: TypeElementVisitor<*, *>,
                 .map { it.resolve() }
                 .find {
                     it.declaration.qualifiedName?.asString() == tevClassName
-                }!!
-            classAnnotation = getType(reference.arguments[0].type!!.resolve(), visitor.classType)
-            elementAnnotation = getType(reference.arguments[1].type!!.resolve(), visitor.elementType)
-        } else {
-            val classes = GenericTypeUtils.resolveInterfaceTypeArguments(
-                javaClass,
-                TypeElementVisitor::class.java
-            )
-            if (classes != null && classes.size == 2) {
-                val classGeneric = classes[0]
-                classAnnotation = if (classGeneric == Any::class.java) {
-                    visitor.classType
-                } else {
-                    classGeneric.name
-                }
-                val elementGeneric = classes[1]
-                elementAnnotation = if (elementGeneric == Any::class.java) {
-                    visitor.elementType
-                } else {
-                    elementGeneric.name
-                }
-            } else {
-                classAnnotation = Any::class.java.name
-                elementAnnotation = Any::class.java.name
             }
+            if (reference == null) {
+                resolveFromClassDeclaration(javaClass)
+            } else {
+
+                val classArgument = reference.arguments[0].type
+                val elementArgument = reference.arguments[1].type
+                if (classArgument != null && elementArgument != null) {
+                    classAnnotation = getType(classArgument.resolve(), visitor.classType)
+                    elementAnnotation = getType(elementArgument.resolve(), visitor.elementType)
+                } else {
+                    resolveFromClassDeclaration(javaClass)
+                }
+            }
+        } else {
+            resolveFromClassDeclaration(javaClass)
         }
         if (classAnnotation == ANY) {
             classAnnotation = Object::class.java.name
         }
         if (elementAnnotation == ANY) {
             elementAnnotation = Object::class.java.name
+        }
+    }
+
+    private fun resolveFromClassDeclaration(javaClass: Class<TypeElementVisitor<*, *>>) {
+        val classes = GenericTypeUtils.resolveInterfaceTypeArguments(
+            javaClass,
+            TypeElementVisitor::class.java
+        )
+        if (classes != null && classes.size == 2) {
+            val classGeneric = classes[0]
+            classAnnotation = if (classGeneric == Any::class.java) {
+                visitor.classType
+            } else {
+                classGeneric.name
+            }
+            val elementGeneric = classes[1]
+            elementAnnotation = if (elementGeneric == Any::class.java) {
+                visitor.elementType
+            } else {
+                elementGeneric.name
+            }
+        } else {
+            classAnnotation = Any::class.java.name
+            elementAnnotation = Any::class.java.name
         }
     }
 
@@ -101,7 +119,8 @@ class LoadedVisitor(val visitor: TypeElementVisitor<*, *>,
         if (classAnnotation == "java.lang.Object") {
             return true
         }
-        val annotationMetadata = visitorContext.annotationMetadataBuilder.buildDeclared(classDeclaration)
+        val annotationMetadata =
+            visitorContext.annotationMetadataBuilder.buildDeclared(classDeclaration)
         return annotationMetadata.hasStereotype(classAnnotation)
     }
 

@@ -30,7 +30,8 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.filter.FilterPatternStyle;
-import io.micronaut.http.filter.HttpFilter;
+import io.micronaut.http.filter.FilterRunner;
+import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpServerFilterResolver;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.web.router.exceptions.RoutingException;
@@ -70,15 +71,15 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     private final Set<Integer> exposedPorts;
     private final List<FilterRoute> alwaysMatchesFilterRoutes = new ArrayList<>();
     private final List<FilterRoute> preconditionFilterRoutes = new ArrayList<>();
-    private final Supplier<List<HttpFilter>> alwaysMatchesHttpFilters = SupplierUtil.memoized(() -> {
+    private final Supplier<List<GenericHttpFilter>> alwaysMatchesHttpFilters = SupplierUtil.memoized(() -> {
         if (alwaysMatchesFilterRoutes.isEmpty()) {
             return Collections.emptyList();
         }
-        List<HttpFilter> httpFilters = new ArrayList<>(alwaysMatchesFilterRoutes.size());
+        List<GenericHttpFilter> httpFilters = new ArrayList<>(alwaysMatchesFilterRoutes.size());
         for (FilterRoute filterRoute : alwaysMatchesFilterRoutes) {
             httpFilters.add(filterRoute.getFilter());
         }
-        httpFilters.sort(OrderUtil.COMPARATOR);
+        FilterRunner.sort(httpFilters);
         return httpFilters;
     });
 
@@ -446,11 +447,11 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @NonNull
     @Override
-    public List<HttpFilter> findFilters(@NonNull HttpRequest<?> request) {
+    public List<GenericHttpFilter> findFilters(@NonNull HttpRequest<?> request) {
         if (preconditionFilterRoutes.isEmpty()) {
             return alwaysMatchesHttpFilters.get();
         }
-        List<HttpFilter> httpFilters = new ArrayList<>(alwaysMatchesFilterRoutes.size() + preconditionFilterRoutes.size());
+        List<GenericHttpFilter> httpFilters = new ArrayList<>(alwaysMatchesFilterRoutes.size() + preconditionFilterRoutes.size());
         httpFilters.addAll(alwaysMatchesHttpFilters.get());
         RouteMatch routeMatch = (RouteMatch) request.getAttribute(HttpAttributes.ROUTE_MATCH).filter(o -> o instanceof RouteMatch).orElse(null);
         HttpMethod method = request.getMethod();
@@ -463,7 +464,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             }
             filterRoute.match(method, uri).ifPresent(httpFilters::add);
         }
-        httpFilters.sort(OrderUtil.COMPARATOR);
+        FilterRunner.sort(httpFilters);
         return Collections.unmodifiableList(httpFilters);
     }
 
@@ -541,11 +542,11 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     @Override
-    public List<FilterEntry<HttpFilter>> resolveFilterEntries(RouteMatch<?> routeMatch) {
+    public List<FilterEntry> resolveFilterEntries(RouteMatch<?> routeMatch) {
         if (preconditionFilterRoutes.isEmpty()) {
-            return (List) alwaysMatchesFilterRoutes;
+            return new ArrayList<>(alwaysMatchesFilterRoutes);
         }
-        List<FilterEntry<HttpFilter>> filterEntries = new ArrayList<>(alwaysMatchesFilterRoutes.size() + preconditionFilterRoutes.size());
+        List<FilterEntry> filterEntries = new ArrayList<>(alwaysMatchesFilterRoutes.size() + preconditionFilterRoutes.size());
         filterEntries.addAll(alwaysMatchesFilterRoutes);
         for (FilterRoute filterRoute : preconditionFilterRoutes) {
             if (!matchesFilterMatcher(filterRoute, routeMatch)) {
@@ -557,9 +558,9 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     @Override
-    public List<HttpFilter> resolveFilters(HttpRequest<?> request, List<FilterEntry<HttpFilter>> filterEntries) {
-        List<HttpFilter> httpFilters = new ArrayList<>(filterEntries.size());
-        for (FilterEntry<HttpFilter> entry : filterEntries) {
+    public List<GenericHttpFilter> resolveFilters(HttpRequest<?> request, List<FilterEntry> filterEntries) {
+        List<GenericHttpFilter> httpFilters = new ArrayList<>(filterEntries.size());
+        for (FilterEntry entry : filterEntries) {
             if (entry.hasMethods() && !entry.getFilterMethods().contains(request.getMethod())) {
                 continue;
             }

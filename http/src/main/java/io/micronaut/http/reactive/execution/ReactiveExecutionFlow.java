@@ -88,4 +88,7 @@ public interface ReactiveExecutionFlow<T> extends ExecutionFlow<T> {
     @NonNull
     Publisher<T> toPublisher();
 
+    static <K> Publisher<K> toPublisher(Supplier<ExecutionFlow<K>> flowSupplier) {
+        return (Publisher<K>) ReactorExecutionFlowImpl.toMono(flowSupplier);
+    }
 }

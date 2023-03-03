@@ -17,66 +17,69 @@ package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.symbol.KSValueParameter
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.inject.ast.ArrayableClassElement
 import io.micronaut.inject.ast.ClassElement
-import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.ParameterElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 
-class KotlinParameterElement(
-    private val parameterType: ClassElement,
-    private val methodElement: KotlinMethodElement,
+internal class KotlinParameterElement(
+    private val presetType: ClassElement?,
+    private val methodElement: AbstractKotlinMethodElement<*>,
     private val parameter: KSValueParameter,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext
-) : AbstractKotlinElement<KSValueParameter>(KSValueParameterReference(parameter), elementAnnotationMetadataFactory, visitorContext), ParameterElement {
-    private val internalName : String by lazy {
+) : AbstractKotlinElement<KotlinMethodParameterNativeElement>(
+    KotlinMethodParameterNativeElement(parameter, methodElement.nativeType),
+    elementAnnotationMetadataFactory,
+    visitorContext
+), ParameterElement {
+
+    private val internalName: String by lazy {
         parameter.name!!.asString()
     }
-    private val internalGenericType : ClassElement by lazy {
-        resolveGeneric(
-            methodElement.declaration.parent,
-            parameterType,
-            methodElement.owningType,
-            visitorContext
-        )
+    private val internalType: ClassElement by lazy {
+        presetType ?: newClassElement(nativeType, parameter.type.resolve(), emptyMap())
+    }
+    private val internalGenericType: ClassElement by lazy {
+        if (presetType != null) {
+            if (presetType is KotlinClassElement) {
+                val newCE = newClassElement(
+                    nativeType,
+                    presetType.kotlinType,
+                    methodElement.typeArguments
+                ) as ArrayableClassElement
+                newCE.withArrayDimensions(presetType.arrayDimensions)
+            } else {
+                presetType
+            }
+        } else {
+            newClassElement(nativeType, parameter.type.resolve(), methodElement.typeArguments)
+        }
     }
 
-    override fun isPrimitive(): Boolean {
-        return parameterType.isPrimitive
-    }
+    override fun isPrimitive() = internalType.isPrimitive
 
-    override fun isArray(): Boolean {
-        return parameterType.isArray
-    }
+    override fun isArray() = internalType.isArray
 
-    override fun copyThis(): AbstractKotlinElement<KSValueParameter> {
-        return KotlinParameterElement(
-            parameterType,
-            methodElement,
-            parameter,
-            annotationMetadataFactory,
-            visitorContext
-        )
-    }
+    override fun copyThis() = KotlinParameterElement(
+        presetType,
+        methodElement,
+        parameter,
+        elementAnnotationMetadataFactory,
+        visitorContext
+    )
 
-    override fun getMethodElement(): MethodElement {
-        return methodElement
-    }
+    override fun getMethodElement() = methodElement
 
-    override fun getName(): String {
-        return internalName
-    }
+    override fun getName() = internalName
 
-    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): ParameterElement {
-        return super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as ParameterElement
-    }
+    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata) =
+        super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as ParameterElement
 
-    override fun getType(): ClassElement = parameterType
+    override fun getType() = internalType
 
-    override fun getGenericType(): ClassElement {
-        return internalGenericType
-    }
+    override fun getGenericType() = internalGenericType
 
-    override fun getArrayDimensions(): Int = parameterType.arrayDimensions
+    override fun getArrayDimensions() = internalType.arrayDimensions
 
 }

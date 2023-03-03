@@ -13,12 +13,12 @@ endpoints:
   health:
     enabled: Boolean
     sensitive: Boolean
-    details-visible: String <1>
+    details-visible: String
     status:
       http-mapping: Map<String, HttpStatus>
 ----
 
-<1> One of api:management.endpoint.health.DetailsVisibility[]
+- `details-visible` is one of api:management.endpoint.health.DetailsVisibility[]
 
 The `details-visible` setting controls whether health detail will be exposed to users who are not authenticated.
 
@@ -96,9 +96,12 @@ endpoints:
   health:
     disk-space:
       enabled: Boolean
-      path: String #The file path used to determine the disk space
-      threshold: String | Long #The minimum amount of free space
+      path: String
+      threshold: String | Long
 ----
+
+- `path` specifies the path used to determine the disk space
+- `threshold` specifies the minimum amount of free space
 
 The threshold can be provided as a string like "10MB" or "200KB", or the number of bytes.
 

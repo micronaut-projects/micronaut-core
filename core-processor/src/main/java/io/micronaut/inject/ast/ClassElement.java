@@ -26,6 +26,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 
 import java.lang.reflect.GenericArrayType;
@@ -66,6 +67,20 @@ public interface ClassElement extends TypedElement {
      * @since 3.1.0
      */
     ClassElement[] ZERO_CLASS_ELEMENTS = new ClassElement[0];
+
+    /**
+     * Returns the type annotations.
+     * Added by:
+     * - The declaration of the type variable {@link java.lang.annotation.ElementType#TYPE_PARAMETER}
+     * - The use of the type {@link java.lang.annotation.ElementType#TYPE}
+     * @return the type annotations
+     * @since 4.0.0
+     */
+    @Experimental
+    @NonNull
+    default MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
+        return (MutableAnnotationMetadataDelegate<AnnotationMetadata>) MutableAnnotationMetadataDelegate.EMPTY;
+    }
 
     /**
      * Tests whether one type is assignable to another.
@@ -458,6 +473,43 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
+     * Find an instance/static field with a name in this class, super class or an interface.
+     *
+     * @param name The field name
+     * @return The field
+     * @since 4.0.0
+     */
+    @Experimental
+    @NonNull
+    default Optional<FieldElement> findField(String name) {
+        return getEnclosedElement(ElementQuery.ALL_FIELDS.named(name));
+    }
+
+    /**
+     * Find an instance/static method with a name in this class, super class or an interface.
+     *
+     * @return The methods
+     * @since 4.0.0
+     */
+    @NonNull
+    default List<MethodElement> getMethods() {
+        return getEnclosedElements(ElementQuery.ALL_METHODS);
+    }
+
+    /**
+     * Find a method with a name.
+     *
+     * @param name The method name
+     * @return The method
+     * @since 4.0.0
+     */
+    @NonNull
+    @Experimental
+    default Optional<MethodElement> findMethod(String name) {
+        return getEnclosedElement(ElementQuery.ALL_METHODS.named(name));
+    }
+
+    /**
      * Return the elements that match the given query.
      *
      * @param query The query to use.
@@ -594,6 +646,7 @@ public interface ClassElement extends TypedElement {
      * @since 3.1.0
      */
     @Experimental
+    @Nullable
     default ClassElement foldBoundGenericTypes(@NonNull Function<ClassElement, ClassElement> fold) {
         List<ClassElement> typeArgs = getBoundGenericTypes().stream().map(arg -> arg.foldBoundGenericTypes(fold)).toList();
         if (typeArgs.contains(null)) {

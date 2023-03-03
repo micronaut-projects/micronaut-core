@@ -1147,7 +1147,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @throws IllegalStateException If no member is available that conforms to the given name and type
      */
     @NonNull
-    public final <T> T getRequiredValue(String member, Class<T> type) {
+    public final <T> T  getRequiredValue(String member, Class<T> type) {
         return get(member, ConversionContext.of(type)).orElseThrow(() -> new IllegalStateException("No value available for annotation member @" + annotationName + "[" + member + "] of type: " + type));
     }
 
@@ -1161,6 +1161,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @throws IllegalStateException If no member is available that conforms to the given name and type
      */
     @NonNull
+    @SuppressWarnings("java:S2259") // false positive
     public <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member, Class<T> type) {
         ArgumentUtils.requireNonNull("type", type);
         String typeName = type.getName();
@@ -1183,17 +1184,18 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         }
         if (CollectionUtils.isEmpty(values)) {
             return Collections.emptyList();
-        }
-        List<AnnotationValue<T>> list = new ArrayList<>(values.size());
-        for (AnnotationValue<?> value : values) {
-            if (value == null) {
-                continue;
+        } else {
+            List<AnnotationValue<T>> list = new ArrayList<>(values.size());
+            for (AnnotationValue<?> value : values) {
+                if (value == null) {
+                    continue;
+                }
+                if (value.getAnnotationName().equals(typeName)) {
+                    list.add((AnnotationValue<T>) value);
+                }
             }
-            if (value.getAnnotationName().equals(typeName)) {
-                list.add((AnnotationValue<T>) value);
-            }
+            return list;
         }
-        return list;
     }
 
     /**

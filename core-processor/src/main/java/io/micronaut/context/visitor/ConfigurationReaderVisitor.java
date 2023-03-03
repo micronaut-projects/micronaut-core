@@ -140,7 +140,7 @@ public class ConfigurationReaderVisitor implements TypeElementVisitor<Configurat
             context.fail("Only zero argument getter methods are allowed on @ConfigurationProperties interfaces: " + method, method);
             return;
         }
-        if ("void".equals(method.getReturnType().getName())) {
+        if (method.getReturnType().isVoid()) {
             context.fail("Getter methods must return a value @ConfigurationProperties interfaces: " + method, method);
             return;
         }

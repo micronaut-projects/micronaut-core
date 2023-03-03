@@ -25,29 +25,20 @@ import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.processing.BeanDefinitionCreator
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
 import io.micronaut.inject.processing.ProcessingException
-import io.micronaut.inject.visitor.VisitorConfiguration
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.kotlin.processing.KotlinOutputVisitor
-import io.micronaut.kotlin.processing.unwrap
 import io.micronaut.kotlin.processing.visitor.KotlinClassElement
+import io.micronaut.kotlin.processing.visitor.KotlinNativeElement
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 import java.io.IOException
 
-class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironment): SymbolProcessor {
+internal class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironment): SymbolProcessor {
 
     private val beanDefinitionMap = mutableMapOf<String, BeanDefinitionCreator>()
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        val visitorContext = object : KotlinVisitorContext(environment, resolver) {
-            override fun getConfiguration(): VisitorConfiguration {
-                return object : VisitorConfiguration {
-                    override fun includeTypeLevelAnnotationsInGenericArguments(): Boolean {
-                        return false
-                    }
-                }
-            }
-        }
+        val visitorContext = KotlinVisitorContext(environment, resolver)
 
         val elements = resolver.getAllFiles()
             .flatMap { file: KSFile ->
@@ -76,7 +67,7 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
         for (classDeclaration in elements) {
             if (classDeclaration.classKind != ClassKind.ANNOTATION_CLASS) {
                 val classElement =
-                    visitorContext.elementFactory.newClassElement(classDeclaration.asStarProjectedType()) as KotlinClassElement
+                    visitorContext.elementFactory.newClassElement(classDeclaration) as KotlinClassElement
                 val innerClasses =
                     classDeclaration.declarations
                         .filter { it is KSClassDeclaration }
@@ -117,15 +108,17 @@ class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironmen
         }
     }
 
-
-
     companion object Helper {
         fun handleProcessingException(environment: SymbolProcessorEnvironment, e: ProcessingException) {
             val message = e.message
-            val originatingNode = (e.originatingElement as KSNode).unwrap()
+            val originatingNode = (e.originatingElement as KotlinNativeElement).element
             if (message != null) {
                 environment.logger.error("Originating element: $originatingNode")
                 environment.logger.error(message, originatingNode)
+                val cause = e.cause
+                if (cause != null) {
+                    environment.logger.exception(cause)
+                }
             } else {
                 environment.logger.error("Unknown error processing element", originatingNode)
                 val cause = e.cause

@@ -3,7 +3,7 @@ To allow any request header for a given configuration, don't include the `allowe
 For multiple allowed headers, set the `allowedHeaders` key of the configuration to a list of strings.
 
 .Example CORS Configuration
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:

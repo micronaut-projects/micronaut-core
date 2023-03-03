@@ -23,6 +23,7 @@ import io.micronaut.aop.writer.AopProxyWriter;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
@@ -49,6 +50,7 @@ import java.util.function.Predicate;
  * @author graemerocher
  * @since 3.0.0
  */
+@Internal
 class JavaBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     private final JavaVisitorContext javaVisitorContext;
 

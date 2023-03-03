@@ -16,35 +16,41 @@
 package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.symbol.KSClassDeclaration
-import com.google.devtools.ksp.symbol.KSType
+import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.EnumElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import java.util.*
 
-class KotlinEnumElement(private val type: KSType, elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory, visitorContext: KotlinVisitorContext):
-    KotlinClassElement(type, elementAnnotationMetadataFactory, visitorContext), EnumElement {
+internal class KotlinEnumElement(
+    nativeType: KotlinClassNativeElement,
+    elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
+    visitorContext: KotlinVisitorContext,
+    resolvedTypeArguments: Map<String, ClassElement>?
+) :
 
-    override fun values(): List<String> {
-        return classDeclaration.declarations
-            .filterIsInstance<KSClassDeclaration>()
-            .map { decl -> decl.simpleName.asString() }
-            .toList()
-    }
+    KotlinClassElement(
+        nativeType,
+        elementAnnotationMetadataFactory,
+        resolvedTypeArguments,
+        visitorContext
+    ), EnumElement {
 
-    override fun getDefaultConstructor(): Optional<MethodElement> {
-        return Optional.empty()
-    }
+    override fun values() = declaration.declarations
+        .filterIsInstance<KSClassDeclaration>()
+        .map { ksClassDeclaration -> ksClassDeclaration.simpleName.asString() }
+        .toList()
 
-    override fun copyThis(): KotlinEnumElement {
-        return KotlinEnumElement(
-            type,
-            annotationMetadataFactory,
-            visitorContext
-        )
-    }
+    override fun getDefaultConstructor(): Optional<MethodElement> = Optional.empty()
 
-    override fun getPrimaryConstructor(): Optional<MethodElement> {
-        return Optional.of(KotlinEnumConstructorElement(this))
-    }
+    override fun getPrimaryConstructor(): Optional<MethodElement> =
+        Optional.of(KotlinEnumConstructorElement(this))
+
+    override fun copyThis() = KotlinEnumElement(
+        nativeType,
+        elementAnnotationMetadataFactory,
+        visitorContext,
+        resolvedTypeArguments
+    )
+
 }

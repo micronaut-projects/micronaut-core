@@ -22,10 +22,12 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpVersion
 import io.micronaut.http.MediaType
 import io.micronaut.http.MutableHttpRequest
+import io.micronaut.http.annotation.ClientFilter
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
+import io.micronaut.http.annotation.RequestFilter
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.HttpClientRegistry
 import io.micronaut.http.client.annotation.Client
@@ -54,6 +56,14 @@ class ClientFilterSpec extends Specification{
     void "test client filter includes header"() {
         given:
         MyApi myApi = context.getBean(MyApi)
+
+        expect:
+        myApi.name() == 'Fred'
+    }
+
+    void "test method-based client filter includes header"() {
+        given:
+        MyMethodApi myApi = context.getBean(MyMethodApi)
 
         expect:
         myApi.name() == 'Fred'
@@ -138,6 +148,11 @@ class ClientFilterSpec extends Specification{
             return username + lastname.orElse('')
         }
 
+        @Get(value = '/method-filters/name', produces = MediaType.TEXT_PLAIN)
+        String name2(@Header('X-Auth-Username') String username, @Header('X-Auth-Lastname') Optional<String> lastname) {
+            return username + lastname.orElse('')
+        }
+
         @Get(value = '/excluded-filters/name', produces = MediaType.TEXT_PLAIN)
         String nameExcluded(@Header('X-Auth-Lastname') Optional<String> lastname) {
             return lastname.orElse('')
@@ -157,6 +172,13 @@ class ClientFilterSpec extends Specification{
     @Requires(property = 'spec.name', value = "ClientFilterSpec")
     @Client('/filters')
     static interface MyApi {
+        @Get(value = '/name', consumes = MediaType.TEXT_PLAIN)
+        String name()
+    }
+
+    @Requires(property = 'spec.name', value = "ClientFilterSpec")
+    @Client('/method-filters')
+    static interface MyMethodApi {
         @Get(value = '/name', consumes = MediaType.TEXT_PLAIN)
         String name()
     }
@@ -186,6 +208,16 @@ class ClientFilterSpec extends Specification{
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
             request.header("X-Auth-Username", "Fred")
             return chain.proceed(request)
+        }
+    }
+
+    // this filter should match
+    @Requires(property = 'spec.name', value = "ClientFilterSpec")
+    @ClientFilter('/method-filters/**')
+    static class MyMethodFilter {
+        @RequestFilter
+        void doFilter(MutableHttpRequest<?> request) {
+            request.header("X-Auth-Username", "Fred")
         }
     }
 

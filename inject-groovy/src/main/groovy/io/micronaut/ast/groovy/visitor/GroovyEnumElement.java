@@ -15,11 +15,11 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.EnumElement;
-import org.codehaus.groovy.ast.ClassNode;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import org.codehaus.groovy.ast.FieldNode;
 
 import java.util.ArrayList;
@@ -32,33 +32,34 @@ import java.util.List;
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 class GroovyEnumElement extends GroovyClassElement implements EnumElement {
 
     protected List<EnumConstantElement> enumConstants;
     protected List<String> values;
 
     /**
-     * @param visitorContext     The visitor context
-     * @param classNode          The {@link ClassNode}
+     * @param visitorContext            The visitor context
+     * @param nativeElement             The native element
      * @param annotationMetadataFactory The annotation metadata factory
      */
     GroovyEnumElement(GroovyVisitorContext visitorContext,
-                      ClassNode classNode,
+                      GroovyNativeElement nativeElement,
                       ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        this(visitorContext, classNode, annotationMetadataFactory, 0);
+        this(visitorContext, nativeElement, annotationMetadataFactory, 0);
     }
 
     /**
-     * @param visitorContext     The visitor context
-     * @param classNode          The {@link ClassNode}
+     * @param visitorContext            The visitor context
+     * @param nativeElement             The native element
      * @param annotationMetadataFactory The annotation metadata
-     * @param arrayDimensions    The number of array dimensions factory
+     * @param arrayDimensions           The number of array dimensions factory
      */
     GroovyEnumElement(GroovyVisitorContext visitorContext,
-                      ClassNode classNode,
+                      GroovyNativeElement nativeElement,
                       ElementAnnotationMetadataFactory annotationMetadataFactory,
                       int arrayDimensions) {
-        super(visitorContext, classNode, annotationMetadataFactory, null, arrayDimensions);
+        super(visitorContext, nativeElement, annotationMetadataFactory, null, arrayDimensions);
     }
 
     @Override
@@ -82,14 +83,13 @@ class GroovyEnumElement extends GroovyClassElement implements EnumElement {
     private void initEnum() {
         values = new ArrayList<>();
         enumConstants = new ArrayList<>();
-        ClassNode nativeType = getNativeType();
-        for (FieldNode field : nativeType.getFields()) {
+        for (FieldNode field : classNode.getFields()) {
             if (field.getName().equals("MAX_VALUE") || field.getName().equals("MIN_VALUE")) {
                 continue;
             }
             if (field.isEnum()) {
                 values.add(field.getName());
-                enumConstants.add(new GroovyEnumConstantElement(this, visitorContext, field, field, elementAnnotationMetadataFactory));
+                enumConstants.add(new GroovyEnumConstantElement(this, visitorContext, field, elementAnnotationMetadataFactory));
             }
         }
 
@@ -99,7 +99,7 @@ class GroovyEnumElement extends GroovyClassElement implements EnumElement {
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new GroovyEnumElement(visitorContext, classNode, elementAnnotationMetadataFactory, arrayDimensions);
+        return new GroovyEnumElement(visitorContext, getNativeType(), elementAnnotationMetadataFactory, arrayDimensions);
     }
 
 }

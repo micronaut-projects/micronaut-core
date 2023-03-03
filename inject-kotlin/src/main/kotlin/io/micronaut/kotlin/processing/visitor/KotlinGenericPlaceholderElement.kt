@@ -15,99 +15,119 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
-import com.google.devtools.ksp.closestClassDeclaration
-import com.google.devtools.ksp.symbol.KSTypeParameter
 import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.inject.ast.ArrayableClassElement
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.GenericPlaceholderElement
+import io.micronaut.inject.ast.WildcardElement
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
-import io.micronaut.kotlin.processing.getBinaryName
+import io.micronaut.inject.ast.annotation.GenericPlaceholderElementAnnotationMetadata
 import java.util.*
 import java.util.function.Function
 
-class KotlinGenericPlaceholderElement(
-    private val parameter: KSTypeParameter,
+internal class KotlinGenericPlaceholderElement(
+    private var internalGenericNativeType: KotlinTypeParameterNativeElement,
+    private var upper: KotlinClassElement,
+    private var resolved: KotlinClassElement?,
+    private var bounds: List<KotlinClassElement>,
+    private var declaringElement: Element?,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext,
-    private val arrayDimensions: Int = 0
-) : KotlinClassElement(parameter, elementAnnotationMetadataFactory, visitorContext, arrayDimensions, true), ArrayableClassElement, GenericPlaceholderElement {
-    override fun copyThis(): KotlinGenericPlaceholderElement {
-        return KotlinGenericPlaceholderElement(
-            parameter,
-            annotationMetadataFactory,
-            visitorContext,
-            arrayDimensions
+    arrayDimensions: Int = resolved?.arrayDimensions ?: 0
+) : KotlinClassElement(
+    upper.nativeType,
+    elementAnnotationMetadataFactory,
+    upper.resolvedTypeArguments,
+    visitorContext,
+    arrayDimensions,
+    true
+), GenericPlaceholderElement {
+
+    constructor(
+        genericNativeType: KotlinTypeParameterNativeElement,
+        resolved: KotlinClassElement?,
+        bounds: List<KotlinClassElement>,
+        declaringElement: Element?,
+        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
+        visitorContext: KotlinVisitorContext
+    ) : this(
+        genericNativeType,
+        selectClassElementRepresentingThisPlaceholder(resolved, bounds),
+        resolved,
+        bounds,
+        declaringElement,
+        elementAnnotationMetadataFactory,
+        visitorContext
+    )
+
+    private val resolvedTypeAnnotationMetadata: ElementAnnotationMetadata by lazy {
+        GenericPlaceholderElementAnnotationMetadata(this, upper)
+    }
+    private val resolvedAnnotationMetadata: AnnotationMetadata by lazy {
+        AnnotationMetadataHierarchy(
+            true,
+            upper.annotationMetadata,
+            resolvedGenericTypeAnnotationMetadata
         )
     }
-
-    override fun getName(): String {
-        val bounds = parameter.bounds.firstOrNull()
-        if (bounds != null) {
-            return bounds.resolve().declaration.getBinaryName(visitorContext.resolver, visitorContext)
-        }
-        return "java.lang.Object"
+    private val resolvedGenericTypeAnnotationMetadata: ElementAnnotationMetadata by lazy {
+        elementAnnotationMetadataFactory.buildGenericTypeAnnotations(this)
     }
 
-    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata): ClassElement {
-        return super<KotlinClassElement>.withAnnotationMetadata(annotationMetadata) as ClassElement
-    }
+    override fun copyThis() = KotlinGenericPlaceholderElement(
+        genericNativeType,
+        upper,
+        resolved,
+        bounds,
+        declaringElement,
+        elementAnnotationMetadataFactory,
+        visitorContext,
+        arrayDimensions
+    )
 
-    override fun isArray(): Boolean = arrayDimensions > 0
+    override fun isGenericPlaceholder() = true
 
-    override fun getArrayDimensions(): Int = arrayDimensions
+    override fun getAnnotationMetadataToWrite() = resolvedGenericTypeAnnotationMetadata
 
-    override fun withArrayDimensions(arrayDimensions: Int): ClassElement {
-        return KotlinGenericPlaceholderElement(parameter, annotationMetadataFactory, visitorContext, arrayDimensions)
-    }
+    override fun getGenericTypeAnnotationMetadata() = resolvedGenericTypeAnnotationMetadata
 
-    override fun getBounds(): MutableList<out ClassElement> {
-        val elementFactory = visitorContext.elementFactory
-        val resolved = parameter.bounds.map {
-            val argumentType = it.resolve()
-            elementFactory.newClassElement(argumentType, annotationMetadataFactory)
-        }.toMutableList()
-        return if (resolved.isEmpty()) {
-            mutableListOf(visitorContext.getClassElement(Object::class.java.name).get())
-        } else {
-            resolved
-        }
-    }
+    override fun getTypeAnnotationMetadata() = resolvedTypeAnnotationMetadata
 
-    override fun getVariableName(): String {
-        return parameter.simpleName.asString()
-    }
+    override fun getAnnotationMetadata() = resolvedAnnotationMetadata
 
-    override fun getDeclaringElement(): Optional<Element> {
-        val classDeclaration = parameter.closestClassDeclaration()
-        return Optional.ofNullable(classDeclaration).map {
-            visitorContext.elementFactory.newClassElement(
-                classDeclaration!!.asStarProjectedType(),
-                visitorContext.elementAnnotationMetadataFactory)
-        }
-    }
+    override fun getGenericNativeType() = internalGenericNativeType
 
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-        if (!super.equals(other)) return false
+    override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata) =
+        super<KotlinClassElement>.withAnnotationMetadata(annotationMetadata)
 
-        other as KotlinGenericPlaceholderElement
+    override fun withArrayDimensions(arrayDimensions: Int) = KotlinGenericPlaceholderElement(
+        genericNativeType,
+        upper,
+        resolved,
+        bounds,
+        declaringElement,
+        elementAnnotationMetadataFactory,
+        visitorContext,
+        arrayDimensions
+    )
 
-        if (parameter.simpleName.asString() != other.parameter.simpleName.asString()) return false
+    override fun getBounds() = bounds
 
-        return true
-    }
+    override fun getVariableName() = genericNativeType.declaration.simpleName.asString()
 
-    override fun hashCode(): Int {
-        var result = super.hashCode()
-        result = 31 * result + parameter.simpleName.asString().hashCode()
-        return result
-    }
+    override fun getResolved(): Optional<ClassElement> = Optional.ofNullable(resolved)
 
-    override fun foldBoundGenericTypes(fold: Function<ClassElement, ClassElement>?): ClassElement {
-        Objects.requireNonNull(fold, "Function argument cannot be null")
-        return fold!!.apply(this)
+    override fun getDeclaringElement(): Optional<Element> = Optional.ofNullable(declaringElement)
+
+    override fun foldBoundGenericTypes(fold: Function<ClassElement?, ClassElement?>) =
+        fold.apply(this)
+
+    companion object {
+        private fun selectClassElementRepresentingThisPlaceholder(
+            resolved: KotlinClassElement?,
+            bounds: List<KotlinClassElement>
+        ) = resolved ?: WildcardElement.findUpperType(bounds, bounds)
     }
 }

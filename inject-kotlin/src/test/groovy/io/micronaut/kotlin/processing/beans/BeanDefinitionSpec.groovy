@@ -1,12 +1,12 @@
 package io.micronaut.kotlin.processing.beans
 
 import io.micronaut.annotation.processing.test.KotlinCompiler
-import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.annotation.Order
 import io.micronaut.core.bind.annotation.Bindable
+import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.HttpMethodMapping
 import io.micronaut.http.client.annotation.Client
@@ -16,7 +16,11 @@ import io.micronaut.inject.writer.BeanDefinitionVisitor
 import spock.lang.PendingFeature
 import spock.lang.Specification
 
-import static io.micronaut.annotation.processing.test.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.buildBeanDefinition
+import static io.micronaut.annotation.processing.test.KotlinCompiler.buildBeanDefinitionReference
+import static io.micronaut.annotation.processing.test.KotlinCompiler.buildContext
+import static io.micronaut.annotation.processing.test.KotlinCompiler.getBean
+import static io.micronaut.annotation.processing.test.KotlinCompiler.getBeanDefinition
 
 class BeanDefinitionSpec extends Specification {
 
@@ -252,7 +256,7 @@ class RepeatedTest {
 ''')
         expect:
         definition.getRequiredMethod("test").getAnnotationValuesByType(Header).size() == 4
-        definition.getRequiredMethod("test").getAnnotationNamesByStereotype(Bindable).size() == 2
+        definition.getRequiredMethod("test").getAnnotationNamesByStereotype(Bindable) == [Header.class.name]
     }
 
     void "test repeated annotations"() {
@@ -875,5 +879,85 @@ class Other
         then:
         noExceptionThrown()
         definition.constructor.arguments[0].isDeclaredNullable()
+    }
+
+    void "test isTypeVariable"() {
+        given:
+            BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
+package test;
+import javax.validation.constraints.*;
+import java.util.List;
+
+@jakarta.inject.Singleton
+class Test : Serde<Object> {
+}
+
+interface Serde<T> : Serializer<T>, Deserializer<T> {
+}
+
+interface Serializer<T> {
+}
+
+interface Deserializer<T> {
+}
+
+
+        ''')
+
+        when: "Micronaut Serialization use-case"
+            def serdeTypeParam = definition.getTypeArguments("test.Serde")[0]
+            def serializerTypeParam = definition.getTypeArguments("test.Serializer")[0]
+            def deserializerTypeParam = definition.getTypeArguments("test.Deserializer")[0]
+
+        then: "The first is a placeholder"
+            serdeTypeParam.isTypeVariable() //
+            (serdeTypeParam instanceof GenericPlaceholder)
+        and: "threat resolved placeholder as not a type variable"
+            serializerTypeParam.isTypeVariable()
+            (serializerTypeParam instanceof GenericPlaceholder)
+            deserializerTypeParam.isTypeVariable()
+            (deserializerTypeParam instanceof GenericPlaceholder)
+    }
+
+    void "test isTypeVariable array"() {
+        given:
+            BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
+package test;
+
+import javax.validation.constraints.*;
+import java.util.List
+
+@jakarta.inject.Singleton
+class Test : Serde<Array<String>> {
+}
+
+interface Serde<T> : Serializer<T>, Deserializer<T> {
+}
+
+interface Serializer<T> {
+}
+
+interface Deserializer<T> {
+}
+
+
+        ''')
+
+        when: "Micronaut Serialization use-case"
+            def serdeTypeParam = definition.getTypeArguments("test.Serde")[0]
+            def serializerTypeParam = definition.getTypeArguments("test.Serializer")[0]
+            def deserializerTypeParam = definition.getTypeArguments("test.Deserializer")[0]
+            // Arrays are not resolved as KotlinClassElements or placeholders
+        then: "The first is a placeholder"
+            serdeTypeParam.simpleName == "String[]"
+            serdeTypeParam.isTypeVariable()
+            (serdeTypeParam instanceof GenericPlaceholder)
+        and: "threat resolved placeholder as not a type variable"
+            serializerTypeParam.simpleName == "String[]"
+            serializerTypeParam.isTypeVariable()
+            (serializerTypeParam instanceof GenericPlaceholder)
+            deserializerTypeParam.simpleName == "String[]"
+            deserializerTypeParam.isTypeVariable()
+            (deserializerTypeParam instanceof GenericPlaceholder)
     }
 }

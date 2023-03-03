@@ -1,8 +1,11 @@
 package io.micronaut.inject.beans
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Order
+import io.micronaut.core.type.Argument
+import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Issue
@@ -491,5 +494,101 @@ public class Test {
         param2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
         param3.getAnnotationMetadata().getAnnotationNames().size() == 1
         param3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
+    }
+
+    void "test isTypeVariable"() {
+        given:
+        ApplicationContext context = buildContext( '''
+package test;
+import javax.validation.constraints.*;
+import java.util.*;
+import io.micronaut.core.annotation.*;
+import io.micronaut.context.annotation.*;
+
+@jakarta.inject.Singleton
+class Test implements Serde<Object> {
+}
+
+interface Serde<T> extends Serializer<T>, Deserializer<T> {
+}
+
+interface Serializer<T> {
+}
+
+interface Deserializer<T> {
+}
+
+@jakarta.inject.Singleton
+@Order(-100)
+class ArrayListTest<E> implements Serde<ArrayList<E>> {
+}
+
+@jakarta.inject.Singleton
+class SetTest<E> implements Serde<HashSet<E>> {
+}
+
+        ''')
+
+        BeanDefinition<?> definition = getBeanDefinition(context, 'test.Test')
+
+
+        when: "Micronaut Serialization use-case"
+            def serdeTypeParam = definition.getTypeArguments("test.Serde")[0]
+            def serializerTypeParam = definition.getTypeArguments("test.Serializer")[0]
+            def deserializerTypeParam = definition.getTypeArguments("test.Deserializer")[0]
+            def listDeser = context.getBean(Argument.of(context.classLoader.loadClass('test.Deserializer'), Argument.listOf(String)))
+            def collectionDeser = context.getBean(Argument.of(context.classLoader.loadClass('test.Deserializer'), Argument.of(Collection.class, String)))
+
+        then: "The first is a placeholder"
+            listDeser.getClass().name == 'test.ArrayListTest'
+            listDeser.is(collectionDeser)
+            !serdeTypeParam.isTypeVariable() //
+            !(serdeTypeParam instanceof GenericPlaceholder)
+        and: "threat resolved placeholder as not a type variable"
+            !serializerTypeParam.isTypeVariable()
+            !(serializerTypeParam instanceof GenericPlaceholder)
+            !deserializerTypeParam.isTypeVariable()
+            !(deserializerTypeParam instanceof GenericPlaceholder)
+    }
+
+    void "test isTypeVariable array"() {
+        given:
+            BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
+package test;
+import javax.validation.constraints.*;
+import java.util.List;
+
+@jakarta.inject.Singleton
+public class Test implements Serde<String[]> {
+}
+
+interface Serde<T> extends Serializer<T>, Deserializer<T> {
+}
+
+interface Serializer<T> {
+}
+
+interface Deserializer<T> {
+}
+
+
+        ''')
+
+        when: "Micronaut Serialization use-case"
+            def serdeTypeParam = definition.getTypeArguments("test.Serde")[0]
+            def serializerTypeParam = definition.getTypeArguments("test.Serializer")[0]
+            def deserializerTypeParam = definition.getTypeArguments("test.Deserializer")[0]
+        // Arrays are not resolved as JavaClassElements or placeholders
+        then: "The first is a placeholder"
+            serdeTypeParam.simpleName == "String[]"
+            !serdeTypeParam.isTypeVariable()
+            !(serdeTypeParam instanceof GenericPlaceholder)
+        and: "threat resolved placeholder as not a type variable"
+            serializerTypeParam.simpleName == "String[]"
+            !serializerTypeParam.isTypeVariable()
+            !(serializerTypeParam instanceof GenericPlaceholder)
+            deserializerTypeParam.simpleName == "String[]"
+            !deserializerTypeParam.isTypeVariable()
+            !(deserializerTypeParam instanceof GenericPlaceholder)
     }
 }

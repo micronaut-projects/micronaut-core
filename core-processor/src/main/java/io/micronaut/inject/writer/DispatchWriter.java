@@ -16,6 +16,7 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ast.ClassElement;
@@ -32,7 +33,6 @@ import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 import org.objectweb.asm.commons.TableSwitchGenerator;
 
-import javax.validation.constraints.NotNull;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -71,11 +71,19 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
 
     private final List<DispatchTarget> dispatchTargets = new ArrayList<>();
     private final Type thisType;
+
+    private final Type dispatchSuperType;
+
     private boolean hasInterceptedMethod;
 
     public DispatchWriter(Type thisType) {
+        this(thisType, ExecutableMethodsDefinitionWriter.SUPER_TYPE);
+    }
+
+    public DispatchWriter(Type thisType, Type dispatchSuperType) {
         super();
         this.thisType = thisType;
+        this.dispatchSuperType = dispatchSuperType;
     }
 
     /**
@@ -118,7 +126,7 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
      * @return the target index
      */
     public int addMethod(TypedElement declaringType, MethodElement methodElement, boolean useOneDispatch) {
-        return addDispatchTarget(new MethodDispatchTarget(declaringType, methodElement, useOneDispatch, !useOneDispatch));
+        return addDispatchTarget(new MethodDispatchTarget(dispatchSuperType, declaringType, methodElement, useOneDispatch, !useOneDispatch));
     }
 
     /**
@@ -136,6 +144,7 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
                                     String interceptedProxyBridgeMethodName) {
         hasInterceptedMethod = true;
         return addDispatchTarget(new InterceptableMethodDispatchTarget(
+                dispatchSuperType,
                 declaringType,
                 methodElement,
                 interceptedProxyClassName,
@@ -377,7 +386,7 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
      */
     @Internal
     public static final class FieldGetDispatchTarget implements DispatchTarget {
-        @NotNull
+        @NonNull
         final FieldElement beanField;
 
         public FieldGetDispatchTarget(FieldElement beanField) {
@@ -412,7 +421,7 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
             pushBoxPrimitiveIfNecessary(propertyType, writer);
         }
 
-        @NotNull
+        @NonNull
         public FieldElement getField() {
             return beanField;
         }
@@ -423,7 +432,7 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
      */
     @Internal
     public static final class FieldSetDispatchTarget implements DispatchTarget {
-        @NotNull
+        @NonNull
         final FieldElement beanField;
 
         public FieldSetDispatchTarget(FieldElement beanField) {
@@ -463,7 +472,7 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
             writer.push((String) null);
         }
 
-        @NotNull
+        @NonNull
         public FieldElement getField() {
             return beanField;
         }
@@ -475,15 +484,17 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
     @Internal
     @SuppressWarnings("FinalClass")
     public static class MethodDispatchTarget implements DispatchTarget {
+        final Type dispatchSuperType;
         final TypedElement declaringType;
         final MethodElement methodElement;
         final boolean oneDispatch;
         final boolean multiDispatch;
 
-        private MethodDispatchTarget(TypedElement declaringType,
+        private MethodDispatchTarget(Type dispatchSuperType, TypedElement declaringType,
                                      MethodElement methodElement,
                                      boolean oneDispatch,
                                      boolean multiDispatch) {
+            this.dispatchSuperType = dispatchSuperType;
             this.declaringType = declaringType;
             this.methodElement = methodElement;
             this.oneDispatch = oneDispatch;
@@ -528,7 +539,7 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
                 }
                 writer.loadThis();
                 writer.push(methodIndex);
-                writer.invokeVirtual(ExecutableMethodsDefinitionWriter.SUPER_TYPE, GET_ACCESSIBLE_TARGET_METHOD);
+                writer.invokeVirtual(dispatchSuperType, GET_ACCESSIBLE_TARGET_METHOD);
                 if (hasArgs) {
                     writer.loadArg(2);
                 } else {
@@ -607,12 +618,13 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
         final String interceptedProxyBridgeMethodName;
         final Type thisType;
 
-        private InterceptableMethodDispatchTarget(TypedElement declaringType,
+        private InterceptableMethodDispatchTarget(Type dispatchSuperType,
+                                                  TypedElement declaringType,
                                                   MethodElement methodElement,
                                                   String interceptedProxyClassName,
                                                   String interceptedProxyBridgeMethodName,
                                                   Type thisType) {
-            super(declaringType, methodElement, false, true);
+            super(dispatchSuperType, declaringType, methodElement, false, true);
             this.interceptedProxyClassName = interceptedProxyClassName;
             this.interceptedProxyBridgeMethodName = interceptedProxyBridgeMethodName;
             this.thisType = thisType;

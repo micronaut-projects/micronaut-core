@@ -115,6 +115,9 @@ public class CorsFilter implements HttpServerFilter {
      */
     protected boolean shouldDenyToPreventDriveByLocalhostAttack(@NonNull CorsOriginConfiguration corsOriginConfiguration,
                                                                 @NonNull HttpRequest<?> request) {
+        if (corsConfiguration.isLocalhostPassThrough()) {
+            return false;
+        }
         if (httpHostResolver == null) {
             return false;
         }
@@ -137,6 +140,9 @@ public class CorsFilter implements HttpServerFilter {
      */
     protected boolean shouldDenyToPreventDriveByLocalhostAttack(@NonNull String origin,
                                                                 @NonNull HttpRequest<?> request) {
+        if (corsConfiguration.isLocalhostPassThrough()) {
+            return false;
+        }
         if (httpHostResolver == null) {
             return false;
         }

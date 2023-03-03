@@ -75,7 +75,7 @@ By default, Micronaut times out idle connections with no activity after five min
 ----
 micronaut:
   server:
-    idle-timeout: 30m # 30 minutes
+    idle-timeout: 30m
 ----
 
 If you use Micronaut's WebSocket client you may also wish to set the timeout on the client:
@@ -86,5 +86,5 @@ If you use Micronaut's WebSocket client you may also wish to set the timeout on 
 micronaut:
   http:
     client:
-      read-idle-timeout: 30m # 30 minutes
+      read-idle-timeout: 30m
 ----

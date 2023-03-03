@@ -15,12 +15,18 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.WildcardElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
+import io.micronaut.inject.ast.annotation.WildcardElementAnnotationMetadata;
 
 import java.util.Collection;
 import java.util.List;
@@ -35,29 +41,64 @@ import java.util.stream.Collectors;
  */
 @Internal
 final class GroovyWildcardElement extends GroovyClassElement implements WildcardElement {
+    private final GroovyNativeElement wildcardNativeElement;
     private final GroovyClassElement upperType;
     private final List<GroovyClassElement> upperBounds;
     private final List<GroovyClassElement> lowerBounds;
+    private final ElementAnnotationMetadata typeAnnotationMetadata;
+    @Nullable
+    private ElementAnnotationMetadata genericTypeAnnotationMetadata;
 
-    GroovyWildcardElement(@NonNull GroovyClassElement upperType,
+    GroovyWildcardElement(@NonNull GroovyNativeElement wildcardNativeElement,
                           @NonNull List<GroovyClassElement> upperBounds,
                           @NonNull List<GroovyClassElement> lowerBounds,
-                          ElementAnnotationMetadataFactory annotationMetadataFactory) {
+                          @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory,
+                          @NonNull GroovyClassElement upperType) {
         super(
                 upperType.visitorContext,
-                upperType.classNode,
+                upperType.getNativeType(),
             annotationMetadataFactory,
                 upperType.getTypeArguments(),
             0
         );
+        this.wildcardNativeElement = wildcardNativeElement;
         this.upperType = upperType;
         this.upperBounds = upperBounds;
         this.lowerBounds = lowerBounds;
+        typeAnnotationMetadata = new WildcardElementAnnotationMetadata(this, upperType);
+    }
+
+    @Override
+    public MutableAnnotationMetadataDelegate<AnnotationMetadata> getGenericTypeAnnotationMetadata() {
+        if (genericTypeAnnotationMetadata == null) {
+            genericTypeAnnotationMetadata = elementAnnotationMetadataFactory.buildGenericTypeAnnotations(this);
+        }
+        return genericTypeAnnotationMetadata;
+    }
+
+    @Override
+    protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
+        return getGenericTypeAnnotationMetadata();
+    }
+
+    @Override
+    public MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
+        return typeAnnotationMetadata;
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return new AnnotationMetadataHierarchy(true, super.getAnnotationMetadata(), getGenericTypeAnnotationMetadata());
+    }
+
+    @Override
+    public Object getGenericNativeType() {
+        return wildcardNativeElement;
     }
 
     @Override
     protected GroovyClassElement copyConstructor() {
-        return new GroovyWildcardElement(upperType, upperBounds, lowerBounds, elementAnnotationMetadataFactory);
+        return new GroovyWildcardElement(wildcardNativeElement, upperBounds, lowerBounds, elementAnnotationMetadataFactory, upperType);
     }
 
     @NonNull
@@ -84,7 +125,7 @@ final class GroovyWildcardElement extends GroovyClassElement implements Wildcard
     public ClassElement foldBoundGenericTypes(@NonNull Function<ClassElement, ClassElement> fold) {
         List<GroovyClassElement> upperBounds = this.upperBounds.stream().map(ele -> toGroovyClassElement(ele.foldBoundGenericTypes(fold))).collect(Collectors.toList());
         List<GroovyClassElement> lowerBounds = this.lowerBounds.stream().map(ele -> toGroovyClassElement(ele.foldBoundGenericTypes(fold))).collect(Collectors.toList());
-        return fold.apply(upperBounds.contains(null) || lowerBounds.contains(null) ? null : new GroovyWildcardElement(upperType, upperBounds, lowerBounds, elementAnnotationMetadataFactory));
+        return fold.apply(upperBounds.contains(null) || lowerBounds.contains(null) ? null : new GroovyWildcardElement(wildcardNativeElement, upperBounds, lowerBounds, elementAnnotationMetadataFactory, upperType));
     }
 
     private GroovyClassElement toGroovyClassElement(ClassElement element) {

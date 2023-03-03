@@ -31,9 +31,26 @@ dependencies {
     compileOnly libs.kotlin.stdlib
     compileOnly libs.managed.netty.transport.native.unix.common
 
+    testImplementation libs.jmh.core
+    testAnnotationProcessor libs.jmh.generator.annprocess
+
     testCompileOnly project(":inject-groovy")
     testCompileOnly(libs.jetbrains.annotations)
+
     testAnnotationProcessor project(":inject-java")
+    testAnnotationProcessor platform(libs.test.boms.micronaut.validation)
+    testAnnotationProcessor (libs.micronaut.validation.processor) {
+        exclude group: 'io.micronaut'
+    }
+
+    testImplementation platform(libs.test.boms.micronaut.validation)
+    testImplementation (libs.micronaut.validation) {
+        exclude group: 'io.micronaut'
+    }
+    testImplementation (libs.micronaut.validation.processor) { // For Groovy
+        exclude group: 'io.micronaut'
+    }
+
     testImplementation project(":inject")
     testImplementation project(":inject-java-test")
     testImplementation project(":http-client")
@@ -75,6 +92,12 @@ dependencies {
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation libs.junit.jupiter.api
     testImplementation project(":websocket")
+}
+
+tasks.withType(Test).configureEach {
+    forkEvery = 100
+    maxParallelForks = 4
+    useJUnitPlatform()
 }
 
 //tasks.withType(Test).configureEach {

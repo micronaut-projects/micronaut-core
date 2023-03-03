@@ -84,7 +84,6 @@ import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
-import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.beans.BeanElement;
@@ -350,9 +349,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final org.objectweb.asm.commons.Method METHOD_OPTIONAL_OF = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredMethod(Optional.class, "of", Object.class)
     );
+    private static final String METHOD_NAME_INSTANTIATE = "instantiate";
     private static final org.objectweb.asm.commons.Method METHOD_BEAN_CONSTRUCTOR_INSTANTIATE = org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredMethod(
             BeanConstructor.class,
-            "instantiate",
+        METHOD_NAME_INSTANTIATE,
             Object[].class
     ));
     private static final String METHOD_DESCRIPTOR_CONSTRUCTOR_INSTANTIATE = getMethodDescriptor(Object.class, Arrays.asList(
@@ -1436,11 +1436,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
                 Type declaringTypeRef = JavaModelUtils.getTypeReference(declaringType);
                 String methodDescriptor = getMethodDescriptor(methodElement.getReturnType(), Arrays.asList(methodElement.getParameters()));
-                injectMethodVisitor.visitMethodInsn(isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL,
+                boolean isDeclaringTypeInterface = declaringType.getType().isInterface();
+                injectMethodVisitor.visitMethodInsn(isDeclaringTypeInterface ? INVOKEINTERFACE : INVOKEVIRTUAL,
                         declaringTypeRef.getInternalName(), methodElement.getName(),
-                        methodDescriptor, isInterface);
+                        methodDescriptor, isDeclaringTypeInterface);
 
-                if (methodElement.getReturnType() != PrimitiveElement.VOID) {
+                if (!methodElement.getReturnType().isVoid()) {
                     injectMethodVisitor.pop();
                 }
 
@@ -2057,7 +2058,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                         new org.objectweb.asm.commons.Method(methodName, methodDescriptor));
             }
 
-            if (returnType != PrimitiveElement.VOID) {
+            if (!returnType.isVoid()) {
                 injectMethodVisitor.pop();
             }
             injectMethodVisitor.visitJumpInsn(GOTO, tryEnd);
@@ -2434,7 +2435,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             injectMethodVisitor.visitMethodInsn(isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL,
                     declaringTypeRef.getInternalName(), methodName,
                     methodDescriptor, isInterface);
-            if (isConfigurationProperties && returnType != PrimitiveElement.VOID) {
+            if (isConfigurationProperties && !returnType.isVoid()) {
                 injectMethodVisitor.pop();
             }
         } else {
@@ -3272,7 +3273,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                 org.objectweb.asm.commons.Method.getMethod(
                                         ReflectionUtils.getRequiredInternalMethod(
                                                 InstantiationUtils.class,
-                                                "instantiate",
+                                            METHOD_NAME_INSTANTIATE,
                                                 Class.class,
                                                 Class[].class,
                                                 Object[].class
@@ -3360,7 +3361,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         generatorAdapter.visitMethodInsn(
                 INVOKESTATIC,
                 "io/micronaut/aop/chain/ConstructorInterceptorChain",
-                "instantiate",
+            METHOD_NAME_INSTANTIATE,
                 METHOD_DESCRIPTOR_CONSTRUCTOR_INSTANTIATE,
                 false
         );
@@ -3964,7 +3965,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             );
         }
 
-        String methodName = isParametrized ? "doInstantiate" : "instantiate";
+        String methodName = isParametrized ? "doInstantiate" : METHOD_NAME_INSTANTIATE;
         this.buildMethodVisitor = new GeneratorAdapter(classWriter.visitMethod(
                 ACC_PUBLIC,
                 methodName,

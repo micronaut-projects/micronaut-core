@@ -22,9 +22,8 @@ import io.micronaut.management.endpoint.routes.RouteDataCollector;
 import io.micronaut.management.endpoint.routes.RoutesEndpoint;
 import io.micronaut.web.router.UriRoute;
 import jakarta.inject.Singleton;
-import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
-import java.util.List;
+
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -39,20 +38,24 @@ import java.util.stream.Stream;
 @Requires(beans = RoutesEndpoint.class)
 public class DefaultRouteDataCollector implements RouteDataCollector<Map<String, Object>> {
 
-    private final RouteData routeData;
+    private final RouteData<Object> routeData;
 
     /**
      * @param routeData       The RouteData
      */
-    public DefaultRouteDataCollector(RouteData routeData) {
+    public DefaultRouteDataCollector(RouteData<Object> routeData) {
         this.routeData = routeData;
     }
 
     @Override
-    public Publisher<Map<String, Object>> getData(Stream<UriRoute> routes) {
-        List<UriRoute> routeList = routes.collect(Collectors.toList());
-        return Flux.fromIterable(routeList)
-                .collectMap(this::getRouteKey, routeData::getData);
+    public Map<String, Object> getData(Stream<UriRoute> routes) {
+        return routes
+            .collect(Collectors.toMap(
+                this::getRouteKey,
+                routeData::getData,
+                (e1, e2) -> e1,
+                LinkedHashMap::new
+            ));
     }
 
     /**

@@ -19,11 +19,10 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.FieldElement;
-import org.codehaus.groovy.ast.AnnotatedNode;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import org.codehaus.groovy.ast.FieldNode;
 
 import java.util.Set;
@@ -43,21 +42,20 @@ public final class GroovyEnumConstantElement extends AbstractGroovyElement imple
      * @param declaringEnum             The declaring enum
      * @param visitorContext            The visitor context
      * @param variable                  The {@link org.codehaus.groovy.ast.Variable}
-     * @param annotatedNode             The annotated node
      * @param annotationMetadataFactory The annotation medatada
      */
     GroovyEnumConstantElement(GroovyClassElement declaringEnum,
                               GroovyVisitorContext visitorContext,
-                              FieldNode variable, AnnotatedNode annotatedNode,
+                              FieldNode variable,
                               ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        super(visitorContext, annotatedNode, annotationMetadataFactory);
+        super(visitorContext, new GroovyNativeElement.Field(variable, declaringEnum.getNativeType()), annotationMetadataFactory);
         this.declaringEnum = declaringEnum;
         this.variable = variable;
     }
 
     @Override
     protected AbstractGroovyElement copyConstructor() {
-        return new GroovyEnumConstantElement(declaringEnum, visitorContext, variable, getNativeType(), elementAnnotationMetadataFactory);
+        return new GroovyEnumConstantElement(declaringEnum, visitorContext, variable, elementAnnotationMetadataFactory);
     }
 
     @Override
@@ -129,11 +127,6 @@ public final class GroovyEnumConstantElement extends AbstractGroovyElement imple
     @Override
     public String getName() {
         return variable.getName();
-    }
-
-    @Override
-    public FieldNode getNativeType() {
-        return variable;
     }
 
     @Override

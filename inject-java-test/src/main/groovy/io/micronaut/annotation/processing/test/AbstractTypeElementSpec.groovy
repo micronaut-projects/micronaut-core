@@ -239,13 +239,14 @@ class Test {
      * @param cls The class data
      * @return The context. Should be shutdown after use
      */
-    ApplicationContext buildContext(String className, @Language("java") String cls, boolean includeAllBeans = false) {
+    ApplicationContext buildContext(String className, @Language("java") String cls, boolean includeAllBeans = false, Map properties = [:]) {
         def files = newJavaParser().generate(className, cls)
         ClassLoader classLoader = new JavaFileObjectClassLoader(files)
 
         def builder = ApplicationContext.builder()
         builder.classLoader(classLoader)
         builder.environments("test")
+        builder.properties(properties)
         configureContext(builder)
         def env = builder.build().environment
         def context = new DefaultApplicationContext((ApplicationContextConfiguration) builder) {
@@ -567,13 +568,15 @@ class Test {
         if (classElement.isArray()) {
             return reconstructTypeSignature(classElement.fromArray()) + "[]"
         } else if (classElement.isGenericPlaceholder()) {
-            def freeVar = (GenericPlaceholderElement) classElement
-            def name = freeVar.variableName
+            def genericPlaceholderElement = (GenericPlaceholderElement) classElement
+            def name = genericPlaceholderElement.variableName
             if (typeVarsAsDeclarations) {
-                def bounds = freeVar.bounds
-                if ( reconstructTypeSignature(bounds[0]) != 'Object') {
+                def bounds = genericPlaceholderElement.bounds
+                if (reconstructTypeSignature(bounds[0]) != 'Object') {
                     name += bounds.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", " extends ", ""))
                 }
+            } else if (genericPlaceholderElement.resolved) {
+                return reconstructTypeSignature(genericPlaceholderElement.resolved.get())
             }
             return name
         } else if (classElement.isWildcard()) {

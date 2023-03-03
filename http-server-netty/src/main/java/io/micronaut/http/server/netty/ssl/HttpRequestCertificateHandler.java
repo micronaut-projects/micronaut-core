@@ -16,16 +16,15 @@
 package io.micronaut.http.server.netty.ssl;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpMessage;
-import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.ssl.SslHandler;
 
 import javax.net.ssl.SSLPeerUnverifiedException;
 import java.security.cert.Certificate;
-import java.util.Optional;
 
 /**
  * Adds the certificate to the decoded request.
@@ -34,35 +33,37 @@ import java.util.Optional;
  * @author Björn Heinrichs
  * @since 1.3.0
  */
-@ChannelHandler.Sharable
 @Internal
 public class HttpRequestCertificateHandler extends ChannelInboundHandlerAdapter {
+    private final SslHandler sslHandler;
+    private Certificate certificate;
+
+    public HttpRequestCertificateHandler(SslHandler sslHandler) {
+        this.sslHandler = sslHandler;
+    }
 
     @Override
     public void channelRead(final ChannelHandlerContext ctx, final Object msg) throws Exception {
-        if (msg instanceof HttpMessage) {
-            HttpMessage<?> request = (HttpMessage<?>) msg;
-            Optional<Certificate> certificate = getCertificate(ctx.pipeline().get(SslHandler.class));
-
-            if (certificate.isPresent()) {
-                request.setAttribute(HttpAttributes.X509_CERTIFICATE, certificate.get());
-            } else {
-                request.removeAttribute(HttpAttributes.X509_CERTIFICATE, Certificate.class);
+        if (msg instanceof HttpMessage<?> http) {
+            if (certificate == null) {
+                certificate = getCertificate(sslHandler);
+                if (certificate == null) {
+                    ctx.pipeline().remove(this);
+                    super.channelRead(ctx, msg);
+                    return;
+                }
             }
+            http.setAttribute(HttpAttributes.X509_CERTIFICATE, certificate);
         }
         super.channelRead(ctx, msg);
     }
 
-    private static Optional<Certificate> getCertificate(final SslHandler handler) {
-        if (handler == null) {
-            return Optional.empty();
-        }
+    @Nullable
+    private static Certificate getCertificate(final SslHandler handler) {
         try {
-            return Optional.of(
-                    handler.engine().getSession().getPeerCertificates()[0]
-            );
+            return handler.engine().getSession().getPeerCertificates()[0];
         } catch (SSLPeerUnverifiedException ex) {
-            return Optional.empty();
+            return null;
         }
     }
 }
