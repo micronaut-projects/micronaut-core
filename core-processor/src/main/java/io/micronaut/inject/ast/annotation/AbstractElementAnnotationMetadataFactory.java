@@ -28,14 +28,19 @@ import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.GenericElement;
+import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.WildcardElement;
 
 import java.lang.annotation.Annotation;
+import java.util.Arrays;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 /**
  * Abstract element annotation metadata factory.
@@ -89,6 +94,137 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         throw new IllegalStateException("Unknown element: " + element.getClass() + " with native type: " + element.getNativeType());
     }
 
+    @Override
+    public ElementAnnotationMetadata buildTypeAnnotations(ClassElement element) {
+        return buildTypeAnnotationsForClass(element);
+    }
+
+    @Override
+    public ElementAnnotationMetadata buildGenericTypeAnnotations(GenericElement element) {
+        if (element instanceof GenericPlaceholderElement placeholderElement) {
+            return buildTypeAnnotationsForGenericPlaceholder(null, placeholderElement);
+        }
+        if (element instanceof WildcardElement wildcardElement) {
+            return buildTypeAnnotationsForWildcard(null, wildcardElement);
+        }
+        throw new IllegalStateException("Unknown generic element: " + element.getClass() + " with native type: " + element.getNativeType());
+    }
+
+    /**
+     * Resolve native element.
+     *
+     * @param element The element
+     * @return The native element
+     */
+    protected K getNativeElement(Element element) {
+        return (K) element.getNativeType();
+    }
+
+    /**
+     * Lookup annotation metadata for the package.
+     *
+     * @param packageElement The element
+     * @return The annotation metadata
+     */
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForPackage(PackageElement packageElement) {
+        return metadataBuilder.lookupOrBuildForType(getNativeElement(packageElement));
+    }
+
+    /**
+     * Lookup annotation metadata for the parameter.
+     *
+     * @param parameterElement The element
+     * @return The annotation metadata
+     */
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForParameter(ParameterElement parameterElement) {
+        return metadataBuilder.lookupOrBuildForParameter(
+            getNativeElement(parameterElement.getMethodElement().getOwningType()),
+            getNativeElement(parameterElement.getMethodElement()),
+            getNativeElement(parameterElement)
+        );
+    }
+
+    /**
+     * Lookup annotation metadata for the field.
+     *
+     * @param fieldElement The element
+     * @return The annotation metadata
+     */
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForField(FieldElement fieldElement) {
+        return metadataBuilder.lookupOrBuildForField(
+            getNativeElement(fieldElement.getOwningType()),
+            getNativeElement(fieldElement)
+        );
+    }
+
+    /**
+     * Lookup annotation metadata for the method.
+     *
+     * @param methodElement The element
+     * @return The annotation metadata
+     */
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForMethod(MethodElement methodElement) {
+        return metadataBuilder.lookupOrBuildForMethod(
+            getNativeElement(methodElement.getOwningType()),
+            getNativeElement(methodElement)
+        );
+    }
+
+    /**
+     * Lookup annotation metadata for the class.
+     *
+     * @param classElement The element
+     * @return The annotation metadata
+     */
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForClass(ClassElement classElement) {
+        return metadataBuilder.lookupOrBuildForType(getNativeElement(classElement));
+    }
+
+    /**
+     * Lookup annotation metadata for the class.
+     *
+     * @param classElement The element
+     * @return The annotation metadata
+     */
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupTypeAnnotationsForClass(ClassElement classElement) {
+        return new AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata() {
+            @Override
+            public AnnotationMetadata getAnnotationMetadata() {
+                return AnnotationMetadata.EMPTY_METADATA;
+            }
+
+            @Override
+            public boolean isMutated() {
+                return false;
+            }
+
+            @Override
+            public void update(AnnotationMetadata annotationMetadata) {
+                throw new IllegalStateException("Class element: [" + classElement + "] doesn't support type annotations!");
+            }
+        };
+    }
+
+    /**
+     * Lookup annotation metadata for the placeholder.
+     *
+     * @param placeholderElement The element
+     * @return The annotation metadata
+     */
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupTypeAnnotationsForGenericPlaceholder(GenericPlaceholderElement placeholderElement) {
+        return metadataBuilder.lookupOrBuildForType(getNativeElement(placeholderElement));
+    }
+
+    /**
+     * Lookup annotation metadata for the wildcard.
+     *
+     * @param wildcardElement The element
+     * @return The annotation metadata
+     */
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupTypeAnnotationsForWildcard(WildcardElement wildcardElement) {
+        return metadataBuilder.lookupOrBuildForType(getNativeElement(wildcardElement));
+    }
+
     @NonNull
     private AbstractElementAnnotationMetadata buildForProperty(@Nullable AnnotationMetadata defaultAnnotationMetadata, @NonNull PropertyElement propertyElement) {
         return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
@@ -112,10 +248,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
 
             @Override
             protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
-                return metadataBuilder.lookupOrBuildForField(
-                    (K) enumConstantElement.getOwningType().getNativeType(),
-                    (K) enumConstantElement.getNativeType()
-                );
+                return lookupForField(enumConstantElement);
             }
 
             @Override
@@ -131,7 +264,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
 
             @Override
             protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
-                return metadataBuilder.lookupOrBuildForType((K) packageElement.getNativeType());
+                return lookupForPackage(packageElement);
             }
 
             @Override
@@ -147,11 +280,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
 
             @Override
             protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
-                return metadataBuilder.lookupOrBuildForParameter(
-                    (K) parameterElement.getMethodElement().getOwningType().getNativeType(),
-                    (K) parameterElement.getMethodElement().getNativeType(),
-                    (K) parameterElement.getNativeType()
-                );
+                return lookupForParameter(parameterElement);
             }
 
             @Override
@@ -168,10 +297,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
 
             @Override
             protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
-                return metadataBuilder.lookupOrBuildForField(
-                    (K) fieldElement.getOwningType().getNativeType(),
-                    (K) fieldElement.getNativeType()
-                );
+                return lookupForField(fieldElement);
             }
 
             @Override
@@ -184,11 +310,16 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
     @NonNull
     private AbstractElementAnnotationMetadata buildForMethod(@Nullable AnnotationMetadata defaultAnnotationMetadata,
                                                              @NonNull MethodElement methodElement) {
-        return new AbstractElementAnnotationMetadata(isReadOnly, methodElement.getOwningType(), defaultAnnotationMetadata) {
+        return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
+
+            @Override
+            protected AnnotationMetadata[] getParentAnnotationMetadata() {
+                return new AnnotationMetadata[]{methodElement.getOwningType()};
+            }
 
             @Override
             protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
-                return metadataBuilder.lookupOrBuildForMethod((K) methodElement.getOwningType().getNativeType(), (K) methodElement.getNativeType());
+                return lookupForMethod(methodElement);
             }
 
             @Override
@@ -205,10 +336,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
 
             @Override
             protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
-                return metadataBuilder.lookupOrBuildForMethod(
-                    (K) constructorElement.getOwningType().getNativeType(),
-                    (K) constructorElement.getNativeType()
-                );
+                return lookupForMethod(constructorElement);
             }
 
             @Override
@@ -219,17 +347,67 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
     }
 
     @NonNull
-    private AbstractElementAnnotationMetadata buildForClass(@Nullable AnnotationMetadata defaultAnnotationMetadata, @NonNull ClassElement classElement) {
-        return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
+    private AbstractElementAnnotationMetadata buildTypeAnnotationsForClass(@NonNull ClassElement classElement) {
+        return new AbstractElementAnnotationMetadata(null) {
 
             @Override
             protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
-                return metadataBuilder.lookupOrBuildForType((K) classElement.getNativeType());
+                return lookupTypeAnnotationsForClass(classElement);
             }
 
             @Override
             public String toString() {
                 return classElement.toString();
+            }
+        };
+    }
+
+    @NonNull
+    private AbstractElementAnnotationMetadata buildForClass(@Nullable AnnotationMetadata defaultAnnotationMetadata, @NonNull ClassElement classElement) {
+        return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
+
+            @Override
+            protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
+                return lookupForClass(classElement);
+            }
+
+            @Override
+            public String toString() {
+                return classElement.toString();
+            }
+        };
+    }
+
+    @NonNull
+    private AbstractElementAnnotationMetadata buildTypeAnnotationsForGenericPlaceholder(@Nullable AnnotationMetadata defaultAnnotationMetadata,
+                                                                                        @NonNull GenericPlaceholderElement placeholderElement) {
+        return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
+
+            @Override
+            protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
+                return lookupTypeAnnotationsForGenericPlaceholder(placeholderElement);
+            }
+
+            @Override
+            public String toString() {
+                return placeholderElement.toString();
+            }
+        };
+    }
+
+    @NonNull
+    private AbstractElementAnnotationMetadata buildTypeAnnotationsForWildcard(@Nullable AnnotationMetadata defaultAnnotationMetadata,
+                                                                              @NonNull WildcardElement wildcardElement) {
+        return new AbstractElementAnnotationMetadata(defaultAnnotationMetadata) {
+
+            @Override
+            protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
+                return lookupTypeAnnotationsForWildcard(wildcardElement);
+            }
+
+            @Override
+            public String toString() {
+                return wildcardElement.toString();
             }
         };
     }
@@ -244,22 +422,16 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
 
         protected AnnotationMetadata preloadedAnnotationMetadata;
         private final boolean readOnly;
-        private AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata cachedAnnotationMetadata;
-        private final ClassElement classElement;
+        private AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata cacheEntry;
+        private AnnotationMetadata cacheAnnotationMetadata;
 
         protected AbstractElementAnnotationMetadata(@Nullable AnnotationMetadata annotationMetadata) {
             this(AbstractElementAnnotationMetadataFactory.this.isReadOnly, annotationMetadata);
         }
 
-        protected AbstractElementAnnotationMetadata(boolean readOnly, @Nullable AnnotationMetadata annotationMetadata) {
-            this(readOnly, null, annotationMetadata);
-        }
-
         protected AbstractElementAnnotationMetadata(boolean readOnly,
-                                                    ClassElement classElement,
                                                     @Nullable AnnotationMetadata annotationMetadata) {
             this.readOnly = readOnly;
-            this.classElement = classElement;
             this.preloadedAnnotationMetadata = annotationMetadata;
             if (preloadedAnnotationMetadata instanceof AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata) {
                 throw new IllegalStateException();
@@ -269,37 +441,52 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
             }
         }
 
+        /**
+         * @return The parent annotation metadata for the annotation hierarchy
+         */
+        @NonNull
+        protected AnnotationMetadata[] getParentAnnotationMetadata() {
+            return new AnnotationMetadata[0];
+        }
+
         protected abstract AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup();
 
         private AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata getCacheEntry() {
-            if (cachedAnnotationMetadata == null) {
-                cachedAnnotationMetadata = lookup();
+            if (cacheEntry == null) {
+                cacheEntry = lookup();
             }
-            return cachedAnnotationMetadata;
+            return cacheEntry;
         }
 
         @Override
         public AnnotationMetadata getAnnotationMetadata() {
-            if (preloadedAnnotationMetadata != null) {
-                if (classElement != null) {
-                    if (preloadedAnnotationMetadata instanceof AnnotationMetadataHierarchy) {
-                        return preloadedAnnotationMetadata;
-                    }
-                    return new AnnotationMetadataHierarchy(classElement, preloadedAnnotationMetadata);
+            if (cacheAnnotationMetadata == null) {
+                if (preloadedAnnotationMetadata instanceof AnnotationMetadataHierarchy) {
+                    return preloadedAnnotationMetadata;
                 }
-                return preloadedAnnotationMetadata;
+                AnnotationMetadata[] parentAnnotationMetadata = getParentAnnotationMetadata();
+                AnnotationMetadata annotationMetadata;
+                if (preloadedAnnotationMetadata != null) {
+                    annotationMetadata = preloadedAnnotationMetadata;
+                } else {
+                    annotationMetadata = getCacheEntry();
+                }
+                if (parentAnnotationMetadata.length > 0) {
+                    cacheAnnotationMetadata = new AnnotationMetadataHierarchy(
+                        Stream.concat(Arrays.stream(parentAnnotationMetadata), Stream.of(annotationMetadata)).toArray(AnnotationMetadata[]::new)
+                    );
+                } else {
+                    cacheAnnotationMetadata = annotationMetadata;
+                }
             }
-            if (classElement != null) {
-                return new AnnotationMetadataHierarchy(classElement, getCacheEntry());
-            }
-            return getCacheEntry();
+            return cacheAnnotationMetadata;
         }
 
         private AnnotationMetadata getAnnotationMetadataToModify() {
+            if (preloadedAnnotationMetadata instanceof AnnotationMetadataHierarchy) {
+                return preloadedAnnotationMetadata.getDeclaredMetadata().copyAnnotationMetadata();
+            }
             if (preloadedAnnotationMetadata != null) {
-                if (preloadedAnnotationMetadata instanceof AnnotationMetadataHierarchy) {
-                    return preloadedAnnotationMetadata.getDeclaredMetadata().copyAnnotationMetadata();
-                }
                 return preloadedAnnotationMetadata;
             }
             return getCacheEntry().copyAnnotationMetadata();
@@ -324,6 +511,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
             } else {
                 preloadedAnnotationMetadata = annotationMetadata;
             }
+            cacheAnnotationMetadata = null;
             return getAnnotationMetadata();
         }
 
@@ -331,7 +519,7 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         @SuppressWarnings("java:S1192")
         public <T extends Annotation> AnnotationMetadata annotate(@NonNull String annotationType, @NonNull Consumer<AnnotationValueBuilder<T>> consumer) {
             ArgumentUtils.requireNonNull("annotationType", annotationType);
-            AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
+            AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType, metadataBuilder.getRetentionPolicy(annotationType));
             //noinspection ConstantConditions
             if (consumer != null) {
                 consumer.accept(builder);

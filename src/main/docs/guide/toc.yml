@@ -110,7 +110,18 @@ httpServer:
   serverIO: Writing Response Data
   uploads: File Uploads
   transfers: File Transfers
-  filters: HTTP Filters
+  filters:
+    title: HTTP Filters
+    filterPatterns: Filter Patterns
+    filtermethods:
+      title: Filter Methods
+      filtermethodsexample: Server Filter with Filter Methods
+      errorStates: Error States
+      continuations: Continuations
+    httpServerFilter:
+      title: HttpServerFilter
+      httpServerFilterExample: HttpServerFilter Example
+      httpServerFilterErrorStates: HttpServerFilter Error States
   sessions: HTTP Sessions
   sse: Server Sent Events
   websocket:
@@ -125,11 +136,21 @@ httpServer:
     threadPools:
       title: Configuring Server Thread Pools
       blockingOperations: Blocking Operations
+      virtualThreads: Virtual Threads
       atBlocking: '@Blocking'
     nettyClientPipeline: Configuring the Netty Client Pipeline
     nettyServerPipeline: Configuring the Netty Server Pipeline
     listener: Advanced Listener Configuration
-    cors: Configuring CORS
+    cors:
+      title: Configuring CORS
+      corsConfiguration: CORS via Configuration
+      corsAllowedOrigins: Allowed Origins
+      corsAllowedMethods: Allowed Methods
+      corsAllowedHeaders: Allowed Headers
+      corsExposedHeaders: Exposed Headers
+      corsAllowCredentials: Allow Credentials
+      corsMaxAge: Max Age
+      corsMultipleHeaderValues: Multiple Header Values
     https: Securing the Server with HTTPS
     dualProtocol: Enabling HTTP and HTTPS
     accessLogger: Enabling Access Logger

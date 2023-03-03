@@ -12,8 +12,8 @@ class CorsFilterEnabledSpec extends Specification {
     @Shared
     ApplicationContext applicationContext = ApplicationContext.run()
 
-    void "CorsFilter is not enabled by default"() {
+    void "CorsFilter is enabled by default"() {
         expect:
-        !applicationContext.containsBean(CorsFilter)
+        applicationContext.containsBean(CorsFilter)
     }
 }

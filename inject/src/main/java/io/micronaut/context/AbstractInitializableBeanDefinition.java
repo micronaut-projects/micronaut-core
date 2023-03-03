@@ -15,6 +15,7 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.DefaultBeanContext.ListenersSupplier;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Parameter;
@@ -74,6 +75,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
@@ -383,42 +385,53 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             return constructorInjectionPoint;
         }
         if (constructor == null) {
-            constructorInjectionPoint = new DefaultConstructorInjectionPoint<>(
+            DefaultConstructorInjectionPoint<T> point = new DefaultConstructorInjectionPoint<>(
                 this,
                 getBeanType(),
                 AnnotationMetadata.EMPTY_METADATA,
                 Argument.ZERO_ARGUMENTS
             );
-        } else {
-            if (constructor instanceof MethodReference methodConstructor) {
-                if ("<init>".equals(methodConstructor.methodName)) {
-                    this.constructorInjectionPoint = new DefaultConstructorInjectionPoint<>(
-                        this,
-                        methodConstructor.declaringType,
-                        methodConstructor.annotationMetadata,
-                        methodConstructor.arguments
-                    );
-                } else {
-                    this.constructorInjectionPoint = new DefaultMethodConstructorInjectionPoint<>(
-                        this,
-                        methodConstructor.declaringType,
-                        methodConstructor.methodName,
-                        methodConstructor.arguments,
-                        methodConstructor.annotationMetadata
-                    );
-                }
-            } else if (constructor instanceof FieldReference fieldConstructor) {
-                constructorInjectionPoint = new DefaultFieldConstructorInjectionPoint<>(
+            if (environment != null) {
+                point.configure(environment);
+            }
+            constructorInjectionPoint = point;
+        } else if (constructor instanceof MethodReference methodConstructor) {
+            if ("<init>".equals(methodConstructor.methodName)) {
+                DefaultConstructorInjectionPoint<T> point = new DefaultConstructorInjectionPoint<>(
                     this,
-                    fieldConstructor.declaringType,
-                    type,
-                    fieldConstructor.argument.getName(),
-                    fieldConstructor.argument.getAnnotationMetadata()
+                    methodConstructor.declaringType,
+                    methodConstructor.annotationMetadata,
+                    methodConstructor.arguments
                 );
+                if (environment != null) {
+                    point.configure(environment);
+                }
+                constructorInjectionPoint = point;
+            } else {
+                DefaultMethodConstructorInjectionPoint<T> point = new DefaultMethodConstructorInjectionPoint<>(
+                    this,
+                    methodConstructor.declaringType,
+                    methodConstructor.methodName,
+                    methodConstructor.arguments,
+                    methodConstructor.annotationMetadata
+                );
+                if (environment != null) {
+                    point.configure(environment);
+                }
+                constructorInjectionPoint = point;
             }
-            if (environment != null && constructorInjectionPoint instanceof EnvironmentConfigurable environmentConfigurable) {
-                environmentConfigurable.configure(environment);
+        } else if (constructor instanceof FieldReference fieldConstructor) {
+            DefaultFieldConstructorInjectionPoint<T> point = new DefaultFieldConstructorInjectionPoint<>(
+                this,
+                fieldConstructor.declaringType,
+                type,
+                fieldConstructor.argument.getName(),
+                fieldConstructor.argument.getAnnotationMetadata()
+            );
+            if (environment != null) {
+                point.configure(environment);
             }
+            constructorInjectionPoint = point;
         }
         return constructorInjectionPoint;
     }
@@ -662,12 +675,17 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         if (requiredParametrizedArguments != null) {
             return requiredParametrizedArguments;
         }
-        requiredParametrizedArguments = Arrays.stream(getConstructor().getArguments())
+        ConstructorInjectionPoint<T> ctor = getConstructor();
+        if (ctor != null) {
+            requiredParametrizedArguments = Arrays.stream(ctor.getArguments())
                 .filter(arg -> {
                     Optional<String> qualifierType = arg.getAnnotationMetadata().getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER);
                     return qualifierType.isPresent() && qualifierType.get().equals(Parameter.class.getName());
                 })
                 .toArray(Argument[]::new);
+        } else {
+            requiredParametrizedArguments = Argument.ZERO_ARGUMENTS;
+        }
         return requiredParametrizedArguments;
     }
 
@@ -820,12 +838,12 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     @Internal
     @UsedByGeneratedCode
     protected Object postConstruct(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
-        final Set<Map.Entry<Class<?>, List<BeanInitializedEventListener>>> beanInitializedEventListeners
+        final List<Map.Entry<Class<?>, ListenersSupplier<BeanInitializedEventListener>>> beanInitializedEventListeners
                 = ((DefaultBeanContext) context).beanInitializedEventListeners;
         if (CollectionUtils.isNotEmpty(beanInitializedEventListeners)) {
-            for (Map.Entry<Class<?>, List<BeanInitializedEventListener>> entry : beanInitializedEventListeners) {
+            for (Map.Entry<Class<?>, ListenersSupplier<BeanInitializedEventListener>> entry : beanInitializedEventListeners) {
                 if (entry.getKey().isAssignableFrom(getBeanType())) {
-                    for (BeanInitializedEventListener listener : entry.getValue()) {
+                    for (BeanInitializedEventListener listener : entry.getValue().get(resolutionContext)) {
                         bean = listener.onInitialized(new BeanInitializingEvent(context, this, bean));
                         if (bean == null) {
                             throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onInitialized event");
@@ -1021,9 +1039,19 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                                                              String cliProperty) {
         MethodReference methodRef = methodInjection[methodIndex];
         Argument<?> argument = methodRef.arguments[argIndex];
-        try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+        try (BeanResolutionContext.Path path = resolutionContext.getPath()
                 .pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments)) {
-            return resolvePropertyValue(resolutionContext, context, argument, propertyValue, cliProperty, false);
+            Object val = resolvePropertyValue(resolutionContext, context, argument, propertyValue, cliProperty, false);
+            if (this instanceof ValidatedBeanDefinition validatedBeanDefinition) {
+                validatedBeanDefinition.validateBeanArgument(
+                    resolutionContext,
+                    Objects.requireNonNull(path.peek()).getInjectionPoint(),
+                    argument,
+                    argIndex,
+                    val
+                );
+            }
+            return val;
         }
     }
 
@@ -1071,9 +1099,19 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                                                      Argument<?> argument,
                                                      String propertyValue,
                                                      String cliProperty) {
-        try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+        try (BeanResolutionContext.Path path = resolutionContext.getPath()
                 .pushMethodArgumentResolve(this, setterName, argument, new Argument[]{argument})) {
-            return resolvePropertyValue(resolutionContext, context, argument, propertyValue, cliProperty, false);
+            Object val = resolvePropertyValue(resolutionContext, context, argument, propertyValue, cliProperty, false);
+            if (this instanceof ValidatedBeanDefinition validatedBeanDefinition) {
+                validatedBeanDefinition.validateBeanArgument(
+                    resolutionContext,
+                    Objects.requireNonNull(path.peek()).getInjectionPoint(),
+                    argument,
+                    0,
+                    val
+                );
+            }
+            return val;
         }
     }
 
@@ -2130,6 +2168,9 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             boolean isNotInnerConfiguration = !precalculatedInfo.isConfigurationProperties || !isInnerConfiguration(argument);
             ConfigurationPath previousPath = isNotInnerConfiguration ? resolutionContext.setConfigurationPath(null) : null;
             try {
+                if (argument.isDeclaredNullable()) {
+                    return resolutionContext.findBean(argument, qualifier).orElse(null);
+                }
                 return resolutionContext.getBean(argument, qualifier);
             } finally {
                 if (previousPath != null) {
@@ -2143,15 +2184,9 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             if (isIterable() && getAnnotationMetadata().hasDeclaredAnnotation(EachBean.class)) {
                 throw new DisabledBeanException("Bean [" + getBeanType().getSimpleName() + "] disabled by parent: " + e.getMessage());
             } else {
-                if (argument.isDeclaredNullable()) {
-                    return null;
-                }
                 throw new DependencyInjectionException(resolutionContext, e);
             }
         } catch (NoSuchBeanException e) {
-            if (argument.isDeclaredNullable()) {
-                return null;
-            }
             throw new DependencyInjectionException(resolutionContext, e);
         }
     }

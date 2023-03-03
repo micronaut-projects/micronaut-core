@@ -39,6 +39,7 @@ dependencies {
     testImplementation libs.kotlinx.coroutines.rx2
     testImplementation libs.kotlinx.coroutines.slf4j
     testImplementation libs.kotlinx.coroutines.reactor
+    testImplementation libs.kotlinx.coroutines.reactive
 
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation libs.junit.jupiter.api
@@ -88,9 +89,18 @@ configurations.testRuntimeClasspath {
 }
 
 tasks.named("compileTestKotlin") {
-    kotlinOptions.jvmTarget = "1.8"
+    kotlinOptions.jvmTarget = "17"
 }
 
 tasks.named("test") {
     useJUnitPlatform()
+}
+
+tasks.withType(Test).configureEach {
+    distribution {
+        enabled = false
+    }
+    predictiveSelection {
+        enabled = false
+    }
 }

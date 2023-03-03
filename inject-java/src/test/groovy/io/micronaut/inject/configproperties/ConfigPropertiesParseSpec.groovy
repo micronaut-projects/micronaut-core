@@ -17,6 +17,47 @@ import java.time.Duration
 
 class ConfigPropertiesParseSpec extends AbstractTypeElementSpec {
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/8574")
+    void "test configuration properties inherited from parent with multiple overloads"() {
+        when:
+        def context = buildContext('''
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.convert.format.MapFormat;
+import io.micronaut.core.naming.conventions.StringConvention;
+import java.io.InputStream;
+import java.util.*;
+
+@ConfigurationProperties("freemarker")
+class TestConfiguration extends ParentConfiguration {
+    @Override
+    public void setSettings(
+            @MapFormat(keyFormat = StringConvention.UNDER_SCORE_SEPARATED_LOWER_CASE) Properties props){
+        super.setSettings(props);
+    }
+
+}
+class ParentConfiguration {
+    private Properties properties;
+    public void setSettings(InputStream inputStream) {
+    }
+    public void setSettings(Properties properties) {
+        this.properties = properties;
+    }
+
+    public Properties properties() {
+        return properties;
+    }
+}
+''')
+        def bean = getBean(context, 'test.TestConfiguration')
+
+        then:
+        bean != null
+        bean.properties() as Map == [url_escaping_charset:'UTF-8']
+    }
+
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/8480")
     void "test configuration properties inheritance for compiled classes - inherited props"() {
         when:
@@ -174,7 +215,8 @@ class MyConfig {
                 "micronaut.server.netty.parent.io-ratio": "10",
                 "micronaut.server.netty.parent.threads": "5",
                 "micronaut.server.netty.child.io-ratio": "15",
-                "micronaut.server.netty.child.threads": "55"
+                "micronaut.server.netty.child.threads": "55",
+                "freemarker.settings.urlEscapingCharset": 'UTF-8'
         )
     }
 

@@ -237,7 +237,7 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
 
     @NonNull
     @Override
-    default Map<String, Object> getDefaultValues(@NonNull String annotation) {
+    default Map<CharSequence, Object> getDefaultValues(@NonNull String annotation) {
         return getAnnotationMetadata().getDefaultValues(annotation);
     }
 

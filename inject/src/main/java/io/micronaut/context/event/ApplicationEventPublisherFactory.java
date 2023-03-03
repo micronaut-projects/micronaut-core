@@ -85,7 +85,7 @@ public final class ApplicationEventPublisherFactory<T>
 
     @Override
     public boolean isCandidateBean(Argument<?> beanType) {
-        return InstantiatableBeanDefinition.super.isCandidateBean(beanType);
+        return beanType.isAssignableFrom(ApplicationEventPublisher.class);
     }
 
     @Override
@@ -214,7 +214,7 @@ public final class ApplicationEventPublisherFactory<T>
     private ApplicationEventPublisher<Object> createEventPublisher(Argument<?> eventType, BeanContext beanContext) {
         return new ApplicationEventPublisher<Object>() {
 
-            private final Supplier<List<ApplicationEventListener>> lazyListeners = SupplierUtil.memoizedNonEmpty(() -> {
+            private final Supplier<List<ApplicationEventListener>> lazyListeners = SupplierUtil.memoized(() -> {
                 List<ApplicationEventListener> listeners = new ArrayList<>(
                         beanContext.getBeansOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(eventType.getType()))
                 );

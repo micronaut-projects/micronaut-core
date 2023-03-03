@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.optim.StaticOptimizations;
-import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import org.slf4j.Logger;
@@ -36,7 +35,6 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -61,7 +59,6 @@ public class ClassUtils {
      * because this class is used both at compilation time and runtime, and we don't want logging at compilation time.
      */
     public static final String PROPERTY_MICRONAUT_CLASSLOADER_LOGGING = "micronaut.classloader.logging";
-    public static final int EMPTY_OBJECT_ARRAY_HASH_CODE = Arrays.hashCode(ArrayUtils.EMPTY_OBJECT_ARRAY);
     public static final Map<String, Class<?>> COMMON_CLASS_MAP = new HashMap<>(34);
     public static final Map<String, Class<?>> BASIC_TYPE_MAP = new HashMap<>(18);
 
@@ -77,8 +74,8 @@ public class ClassUtils {
 
     private static final boolean ENABLE_CLASS_LOADER_LOGGING = Boolean.getBoolean(PROPERTY_MICRONAUT_CLASSLOADER_LOGGING);
     private static final Set<String> MISSING_TYPES = StaticOptimizations.get(Optimizations.class)
-            .map(Optimizations::getMissingTypes)
-            .orElse(Collections.emptySet());
+        .map(Optimizations::getMissingTypes)
+        .orElse(Collections.emptySet());
 
     static {
         REFLECTION_LOGGER = getLogger(ClassUtils.class);
@@ -87,26 +84,26 @@ public class ClassUtils {
     @SuppressWarnings("unchecked")
     private static final Map<String, Class<?>> PRIMITIVE_TYPE_MAP = CollectionUtils.mapOf(
         "int", Integer.TYPE,
-            "boolean", Boolean.TYPE,
-            "long", Long.TYPE,
-            "byte", Byte.TYPE,
-            "double", Double.TYPE,
-            "float", Float.TYPE,
-            "char", Character.TYPE,
-            "short", Short.TYPE,
-            "void", void.class
+        "boolean", Boolean.TYPE,
+        "long", Long.TYPE,
+        "byte", Byte.TYPE,
+        "double", Double.TYPE,
+        "float", Float.TYPE,
+        "char", Character.TYPE,
+        "short", Short.TYPE,
+        "void", void.class
     );
 
     @SuppressWarnings("unchecked")
     private static final Map<String, Class<?>> PRIMITIVE_ARRAY_MAP = CollectionUtils.mapOf(
-            "int", int[].class,
-            "boolean", boolean[].class,
-            "long", long[].class,
-            "byte", byte[].class,
-            "double", double[].class,
-            "float", float[].class,
-            "char", char[].class,
-            "short", short[].class
+        "int", int[].class,
+        "boolean", boolean[].class,
+        "long", long[].class,
+        "byte", byte[].class,
+        "double", double[].class,
+        "float", float[].class,
+        "char", char[].class,
+        "short", short[].class
     );
 
     static {
@@ -170,6 +167,7 @@ public class ClassUtils {
 
     /**
      * Returns the array type for the given primitive type name.
+     *
      * @param primitiveType The primitive type name
      * @return The array type
      */

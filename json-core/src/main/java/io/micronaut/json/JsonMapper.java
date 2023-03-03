@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.json.tree.JsonNode;
@@ -88,6 +89,19 @@ public interface JsonMapper {
     <T> T readValue(@NonNull byte[] byteArray, @NonNull Argument<T> type) throws IOException;
 
     /**
+     * Parse and map json from the given byte buffer.
+     *
+     * @param byteBuffer The input data.
+     * @param type       The type to deserialize to.
+     * @param <T>        Type variable of the return type.
+     * @return The deserialized object.
+     * @throws IOException IOException
+     */
+    default <T> T readValue(@NonNull ByteBuffer<?> byteBuffer, @NonNull Argument<T> type) throws IOException {
+        return readValue(byteBuffer.toByteArray(), type);
+    }
+
+    /**
      * Parse and map json from the given string.
      *
      * @param string The input data.
@@ -108,7 +122,10 @@ public interface JsonMapper {
      * @return The reactive processor.
      */
     @NonNull
-    Processor<byte[], JsonNode> createReactiveParser(@NonNull Consumer<Processor<byte[], JsonNode>> onSubscribe, boolean streamArray);
+    @Deprecated
+    default Processor<byte[], JsonNode> createReactiveParser(@NonNull Consumer<Processor<byte[], JsonNode>> onSubscribe, boolean streamArray) {
+        throw new UnsupportedOperationException("Reactive parser not supported");
+    }
 
     /**
      * Transform an object value to a json tree.

@@ -7,10 +7,16 @@ import jakarta.inject.Singleton;
 @Singleton
 public class OffendingInterfaceListener implements BeanCreatedEventListener<B> {
 
-    OffendingInterfaceListener(AInterface a) {}
+    static boolean initialized;
+    static boolean executed;
+
+    OffendingInterfaceListener(AInterface a) {
+        initialized = true;
+    }
 
     @Override
     public B onCreated(BeanCreatedEvent<B> event) {
+        executed = true;
         return event.getBean();
     }
 }

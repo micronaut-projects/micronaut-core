@@ -21,17 +21,19 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.PropertyElement;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -51,7 +53,28 @@ import java.util.function.Predicate;
 @Internal
 public abstract class EnclosedElementsQuery<C, N> {
 
-    private final Map<N, io.micronaut.inject.ast.Element> elementsCache = new HashMap<>();
+    private static final int MAX_ITEMS_IN_CACHE = 200;
+    private final Map<CacheKey, Element> elementsCache = new LinkedHashMap<>();
+
+    /**
+     * Get native class element.
+     *
+     * @param classElement The class element
+     * @return The native element
+     */
+    protected C getNativeClassType(ClassElement classElement) {
+        return (C) classElement.getNativeType();
+    }
+
+    /**
+     * Get native element.
+     *
+     * @param element The element
+     * @return The native element
+     */
+    protected N getNativeType(Element element) {
+        return (N) element.getNativeType();
+    }
 
     /**
      * Return the elements that match the given query.
@@ -65,14 +88,14 @@ public abstract class EnclosedElementsQuery<C, N> {
         Objects.requireNonNull(query, "Query cannot be null");
         ElementQuery.Result<T> result = query.result();
         Set<N> excludeElements = getExcludedNativeElements(result);
-        Predicate<io.micronaut.inject.ast.Element> filter = element -> {
-            if (excludeElements.contains(element.getNativeType())) {
+        Predicate<T> filter = element -> {
+            if (excludeElements.contains(getNativeType(element))) {
                 return false;
             }
             List<Predicate<T>> elementPredicates = result.getElementPredicates();
             if (!elementPredicates.isEmpty()) {
                 for (Predicate<T> elementPredicate : elementPredicates) {
-                    if (!elementPredicate.test((T) element)) {
+                    if (!elementPredicate.test(element)) {
                         return false;
                     }
                 }
@@ -134,12 +157,12 @@ public abstract class EnclosedElementsQuery<C, N> {
                     ClassElement ce;
                     if (element instanceof ConstructorElement) {
                         ce = classElement;
-                    } else if (element instanceof MethodElement) {
-                        ce = ((MethodElement) element).getGenericReturnType();
-                    } else if (element instanceof ClassElement) {
-                        ce = (ClassElement) element;
-                    } else if (element instanceof FieldElement) {
-                        ce = ((FieldElement) element).getGenericField();
+                    } else if (element instanceof MethodElement methodElement) {
+                        ce = methodElement.getGenericReturnType();
+                    } else if (element instanceof ClassElement theClass) {
+                        ce = theClass;
+                    } else if (element instanceof FieldElement fieldElement) {
+                        ce = fieldElement.getGenericField();
                     } else {
                         throw new IllegalStateException("Unknown element: " + element);
                     }
@@ -150,47 +173,77 @@ public abstract class EnclosedElementsQuery<C, N> {
             }
             return true;
         };
-        return (List<T>) getAllElements((C) classElement.getNativeType(), result.isOnlyDeclared(), (t1, t2) -> reduceElements(t1, t2, result), result)
-            .stream()
-            .filter(filter)
-            .toList();
+        Collection<T> allElements = getAllElements(getNativeClassType(classElement), result.isOnlyDeclared(), (t1, t2) -> reduceElements(t1, t2, result), result);
+        return allElements
+                .stream()
+                .filter(filter)
+                .toList();
     }
 
     private boolean reduceElements(io.micronaut.inject.ast.Element newElement,
                                    io.micronaut.inject.ast.Element existingElement,
                                    ElementQuery.Result<?> result) {
         if (!result.isIncludeHiddenElements()) {
-            if (newElement instanceof FieldElement && existingElement instanceof FieldElement) {
-                return ((FieldElement) newElement).hides((FieldElement) existingElement);
+            if (newElement instanceof FieldElement newFiledElement && existingElement instanceof FieldElement existingFieldElement) {
+                return newFiledElement.hides(existingFieldElement);
             }
-            if (newElement instanceof MethodElement && existingElement instanceof MethodElement) {
-                if (((MethodElement) newElement).hides((MethodElement) existingElement)) {
+            if (newElement instanceof MethodElement newMethodElement && existingElement instanceof MethodElement existingMethodElement) {
+                if (newMethodElement.hides(existingMethodElement)) {
                     return true;
                 }
             }
         }
         if (!result.isIncludeOverriddenMethods()) {
-            if (newElement instanceof MethodElement && existingElement instanceof MethodElement) {
-                return ((MethodElement) newElement).overrides((MethodElement) existingElement);
+            if (newElement instanceof MethodElement newMethodElement && existingElement instanceof MethodElement existingMethodElement) {
+                return newMethodElement.overrides(existingMethodElement);
+            } else if (newElement instanceof PropertyElement newPropertyElement && existingElement instanceof PropertyElement existingPropertyElement) {
+                return newPropertyElement.overrides(existingPropertyElement);
             }
         }
         return false;
     }
 
-    private Collection<io.micronaut.inject.ast.Element> getAllElements(C classNode,
-                                                                       boolean onlyDeclared,
-                                                                       BiPredicate<io.micronaut.inject.ast.Element, io.micronaut.inject.ast.Element> reduce,
-                                                                       ElementQuery.Result<?> result) {
-        Set<io.micronaut.inject.ast.Element> elements = new LinkedHashSet<>();
+    private <T extends io.micronaut.inject.ast.Element> Collection<T> getAllElements(C classNode,
+                                                                                     boolean onlyDeclared,
+                                                                                     BiPredicate<T, T> reduce,
+                                                                                     ElementQuery.Result<?> result) {
+        Set<T> elements = new LinkedHashSet<>();
         List<List<N>> hierarchy = new ArrayList<>();
         collectHierarchy(classNode, onlyDeclared, hierarchy, result);
         for (List<N> classElements : hierarchy) {
-            Set<io.micronaut.inject.ast.Element> addedFromClassElements = new LinkedHashSet<>();
+            Set<T> addedFromClassElements = new LinkedHashSet<>();
             classElements:
             for (N element : classElements) {
-                io.micronaut.inject.ast.Element newElement = elementsCache.computeIfAbsent(element, this::toAstElement);
-                for (Iterator<io.micronaut.inject.ast.Element> iterator = elements.iterator(); iterator.hasNext(); ) {
-                    io.micronaut.inject.ast.Element existingElement = iterator.next();
+                N nativeType = getCacheKey(element);
+                CacheKey cacheKey = new CacheKey(result.getElementType(), nativeType);
+                T newElement = (T) elementsCache.computeIfAbsent(cacheKey, ck -> toAstElement(nativeType, result.getElementType()));
+                if (result.getElementType() == MemberElement.class) {
+                    // Also cache members query results as it's original element type
+                    if (newElement instanceof FieldElement) {
+                        elementsCache.putIfAbsent(new CacheKey(FieldElement.class, nativeType), newElement);
+                    } else if (newElement instanceof ConstructorElement) {
+                        elementsCache.putIfAbsent(new CacheKey(ConstructorElement.class, nativeType), newElement);
+                        elementsCache.putIfAbsent(new CacheKey(MethodElement.class, nativeType), newElement);
+                    } else if (newElement instanceof MethodElement) {
+                        elementsCache.putIfAbsent(new CacheKey(MethodElement.class, nativeType), newElement);
+                    } else if (newElement instanceof PropertyElement) {
+                        elementsCache.putIfAbsent(new CacheKey(PropertyElement.class, nativeType), newElement);
+                    }
+                } else if (MemberElement.class.isAssignableFrom(result.getElementType())) {
+                    elementsCache.putIfAbsent(new CacheKey(MemberElement.class, nativeType), newElement);
+                }
+                if (elementsCache.size() == MAX_ITEMS_IN_CACHE) {
+                    Iterator<Map.Entry<CacheKey, Element>> iterator = elementsCache.entrySet().iterator();
+                    iterator.next();
+                    iterator.remove();
+                }
+                if (!result.getElementType().isInstance(newElement)) {
+                    // dirty cache
+                    elementsCache.remove(cacheKey);
+                    newElement = (T) elementsCache.computeIfAbsent(cacheKey, ck -> toAstElement(nativeType, result.getElementType()));
+                }
+                for (Iterator<T> iterator = elements.iterator(); iterator.hasNext(); ) {
+                    T existingElement = iterator.next();
                     if (newElement.equals(existingElement)) {
                         continue;
                     }
@@ -206,6 +259,16 @@ public abstract class EnclosedElementsQuery<C, N> {
             elements.addAll(addedFromClassElements);
         }
         return elements;
+    }
+
+    /**
+     * Get the cache key.
+     *
+     * @param element The element
+     * @return The cache key
+     */
+    protected N getCacheKey(N element) {
+        return element;
     }
 
     private void collectHierarchy(C classNode,
@@ -278,10 +341,13 @@ public abstract class EnclosedElementsQuery<C, N> {
     /**
      * Converts the native element to the AST element.
      *
-     * @param enclosedElement The native element.
+     * @param nativeType The native element.
+     * @param elementType     The result type
      * @return The AST element
      */
     @NonNull
-    protected abstract io.micronaut.inject.ast.Element toAstElement(N enclosedElement);
+    protected abstract io.micronaut.inject.ast.Element toAstElement(N nativeType, Class<?> elementType);
 
+    private record CacheKey(Class<?> elementType, Object nativeType) {
+    }
 }

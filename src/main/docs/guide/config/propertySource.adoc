@@ -62,7 +62,7 @@ It is important to note that it is not recommended to store sensitive configurat
 It is good practise to instead externalize sensitive configuration completely from the application code using preferably a external secret manager system (there are many options here, many provided by Cloud providers) or environment variables that are set during the deployment of the application. You can also use property placeholders (see the following section), to customize names of the environment variables to use and supply default values:
 
 .Using Property Value Placeholders to Define Secure Configuration
-[source,java]
+[configuration]
 ----
 datasources:
   default:
@@ -87,10 +87,9 @@ As mentioned in the previous section, Micronaut includes a property placeholder 
 
 TIP: Programmatic usage is also possible via the api:io.micronaut.context.env.PropertyPlaceholderResolver[] interface.
 
-The basic syntax is to wrap a reference to a property in `${...}`. For example in `application.yml`:
+The basic syntax is to wrap a reference to a property in `${...}`. For example:
 
-.Defining Property Placeholders
-[source,yaml]
+[configuration,title="Defining Property Placeholders"]
 ----
 myapp:
   endpoint: http://${micronaut.server.host}:${micronaut.server.port}/foo
@@ -100,8 +99,7 @@ The above example embeds references to the `micronaut.server.host` and `micronau
 
 You can specify default values by defining a value after the `:` character. For example:
 
-.Using Default Values
-[source,yaml]
+[configuration,title="Using Default Values"]
 ----
 myapp:
   endpoint: http://${micronaut.server.host:localhost}:${micronaut.server.port:8080}/foo
@@ -110,7 +108,7 @@ myapp:
 The above example defaults to `localhost` and port `8080` if no value is found (rather than throwing an exception). Note that if the default value contains a `:` character, you must escape it using backticks:
 
 .Using Backticks
-[source,yaml]
+[configuration]
 ----
 myapp:
   endpoint: ${server.address:`http://localhost:8080`}/foo
@@ -152,7 +150,7 @@ NOTE: The configuration above does not have any impact on property placeholders.
 
 You can use `random` values by using the following properties. These can be used in configuration files as variables like the following.
 
-[source,yaml]
+[configuration]
 ----
 micronaut:
   application:
@@ -195,7 +193,7 @@ The `random.int`, `random.integer`, `random.long` and `random.float` properties 
 - `(max)` where max is an exclusive value
 - `[min,max]` where min being inclusive and max being exclusive values.
 
-[source,yaml]
+[configuration]
 ----
 instance:
   id: ${random.int[5,10]}
@@ -209,4 +207,3 @@ NOTE: The range could vary from negative to positive as well.
 For beans that inject required properties, the injection and potential failure will not occur until the bean is requested. To verify at startup that the properties exist and can be injected, the bean can be annotated with ann:io.micronaut.context.annotation.Context[]. Context-scoped beans are injected at startup, and startup fails if any required properties are missing or cannot be converted to the required type.
 
 IMPORTANT: It is recommended to use this feature sparingly to ensure fast startup.
-

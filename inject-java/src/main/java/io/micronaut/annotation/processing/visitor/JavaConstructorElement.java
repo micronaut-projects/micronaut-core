@@ -17,12 +17,9 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ConstructorElement;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.ParameterElement;
-
-import javax.lang.model.element.ExecutableElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
 /**
  * A {@link ConstructorElement} for Java.
@@ -34,26 +31,21 @@ import javax.lang.model.element.ExecutableElement;
 class JavaConstructorElement extends JavaMethodElement implements ConstructorElement {
 
     /**
-     * @param declaringClass            The declaring class
-     * @param executableElement         The {@link ExecutableElement}
+     * @param owningClass            The declaring class
+     * @param nativeElement             The native element
      * @param annotationMetadataFactory The annotation metadata factory
      * @param visitorContext            The visitor context
      */
-    JavaConstructorElement(JavaClassElement declaringClass,
-                           ExecutableElement executableElement,
+    JavaConstructorElement(JavaClassElement owningClass,
+                           JavaNativeElement.Method nativeElement,
                            ElementAnnotationMetadataFactory annotationMetadataFactory,
                            JavaVisitorContext visitorContext) {
-        super(declaringClass, executableElement, annotationMetadataFactory, visitorContext);
+        super(owningClass, nativeElement, annotationMetadataFactory, visitorContext);
     }
 
     @Override
-    public MethodElement withParameters(ParameterElement... newParameters) {
-        return new JavaConstructorElement(owningType, executableElement, elementAnnotationMetadataFactory, visitorContext) {
-            @Override
-            public ParameterElement[] getParameters() {
-                return newParameters;
-            }
-        };
+    protected AbstractJavaElement copyThis() {
+        return new JavaConstructorElement(getDeclaringType(), getNativeType(), elementAnnotationMetadataFactory, visitorContext);
     }
 
     @Override

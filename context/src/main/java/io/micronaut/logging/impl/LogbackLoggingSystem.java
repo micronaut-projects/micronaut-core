@@ -17,8 +17,10 @@ package io.micronaut.logging.impl;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.LoggerContext;
+import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.logging.LoggingSystem;
 import jakarta.inject.Singleton;
@@ -35,9 +37,24 @@ import org.slf4j.LoggerFactory;
 @Internal
 public final class LogbackLoggingSystem implements LoggingSystem {
 
+    private static final String DEFAULT_LOGBACK_LOCATION = "logback.xml";
+
+    private final String logbackXmlLocation;
+
+    public LogbackLoggingSystem(@Nullable @Property(name = "logger.config") String logbackXmlLocation) {
+        this.logbackXmlLocation = logbackXmlLocation != null ? logbackXmlLocation : DEFAULT_LOGBACK_LOCATION;
+    }
+
     @Override
     public void setLogLevel(String name, LogLevel level) {
         getLoggerContext().getLogger(name).setLevel(toLevel(level));
+    }
+
+    @Override
+    public void refresh() {
+        LoggerContext context = getLoggerContext();
+        context.reset();
+        LogbackUtils.configure(getClass().getClassLoader(), context, logbackXmlLocation);
     }
 
     /**

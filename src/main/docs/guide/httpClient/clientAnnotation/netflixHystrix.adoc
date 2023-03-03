@@ -34,10 +34,10 @@ TIP: For information on how to customize the Hystrix thread pool, group, and pro
 
 == Enabling Hystrix Stream and Dashboard
 
-You can enable a Server Sent Event stream to feed into the https://github.com/Netflix-Skunkworks/hystrix-dashboard[Hystrix Dashboard] by setting the `hystrix.stream.enabled` setting to `true` in `application.yml`:
+You can enable a Server Sent Event stream to feed into the https://github.com/Netflix-Skunkworks/hystrix-dashboard[Hystrix Dashboard] by setting the `hystrix.stream.enabled` setting to `true` in your configuration file (e.g `application.yml`):
 
 .Enabling Hystrix Stream
-[source,yaml]
+[configuration]
 ----
 hystrix:
   stream:

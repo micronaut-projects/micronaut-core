@@ -16,17 +16,18 @@
 package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.FieldElement;
-import org.codehaus.groovy.ast.ClassHelper;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
 
 import java.lang.reflect.Modifier;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -36,10 +37,17 @@ import java.util.Set;
  * @author James Kleeh
  * @since 1.0
  */
+@Internal
 public class GroovyFieldElement extends AbstractGroovyElement implements FieldElement {
 
     private final GroovyClassElement owningType;
     private final FieldNode fieldNode;
+    @Nullable
+    private GroovyClassElement declaringType;
+    @Nullable
+    private ClassElement type;
+    @Nullable
+    private ClassElement genericType;
 
     /**
      * @param visitorContext            The visitor context
@@ -51,7 +59,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
                        GroovyClassElement owningType,
                        FieldNode fieldNode,
                        ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        super(visitorContext, fieldNode, annotationMetadataFactory);
+        super(visitorContext, new GroovyNativeElement.Field(fieldNode, owningType.getNativeType()), annotationMetadataFactory);
         this.owningType = owningType;
         this.fieldNode = fieldNode;
     }
@@ -64,11 +72,6 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     @Override
     public FieldElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
         return (FieldElement) super.withAnnotationMetadata(annotationMetadata);
-    }
-
-    @Override
-    public FieldNode getNativeType() {
-        return fieldNode;
     }
 
     @Override
@@ -88,21 +91,7 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
 
     @Override
     public ClassElement getGenericField() {
-        if (isPrimitive()) {
-            ClassNode cn = ClassHelper.make(ClassUtils.getPrimitiveType(getType().getName()).orElse(null));
-            if (cn != null) {
-                return new GroovyClassElement(visitorContext, cn, elementAnnotationMetadataFactory) {
-
-                    @Override
-                    public boolean isPrimitive() {
-                        return true;
-                    }
-                };
-            } else {
-                return getGenericType();
-            }
-        }
-        return new GroovyClassElement(visitorContext, (ClassNode) getGenericType().getNativeType(), elementAnnotationMetadataFactory);
+        return newClassElement(fieldNode.getType(), getDeclaringType().getTypeArguments());
     }
 
     @Override
@@ -163,15 +152,34 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     @NonNull
     @Override
     public ClassElement getType() {
-        return visitorContext.getElementFactory().newClassElement(fieldNode.getType(), elementAnnotationMetadataFactory);
+        if (type == null) {
+            type = newClassElement(fieldNode.getType());
+        }
+        return type;
+    }
+
+    @Override
+    public ClassElement getGenericType() {
+        if (genericType == null) {
+            genericType = newClassElement(fieldNode.getType(), getDeclaringType().getTypeArguments());
+        }
+        return genericType;
     }
 
     @Override
     public GroovyClassElement getDeclaringType() {
-        ClassNode declaringClass = fieldNode.getDeclaringClass();
-        if (declaringClass == null) {
-            throw new IllegalStateException("Declaring class could not be established");
+        if (declaringType == null) {
+            ClassNode declaringClass = fieldNode.getDeclaringClass();
+            if (declaringClass == null) {
+                throw new IllegalStateException("Declaring class could not be established");
+            }
+            if (owningType.getNativeType().annotatedNode().equals(declaringClass)) {
+                declaringType = owningType;
+            } else {
+                Map<String, ClassElement> typeArguments = getOwningType().getTypeArguments(declaringClass.getName());
+                declaringType = (GroovyClassElement) newClassElement(declaringClass, typeArguments);
+            }
         }
-        return (GroovyClassElement) visitorContext.getElementFactory().newClassElement(declaringClass, elementAnnotationMetadataFactory);
+        return declaringType;
     }
 }

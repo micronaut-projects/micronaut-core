@@ -31,6 +31,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.annotation.AbstractAnnotationElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.beans.BeanElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
@@ -76,7 +77,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-public class JavaVisitorContext implements VisitorContext, BeanElementVisitorContext {
+public final class JavaVisitorContext implements VisitorContext, BeanElementVisitorContext {
 
     private final Messager messager;
     private final Elements elements;
@@ -262,8 +263,8 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
             if (element instanceof BeanElement) {
                 element = ((BeanElement) element).getDeclaringClass();
             }
-            if (element instanceof AbstractJavaElement) {
-                Element el = (Element) element.getNativeType();
+            if (element instanceof AbstractJavaElement abstractJavaElement) {
+                Element el = abstractJavaElement.getNativeType().element();
                 messager.printMessage(kind, message, el);
             } else {
                 messager.printMessage(kind, message);
@@ -416,18 +417,24 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
 
     private void populateClassElements(@NonNull String[] stereotypes, PackageElement packageElement, List<ClassElement> classElements) {
         final List<? extends Element> enclosedElements = packageElement.getEnclosedElements();
-        boolean includeAll = Arrays.equals(stereotypes, new String[]{"*"});
+        boolean includeAll = Arrays.equals(stereotypes, new String[] { "*" });
         for (Element enclosedElement : enclosedElements) {
-            if (enclosedElement instanceof TypeElement) {
-                JavaClassElement classElement = elementFactory.newClassElement((TypeElement) enclosedElement, elementAnnotationMetadataFactory);
-                if (includeAll || Arrays.stream(stereotypes).anyMatch(classElement::hasStereotype)) {
-                    if (!classElement.isAbstract()) {
-                        classElements.add(classElement);
-                    }
-                }
-            } else if (enclosedElement instanceof PackageElement) {
-                populateClassElements(stereotypes, (PackageElement) enclosedElement, classElements);
+            populateClassElements(stereotypes, includeAll, packageElement, enclosedElement, classElements);
+        }
+    }
+
+    private void populateClassElements(@NonNull String[] stereotypes, boolean includeAll, PackageElement packageElement, Element enclosedElement, List<ClassElement> classElements) {
+        if (enclosedElement instanceof TypeElement) {
+            JavaClassElement classElement = elementFactory.newClassElement((TypeElement) enclosedElement, elementAnnotationMetadataFactory);
+            if ((includeAll || Arrays.stream(stereotypes).anyMatch(classElement::hasStereotype)) && !classElement.isAbstract()) {
+                classElements.add(classElement);
             }
+            List<? extends Element> nestedElements = enclosedElement.getEnclosedElements();
+            for (Element nestedElement : nestedElements) {
+                populateClassElements(stereotypes, includeAll, packageElement, nestedElement, classElements);
+            }
+        } else if (enclosedElement instanceof PackageElement) {
+            populateClassElements(stereotypes, (PackageElement) enclosedElement, classElements);
         }
     }
 
@@ -488,7 +495,7 @@ public class JavaVisitorContext implements VisitorContext, BeanElementVisitorCon
             originatingElement,
             type,
             ConfigurationMetadataBuilder.INSTANCE,
-            type instanceof AbstractJavaElement ? ((AbstractJavaElement) type).elementAnnotationMetadataFactory : elementAnnotationMetadataFactory,
+            type instanceof AbstractAnnotationElement ? ((AbstractAnnotationElement) type).getElementAnnotationMetadataFactory() : elementAnnotationMetadataFactory,
             this
         );
     }

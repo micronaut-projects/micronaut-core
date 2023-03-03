@@ -18,10 +18,13 @@ package io.micronaut.management.endpoint.loggers.impl;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
+import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.logging.LogLevel;
+import io.micronaut.logging.impl.LogbackUtils;
 import io.micronaut.management.endpoint.loggers.LoggerConfiguration;
 import io.micronaut.management.endpoint.loggers.LoggersEndpoint;
 import io.micronaut.management.endpoint.loggers.ManagedLoggingSystem;
@@ -42,6 +45,13 @@ import java.util.stream.Collectors;
 @Requires(classes = ch.qos.logback.classic.LoggerContext.class)
 @Replaces(io.micronaut.logging.impl.LogbackLoggingSystem.class)
 public class LogbackLoggingSystem implements ManagedLoggingSystem, io.micronaut.logging.LoggingSystem {
+    private static final String DEFAULT_LOGBACK_LOCATION = "logback.xml";
+
+    private final String logbackXmlLocation;
+
+    public LogbackLoggingSystem(@Nullable @Property(name = "logger.config") String logbackXmlLocation) {
+        this.logbackXmlLocation = logbackXmlLocation != null ? logbackXmlLocation : DEFAULT_LOGBACK_LOCATION;
+    }
 
     @Override
     @NonNull
@@ -105,5 +115,12 @@ public class LogbackLoggingSystem implements ManagedLoggingSystem, io.micronaut.
         } else {
             return Level.valueOf(logLevel.name());
         }
+    }
+
+    @Override
+    public void refresh() {
+        LoggerContext context = getLoggerContext();
+        context.reset();
+        LogbackUtils.configure(getClass().getClassLoader(), context, logbackXmlLocation);
     }
 }

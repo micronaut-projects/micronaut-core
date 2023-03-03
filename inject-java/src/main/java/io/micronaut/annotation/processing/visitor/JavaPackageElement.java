@@ -39,7 +39,7 @@ public class JavaPackageElement extends AbstractJavaElement implements io.micron
     public JavaPackageElement(PackageElement element,
                               ElementAnnotationMetadataFactory annotationMetadataFactory,
                               JavaVisitorContext visitorContext) {
-        super(element, annotationMetadataFactory, visitorContext);
+        super(new JavaNativeElement.Package(element), annotationMetadataFactory, visitorContext);
         this.element = element;
     }
 

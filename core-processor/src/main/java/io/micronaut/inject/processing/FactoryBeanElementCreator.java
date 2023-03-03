@@ -109,27 +109,15 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
 
     void visitBeanFactoryElement(BeanDefinitionVisitor visitor, ClassElement producedType, MemberElement producingElement) {
         if (producedType.isPrimitive()) {
-            BeanDefinitionWriter producedBeanDefinitionWriter = new BeanDefinitionWriter(producingElement,
-                OriginatingElements.of(producingElement),
-                visitorContext,
-                factoryMethodIndex.getAndIncrement()
-            );
-            buildProducedBeanDefinition(producedBeanDefinitionWriter, producedType, producingElement, producingElement.getAnnotationMetadata());
+            buildProducedBeanDefinition(producedType, producingElement, producingElement.getAnnotationMetadata());
         } else {
             AnnotationMetadata producedTypeAnnotationMetadata = createProducedTypeAnnotationMetadata(producedType, producingElement);
             producedType = producedType.withAnnotationMetadata(producedTypeAnnotationMetadata);
             AnnotationMetadata producingElementAnnotationMetadata = createProducingElementAnnotationMetadata(producedTypeAnnotationMetadata);
             producingElement = producingElement.withAnnotationMetadata(producingElementAnnotationMetadata);
 
-            BeanDefinitionWriter producedBeanDefinitionWriter = new BeanDefinitionWriter(
-                producingElement,
-                OriginatingElements.of(producingElement),
-                visitorContext,
-                factoryMethodIndex.getAndIncrement()
-            );
-
 //            producingElement = producingElement.withAnnotationMetadata(producedTypeAnnotationMetadata);
-            buildProducedBeanDefinition(producedBeanDefinitionWriter, producedType, producingElement, producedType.getAnnotationMetadata());
+            buildProducedBeanDefinition(producedType, producingElement, producedType.getAnnotationMetadata());
 
             if (producingElement instanceof MethodElement methodElement) {
                 if (isAopProxy && visitAopMethod(visitor, methodElement)) {
@@ -172,22 +160,41 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
         return producedAnnotationMetadata;
     }
 
-    private void buildProducedBeanDefinition(BeanDefinitionWriter producedBeanDefinitionWriter,
-                                             ClassElement producedType,
+    private void buildProducedBeanDefinition(ClassElement producedType,
                                              MemberElement producingElement,
                                              AnnotationMetadata producedAnnotationMetadata) {
+
+        if (producedType.hasStereotype(EachProperty.class)) {
+            producedType.annotate(ConfigurationReader.class, builder -> builder.member(ConfigurationReader.PREFIX, ConfigurationUtils.getRequiredTypePath(producedType)));
+            producingElement.annotate(ConfigurationReader.class, builder -> builder.member(ConfigurationReader.PREFIX, ConfigurationUtils.getRequiredTypePath(producedType)));
+        }
+
+        BeanDefinitionWriter producedBeanDefinitionWriter = new BeanDefinitionWriter(
+                producingElement,
+                OriginatingElements.of(producingElement),
+                visitorContext,
+                factoryMethodIndex.getAndIncrement()
+        );
+
+        beanDefinitionWriters.add(producedBeanDefinitionWriter);
 
         visitAnnotationMetadata(producedBeanDefinitionWriter, producedAnnotationMetadata);
         producedBeanDefinitionWriter.visitTypeArguments(producedType.getAllTypeArguments());
 
-        beanDefinitionWriters.add(producedBeanDefinitionWriter);
-
-        if (producedType.hasStereotype(EachProperty.class)) {
-            producedType.annotate(ConfigurationReader.class, builder -> builder.member(ConfigurationReader.PREFIX, ConfigurationUtils.getRequiredTypePath(producedType)));
-        }
-
-        if (producingElement instanceof MethodElement) {
-            producedBeanDefinitionWriter.visitBeanFactoryMethod(classElement, (MethodElement) producingElement);
+        if (producingElement instanceof PropertyElement propertyElement) {
+            MethodElement readMethod = propertyElement.getReadMethod().orElse(null);
+            if (readMethod != null) {
+                producedBeanDefinitionWriter.visitBeanFactoryMethod(classElement, readMethod);
+            } else {
+                FieldElement fieldElement = propertyElement.getField().orElse(null);
+                if (fieldElement != null && fieldElement.isAccessible()) {
+                    producedBeanDefinitionWriter.visitBeanFactoryField(classElement, fieldElement);
+                } else {
+                    throw new ProcessingException(producingElement, "A property element that defines the @Bean annotation must have an accessible getter or field");
+                }
+            }
+        } else if (producingElement instanceof MethodElement methodElement) {
+            producedBeanDefinitionWriter.visitBeanFactoryMethod(classElement, methodElement);
         } else {
             producedBeanDefinitionWriter.visitBeanFactoryField(classElement, (FieldElement) producingElement);
         }

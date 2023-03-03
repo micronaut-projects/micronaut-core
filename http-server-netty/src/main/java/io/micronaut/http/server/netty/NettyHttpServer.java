@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.DefaultApplicationContext;
 import io.micronaut.context.env.CachedEnvironment;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.ApplicationEventPublisher;
@@ -262,6 +263,10 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     public synchronized NettyEmbeddedServer start() {
         if (!isRunning()) {
             if (isDefault && !applicationContext.isRunning()) {
+                if (applicationContext instanceof DefaultApplicationContext defaultApplicationContext) {
+                    // Stop did remove the existing environment
+                    defaultApplicationContext.setEnvironment(environment);
+                }
                 applicationContext.start();
             }
             //suppress unused
@@ -586,7 +591,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     private void fireStartupEvents() {
-        Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
         applicationContext.getEventPublisher(ServerStartupEvent.class)
                 .publishEvent(new ServerStartupEvent(this));
     }

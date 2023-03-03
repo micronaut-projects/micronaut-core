@@ -115,6 +115,22 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR = true;
 
+    /**
+     * The default value for eager parsing.
+     *
+     * @since 4.0.0
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_EAGER_PARSING = false;
+
+    /**
+     * The default value for eager parsing.
+     *
+     * @since 4.0.0
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_JSON_BUFFER_MAX_COMPONENTS = 4096;
+
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServerConfiguration.class);
 
     private final List<ChannelPipelineListener> pipelineCustomizers;
@@ -141,6 +157,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private boolean keepAliveOnServerError = DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR;
     private String pcapLoggingPathPattern = null;
     private List<NettyListenerConfiguration> listeners = null;
+    private boolean eagerParsing = DEFAULT_EAGER_PARSING;
+    private int jsonBufferMaxComponents = DEFAULT_JSON_BUFFER_MAX_COMPONENTS;
 
     /**
      * Default empty constructor.
@@ -563,6 +581,51 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setListeners(List<NettyListenerConfiguration> listeners) {
         this.listeners = listeners;
+    }
+
+    /**
+     * Parse incoming JSON data eagerly, before route binding. Default value
+     * {@value DEFAULT_EAGER_PARSING}.
+     *
+     * @return Whether to parse incoming JSON data eagerly before route binding
+     * @since 4.0.0
+     */
+    public boolean isEagerParsing() {
+        return eagerParsing;
+    }
+
+    /**
+     * Parse incoming JSON data eagerly, before route binding. Default value
+     * {@value DEFAULT_EAGER_PARSING}.
+     *
+     * @param eagerParsing Whether to parse incoming JSON data eagerly before route binding
+     * @since 4.0.0
+     */
+    public void setEagerParsing(boolean eagerParsing) {
+        this.eagerParsing = eagerParsing;
+    }
+
+    /**
+     * Maximum number of buffers to keep around in JSON parsing before they should be consolidated.
+     * Defaults to {@value #DEFAULT_JSON_BUFFER_MAX_COMPONENTS}.
+     *
+     * @return The maximum number of components
+     * @since 4.0.0
+     */
+    public int getJsonBufferMaxComponents() {
+        return jsonBufferMaxComponents;
+    }
+
+
+    /**
+     * Maximum number of buffers to keep around in JSON parsing before they should be consolidated.
+     * Defaults to {@value #DEFAULT_JSON_BUFFER_MAX_COMPONENTS}.
+     *
+     * @param jsonBufferMaxComponents The maximum number of components
+     * @since 4.0.0
+     */
+    public void setJsonBufferMaxComponents(int jsonBufferMaxComponents) {
+        this.jsonBufferMaxComponents = jsonBufferMaxComponents;
     }
 
     /**

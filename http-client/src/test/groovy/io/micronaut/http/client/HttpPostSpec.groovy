@@ -325,7 +325,7 @@ class HttpPostSpec extends Specification {
         List<Boolean> booleans = blockingHttpClient.retrieve(
                 HttpRequest.POST("/post/booleans", "[true, true, false]"),
 
-                Argument.of(List.class, Boolean.class)
+                Argument.listOf(Boolean.class)
         )
 
         expect:

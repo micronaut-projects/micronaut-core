@@ -131,7 +131,7 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
         }
 
         void visitClass(ClassNode node) {
-            if (targetClassElement.getNativeType() != node) {
+            if ((targetClassElement as GroovyClassElement).getNativeType().annotatedNode() != node) {
                 targetClassElement = visitorContext.getElementFactory().newSourceClassElement(node, visitorContext.getElementAnnotationMetadataFactory())
             }
             for (LoadedVisitor it : typeElementVisitors) {

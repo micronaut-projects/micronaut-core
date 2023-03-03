@@ -19,10 +19,12 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 
@@ -30,6 +32,7 @@ import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -54,6 +57,36 @@ public interface MethodElement extends MemberElement {
      */
     default List<? extends GenericPlaceholderElement> getDeclaredTypeVariables() {
         return Collections.emptyList();
+    }
+
+    /**
+     * The type arguments for this method element.
+     * The type arguments should include the type arguments added to the method plus the type arguments of the declaring class.
+     *
+     * @return The type arguments for this method element
+     * @since 4.0.0
+     */
+    @Experimental
+    @NonNull
+    default Map<String, ClassElement> getTypeArguments() {
+        Map<String, ClassElement> typeArguments = getDeclaringType().getTypeArguments();
+        Map<String, ClassElement> methodTypeArguments = getDeclaredTypeArguments();
+        Map<String, ClassElement> newTypeArguments = CollectionUtils.newLinkedHashMap(typeArguments.size() + methodTypeArguments.size());
+        newTypeArguments.putAll(typeArguments);
+        newTypeArguments.putAll(methodTypeArguments);
+        return newTypeArguments;
+    }
+
+    /**
+     * The declared type arguments for this method element.
+     *
+     * @return The declared type arguments for this method element
+     * @since 4.0.0
+     */
+    @Experimental
+    @NonNull
+    default Map<String, ClassElement> getDeclaredTypeArguments() {
+        return Collections.emptyMap();
     }
 
     /**
@@ -205,6 +238,15 @@ public interface MethodElement extends MemberElement {
      */
     default boolean overrides(@NonNull MethodElement overridden) {
         if (this.equals(overridden) || isStatic() || overridden.isStatic()) {
+            return false;
+        }
+        ClassElement thisType = getDeclaringType();
+        ClassElement thatType = overridden.getDeclaringType();
+        if (thisType.getName().equals(thatType.getName())) {
+            return false;
+        }
+        if (!thisType.isAssignable(thatType)) {
+            // not a parent class
             return false;
         }
         MethodElement newMethod = this;

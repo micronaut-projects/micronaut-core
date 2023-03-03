@@ -7,7 +7,7 @@ To execute the routes endpoint, send a GET request to /routes.
 To configure the routes endpoint, supply configuration through `endpoints.routes`.
 
 .Routes Endpoint Configuration Example
-[source,yaml]
+[configuration]
 ----
 endpoints:
   routes:

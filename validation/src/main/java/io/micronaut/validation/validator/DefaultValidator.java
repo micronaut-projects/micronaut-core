@@ -1115,6 +1115,9 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
         @SuppressWarnings("unchecked")
         final Class<T> rootBeanClass = (Class<T>) rootBean.getClass();
         for (BeanProperty<Object, Object> constrainedProperty : constrainedProperties) {
+            if (constrainedProperty.isWriteOnly()) {
+                continue;
+            }
             final Object propertyValue = constrainedProperty.get(object);
             //noinspection unchecked
             validateConstrainedPropertyInternal(
@@ -1576,9 +1579,9 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator, R
             variables.put(entry.getKey().toString(),  entry.getValue());
         }
         variables.put("validatedValue", propertyValue);
-        final Map<String, Object> defaultValues = annotationMetadata.getDefaultValues(annotationValue.getAnnotationName());
-        for (Map.Entry<String, Object> entry : defaultValues.entrySet()) {
-            final String n = entry.getKey();
+        final Map<CharSequence, Object> defaultValues = annotationMetadata.getDefaultValues(annotationValue.getAnnotationName());
+        for (Map.Entry<CharSequence, Object> entry : defaultValues.entrySet()) {
+            final String n = entry.getKey().toString();
             if (!variables.containsKey(n)) {
                 final Object v = entry.getValue();
                 if (v != null) {
