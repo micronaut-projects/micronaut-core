@@ -31,16 +31,16 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 class JavaConstructorElement extends JavaMethodElement implements ConstructorElement {
 
     /**
-     * @param declaringClass            The declaring class
+     * @param owningClass            The declaring class
      * @param nativeElement             The native element
      * @param annotationMetadataFactory The annotation metadata factory
      * @param visitorContext            The visitor context
      */
-    JavaConstructorElement(JavaClassElement declaringClass,
+    JavaConstructorElement(JavaClassElement owningClass,
                            JavaNativeElement.Method nativeElement,
                            ElementAnnotationMetadataFactory annotationMetadataFactory,
                            JavaVisitorContext visitorContext) {
-        super(declaringClass, nativeElement, annotationMetadataFactory, visitorContext);
+        super(owningClass, nativeElement, annotationMetadataFactory, visitorContext);
     }
 
     @Override

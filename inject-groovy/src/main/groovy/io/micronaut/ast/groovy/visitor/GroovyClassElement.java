@@ -415,6 +415,12 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         }
         AtomicReference<AnnotationMetadataProvider> ref = new AtomicReference<>();
         if (conf.getAccessKinds().contains(BeanProperties.AccessKind.METHOD) && nativeProps.remove(value.propertyName)) {
+            AnnotationMetadataProvider methodAnnotationMetadataProvider = new AnnotationMetadataProvider() {
+                @Override
+                public AnnotationMetadata getAnnotationMetadata() {
+                    return ref.get().getAnnotationMetadata();
+                }
+            };
             AnnotationMetadataProvider annotationMetadataProvider = new AnnotationMetadataProvider() {
                 @Override
                 public AnnotationMetadata getAnnotationMetadata() {
@@ -432,6 +438,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                 value.getter = MethodElement.of(
                         this,
                         value.field.getDeclaringType(),
+                        methodAnnotationMetadataProvider,
                         annotationMetadataProvider,
                         visitorContext.getAnnotationMetadataBuilder(),
                         value.field.getGenericType(),
@@ -449,6 +456,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                 value.setter = MethodElement.of(
                         this,
                         value.field.getDeclaringType(),
+                        methodAnnotationMetadataProvider,
                         annotationMetadataProvider,
                         visitorContext.getAnnotationMetadataBuilder(),
                         PrimitiveElement.VOID,
@@ -456,7 +464,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                         NameUtils.setterNameFor(value.propertyName),
                         value.field.isStatic(),
                         value.field.isFinal(),
-                        ParameterElement.of(value.field.getGenericType(), value.propertyName, annotationMetadataProvider, visitorContext.getAnnotationMetadataBuilder())
+                        ParameterElement.of(value.field.getGenericType(), value.propertyName, methodAnnotationMetadataProvider, visitorContext.getAnnotationMetadataBuilder())
                 );
                 value.writeAccessKind = BeanProperties.AccessKind.METHOD;
             } else if (nativePropertiesOnly) {
@@ -754,38 +762,38 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         }
 
         @Override
-        protected Element toAstElement(AnnotatedNode enclosedElement, Class<?> elementType) {
+        protected Element toAstElement(AnnotatedNode nativeType, Class<?> elementType) {
             final GroovyElementFactory elementFactory = visitorContext.getElementFactory();
             if (isSource) {
-                if (!(enclosedElement instanceof ConstructorNode) && enclosedElement instanceof MethodNode methodNode) {
+                if (!(nativeType instanceof ConstructorNode) && nativeType instanceof MethodNode methodNode) {
                     return elementFactory.newSourceMethodElement(
                             GroovyClassElement.this,
                             methodNode,
                             elementAnnotationMetadataFactory
                     );
                 }
-                if (enclosedElement instanceof ClassNode cn) {
+                if (nativeType instanceof ClassNode cn) {
                     return elementFactory.newSourceClassElement(
                             cn,
                             elementAnnotationMetadataFactory
                     );
                 }
             }
-            if (enclosedElement instanceof ConstructorNode constructorNode) {
+            if (nativeType instanceof ConstructorNode constructorNode) {
                 return elementFactory.newConstructorElement(
                         GroovyClassElement.this,
                         constructorNode,
                         elementAnnotationMetadataFactory
                 );
             }
-            if (enclosedElement instanceof MethodNode methodNode) {
+            if (nativeType instanceof MethodNode methodNode) {
                 return elementFactory.newMethodElement(
                         GroovyClassElement.this,
                         methodNode,
                         elementAnnotationMetadataFactory
                 );
             }
-            if (enclosedElement instanceof FieldNode fieldNode) {
+            if (nativeType instanceof FieldNode fieldNode) {
                 if (fieldNode.isEnum()) {
                     return elementFactory.newEnumConstantElement(
                             GroovyClassElement.this,
@@ -799,13 +807,13 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                         elementAnnotationMetadataFactory
                 );
             }
-            if (enclosedElement instanceof ClassNode cn) {
+            if (nativeType instanceof ClassNode cn) {
                 return elementFactory.newClassElement(
                         cn,
                         elementAnnotationMetadataFactory
                 );
             }
-            throw new IllegalStateException("Unknown element: " + enclosedElement);
+            throw new IllegalStateException("Unknown element: " + nativeType);
         }
     }
 

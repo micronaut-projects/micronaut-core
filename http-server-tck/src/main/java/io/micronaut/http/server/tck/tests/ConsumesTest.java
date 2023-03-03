@@ -16,6 +16,7 @@
 package io.micronaut.http.server.tck.tests;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
@@ -61,6 +62,7 @@ public class ConsumesTest {
         }
     }
 
+    @Introspected
     static class Pojo {
         private String name;
 

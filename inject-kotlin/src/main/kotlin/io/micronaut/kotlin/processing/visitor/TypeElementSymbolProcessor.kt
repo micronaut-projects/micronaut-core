@@ -20,7 +20,12 @@ import com.google.devtools.ksp.isInternal
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
-import com.google.devtools.ksp.symbol.*
+import com.google.devtools.ksp.symbol.ClassKind
+import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSFile
+import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.google.devtools.ksp.symbol.KSNode
 import com.google.devtools.ksp.visitor.KSTopDownVisitor
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.annotation.Requires.Sdk
@@ -29,28 +34,34 @@ import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.order.OrderUtil
 import io.micronaut.core.util.StringUtils
 import io.micronaut.core.version.VersionUtils
-import io.micronaut.inject.ast.*
+import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ElementModifier
+import io.micronaut.inject.ast.ElementQuery
+import io.micronaut.inject.ast.FieldElement
+import io.micronaut.inject.ast.MethodElement
+import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.kotlin.processing.beans.BeanDefinitionProcessor
-import java.util.*
 
-open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnvironment): SymbolProcessor {
+internal open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEnvironment) :
+    SymbolProcessor {
 
     private lateinit var loadedVisitors: MutableList<LoadedVisitor>
     private lateinit var typeElementVisitors: Collection<TypeElementVisitor<*, *>>
     private lateinit var visitorContext: KotlinVisitorContext
 
     companion object {
-        private val SERVICE_LOADER = io.micronaut.core.io.service.SoftServiceLoader.load(TypeElementVisitor::class.java)
+        private val SERVICE_LOADER =
+            io.micronaut.core.io.service.SoftServiceLoader.load(TypeElementVisitor::class.java)
     }
 
     open fun newClassElement(
         visitorContext: KotlinVisitorContext,
         classDeclaration: KSClassDeclaration
     ) = visitorContext.elementFactory.newClassElement(
-        classDeclaration.asStarProjectedType(),
+        classDeclaration,
         visitorContext.elementAnnotationMetadataFactory
     )
 
@@ -78,7 +89,6 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
 
         if (loadedVisitors.isNotEmpty()) {
 
-
             val elements = resolver.getAllFiles()
                 .flatMap { file: KSFile -> file.declarations }
                 .filterIsInstance<KSClassDeclaration>()
@@ -90,6 +100,7 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
                 .toList()
 
             if (elements.isNotEmpty()) {
+                val classElementsCache: MutableMap<KSClassDeclaration, ClassElement> = HashMap()
 
                 // The visitor X with a higher priority should process elements of A before
                 // the visitor Y which is processing elements of B but also using elements A
@@ -104,7 +115,13 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
                         if (typeElement.classKind != ClassKind.ANNOTATION_CLASS) {
                             val className = typeElement.qualifiedName.toString()
                             try {
-                                typeElement.accept(ElementVisitor(loadedVisitor, typeElement), className)
+                                typeElement.accept(
+                                    ElementVisitor(
+                                        loadedVisitor,
+                                        typeElement,
+                                        classElementsCache
+                                    ), className
+                                )
                             } catch (e: ProcessingException) {
                                 BeanDefinitionProcessor.handleProcessingException(environment, e)
                             }
@@ -179,7 +196,10 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
                     val sdk: Sdk = requires.sdk
                     if (sdk == Sdk.MICRONAUT) {
                         val version: String = requires.version
-                        if (StringUtils.isNotEmpty(version) && !VersionUtils.isAtLeastMicronautVersion(version)) {
+                        if (StringUtils.isNotEmpty(version) && !VersionUtils.isAtLeastMicronautVersion(
+                                version
+                            )
+                        ) {
                             try {
                                 environment.logger.warn("TypeElementVisitor [" + definition.name + "] will be ignored because Micronaut version [" + VersionUtils.MICRONAUT_VERSION + "] must be at least " + version)
                                 continue
@@ -195,8 +215,11 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
         return typeElementVisitors.values
     }
 
-    private inner class ElementVisitor(private val loadedVisitor: LoadedVisitor,
-    private val classDeclaration: KSClassDeclaration) : KSTopDownVisitor<Any, Any>() {
+    private inner class ElementVisitor(
+        private val loadedVisitor: LoadedVisitor,
+        private val classDeclaration: KSClassDeclaration,
+        private val classElementsCache: MutableMap<KSClassDeclaration, ClassElement>
+    ) : KSTopDownVisitor<Any, Any>() {
 
         override fun visitClassDeclaration(classDeclaration: KSClassDeclaration, data: Any): Any {
             if (classDeclaration.qualifiedName!!.asString() == "kotlin.Any") {
@@ -208,14 +231,18 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
             if (classDeclaration == this.classDeclaration) {
                 val visitorContext = loadedVisitor.visitorContext
                 if (loadedVisitor.matches(classDeclaration)) {
-                    val classElement = newClassElement(visitorContext, classDeclaration)
+                    val classElement = classElementsCache.computeIfAbsent(classDeclaration) { cd ->
+                        newClassElement(
+                            visitorContext,
+                            cd
+                        )
+                    }
 
                     try {
                         loadedVisitor.visitor.visitClass(classElement, visitorContext)
                     } catch (e: Exception) {
-                        throw ProcessingException(classElement, e.message)
+                        throw ProcessingException(classElement, e.message, e)
                     }
-
 
                     classDeclaration.getAllFunctions()
                         .filter { it.isConstructor() && !it.isInternal() }
@@ -225,13 +252,13 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
 
                     visitMembers(classElement)
                     val innerClassQuery =
-                        ElementQuery.ALL_INNER_CLASSES.onlyStatic().modifiers { it.contains(ElementModifier.PUBLIC) }
+                        ElementQuery.ALL_INNER_CLASSES.onlyStatic()
+                            .modifiers { it.contains(ElementModifier.PUBLIC) }
                     val innerClasses = classElement.getEnclosedElements(innerClassQuery)
                     innerClasses.forEach {
                         val visitor = loadedVisitor.visitor
-                        val visitorContext = loadedVisitor.visitorContext
                         if (loadedVisitor.matches(it)) {
-                            visitor.visitClass(it, visitorContext)
+                            visitor.visitClass(it, loadedVisitor.visitorContext)
                             visitMembers(it)
                         }
                     }
@@ -249,7 +276,8 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
                     throw ProcessingException(property, e.message, e)
                 }
             }
-            val memberElements = classElement.getEnclosedElements(ElementQuery.ALL_FIELD_AND_METHODS)
+            val memberElements =
+                classElement.getEnclosedElements(ElementQuery.ALL_FIELD_AND_METHODS)
             for (memberElement in memberElements) {
                 when (memberElement) {
                     is FieldElement -> {
@@ -304,14 +332,14 @@ open class TypeElementSymbolProcessor(private val environment: SymbolProcessorEn
             }
         }
 
-        fun visitNativeProperty(propertyNode : PropertyElement) {
+        fun visitNativeProperty(propertyNode: PropertyElement) {
             val visitor = loadedVisitor.visitor
             val visitorContext = loadedVisitor.visitorContext
             if (loadedVisitor.matches(propertyNode)) {
-                propertyNode.field.ifPresent { visitor.visitField(it, visitorContext)}
+                propertyNode.field.ifPresent { visitor.visitField(it, visitorContext) }
                 // visit synthetic getter/setter methods
-                propertyNode.writeMethod.ifPresent { visitor.visitMethod(it, visitorContext)}
-                propertyNode.readMethod.ifPresent{ visitor.visitMethod(it, visitorContext)}
+                propertyNode.writeMethod.ifPresent { visitor.visitMethod(it, visitorContext) }
+                propertyNode.readMethod.ifPresent { visitor.visitMethod(it, visitorContext) }
             }
         }
 

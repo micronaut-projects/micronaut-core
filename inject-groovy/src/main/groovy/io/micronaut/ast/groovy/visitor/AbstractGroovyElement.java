@@ -17,8 +17,6 @@ package io.micronaut.ast.groovy.visitor;
 
 import groovy.transform.PackageScope;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -30,9 +28,8 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.WildcardElement;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
+import io.micronaut.inject.ast.annotation.AbstractAnnotationElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
-import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
@@ -42,7 +39,6 @@ import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -52,8 +48,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Consumer;
-import java.util.function.Predicate;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -65,16 +59,13 @@ import java.util.stream.Stream;
  * @since 1.1
  */
 @Internal
-public abstract class AbstractGroovyElement implements Element {
+public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
 
     private static final Pattern JAVADOC_PATTERN = Pattern.compile("(/\\s*\\*\\*)|\\s*\\*|(\\s*[*/])");
 
     protected final SourceUnit sourceUnit;
     protected final CompilationUnit compilationUnit;
     protected final GroovyVisitorContext visitorContext;
-    protected final ElementAnnotationMetadataFactory elementAnnotationMetadataFactory;
-    protected AnnotationMetadata presetAnnotationMetadata;
-    private ElementAnnotationMetadata elementAnnotationMetadata;
     private final GroovyNativeElement nativeElement;
 
     /**
@@ -87,98 +78,11 @@ public abstract class AbstractGroovyElement implements Element {
     protected AbstractGroovyElement(GroovyVisitorContext visitorContext,
                                     GroovyNativeElement nativeElement,
                                     ElementAnnotationMetadataFactory annotationMetadataFactory) {
+        super(annotationMetadataFactory);
         this.visitorContext = visitorContext;
         this.compilationUnit = visitorContext.getCompilationUnit();
         this.nativeElement = nativeElement;
-        this.elementAnnotationMetadataFactory = annotationMetadataFactory;
         this.sourceUnit = visitorContext.getSourceUnit();
-    }
-
-    @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
-        getAnnotationMetadataToWrite().annotate(annotationType, consumer);
-        return this;
-    }
-
-    @Override
-    public io.micronaut.inject.ast.Element removeAnnotation(String annotationType) {
-        getAnnotationMetadataToWrite().removeAnnotation(annotationType);
-        return this;
-    }
-
-    @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element removeAnnotation(Class<T> annotationType) {
-        getAnnotationMetadataToWrite().removeAnnotation(annotationType);
-        return this;
-    }
-
-    @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
-        getAnnotationMetadataToWrite().removeAnnotationIf(predicate);
-        return this;
-    }
-
-    @Override
-    public io.micronaut.inject.ast.Element removeStereotype(String annotationType) {
-        getAnnotationMetadataToWrite().removeStereotype(annotationType);
-        return this;
-    }
-
-    @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element removeStereotype(Class<T> annotationType) {
-        getAnnotationMetadataToWrite().removeStereotype(annotationType);
-        return this;
-    }
-
-    @Override
-    public io.micronaut.inject.ast.Element annotate(String annotationType) {
-        getAnnotationMetadataToWrite().annotate(annotationType);
-        return this;
-    }
-
-    @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
-        getAnnotationMetadataToWrite().annotate(annotationType, consumer);
-        return this;
-    }
-
-    @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(Class<T> annotationType) {
-        getAnnotationMetadataToWrite().annotate(annotationType);
-        return this;
-    }
-
-    @Override
-    public <T extends Annotation> io.micronaut.inject.ast.Element annotate(AnnotationValue<T> annotationValue) {
-        getAnnotationMetadataToWrite().annotate(annotationValue);
-        return this;
-    }
-
-    @Override
-    public AnnotationMetadata getAnnotationMetadata() {
-        return getElementAnnotationMetadata();
-    }
-
-    /**
-     * @return The element annotation metadata
-     */
-    protected ElementAnnotationMetadata getElementAnnotationMetadata() {
-        if (elementAnnotationMetadata == null) {
-            if (presetAnnotationMetadata == null) {
-                elementAnnotationMetadata = elementAnnotationMetadataFactory.build(this);
-            } else {
-                elementAnnotationMetadata = elementAnnotationMetadataFactory.build(this, presetAnnotationMetadata);
-            }
-        }
-        return elementAnnotationMetadata;
-    }
-
-    /**
-     * Get annotation metadata to add or remove annotations.
-     * @return The annotation metadata to write
-     */
-    protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
-        return getElementAnnotationMetadata();
     }
 
     /**

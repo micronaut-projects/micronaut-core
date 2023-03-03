@@ -48,16 +48,18 @@ public interface ElementFactory<E, C extends E, M extends E, F extends E> {
      *
      * @param type                      The type
      * @param annotationMetadataFactory The element annotation metadata factory
-     * @param resolvedGenerics          The resolved generics
+     * @param typeArguments             The resolved generics
      * @return The class element
      * @since 4.0.0
      * @deprecated no longer used
      */
     @NonNull
     @Deprecated
-    ClassElement newClassElement(@NonNull C type,
+    default ClassElement newClassElement(@NonNull C type,
                                  @NonNull ElementAnnotationMetadataFactory annotationMetadataFactory,
-                                 @NonNull Map<String, ClassElement> resolvedGenerics);
+                                 @NonNull Map<String, ClassElement> typeArguments) {
+        return newClassElement(type, annotationMetadataFactory).withTypeArguments(typeArguments);
+    }
 
     /**
      * Builds a new source class element for the given type. This method

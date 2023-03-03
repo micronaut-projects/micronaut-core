@@ -17,7 +17,6 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.AbstractJavaElement;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
@@ -66,17 +65,6 @@ public final class JavaElementAnnotationMetadataFactory extends AbstractElementA
     }
 
     @Override
-    public ElementAnnotationMetadata build(io.micronaut.inject.ast.Element element, AnnotationMetadata defaultAnnotationMetadata) {
-        if (defaultAnnotationMetadata == null) {
-            AbstractJavaElement javaElement = (AbstractJavaElement) element;
-            if (!allowedAnnotations(javaElement)) {
-                return EMPTY;
-            }
-        }
-        return super.build(element, defaultAnnotationMetadata);
-    }
-
-    @Override
     protected Element getNativeElement(io.micronaut.inject.ast.Element element) {
         return ((AbstractJavaElement) element).getNativeType().element();
     }
@@ -88,7 +76,7 @@ public final class JavaElementAnnotationMetadataFactory extends AbstractElementA
         if (typeMirror == null) {
             return super.lookupTypeAnnotationsForClass(classElement);
         }
-        return metadataBuilder.lookupOrBuild(clazz, new AnnotationsElement(typeMirror), true);
+        return metadataBuilder.lookupOrBuild(clazz, new AnnotationsElement(typeMirror));
     }
 
     @Override
@@ -107,7 +95,7 @@ public final class JavaElementAnnotationMetadataFactory extends AbstractElementA
     @Override
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupTypeAnnotationsForWildcard(WildcardElement wildcardElement) {
         WildcardType wildcard = (WildcardType) wildcardElement.getGenericNativeType();
-        return metadataBuilder.lookupOrBuild(wildcard, new AnnotationsElement(wildcard), true);
+        return metadataBuilder.lookupOrBuild(wildcard, new AnnotationsElement(wildcard));
     }
 
 }

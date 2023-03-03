@@ -16,6 +16,7 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ast.ClassElement;
@@ -32,7 +33,6 @@ import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 import org.objectweb.asm.commons.TableSwitchGenerator;
 
-import javax.validation.constraints.NotNull;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -386,7 +386,7 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
      */
     @Internal
     public static final class FieldGetDispatchTarget implements DispatchTarget {
-        @NotNull
+        @NonNull
         final FieldElement beanField;
 
         public FieldGetDispatchTarget(FieldElement beanField) {
@@ -421,7 +421,7 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
             pushBoxPrimitiveIfNecessary(propertyType, writer);
         }
 
-        @NotNull
+        @NonNull
         public FieldElement getField() {
             return beanField;
         }
@@ -432,7 +432,7 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
      */
     @Internal
     public static final class FieldSetDispatchTarget implements DispatchTarget {
-        @NotNull
+        @NonNull
         final FieldElement beanField;
 
         public FieldSetDispatchTarget(FieldElement beanField) {
@@ -472,7 +472,7 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
             writer.push((String) null);
         }
 
-        @NotNull
+        @NonNull
         public FieldElement getField() {
             return beanField;
         }

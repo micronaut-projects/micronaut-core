@@ -268,7 +268,15 @@ public class JavaModelUtils {
     public static Type getTypeReference(TypedElement type) {
         ClassElement classElement = type.getType();
         if (classElement.isPrimitive()) {
-            String internalName = NAME_TO_TYPE_MAP.get(classElement.getName());
+            String internalName;
+            if (classElement.isVoid()) {
+                internalName = NAME_TO_TYPE_MAP.get("void");
+            } else {
+                internalName = NAME_TO_TYPE_MAP.get(classElement.getName());
+            }
+            if (internalName == null) {
+                throw new IllegalStateException("Unrecognized primitive type: " + classElement.getName());
+            }
             if (classElement.isArray()) {
                 StringBuilder name = new StringBuilder(internalName);
                 for (int i = 0; i < classElement.getArrayDimensions(); i++) {

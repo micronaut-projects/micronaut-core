@@ -251,7 +251,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             Set<Object> visitedTypes,
             Map<String, Integer> defaults,
             Map<String, GeneratorAdapter> loadTypeMethods) {
-        if (element == null || element.getClass().getSimpleName().equals("KotlinClassElement")) {
+        if (element == null) {
             if (visitedTypes.contains(declaringElementName)) {
                 generatorAdapter.getStatic(
                         TYPE_ARGUMENT,
@@ -403,10 +403,6 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
         // Persist only type annotations added to the type argument
         AnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(classElement.getTypeAnnotationMetadata());
-        if (classElement.getClass().getSimpleName().startsWith("Kotlin")) {
-            // Remove after KSP supports type annotations
-            annotationMetadata = MutableAnnotationMetadata.of(classElement.getAnnotationMetadata());
-        }
         boolean hasAnnotationMetadata = !annotationMetadata.isEmpty();
 
         boolean isRecursiveType = false;
@@ -578,20 +574,27 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         // Persist only type annotations added
         AnnotationMetadata annotationMetadata = argument.getTypeAnnotationMetadata();
 
-        if (annotationMetadata.isEmpty()) {
+        if (argument.isVoid()) {
             Type type = Type.getType(Argument.class);
-            if (argument.isPrimitive() && !argument.isArray()) {
-                String constantName = argument.getName().toUpperCase(Locale.ENGLISH);
-                // refer to constant for primitives
-                generatorAdapter.getStatic(type, constantName, type);
-                return;
-            }
-            if (!argument.isArray() && String.class.getName().equals(argument.getType().getName())
-                    && argument.getName().equals(argument.getType().getName())
-                    && argument.getAnnotationMetadata().isEmpty()) {
-                generatorAdapter.getStatic(type, "STRING", type);
-                return;
-            }
+            generatorAdapter.getStatic(type, "VOID", type);
+            return;
+        }
+        if (argument.isPrimitive() && !argument.isArray()) {
+            String constantName = argument.getName().toUpperCase(Locale.ENGLISH);
+            // refer to constant for primitives
+            Type type = Type.getType(Argument.class);
+            generatorAdapter.getStatic(type, constantName, type);
+            return;
+        }
+
+        if (annotationMetadata.isEmpty()
+                && !argument.isArray()
+                && String.class.getName().equals(argument.getType().getName())
+                && argument.getName().equals(argument.getType().getName())
+                && argument.getAnnotationMetadata().isEmpty()) {
+            Type type = Type.getType(Argument.class);
+            generatorAdapter.getStatic(type, "STRING", type);
+            return;
         }
 
         pushCreateArgument(

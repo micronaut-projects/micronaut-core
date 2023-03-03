@@ -267,7 +267,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The annotation metadata
      * @since 4.0.0
      */
-    public CachedAnnotationMetadata lookupOrBuild(Object key, T element, boolean includeTypeAnnotations) {
+    private CachedAnnotationMetadata lookupOrBuild(Object key, T element, boolean includeTypeAnnotations) {
         CachedAnnotationMetadata cachedAnnotationMetadata = MUTATED_ANNOTATION_METADATA.get(key);
         if (cachedAnnotationMetadata == null) {
             AnnotationMetadata annotationMetadata = buildInternal(includeTypeAnnotations, false, element);

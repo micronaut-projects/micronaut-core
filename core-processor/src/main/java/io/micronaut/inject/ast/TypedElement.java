@@ -56,6 +56,15 @@ public interface TypedElement extends Element {
     }
 
     /**
+     * Whether the type is void.
+     * @return True if it is
+     * @since 4.0.0
+     */
+    default boolean isVoid() {
+        return this == PrimitiveElement.VOID;
+    }
+
+    /**
      * Is the type an array.
      * @return True if it is.
      */

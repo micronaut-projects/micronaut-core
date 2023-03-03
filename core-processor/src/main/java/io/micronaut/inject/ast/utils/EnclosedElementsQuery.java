@@ -54,7 +54,7 @@ import java.util.function.Predicate;
 public abstract class EnclosedElementsQuery<C, N> {
 
     private static final int MAX_ITEMS_IN_CACHE = 200;
-    private final Map<N, Element> elementsCache = new LinkedHashMap<>();
+    private final Map<CacheKey, Element> elementsCache = new LinkedHashMap<>();
 
     /**
      * Get native class element.
@@ -214,17 +214,33 @@ public abstract class EnclosedElementsQuery<C, N> {
             Set<T> addedFromClassElements = new LinkedHashSet<>();
             classElements:
             for (N element : classElements) {
-                N cacheKey = getCacheKey(element);
-                T newElement = (T) elementsCache.computeIfAbsent(cacheKey, e -> this.toAstElement(e, result.getElementType()));
+                N nativeType = getCacheKey(element);
+                CacheKey cacheKey = new CacheKey(result.getElementType(), nativeType);
+                T newElement = (T) elementsCache.computeIfAbsent(cacheKey, ck -> toAstElement(nativeType, result.getElementType()));
+                if (result.getElementType() == MemberElement.class) {
+                    // Also cache members query results as it's original element type
+                    if (newElement instanceof FieldElement) {
+                        elementsCache.putIfAbsent(new CacheKey(FieldElement.class, nativeType), newElement);
+                    } else if (newElement instanceof ConstructorElement) {
+                        elementsCache.putIfAbsent(new CacheKey(ConstructorElement.class, nativeType), newElement);
+                        elementsCache.putIfAbsent(new CacheKey(MethodElement.class, nativeType), newElement);
+                    } else if (newElement instanceof MethodElement) {
+                        elementsCache.putIfAbsent(new CacheKey(MethodElement.class, nativeType), newElement);
+                    } else if (newElement instanceof PropertyElement) {
+                        elementsCache.putIfAbsent(new CacheKey(PropertyElement.class, nativeType), newElement);
+                    }
+                } else if (MemberElement.class.isAssignableFrom(result.getElementType())) {
+                    elementsCache.putIfAbsent(new CacheKey(MemberElement.class, nativeType), newElement);
+                }
                 if (elementsCache.size() == MAX_ITEMS_IN_CACHE) {
-                    Iterator<Map.Entry<N, Element>> iterator = elementsCache.entrySet().iterator();
+                    Iterator<Map.Entry<CacheKey, Element>> iterator = elementsCache.entrySet().iterator();
                     iterator.next();
                     iterator.remove();
                 }
                 if (!result.getElementType().isInstance(newElement)) {
                     // dirty cache
                     elementsCache.remove(cacheKey);
-                    newElement = (T) elementsCache.computeIfAbsent(cacheKey, e -> this.toAstElement(e, result.getElementType()));
+                    newElement = (T) elementsCache.computeIfAbsent(cacheKey, ck -> toAstElement(nativeType, result.getElementType()));
                 }
                 for (Iterator<T> iterator = elements.iterator(); iterator.hasNext(); ) {
                     T existingElement = iterator.next();
@@ -246,7 +262,7 @@ public abstract class EnclosedElementsQuery<C, N> {
     }
 
     /**
-     * get the cache key.
+     * Get the cache key.
      *
      * @param element The element
      * @return The cache key
@@ -325,11 +341,13 @@ public abstract class EnclosedElementsQuery<C, N> {
     /**
      * Converts the native element to the AST element.
      *
-     * @param enclosedElement The native element.
+     * @param nativeType The native element.
      * @param elementType     The result type
      * @return The AST element
      */
     @NonNull
-    protected abstract io.micronaut.inject.ast.Element toAstElement(N enclosedElement, Class<?> elementType);
+    protected abstract io.micronaut.inject.ast.Element toAstElement(N nativeType, Class<?> elementType);
 
+    private record CacheKey(Class<?> elementType, Object nativeType) {
+    }
 }

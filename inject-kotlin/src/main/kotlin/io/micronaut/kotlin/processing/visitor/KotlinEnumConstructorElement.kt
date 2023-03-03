@@ -19,7 +19,8 @@ import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.ParameterElement
 
-class KotlinEnumConstructorElement(private val classElement: ClassElement): MethodElement {
+internal class KotlinEnumConstructorElement(private val classElement: ClassElement) :
+    MethodElement {
 
     override fun getName(): String = "valueOf"
 

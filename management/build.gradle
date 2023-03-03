@@ -10,8 +10,13 @@ dependencies {
     api project(":discovery-core")
     compileOnly project(":jackson-databind")
     compileOnly(libs.micronaut.sql.jdbc) {
-        exclude module:'micronaut-inject'
-        exclude module:'micronaut-bom'
+        exclude group: 'io.micronaut'
+    }
+
+    // Support validation annotations
+    compileOnly platform(libs.test.boms.micronaut.validation)
+    compileOnly (libs.micronaut.validation) {
+        exclude group: 'io.micronaut'
     }
 
     implementation libs.managed.reactor
@@ -21,8 +26,7 @@ dependencies {
     testImplementation project(":http-server-netty")
     testImplementation project(":jackson-databind")
     testImplementation(libs.micronaut.sql.jdbc.tomcat) {
-        exclude module:'micronaut-inject'
-        exclude module:'micronaut-bom'
+        exclude group: 'io.micronaut'
     }
     testImplementation libs.managed.groovy.json
 

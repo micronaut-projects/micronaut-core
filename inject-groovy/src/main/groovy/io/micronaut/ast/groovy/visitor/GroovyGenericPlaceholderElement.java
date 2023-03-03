@@ -24,11 +24,10 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.WildcardElement;
-import io.micronaut.inject.ast.annotation.AbstractElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
+import io.micronaut.inject.ast.annotation.GenericPlaceholderElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -77,7 +76,7 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
                                     boolean rawType) {
         super(visitorContext,
                 classElementRepresentingThisPlaceholder.getNativeType(),
-                classElementRepresentingThisPlaceholder.elementAnnotationMetadataFactory,
+                classElementRepresentingThisPlaceholder.getElementAnnotationMetadataFactory(),
                 classElementRepresentingThisPlaceholder.resolvedTypeArguments,
                 arrayDimensions);
         this.declaringElement = declaringElement;
@@ -86,31 +85,8 @@ final class GroovyGenericPlaceholderElement extends GroovyClassElement implement
         this.resolved = resolved;
         this.bounds = bounds;
         this.rawType = rawType;
-        typeAnnotationMetadata = new AbstractElementAnnotationMetadata() {
+        typeAnnotationMetadata = new GenericPlaceholderElementAnnotationMetadata(this, classElementRepresentingThisPlaceholder);
 
-            AnnotationMetadata annotationMetadata;
-
-            public AnnotationMetadata getReturnInstance() {
-                return getAnnotationMetadata();
-            }
-
-            @Override
-            protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
-                return getGenericTypeAnnotationMetadata();
-            }
-
-            @Override
-            public AnnotationMetadata getAnnotationMetadata() {
-                if (annotationMetadata == null) {
-                    List<AnnotationMetadata> allAnnotationMetadata = new ArrayList<>();
-                    getBounds().forEach(ce -> allAnnotationMetadata.add(ce.getTypeAnnotationMetadata()));
-                    allAnnotationMetadata.add(GroovyGenericPlaceholderElement.super.getTypeAnnotationMetadata());
-                    allAnnotationMetadata.add(getGenericTypeAnnotationMetadata());
-                    annotationMetadata = new AnnotationMetadataHierarchy(true, allAnnotationMetadata.toArray(AnnotationMetadata[]::new));
-                }
-                return annotationMetadata;
-            }
-        };
     }
 
     private static GroovyClassElement selectClassElementRepresentingThisPlaceholder(@Nullable GroovyClassElement resolved,
