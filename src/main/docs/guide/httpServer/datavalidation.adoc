@@ -4,7 +4,7 @@ Micronaut provides native support for the `javax.validation` annotations with th
 
 dependency::micronaut-validation[]
 
-Or full JSR 380 compliance with the `micronaut-hibernate-validator` dependency:
+Or full https://beanvalidation.org/2.0/spec/[JSR 380] compliance with the `micronaut-hibernate-validator` dependency:
 
 dependency:micronaut-hibernate-validator[groupId="io.micronaut.beanvalidation"]
 
