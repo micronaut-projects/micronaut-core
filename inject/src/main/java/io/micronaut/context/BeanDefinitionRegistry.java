@@ -28,6 +28,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ProxyBeanDefinition;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -263,6 +264,16 @@ public interface BeanDefinitionRegistry {
      * @return The bean definitions
      */
     @NonNull Collection<BeanDefinitionReference<?>> getBeanDefinitionReferences();
+
+    /**
+     * Get all of the disabled {@link DisabledBean}.
+     *
+     * @return The disabled bean definitions
+     * @since 4.0.0
+     */
+    default @NonNull Collection<DisabledBean<?>> getDisabledBeans() {
+        return Collections.emptyList();
+    }
 
     /**
      * Find active {@link javax.inject.Singleton} beans for the given qualifier. Note that

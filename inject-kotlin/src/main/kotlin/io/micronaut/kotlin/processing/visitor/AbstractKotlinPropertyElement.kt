@@ -86,6 +86,8 @@ internal abstract class AbstractKotlinPropertyElement<T : KotlinNativeElement>(
 
     override fun getAnnotationMetadata() = internalAnnotationMetadata
 
+    override fun getAnnotationMetadataToWrite() = internalAnnotationMetadata
+
     override fun getField() = fieldElement
 
     override fun getName() = name

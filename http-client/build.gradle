@@ -19,12 +19,22 @@ dependencies {
 
     compileOnly libs.managed.netty.incubator.codec.http3
 
-    testAnnotationProcessor project(":validation")
+    testAnnotationProcessor platform(libs.test.boms.micronaut.validation)
+    testAnnotationProcessor (libs.micronaut.validation.processor) {
+        exclude group: 'io.micronaut'
+    }
     testAnnotationProcessor project(":inject-java")
 
     testCompileOnly project(":inject-groovy")
-    testImplementation project(":validation")
     testImplementation project(":inject")
+
+    testImplementation platform(libs.test.boms.micronaut.validation)
+    testImplementation (libs.micronaut.validation) {
+        exclude group: 'io.micronaut'
+    }
+    testImplementation (libs.micronaut.validation.processor) { // For Groovy
+        exclude group: 'io.micronaut'
+    }
 
     implementation libs.managed.reactor
 

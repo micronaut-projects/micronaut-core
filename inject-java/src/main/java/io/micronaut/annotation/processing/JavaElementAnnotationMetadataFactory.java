@@ -17,7 +17,6 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.AbstractJavaElement;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
@@ -63,17 +62,6 @@ public final class JavaElementAnnotationMetadataFactory extends AbstractElementA
 
     private static boolean allowedAnnotations(AbstractJavaElement javaElement) {
         return javaElement.getNativeType().element() != null;
-    }
-
-    @Override
-    public ElementAnnotationMetadata build(io.micronaut.inject.ast.Element element, AnnotationMetadata defaultAnnotationMetadata) {
-        if (defaultAnnotationMetadata == null) {
-            AbstractJavaElement javaElement = (AbstractJavaElement) element;
-            if (!allowedAnnotations(javaElement)) {
-                return EMPTY;
-            }
-        }
-        return super.build(element, defaultAnnotationMetadata);
     }
 
     @Override

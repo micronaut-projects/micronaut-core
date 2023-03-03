@@ -15,7 +15,7 @@
  */
 package io.micronaut.management.endpoint.env;
 
-import javax.validation.constraints.NotNull;
+import io.micronaut.core.annotation.NonNull;
 
 /**
  * A bean interface that allows hiding or masking of parts of the environment and its property sources when they are
@@ -31,5 +31,5 @@ public interface EnvironmentEndpointFilter {
      *
      * @param specification a specification of which properties are masked or hidden from the endpoint.
      */
-    void specifyFiltering(@NotNull EnvironmentFilterSpecification specification);
+    void specifyFiltering(@NonNull EnvironmentFilterSpecification specification);
 }

@@ -16,7 +16,6 @@
 package io.micronaut.inject.ast.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.NonNull;
@@ -59,7 +58,7 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
         this.thisElement = thisElement;
         List<MutableAnnotationMetadataDelegate<?>> elements = new ArrayList<>(3);
         if (setter != null && (!setter.isSynthetic() || includeSynthetic)) {
-            elements.add(setter);
+            elements.add(setter.getMethodAnnotationMetadata());
             ParameterElement[] parameters = setter.getParameters();
             if (parameters.length > 0) {
                 ParameterElement parameter = parameters[0];
@@ -84,7 +83,7 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
             }
         }
         if (getter != null && (!getter.isSynthetic() || includeSynthetic)) {
-            elements.add(getter);
+            elements.add(getter.getMethodAnnotationMetadata());
             MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = getter.getReturnType().getTypeAnnotationMetadata();
             if (!typeAnnotationMetadata.isEmpty()) {
                 elements.add(typeAnnotationMetadata);
@@ -93,19 +92,7 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
 
         // The instance AnnotationMetadata of each element can change after a modification
         // Set annotation metadata as actual elements so the changes are reflected
-        AnnotationMetadata[] hierarchy = elements.stream().map(e -> {
-            if (e instanceof MethodElement methodElement) {
-                return new AnnotationMetadataDelegate() {
-                    @Override
-                    public AnnotationMetadata getAnnotationMetadata() {
-                        AnnotationMetadata annotationMetadata = methodElement.getAnnotationMetadata();
-                        // Exclude type metadata
-                        return annotationMetadata.getDeclaredMetadata();
-                    }
-                };
-            }
-            return e;
-        }).toArray(AnnotationMetadata[]::new);
+        AnnotationMetadata[] hierarchy = elements.toArray(AnnotationMetadata[]::new);
         this.propertyAnnotationMetadata =
             hierarchy.length == 1 ? hierarchy[0] : new AnnotationMetadataHierarchy(true, hierarchy);
         this.elements = elements;

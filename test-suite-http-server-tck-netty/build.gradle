@@ -1,6 +1,17 @@
 plugins {
-    id "io.micronaut.build.internal.common"
-    id 'org.graalvm.buildtools.native'
+    id "java"
+    id("org.graalvm.buildtools.native")
+}
+
+
+repositories {
+    mavenCentral()
+    maven {
+        url "https://s01.oss.sonatype.org/content/repositories/snapshots/"
+        mavenContent {
+            snapshotsOnly()
+        }
+    }
 }
 
 micronautBuild {
@@ -8,31 +19,17 @@ micronautBuild {
     enableProcessing = false
 }
 
-repositories {
-    mavenCentral()
-    maven { url "https://s01.oss.sonatype.org/content/repositories/snapshots/" }
-}
-
 dependencies {
-    annotationProcessor libs.bundles.asm
-    annotationProcessor project(":inject-java")
-    implementation project(":context")
-    implementation project(":core")
-    implementation project(":inject")
-    implementation project(":graal")
-    implementation project(":http-server-netty")
-    implementation project(":http-client")
-    implementation project(":validation")
-    implementation project(":inject-java")
+    implementation(projects.httpServerTck)
+    testImplementation(projects.httpServerNetty)
+    testImplementation(projects.httpClient)
+    testImplementation(libs.junit.platform.engine)
+    testImplementation(libs.managed.logback.classic)
+    implementation platform(libs.test.boms.micronaut.validation)
+    implementation(libs.micronaut.validation) {
+        exclude group: 'io.micronaut'
+    }
 
-    testAnnotationProcessor libs.bundles.asm
-    testAnnotationProcessor project(":inject-java")
-    testImplementation(libs.micronaut.serde.jackson)
-    testImplementation libs.micronaut.test.junit5
-}
-
-tasks.withType(Test).configureEach {
-    useJUnitPlatform()
 }
 
 configurations {
@@ -70,6 +67,7 @@ graalvmNative {
     }
     binaries {
         all {
+            resources.autodetect()
             openGraalModules.each { module ->
                 jvmArgs.add("--add-exports=" + module + "=ALL-UNNAMED")
             }
