@@ -55,7 +55,7 @@ dependency:micronaut-reactor[groupId="io.micronaut.reactor"]
 
 ==== Validation Support Moved to Validation Module
 
-The validation features https://micronaut-projects.github.io/micronaut-validation/snapshot/guide/[have been moved to a separate module]. Moreover, the new validation module requires you to use `micronaut-validation-processor` in the annotation processor classpath.
+The validation features link:{micronautvalidationdocs}[have been moved to a separate module]. Moreover, the new validation module requires you to use `micronaut-validation-processor` in the annotation processor classpath.
 
 dependency:io.micronaut.vallidation:micronaut-validation-processor[scope='annotationProcessor']
 

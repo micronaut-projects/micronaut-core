@@ -1,1 +1,1 @@
-See the https://micronaut-projects.github.io/micronaut-validation/snapshot/guide/index.html[Micronaut Validation documentation].
+See the link:{micronautvalidationdocs}[Micronaut Validation documentation].

@@ -14,7 +14,7 @@ Note how the interface uses Micronaut's HTTP annotations which are usable on bot
 
 TIP: Be aware that some annotations, such as api:http.annotation.Produces[] and api:http.annotation.Consumes[], have different semantics between server and client side usage. For example, `@Produces` on a controller method (server side) indicates how the method's *return value* is formatted, while `@Produces` on a client indicates how the method's *parameters* are formatted when sent to the server. While this may seem a little confusing, it is logical considering the different semantics between a server producing/consuming vs a client: a server consumes an argument and *returns* a response to the client, whereas a client consumes an argument and *sends* output to a server.
 
-Additionally, to use the `javax.validation` features, add https://micronaut-projects.github.io/micronaut-validation/snapshot/guide/[Micronaut Validation] to your build.
+Additionally, to use the `javax.validation` features, add link:{micronautvalidationdocs}[Micronaut Validation] to your build.
 
 On the server-side of Micronaut you can implement the `PetOperations` interface:
 
