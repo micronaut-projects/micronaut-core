@@ -16,6 +16,8 @@
 package io.micronaut.http.server.tck;
 
 import io.micronaut.core.annotation.Experimental;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.function.BiPredicate;
@@ -29,6 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @Experimental
 public final class BodyAssertion<T> {
+    private static final Logger LOG = LoggerFactory.getLogger(BodyAssertion.class);
 
     private final Class<T> bodyType;
     private final T expected;
@@ -54,7 +57,7 @@ public final class BodyAssertion<T> {
      */
     @SuppressWarnings("java:S5960") // Assertion is the whole point of this method
     public void evaluate(T body) {
-        assertTrue(this.evaluator.test(expected, body));
+        assertTrue(this.evaluator.test(expected, body), "Expected [" + expected + "] but was [" + body + "]");
     }
 
     /**
@@ -119,7 +122,13 @@ public final class BodyAssertion<T> {
          * @return a body assertion which verifiers the HTTP Response's body contains the expected body
          */
         public BodyAssertion<String> contains() {
-            return new BodyAssertion<>(String.class, this.body, (required, received) -> received.contains(required));
+            return new BodyAssertion<>(String.class, this.body, (required, received) -> {
+                boolean result = received.contains(required);
+                if (!result) {
+                    LOG.warn("The following body does not contains {}.\n{}\n", required, received);
+                }
+                return result;
+            });
         }
 
         /**
