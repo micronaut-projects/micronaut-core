@@ -1,1 +1,1 @@
-See the documentation for link:https://micronaut-projects.github.io/micronaut-session/snapshot/guide/[Micronaut Session] for information about supporting HTTP sessions in your applications.
+See the documentation for link:{micronautsessiondocs}[Micronaut Session] for information about supporting HTTP sessions in your applications.
