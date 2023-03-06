@@ -353,6 +353,7 @@ public final class AstBeanPropertiesUtils {
             case DEFAULT ->
                 !memberElement.isPrivate() && (memberElement.isAccessible() || memberElement.getDeclaringType().hasDeclaredStereotype(BeanProperties.class));
             case PUBLIC -> memberElement.isPublic();
+            case ANY -> true;
         };
     }
 

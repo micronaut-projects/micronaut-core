@@ -15,9 +15,13 @@
  */
 package io.micronaut.core.annotation;
 
-import java.lang.annotation.*;
+import java.lang.annotation.Annotation;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Inherited;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 
-import static java.lang.annotation.RetentionPolicy.CLASS;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
@@ -219,6 +223,13 @@ public @interface Introspected {
          * The default behaviour which in addition to public getters and setters will also include package protected fields if an {@link io.micronaut.core.annotation.Introspected.AccessKind} of {@link io.micronaut.core.annotation.Introspected.AccessKind#FIELD} is specified.
          *
          */
-        DEFAULT
+        DEFAULT,
+
+        /**
+         * All methods and/or fields are included.
+         *
+         * @since 4.0.0
+         */
+        ANY
     }
 }

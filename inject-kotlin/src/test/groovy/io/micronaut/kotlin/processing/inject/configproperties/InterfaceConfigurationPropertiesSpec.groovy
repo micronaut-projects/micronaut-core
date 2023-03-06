@@ -8,10 +8,10 @@ import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.ValidatedBeanDefinition
 import io.micronaut.runtime.context.env.ConfigurationAdvice
 import spock.lang.Specification
-import static io.micronaut.annotation.processing.test.KotlinCompiler.*
+
+import static io.micronaut.annotation.processing.test.KotlinCompiler.buildBeanDefinition
 
 class InterfaceConfigurationPropertiesSpec extends Specification {
-
 
     void "test simple interface config props"() {
         when:
