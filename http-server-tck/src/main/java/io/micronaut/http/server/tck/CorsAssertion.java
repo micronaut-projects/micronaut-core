@@ -131,6 +131,7 @@ public final class CorsAssertion {
         /**
          *
          * Set expectation of value for the HTTP Header {@value HttpHeaders#ACCESS_CONTROL_ALLOW_CREDENTIALS} to {@value StringUtils#TRUE}.
+         * @param allowCredentials Set expectation of value for the HTTP Header {@value HttpHeaders#ACCESS_CONTROL_ALLOW_CREDENTIALS}
          * @return The Builder
          */
         public Builder allowCredentials(boolean allowCredentials) {
