@@ -65,6 +65,16 @@ public class PrivateAccessTest {
     }
 
     @Test
+    public void privateFieldWrite2() {
+        PrivateFieldBean2 bean = new PrivateFieldBean2();
+        BeanIntrospection<PrivateFieldBean2> introspection = BeanIntrospector.SHARED.getIntrospection(PrivateFieldBean2.class);
+        BeanProperty<PrivateFieldBean2, Object> property = introspection.getProperty("abc").get();
+        Assertions.assertEquals(0, property.get(bean));
+        property.set(bean, 123);
+        Assertions.assertEquals(123, property.get(bean));
+    }
+
+    @Test
     public void privateMethodWrite() {
         PrivateMethodsBean bean = new PrivateMethodsBean();
         BeanIntrospection<PrivateMethodsBean> introspection = BeanIntrospector.SHARED.getIntrospection(PrivateMethodsBean.class);

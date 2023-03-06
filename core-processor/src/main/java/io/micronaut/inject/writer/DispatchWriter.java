@@ -420,6 +420,9 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
                 writer.push(beanField.getName()); // Field name
                 writer.loadArg(1); // Bean instance
                 writer.invokeStatic(TYPE_REFLECTION_UTILS, METHOD_GET_FIELD_VALUE);
+                if (beanField.isPrimitive()) {
+                    pushCastToType(writer, propertyType);
+                }
             } else {
                 // load this
                 writer.loadArg(1);
