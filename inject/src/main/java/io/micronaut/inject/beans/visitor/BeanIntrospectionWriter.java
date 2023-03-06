@@ -136,7 +136,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         this.introspectionName = computeIntrospectionName(name);
         this.introspectionType = getTypeReferenceForName(introspectionName);
         this.beanType = getTypeReferenceForName(name);
-        this.dispatchWriter = new DispatchWriter(introspectionType);
+        this.dispatchWriter = new DispatchWriter(introspectionType, Type.getType(AbstractInitializableBeanIntrospection.class));
     }
 
     /**
@@ -618,6 +618,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
         dispatchWriter.buildDispatchOneMethod(classWriter);
         dispatchWriter.buildDispatchMethod(classWriter);
+        dispatchWriter.buildGetTargetMethodByIndex(classWriter);
         buildPropertyIndexOfMethod(classWriter);
         buildFindIndexedProperty(classWriter);
         buildGetIndexedProperties(classWriter);

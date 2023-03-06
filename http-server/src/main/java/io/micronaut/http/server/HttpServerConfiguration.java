@@ -664,9 +664,11 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
 
         public static final boolean DEFAULT_ENABLED = false;
         public static final boolean DEFAULT_SINGLE_HEADER = false;
+        public static final boolean DEFAULT_LOCALHOST_PASS_THROUGH = false;
 
         private boolean enabled = DEFAULT_ENABLED;
         private boolean singleHeader = DEFAULT_SINGLE_HEADER;
+        private boolean localhostPassThrough = DEFAULT_LOCALHOST_PASS_THROUGH;
 
         private Map<String, CorsOriginConfiguration> configurations = Collections.emptyMap();
 
@@ -678,6 +680,14 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
         @Override
         public boolean isEnabled() {
             return enabled;
+        }
+
+        /**
+         * @return Whether localhost pass-through is enabled. Defaults to {@value #DEFAULT_LOCALHOST_PASS_THROUGH}.
+         * @since 3.8.5
+         */
+        public boolean isLocalhostPassThrough() {
+            return localhostPassThrough;
         }
 
         /**
@@ -706,6 +716,17 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
          */
         public void setEnabled(boolean enabled) {
             this.enabled = enabled;
+        }
+
+        /**
+         * Sets whether localhost pass-through is enabled. Default value {@value #DEFAULT_LOCALHOST_PASS_THROUGH}.
+         * Setting this to true will allow requests to be made to localhost from any origin.
+         *
+         * @param localhostPassThrough True if localhost pass-through is enabled
+         * @since 3.8.5
+         */
+        public void setLocalhostPassThrough(boolean localhostPassThrough) {
+            this.localhostPassThrough = localhostPassThrough;
         }
 
         /**

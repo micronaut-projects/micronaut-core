@@ -9,6 +9,8 @@ on:
     types: [published]
 jobs:
   release:
+    outputs:
+      artifacts-sha256: ${{ steps.hash.outputs.artifacts-sha256 }} # Computed hashes for build artifacts.
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -19,11 +21,11 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v3
         with:
-          distribution: 'adopt'
           java-version: '11'
+          distribution: 'temurin'
       - name: Set the current release version
         id: release_version
-        run: echo ::set-output name=release_version::${GITHUB_REF:11}
+        run: echo "release_version=${GITHUB_REF:11}" >> $GITHUB_OUTPUT
       - name: Run pre-release
         uses: micronaut-projects/github-actions/pre-release@master
         env:
@@ -31,6 +33,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Publish to Sonatype OSSRH
+        id: publish
         env:
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
@@ -42,13 +45,46 @@ jobs:
           GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
         run: |
           echo $GPG_FILE | base64 -d > secring.gpg
-          ./gradlew publishToSonatype closeAndReleaseSonatypeStagingRepository
+          # Publish both locally and to Sonatype.
+          # The artifacts stored locally will be used to generate the SLSA provenance.
+          ./gradlew publishAllPublicationsToBuildRepository publishToSonatype closeAndReleaseSonatypeStagingRepository
+          # Read the current version from gradle.properties.
+          VERSION=$(./gradlew properties | grep 'version:' | awk '{print $2}')
+          # Read the project group from gradle.properties.
+          GROUP_PATH=$(./gradlew properties| grep "projectGroup" | awk '{print $2}' | sed 's/\./\//g')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "group=$GROUP_PATH" >> "$GITHUB_OUTPUT"
+      - name: Generate subject
+        id: hash
+        run: |
+          # Find the relevant published artifacts in the local repository.
+          ARTIFACTS=$(find  build/repo/${{ steps.publish.outputs.group }}/*/${{ steps.publish.outputs.version }}/* \
+              -regextype sed -regex '\(.*\.jar\|.*\.pom\|.*\.module\|.*\.toml\)')
+          # Compute the hashes for the artifacts.
+          # Set the hash as job output for debugging.
+          echo "artifacts-sha256=$(sha256sum $ARTIFACTS | base64 -w0)" >> "$GITHUB_OUTPUT"
+          # Store the hash in a file, which is uploaded as a workflow artifact.
+          echo $(sha256sum $ARTIFACTS | base64 -w0) > artifacts-sha256
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
+        with:
+          name: gradle-build-outputs
+          path: build/repo/${{ steps.publish.outputs.group }}/*/${{ steps.publish.outputs.version }}/*
+          retention-days: 5
+      - name: Upload artifacts-sha256
+        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
+        with:
+          name: artifacts-sha256
+          path: artifacts-sha256
+          retention-days: 5
       - name: Generate docs
+        run: ./gradlew docs
         env:
           GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
           GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
           GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
-        run: ./gradlew docs
+          GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
+          GH_USERNAME: ${{ secrets.GH_USERNAME }}
       - name: Export Gradle Properties
         uses: micronaut-projects/github-actions/export-gradle-properties@master
       - name: Publish to Github Pages
@@ -86,3 +122,57 @@ jobs:
           MICRONAUT_BUILD_EMAIL: ${{ secrets.MICRONAUT_BUILD_EMAIL }}
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+
+  provenance-subject:
+    needs: [release]
+    runs-on: ubuntu-latest
+    outputs:
+      artifacts-sha256: ${{ steps.set-hash.outputs.artifacts-sha256 }}
+    steps:
+      - name: Download artifacts-sha256
+        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
+        with:
+          name: artifacts-sha256
+      # The SLSA provenance generator expects the hash digest of artifacts to be passed as a job
+      # output. So we need to download the artifacts-sha256 and set it as job output. The hash of
+      # the artifacts should be set as output directly in the release job. But due to a known bug
+      # in GitHub Actions we have to use a workaround.
+      # See https://github.com/community/community/discussions/37942.
+      - name: Set artifacts-sha256 as output
+        id: set-hash
+        shell: bash
+        run: echo "artifacts-sha256=$(cat artifacts-sha256)" >> "$GITHUB_OUTPUT"
+
+  provenance:
+    needs: [release, provenance-subject]
+    permissions:
+      actions: read # To read the workflow path.
+      id-token: write # To sign the provenance.
+      contents: write # To add assets to a release.
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.4.0
+    with:
+      base64-subjects: "${{ needs.provenance-subject.outputs.artifacts-sha256 }}"
+      upload-assets: true # Upload to a new release.
+      compile-generator: true # Build the generator from source.
+
+  github_release:
+    needs: [release]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v3.0.2
+      - name: Download artifacts
+        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
+        with:
+          name: gradle-build-outputs
+          path: build/repo
+      - name: Upload assets
+        # Upload the artifacts and SLSA L3 provenance as assets to the existing
+        # release. Note that the provenance will attest to each artifact file and
+        # not the aggregated ZIP file.
+        run: |
+          find build/repo -regextype sed -regex '\(.*\.jar\|.*\.pom\|.*\.module\|.*\.toml\)' | xargs zip artifacts.zip
+          gh release upload ${{ github.ref_name }} artifacts.zip
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

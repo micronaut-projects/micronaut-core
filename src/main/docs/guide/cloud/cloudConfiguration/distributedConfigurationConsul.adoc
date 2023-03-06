@@ -23,10 +23,9 @@ $ mn create-app my-app --features config-consul
 ----
 ====
 
-To enable distributed configuration, similar to Spring Boot and Grails, create a `src/main/resources/bootstrap.yml` configuration file and enable the configuration client:
+To enable distributed configuration make sure <<bootstrap>> is enabled and create a `src/main/resources/bootstrap.[yml/toml/properties]` file with the following configuration:
 
-.bootstrap.yml
-[source,yaml]
+[configuration]
 ----
 micronaut:
   application:
@@ -66,7 +65,7 @@ Within the `/config` directory Micronaut searches values within the following di
 
 |===
 
-The value of `APPLICATION_NAME` is whatever your have configured `micronaut.application.name` to be in `bootstrap.yml`.
+The value of `APPLICATION_NAME` is whatever your have configured `micronaut.application.name` to be in your `bootstrap` configuration file.
 
 To see this in action, use the following cURL command to store a property called `foo.bar` with a value of `myvalue` in the directory `/config/application`.
 
@@ -88,8 +87,7 @@ You can set the `consul.client.config.format` option to configure the format wit
 
 For example, to configure JSON:
 
-.application.yml
-[source,yaml]
+[configuration]
 ----
 consul:
   client:
@@ -116,8 +114,7 @@ You can setup a Git repository that contains files like `application.yml`, `hell
 
 In this case, each key in Consul represents a file with an extension, for example `/config/application.yml`, and you must configure the `FILE` format:
 
-.application.yml
-[source,yaml]
+[configuration]
 ----
 consul:
   client:

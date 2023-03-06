@@ -7,8 +7,8 @@ If you use Gradle, add the following dependencies:
 .Configuring Lombok in Gradle
 [source,groovy]
 ----
-compileOnly 'org.projectlombok:lombok:1.18.12'
-annotationProcessor "org.projectlombok:lombok:1.18.12"
+compileOnly 'org.projectlombok:lombok:1.18.24'
+annotationProcessor "org.projectlombok:lombok:1.18.24"
 ...
 // Micronaut processor defined after Lombok
 annotationProcessor "io.micronaut:micronaut-inject-java"
@@ -23,7 +23,7 @@ Or if using Maven:
   <dependency>
     <groupId>org.projectlombok</groupId>
     <artifactId>lombok</artifactId>
-    <version>1.18.12</version>
+    <version>1.18.24</version>
     <scope>provided</scope>
   </dependency>
 </dependencies>
@@ -33,7 +33,7 @@ Or if using Maven:
     <!-- must precede micronaut-inject-java -->
     <groupId>org.projectlombok</groupId>
     <artifactId>lombok</artifactId>
-    <version>1.18.12</version>
+    <version>1.18.24</version>
   </path>
   <path>
     <groupId>io.micronaut</groupId>

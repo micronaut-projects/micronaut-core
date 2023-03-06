@@ -71,20 +71,20 @@ $ mn create-websocket-server MyChat
 By default, Micronaut times out idle connections with no activity after five minutes. Normally this is not a problem as browsers automatically reconnect WebSocket sessions, however you can control this behaviour by setting the `micronaut.server.idle-timeout` setting (a negative value results in no timeout):
 
 .Setting the Connection Timeout for the Server
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:
-    idle-timeout: 30m # 30 minutes
+    idle-timeout: 30m
 ----
 
 If you use Micronaut's WebSocket client you may also wish to set the timeout on the client:
 
 .Setting the Connection Timeout for the Client
-[source,yaml]
+[configuration]
 ----
 micronaut:
   http:
     client:
-      read-idle-timeout: 30m # 30 minutes
+      read-idle-timeout: 30m
 ----

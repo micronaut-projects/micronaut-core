@@ -4,7 +4,7 @@ This section documents breaking changes between Micronaut versions
 
 - The <<environmentEndpoint, environmental endpoint>> is now disabled by default. To enable it, you must update your endpoint config:
 
-[source,yaml]
+[configuration]
 ----
 endpoints:
   env:

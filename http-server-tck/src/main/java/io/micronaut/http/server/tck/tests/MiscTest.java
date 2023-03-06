@@ -38,7 +38,6 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
 
-
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
