@@ -33,6 +33,8 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: 17
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2.3.3
       - name: Optional setup step
         env:
           GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
