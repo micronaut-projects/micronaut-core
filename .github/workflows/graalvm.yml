@@ -39,6 +39,8 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Setup Gradle
         uses: gradle/gradle-build-action@v2.4.0
+        with:
+          gradle-home-cache-cleanup: true
       - name: Build with Gradle
         id: gradle
         run: |
