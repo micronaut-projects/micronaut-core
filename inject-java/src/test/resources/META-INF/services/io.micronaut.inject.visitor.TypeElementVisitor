@@ -16,3 +16,4 @@ io.micronaut.annotation.AnnotateFieldSpec$AnnotationFieldVisitor
 io.micronaut.annotation.AnnotateFieldTypeSpec$AnnotateFieldTypeVisitor
 io.micronaut.annotation.AnnotateMethodParameterSpec$AnnotateMethodParameterVisitor
 io.micronaut.annotation.AnnotatePropertySpec$AnnotatePropertyVisitor
+io.micronaut.annotation.AnnotateClassSpec$AnnotateClassVisitor
