@@ -27,7 +27,7 @@ import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
-import io.micronaut.core.annotation.EvaluatedExpressionReference;
+import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.annotation.InstantiatedMember;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -57,8 +57,8 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
-import static io.micronaut.core.expression.EvaluatedExpression.EXPRESSION_PATTERN;
-import static io.micronaut.core.annotation.EvaluatedExpressionReference.EXPR_SUFFIX;
+import static io.micronaut.core.expressions.EvaluatedExpressionReference.EXPR_SUFFIX;
+import static io.micronaut.expressions.EvaluatedExpressionConstants.EXPRESSION_PATTERN;
 
 /**
  * An abstract implementation that builds {@link AnnotationMetadata}.

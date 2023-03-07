@@ -15,17 +15,13 @@
  */
 package io.micronaut.inject.annotation;
 
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.BeanDefinitionAware;
-import io.micronaut.context.ContextConfigurable;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.ConvertibleValuesMap;
-import io.micronaut.core.expression.EvaluatedExpression;
-import io.micronaut.inject.BeanDefinition;
+import io.micronaut.core.expressions.EvaluatedExpression;
+import io.micronaut.core.expressions.ExpressionEvaluationContext;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -36,22 +32,19 @@ import java.util.stream.Collectors;
  * Version of {@link ConvertibleValuesMap} that is aware of evaluated expressions.
  *
  * @param <V> The generic value
+ *
+ * @since 4.0.0
+ * @author Sergey Gavrilov
  */
 @Internal
-public class EvaluatedConvertibleValuesMap<V> implements ConvertibleValues<V>
-{
-    private final BeanContext beanContext;
-    private final BeanDefinition<?> owningBean;
-    private final Object[] args;
+public class EvaluatedConvertibleValuesMap<V> implements ConvertibleValues<V> {
+
+    private final ExpressionEvaluationContext evaluationContext;
     private final ConvertibleValues<V> delegateValues;
 
-    EvaluatedConvertibleValuesMap(@Nullable BeanContext beanContext,
-                                  @Nullable BeanDefinition<?> owningBean,
-                                  Object[] args,
+    EvaluatedConvertibleValuesMap(ExpressionEvaluationContext evaluationContext,
                                   ConvertibleValues<V> delegateValues) {
-        this.beanContext = beanContext;
-        this.owningBean = owningBean;
-        this.args = args;
+        this.evaluationContext = evaluationContext;
         this.delegateValues = delegateValues;
     }
 
@@ -65,18 +58,11 @@ public class EvaluatedConvertibleValuesMap<V> implements ConvertibleValues<V>
                                ArgumentConversionContext<T> conversionContext) {
         V value = delegateValues.getValue(name);
         if (value instanceof EvaluatedExpression expression) {
-            if (value instanceof ContextConfigurable ctxConfigurable && beanContext != null) {
-                ctxConfigurable.configure(beanContext);
-                if (value instanceof BeanDefinitionAware beanDefinitionAware && owningBean != null) {
-                    beanDefinitionAware.setBeanDefinition(owningBean);
-                }
-            }
-
             if (EvaluatedExpression.class.isAssignableFrom(conversionContext.getArgument().getClass())) {
                 return Optional.of((T) value);
             }
 
-            Object evaluationResult = expression.evaluate(args);
+            Object evaluationResult = expression.evaluate(evaluationContext);
             if (evaluationResult == null ||  conversionContext.getArgument().isAssignableFrom(evaluationResult.getClass())) {
                 return Optional.ofNullable((T) evaluationResult);
             }
@@ -91,15 +77,7 @@ public class EvaluatedConvertibleValuesMap<V> implements ConvertibleValues<V>
     public Collection<V> values() {
         return delegateValues.values().stream().map(v -> {
             if (v instanceof EvaluatedExpression expression) {
-                if (v instanceof ContextConfigurable ctxConfigurable) {
-                    ctxConfigurable.configure(beanContext);
-                }
-
-                if (v instanceof BeanDefinitionAware beanDefinitionAware && owningBean != null) {
-                    beanDefinitionAware.setBeanDefinition(owningBean);
-                }
-
-                Object evaluationResult = expression.evaluate(args);
+                Object evaluationResult = expression.evaluate(evaluationContext);
                 return (V) evaluationResult;
             }
             return v;

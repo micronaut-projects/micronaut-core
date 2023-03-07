@@ -19,7 +19,7 @@ import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.EvaluatedExpressionReference;
+import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;

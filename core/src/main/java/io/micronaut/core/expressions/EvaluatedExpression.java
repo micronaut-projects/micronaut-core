@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.expression;
+package io.micronaut.core.expressions;
+
+import io.micronaut.core.annotation.Internal;
 
 /**
  * Expression included in annotation metadata which can be evaluated at runtime.
@@ -21,33 +23,14 @@ package io.micronaut.core.expression;
  * @author Sergey Gavrilov
  * @since 4.0.0
  */
+@Internal
 public interface EvaluatedExpression {
-
-    /**
-     * Evaluated expression prefix.
-     */
-    String EXPRESSION_PREFIX = "#{";
-
-    /**
-     * RegEx pattern used to determine whether string value in
-     * annotation includes evaluated expression.
-     */
-    String EXPRESSION_PATTERN = ".*#\\{.*}.*";
-
     /**
      * Evaluate expression to obtain evaluation result.
      *
-     * @param args Array of arguments which need to be passed to expression
-     *             for evaluation. Args are used when expression itself is used
-     *             on method and references method arguments
+     * @param evaluationContext context that expression might need for evaluation.
+     *
      * @return evaluation result
      */
-    Object evaluate(Object... args);
-
-    /**
-     * Get original annotation value that was used to generated EvaluatedExpression class.
-     *
-     * @return the original expression
-     */
-    Object getInitialAnnotationValue();
+    Object evaluate(ExpressionEvaluationContext evaluationContext);
 }

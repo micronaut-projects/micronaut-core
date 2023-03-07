@@ -15,8 +15,9 @@
  */
 package io.micronaut.expressions.parser.ast.conditional;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
-import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
+import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
 import org.objectweb.asm.Label;
@@ -44,6 +45,7 @@ import static org.objectweb.asm.commons.GeneratorAdapter.NE;
  * @author Sergey Gavrilov
  * @since 4.0.0
  */
+@Internal
 public final class TernaryExpression extends ExpressionNode {
     private final ExpressionNode condition;
     private final ExpressionNode trueExpr;
@@ -57,7 +59,7 @@ public final class TernaryExpression extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(ExpressionVisitorContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         Label falseLabel = new Label();
         Label returnLabel = new Label();
@@ -99,7 +101,7 @@ public final class TernaryExpression extends ExpressionNode {
     }
 
     @Override
-    protected Type doResolveType(ExpressionCompilationContext ctx) {
+    protected Type doResolveType(ExpressionVisitorContext ctx) {
         if (!isOneOf(condition.resolveType(ctx), BOOLEAN, BOOLEAN_WRAPPER)) {
             throw new ExpressionCompilationException("Invalid ternary operator. Condition should resolve to boolean type");
         }

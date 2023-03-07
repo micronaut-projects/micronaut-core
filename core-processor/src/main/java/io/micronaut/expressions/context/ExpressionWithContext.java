@@ -17,7 +17,7 @@ package io.micronaut.expressions.context;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.EvaluatedExpressionReference;
+import io.micronaut.core.expressions.EvaluatedExpressionReference;
 
 /**
  * Metadata for evaluated expression used at compilation time
@@ -31,7 +31,7 @@ import io.micronaut.core.annotation.EvaluatedExpressionReference;
  */
 @Internal
 public record ExpressionWithContext(@NonNull EvaluatedExpressionReference expressionReference,
-                                    @NonNull ExpressionEvaluationContext evaluationContext) {
+                                    @NonNull ExpressionCompilationContext evaluationContext) {
 
     /**
      * Provides initial annotation value treated as evaluated expression.

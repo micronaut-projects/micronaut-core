@@ -18,9 +18,12 @@ package io.micronaut.inject.annotation;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanDefinitionAware;
 import io.micronaut.context.ContextConfigurable;
+import io.micronaut.context.expressions.ConfigurableExpressionEvaluationContext;
+import io.micronaut.context.expressions.DefaultExpressionEvaluationContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.expressions.EvaluatedExpression;
 import io.micronaut.inject.BeanDefinition;
 
 import java.lang.annotation.Annotation;
@@ -35,42 +38,47 @@ import java.lang.annotation.Annotation;
 @Internal
 public final class EvaluatedAnnotationMetadata extends MappingAnnotationMetadataDelegate implements ContextConfigurable, BeanDefinitionAware {
 
-    private BeanContext beanContext;
-    private BeanDefinition<?> owningBean;
-
     private final AnnotationMetadata delegateAnnotationMetadata;
-    private final Object[] args;
 
-    private EvaluatedAnnotationMetadata(AnnotationMetadata targetMetadata, Object[] args) {
+    private ConfigurableExpressionEvaluationContext evaluationContext;
+
+    private EvaluatedAnnotationMetadata(AnnotationMetadata targetMetadata,
+                                        ConfigurableExpressionEvaluationContext evaluationContext) {
         this.delegateAnnotationMetadata = targetMetadata;
-        this.args = args;
+        this.evaluationContext = evaluationContext;
     }
 
-    private EvaluatedAnnotationMetadata(AnnotationMetadata targetMetadata) {
-        this(targetMetadata, new Object[0]);
+    /**
+     * Provide a copy of this annotation metadata with passed method arguments.
+     *
+     * @param args arguments passed to method
+     * @return copy of annotation metadata
+     */
+    public EvaluatedAnnotationMetadata copyWithArgs(Object[] args) {
+        return new EvaluatedAnnotationMetadata(
+            delegateAnnotationMetadata,
+            evaluationContext.setArguments(args));
     }
 
-    public static AnnotationMetadata wrapIfNecessary(AnnotationMetadata targetMetadata,
-                                                     Object[] args) {
-        if (targetMetadata == null) {
-            return null;
-        } else if (targetMetadata instanceof EvaluatedAnnotationMetadata eam) {
-            AnnotationMetadata delegateMetadata = eam.getAnnotationMetadata();
-            EvaluatedAnnotationMetadata methodInvocationMetadata =
-                new EvaluatedAnnotationMetadata(delegateMetadata, args);
-            methodInvocationMetadata.setBeanDefinition(eam.owningBean);
-            methodInvocationMetadata.configure(eam.beanContext);
-            return methodInvocationMetadata;
-        }
+    @Override
+    public void configure(BeanContext context) {
+        evaluationContext = evaluationContext.setBeanContext(context);
+    }
 
-        if (targetMetadata.hasEvaluatedExpressions()) {
-            return new EvaluatedAnnotationMetadata(targetMetadata);
-        }
-        return targetMetadata;
+    @Override
+    public void setBeanDefinition(BeanDefinition<?> beanDefinition) {
+        evaluationContext = evaluationContext.setOwningBean(beanDefinition);
     }
 
     public static AnnotationMetadata wrapIfNecessary(AnnotationMetadata targetMetadata) {
-        return wrapIfNecessary(targetMetadata, new Object[0]);
+        if (targetMetadata == null) {
+            return null;
+        } else if (targetMetadata instanceof EvaluatedAnnotationMetadata) {
+            return targetMetadata;
+        } else if (targetMetadata.hasEvaluatedExpressions()) {
+            return new EvaluatedAnnotationMetadata(targetMetadata, new DefaultExpressionEvaluationContext());
+        }
+        return targetMetadata;
     }
 
     @Override
@@ -86,16 +94,15 @@ public final class EvaluatedAnnotationMetadata extends MappingAnnotationMetadata
 
     @Override
     public <T extends Annotation> AnnotationValue<T> mapAnnotationValue(AnnotationValue<T> av) {
-        return new EvaluatedAnnotationValue<>(beanContext, owningBean, args, av);
-    }
-
-    @Override
-    public void configure(BeanContext context) {
-        this.beanContext = context;
-    }
-
-    @Override
-    public void setBeanDefinition(BeanDefinition<?> beanDefinition) {
-        this.owningBean = beanDefinition;
+        return new AnnotationValue<T>(
+            av,
+            AnnotationMetadataSupport.getDefaultValues(av.getAnnotationName()),
+            new EvaluatedConvertibleValuesMap<>(evaluationContext, av.getConvertibleValues()),
+            value -> {
+                if (value instanceof EvaluatedExpression expression) {
+                    return expression.evaluate(evaluationContext);
+                }
+                return value;
+            });
     }
 }

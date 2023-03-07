@@ -17,55 +17,66 @@ package io.micronaut.expressions.context;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.inject.ast.AnnotationElement;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
-import io.micronaut.inject.ast.TypedElement;
 
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 import static io.micronaut.inject.ast.ElementQuery.ALL_METHODS;
 import static java.util.function.Predicate.not;
 
 /**
- * Root expression evaluation context is a context which elements are
- * registered in and obtained through bean context.
+ * Default implementation of {@link ExtendableExpressionCompilationContext}. Extending
+ * this context will always return new instance instead of modifying the existing one.
  *
- * @author Sergey Gavrilov
  * @since 4.0.0
+ * @author Sergey Gavrilov
  */
 @Internal
-public final class BeanContextExpressionEvaluationContext implements ExpressionEvaluationContext {
+public class DefaultExpressionCompilationContext implements ExtendableExpressionCompilationContext {
 
-    private final Set<ClassElement> contextTypes = ConcurrentHashMap.newKeySet();
+    private final Collection<ClassElement> classElements;
+    private final MethodElement methodElement;
 
-    public BeanContextExpressionEvaluationContext(ClassElement... contextClasses) {
-        Arrays.stream(contextClasses)
-            .filter(classElement -> !(classElement instanceof AnnotationElement))
-            .forEach(contextTypes::add);
+    DefaultExpressionCompilationContext(ClassElement... classElements) {
+        this(null, classElements);
     }
 
-    /**
-     * @return set of class elements registered in this evaluation context.
-     */
-    public Set<ClassElement> getContextTypes() {
-        return contextTypes;
+    private DefaultExpressionCompilationContext(MethodElement methodElement,
+                                                ClassElement... classElements) {
+        this.methodElement = methodElement;
+        this.classElements = Arrays.asList(classElements);
     }
 
     @Override
-    public List<MethodElement> getMethods(String name) {
-        return contextTypes.stream()
-                   .map(element -> findMatchingMethods(element, name))
-                   .flatMap(Collection::stream)
+    public DefaultExpressionCompilationContext extendWith(MethodElement methodElement) {
+        return new DefaultExpressionCompilationContext(
+            methodElement,
+            classElements.toArray(ClassElement[]::new)
+        );
+    }
+
+    @Override
+    public DefaultExpressionCompilationContext extendWith(ClassElement classElement) {
+        return new DefaultExpressionCompilationContext(
+            this.methodElement,
+            ArrayUtils.concat(classElements.toArray(ClassElement[]::new), classElement)
+        );
+    }
+
+    @Override
+    public List<MethodElement> findMethods(String name) {
+        return classElements.stream()
+                   .flatMap(element -> findMatchingMethods(element, name).stream())
                    .toList();
     }
 
@@ -84,19 +95,30 @@ public final class BeanContextExpressionEvaluationContext implements ExpressionE
                    .toList();
     }
 
-    @Override
-    public List<? extends TypedElement> getTypedElements(String name) {
-        return contextTypes.stream()
-                   .flatMap(classElement -> getNamedProperties(classElement, name).stream())
-                   .toList();
-    }
-
     private List<PropertyElement> getNamedProperties(ClassElement classElement, String name) {
         return classElement.getBeanProperties(
                 PropertyElementQuery.of(classElement.getAnnotationMetadata())
                     .includes(Collections.singleton(name)))
                    .stream()
                    .filter(not(PropertyElement::isExcluded))
+                   .toList();
+    }
+
+    @Override
+    public List<PropertyElement> findProperties(String name) {
+        return classElements.stream()
+                   .flatMap(classElement -> getNamedProperties(classElement, name).stream())
+                   .toList();
+    }
+
+    @Override
+    public List<ParameterElement> findParameters(String name) {
+        if (this.methodElement == null) {
+            return Collections.emptyList();
+        }
+
+        return Arrays.stream(methodElement.getParameters())
+                   .filter(parameter -> parameter.getName().equals(name))
                    .toList();
     }
 }

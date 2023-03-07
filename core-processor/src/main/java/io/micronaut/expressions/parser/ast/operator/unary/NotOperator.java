@@ -17,7 +17,7 @@ package io.micronaut.expressions.parser.ast.operator.unary;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
-import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
+import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Type;
@@ -40,7 +40,7 @@ public final class NotOperator extends UnaryOperator {
     }
 
     @Override
-    public Type doResolveType(ExpressionCompilationContext ctx) {
+    public Type doResolveType(ExpressionVisitorContext ctx) {
         if (nodeType != null) {
             return nodeType;
         }
@@ -56,7 +56,7 @@ public final class NotOperator extends UnaryOperator {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(ExpressionVisitorContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         Label falseLabel = new Label();
         Label returnLabel = new Label();

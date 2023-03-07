@@ -15,9 +15,10 @@
  */
 package io.micronaut.expressions.parser.ast.collection;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.types.TypeIdentifier;
-import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
+import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 
@@ -38,6 +39,7 @@ import static org.objectweb.asm.Opcodes.AASTORE;
  * @author Sergey Gavrilov
  * @since 4.0.0
  */
+@Internal
 public final class OneDimensionalArray extends ExpressionNode {
     private final TypeIdentifier elementTypeIdentifier;
     private final List<ExpressionNode> initializer;
@@ -49,7 +51,7 @@ public final class OneDimensionalArray extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(ExpressionVisitorContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         int arraySize = initializer.size();
 
@@ -80,7 +82,7 @@ public final class OneDimensionalArray extends ExpressionNode {
     }
 
     @Override
-    protected Type doResolveType(ExpressionCompilationContext ctx) {
+    protected Type doResolveType(ExpressionVisitorContext ctx) {
         return getTypeReference(getRequiredClassElement(elementTypeIdentifier.resolveType(ctx), ctx.visitorContext())
                                     .toArray());
     }

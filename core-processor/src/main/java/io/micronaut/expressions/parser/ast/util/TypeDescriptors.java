@@ -15,9 +15,10 @@
  */
 package io.micronaut.expressions.parser.ast.util;
 
-import io.micronaut.context.AbstractEvaluatedExpression;
+import io.micronaut.context.expressions.AbstractEvaluatedExpression;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.expressions.ExpressionEvaluationContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import org.objectweb.asm.Type;
 
@@ -34,7 +35,7 @@ import static java.util.stream.Collectors.toMap;
  */
 @Internal
 public final class TypeDescriptors {
-    public static final Type EVALUATED_EXPRESSION_TYPE = Type.getType(AbstractEvaluatedExpression.class);
+    public static final Type EVALUATION_CONTEXT_TYPE = Type.getType(ExpressionEvaluationContext.class);
 
     public static final Type STRING = Type.getType(String.class);
     public static final Type OBJECT = Type.getType(Object.class);

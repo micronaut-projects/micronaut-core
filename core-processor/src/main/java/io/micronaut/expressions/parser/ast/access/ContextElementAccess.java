@@ -16,13 +16,12 @@
 package io.micronaut.expressions.parser.ast.access;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.expressions.context.ExpressionEvaluationContext;
+import io.micronaut.expressions.context.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
-import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
+import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
-import io.micronaut.inject.ast.TypedElement;
 import org.objectweb.asm.Type;
 
 import java.util.List;
@@ -54,7 +53,7 @@ public final class ContextElementAccess extends ExpressionNode {
     }
 
     @Override
-    protected void generateBytecode(ExpressionCompilationContext ctx) {
+    protected void generateBytecode(ExpressionVisitorContext ctx) {
         if (contextMethodParameterAccess != null) {
             contextMethodParameterAccess.compile(ctx);
         } else if (contextPropertyMethodCall != null) {
@@ -63,22 +62,26 @@ public final class ContextElementAccess extends ExpressionNode {
     }
 
     @Override
-    public Type doResolveType(ExpressionCompilationContext ctx) {
-        ExpressionEvaluationContext evaluationContext = ctx.evaluationContext();
-        List<? extends TypedElement> namedElements = evaluationContext.getTypedElements(name);
+    public Type doResolveType(ExpressionVisitorContext ctx) {
+        ExpressionCompilationContext evaluationContext = ctx.compilationContext();
 
-        if (namedElements.size() == 0) {
+        List<PropertyElement> propertyElements = evaluationContext.findProperties(name);
+        List<ParameterElement> parameterElements = evaluationContext.findParameters(name);
+
+        int totalElements = propertyElements.size() + parameterElements.size();
+
+        if (totalElements == 0) {
             throw new ExpressionCompilationException(
                 "No element with name [" + name + "] available in evaluation context");
-        } else if (namedElements.size() > 1) {
+        } else if (totalElements > 1) {
             throw new ExpressionCompilationException(
-                "Ambiguous expression evaluation context reference. Found " + namedElements.size() +
+                "Ambiguous expression evaluation context reference. Found " + totalElements +
                     " elements with name [" + name + "]");
         }
 
-        TypedElement element = namedElements.iterator().next();
-        if (element instanceof PropertyElement property) {
+        if (!propertyElements.isEmpty()) {
 
+            PropertyElement property = propertyElements.iterator().next();
             String readMethodName =
                 property.getReadMethod()
                     .orElseThrow(() -> new ExpressionCompilationException(
@@ -88,15 +91,10 @@ public final class ContextElementAccess extends ExpressionNode {
             contextPropertyMethodCall = new ContextMethodCall(readMethodName, emptyList());
             return contextPropertyMethodCall.resolveType(ctx);
 
-        } else if (element instanceof ParameterElement parameter) {
-
-            contextMethodParameterAccess = new ContextMethodParameterAccess(parameter);
-            return contextMethodParameterAccess.resolveType(ctx);
-
-        } else {
-            throw new ExpressionCompilationException(
-                "Unsupported element referenced in expression: [" + element + "]. Only " +
-                    "properties, methods and method parameters can be referenced in expressions");
         }
+
+        ParameterElement parameter = parameterElements.iterator().next();
+        contextMethodParameterAccess = new ContextMethodParameterAccess(parameter);
+        return contextMethodParameterAccess.resolveType(ctx);
     }
 }

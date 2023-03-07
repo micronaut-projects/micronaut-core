@@ -17,7 +17,7 @@ package io.micronaut.expressions.parser.ast.operator.unary;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
-import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
+import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import org.objectweb.asm.Type;
 
 /**
@@ -37,7 +37,7 @@ public abstract sealed class UnaryOperator extends ExpressionNode permits NegOpe
     }
 
     @Override
-    public Type doResolveType(ExpressionCompilationContext ctx) {
+    public Type doResolveType(ExpressionVisitorContext ctx) {
         return operand.resolveType(ctx);
     }
 }

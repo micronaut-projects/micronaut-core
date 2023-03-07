@@ -17,36 +17,28 @@ package io.micronaut.inject.beans.visitor;
 
 import io.micronaut.context.annotation.EvaluatedExpressionContext;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.expressions.context.ExpressionContextLoader;
-import io.micronaut.expressions.context.ExpressionWithContext;
+import io.micronaut.expressions.context.ExpressionCompilationContextRegistry;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.inject.writer.ClassGenerationException;
 
-import java.io.IOException;
 import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Set;
 
 /**
  * A {@link TypeElementVisitor} that visits classes annotated with
- * {@link EvaluatedExpressionContext} and produces
- * {@link ExpressionWithContext} instances at compilation time. This visitor is also responsible
- * for assembling expression evaluation context by adding discovered context classes to
- * {@link ExpressionContextLoader}
+ * {@link EvaluatedExpressionContext} and adds discovered context classes to
+ * {@link ExpressionCompilationContextRegistry}.
  *
  * @author Sergey Gavrilov
  * @since 4.0.0
  */
 @Internal
 public final class EvaluatedExpressionContextTypeElementVisitor implements TypeElementVisitor<Object, Object> {
-    private final Map<String, ExpressionContextReferenceWriter> writers = new LinkedHashMap<>(10);
 
     @Override
     public void start(VisitorContext visitorContext) {
-        ExpressionContextLoader.reset();
+        ExpressionCompilationContextRegistry.reset();
     }
 
     @Override
@@ -57,22 +49,8 @@ public final class EvaluatedExpressionContextTypeElementVisitor implements TypeE
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
         if (!element.isPrivate() && element.hasStereotype(EvaluatedExpressionContext.class)) {
-            ExpressionContextLoader.addContextClass(element, context);
-            writers.putIfAbsent(element.getName(), new ExpressionContextReferenceWriter(element));
+            ExpressionCompilationContextRegistry.registerContextClass(element);
         }
-    }
-
-    @Override
-    public void finish(VisitorContext visitorContext) {
-        for (ExpressionContextReferenceWriter writer: writers.values()) {
-            try {
-                writer.accept(visitorContext);
-            } catch (IOException e) {
-                throw new ClassGenerationException("I/O error occurred during class generation: " + e.getMessage(), e);
-            }
-        }
-
-        writers.clear();
     }
 
     @Override

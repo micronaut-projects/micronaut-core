@@ -13,20 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.expressions.context;
-
-import io.micronaut.core.annotation.Internal;
+package io.micronaut.expressions;
 
 /**
- * A reference for expression context class. This reference is generated at compilation
- * time and allows compiled modules expose their classes annotated with
- * {@link ExpressionEvaluationContext} in such a way that dependant modules can reference
- * external contexts at their compilation time.
+ * Set of constants used for evaluated expressions processing.
  *
- * @author Sergey Gavrilov
  * @since 4.0.0
+ * @author Sergey Gavrilov
  */
-@Internal
-public abstract class ExpressionContextReference {
-    public abstract String getType();
+public class EvaluatedExpressionConstants {
+    /**
+     * Evaluated expression prefix.
+     */
+    public static final String EXPRESSION_PREFIX = "#{";
+
+    /**
+     * RegEx pattern used to determine whether string value in
+     * annotation includes evaluated expression.
+     */
+    public static final String EXPRESSION_PATTERN = ".*#\\{.*}.*";
 }

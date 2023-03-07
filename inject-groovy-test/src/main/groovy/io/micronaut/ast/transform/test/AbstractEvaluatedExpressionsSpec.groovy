@@ -15,10 +15,10 @@
  */
 package io.micronaut.ast.transform.test
 
-import io.micronaut.context.AbstractEvaluatedExpression
-import io.micronaut.core.expression.EvaluatedExpression
+import io.micronaut.context.expressions.AbstractEvaluatedExpression
+import io.micronaut.context.expressions.DefaultExpressionEvaluationContext
+import io.micronaut.core.expressions.EvaluatedExpressionReference
 import io.micronaut.core.naming.NameUtils
-import io.micronaut.core.annotation.EvaluatedExpressionReference
 import org.intellij.lang.annotations.Language
 
 class AbstractEvaluatedExpressionsSpec extends AbstractBeanDefinitionSpec {
@@ -56,8 +56,7 @@ class AbstractEvaluatedExpressionsSpec extends AbstractBeanDefinitionSpec {
             String exprFullName = exprClassName + i
             try {
                 def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName).newInstance()
-                exprClass.configure(applicationContext)
-                result.add(exprClass.evaluate())
+                result.add(exprClass.evaluate(new DefaultExpressionEvaluationContext(null, applicationContext, null)))
             } catch (ClassNotFoundException e) {
                 return null
             }
@@ -92,15 +91,20 @@ class AbstractEvaluatedExpressionsSpec extends AbstractBeanDefinitionSpec {
         try {
             def index = EvaluatedExpressionReference.nextIndex(exprClassName)
             def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprClassName + (index == 0 ? index : index - 1)).newInstance()
-            exprClass.configure(applicationContext)
-            return exprClass.evaluate();
+            return exprClass.evaluate(new DefaultExpressionEvaluationContext(null, applicationContext, null));
         } catch (ClassNotFoundException e) {
             return null
         }
     }
 
-    EvaluatedExpression buildSingleExpressionFromClass(String className,
-                                                       @Language("groovy") String cls) {
+    Object evaluateSingle(String className,
+                          @Language("groovy") String cls) {
+        return evaluateSingle(className, cls, null);
+    }
+
+    Object evaluateSingle(String className,
+                          @Language("groovy") String cls,
+                          Object[] args) {
 
         def classSimpleName = NameUtils.getSimpleName(className)
         def packageName = NameUtils.getPackageName(className)
@@ -114,8 +118,7 @@ class AbstractEvaluatedExpressionsSpec extends AbstractBeanDefinitionSpec {
         try {
             def index = EvaluatedExpressionReference.nextIndex(exprFullName)
             def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName + (index == 0 ? index : index - 1)).newInstance()
-            exprClass.configure(applicationContext)
-            return exprClass
+            return exprClass.evaluate(new DefaultExpressionEvaluationContext(args, applicationContext, null));
         } catch (ClassNotFoundException e) {
             return null
         }

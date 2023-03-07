@@ -15,8 +15,9 @@
  */
 package io.micronaut.expressions.parser.ast;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
+import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import org.objectweb.asm.Type;
 
 /**
@@ -25,6 +26,7 @@ import org.objectweb.asm.Type;
  * @author Sergey Gavrilov
  * @since 4.0.0
  */
+@Internal
 public abstract class ExpressionNode {
 
     protected Type nodeType;
@@ -35,7 +37,7 @@ public abstract class ExpressionNode {
      *
      * @param ctx expression compilation context
      */
-    public final void compile(@NonNull ExpressionCompilationContext ctx) {
+    public final void compile(@NonNull ExpressionVisitorContext ctx) {
         resolveType(ctx);
         generateBytecode(ctx);
     }
@@ -45,7 +47,7 @@ public abstract class ExpressionNode {
      *
      * @param ctx expression compilation context
      */
-    protected abstract void generateBytecode(@NonNull ExpressionCompilationContext ctx);
+    protected abstract void generateBytecode(@NonNull ExpressionVisitorContext ctx);
 
     /**
      * On resolution stage type information is collected and node validity is checked. Once type
@@ -56,7 +58,7 @@ public abstract class ExpressionNode {
      * @return resolved type
      */
     @NonNull
-    public final Type resolveType(@NonNull ExpressionCompilationContext ctx) {
+    public final Type resolveType(@NonNull ExpressionVisitorContext ctx) {
         if (nodeType == null) {
             nodeType = doResolveType(ctx);
         }
@@ -71,5 +73,5 @@ public abstract class ExpressionNode {
      * @return resolved type
      */
     @NonNull
-    protected abstract Type doResolveType(@NonNull ExpressionCompilationContext ctx);
+    protected abstract Type doResolveType(@NonNull ExpressionVisitorContext ctx);
 }

@@ -15,10 +15,10 @@
  */
 package io.micronaut.annotation.processing.test
 
-import io.micronaut.context.AbstractEvaluatedExpression
-import io.micronaut.core.expression.EvaluatedExpression
+import io.micronaut.context.expressions.AbstractEvaluatedExpression
+import io.micronaut.context.expressions.DefaultExpressionEvaluationContext
 import io.micronaut.core.naming.NameUtils
-import io.micronaut.core.annotation.EvaluatedExpressionReference
+import io.micronaut.core.expressions.EvaluatedExpressionReference
 import org.intellij.lang.annotations.Language
 
 abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec {
@@ -56,8 +56,7 @@ abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec 
             String exprFullName = exprClassName + i
             try {
                 def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName).newInstance()
-                exprClass.configure(applicationContext)
-                result.add(exprClass.evaluate())
+                result.add(exprClass.evaluate(new DefaultExpressionEvaluationContext(null, applicationContext, null)))
             } catch (ClassNotFoundException e) {
                 return null
             }
@@ -94,15 +93,20 @@ abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec 
         try {
             def index = EvaluatedExpressionReference.nextIndex(exprFullName)
             def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName + (index == 0 ? index : index - 1)).newInstance()
-            exprClass.configure(applicationContext)
-            return exprClass.evaluate();
+            exprClass.evaluate(new DefaultExpressionEvaluationContext(null, applicationContext, null))
         } catch (ClassNotFoundException e) {
             return null
         }
     }
 
-    EvaluatedExpression buildSingleExpressionFromClass(String className,
-                                                       @Language("java") String cls) {
+    Object evaluateSingle(String className,
+                          @Language("java") String cls) {
+        return evaluateSingle(className, cls, null)
+    }
+
+    Object evaluateSingle(String className,
+                          @Language("java") String cls,
+                          Object[] args) {
         def classSimpleName = NameUtils.getSimpleName(className)
         def packageName = NameUtils.getPackageName(className)
         def exprClassName = (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + '$Expr'
@@ -115,8 +119,7 @@ abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec 
         try {
             def index = EvaluatedExpressionReference.nextIndex(exprFullName)
             def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName + (index == 0 ? index : index - 1)).newInstance()
-            exprClass.configure(applicationContext)
-            return exprClass
+            return exprClass.evaluate(new DefaultExpressionEvaluationContext(args, applicationContext, null))
         } catch (ClassNotFoundException e) {
             return null
         }

@@ -21,7 +21,7 @@ import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.collection.OneDimensionalArray;
 import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
 import io.micronaut.expressions.parser.ast.types.TypeIdentifier;
-import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
+import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -59,7 +59,7 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
     }
 
     @Override
-    protected Type doResolveType(ExpressionCompilationContext ctx) {
+    protected Type doResolveType(ExpressionVisitorContext ctx) {
         usedMethod = resolveUsedMethod(ctx);
         return usedMethod.getReturnType();
     }
@@ -73,7 +73,7 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
      * candidate method can be found or if there is more than one candidate method.
      */
     @NonNull
-    protected abstract CandidateMethod resolveUsedMethod(ExpressionCompilationContext ctx);
+    protected abstract CandidateMethod resolveUsedMethod(ExpressionVisitorContext ctx);
 
     /**
      * Builds candidate method for method element.
@@ -84,7 +84,7 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
      *
      * @return candidate method
      */
-    protected CandidateMethod toCandidateMethod(ExpressionCompilationContext ctx,
+    protected CandidateMethod toCandidateMethod(ExpressionVisitorContext ctx,
                                                 MethodElement methodElement,
                                                 List<Type> argumentTypes) {
         VisitorContext visitorContext = ctx.visitorContext();
@@ -135,7 +135,7 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
      *
      * @return types of method arguments
      */
-    protected List<Type> resolveArgumentTypes(ExpressionCompilationContext ctx) {
+    protected List<Type> resolveArgumentTypes(ExpressionVisitorContext ctx) {
         return arguments.stream()
                    .map(argument -> argument instanceof TypeIdentifier
                        ? TypeDescriptors.CLASS
@@ -148,7 +148,7 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
      *
      * @param ctx expression evaluation context
      */
-    protected void compileArguments(ExpressionCompilationContext ctx) {
+    protected void compileArguments(ExpressionVisitorContext ctx) {
         List<ExpressionNode> arguments = this.arguments;
         if (usedMethod.isVarArgs()) {
             arguments = prepareVarargsArguments();
@@ -166,7 +166,7 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
      * @param argumentIndex argument index
      * @param argument      compiled argument
      */
-    private void compileArgument(ExpressionCompilationContext ctx,
+    private void compileArgument(ExpressionVisitorContext ctx,
                                  int argumentIndex,
                                  ExpressionNode argument) {
         GeneratorAdapter mv = ctx.methodVisitor();
@@ -190,7 +190,7 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
      *
      * @return arguments string
      */
-    protected String stringifyArguments(ExpressionCompilationContext ctx) {
+    protected String stringifyArguments(ExpressionVisitorContext ctx) {
         return arguments.stream()
                    .map(argument -> argument.resolveType(ctx))
                    .map(Type::getClassName)

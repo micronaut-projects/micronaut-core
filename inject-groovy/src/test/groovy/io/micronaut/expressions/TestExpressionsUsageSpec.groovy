@@ -2,7 +2,10 @@ package io.micronaut.expressions
 
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.env.PropertySource
+import io.micronaut.context.exceptions.CircularDependencyException
+import io.micronaut.context.exceptions.ExpressionEvaluationException
 import io.micronaut.context.exceptions.NoSuchBeanException
+import io.micronaut.core.expressions.ExpressionEvaluationContext
 
 class TestExpressionsUsageSpec extends AbstractBeanDefinitionSpec {
 

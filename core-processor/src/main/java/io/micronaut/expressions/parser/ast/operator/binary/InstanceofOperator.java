@@ -18,7 +18,7 @@ package io.micronaut.expressions.parser.ast.operator.binary;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.types.TypeIdentifier;
-import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
+import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
@@ -45,7 +45,7 @@ public final class InstanceofOperator extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(ExpressionVisitorContext ctx) {
         Type targetType = typeIdentifier.resolveType(ctx);
         if (isPrimitive(targetType)) {
             throw new ExpressionCompilationException(
@@ -62,7 +62,7 @@ public final class InstanceofOperator extends ExpressionNode {
     }
 
     @Override
-    protected Type doResolveType(ExpressionCompilationContext ctx) {
+    protected Type doResolveType(ExpressionVisitorContext ctx) {
         return BOOLEAN;
     }
 }

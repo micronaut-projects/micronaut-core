@@ -15,12 +15,13 @@
  */
 package io.micronaut.expressions;
 
-import io.micronaut.context.AbstractEvaluatedExpression;
+import io.micronaut.context.expressions.AbstractEvaluatedExpression;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.expressions.ExpressionEvaluationContext;
 import io.micronaut.expressions.context.ExpressionWithContext;
 import io.micronaut.expressions.parser.CompoundEvaluatedEvaluatedExpressionParser;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
-import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
+import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.expressions.parser.exception.ExpressionParsingException;
 import io.micronaut.inject.ast.Element;
@@ -94,10 +95,10 @@ public final class EvaluatedExpressionWriter extends AbstractClassFileWriter {
         // MAXLOCALS = 1
         cv.visitMaxs(2, 1);
 
-        GeneratorAdapter evaluateMethodVisitor = startProtectedVarargsMethod(classWriter, "doEvaluate",
-            Object.class.getName(), Object.class.getName() + "[]");
+        GeneratorAdapter evaluateMethodVisitor = startProtectedMethod(classWriter, "doEvaluate",
+            Object.class.getName(), ExpressionEvaluationContext.class.getName());
 
-        ExpressionCompilationContext ctx = new ExpressionCompilationContext(
+        ExpressionVisitorContext ctx = new ExpressionVisitorContext(
             expressionMetadata.evaluationContext(),
             visitorContext,
             evaluateMethodVisitor);

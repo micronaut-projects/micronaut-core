@@ -25,9 +25,7 @@ import io.micronaut.ast.groovy.visitor.GroovyPackageElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.context.annotation.Configuration
 import io.micronaut.context.annotation.Context
-import io.micronaut.expressions.context.ExpressionContextLoader
 import io.micronaut.expressions.context.ExpressionWithContext
-import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.processing.BeanDefinitionCreator
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
 import io.micronaut.inject.processing.ProcessingException

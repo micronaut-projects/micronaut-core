@@ -6,7 +6,7 @@ class MethodArgumentEvaluationContextExpressionsSpec extends AbstractEvaluatedEx
 {
     void "test method argument access"() {
         given:
-        Object expr1 = buildSingleExpressionFromClass("test.Expr", """
+        Object result = evaluateSingle("test.Expr", """
             package test
             import io.micronaut.context.annotation.Executable
             import io.micronaut.context.annotation.Requires
@@ -22,10 +22,9 @@ class MethodArgumentEvaluationContextExpressionsSpec extends AbstractEvaluatedEx
             }
 
 
-        """)
-        .evaluate("arg0", "arg1")
+        """, ["arg0", "arg1"] as Object[]);
 
         expect:
-        expr1 instanceof String && expr1 == 'arg1abc'
+        result instanceof String && result == 'arg1abc'
     }
 }

@@ -18,7 +18,7 @@ package io.micronaut.expressions.parser.ast.types;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
-import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
+import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.processing.JavaModelUtils;
 import org.objectweb.asm.Type;
@@ -55,12 +55,12 @@ public final class TypeIdentifier extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(ExpressionVisitorContext ctx) {
         ctx.methodVisitor().push(resolveType(ctx));
     }
 
     @Override
-    public Type doResolveType(ExpressionCompilationContext ctx) {
+    public Type doResolveType(ExpressionVisitorContext ctx) {
         String name = this.toString();
         if (PRIMITIVES.containsKey(name)) {
             return PRIMITIVES.get(name);
@@ -80,7 +80,7 @@ public final class TypeIdentifier extends ExpressionNode {
         return resolvedType;
     }
 
-    private Type resolveObjectType(ExpressionCompilationContext ctx, String name) {
+    private Type resolveObjectType(ExpressionVisitorContext ctx, String name) {
         return ctx.visitorContext().getClassElement(name)
                    .map(JavaModelUtils::getTypeReference)
                    .orElse(null);

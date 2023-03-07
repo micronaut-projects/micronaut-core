@@ -2,6 +2,8 @@ package io.micronaut.expressions
 
 import io.micronaut.annotation.processing.test.AbstractEvaluatedExpressionsSpec
 import io.micronaut.context.env.PropertySource
+import io.micronaut.context.exceptions.CircularDependencyException
+import io.micronaut.context.exceptions.ExpressionEvaluationException
 import io.micronaut.context.exceptions.NoSuchBeanException
 
 class TestExpressionsUsageSpec extends AbstractEvaluatedExpressionsSpec {

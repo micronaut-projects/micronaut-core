@@ -6,7 +6,7 @@ class AnnotationLevelContextExpressionsSpec extends AbstractEvaluatedExpressions
 
     void "test annotation level context"() {
         given:
-        Object expr = buildSingleExpressionFromClass("test.Expr", """
+        Object result = evaluateSingle("test.Expr", """
 
             package test;
             import io.micronaut.context.annotation.EvaluatedExpressionContext;import io.micronaut.context.annotation.Executable;
@@ -30,16 +30,16 @@ class AnnotationLevelContextExpressionsSpec extends AbstractEvaluatedExpressions
                 String value();
             }
 
-        """).evaluate()
+        """)
 
         expect:
-        expr instanceof String && expr == "annotationLevelValue"
+        result instanceof String && result == "annotationLevelValue"
 
     }
 
     void "test annotation member level context"() {
         given:
-        Object expr = buildSingleExpressionFromClass("test.Expr", """
+        Object result = evaluateSingle("test.Expr", """
 
             package test;
             import io.micronaut.context.annotation.EvaluatedExpressionContext;import io.micronaut.context.annotation.Executable;
@@ -63,10 +63,10 @@ class AnnotationLevelContextExpressionsSpec extends AbstractEvaluatedExpressions
                 String customValue();
             }
 
-        """).evaluate()
+        """)
 
         expect:
-        expr instanceof String && expr == "annotationLevelValue"
+        result instanceof String && result == "annotationLevelValue"
 
     }
 

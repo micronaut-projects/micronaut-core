@@ -101,7 +101,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         if (executionHandle.getAnnotationMetadata() instanceof EvaluatedAnnotationMetadata eam) {
-            return EvaluatedAnnotationMetadata.wrapIfNecessary(eam, originalParameters);
+            return eam.copyWithArgs(originalParameters);
         }
         return executionHandle.getAnnotationMetadata();
     }

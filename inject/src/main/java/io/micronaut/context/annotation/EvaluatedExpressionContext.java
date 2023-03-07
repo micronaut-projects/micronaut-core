@@ -33,7 +33,7 @@ import java.lang.annotation.Target;
  */
 @DefaultScope(Singleton.class)
 @Target({ElementType.TYPE, ElementType.METHOD})
-@Retention(RetentionPolicy.RUNTIME)
+@Retention(RetentionPolicy.CLASS)
 public @interface EvaluatedExpressionContext {
     Class<?> value() default void.class;
 }

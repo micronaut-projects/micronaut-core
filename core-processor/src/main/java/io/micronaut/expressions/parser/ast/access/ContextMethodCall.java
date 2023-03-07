@@ -16,9 +16,9 @@
 package io.micronaut.expressions.parser.ast.access;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.expressions.context.ExpressionEvaluationContext;
+import io.micronaut.expressions.context.ExpressionCompilationContext;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
-import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
+import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
 import org.objectweb.asm.Type;
@@ -27,7 +27,7 @@ import org.objectweb.asm.commons.Method;
 
 import java.util.List;
 
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.EVALUATED_EXPRESSION_TYPE;
+import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.EVALUATION_CONTEXT_TYPE;
 import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.getRequiredClassElement;
 import static org.objectweb.asm.Opcodes.CHECKCAST;
 
@@ -50,12 +50,12 @@ public final class ContextMethodCall extends AbstractMethodCall {
     }
 
     @Override
-    protected CandidateMethod resolveUsedMethod(ExpressionCompilationContext ctx) {
+    protected CandidateMethod resolveUsedMethod(ExpressionVisitorContext ctx) {
         List<Type> argumentTypes = resolveArgumentTypes(ctx);
 
-        ExpressionEvaluationContext evaluationContext = ctx.evaluationContext();
+        ExpressionCompilationContext evaluationContext = ctx.compilationContext();
         List<CandidateMethod> candidateMethods =
-            evaluationContext.getMethods(name)
+            evaluationContext.findMethods(name)
                 .stream()
                 .map(method -> toCandidateMethod(ctx, method, argumentTypes))
                 .filter(method -> method.isMatching(ctx.visitorContext()))
@@ -74,7 +74,7 @@ public final class ContextMethodCall extends AbstractMethodCall {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(ExpressionVisitorContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         Type calleeType = usedMethod.getOwningType();
 
@@ -96,11 +96,11 @@ public final class ContextMethodCall extends AbstractMethodCall {
      * @param beanType required bean typ
      */
     private void pushGetBeanFromContext(GeneratorAdapter mv, Type beanType) {
-        mv.loadThis();
+        mv.loadArg(0);
         mv.push(beanType);
 
         // invoke getBean method
-        mv.invokeVirtual(EVALUATED_EXPRESSION_TYPE, GET_BEAN_METHOD);
+        mv.invokeInterface(EVALUATION_CONTEXT_TYPE, GET_BEAN_METHOD);
 
         // cast the return value to the correct type
         mv.visitTypeInsn(CHECKCAST, beanType.getInternalName());

@@ -22,8 +22,9 @@ package io.micronaut.context.exceptions;
  * @author Sergey Gavrilov
  */
 public class ExpressionEvaluationException extends RuntimeException {
-    public ExpressionEvaluationException(Throwable ex) {
-        super(ex);
+
+    public ExpressionEvaluationException(String message, Throwable ex) {
+        super(message, ex);
     }
 
     public ExpressionEvaluationException(String message) {

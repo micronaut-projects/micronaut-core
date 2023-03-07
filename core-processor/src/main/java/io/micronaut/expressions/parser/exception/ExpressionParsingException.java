@@ -15,12 +15,15 @@
  */
 package io.micronaut.expressions.parser.exception;
 
+import io.micronaut.core.annotation.Internal;
+
 /**
  * Exception throws when problems with expression parsing occur.
  *
  * @author Sergey Gavrilov
  * @since 4.0.0
  */
+@Internal
 public class ExpressionParsingException extends RuntimeException {
     public ExpressionParsingException(String message) {
         super(message);

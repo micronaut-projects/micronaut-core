@@ -1667,25 +1667,6 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param writer        The class writer
-     * @param methodName    The method name
-     * @param returnType    The return type
-     * @param argumentTypes The argument types
-     * @return The {@link GeneratorAdapter}
-     */
-    protected GeneratorAdapter startProtectedVarargsMethod(ClassWriter writer, String methodName, String returnType, String... argumentTypes) {
-        return new GeneratorAdapter(writer.visitMethod(
-            ACC_PROTECTED | ACC_VARARGS,
-            methodName,
-            getMethodDescriptor(returnType, argumentTypes),
-            null,
-            null
-        ), ACC_PROTECTED | ACC_VARARGS,
-            methodName,
-            getMethodDescriptor(returnType, argumentTypes));
-    }
-
-    /**
      * @param writer    The class writer
      * @param asmMethod The asm method
      * @return The {@link GeneratorAdapter}

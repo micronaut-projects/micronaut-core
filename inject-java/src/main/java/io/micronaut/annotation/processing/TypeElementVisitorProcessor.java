@@ -30,7 +30,7 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.VersionUtils;
-import io.micronaut.expressions.context.ExpressionContextLoader;
+import io.micronaut.expressions.context.ExpressionCompilationContextRegistry;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.EnumConstantElement;
@@ -308,7 +308,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         if (roundEnv.processingOver()) {
             javaVisitorContext.finish();
             writeBeanDefinitionsToMetaInf();
-            ExpressionContextLoader.reset();
+            ExpressionCompilationContextRegistry.reset();
         }
         return false;
     }

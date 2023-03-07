@@ -16,21 +16,21 @@
 package io.micronaut.expressions.parser.compilation;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.expressions.context.ExpressionEvaluationContext;
+import io.micronaut.expressions.context.ExpressionCompilationContext;
 import io.micronaut.inject.visitor.VisitorContext;
 import org.objectweb.asm.commons.GeneratorAdapter;
 
 /**
  * Context class used for compiling expressions.
  *
- * @param evaluationContext expression evaluation context
- * @param visitorContext visitor context
- * @param methodVisitor method visitor for compiled expression class
+ * @param compilationContext expression evaluation context
+ * @param visitorContext     visitor context
+ * @param methodVisitor      method visitor for compiled expression class
  *
  * @author Sergey Gavrilov
  * @since 4.0.0
  */
 @Internal
-public record ExpressionCompilationContext(ExpressionEvaluationContext evaluationContext,
-                                           VisitorContext visitorContext,
-                                           GeneratorAdapter methodVisitor) { }
+public record ExpressionVisitorContext(ExpressionCompilationContext compilationContext,
+                                       VisitorContext visitorContext,
+                                       GeneratorAdapter methodVisitor) {}

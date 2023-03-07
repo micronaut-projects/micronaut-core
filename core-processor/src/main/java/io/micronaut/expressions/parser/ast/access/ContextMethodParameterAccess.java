@@ -17,12 +17,15 @@ package io.micronaut.expressions.parser.ast.access;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
-import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
+import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
+import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ParameterElement;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
+import org.objectweb.asm.commons.Method;
 
+import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.EVALUATION_CONTEXT_TYPE;
 import static io.micronaut.inject.processing.JavaModelUtils.getTypeReference;
 import static org.objectweb.asm.Opcodes.AALOAD;
 
@@ -34,6 +37,11 @@ import static org.objectweb.asm.Opcodes.AALOAD;
  */
 @Internal
 final class ContextMethodParameterAccess extends ExpressionNode {
+
+    private static final Method GET_ARGUMENT_METHOD =
+        new Method("getArgument", Type.getType(Object.class),
+            new Type[]{TypeDescriptors.INT});
+
     private final ParameterElement parameterElement;
 
     private Integer parameterIndex;
@@ -43,15 +51,16 @@ final class ContextMethodParameterAccess extends ExpressionNode {
     }
 
     @Override
-    protected void generateBytecode(ExpressionCompilationContext ctx) {
+    protected void generateBytecode(ExpressionVisitorContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         mv.loadArg(0);
         mv.push(parameterIndex);
-        mv.visitInsn(AALOAD);
+        // invoke getArgument method
+        mv.invokeInterface(EVALUATION_CONTEXT_TYPE, GET_ARGUMENT_METHOD);
     }
 
     @Override
-    protected Type doResolveType(ExpressionCompilationContext ctx) {
+    protected Type doResolveType(ExpressionVisitorContext ctx) {
         String parameterName = parameterElement.getName();
         ParameterElement[] methodParameters = parameterElement.getMethodElement().getParameters();
 

@@ -15,8 +15,9 @@
  */
 package io.micronaut.expressions.parser.ast.operator.binary;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
-import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
+import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import org.objectweb.asm.Type;
 
 /**
@@ -25,6 +26,7 @@ import org.objectweb.asm.Type;
  * @author Sergey Gavrilov
  * @since 4.0.0
  */
+@Internal
 public abstract sealed class BinaryOperator extends ExpressionNode permits LogicalOperator,
                                                                            RelationalOperator,
                                                                            PowOperator,
@@ -40,7 +42,7 @@ public abstract sealed class BinaryOperator extends ExpressionNode permits Logic
     }
 
     @Override
-    protected Type doResolveType(ExpressionCompilationContext ctx) {
+    protected Type doResolveType(ExpressionVisitorContext ctx) {
         Type leftType = leftOperand.resolveType(ctx);
         Type rightType = rightOperand.resolveType(ctx);
         return resolveOperationType(leftType, rightType);

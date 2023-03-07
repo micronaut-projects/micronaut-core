@@ -19,7 +19,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
-import io.micronaut.core.expression.EvaluatedExpression;
+import io.micronaut.core.expressions.EvaluatedExpression;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -158,8 +158,6 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     }
 
     /**
-     * Internal copy constructor.
-     *
      * @param target            The target
      * @param defaultValues     The default values
      * @param convertibleValues The convertible values
@@ -167,10 +165,10 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @Internal
     @UsedByGeneratedCode
-    protected AnnotationValue(AnnotationValue<A> target,
-                              Map<CharSequence, Object> defaultValues,
-                              ConvertibleValues<Object> convertibleValues,
-                              Function<Object, Object> valueMapper) {
+    public AnnotationValue(AnnotationValue<A> target,
+                           Map<CharSequence, Object> defaultValues,
+                           ConvertibleValues<Object> convertibleValues,
+                           Function<Object, Object> valueMapper) {
         this.annotationName = target.annotationName;
         this.defaultValues = defaultValues;
         this.values = target.values;

@@ -17,7 +17,7 @@ package io.micronaut.expressions.parser.ast.operator.unary;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
-import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
+import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
@@ -51,7 +51,7 @@ public final class NegOperator extends UnaryOperator {
     }
 
     @Override
-    public Type doResolveType(ExpressionCompilationContext ctx) {
+    public Type doResolveType(ExpressionVisitorContext ctx) {
         Type nodeType = super.doResolveType(ctx);
         if (!isNumeric(nodeType)) {
             throw new ExpressionCompilationException(
@@ -61,7 +61,7 @@ public final class NegOperator extends UnaryOperator {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(ExpressionVisitorContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
 
         operand.compile(ctx);

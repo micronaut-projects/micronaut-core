@@ -15,9 +15,10 @@
  */
 package io.micronaut.expressions.util;
 
-import io.micronaut.core.annotation.EvaluatedExpressionReference;
+import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -32,6 +33,7 @@ import java.util.stream.Stream;
  * @author Sergey Gavrilov
  * @since 4.0.0
  */
+@Internal
 public final class EvaluatedExpressionsUtils {
 
     /**

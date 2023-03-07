@@ -17,7 +17,7 @@ package io.micronaut.expressions.parser.ast.access;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
-import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
+import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -47,7 +47,7 @@ public final class PropertyAccess extends ElementMethodCall {
     }
 
     @Override
-    protected CandidateMethod resolveUsedMethod(ExpressionCompilationContext ctx) {
+    protected CandidateMethod resolveUsedMethod(ExpressionVisitorContext ctx) {
         Type calleeType = callee.resolveType(ctx);
         ClassElement classElement = getRequiredClassElement(calleeType, ctx.visitorContext());
 

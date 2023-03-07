@@ -17,7 +17,7 @@ package io.micronaut.expressions.parser.ast.literal;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
-import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
+import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import org.objectweb.asm.Type;
 
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.DOUBLE;
@@ -37,12 +37,12 @@ public final class DoubleLiteral extends ExpressionNode {
     }
 
     @Override
-    public void generateBytecode(ExpressionCompilationContext ctx) {
+    public void generateBytecode(ExpressionVisitorContext ctx) {
         ctx.methodVisitor().push(value);
     }
 
     @Override
-    protected Type doResolveType(ExpressionCompilationContext ctx) {
+    protected Type doResolveType(ExpressionVisitorContext ctx) {
         return DOUBLE;
     }
 }

@@ -18,17 +18,18 @@ package io.micronaut.expressions.parser;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
-import io.micronaut.expressions.parser.ast.literal.StringLiteral;
-import io.micronaut.expressions.parser.ast.types.TypeIdentifier;
 import io.micronaut.expressions.parser.ast.collection.OneDimensionalArray;
+import io.micronaut.expressions.parser.ast.literal.StringLiteral;
 import io.micronaut.expressions.parser.ast.operator.binary.AddOperator;
+import io.micronaut.expressions.parser.ast.types.TypeIdentifier;
 import io.micronaut.expressions.parser.exception.ExpressionParsingException;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import static io.micronaut.core.expression.EvaluatedExpression.EXPRESSION_PREFIX;
+import static io.micronaut.expressions.EvaluatedExpressionConstants.EXPRESSION_PREFIX;
+
 
 /**
  * This parser is used to split complex expression into multiple

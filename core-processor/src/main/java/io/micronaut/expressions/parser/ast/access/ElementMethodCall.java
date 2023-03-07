@@ -18,7 +18,7 @@ package io.micronaut.expressions.parser.ast.access;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.types.TypeIdentifier;
-import io.micronaut.expressions.parser.compilation.ExpressionCompilationContext;
+import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
@@ -54,7 +54,7 @@ public sealed class ElementMethodCall extends AbstractMethodCall permits Propert
     }
 
     @Override
-    protected void generateBytecode(ExpressionCompilationContext ctx) {
+    protected void generateBytecode(ExpressionVisitorContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
         VisitorContext visitorContext = ctx.visitorContext();
         Type calleeType = callee.resolveType(ctx);
@@ -82,7 +82,7 @@ public sealed class ElementMethodCall extends AbstractMethodCall permits Propert
     }
 
     @Override
-    protected CandidateMethod resolveUsedMethod(ExpressionCompilationContext ctx) {
+    protected CandidateMethod resolveUsedMethod(ExpressionVisitorContext ctx) {
         List<Type> argumentTypes = resolveArgumentTypes(ctx);
         Type calleeType = callee.resolveType(ctx);
 

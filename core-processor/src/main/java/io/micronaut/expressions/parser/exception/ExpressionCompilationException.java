@@ -15,6 +15,8 @@
  */
 package io.micronaut.expressions.parser.exception;
 
+import io.micronaut.core.annotation.Internal;
+
 /**
  * Exception throws when problems with expression compilation occur.
  * These usually include problems with type resolution.
@@ -22,6 +24,7 @@ package io.micronaut.expressions.parser.exception;
  * @author Sergey Gavrilov
  * @since 4.0.0
  */
+@Internal
 public class ExpressionCompilationException extends RuntimeException {
     public ExpressionCompilationException(String message) {
         super(message);

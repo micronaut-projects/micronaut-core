@@ -21,7 +21,7 @@ class CompoundExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
     }
 
     void "test string expressions in arrays"() {
-        Object expr1 = buildSingleExpressionFromClass("test.Expr", """
+        Object result = evaluateSingle("test.Expr", """
             package test
             import io.micronaut.context.annotation.Requires
             import jakarta.inject.Singleton
@@ -31,15 +31,14 @@ class CompoundExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
             class Expr {
             }
         """)
-                .evaluate()
 
         expect:
-        expr1 instanceof Object[] && Arrays.equals((Object[]) expr1, new Object[]{'a', 'b', 'cd'})
+        result instanceof Object[] && Arrays.equals((Object[]) result, new Object[]{'a', 'b', 'cd'})
     }
 
 
     void "test mixed expressions in arrays"() {
-        Object expr1 = buildSingleExpressionFromClass("test.Expr", """
+        Object result = evaluateSingle("test.Expr", """
             package test;
             import io.micronaut.context.annotation.Requires;
             import jakarta.inject.Singleton;
@@ -49,10 +48,9 @@ class CompoundExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
             class Expr {
             }
         """)
-                .evaluate()
 
         expect:
-        expr1 instanceof Object[] && Arrays.equals((Object[]) expr1, new Object[]{1, 'b', 15l, 'c'})
+        result instanceof Object[] && Arrays.equals((Object[]) result, new Object[]{1, 'b', 15l, 'c'})
     }
 
 }
