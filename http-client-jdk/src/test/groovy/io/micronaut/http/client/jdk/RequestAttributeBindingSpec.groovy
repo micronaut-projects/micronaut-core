@@ -1,6 +1,8 @@
-package io.micronaut.http.server.netty.binding
+package io.micronaut.http.client.jdk
 
+import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MutableHttpResponse
@@ -9,16 +11,23 @@ import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.RequestAttribute
 import io.micronaut.http.client.BlockingHttpClient
+import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
-import io.micronaut.http.server.netty.AbstractMicronautSpec
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import jakarta.inject.Inject
 import org.reactivestreams.Publisher
-import spock.lang.Issue
+import spock.lang.Specification
 
-import javax.annotation.Nullable
+@MicronautTest
+@Property(name = "spec.name", value = "RequestAttributeBindingSpec")
+class RequestAttributeBindingSpec extends Specification {
 
-class RequestAttributeBindingSpec extends AbstractMicronautSpec {
+    @Inject
+    @Client("/")
+    HttpClient rxClient
 
     void "test request attribute binding from a filter"() {
         given:
