@@ -178,6 +178,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             writers.clear();
         }
     }
+
     private void processElement(boolean metadata,
                                 Set<AnnotationValue<Annotation>> indexedAnnotations,
                                 ClassElement ce,
