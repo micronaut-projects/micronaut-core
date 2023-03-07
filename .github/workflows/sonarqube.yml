@@ -18,13 +18,13 @@ jobs:
     if: github.repository != 'micronaut-projects/micronaut-project-template'
     runs-on: ubuntu-latest
     steps:
-      # https://github.com/actions/virtual-environments/issues/709
+       # https://github.com/actions/virtual-environments/issues/709
       - name: Free disk space
         run: |
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo apt-get clean
-          df -h
+         sudo rm -rf "/usr/local/share/boost"
+         sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+         sudo apt-get clean
+         df -h
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
@@ -56,3 +56,5 @@ jobs:
           GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
+          GH_USERNAME: ${{ secrets.GH_USERNAME }}
