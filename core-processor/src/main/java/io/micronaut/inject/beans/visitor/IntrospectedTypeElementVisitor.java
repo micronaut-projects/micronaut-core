@@ -139,7 +139,11 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                             metadata ? element.getAnnotationMetadata() : null
                         );
 
-                        processElement(metadata, indexedAnnotations, classElement, writer);
+                        processElement(metadata,
+                            indexedAnnotations,
+                            PropertyElementQuery.of(element).ignoreSettersWithDifferingType(true),
+                            classElement,
+                            writer);
                     }
                 }
             }
