@@ -36,6 +36,7 @@ import java.util.stream.Stream;
 public final class CrossOriginUtil {
 
     public static final String MEMBER_ALLOWED_ORIGINS = "allowedOrigins";
+    public static final String MEMBER_ALLOWED_ORIGINS_REGEX = "allowedOriginsRegex";
     public static final String MEMBER_ALLOWED_HEADERS = "allowedHeaders";
     public static final String MEMBER_EXPOSED_HEADERS = "exposedHeaders";
     public static final String MEMBER_ALLOWED_METHODS = "allowedMethods";
@@ -61,6 +62,9 @@ public final class CrossOriginUtil {
         }
         CorsOriginConfiguration config = new CorsOriginConfiguration();
         config.setAllowedOrigins(Arrays.asList(annotationMetadata.stringValues(CrossOrigin.class, MEMBER_ALLOWED_ORIGINS)));
+        annotationMetadata.booleanValue(CrossOrigin.class, MEMBER_ALLOWED_ORIGINS_REGEX)
+            .ifPresent(config::setAllowedOriginsRegex);
+
         String[] allowedHeaders = annotationMetadata.stringValues(CrossOrigin.class, MEMBER_ALLOWED_HEADERS);
         List<String> allowedHeadersList = allowedHeaders.length == 0 ? CorsOriginConfiguration.ANY : Arrays.asList(allowedHeaders);
         config.setAllowedHeaders(allowedHeadersList);

@@ -9,6 +9,7 @@ The `@CrossOrigin` annotation maps with a one-to-one correspondence to applicati
 ----
 @CrossOrigin(
 	allowedOrigins = { "http://foo.com" ,"^http(|s):\\/\\/www\\.google\\.com$" },
+	allowedOriginsRegex = true,
 	allowedMethods = { HttpMethod.POST, HttpMethod.PUT },
 	allowedHeaders = { HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION },
 	exposedHeaders = { HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION },

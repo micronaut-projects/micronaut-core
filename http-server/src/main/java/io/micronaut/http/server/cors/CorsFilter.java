@@ -336,16 +336,19 @@ public class CorsFilter implements HttpServerFilter {
 
     private static boolean matchesOrigin(@NonNull CorsOriginConfiguration config, String requestOrigin) {
         List<String> allowedOrigins = config.getAllowedOrigins();
-        return !allowedOrigins.isEmpty() && (isAny(allowedOrigins) || allowedOrigins.stream().anyMatch(origin -> matchesOrigin(origin, requestOrigin)));
+        return !allowedOrigins.isEmpty() && (isAny(allowedOrigins) || allowedOrigins.stream().anyMatch(origin -> matchesOrigin(origin, requestOrigin, config.isAllowedOriginsRegex())));
     }
 
-    private static boolean matchesOrigin(@NonNull String origin, @NonNull String requestOrigin) {
+    private static boolean matchesOrigin(@NonNull String origin, @NonNull String requestOrigin, boolean isAllowedOriginsRegex) {
         if (origin.equals(requestOrigin)) {
             return true;
         }
-        Pattern p = Pattern.compile(origin);
-        Matcher m = p.matcher(requestOrigin);
-        return m.matches();
+        if (isAllowedOriginsRegex) {
+            Pattern p = Pattern.compile(origin);
+            Matcher m = p.matcher(requestOrigin);
+            return m.matches();
+        }
+        return false;
     }
 
     private static boolean isAny(List<String> values) {

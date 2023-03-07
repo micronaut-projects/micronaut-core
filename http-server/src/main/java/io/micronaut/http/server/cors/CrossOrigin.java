@@ -54,6 +54,12 @@ public @interface CrossOrigin {
 
     /**
      *
+     * @return whether regex is allowed for allowedOrigins
+     */
+    boolean allowedOriginsRegex() default false;
+
+    /**
+     *
      * @return request headers permitted in requests
      */
     String[] allowedHeaders() default {};

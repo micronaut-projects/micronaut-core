@@ -113,6 +113,30 @@ public class CrossOriginTest {
         );
     }
 
+
+    @Test
+    void allowedHeadersRegexHappyPath() throws IOException {
+        asserts(SPECNAME,
+            preflight(UriBuilder.of("/allowedoriginsregex").path("foo"), "https://foo.com", HttpMethod.GET),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .assertResponse(response -> {
+                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
+                    assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS));
+                })
+                .build()));
+    }
+
+    @Test
+    void allowedHeadersRegexFailure() throws IOException {
+        asserts(SPECNAME,
+            preflight(UriBuilder.of("/allowedoriginsregex").path("bar"), "https://foo.com", HttpMethod.GET),
+            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.METHOD_NOT_ALLOWED)
+                .assertResponse(CorsUtils::assertCorsHeadersNotPresent)
+                .build()));
+    }
+
     @Test
     void allowedHeadersHappyPath() throws IOException {
         asserts(SPECNAME,
@@ -264,6 +288,31 @@ public class CrossOriginTest {
         @Produces(MediaType.TEXT_PLAIN)
         @Get("/bar")
         String index() {
+            return "bar";
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPECNAME)
+    @Controller("/allowedoriginsregex")
+    static class AllowedOriginsRegex {
+
+        @CrossOrigin(
+            value = "^http(|s):\\/\\.foo\\.com$",
+            allowedOriginsRegex = true
+        )
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get("/foo")
+        String foo() {
+            return "foo";
+        }
+
+        @CrossOrigin(
+            value = "^http(|s):\\/\\.foo\\.com$"
+            // allowedOriginsRegex defaults to false
+        )
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get("/bar")
+        String bar() {
             return "bar";
         }
     }

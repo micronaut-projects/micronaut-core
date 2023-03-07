@@ -42,6 +42,7 @@ public class CorsOriginConfiguration {
     public static final List<HttpMethod> ANY_METHOD = Collections.emptyList();
 
     private List<String> allowedOrigins = ANY;
+    private boolean allowedOriginsRegex = false;
     private List<HttpMethod> allowedMethods = ANY_METHOD;
     private List<String> allowedHeaders = ANY;
     private List<String> exposedHeaders = Collections.emptyList();
@@ -64,6 +65,22 @@ public class CorsOriginConfiguration {
         if (allowedOrigins != null) {
             this.allowedOrigins = allowedOrigins;
         }
+    }
+
+    /**
+     * @return Whether regex is allowed for allowedOrigins
+     */
+    public boolean isAllowedOriginsRegex() {
+        return allowedOriginsRegex;
+    }
+
+    /**
+     * Sets whether regex is allowed for allowedOrigins.
+     *
+     * @param allowedOriginsRegex regex allowed for origins
+     */
+    public void setAllowedOriginsRegex(boolean allowedOriginsRegex) {
+        this.allowedOriginsRegex = allowedOriginsRegex;
     }
 
     /**
