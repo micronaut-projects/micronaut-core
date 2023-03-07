@@ -28,19 +28,20 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.client.multipart.MultipartBody;
-import io.micronaut.http.server.tck.AssertionUtils;
-import io.micronaut.http.server.tck.HttpResponseAssertion;
-import io.micronaut.http.server.tck.RequestSupplier;
-import io.micronaut.http.server.tck.ServerUnderTest;
+import io.micronaut.http.tck.AssertionUtils;
+import io.micronaut.http.tck.HttpResponseAssertion;
+import io.micronaut.http.tck.RequestSupplier;
+import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.Collections;
 
-import static io.micronaut.http.server.tck.TestScenario.asserts;
+import static io.micronaut.http.tck.TestScenario.asserts;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SuppressWarnings({
@@ -68,6 +69,7 @@ public class CorsSimpleRequestTest {
      * @throws IOException may throw the try for resources
      */
     @Test
+    @Tag("multipart")
     void corsSimpleRequestNotAllowedForLocalhostAndAny() throws IOException {
         asserts(SPECNAME,
             Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
@@ -83,6 +85,7 @@ public class CorsSimpleRequestTest {
      * @throws IOException
      */
     @Test
+    @Tag("multipart")
     void corsSimpleRequestAllowedForLocalhostAndAnyWhenSpecificallyTurnedOff() throws IOException {
         asserts(SPECNAME,
             CollectionUtils.mapOf(
@@ -108,6 +111,7 @@ public class CorsSimpleRequestTest {
      * @throws IOException may throw the try for resources
      */
     @Test
+    @Tag("multipart")
     void corsSimpleRequestNotAllowedFor127AndAny() throws IOException {
         asserts(SPECNAME,
             Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
@@ -121,6 +125,7 @@ public class CorsSimpleRequestTest {
      * @throws IOException scenario step fails
      */
     @Test
+    @Tag("multipart")
     void corsSimpleRequestAllowedForLocalhostAndOriginLocalhost() throws IOException {
         asserts(SPECNAME,
             Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
@@ -135,6 +140,7 @@ public class CorsSimpleRequestTest {
      * @throws IOException
      */
     @Test
+    @Tag("multipart")
     void corsSimpleRequestAllowedForLocalhostAnd127Origin() throws IOException {
         asserts(SPECNAME,
             Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
@@ -149,6 +155,7 @@ public class CorsSimpleRequestTest {
      * @throws IOException
      */
     @Test
+    @Tag("multipart")
     void corsSimpleRequestFailsForLocalhostAndSpoofed127Origin() throws IOException {
         asserts(SPECNAME,
             Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
@@ -163,6 +170,7 @@ public class CorsSimpleRequestTest {
      * @throws IOException
      */
     @Test
+    @Tag("multipart")
     void corsSimpleRequestAllowedFor127RequestAndLocalhostOrigin() throws IOException {
         asserts(SPECNAME,
             Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
@@ -176,6 +184,7 @@ public class CorsSimpleRequestTest {
      * @throws IOException may throw the try for resources
      */
     @Test
+    @Tag("multipart")
     void corsSimpleRequestForLocalhostCanBeAllowedViaConfiguration() throws IOException {
         asserts(SPECNAME,
             CollectionUtils.mapOf(

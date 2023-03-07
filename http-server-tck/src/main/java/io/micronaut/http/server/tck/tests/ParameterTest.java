@@ -20,14 +20,15 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
-import io.micronaut.http.server.tck.AssertionUtils;
-import io.micronaut.http.server.tck.HttpResponseAssertion;
-import static io.micronaut.http.server.tck.TestScenario.asserts;
+import io.micronaut.http.tck.AssertionUtils;
+import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.uri.UriBuilder;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.List;
+
+import static io.micronaut.http.tck.TestScenario.asserts;
 
 
 @SuppressWarnings({
