@@ -113,7 +113,6 @@ public class CrossOriginTest {
         );
     }
 
-
     @Test
     void allowedOriginsRegexHappyPath() throws IOException {
         asserts(SPECNAME,

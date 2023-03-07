@@ -355,10 +355,6 @@ public class CorsFilter implements HttpServerFilter {
         return values == CorsOriginConfiguration.ANY;
     }
 
-    private static boolean isNone(List<String> values) {
-        return values.isEmpty();
-    }
-
     private static boolean isAnyMethod(List<HttpMethod> allowedMethods) {
         return allowedMethods == CorsOriginConfiguration.ANY_METHOD;
     }

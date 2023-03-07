@@ -56,9 +56,7 @@ public class CorsDisabledByDefaultTest {
             (server, request) -> {
                 AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                     .status(HttpStatus.OK)
-                    .assertResponse(response -> {
-                        CorsUtils.assertCorsHeadersNotPresent(response);
-                    })
+                    .assertResponse(CorsUtils::assertCorsHeadersNotPresent)
                     .build());
             });
     }
