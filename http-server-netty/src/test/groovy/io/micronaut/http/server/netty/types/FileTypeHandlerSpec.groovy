@@ -75,6 +75,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         response.header(CONTENT_TYPE) == "text/html"
         Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
         response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
+        response.headers.getAll(DATE).size() == 1
         response.header(CACHE_CONTROL) == "private, max-age=60"
         response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(tempFile.lastModified()), ZoneId.of("GMT")).truncatedTo(ChronoUnit.SECONDS)
         response.body() == tempFileContents
