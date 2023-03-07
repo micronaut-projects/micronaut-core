@@ -115,7 +115,7 @@ public class CrossOriginTest {
 
 
     @Test
-    void allowedHeadersRegexHappyPath() throws IOException {
+    void allowedOriginsRegexHappyPath() throws IOException {
         asserts(SPECNAME,
             preflight(UriBuilder.of("/allowedoriginsregex").path("foo"), "https://foo.com", HttpMethod.GET),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
@@ -128,7 +128,7 @@ public class CrossOriginTest {
     }
 
     @Test
-    void allowedHeadersRegexFailure() throws IOException {
+    void allowedOriginsRegexFailure() throws IOException {
         asserts(SPECNAME,
             preflight(UriBuilder.of("/allowedoriginsregex").path("bar"), "https://foo.com", HttpMethod.GET),
             (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
