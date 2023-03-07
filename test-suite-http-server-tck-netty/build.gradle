@@ -54,7 +54,7 @@ tasks.named("check") { task ->
     }
 }
 
-test {
+tasks.named("test") {
     useJUnitPlatform()
 }
 
