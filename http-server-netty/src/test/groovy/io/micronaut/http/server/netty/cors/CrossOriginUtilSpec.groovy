@@ -39,6 +39,7 @@ class CrossOriginUtilSpec extends Specification {
         then:
         config
         config.allowedOrigins == [ "https://foo.com" ]
+        config.allowedOriginsRegex
         config.allowedHeaders == [ HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION ]
         config.exposedHeaders == [ HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION ]
         config.allowedMethods == [ HttpMethod.GET, HttpMethod.POST ]
@@ -58,6 +59,7 @@ class CrossOriginUtilSpec extends Specification {
         then:
         config
         config.allowedOrigins == [ "https://foo.com" ]
+        !config.allowedOriginsRegex
         config.allowedHeaders == CorsOriginConfiguration.ANY
         config.exposedHeaders == CorsOriginConfiguration.NONE
         config.allowedMethods == CorsOriginConfiguration.ANY_METHOD
@@ -113,6 +115,7 @@ class CrossOriginUtilSpec extends Specification {
 
         @CrossOrigin(
                 allowedOrigins = "https://foo.com",
+                allowedOriginsRegex = true,
                 allowedHeaders = [ HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION ],
                 exposedHeaders = [ HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION ],
                 allowedMethods = [ HttpMethod.GET, HttpMethod.POST ],
@@ -126,7 +129,10 @@ class CrossOriginUtilSpec extends Specification {
             return "method"
         }
 
-        @CrossOrigin("https://foo.com")
+        @CrossOrigin(
+                "https://foo.com"
+                // allowedOriginsRegex = false - is the default
+        )
         @Produces(MediaType.TEXT_PLAIN)
         @Get("/anothermethod")
         String example(HttpRequest req) {
