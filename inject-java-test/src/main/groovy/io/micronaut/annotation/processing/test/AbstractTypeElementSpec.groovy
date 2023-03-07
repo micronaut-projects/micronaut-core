@@ -146,7 +146,7 @@ abstract class AbstractTypeElementSpec extends Specification {
     **/
     protected BeanIntrospection buildBeanIntrospection(String className, @Language("java") String cls) {
         def simpleName = NameUtils.getSimpleName(className)
-        def beanDefName= (simpleName.startsWith('$') ? '' : '$') + simpleName + '$Introspection'
+        def beanDefName = (simpleName.startsWith('$') ? '' : '$') + simpleName + '$Introspection'
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
