@@ -54,6 +54,10 @@ tasks.named("check") { task ->
     }
 }
 
+tasks.named("test") {
+    useJUnitPlatform()
+}
+
 def openGraalModules = [
         "org.graalvm.nativeimage.builder/com.oracle.svm.core.jdk",
         "org.graalvm.nativeimage.builder/com.oracle.svm.core.configure",

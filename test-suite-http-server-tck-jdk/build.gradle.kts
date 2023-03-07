@@ -14,3 +14,7 @@ tasks.withType(Test::class) {
     // These restricted headers are set in the server TCK
     systemProperty("jdk.httpclient.allowRestrictedHeaders", "Host,Connection,Content-Length")
 }
+
+tasks.named<Test>("test") {
+    useJUnitPlatform()
+}
