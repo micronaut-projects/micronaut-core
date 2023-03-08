@@ -499,11 +499,10 @@ public interface HttpHeaders extends Headers {
      */
     String X_AUTH_TOKEN = "X-Auth-Token";
 
-
     /**
      * Unmodifiable List of every header define in {@link HttpHeaders}.
      */
-    List<String> STANDARD_HEADERS = Arrays.asList(
+    List<String> STANDARD_HEADERS = Collections.unmodifiableList(Arrays.asList(
         ACCEPT,
         ACCEPT,
         ACCEPT_CH,
@@ -598,7 +597,7 @@ public interface HttpHeaders extends Headers {
         WIDTH,
         WWW_AUTHENTICATE,
         X_AUTH_TOKEN
-    );
+    ));
 
     /**
      * Obtain the date header.
