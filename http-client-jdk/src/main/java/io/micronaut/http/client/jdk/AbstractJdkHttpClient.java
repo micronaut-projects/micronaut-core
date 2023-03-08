@@ -53,6 +53,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 import static io.micronaut.http.client.exceptions.HttpClientExceptionUtils.populateServiceId;
@@ -69,6 +71,8 @@ import static io.micronaut.http.client.exceptions.HttpClientExceptionUtils.popul
 abstract class AbstractJdkHttpClient {
 
     public static final String H2C_ERROR_MESSAGE = "H2C is not supported by the JDK HTTP client";
+    public static final String H3_ERROR_MESSAGE = "HTTP/3 is not supported by the JDK HTTP client";
+    public static final String WEIRD_ALPN_ERROR_MESSAGE = "The only supported ALPN modes are [" + HttpVersionSelection.ALPN_HTTP_1 + "] or [" + HttpVersionSelection.ALPN_HTTP_1 + "," + HttpVersionSelection.ALPN_HTTP_2 + "]";
 
     protected final LoadBalancer loadBalancer;
     protected final HttpVersionSelection httpVersion;
@@ -142,9 +146,22 @@ abstract class AbstractJdkHttpClient {
         if (httpVersionSelection.getPlaintextMode() == HttpVersionSelection.PlaintextMode.H2C) {
             throw new ConfigurationException(H2C_ERROR_MESSAGE);
         }
+        if (httpVersionSelection.isHttp3()) {
+            throw new ConfigurationException(H3_ERROR_MESSAGE);
+        }
 
-        if (httpVersionSelection.isAlpn() && httpVersionSelection.isHttp2CipherSuites()) {
-            builder.version(HttpClient.Version.HTTP_2);
+        if (httpVersionSelection.isAlpn()) {
+            List<String> supportedProtocols = Arrays.asList(httpVersionSelection.getAlpnSupportedProtocols());
+            if (supportedProtocols.size() == 2 &&
+                supportedProtocols.contains(HttpVersionSelection.ALPN_HTTP_1) &&
+                supportedProtocols.contains(HttpVersionSelection.ALPN_HTTP_2)) {
+                builder.version(HttpClient.Version.HTTP_2);
+            } else if (supportedProtocols.size() == 1 &&
+                supportedProtocols.get(0).equals(HttpVersionSelection.ALPN_HTTP_1)) {
+                builder.version(HttpClient.Version.HTTP_1_1);
+            } else {
+                throw new ConfigurationException(WEIRD_ALPN_ERROR_MESSAGE);
+            }
         } else {
             builder.version(HttpClient.Version.HTTP_1_1);
         }
