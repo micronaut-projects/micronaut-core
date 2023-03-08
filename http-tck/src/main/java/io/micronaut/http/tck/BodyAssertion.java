@@ -35,11 +35,13 @@ public final class BodyAssertion<T, E> {
     private final Class<T> bodyType;
     private final Class<E> errorType;
     private final T expected;
-    private final BiPredicate<T, T> evaluator;
+    private final BodyEvaluator<T> evaluator;
 
     private BodyAssertion(Class<T> bodyType,
                           Class<E> errorType,
-                          T expected, BiPredicate<T, T> evaluator) {
+                          T expected,
+                          BodyEvaluator<T> evaluator
+    ) {
         this.bodyType = bodyType;
         this.errorType = errorType;
         this.expected = expected;
@@ -60,7 +62,7 @@ public final class BodyAssertion<T, E> {
      */
     @SuppressWarnings("java:S5960") // Assertion is the whole point of this method
     public void evaluate(T body) {
-        assertTrue(this.evaluator.test(expected, body));
+        assertTrue(this.evaluator.test(expected, body), () -> this.evaluator.message(expected, body));
     }
 
     /**
@@ -73,6 +75,11 @@ public final class BodyAssertion<T, E> {
     @Nullable
     public Class<E> getErrorType() {
         return errorType;
+    }
+
+    private static enum EvaluatorType {
+        EQUAL,
+        CONTAIN,
     }
 
     /**
@@ -92,6 +99,15 @@ public final class BodyAssertion<T, E> {
          * @return a body assertion which verifiers the HTTP Response's body is equals to the expected body
          */
         BodyAssertion<T, E> equals();
+    }
+
+    private interface BodyEvaluator<T> extends BiPredicate<T, T> {
+
+        EvaluatorType type();
+
+        default String message(T expected, T actual) {
+            return "Expected received body of '" + actual + "' to " + type().name().toLowerCase() + " '" + expected + "'";
+        }
     }
 
     /**
@@ -131,14 +147,14 @@ public final class BodyAssertion<T, E> {
          * @return a body assertion which verifiers the HTTP Response's body contains the expected body
          */
         public BodyAssertion<String, String> contains() {
-            return new BodyAssertion<>(String.class, String.class, this.body, (required, received) -> received.contains(required));
+            return new BodyAssertion<>(String.class, String.class, this.body, new StringEvaluator(EvaluatorType.CONTAIN));
         }
 
         /**
          * @return a body assertion which verifiers the HTTP Response's body is equals to the expected body
          */
         public BodyAssertion<String, String> equals() {
-            return new BodyAssertion<>(String.class, String.class, this.body, (required, received) -> received.equals(required));
+            return new BodyAssertion<>(String.class, String.class, this.body, new StringEvaluator(EvaluatorType.EQUAL));
         }
     }
 
@@ -157,16 +173,36 @@ public final class BodyAssertion<T, E> {
          * @return a body assertion which verifiers the HTTP Response's body contains the expected body
          */
         public BodyAssertion<byte[], byte[]> contains() {
-            return new BodyAssertion<>(byte[].class, byte[].class, this.body, (required, received) -> {
-                throw new AssertionError("Not implemented yet!");
-            });
+            return new BodyAssertion<>(byte[].class, byte[].class, this.body, new ByteArrayEvaluator(EvaluatorType.CONTAIN));
         }
 
         /**
          * @return a body assertion which verifiers the HTTP Response's body is equals to the expected body
          */
         public BodyAssertion<byte[], byte[]> equals() {
-            return new BodyAssertion<>(byte[].class, byte[].class, this.body, (required, received) -> Arrays.equals(received, required));
+            return new BodyAssertion<>(byte[].class, byte[].class, this.body, new ByteArrayEvaluator(EvaluatorType.EQUAL));
+        }
+    }
+
+    private record StringEvaluator(EvaluatorType type) implements BodyEvaluator<String> {
+
+        @Override
+        public boolean test(String expected, String received) {
+            return switch (type) {
+                case EQUAL -> received.equals(expected);
+                case CONTAIN -> received.contains(expected);
+            };
+        }
+    }
+
+    private record ByteArrayEvaluator(EvaluatorType type) implements BodyEvaluator<byte[]> {
+
+        @Override
+        public boolean test(byte[] expected, byte[] received) {
+            return switch (type) {
+                case EQUAL -> Arrays.equals(received, expected);
+                case CONTAIN -> throw new AssertionError("Not implemented yet!");
+            };
         }
     }
 }
