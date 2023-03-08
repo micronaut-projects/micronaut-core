@@ -499,6 +499,10 @@ public interface HttpHeaders extends Headers {
      */
     String X_AUTH_TOKEN = "X-Auth-Token";
 
+
+    /**
+     * Unmodifiable List of every header define in {@link HttpHeaders}.
+     */
     List<String> STANDARD_HEADERS = Arrays.asList(
         ACCEPT,
         ACCEPT,
