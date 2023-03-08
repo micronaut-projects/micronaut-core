@@ -31,6 +31,13 @@ import java.util.List;
 public class CorsOriginConfiguration {
 
     /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ALLOWED_ORIGINS_REGEX = false;
+
+
+    /**
      * Constant to represent any value.
      */
     public static final List<String> ANY = Collections.singletonList("*");
@@ -42,7 +49,7 @@ public class CorsOriginConfiguration {
     public static final List<HttpMethod> ANY_METHOD = Collections.emptyList();
 
     private List<String> allowedOrigins = ANY;
-    private boolean allowedOriginsRegex = false;
+    private boolean allowedOriginsRegex = DEFAULT_ALLOWED_ORIGINS_REGEX;
     private List<HttpMethod> allowedMethods = ANY_METHOD;
     private List<String> allowedHeaders = ANY;
     private List<String> exposedHeaders = Collections.emptyList();
@@ -68,14 +75,14 @@ public class CorsOriginConfiguration {
     }
 
     /**
-     * @return Whether regex is allowed for allowedOrigins
+     * @return Whether regex is allowed for allowedOrigins. Default value {@value #DEFAULT_ALLOWED_ORIGINS_REGEX}.
      */
     public boolean isAllowedOriginsRegex() {
         return allowedOriginsRegex;
     }
 
     /**
-     * Sets whether regex is allowed for allowedOrigins.
+     * Sets whether regex is allowed for allowedOrigins. Default value {@value #DEFAULT_ALLOWED_ORIGINS_REGEX}.
      *
      * @param allowedOriginsRegex regex allowed for origins
      */
