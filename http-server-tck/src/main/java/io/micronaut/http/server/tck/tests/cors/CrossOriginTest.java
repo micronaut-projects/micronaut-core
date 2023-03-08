@@ -36,12 +36,15 @@ import io.micronaut.http.server.cors.CrossOrigin;
 import io.micronaut.http.server.tck.AssertionUtils;
 import io.micronaut.http.server.tck.CorsUtils;
 import io.micronaut.http.server.tck.HttpResponseAssertion;
+import io.micronaut.http.server.tck.ServerUnderTest;
 import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.http.uri.UriBuilder;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.net.URI;
+import java.util.function.BiConsumer;
 
 import static io.micronaut.http.server.tck.CorsUtils.*;
 import static io.micronaut.http.server.tck.TestScenario.asserts;
@@ -115,15 +118,21 @@ public class CrossOriginTest {
 
     @Test
     void allowedOriginsRegexHappyPath() throws IOException {
-        asserts(SPECNAME,
-            preflight(UriBuilder.of("/allowedoriginsregex").path("foo"), "https://foo.com", HttpMethod.GET),
-            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
-                .status(HttpStatus.OK)
-                .assertResponse(response -> {
-                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
-                    assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS));
-                })
-                .build()));
+        URI uri = UriBuilder.of("/allowedoriginsregex").path("foo").build();
+        String origin = "https://foo.com";
+        asserts(SPECNAME, preflight(uri, origin, HttpMethod.GET), happyPathAssertion(origin));
+        origin = "http://foo.com";
+        asserts(SPECNAME, preflight(uri, origin, HttpMethod.GET), happyPathAssertion(origin));
+    }
+
+    private static BiConsumer<ServerUnderTest, HttpRequest<?>> happyPathAssertion(String origin) {
+        return (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+            .status(HttpStatus.OK)
+            .assertResponse(response -> {
+                assertCorsHeaders(response, origin, HttpMethod.GET);
+                assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS));
+            })
+            .build());
     }
 
     @Test
@@ -274,7 +283,11 @@ public class CrossOriginTest {
     }
 
     private static MutableHttpRequest<?> preflight(UriBuilder uriBuilder, String originValue, HttpMethod method) {
-        return HttpRequest.OPTIONS(uriBuilder.build())
+        return preflight(uriBuilder.build(), originValue, method);
+    }
+
+    private static MutableHttpRequest<?> preflight(URI uri, String originValue, HttpMethod method) {
+        return HttpRequest.OPTIONS(uri)
             .header(HttpHeaders.ACCEPT, MediaType.TEXT_PLAIN)
             .header(HttpHeaders.ORIGIN, originValue)
             .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, method);
@@ -296,7 +309,7 @@ public class CrossOriginTest {
     static class AllowedOriginsRegex {
 
         @CrossOrigin(
-            value = "^http(|s):\\/\\.foo\\.com$",
+            value = "^http(|s):\\/\\/foo\\.com$",
             allowedOriginsRegex = true
         )
         @Produces(MediaType.TEXT_PLAIN)
@@ -306,7 +319,7 @@ public class CrossOriginTest {
         }
 
         @CrossOrigin(
-            value = "^http(|s):\\/\\.foo\\.com$"
+            value = "^http(|s):\\/\\/foo\\.com$"
             // allowedOriginsRegex defaults to false
         )
         @Produces(MediaType.TEXT_PLAIN)
