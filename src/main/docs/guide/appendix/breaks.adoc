@@ -1,5 +1,9 @@
 This section documents breaking changes between Micronaut versions
 
+== 3.9.0
+
+Since Micronaut Framework 3.9.0, CORS `allowed-origins` configuration does not support regular expressions by default to prevent accidentally exposing your API. If you wish to support regular expression in your `allowed-origins,` you can enable it via the boolean `allowed-origins-regex`, which defaults to false.
+
 == 3.8.7
 
 Micronaut Framework 3.8.7 updates to https://bitbucket.org/snakeyaml/snakeyaml/wiki/Changes[SnakeYAML 2.0] which addresses https://nvd.nist.gov/vuln/detail/CVE-2022-1471[CVE-2022-1471]. Many organizations' policies forbid their teams to use Micronaut Framework if the framework depends on a vulnerable dependency, even if the framework is unaffected. Micronaut Framework is not affected by https://nvd.nist.gov/vuln/detail/CVE-2022-1471[CVE-2022-1471].
