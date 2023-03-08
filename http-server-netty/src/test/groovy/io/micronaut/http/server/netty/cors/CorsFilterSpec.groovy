@@ -100,6 +100,7 @@ class CorsFilterSpec extends Specification {
 
         CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
         originConfig.allowedOrigins = regex
+        originConfig.allowedOriginsRegex = true
         HttpServerConfiguration.CorsConfiguration config = enabledCorsConfiguration([foo: originConfig])
         CorsFilter corsHandler = buildCorsHandler(config)
 
