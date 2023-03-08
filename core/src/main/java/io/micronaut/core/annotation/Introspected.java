@@ -76,6 +76,13 @@ public @interface Introspected {
     Class<?>[] classes() default {};
 
     /**
+     * Alternative way to specify the value for `classes` when the class cannot be referenced.
+     *
+     * @return The class names to generate introspections for
+     */
+    String[] classNames() default {};
+
+    /**
      * <p>The default access type is {@link AccessKind#METHOD} which treats only public JavaBean getters or Java record components as properties. By specifying {@link AccessKind#FIELD}, public or package-protected fields will be used instead. </p>
      *
      *  <p>If both {@link AccessKind#FIELD} and {@link AccessKind#METHOD} are specified then the order as they appear in the annotation will be used to determine whether the field or method will be used in the case where both exist.</p>
