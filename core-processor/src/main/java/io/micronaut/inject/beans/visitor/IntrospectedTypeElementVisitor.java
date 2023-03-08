@@ -115,7 +115,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 processElement(
                     metadata,
                     indexedAnnotations,
-                    PropertyElementQuery.of(element).ignoreSettersWithDifferingType(true),
+                    getExternalPropertyElementQuery(element, ce),
                     ce,
                     writer
                 );
@@ -141,7 +141,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
                         processElement(metadata,
                             indexedAnnotations,
-                            PropertyElementQuery.of(element).ignoreSettersWithDifferingType(true),
+                            getExternalPropertyElementQuery(element, classElement),
                             classElement,
                             writer);
                     }
@@ -154,6 +154,12 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             );
             processElement(metadata, indexedAnnotations, element, writer);
         }
+    }
+
+    @NonNull
+    private static PropertyElementQuery getExternalPropertyElementQuery(ClassElement defined, ClassElement current) {
+        AnnotationMetadataHierarchy hierarchy = new AnnotationMetadataHierarchy(defined, current);
+        return PropertyElementQuery.of(hierarchy).ignoreSettersWithDifferingType(true);
     }
 
     @NonNull
