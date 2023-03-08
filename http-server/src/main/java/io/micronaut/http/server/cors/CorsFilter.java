@@ -340,15 +340,15 @@ public class CorsFilter implements HttpServerFilter {
     }
 
     private static boolean matchesOrigin(@NonNull String origin, @NonNull String requestOrigin, boolean isAllowedOriginsRegex) {
-        if (origin.equals(requestOrigin)) {
-            return true;
-        }
-        if (isAllowedOriginsRegex) {
-            Pattern p = Pattern.compile(origin);
-            Matcher m = p.matcher(requestOrigin);
-            return m.matches();
-        }
-        return false;
+        return isAllowedOriginsRegex ?
+            matchesOrigin(requestOrigin, origin) :
+            origin.equals(requestOrigin);
+    }
+
+    private static boolean matchesOrigin(@NonNull String origin, @NonNull String regex) {
+        Pattern p = Pattern.compile(regex);
+        Matcher m = p.matcher(origin);
+        return m.matches();
     }
 
     private static boolean isAny(List<String> values) {
