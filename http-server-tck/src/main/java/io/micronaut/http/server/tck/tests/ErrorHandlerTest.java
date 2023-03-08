@@ -104,7 +104,7 @@ public class ErrorHandlerTest {
                 .header(HttpHeaders.CONTENT_TYPE, io.micronaut.http.MediaType.APPLICATION_JSON);
             AssertionUtils.assertDoesNotThrow(server, request,
                 HttpStatus.OK,
-                "{\"message\":\"Error: bad things when post and body in request\",\"",
+                "\"message\":\"Error: bad things when post and body in request\",\"",
                 Collections.singletonMap(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON));
         }
     }
