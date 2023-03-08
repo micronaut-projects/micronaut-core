@@ -1,5 +1,14 @@
 This section documents breaking changes between Micronaut versions
 
+== 3.8.7
+
+Micronaut Framework 3.8.7 updates to https://bitbucket.org/snakeyaml/snakeyaml/wiki/Changes[SnakeYAML 2.0] which addresses https://nvd.nist.gov/vuln/detail/CVE-2022-1471[CVE-2022-1471]. Many organizations' policies forbid their teams to use Micronaut Framework if the framework depends on a vulnerable dependency, even if the framework is unaffected. Micronaut Framework is not affected by https://nvd.nist.gov/vuln/detail/CVE-2022-1471[CVE-2022-1471].
+Micronaut Framework uses SnakeYAML to load configuration in Micronaut applications. There is only one instance of https://github.com/micronaut-projects/micronaut-core/blob/3.7.x/inject/src/main/java/io/micronaut/context/env/yaml/YamlPropertySourceLoader.java#L56[SnakeYAML instantiation] which uses the https://github.com/micronaut-projects/micronaut-core/blob/3.8.x/inject/src/main/java/io/micronaut/context/env/yaml/CustomSafeConstructor.java[Safe Constructor]. Using SnakeYaml's SafeConstructor which is the recommended way to prevent this issue:
+
+____
+We recommend using SnakeYaml's SafeConsturctor when parsing untrusted content to restrict deserialization.
+____
+
 == 3.3.0
 
 - The <<environmentEndpoint, environmental endpoint>> is now disabled by default. To enable it, you must update your endpoint config:
