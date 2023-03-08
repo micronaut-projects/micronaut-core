@@ -22,6 +22,7 @@ repositories {
 dependencies {
     testImplementation libs.managed.netty.codec.http
     testImplementation project(":http-client")
+    testImplementation project(":http-client-jdk")
     testImplementation project(":inject-groovy")
     testImplementation project(":http-server-netty")
     testImplementation project(":jackson-databind")

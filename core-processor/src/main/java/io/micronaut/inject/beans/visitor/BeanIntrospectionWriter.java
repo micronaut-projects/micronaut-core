@@ -1015,7 +1015,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         }
 
         @Override
-        public void writeDispatchOne(GeneratorAdapter writer) {
+        public void writeDispatchOne(GeneratorAdapter writer, int index) {
             writer.throwException(Type.getType(exceptionType), message);
         }
     }
@@ -1039,7 +1039,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         }
 
         @Override
-        public void writeDispatchOne(GeneratorAdapter writer) {
+        public void writeDispatchOne(GeneratorAdapter writer, int index) {
             // In this case we have to do the copy constructor approach
             Set<BeanPropertyData> constructorProps = new HashSet<>();
 

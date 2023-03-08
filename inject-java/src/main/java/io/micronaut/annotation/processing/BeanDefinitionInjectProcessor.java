@@ -56,7 +56,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static javax.lang.model.element.ElementKind.ANNOTATION_TYPE;
 import static javax.lang.model.element.ElementKind.ENUM;
 
 /**
@@ -154,19 +153,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
                 TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
                 // accumulate all the class elements for all annotated elements
-                annotations.forEach(annotation -> roundEnv.getElementsAnnotatedWith(annotation)
-                    .stream()
-                    // filtering annotation definitions, which are not processed
-                    .filter(element -> element.getKind() != ANNOTATION_TYPE)
-                    .forEach(element -> {
-                        TypeElement typeElement = modelUtils.classElementFor(element);
-                        if (typeElement == null) {
-                            return;
-                        }
-                        if (element.getKind() == ENUM) {
-                            final AnnotationMetadata am = annotationMetadataBuilder.lookupOrBuildForType(element);
+                annotations.forEach(annotation -> modelUtils.resolveTypeElements(
+                        roundEnv.getElementsAnnotatedWith(annotation)
+                    )
+                    .forEach(typeElement -> {
+                        if (typeElement.getKind() == ENUM) {
+                            final AnnotationMetadata am = annotationMetadataBuilder.lookupOrBuildForType(typeElement);
                             if (BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(am)) {
-                                error(element, "Enum types cannot be defined as beans");
+                                error(typeElement, "Enum types cannot be defined as beans");
                             }
                             return;
                         }

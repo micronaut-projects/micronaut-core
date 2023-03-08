@@ -36,11 +36,10 @@ import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
-import io.micronaut.http.server.tck.AssertionUtils;
-import io.micronaut.http.server.tck.HttpResponseAssertion;
-import io.micronaut.http.server.tck.ServerUnderTest;
-import io.micronaut.http.server.tck.ServerUnderTestProviderUtils;
-import static io.micronaut.http.server.tck.TestScenario.asserts;
+import io.micronaut.http.tck.AssertionUtils;
+import io.micronaut.http.tck.HttpResponseAssertion;
+import io.micronaut.http.tck.ServerUnderTest;
+import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
@@ -49,6 +48,8 @@ import javax.validation.constraints.Min;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
+
+import static io.micronaut.http.tck.TestScenario.asserts;
 
 
 @SuppressWarnings({
@@ -103,7 +104,7 @@ public class ErrorHandlerTest {
                 .header(HttpHeaders.CONTENT_TYPE, io.micronaut.http.MediaType.APPLICATION_JSON);
             AssertionUtils.assertDoesNotThrow(server, request,
                 HttpStatus.OK,
-                "{\"message\":\"Error: bad things when post and body in request\",\"",
+                "\"message\":\"Error: bad things when post and body in request\"",
                 Collections.singletonMap(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON));
         }
     }

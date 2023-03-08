@@ -40,6 +40,7 @@ import javax.persistence.Entity
 import javax.persistence.Id
 import javax.persistence.Version
 import javax.validation.Constraint
+import javax.validation.constraints.DecimalMin
 import javax.validation.constraints.Min
 import javax.validation.constraints.NotBlank
 import javax.validation.constraints.Size
@@ -4647,6 +4648,57 @@ class Holder<A extends Animal> {
             animal.isTypeVariable()
     }
 
+    void "test private property 1"() {
+        given:
+            BeanIntrospection introspection = buildBeanIntrospection('test.OptionalDoubleHolder', '''
+package test;
+import io.micronaut.core.annotation.Introspected;
+import javax.validation.constraints.DecimalMin;
+import java.util.List;
+import java.util.Collections;
+import java.util.OptionalDouble;
+
+@Introspected(accessKind = Introspected.AccessKind.FIELD, visibility = Introspected.Visibility.ANY)
+class OptionalDoubleHolder {
+    @DecimalMin("5")
+    private final OptionalDouble optionalDouble;
+
+    private OptionalDoubleHolder(OptionalDouble optionalDouble) {
+        this.optionalDouble = optionalDouble;
+    }
+}
+        ''')
+
+        expect:
+            introspection.getProperty("optionalDouble").get().getType() == OptionalDouble.class
+            introspection.getProperty("optionalDouble").get().hasAnnotation(DecimalMin)
+    }
+    void "test private property 2"() {
+        given:
+            BeanIntrospection introspection = buildBeanIntrospection('test.OptionalStringHolder', '''
+package test;
+import io.micronaut.core.annotation.Introspected;
+import javax.validation.constraints.NotBlank;
+import java.util.List;
+import java.util.Collections;
+import java.util.Optional;
+
+@Introspected(accessKind = Introspected.AccessKind.FIELD, visibility = Introspected.Visibility.ANY)
+class OptionalStringHolder {
+    private final Optional<@NotBlank String> optionalString;
+
+    private OptionalStringHolder(Optional<String> optionalString) {
+        this.optionalString = optionalString;
+    }
+}
+        ''')
+
+        expect:
+            introspection.getProperty("optionalString").get().getType() == Optional.class
+            introspection.getProperty("optionalString").get().asArgument().getFirstTypeVariable().get().getAnnotationMetadata().hasAnnotation(NotBlank)
+
+    }
+
     @Override
     protected JavaParser newJavaParser() {
         return new JavaParser() {
@@ -4661,7 +4713,7 @@ class Holder<A extends Animal> {
     static class MyTypeElementVisitorProcessor extends TypeElementVisitorProcessor {
         @Override
         protected Collection<TypeElementVisitor> findTypeElementVisitors() {
-            return [new ValidationVisitor(), new ConfigurationReaderVisitor(), new IntrospectedTypeElementVisitor()]
+            return [new ValidationVisitor(), new ConfigurationReaderVisitor(), new io.micronaut.validation.visitor.IntrospectedValidationIndexesVisitor(), new IntrospectedTypeElementVisitor()]
         }
     }
 
