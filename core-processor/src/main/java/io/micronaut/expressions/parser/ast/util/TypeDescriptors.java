@@ -15,7 +15,6 @@
  */
 package io.micronaut.expressions.parser.ast.util;
 
-import io.micronaut.context.expressions.AbstractEvaluatedExpression;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.expressions.ExpressionEvaluationContext;

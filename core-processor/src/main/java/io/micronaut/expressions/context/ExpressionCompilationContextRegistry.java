@@ -21,7 +21,6 @@ import io.micronaut.inject.ast.ClassElement;
 
 import java.util.Collection;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * This class is responsible for assembling expression evaluation context

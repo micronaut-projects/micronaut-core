@@ -27,7 +27,6 @@ import org.objectweb.asm.commons.Method;
 
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.EVALUATION_CONTEXT_TYPE;
 import static io.micronaut.inject.processing.JavaModelUtils.getTypeReference;
-import static org.objectweb.asm.Opcodes.AALOAD;
 
 /**
  * Expression AST node used for context method parameter access.

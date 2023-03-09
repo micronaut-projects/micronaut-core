@@ -1,7 +1,6 @@
 package io.micronaut.expressions
 
 import io.micronaut.annotation.processing.test.AbstractEvaluatedExpressionsSpec
-import org.codehaus.groovy.control.CompilationFailedException
 
 class OperatorExpressionSpec extends AbstractEvaluatedExpressionsSpec {
 
