@@ -31,8 +31,6 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import org.junit.jupiter.api.Test;
-
-import javax.validation.constraints.NotBlank;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
@@ -187,7 +185,6 @@ public class MiscTest {
     static class MessageCreate {
 
         @NonNull
-        @NotBlank
         private final String message;
 
         MessageCreate(@NonNull String message) {
@@ -204,7 +201,6 @@ public class MiscTest {
     static class MyResponse {
 
         @NonNull
-        @NotBlank
         private final String greeting;
 
         public MyResponse(@NonNull String greeting) {
