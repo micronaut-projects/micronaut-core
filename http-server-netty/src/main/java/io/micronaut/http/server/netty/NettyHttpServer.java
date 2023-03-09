@@ -356,6 +356,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     @Override
+    @SuppressWarnings("InnerAssignmentCheck")
     public int getPort() {
         List<Listener> listenersLocal = this.activeListeners;
 
