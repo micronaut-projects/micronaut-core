@@ -669,7 +669,6 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         return jsonBufferMaxComponents;
     }
 
-
     /**
      * Maximum number of buffers to keep around in JSON parsing before they should be consolidated.
      * Defaults to {@value #DEFAULT_JSON_BUFFER_MAX_COMPONENTS}.
@@ -830,6 +829,9 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         }
     }
 
+    /**
+     * Configuration for the experimental HTTP/3 server.
+     */
     @ConfigurationProperties("http3")
     @Experimental
     public static final class Http3Settings {
