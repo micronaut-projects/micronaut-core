@@ -41,7 +41,9 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
+import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.ChannelPipeline;
+import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.handler.codec.DecoderException;
@@ -52,11 +54,13 @@ import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObjectAggregator;
+import io.netty.handler.codec.http.HttpScheme;
 import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketClientCompressionHandler;
 import io.netty.handler.codec.http2.Http2ClientUpgradeCodec;
 import io.netty.handler.codec.http2.Http2FrameCodec;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2FrameLogger;
+import io.netty.handler.codec.http2.Http2HeadersFrame;
 import io.netty.handler.codec.http2.Http2MultiplexHandler;
 import io.netty.handler.codec.http2.Http2SettingsAckFrame;
 import io.netty.handler.codec.http2.Http2SettingsFrame;
@@ -74,6 +78,15 @@ import io.netty.handler.ssl.SslHandshakeCompletionEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.handler.timeout.ReadTimeoutException;
 import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.netty.incubator.codec.http3.Http3;
+import io.netty.incubator.codec.http3.Http3ClientConnectionHandler;
+import io.netty.incubator.codec.http3.Http3FrameToHttpObjectCodec;
+import io.netty.incubator.codec.http3.Http3HeadersFrame;
+import io.netty.incubator.codec.http3.Http3RequestStreamInitializer;
+import io.netty.incubator.codec.http3.Http3SettingsFrame;
+import io.netty.incubator.codec.quic.QuicChannel;
+import io.netty.incubator.codec.quic.QuicSslContext;
+import io.netty.incubator.codec.quic.QuicStreamChannel;
 import io.netty.resolver.NoopAddressResolverGroup;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ResourceLeakDetector;
@@ -123,9 +136,12 @@ class ConnectionManager {
     private final boolean shutdownGroup;
     private final ThreadFactory threadFactory;
     private final ChannelFactory<? extends Channel> socketChannelFactory;
+    private final ChannelFactory<? extends Channel> udpChannelFactory;
     private Bootstrap bootstrap;
+    private Bootstrap udpBootstrap;
     private final HttpClientConfiguration configuration;
     private final SslContext sslContext;
+    private final /* QuicSslContext */ Object http3SslContext;
     private final NettyClientCustomizer clientCustomizer;
     private final String informationalServiceId;
 
@@ -142,9 +158,12 @@ class ConnectionManager {
         this.shutdownGroup = from.shutdownGroup;
         this.threadFactory = from.threadFactory;
         this.socketChannelFactory = from.socketChannelFactory;
+        this.udpChannelFactory = from.udpChannelFactory;
         this.bootstrap = from.bootstrap;
+        this.udpBootstrap = from.udpBootstrap;
         this.configuration = from.configuration;
         this.sslContext = from.sslContext;
+        this.http3SslContext = from.http3SslContext;
         this.clientCustomizer = from.clientCustomizer;
         this.informationalServiceId = from.informationalServiceId;
     }
@@ -154,9 +173,10 @@ class ConnectionManager {
         @Nullable EventLoopGroup eventLoopGroup,
         @Nullable ThreadFactory threadFactory,
         HttpClientConfiguration configuration,
-        @Nullable  HttpVersionSelection httpVersion,
+        @Nullable HttpVersionSelection httpVersion,
         InvocationInstrumenter instrumenter,
         ChannelFactory<? extends Channel> socketChannelFactory,
+        ChannelFactory<? extends Channel> udpChannelFactory,
         NettyClientSslBuilder nettyClientSslBuilder,
         NettyClientCustomizer clientCustomizer,
         String informationalServiceId) {
@@ -169,12 +189,18 @@ class ConnectionManager {
         this.httpVersion = httpVersion;
         this.threadFactory = threadFactory;
         this.socketChannelFactory = socketChannelFactory;
+        this.udpChannelFactory = udpChannelFactory;
         this.configuration = configuration;
         this.instrumenter = instrumenter;
         this.clientCustomizer = clientCustomizer;
         this.informationalServiceId = informationalServiceId;
 
         this.sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration(), httpVersion);
+        if (httpVersion.isHttp3()) {
+            this.http3SslContext = nettyClientSslBuilder.buildHttp3(configuration.getSslConfiguration());
+        } else {
+            this.http3SslContext = null;
+        }
 
         if (eventLoopGroup != null) {
             group = eventLoopGroup;
@@ -284,10 +310,15 @@ class ConnectionManager {
     }
 
     private void initBootstrap() {
-        this.bootstrap = new Bootstrap();
-        this.bootstrap.group(group)
+        this.bootstrap = new Bootstrap()
+            .group(group)
             .channelFactory(socketChannelFactory)
             .option(ChannelOption.SO_KEEPALIVE, true);
+        if (httpVersion.isHttp3()) {
+            this.udpBootstrap = new Bootstrap()
+                .group(group)
+                .channelFactory(udpChannelFactory);
+        }
     }
 
     /**
@@ -477,7 +508,7 @@ class ConnectionManager {
     }
 
     <V, C extends Future<V>> void addInstrumentedListener(
-            Future<V> channelFuture, GenericFutureListener<C> listener) {
+        Future<? extends V> channelFuture, GenericFutureListener<C> listener) {
         channelFuture.addListener(f -> {
             try (Instrumentation ignored = instrumenter.newInstrumentation()) {
                 //noinspection unchecked
@@ -729,6 +760,95 @@ class ConnectionManager {
         }
     }
 
+    private final class Http3ChannelInitializer extends ChannelOutboundHandlerAdapter {
+        private final Pool pool;
+
+        private final String host;
+        private final int port;
+
+        Http3ChannelInitializer(Pool pool, String host, int port) {
+            this.pool = pool;
+            this.host = host;
+            this.port = port;
+        }
+
+        // delay channel initialization until bind is complete. This is required so that we can see
+        // the local address
+        @Override
+        public void bind(ChannelHandlerContext ctx, SocketAddress localAddress, ChannelPromise promise) throws Exception {
+            ChannelPromise downstreamPromise = ctx.newPromise();
+            super.bind(ctx, localAddress, downstreamPromise);
+            downstreamPromise.addListener(future -> {
+                if (future.isSuccess()) {
+                    try {
+                        initChannel(promise.channel());
+                        ctx.pipeline().remove(this);
+                        promise.setSuccess();
+                    } catch (Exception e) {
+                        promise.setFailure(e);
+                    }
+                } else {
+                    promise.setFailure(future.cause());
+                }
+            });
+        }
+
+        private void initChannel(Channel ch) {
+            NettyClientCustomizer channelCustomizer = clientCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
+
+            ch.pipeline()
+                .addLast(Http3.newQuicClientCodecBuilder()
+                    .sslEngineProvider(c -> ((QuicSslContext) http3SslContext).newEngine(c.alloc(), host, port))
+                    .initialMaxData(10000000)
+                    .initialMaxStreamDataBidirectionalLocal(1000000)
+                    .build())
+                .addLast(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR, pool.initialErrorHandler);
+
+            channelCustomizer.onInitialPipelineBuilt();
+
+            QuicChannel.newBootstrap(ch)
+                .handler(new ChannelInboundHandlerAdapter() {
+                    @Override
+                    public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+                        QuicChannel quicChannel = (QuicChannel) ctx.channel();
+                        ctx.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, new Http3ClientConnectionHandler(
+                            // control stream handler
+                            new ChannelInboundHandlerAdapter() {
+                                @Override
+                                public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+                                    if (msg instanceof Http3SettingsFrame) {
+                                        ch.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
+                                        pool.new Http3ConnectionHolder(ch, quicChannel, channelCustomizer).init();
+                                    }
+                                    super.channelRead(ctx, msg);
+                                }
+
+                                @Override
+                                public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+                                    ch.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
+                                    ch.close();
+                                    pool.onNewConnectionFailure(cause);
+                                }
+                            },
+                            null,
+                            null,
+                            null,
+                            false
+                        ));
+                        ctx.pipeline().remove(this);
+                    }
+                })
+                .remoteAddress(new InetSocketAddress(this.host, this.port))
+                .localAddress(ch.localAddress())
+                .connect()
+                .addListener((GenericFutureListener<Future<QuicChannel>>) future -> {
+                    if (!future.isSuccess()) {
+                        pool.onNewConnectionFailure(future.cause());
+                    }
+                });
+        }
+    }
+
     /**
      * Handle for a pooled connection. One pool handle generally corresponds to one request, and
      * once the request and response are done, the handle is {@link #release() released} and a new
@@ -846,8 +966,28 @@ class ConnectionManager {
         @Override
         void openNewConnection(@Nullable BlockHint blockHint) throws Exception {
             // open a new connection
+            ChannelFuture channelFuture = openConnectionFuture();
+            if (blockHint != null && blockHint.blocks(channelFuture.channel().eventLoop())) {
+                channelFuture.channel().close();
+                onNewConnectionFailure(BlockHint.createException());
+                return;
+            }
+            addInstrumentedListener(channelFuture, future -> {
+                if (!future.isSuccess()) {
+                    onNewConnectionFailure(future.cause());
+                }
+            });
+        }
+
+        private ChannelFuture openConnectionFuture() {
             ChannelInitializer<?> initializer;
             if (requestKey.isSecure()) {
+                if (httpVersion.isHttp3()) {
+                    return udpBootstrap.clone()
+                        .handler(new Http3ChannelInitializer(this, requestKey.getHost(), requestKey.getPort()))
+                        .bind(0);
+                }
+
                 initializer = new AdaptiveAlpnChannelInitializer(
                     this,
                     buildSslContext(requestKey),
@@ -881,17 +1021,7 @@ class ConnectionManager {
                         throw new AssertionError("Unknown plaintext mode");
                 }
             }
-            ChannelFuture channelFuture = doConnect(requestKey, initializer);
-            if (blockHint != null && blockHint.blocks(channelFuture.channel().eventLoop())) {
-                channelFuture.channel().close();
-                onNewConnectionFailure(BlockHint.createException());
-                return;
-            }
-            addInstrumentedListener(channelFuture, future -> {
-                if (!future.isSuccess()) {
-                    onNewConnectionFailure(future.cause());
-                }
-            });
+            return doConnect(requestKey, initializer);
         }
 
         public void shutdown() {
@@ -1158,7 +1288,7 @@ class ConnectionManager {
             }
         }
 
-        final class Http2ConnectionHolder extends ConnectionHolder {
+        class Http2ConnectionHolder extends ConnectionHolder {
             private final AtomicInteger liveRequests = new AtomicInteger(0);
             private final Set<Channel> liveStreamChannels = new HashSet<>(); // todo: https://github.com/netty/netty/pull/12830
 
@@ -1167,15 +1297,19 @@ class ConnectionManager {
             }
 
             void init() {
+                addTimeoutHandlers();
+
+                connectionCustomizer.onStreamPipelineBuilt();
+
+                onNewConnectionEstablished2(this);
+            }
+
+            void addTimeoutHandlers() {
                 addTimeoutHandlers(
                     requestKey.isSecure() ?
                         ChannelPipelineCustomizer.HANDLER_SSL :
                         ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION
                 );
-
-                connectionCustomizer.onStreamPipelineBuilt();
-
-                onNewConnectionEstablished2(this);
             }
 
             @Override
@@ -1201,11 +1335,18 @@ class ConnectionManager {
                     returnPendingRequest(sink);
                     return;
                 }
-                addInstrumentedListener(new Http2StreamChannelBootstrap(channel).open(), (Future<Http2StreamChannel> future) -> {
+                addInstrumentedListener(openStreamChannel(), (Future<Channel> future) -> {
                     if (future.isSuccess()) {
-                        Http2StreamChannel streamChannel = future.get();
+                        Channel streamChannel = future.get();
                         streamChannel.pipeline()
-                            .addLast(new Http2StreamFrameToHttpObjectCodec(false))
+                            .addLast(new ChannelOutboundHandlerAdapter() {
+                                @Override
+                                public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
+                                    adaptHeaders(msg);
+                                    super.write(ctx, msg, promise);
+                                }
+                            })
+                            .addLast(createFrameToHttpObjectCodec())
                             .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
                         NettyClientCustomizer streamCustomizer = connectionCustomizer.specializeForChannel(streamChannel, NettyClientCustomizer.ChannelRole.HTTP2_STREAM);
                         PoolHandle ph = new PoolHandle(true, streamChannel) {
@@ -1246,6 +1387,25 @@ class ConnectionManager {
                 });
             }
 
+            @NonNull
+            ChannelHandler createFrameToHttpObjectCodec() {
+                return new Http2StreamFrameToHttpObjectCodec(false);
+            }
+
+            Future<? extends Channel> openStreamChannel() {
+                return new Http2StreamChannelBootstrap(channel).open();
+            }
+
+            void adaptHeaders(Object msg) {
+                if (msg instanceof Http2HeadersFrame hf) {
+                    if (requestKey.isSecure()) {
+                        hf.headers().scheme(HttpScheme.HTTPS.name());
+                    } else {
+                        hf.headers().scheme(HttpScheme.HTTP.name());
+                    }
+                }
+            }
+
             private void returnPendingRequest(PoolSink<PoolHandle> sink) {
                 // failed, but the pending request may still work on another connection.
                 addPendingRequest(sink);
@@ -1264,6 +1424,54 @@ class ConnectionManager {
             void onInactive() {
                 super.onInactive();
                 onConnectionInactive2(this);
+            }
+        }
+
+        final class Http3ConnectionHolder extends Http2ConnectionHolder {
+            private final Channel udpChannel;
+            private final QuicChannel quicChannel;
+
+            Http3ConnectionHolder(Channel channel, QuicChannel quicChannel, NettyClientCustomizer customizer) {
+                super(quicChannel, customizer);
+                this.udpChannel = channel;
+                this.quicChannel = quicChannel;
+            }
+
+            @Override
+            void adaptHeaders(Object msg) {
+                if (msg instanceof Http3HeadersFrame hf) {
+                    if (requestKey.isSecure()) {
+                        hf.headers().scheme(HttpScheme.HTTPS.name());
+                    } else {
+                        hf.headers().scheme(HttpScheme.HTTP.name());
+                    }
+                }
+            }
+
+            @Override
+            void addTimeoutHandlers() {
+                addTimeoutHandlers(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION);
+            }
+
+            @Override
+            ChannelHandler createFrameToHttpObjectCodec() {
+                return new Http3FrameToHttpObjectCodec(false);
+            }
+
+            @Override
+            Future<? extends Channel> openStreamChannel() {
+                return Http3.newRequestStream(quicChannel, new Http3RequestStreamInitializer() {
+                    @Override
+                    protected void initRequestStream(QuicStreamChannel ch) {
+                        // do nothing, channel is initialized in the future handler
+                    }
+                });
+            }
+
+            @Override
+            void onInactive() {
+                super.onInactive();
+                udpChannel.close();
             }
         }
     }

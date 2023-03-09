@@ -32,6 +32,7 @@ import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
+import io.micronaut.http.netty.channel.NettyChannelType;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.HttpServerConfiguration;
@@ -49,6 +50,7 @@ import io.micronaut.runtime.server.event.ServerShutdownEvent;
 import io.micronaut.runtime.server.event.ServerStartupEvent;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.web.router.Router;
+import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
@@ -273,6 +275,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             workerGroup = createWorkerEventLoopGroup(workerConfig);
             parentGroup = createParentEventLoopGroup();
             ServerBootstrap serverBootstrap = createServerBootstrap();
+            Bootstrap udpBootstrap = null; // create lazily
 
             processOptions(serverConfiguration.getOptions(), serverBootstrap::option);
             processOptions(serverConfiguration.getChildOptions(), serverBootstrap::childOption);
@@ -280,7 +283,12 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
             List<Listener> listeners = new ArrayList<>();
             for (NettyHttpServerConfiguration.NettyListenerConfiguration listenerConfiguration : listenerConfigurations) {
-                Listener listener = bind(serverBootstrap, listenerConfiguration, workerConfig);
+                if (listenerConfiguration.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC && udpBootstrap == null) {
+                    udpBootstrap = new Bootstrap();
+                    processOptions(serverConfiguration.getOptions(), udpBootstrap::option);
+                    udpBootstrap.group(workerGroup);
+                }
+                Listener listener = bind(serverBootstrap, udpBootstrap, listenerConfiguration, workerConfig);
                 listeners.add(listener);
             }
             this.activeListeners = Collections.unmodifiableList(listeners);
@@ -348,6 +356,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     @Override
+    @SuppressWarnings("InnerAssignmentCheck")
     public int getPort() {
         List<Listener> listenersLocal = this.activeListeners;
 
@@ -358,19 +367,18 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             // not started, try to infer from config
             for (NettyHttpServerConfiguration.NettyListenerConfiguration listenerCfg : listenerConfigurations) {
                 switch (listenerCfg.getFamily()) {
-                    case TCP:
+                    case TCP, QUIC -> {
                         if (listenerCfg.getPort() == -1) {
                             hasRandom = true;
                         } else {
                             // found one \o/
                             return listenerCfg.getPort();
                         }
-                        break;
-                    case UNIX:
-                        hasUnix = true;
-                        break;
-                    default:
+                    }
+                    case UNIX -> hasUnix = true;
+                    default -> {
                         // unknown
+                    }
                 }
             }
         } else {
@@ -489,41 +497,58 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         return new ServerBootstrap();
     }
 
-    private Listener bind(ServerBootstrap bootstrap, NettyHttpServerConfiguration.NettyListenerConfiguration cfg, EventLoopGroupConfiguration workerConfig) {
+    private Listener bind(ServerBootstrap bootstrap, Bootstrap udpBootstrap, NettyHttpServerConfiguration.NettyListenerConfiguration cfg, EventLoopGroupConfiguration workerConfig) {
         logBind(cfg);
 
         try {
-            Listener listener = new Listener(cfg);
-            ServerBootstrap listenerBootstrap = bootstrap.clone()
-                // this initializer runs before the actual bind operation, so we can be sure
-                // setServerChannel has been called by the time bind runs.
-                .handler(new ChannelInitializer<Channel>() {
-                    @Override
-                    protected void initChannel(@NonNull Channel ch) {
-                        listener.setServerChannel(ch);
-                    }
-                })
-                .childHandler(listener);
             ChannelFuture future;
-            switch (cfg.getFamily()) {
-                case TCP:
-                    listenerBootstrap.channelFactory(() -> nettyEmbeddedServices.getServerSocketChannelInstance(workerConfig));
-                    int port = cfg.getPort();
-                    if (port == -1) {
-                        port = 0;
-                    }
-                    if (cfg.getHost() == null) {
-                        future = listenerBootstrap.bind(port);
-                    } else {
-                        future = listenerBootstrap.bind(cfg.getHost(), port);
-                    }
-                    break;
-                case UNIX:
-                    listenerBootstrap.channelFactory(() -> nettyEmbeddedServices.getDomainServerChannelInstance(workerConfig));
-                    future = listenerBootstrap.bind(DomainSocketHolder.makeDomainSocketAddress(cfg.getPath()));
-                    break;
-                default:
-                    throw new UnsupportedOperationException("Unsupported family: " + cfg.getFamily());
+            Listener listener;
+            if (cfg.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC) {
+                listener = new UdpListener(cfg);
+                Bootstrap listenerBootstrap = udpBootstrap.clone()
+                    .handler(listener)
+                    .channelFactory(() -> nettyEmbeddedServices.getChannelInstance(NettyChannelType.DATAGRAM_SOCKET, workerConfig));
+                int port = cfg.getPort();
+                if (port == -1) {
+                    port = 0;
+                }
+                if (cfg.getHost() == null) {
+                    future = listenerBootstrap.bind(port);
+                } else {
+                    future = listenerBootstrap.bind(cfg.getHost(), port);
+                }
+            } else {
+                listener = new Listener(cfg);
+                ServerBootstrap listenerBootstrap = bootstrap.clone()
+                    // this initializer runs before the actual bind operation, so we can be sure
+                    // setServerChannel has been called by the time bind runs.
+                    .handler(new ChannelInitializer<Channel>() {
+                        @Override
+                        protected void initChannel(@NonNull Channel ch) {
+                            listener.setServerChannel(ch);
+                        }
+                    })
+                    .childHandler(listener);
+                switch (cfg.getFamily()) {
+                    case TCP:
+                        listenerBootstrap.channelFactory(() -> nettyEmbeddedServices.getServerSocketChannelInstance(workerConfig));
+                        int port = cfg.getPort();
+                        if (port == -1) {
+                            port = 0;
+                        }
+                        if (cfg.getHost() == null) {
+                            future = listenerBootstrap.bind(port);
+                        } else {
+                            future = listenerBootstrap.bind(cfg.getHost(), port);
+                        }
+                        break;
+                    case UNIX:
+                        listenerBootstrap.channelFactory(() -> nettyEmbeddedServices.getDomainServerChannelInstance(workerConfig));
+                        future = listenerBootstrap.bind(DomainSocketHolder.makeDomainSocketAddress(cfg.getPath()));
+                        break;
+                    default:
+                        throw new UnsupportedOperationException("Unsupported family: " + cfg.getFamily());
+                }
             }
             future.syncUninterruptibly();
             return listener;
@@ -558,22 +583,10 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     private static String displayAddress(NettyHttpServerConfiguration.NettyListenerConfiguration cfg) {
-        switch (cfg.getFamily()) {
-            case TCP:
-                if (cfg.getHost() == null) {
-                    return "*:" + cfg.getPort();
-                } else {
-                    return cfg.getHost() + ":" + cfg.getPort();
-                }
-            case UNIX:
-                if (cfg.getPath().startsWith("\0")) {
-                    return "unix:@" + cfg.getPath().substring(1);
-                } else {
-                    return "unix:" + cfg.getPath();
-                }
-            default:
-                throw new UnsupportedOperationException("Unsupported family: " + cfg.getFamily());
-        }
+        return switch (cfg.getFamily()) {
+            case TCP, QUIC -> cfg.getHost() == null ? "*:" + cfg.getPort() : cfg.getHost() + ":" + cfg.getPort();
+            case UNIX -> cfg.getPath().startsWith("\0") ? "unix:@" + cfg.getPath().substring(1) : "unix:" + cfg.getPath();
+        };
     }
 
     private void fireStartupEvents() {
@@ -707,9 +720,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
     }
 
-    private HttpPipelineBuilder createPipelineBuilder(NettyServerCustomizer customizer) {
+    private HttpPipelineBuilder createPipelineBuilder(NettyServerCustomizer customizer, boolean quic) {
         Objects.requireNonNull(customizer, "customizer");
-        return new HttpPipelineBuilder(NettyHttpServer.this, nettyEmbeddedServices, sslConfiguration, routingHandler, hostResolver, customizer);
+        return new HttpPipelineBuilder(NettyHttpServer.this, nettyEmbeddedServices, sslConfiguration, routingHandler, hostResolver, customizer, quic);
     }
 
     /**
@@ -733,7 +746,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      */
     @Internal
     public void buildEmbeddedChannel(EmbeddedChannel prototype, boolean ssl) {
-        createPipelineBuilder(rootCustomizer).new ConnectionPipeline(prototype, ssl).initChannel();
+        createPipelineBuilder(rootCustomizer, false).new ConnectionPipeline(prototype, ssl, ssl).initChannel();
     }
 
     static Predicate<String> inclusionPredicate(NettyHttpServerConfiguration.AccessLogger config) {
@@ -752,14 +765,14 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         NettyServerCustomizer listenerCustomizer;
         NettyHttpServerConfiguration.NettyListenerConfiguration config;
 
-        private volatile HttpPipelineBuilder httpPipelineBuilder;
+        volatile HttpPipelineBuilder httpPipelineBuilder;
 
         Listener(NettyHttpServerConfiguration.NettyListenerConfiguration config) {
             this.config = config;
         }
 
         void refresh() {
-            httpPipelineBuilder = createPipelineBuilder(listenerCustomizer);
+            httpPipelineBuilder = createPipelineBuilder(listenerCustomizer, config.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC);
             if (config.isSsl() && !httpPipelineBuilder.supportsSsl()) {
                 throw new IllegalStateException("Listener configured for SSL, but no SSL context available");
             }
@@ -773,7 +786,20 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         @Override
         protected void initChannel(@NonNull Channel ch) throws Exception {
-            httpPipelineBuilder.new ConnectionPipeline(ch, config.isSsl()).initChannel();
+            httpPipelineBuilder.new ConnectionPipeline(ch, config.isSsl(), config.isSsl()).initChannel();
+        }
+    }
+
+    private class UdpListener extends Listener {
+        UdpListener(NettyHttpServerConfiguration.NettyListenerConfiguration config) {
+            super(config);
+        }
+
+        @Override
+        protected void initChannel(Channel ch) throws Exception {
+            // udp does not have connection channels
+            setServerChannel(ch);
+            httpPipelineBuilder.new ConnectionPipeline(ch, false, true).initHttp3Channel();
         }
     }
 

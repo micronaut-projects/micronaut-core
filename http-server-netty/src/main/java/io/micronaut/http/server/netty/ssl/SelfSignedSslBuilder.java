@@ -28,6 +28,9 @@ import io.micronaut.http.ssl.SslConfigurationException;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
+import io.netty.incubator.codec.http3.Http3;
+import io.netty.incubator.codec.quic.QuicSslContext;
+import io.netty.incubator.codec.quic.QuicSslContextBuilder;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -93,6 +96,19 @@ public class SelfSignedSslBuilder extends SslBuilder<SslContext> implements Serv
         } catch (CertificateException | SSLException e) {
             throw new SslConfigurationException("Encountered an error while building a self signed certificate", e);
         }
+    }
+
+    @Override
+    public Optional<QuicSslContext> buildQuic() {
+        SelfSignedCertificate ssc;
+        try {
+            ssc = new SelfSignedCertificate();
+        } catch (CertificateException e) {
+            throw new SslConfigurationException("Encountered an error while building a self signed certificate", e);
+        }
+        return Optional.of(QuicSslContextBuilder.forServer(ssc.privateKey(), null, ssc.certificate())
+            .applicationProtocols(Http3.supportedApplicationProtocols())
+            .build());
     }
 
     static class SelfSignedConfigured extends BuildSelfSignedCondition {

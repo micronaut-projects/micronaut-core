@@ -101,6 +101,7 @@ dependencies {
             classifier = Os.isFamily(Os.FAMILY_MAC) ? (Os.isArch("aarch64") ? "osx-aarch_64" : "osx-x86_64") : 'linux-x86_64'
         }
     }
+    testImplementation libs.managed.netty.incubator.codec.http3
     testImplementation libs.logbook.netty
     testImplementation libs.managed.logback.classic
 
