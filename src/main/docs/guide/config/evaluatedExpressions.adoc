@@ -28,11 +28,18 @@ String url;
 ----
 
 Evaluated Expressions are validated and compiled at build time which guarantees type safety at runtime.
+
 Once an application is running expressions are evaluated on demand as part of annotation metadata resolution. The
 usage of expressions does not impact performance as evaluation process is completely reflection free.
+
 Note that, for security reasons expressions cannot be dynamically compiled at runtime from potentially untrusted
 input. All expressions are compiled and checked statically during the compilation process of the application with
 errors reported as compilation failures.
+
+In general, Evaluated Expression can be treated as statement written using a programming language with reduced
+set of available features. Even though the complexity of expression is only limited by the list of supported syntax
+constructs, it is in general not recommended to place complex logic inside an expression as there are usually better
+ways to achieve the same result.
 
 == Evaluated Expression Language Reference
 
@@ -184,11 +191,11 @@ A simple type reference is resolved as a `Class<?>` object.
 #{ T(java.lang.String) }    // String.class
 ----
 
-Same rule applies if type reference is specified as method argument.
+Same rule applies if type reference is specified as a method argument.
 
 ==== Type check with `instanceof`
 
-Type Reference can be used as right-hand side part of `instanceof` operator
+A Type Reference can be used as the right-hand side part of the `instanceof` operator
 
 .Type check example
 [source]
@@ -196,7 +203,7 @@ Type Reference can be used as right-hand side part of `instanceof` operator
 #{ 'abc' instanceof T(String) }  // true
 ----
 
-which is equivalent to the following Java code and will be evaluated as boolean value:
+which is equivalent to the following Java code and will be evaluated as a boolean value:
 
 [source]
 ----
@@ -205,7 +212,7 @@ which is equivalent to the following Java code and will be evaluated as boolean 
 
 ==== Static method invocation
 
-Type Reference can be used to invoke static method of a class
+Type Reference can be used to invoke a static method of a class
 
 .Static method invocation
 [source]
