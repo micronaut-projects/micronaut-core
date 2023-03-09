@@ -366,20 +366,18 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             // not started, try to infer from config
             for (NettyHttpServerConfiguration.NettyListenerConfiguration listenerCfg : listenerConfigurations) {
                 switch (listenerCfg.getFamily()) {
-                    case TCP:
-                    case QUIC:
+                    case TCP, QUIC -> {
                         if (listenerCfg.getPort() == -1) {
                             hasRandom = true;
                         } else {
                             // found one \o/
                             return listenerCfg.getPort();
                         }
-                        break;
-                    case UNIX:
-                        hasUnix = true;
-                        break;
-                    default:
+                    }
+                    case UNIX -> hasUnix = true;
+                    default -> {
                         // unknown
+                    }
                 }
             }
         } else {

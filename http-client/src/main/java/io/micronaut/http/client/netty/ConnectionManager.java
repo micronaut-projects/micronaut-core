@@ -793,7 +793,7 @@ class ConnectionManager {
             });
         }
 
-        private void initChannel(Channel ch) throws Exception {
+        private void initChannel(Channel ch) {
             NettyClientCustomizer channelCustomizer = clientCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
 
             ch.pipeline()
@@ -1437,6 +1437,7 @@ class ConnectionManager {
                 this.quicChannel = quicChannel;
             }
 
+            @Override
             void adaptHeaders(Object msg) {
                 if (msg instanceof Http3HeadersFrame hf) {
                     if (requestKey.isSecure()) {

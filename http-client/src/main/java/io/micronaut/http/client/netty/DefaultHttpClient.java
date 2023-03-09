@@ -124,6 +124,8 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultithreadEventLoopGroup;
+import io.netty.channel.socket.DatagramChannel;
+import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.TooLongFrameException;
@@ -336,8 +338,8 @@ public class DefaultHttpClient implements
                              @NonNull WebSocketBeanRegistry webSocketBeanRegistry,
                              @NonNull RequestBinderRegistry requestBinderRegistry,
                              @Nullable EventLoopGroup eventLoopGroup,
-                             @NonNull ChannelFactory socketChannelFactory,
-                             @NonNull ChannelFactory udpChannelFactory,
+                             @NonNull ChannelFactory<? extends SocketChannel> socketChannelFactory,
+                             @NonNull ChannelFactory<? extends DatagramChannel> udpChannelFactory,
                              NettyClientCustomizer clientCustomizer,
                              List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
                              @Nullable String informationalServiceId,
