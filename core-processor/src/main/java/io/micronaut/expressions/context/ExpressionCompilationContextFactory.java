@@ -15,7 +15,7 @@
  */
 package io.micronaut.expressions.context;
 
-import io.micronaut.context.annotation.EvaluatedExpressionContext;
+import io.micronaut.context.annotation.AnnotationExpressionContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
@@ -92,7 +92,7 @@ public final class ExpressionCompilationContextFactory {
         ExtendableExpressionCompilationContext currentEvaluationContext,
         ClassElement annotation) {
 
-        return Optional.ofNullable(annotation.getAnnotation(EvaluatedExpressionContext.class))
+        return Optional.ofNullable(annotation.getAnnotation(AnnotationExpressionContext.class))
                    .flatMap(av -> av.annotationClassValue(AnnotationMetadata.VALUE_MEMBER))
                    .map(AnnotationClassValue::getName)
                    .flatMap(visitorContext::getClassElement)
@@ -108,11 +108,11 @@ public final class ExpressionCompilationContextFactory {
         ElementQuery<MethodElement> memberQuery =
             ElementQuery.ALL_METHODS
                 .onlyDeclared()
-                .annotated(am -> am.hasAnnotation(EvaluatedExpressionContext.class))
+                .annotated(am -> am.hasAnnotation(AnnotationExpressionContext.class))
                 .named(annotationMember);
 
         return annotation.getEnclosedElements(memberQuery).stream()
-                   .flatMap(element -> Optional.ofNullable(element.getDeclaredAnnotation(EvaluatedExpressionContext.class)).stream())
+                   .flatMap(element -> Optional.ofNullable(element.getDeclaredAnnotation(AnnotationExpressionContext.class)).stream())
                    .flatMap(av -> av.annotationClassValue(AnnotationMetadata.VALUE_MEMBER).stream())
                    .map(AnnotationClassValue::getName)
                    .flatMap(className -> visitorContext.getClassElement(className).stream())

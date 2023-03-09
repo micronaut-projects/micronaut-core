@@ -8,7 +8,7 @@ allows to achieve even more flexibility while configuring your application.
 double injectedValue;
 ----
 
-Evaluated expressions can be used wherever annotation value accept string (within array of strings as well).
+Expressions can be defined whenever an annotation member accepts a string or an array of strings.
 
 .Evaluated Expression in array
 [source,java]
@@ -18,7 +18,7 @@ Evaluated expressions can be used wherever annotation value accept string (withi
 public class EvaluatedExpressionInArray {}
 ----
 
-You can also embed one or more expressions in string template in a way similar to embedding properties with `${...}` syntax.
+You can also embed one or more expressions in a string template in a similar manner to embedding properties with the `${...}` syntax.
 
 .Evaluated Expression template
 [source,groovy]
@@ -27,16 +27,14 @@ You can also embed one or more expressions in string template in a way similar t
 String url;
 ----
 
-Evaluated Expressions are validated and compiled at build time which guarantees type safety at runtime. Once application
-is running expressions are evaluated on demand as part of annotation metadata resolution. The usage of expressions does
-not affect performance as evaluation process is completely reflection free.
+Evaluated Expressions are validated and compiled at build time which guarantees type safety at runtime.
+Once an application is running expressions are evaluated on demand as part of annotation metadata resolution. The
+usage of expressions does not impact performance as evaluation process is completely reflection free.
+Note that, for security reasons expressions cannot be dynamically compiled at runtime from potentially untrusted
+input. All expressions are compiled and checked statically during the compilation process of the application with
+errors reported as compilation failures.
 
-In general, Evaluated Expression can be treated as statement written using a programming language with reduced
-set of available features. Even though the complexity of expression is only limited by the list of supported syntax
-constructs, it is in general not recommended to place complex logic inside it as there are usually better ways to
-achieve the same result.
-
-== Evaluated Expression language reference
+== Evaluated Expression Language Reference
 
 The Evaluated Expressions syntax supports the following functionality:
 
@@ -170,15 +168,15 @@ limited.
 
 === Type References
 
-Predefined syntax construct `T(...)` can be used to reference a class. The value inside brackets should be fully
-qualified class name (including package). The only exception is `java.lang.*` classes which can be referenced
-directly by only specifying simple class name. Primitive types can not be specified inside brackets.
+A predefined syntax construct `T(...)` can be used to reference a class. The value inside brackets should be fully
+qualified class name (including the package name). The only exception is `java.lang.*` classes which can be referenced
+directly by only specifying the simple class name. Primitive types can not be referenced.
 
 Type References are evaluated in different ways depending on the context.
 
 ==== Simple type reference
 
-Simple type reference is resolved as `Class<?>` object.
+A simple type reference is resolved as a `Class<?>` object.
 
 .Type reference example
 [source]
@@ -230,6 +228,7 @@ Consider the following example:
 [source, java]
 ----
 import io.micronaut.context.annotation.EvaluatedExpressionContext;
+import jakarta.inject.Singleton;
 import java.util.Random;
 
 @EvaluatedExpressionContext
@@ -260,20 +259,58 @@ public class ContextConsumer {
 ----
 
 Note that annotating a class with `@EvaluatedExpressionContext` makes it a bean. By default, it will be treated as
-singleton, but you can specify other scope for it. At runtime, the bean will be retrieved from application context
-and respective method will be invoked.
+singleton, but you can specify an alternative scope if required. At runtime, the bean will be retrieved from
+application context and respective method will be invoked.
 
-if matching method is not found within evaluation context at compilation time, the compilation will fail. Same applies
-in case of multiple suitable methods are found in evaluation context, keep that in mind if you annotate multiple classes
-with `@EvaluatedExpressionContext`.
+If a matching method is not found within evaluation context at compilation time, the compilation will fail. A
+compilation error will also occur if multiple suitable methods are found in the evaluation context, keep that in mind
+if you annotate multiple classes with `@EvaluatedExpressionContext`.
 
 The methods will be considered ambiguous (leading to compilation failure) when their names are the same and list of
 provided arguments matches multiple methods parameters.
 
-If the class annotated with `@EvaluatedExpressionContext` resides within separate JAR which is added as a dependency
-to your project, it has to be added to the `annotationProcessor` classpath to become available at annotation processing
-stage. That's why it is generally preferable to place separate contexts in projects that include few external dependencies
-to avoid polluting the annotation processor classpath.
+The class annotated with `@EvaluatedExpressionContext` needs to reside within the same module as the classes referencing
+its methods or properties.
+
+Annotating a class with `@EvaluatedExpressionContext` makes its methods and properties available for evaluated
+expressions within any annotation. However, you can also specify evaluation context scoped to concrete annotation or
+annotation member using `@AnnotationExpressionContext`.
+
+.Usage of annotation level evaluated expression context
+[source, java]
+----
+import jakarta.inject.Singleton;
+import io.micronaut.context.annotation.AnnotationExpressionContext;
+
+@Singleton
+@CustomAnnotation(value = "#{ #firstValue() + #secondValue() }")
+class Expr {
+}
+
+@Singleton
+class AnnotationContext {
+    String firstValue() {
+        return "fist value";
+    }
+}
+
+@Singleton
+class AnnotationMemberContext {
+    String secondValue() {
+        return "second value";
+    }
+}
+
+@AnnotationExpressionContext(AnnotationContext.class)
+@interface CustomAnnotation {
+
+    @AnnotationExpressionContext(AnnotationMemberContext.class)
+    String value();
+}
+----
+
+In this case the context classes need to be explicitly defined as beans to make them available for retrieval from
+application context at runtime.
 
 === Method Invocation
 

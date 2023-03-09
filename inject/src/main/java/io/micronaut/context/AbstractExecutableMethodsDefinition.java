@@ -29,13 +29,12 @@ import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ExecutableMethodsDefinition;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
-import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
 
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -327,9 +326,9 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
      * @param <T> The type
      * @param <R> The result type
      */
-    private static final class DispatchedExecutableMethod<T, R> implements ExecutableMethod<T, R>, ReturnType<R>,
-                                                                           EnvironmentConfigurable, ContextConfigurable {
-    private static final class DispatchedExecutableMethod<T, R> implements ExecutableMethod<T, R>, EnvironmentConfigurable {
+    private static final class DispatchedExecutableMethod<T, R> implements ExecutableMethod<T, R>,
+                                                                           EnvironmentConfigurable,
+                                                                           ContextConfigurable {
 
         private final AbstractExecutableMethodsDefinition dispatcher;
         private final int index;

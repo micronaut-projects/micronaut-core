@@ -95,15 +95,6 @@ public class DefaultExpressionCompilationContext implements ExtendableExpression
                    .toList();
     }
 
-    private List<PropertyElement> getNamedProperties(ClassElement classElement, String name) {
-        return classElement.getBeanProperties(
-                PropertyElementQuery.of(classElement.getAnnotationMetadata())
-                    .includes(Collections.singleton(name)))
-                   .stream()
-                   .filter(not(PropertyElement::isExcluded))
-                   .toList();
-    }
-
     @Override
     public List<PropertyElement> findProperties(String name) {
         return classElements.stream()
@@ -119,6 +110,15 @@ public class DefaultExpressionCompilationContext implements ExtendableExpression
 
         return Arrays.stream(methodElement.getParameters())
                    .filter(parameter -> parameter.getName().equals(name))
+                   .toList();
+    }
+
+    private List<PropertyElement> getNamedProperties(ClassElement classElement, String name) {
+        return classElement.getBeanProperties(
+                PropertyElementQuery.of(classElement.getAnnotationMetadata())
+                    .includes(Collections.singleton(name)))
+                   .stream()
+                   .filter(not(PropertyElement::isExcluded))
                    .toList();
     }
 }

@@ -9,7 +9,9 @@ class AnnotationLevelContextExpressionsSpec extends AbstractEvaluatedExpressions
         given:
         Object result = evaluateSingle("test.Expr", """
             package test
-            import io.micronaut.context.annotation.EvaluatedExpressionContext;import io.micronaut.context.annotation.Executable;
+
+            import io.micronaut.context.annotation.AnnotationExpressionContext
+            import io.micronaut.context.annotation.Executable;
             import io.micronaut.context.annotation.Requires;
             import jakarta.inject.Singleton
 
@@ -25,7 +27,7 @@ class AnnotationLevelContextExpressionsSpec extends AbstractEvaluatedExpressions
                 }
             }
 
-            @EvaluatedExpressionContext(CustomContext.class)
+            @AnnotationExpressionContext(CustomContext.class)
             @interface CustomAnnotation {
                 String value();
             }
@@ -41,7 +43,8 @@ class AnnotationLevelContextExpressionsSpec extends AbstractEvaluatedExpressions
         given:
         Object result = evaluateSingle("test.Expr", """
             package test
-            import io.micronaut.context.annotation.EvaluatedExpressionContext
+
+            import io.micronaut.context.annotation.AnnotationExpressionContext
             import io.micronaut.context.annotation.Executable
             import io.micronaut.context.annotation.Requires
             import jakarta.inject.Singleton
@@ -59,7 +62,7 @@ class AnnotationLevelContextExpressionsSpec extends AbstractEvaluatedExpressions
             }
 
             @interface CustomAnnotation {
-                @EvaluatedExpressionContext(CustomContext.class)
+                @AnnotationExpressionContext(CustomContext.class)
                 String customValue();
             }
 

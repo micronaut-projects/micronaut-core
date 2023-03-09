@@ -15,24 +15,23 @@
  */
 package io.micronaut.context.annotation;
 
-import jakarta.inject.Singleton;
-
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Annotation used to mark classes which are considered as context
- * for expression evaluation. Being an expression context means that
- * expressions can reference methods and properties of this object
- * directly with # prefix
+ * A meta annotation used to extend {@link io.micronaut.core.expressions.EvaluatedExpression}
+ * context with specified type. Being an expression context means that expressions can reference
+ * methods and properties of this object directly with # prefix. The difference between this
+ * annotation and {@link EvaluatedExpressionContext} is that this one allows to specify context
+ * that will only be scoped to this concrete annotation or annotation member.
  *
  * @author Sergey Gavrilov
  * @since 4.0.0
  */
-@DefaultScope(Singleton.class)
-@Target({ElementType.TYPE})
+@Target({ElementType.ANNOTATION_TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.CLASS)
-public @interface EvaluatedExpressionContext {
+public @interface AnnotationExpressionContext {
+    Class<?> value();
 }
