@@ -673,7 +673,7 @@ class AccessorStyleBean {
 package test;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.convert.ConversionService;
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 import jakarta.inject.Inject;
 import io.micronaut.context.BeanContext;
 import jakarta.inject.Singleton;

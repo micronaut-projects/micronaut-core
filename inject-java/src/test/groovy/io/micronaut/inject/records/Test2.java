@@ -6,7 +6,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ConversionService;
 import jakarta.inject.Inject;
 
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 
 @Requires(property = "spec.name", value = "RecordBeansSpec")
 record Test2(

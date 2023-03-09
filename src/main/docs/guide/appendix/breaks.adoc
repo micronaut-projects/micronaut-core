@@ -322,7 +322,7 @@ The following table summarizes the core Micronaut annotations and which are inhe
 
 When upgrading an application you may need to take action if you implement an interface or subclass a superclass and override a method.
 
-For example the annotations defined in `javax.validation` are not inherited by default, so they must be defined again in any overridden or implemented methods.
+For example the annotations defined in `jakarta.validation` are not inherited by default, so they must be defined again in any overridden or implemented methods.
 
 This behaviour grants more flexibility if you need to redefine the validation rules. Note that it is still possible to inherit validation rules through meta-annotations. See the section on <<annotationMetadata, Annotation Inheritance>> for more information.
 

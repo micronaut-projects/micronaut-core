@@ -3,7 +3,7 @@ package io.micronaut.inject.configproperties.writeonly;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotBlank;
 
 @ConfigurationProperties("test")
 public class WriteOnlyConfigProperties {

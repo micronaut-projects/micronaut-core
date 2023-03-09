@@ -22,10 +22,10 @@ import io.micronaut.context.annotation.*
 
 @ConfigurationProperties("foo.bar")
 interface MyConfig {
-    @javax.validation.constraints.NotBlank
+    @jakarta.validation.constraints.NotBlank
     fun getHost(): String?
 
-    @javax.validation.constraints.Min(10L)
+    @jakarta.validation.constraints.Min(10L)
     fun getServerPort(): Int
 }
 ''')
@@ -65,7 +65,7 @@ interface MyConfig {
 
     fun getHost(): String?
 
-    @javax.validation.constraints.Min(10L)
+    @jakarta.validation.constraints.Min(10L)
     fun getServerPort(): Optional<Int>
 
     @io.micronaut.core.bind.annotation.Bindable(defaultValue = "http://default")
@@ -117,7 +117,7 @@ import io.micronaut.context.annotation.*
 interface MyConfig: ParentConfig {
 
     @Executable
-    @javax.validation.constraints.Min(10L)
+    @jakarta.validation.constraints.Min(10L)
     fun getServerPort(): Int
 }
 
@@ -125,7 +125,7 @@ interface MyConfig: ParentConfig {
 interface ParentConfig {
 
     @Executable
-    @javax.validation.constraints.NotBlank
+    @jakarta.validation.constraints.NotBlank
     fun getHost(): String?
 }
 
@@ -162,11 +162,11 @@ import java.net.URL
 @ConfigurationProperties("foo.bar")
 interface MyConfig {
     @Executable
-    @javax.validation.constraints.NotBlank
+    @jakarta.validation.constraints.NotBlank
     fun getHost(): String?
 
     @Executable
-    @javax.validation.constraints.Min(10L)
+    @jakarta.validation.constraints.Min(10L)
     fun getServerPort(): Int
 
     @ConfigurationProperties("child")
@@ -202,11 +202,11 @@ import java.net.URL
 
 @ConfigurationProperties("foo.bar")
 interface MyConfig {
-    @javax.validation.constraints.NotBlank
+    @jakarta.validation.constraints.NotBlank
     @Executable
     fun getHost(): String
 
-    @javax.validation.constraints.Min(10L)
+    @jakarta.validation.constraints.Min(10L)
     @Executable
     fun getServerPort(): Int
 
@@ -248,10 +248,10 @@ import io.micronaut.context.annotation.*
 
 @ConfigurationProperties("foo.bar")
 interface MyConfig {
-    @javax.validation.constraints.NotBlank
+    @jakarta.validation.constraints.NotBlank
     fun junk(s: String): String
 
-    @javax.validation.constraints.Min(10L)
+    @jakarta.validation.constraints.Min(10L)
     fun getServerPort(): Int
 }
 

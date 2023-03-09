@@ -7,7 +7,7 @@ import org.junit.rules.ExpectedException
 import reactor.core.publisher.Mono
 import spock.lang.Specification
 
-import javax.validation.ConstraintViolationException
+import jakarta.validation.ConstraintViolationException
 
 class PetControllerSpec extends Specification {
 

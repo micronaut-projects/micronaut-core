@@ -32,7 +32,7 @@ class AnnotateTypeArg0 {
             def introspection = buildBeanIntrospection('addann.AnnotateTypeArg1', '''
 package addann;
 
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotBlank;
 import java.util.Map;
 
 class AnnotateTypeArg1 {
@@ -52,7 +52,7 @@ class AnnotateTypeArg1 {
             def introspection = buildBeanIntrospection('addann.Outer1$AnnotateTypeArg2', '''
 package addann;
 
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotBlank;
 import java.util.Map;
 
 class Outer1 {
@@ -74,7 +74,7 @@ class Outer1 {
 package addann;
 
 import io.micronaut.core.annotation.Introspected;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotBlank;
 import java.util.Map;
 
 @Introspected(classes = addann.Outer2.NotProcessedByVisitor.class, accessKind = Introspected.AccessKind.FIELD, visibility = Introspected.Visibility.ANY)
@@ -98,7 +98,7 @@ class Outer2 {
 package addann;
 
 import io.micronaut.core.annotation.Introspected;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotBlank;
 import java.util.Map;
 
 @Introspected(classNames = "addann.Outer3.NotProcessedByVisitor2", accessKind = Introspected.AccessKind.FIELD, visibility = Introspected.Visibility.ANY)

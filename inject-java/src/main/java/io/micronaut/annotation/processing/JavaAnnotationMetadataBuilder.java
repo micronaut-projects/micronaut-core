@@ -391,7 +391,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     private boolean isValidationRequired(List<? extends AnnotationMirror> annotationMirrors) {
         for (AnnotationMirror annotationMirror : annotationMirrors) {
             final String annotationName = getAnnotationTypeName(annotationMirror);
-            if (annotationName.startsWith("javax.validation") || annotationName.startsWith("jakarta.validation")) {
+            if (annotationName.startsWith("jakarta.validation") || annotationName.startsWith("jakarta.validation")) {
                 return true;
             } else if (!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationName)) {
                 final Element element = getAnnotationMirror(annotationName).orElse(null);

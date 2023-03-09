@@ -61,7 +61,7 @@ package test
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.kotlin.processing.inject.configproperties.Pojo
 
-import javax.validation.Valid
+import jakarta.validation.Valid
 
 @ConfigurationProperties("test.valid")
 class MyConfig {

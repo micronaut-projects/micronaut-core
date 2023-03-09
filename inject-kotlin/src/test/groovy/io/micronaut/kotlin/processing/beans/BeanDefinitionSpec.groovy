@@ -209,7 +209,7 @@ package test
 
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.core.convert.format.MapFormat
-import javax.validation.constraints.Min
+import jakarta.validation.constraints.Min
 // end::imports[]
 
 // tag::class[]
@@ -885,7 +885,7 @@ class Other
         given:
             BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
 package test;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.List;
 
 @jakarta.inject.Singleton
@@ -924,7 +924,7 @@ interface Deserializer<T> {
             BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
 package test;
 
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.List
 
 @jakarta.inject.Singleton
