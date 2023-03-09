@@ -20,13 +20,13 @@ micronautBuild {
 }
 
 dependencies {
-    testImplementation(projects.httpServerTck)
+    implementation(projects.httpServerTck)
     testImplementation(projects.httpServerNetty)
     testImplementation(projects.httpClient)
     testImplementation(libs.junit.platform.engine)
     testImplementation(libs.managed.logback.classic)
-    testImplementation platform(libs.test.boms.micronaut.validation)
-    testImplementation(libs.micronaut.validation) {
+    implementation platform(libs.test.boms.micronaut.validation)
+    implementation(libs.micronaut.validation) {
         exclude group: 'io.micronaut'
     }
 

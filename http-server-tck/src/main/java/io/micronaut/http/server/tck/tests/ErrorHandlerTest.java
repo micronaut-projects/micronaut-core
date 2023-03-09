@@ -41,7 +41,6 @@ import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import jakarta.inject.Singleton;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import jakarta.validation.Valid;
@@ -192,7 +191,6 @@ public class ErrorHandlerTest {
                 .build()));
     }
 
-    @Disabled("/to avoid a circular dependency to validation. https://github.com/micronaut-projects/micronaut-validation/issues/63")
     @Test
     void messageValidationErrorsReturn400() throws IOException {
         asserts(SPEC_NAME,
