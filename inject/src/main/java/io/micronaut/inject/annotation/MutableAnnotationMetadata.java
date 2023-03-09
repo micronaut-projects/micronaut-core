@@ -17,7 +17,6 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -921,7 +920,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         annotations.entrySet().removeIf(entry -> {
             final String annotationName = entry.getKey();
             if (predicate.test(newAnnotationValue(annotationName, entry.getValue()))) {
-                removeFromStereotypes(annotationName, annotations);
+                removeFromStereotypes(annotationName);
                 return true;
             }
             return false;
@@ -946,7 +945,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         }
         if (declaredAnnotations != null) {
             declaredAnnotations.remove(annotationType);
-            removeFromStereotypes(annotationType, declaredAnnotations);
+            removeFromStereotypes(annotationType);
         }
         if (annotationRepeatableContainer != null) {
             annotationRepeatableContainer.remove(annotationType);
@@ -982,19 +981,19 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         }
     }
 
-    private void removeFromStereotypes(String annotationType, Map<String, Map<CharSequence, Object>> declaredAnnotations) {
-        if (annotationsByStereotype == null) {
+    private void removeFromStereotypes(String annotationType) {
+        if (annotationsByStereotype == null || annotationsByStereotype.isEmpty()) {
             return;
         }
         final Iterator<Map.Entry<String, List<String>>> i = annotationsByStereotype.entrySet().iterator();
-        Set<String> toBeRemoved = CollectionUtils.setOf(annotationType);
+        Set<String> removeNext = new LinkedHashSet<>();
         while (i.hasNext()) {
             final Map.Entry<String, List<String>> entry = i.next();
             final String stereotypeName = entry.getKey();
             final List<String> value = entry.getValue();
-            if (value.removeAll(toBeRemoved)) {
+            if (value.remove(annotationType)) {
                 if (value.isEmpty()) {
-                    toBeRemoved.add(stereotypeName);
+                    removeNext.add(stereotypeName);
                     i.remove();
                     if (allStereotypes != null) {
                         this.allStereotypes.remove(stereotypeName);
@@ -1005,33 +1004,12 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                     if (annotationDefaultValues != null) {
                         annotationDefaultValues.remove(stereotypeName);
                     }
-                }
-
-                if (AnnotationUtil.ANN_AROUND.equals(stereotypeName) || AnnotationUtil.ANN_INTRODUCTION.equals(stereotypeName) || AnnotationUtil.ANN_AROUND_CONSTRUCT.equals(stereotypeName)) {
-                    // purge from interceptor binding
-                    purgeInterceptorBindings(declaredAnnotations, toBeRemoved);
-                    purgeInterceptorBindings(this.allAnnotations, toBeRemoved);
+                    removeNext.add(stereotypeName);
                 }
             }
         }
-    }
-
-    private void purgeInterceptorBindings(Map<String, Map<CharSequence, Object>> declaredAnnotations, Set<String> toBeRemoved) {
-        if (declaredAnnotations == null) {
-            return;
-        }
-        final Map<CharSequence, Object> v = declaredAnnotations.get(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
-        if (v != null) {
-            final Object o = v.get(AnnotationMetadata.VALUE_MEMBER);
-            if (o instanceof Collection<?>) {
-                Collection<AnnotationValue<?>> col = (Collection) o;
-                col.removeIf(av -> Arrays.stream(av.annotationClassValues(AnnotationMetadata.VALUE_MEMBER))
-                        .anyMatch(acv -> toBeRemoved.contains(acv.getName())));
-
-                if (col.isEmpty()) {
-                    declaredAnnotations.remove(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
-                }
-            }
+        for (String stereotype : removeNext) {
+            removeFromStereotypes(stereotype);
         }
     }
 
