@@ -21,6 +21,7 @@ import io.micronaut.context.env.PropertySource
 import io.micronaut.context.env.PropertySourceLoader
 import io.micronaut.core.io.service.ServiceDefinition
 import io.micronaut.core.io.service.SoftServiceLoader
+import io.micronaut.core.reflect.ReflectionUtils
 import io.micronaut.core.version.SemanticVersion
 import spock.lang.Requires
 import spock.lang.Specification
@@ -50,10 +51,10 @@ class JsonPropertySourceLoaderSpec extends Specification {
     { "pooled": true,
       "driverClassName": "org.h2.Driver",
       "username": "sa",
-      "password": "", 
-      "something": [1,2]  
+      "password": "",
+      "something": [1,2]
     }
-}   
+}
 '''
             }
         }
@@ -90,7 +91,6 @@ class JsonPropertySourceLoaderSpec extends Specification {
             @Override
             protected SoftServiceLoader<PropertySourceLoader> readPropertySourceLoaders() {
                 GroovyClassLoader gcl = new GroovyClassLoader()
-                gcl.addClass(JsonPropertySourceLoader)
                 gcl.addURL(JsonPropertySourceLoader.getResource("/META-INF/services/io.micronaut.context.env.PropertySourceLoader"))
                 return new SoftServiceLoader<PropertySourceLoader>(PropertySourceLoader, gcl)
             }
@@ -102,7 +102,7 @@ class JsonPropertySourceLoaderSpec extends Specification {
 { "dataSource":
     { "jmxExport": true,
       "username": "sa",
-      "password": "test" 
+      "password": "test"
     }
 }
 '''.bytes))
@@ -117,10 +117,10 @@ class JsonPropertySourceLoaderSpec extends Specification {
     { "pooled": true,
       "driverClassName": "org.h2.Driver",
       "username": "sa",
-      "password": "", 
-      "something": [1,2]  
+      "password": "",
+      "something": [1,2]
     }
-}     
+}
 '''.bytes))
                 }
                 return Optional.empty()

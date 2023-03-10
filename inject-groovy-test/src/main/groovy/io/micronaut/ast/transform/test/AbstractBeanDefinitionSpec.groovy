@@ -229,7 +229,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
             protected Class<?> findClass(String name) throws ClassNotFoundException {
                 if (name == className) {
                     def bytes = stream.toByteArray()
-                    return defineClass(name, bytes, 0, bytes.length)
+                    return super.defineClass(name, bytes, 0, bytes.length)
                 }
                 return super.findClass(name)
             }

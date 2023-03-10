@@ -8,6 +8,8 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.ValidatedBeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
+import io.micronaut.inject.visitor.TypeElementVisitor
+import io.micronaut.validation.visitor.ValidationVisitor
 
 class ImmutableConfigurationPropertiesSpec extends AbstractTypeElementSpec {
 
@@ -243,5 +245,10 @@ class MyConfig {
         cleanup:
         context.close()
 
+    }
+
+    @Override
+    protected Collection<TypeElementVisitor> getLocalTypeElementVisitors() {
+        [new ValidationVisitor()]
     }
 }
