@@ -295,7 +295,7 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
             return member.annotations.any {
                 val name = it.annotationType.resolve().declaration.qualifiedName?.asString()
                 if (name != null) {
-                    return name.startsWith("jakarta.validation") || name.startsWith("jakarta.validation")
+                    return name.startsWith("jakarta.validation")
                 } else {
                     return false
                 }
