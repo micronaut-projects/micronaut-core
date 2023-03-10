@@ -61,8 +61,8 @@ dependencies {
     testRuntimeOnly libs.javax.el.impl
     testRuntimeOnly libs.javax.el
 }
-compileTestJava.options.fork = true
-compileTestJava.options.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
+//compileTestJava.options.fork = true
+//compileTestJava.options.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
 
 
 tasks.withType(Test).configureEach {
