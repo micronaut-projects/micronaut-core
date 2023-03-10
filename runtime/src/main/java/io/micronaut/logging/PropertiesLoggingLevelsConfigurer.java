@@ -45,7 +45,6 @@ import java.util.Map;
 @Context
 @Requires(beans = LoggingSystem.class)
 @Requires(beans = Environment.class)
-@Requires(property = PropertiesLoggingLevelsConfigurer.LOGGER_LEVELS_PROPERTY_PREFIX)
 @Internal
 final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListener<RefreshEvent> {
 

@@ -176,4 +176,18 @@ logger:
         context.close()
     }
 
+    void 'logging system is refreshed even without logging levels'() {
+        given:
+        ApplicationContext context = ApplicationContext.builder()
+                .singletons(new NoOpLoggingSystem())
+                .build()
+
+        def noOpLoggingSystem = context.getBean(NoOpLoggingSystem)
+
+        when:
+        context.start()
+
+        then:
+        noOpLoggingSystem.isInitialized()
+    }
 }
