@@ -46,7 +46,7 @@ jobs:
       - name: Build with Gradle
         id: gradle
         run: |
-          ./gradlew check --no-daemon --parallel --continue
+          ./gradlew check --no-daemon --parallel --continue --refresh-dependencies
         env:
            GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
            GH_USERNAME: ${{ secrets.GH_USERNAME }}
@@ -72,7 +72,7 @@ jobs:
         if: success() && github.event_name == 'push' && matrix.java == '17'
         env:
           GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
-          GH_USERNAME: ${{ secrets.GH_USERNAME }}        
+          GH_USERNAME: ${{ secrets.GH_USERNAME }}
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
           GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
