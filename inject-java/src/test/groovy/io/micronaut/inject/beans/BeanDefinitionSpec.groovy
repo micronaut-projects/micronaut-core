@@ -487,7 +487,8 @@ public class Test {
         def param3 = param2.getTypeParameters()[0]
 
         then:
-        param.getAnnotationMetadata().getAnnotationNames().size() == 0
+        param.getAnnotationMetadata().getAnnotationNames().size() == 1
+        param.getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.validation.annotation.ValidatedElement']
         param1.getAnnotationMetadata().getAnnotationNames().size() == 1
         param1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
         param2.getAnnotationMetadata().getAnnotationNames().size() == 1
