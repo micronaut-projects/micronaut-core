@@ -134,6 +134,7 @@ public class FilterRunner {
      * @param response The current response
      * @return A flow that will be passed on to the next filter
      */
+    @SuppressWarnings("java:S1452")
     protected ExecutionFlow<? extends HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response) {
         return ExecutionFlow.just(response);
     }
@@ -146,6 +147,7 @@ public class FilterRunner {
      * @param failure The failure
      * @return A flow that will be passed on to the next filter
      */
+    @SuppressWarnings("java:S1452")
     protected ExecutionFlow<? extends HttpResponse<?>> processFailure(HttpRequest<?> request, Throwable failure) {
         return ExecutionFlow.error(failure);
     }
@@ -170,6 +172,7 @@ public class FilterRunner {
      * @return The flow that completes after all filters and the terminal operation, with the final
      * response
      */
+    @SuppressWarnings("java:S1452")
     public final ExecutionFlow<MutableHttpResponse<?>> run(HttpRequest<?> request) {
         return (ExecutionFlow) filterRequest(new FilterContext(request, initialReactorContext), filters.listIterator(), new HashMap<>());
     }
@@ -233,6 +236,11 @@ public class FilterRunner {
         }
     }
 
+    @SuppressWarnings({
+        "java:S3776", // performance
+        "java:S2259", // false positive
+        "java:S1181" // this is a framework not an application
+    })
     private ExecutionFlow<FilterContext> processRequestFilter(GenericHttpFilter filter,
                                                               FilterContext context,
                                                               Map<GenericHttpFilter, Map.Entry<ExecutionFlow<FilterContext>,
@@ -395,6 +403,7 @@ public class FilterRunner {
     }
 
     @Internal
+    @SuppressWarnings("java:S3776") // performance
     public static <T> FilterMethod<T> prepareFilterMethod(ConversionService conversionService,
                                                           T bean,
                                                           ExecutableMethod<T, ?> method,
@@ -490,6 +499,7 @@ public class FilterRunner {
         return continuationReturnType.isReactive() || continuationReturnType.getType() == Publisher.class;
     }
 
+    @SuppressWarnings({"java:S3776", "java:S3740"}) // performance
     private static FilterReturnHandler prepareReturnHandler(ConversionService conversionService,
                                                             Argument<?> type,
                                                             boolean isResponseFilter,
@@ -542,30 +552,25 @@ public class FilterRunner {
         }
         if (isReactive(type)) {
             var next = prepareReturnHandler(conversionService, type.getWrappedType(), isResponseFilter, hasContinuation, false);
-            return new FilterReturnHandler() {
-
-                @Override
-                public ExecutionFlow<FilterContext> handle(FilterContext context, Object returnValue, FilterContinuationImpl<?> continuation) throws Throwable {
-                    if (returnValue == null && !nullable) {
-                        return next.handle(context, null, continuation);
-                    }
-
-                    Mono publisher = Mono.from(Publishers.convertPublisher(conversionService, returnValue, Publisher.class))
-                            .contextWrite(context.reactorContext());
-
-                    if (continuation instanceof ReactiveResultAwareReactiveContinuationImpl<?> reactiveContinuation) {
-                        publisher.subscribe(reactiveContinuation);
-                        return reactiveContinuation.nextFilterFlow();
-                    }
-                    return ReactiveExecutionFlow.fromPublisher(publisher).flatMap(v -> {
-                        try {
-                            return next.handle(context, v, continuation);
-                        } catch (Throwable e) {
-                            return ExecutionFlow.error(e);
-                        }
-                    });
+            return (context, returnValue, continuation) -> {
+                if (returnValue == null && !nullable) {
+                    return next.handle(context, null, continuation);
                 }
 
+                Mono publisher = Mono.from(Publishers.convertPublisher(conversionService, returnValue, Publisher.class))
+                        .contextWrite(context.reactorContext());
+
+                if (continuation instanceof ReactiveResultAwareReactiveContinuationImpl<?> reactiveContinuation) {
+                    publisher.subscribe(reactiveContinuation);
+                    return reactiveContinuation.nextFilterFlow();
+                }
+                return ReactiveExecutionFlow.fromPublisher(publisher).flatMap(v -> {
+                    try {
+                        return next.handle(context, v, continuation);
+                    } catch (Throwable e) {
+                        return ExecutionFlow.error(e);
+                    }
+                });
             };
         } else if (type.isAsync()) {
             var next = prepareReturnHandler(conversionService, type.getWrappedType(), isResponseFilter, hasContinuation, false);
@@ -581,6 +586,7 @@ public class FilterRunner {
         }
     }
 
+    @SuppressWarnings("java:S6218") // equals/hashCode not used
     record FilterMethod<T>(FilterOrder order,
                            T bean,
                            Executable<T, ?> method,
@@ -608,6 +614,7 @@ public class FilterRunner {
             return order.getOrder(bean);
         }
 
+        @SuppressWarnings("java:S1452")
         public FilterContinuationImpl<?> createContinuation(FilterContext filterContext) {
             return continuationCreator.apply(filterContext);
         }
@@ -737,6 +744,7 @@ public class FilterRunner {
             );
         };
 
+        @SuppressWarnings("java:S112") // internal interface
         ExecutionFlow<FilterContext> handle(FilterContext context,
                                             @Nullable Object returnValue,
                                             @Nullable FilterContinuationImpl<?> passedOnContinuation) throws Throwable;
@@ -753,6 +761,7 @@ public class FilterRunner {
             this.nullable = nullable;
         }
 
+        @SuppressWarnings("java:S1452")
         protected abstract ExecutionFlow<?> toFlow(FilterContext context,
                                                    Object returnValue,
                                                    @Nullable FilterContinuationImpl<?> continuation);
@@ -906,6 +915,9 @@ public class FilterRunner {
                 // This is blocking scenario
                 try {
                     newFilterContext = suspensionPoint.get();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return ExecutionFlow.error(new IllegalStateException("Failed to extract suspension point result", e));
                 } catch (Exception e) {
                     return ExecutionFlow.error(new IllegalStateException("Failed to extract suspension point result", e));
                 }
@@ -915,6 +927,7 @@ public class FilterRunner {
             return asFilterProcessed(newFilterContext, newResponse, newFailure);
         }
 
+        @SuppressWarnings("java:S3776") // performance
         protected void triggerFilterProcessed(FilterContext filterContext,
                                               @Nullable
                                               HttpResponse<?> newResponse,
@@ -1153,6 +1166,7 @@ public class FilterRunner {
     /**
      * Implementation of {@link FilterContinuation} for blocking calls.
      */
+    @SuppressWarnings("java:S112") // framework code
     private static final class BlockingContinuationImpl extends FilterContinuationImpl<HttpResponse<?>> {
         BlockingContinuationImpl(FilterContext filterContext) {
             super(filterContext);
@@ -1172,6 +1186,7 @@ public class FilterRunner {
                     }
                     return filterContext.response;
                 } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                     interrupted = true;
                 } catch (ExecutionException e) {
                     Throwable cause = e.getCause();

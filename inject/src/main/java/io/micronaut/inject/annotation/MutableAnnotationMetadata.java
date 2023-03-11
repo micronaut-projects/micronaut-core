@@ -537,6 +537,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         }
     }
 
+    @SuppressWarnings("java:S2259") // false positive
     private void addAnnotation(String annotation,
                                Map<CharSequence, Object> values,
                                Map<String, Map<CharSequence, Object>> declaredAnnotations,
