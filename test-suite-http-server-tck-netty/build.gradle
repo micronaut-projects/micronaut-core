@@ -27,7 +27,7 @@ dependencies {
     testImplementation(libs.managed.logback.classic)
     testImplementation(platform(libs.test.boms.micronaut.validation))
     testImplementation(libs.micronaut.validation) {
-        exclude(group = "io.micronaut")
+        exclude(group: "io.micronaut")
     }
 
 }
