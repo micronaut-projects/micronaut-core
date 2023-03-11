@@ -32,9 +32,6 @@ import java.lang.annotation.Target;
  * <p>Should be used at parameter, return value, and field level. Method overrides should repeat parent {@code @NonNull} annotations unless
  * they behave differently.</p>
  *
- * <p>Use {@code @NonNull} Api (scope = parameters + return values) to set the default behavior to non-nullable in order to avoid annotating
- * your whole codebase with {@code @NonNull}.</p>
- *
  * @author graemerocher
  * @see Nullable
  * @since 2.4
