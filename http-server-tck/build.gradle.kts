@@ -10,14 +10,14 @@ dependencies {
     }
     annotationProcessor(projects.httpValidation)
 
-    compileOnly(platform(libs.test.boms.micronaut.validation))
-    compileOnly(libs.micronaut.validation) {
+    implementation(platform(libs.test.boms.micronaut.validation))
+    implementation(libs.micronaut.validation) {
         exclude(group = "io.micronaut")
     }
     implementation(projects.runtime)
     implementation(projects.jacksonDatabind)
     implementation(projects.inject)
-
+    implementation(projects.management)
     api(projects.httpTck)
     api(projects.httpServer)
     api(projects.httpClientCore)

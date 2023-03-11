@@ -17,6 +17,8 @@ package io.micronaut.http.tck;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.function.BiPredicate;
@@ -31,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @Experimental
 public final class BodyAssertion<T, E> {
+    private static final Logger LOG = LoggerFactory.getLogger(BodyAssertion.class);
 
     private final Class<T> bodyType;
     private final Class<E> errorType;

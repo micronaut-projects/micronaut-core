@@ -1,6 +1,6 @@
 Micronaut supports binding both HTTP and HTTPS. To enable dual protocol support, modify your configuration. For example:
 
-.Enable HTTP to HTTPS Redirects
+.Dual Protocol Configuration Example
 [configuration]
 ----
 micronaut:

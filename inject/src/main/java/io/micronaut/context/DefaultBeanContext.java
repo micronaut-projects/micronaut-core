@@ -1956,6 +1956,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
                 // The supplier can be triggered concurrently.
                 // We allow for the listeners collection to be initialized multiple times.
+                @SuppressWarnings("java:S3077")
                 private volatile List<T> listeners;
 
                 @Override

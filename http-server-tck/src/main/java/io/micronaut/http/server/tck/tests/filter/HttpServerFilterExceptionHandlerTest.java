@@ -54,7 +54,7 @@ public class HttpServerFilterExceptionHandlerTest {
     @Test
     public void exceptionHandlerTest() throws IOException {
         assertion(HttpRequest.GET("/foo"),
-            AssertionUtils.assertThrowsStatus(HttpStatus.UNPROCESSABLE_ENTITY));
+        AssertionUtils.assertThrowsStatus(HttpStatus.UNPROCESSABLE_ENTITY));
     }
 
     private static void assertion(HttpRequest<?> request, BiConsumer<ServerUnderTest, HttpRequest<?>> assertion) throws IOException {
