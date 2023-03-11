@@ -17,13 +17,14 @@ package io.micronaut.http.server.tck.tests.endpoints.health;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.server.tck.AssertionUtils;
-import io.micronaut.http.server.tck.HttpResponseAssertion;
+import io.micronaut.http.tck.AssertionUtils;
+import io.micronaut.http.tck.HttpResponseAssertion;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
-import static io.micronaut.http.server.tck.TestScenario.asserts;
+import static io.micronaut.http.tck.TestScenario.asserts;
+
 
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
