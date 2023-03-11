@@ -30,6 +30,8 @@ jobs:
          sudo apt-get clean
          df -h
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       - name: Setup GraalVM CE
         uses: graalvm/setup-graalvm@v1
         with:
@@ -61,7 +63,7 @@ jobs:
       - name: Run static analysis
         if: github.repository_owner == 'micronaut-projects'
         run: |
-          ./gradlew sonarqube
+          ./gradlew sonar
         env:
           TESTCONTAINERS_RYUK_DISABLED: true
           GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
