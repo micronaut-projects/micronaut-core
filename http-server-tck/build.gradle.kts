@@ -10,8 +10,8 @@ dependencies {
     }
     annotationProcessor(projects.httpValidation)
 
-    implementation(platform(libs.test.boms.micronaut.validation))
-    implementation(libs.micronaut.validation) {
+    compileOnly(platform(libs.test.boms.micronaut.validation))
+    compileOnly(libs.micronaut.validation) {
         exclude(group = "io.micronaut")
     }
     implementation(projects.runtime)

@@ -51,7 +51,7 @@ jobs:
       - name: Build with Gradle
         id: gradle
         run: |
-          ./gradlew check --no-daemon --parallel --continue
+          ./gradlew preReleaseCheck check --no-daemon --parallel --continue
         env:
            GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
            GH_USERNAME: ${{ secrets.GH_USERNAME }}
