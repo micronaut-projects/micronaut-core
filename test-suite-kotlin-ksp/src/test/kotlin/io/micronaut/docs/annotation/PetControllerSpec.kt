@@ -7,7 +7,7 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import reactor.core.publisher.Mono
 
-import javax.validation.ConstraintViolationException
+import jakarta.validation.ConstraintViolationException
 
 import java.lang.Exception
 

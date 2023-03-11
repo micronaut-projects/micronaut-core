@@ -2,7 +2,7 @@ package io.micronaut.inject.executable;
 
 import io.micronaut.context.annotation.Executable;
 
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 import java.util.List;
 
 @jakarta.inject.Singleton

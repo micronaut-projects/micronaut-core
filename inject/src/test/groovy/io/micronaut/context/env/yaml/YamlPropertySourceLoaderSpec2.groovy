@@ -48,7 +48,6 @@ class YamlPropertySourceLoaderSpec2 extends Specification {
             @Override
             protected SoftServiceLoader<PropertySourceLoader> readPropertySourceLoaders() {
                 GroovyClassLoader gcl = new GroovyClassLoader()
-                gcl.addClass(YamlPropertySourceLoader)
                 gcl.addURL(YamlPropertySourceLoader.getResource("/META-INF/services/io.micronaut.context.env.PropertySourceLoader"))
                 return new SoftServiceLoader<PropertySourceLoader>(PropertySourceLoader, gcl)
             }

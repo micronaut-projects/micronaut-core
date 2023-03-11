@@ -24,8 +24,8 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 
-import javax.validation.constraints.Min
-import javax.validation.constraints.NotBlank
+import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.NotBlank
 /**
  * @author graemerocher
  * @since 1.0
@@ -120,7 +120,7 @@ package test;
 import io.micronaut.aop.introduction.*;
 import io.micronaut.context.annotation.*;
 import java.net.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 
 interface MyInterface{
     @Executable

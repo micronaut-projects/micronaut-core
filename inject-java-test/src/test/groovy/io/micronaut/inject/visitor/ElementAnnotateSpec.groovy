@@ -28,7 +28,7 @@ package test;
 import io.micronaut.inject.visitor.Stub;
 import io.micronaut.context.annotation.*;
 import java.net.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 
 @Stub
 interface MyInterface{

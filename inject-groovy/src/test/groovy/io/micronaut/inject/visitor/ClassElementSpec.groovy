@@ -87,7 +87,7 @@ import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 
-import javax.validation.constraints.NotNull
+import jakarta.validation.constraints.NotNull
 
 @Controller
 class TestController {
@@ -1047,7 +1047,7 @@ class Pet {
         ClassElement ce = buildClassElement('''
 package test;
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.List;
 
 class Test {
@@ -1061,28 +1061,28 @@ class Test {
             fieldType.getAnnotationMetadata().getAnnotationNames().size() == 0
 
             assertListGenericArgument(fieldType, { ClassElement listArg1 ->
-                assert listArg1.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.Size$List']
+                assert listArg1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
                 assertListGenericArgument(listArg1, { ClassElement listArg2 ->
-                    assert listArg2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
+                    assert listArg2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
                     assertListGenericArgument(listArg2, { ClassElement listArg3 ->
-                        assert listArg3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
+                        assert listArg3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
                     })
                 })
             })
 
             def level1 = fieldType.getTypeArguments()["E"]
-            level1.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.Size$List']
+            level1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
             def level2 = level1.getTypeArguments()["E"]
-            level2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
+            level2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
             def level3 = level2.getTypeArguments()["E"]
-            level3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
+            level3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
     }
 
     void "test annotation metadata present on deep type parameters for method"() {
         ClassElement ce = buildClassElement('''
 package test;
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.List;
 
 class Test {
@@ -1098,28 +1098,28 @@ class Test {
             theType.getAnnotationMetadata().getAnnotationNames().size() == 0
 
             assertListGenericArgument(theType, { ClassElement listArg1 ->
-                assert listArg1.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.Size$List']
+                assert listArg1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
                 assertListGenericArgument(listArg1, { ClassElement listArg2 ->
-                    assert listArg2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
+                    assert listArg2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
                     assertListGenericArgument(listArg2, { ClassElement listArg3 ->
-                        assert listArg3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
+                        assert listArg3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
                     })
                 })
             })
 
             def level1 = theType.getTypeArguments()["E"]
-            level1.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.Size$List']
+            level1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
             def level2 = level1.getTypeArguments()["E"]
-            level2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
+            level2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
             def level3 = level2.getTypeArguments()["E"]
-            level3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
+            level3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
     }
 
     void "test annotation metadata present on deep type parameters for method 2"() {
         ClassElement ce = buildClassElement('''
 package test;
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.List;
 
 class Test {

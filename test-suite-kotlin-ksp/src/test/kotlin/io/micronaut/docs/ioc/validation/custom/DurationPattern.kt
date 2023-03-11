@@ -16,7 +16,7 @@
 package io.micronaut.docs.ioc.validation.custom
 
 // tag::imports[]
-import javax.validation.Constraint
+import jakarta.validation.Constraint
 import kotlin.annotation.AnnotationRetention.RUNTIME
 // end::imports[]
 

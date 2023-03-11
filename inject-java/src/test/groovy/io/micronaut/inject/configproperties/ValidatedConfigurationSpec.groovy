@@ -24,7 +24,7 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ValidatedBeanDefinition
 import spock.lang.Specification
 
-import javax.validation.Validation
+import jakarta.validation.Validation
 
 class ValidatedConfigurationSpec extends AbstractTypeElementSpec {
 
@@ -79,7 +79,7 @@ package test;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.inject.configproperties.Pojo;
 
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 import java.util.List;
 
 @ConfigurationProperties("test.valid")
@@ -111,12 +111,12 @@ package test;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.inject.configproperties.Pojo;
 
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 import java.util.List;
 
 @ConfigurationProperties("test.valid")
 public class MyConfig {
-  
+
     private List<Pojo> pojos;
 
     @Valid

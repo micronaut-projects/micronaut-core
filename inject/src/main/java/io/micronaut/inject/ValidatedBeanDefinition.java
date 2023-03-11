@@ -24,7 +24,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
 /**
- * A bean definition that is validated with javax.validation.
+ * A bean definition that is validated with jakarta.validation.
  *
  * @param <T> The bean definition type
  * @author Graeme Rocher

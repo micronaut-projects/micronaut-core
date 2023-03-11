@@ -1,6 +1,6 @@
 package io.micronaut.kotlin.processing.elementapi
 
-import javax.validation.constraints.*
+import jakarta.validation.constraints.*
 import javax.persistence.*
 
 @Entity

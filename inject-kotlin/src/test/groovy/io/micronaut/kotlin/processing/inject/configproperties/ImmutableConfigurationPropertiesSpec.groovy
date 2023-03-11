@@ -9,7 +9,7 @@ import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.ValidatedBeanDefinition
 import spock.lang.Specification
 
-import javax.validation.Constraint
+import jakarta.validation.Constraint
 
 import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
@@ -25,7 +25,7 @@ import io.micronaut.context.annotation.EachProperty
 @EachProperty("foo.bar")
 interface MyConfig {
 
-    @javax.validation.constraints.NotBlank
+    @jakarta.validation.constraints.NotBlank
     fun getHost(): String
 
     fun getPort(): Int
@@ -48,7 +48,7 @@ package test
 import io.micronaut.context.annotation.*
 
 @ConfigurationProperties("foo.bar")
-class MyConfig @ConfigurationInject constructor(@javax.validation.constraints.NotBlank val host: String, val serverPort: Int)
+class MyConfig @ConfigurationInject constructor(@jakarta.validation.constraints.NotBlank val host: String, val serverPort: Int)
 
 ''')
         def arguments = beanDefinition.constructor.arguments
@@ -80,7 +80,7 @@ package test
 import io.micronaut.context.annotation.*
 
 @ConfigurationProperties("foo.bar")
-class MyConfig @ConfigurationInject constructor(@javax.validation.constraints.NotBlank val host: String, val serverPort: Int) {
+class MyConfig @ConfigurationInject constructor(@jakarta.validation.constraints.NotBlank val host: String, val serverPort: Int) {
 
     @ConfigurationProperties("baz")
     class ChildConfig @ConfigurationInject constructor(val stuff: String)
@@ -115,7 +115,7 @@ import io.micronaut.context.annotation.*;
 import java.time.Duration;
 
 @EachProperty("foo.bar")
-class MyConfig @ConfigurationInject constructor(@javax.validation.constraints.NotBlank val host: String, val serverPort: Int)
+class MyConfig @ConfigurationInject constructor(@jakarta.validation.constraints.NotBlank val host: String, val serverPort: Int)
 ''', false, ['foo.bar.one.host': 'test', 'foo.bar.one.server-port': '9999'])
         def config = getBean(context, 'test.MyConfig')
 
