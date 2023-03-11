@@ -6,6 +6,10 @@ dependencies {
     testImplementation(projects.httpClientJdk)
     testImplementation(projects.httpServerTck)
     testImplementation(libs.junit.platform.engine)
+    testImplementation(platform(libs.test.boms.micronaut.validation))
+    testImplementation(libs.micronaut.validation) {
+        exclude(group = "io.micronaut")
+    }
 }
 
 tasks.withType(Test::class) {
