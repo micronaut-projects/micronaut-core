@@ -43,6 +43,9 @@ import java.util.stream.Stream;
  * <p>If a member is not present then the methods of the class will attempt to resolve the default value for a given annotation member. In this sense the behaviour of this class is similar to how
  * a implementation of {@link Annotation} behaves.</p>
  *
+ * NOTE: During the mapping or remapping, nullable stereotypes value means that
+ * the stereotypes will be filled from the annotation definition, when empty collection will skip it.
+ *
  * @param <A> The annotation type
  * @author Graeme Rocher
  * @since 1.0
@@ -177,6 +180,16 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         this.valueMapper = valueMapper;
         this.retentionPolicy = RetentionPolicy.RUNTIME;
         this.stereotypes = null;
+    }
+
+    /**
+     * Creates a builder with the initial value of this annotation.
+     *
+     * @return The builder with this annotation value
+     * @since 4.0.0
+     */
+    public AnnotationValueBuilder<A> mutate() {
+        return builder(this);
     }
 
     /**
