@@ -6,7 +6,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import jakarta.inject.Inject
-import javax.validation.ConstraintViolationException
+import jakarta.validation.ConstraintViolationException
 // end::imports[]
 
 // tag::test[]

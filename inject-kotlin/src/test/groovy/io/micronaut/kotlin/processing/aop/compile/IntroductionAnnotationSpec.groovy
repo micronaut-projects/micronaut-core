@@ -9,8 +9,8 @@ import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.kotlin.processing.aop.introduction.NotImplementedAdvice
 import spock.lang.Specification
 
-import javax.validation.constraints.Min
-import javax.validation.constraints.NotBlank
+import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.NotBlank
 
 import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
@@ -97,8 +97,8 @@ package test
 
 import io.micronaut.kotlin.processing.aop.introduction.Stub
 import io.micronaut.context.annotation.Executable
-import javax.validation.constraints.Min
-import javax.validation.constraints.NotBlank
+import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.NotBlank
 
 interface MyInterface{
     @Executable

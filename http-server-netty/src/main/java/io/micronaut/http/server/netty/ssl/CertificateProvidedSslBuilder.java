@@ -38,6 +38,9 @@ import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
+import io.netty.incubator.codec.http3.Http3;
+import io.netty.incubator.codec.quic.QuicSslContext;
+import io.netty.incubator.codec.quic.QuicSslContextBuilder;
 import jakarta.inject.Singleton;
 
 import javax.net.ssl.SSLException;
@@ -139,6 +142,22 @@ public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implem
                     ApplicationProtocolNames.HTTP_1_1
             ));
         }
+    }
+
+    @Override
+    public Optional<QuicSslContext> buildQuic() {
+        QuicSslContextBuilder sslBuilder = QuicSslContextBuilder.forServer(getKeyManagerFactory(ssl), ssl.getKeyStore().getPassword().orElse(null))
+            .applicationProtocols(Http3.supportedApplicationProtocols());
+        Optional<ClientAuthentication> clientAuthentication = ssl.getClientAuthentication();
+        if (clientAuthentication.isPresent()) {
+            ClientAuthentication clientAuth = clientAuthentication.get();
+            if (clientAuth == ClientAuthentication.NEED) {
+                sslBuilder.clientAuth(ClientAuth.REQUIRE);
+            } else if (clientAuth == ClientAuthentication.WANT) {
+                sslBuilder.clientAuth(ClientAuth.OPTIONAL);
+            }
+        }
+        return Optional.of(sslBuilder.build());
     }
 
     @Override

@@ -2,8 +2,8 @@ package io.micronaut.inject.visitor.beans.reflection;
 
 import io.micronaut.core.annotation.Introspected;
 
-import javax.validation.constraints.DecimalMin;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotNull;
 import java.util.OptionalDouble;
 
 @Introspected(accessKind = Introspected.AccessKind.FIELD, visibility = Introspected.Visibility.ANY)

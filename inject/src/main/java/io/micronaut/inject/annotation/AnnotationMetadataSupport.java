@@ -296,6 +296,19 @@ public final class AnnotationMetadataSupport {
     }
 
     /**
+     * Registers repeatable annotation containers.
+     *
+     * @param repeatable          the repeatable annotations
+     * @param repeatableContainer the repeatable annotation container
+     * @MyRepeatable -> @MyRepeatableContainer
+     * @since 4.0.0
+     */
+    @Internal
+    static void registerRepeatableAnnotation(@NonNull String repeatable, @NonNull String repeatableContainer) {
+        REPEATABLE_ANNOTATIONS_CONTAINERS.put(repeatable, repeatableContainer);
+    }
+
+    /**
      * @param annotation The annotation
      * @return The proxy class
      */

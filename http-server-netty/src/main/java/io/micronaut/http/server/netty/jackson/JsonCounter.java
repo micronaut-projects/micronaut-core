@@ -132,6 +132,7 @@ public final class JsonCounter {
     /**
      * Proceed until {@link #isBuffering()} becomes false.
      */
+    @SuppressWarnings("java:S3776")
     private void proceedUntilNonBuffering(ByteBuf buf) throws JsonSyntaxException {
         assert isBuffering();
         int end = buf.writerIndex();
@@ -195,6 +196,7 @@ public final class JsonCounter {
      * Consume some input until {@link #isBuffering()}. Sometimes this method returns before that
      * is the case, to make the implementation simpler.
      */
+    @SuppressWarnings("java:S3776")
     private void proceedUntilBuffering(ByteBuf buf) throws JsonSyntaxException {
         assert !isBuffering();
         assert depth == 0 : depth;
@@ -329,7 +331,7 @@ public final class JsonCounter {
     /**
      * Handle a byte in the {@link State#ESCAPE} state.
      */
-    private void handleEscape(byte b) throws JsonSyntaxException {
+    private void handleEscape(byte b) {
         state = State.STRING;
     }
 
@@ -360,6 +362,7 @@ public final class JsonCounter {
      * @return {@code true} if this character does not change the state while in {@link State#BASE}
      * and while not buffering
      */
+    @SuppressWarnings("java:S2178") // performance
     private static boolean skipBufferingBase(byte b) {
         return (b != '"') & (b != '{') & (b != '[') & (b != ']') & (b != '}');
     }

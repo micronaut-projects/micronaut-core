@@ -48,7 +48,6 @@ import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 import java.lang.annotation.Annotation;
-import java.lang.annotation.Inherited;
 import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -183,51 +182,6 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
         }
         return RetentionPolicy.RUNTIME;
-    }
-
-    @Override
-    protected boolean isInheritedAnnotation(@NonNull AnnotationMirror annotationMirror) {
-        final List<? extends AnnotationMirror> annotationMirrors = annotationMirror.getAnnotationType().asElement().getAnnotationMirrors();
-        for (AnnotationMirror mirror : annotationMirrors) {
-            if (getAnnotationTypeName(mirror).equals(Inherited.class.getName())) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    @Override
-    protected Map<String, Element> getAnnotationMembers(String annotationType) {
-        final Element element = getAnnotationMirror(annotationType).orElse(null);
-        if (element != null && element.getKind() == ElementKind.ANNOTATION_TYPE) {
-            final List<? extends Element> elements = element.getEnclosedElements();
-            if (elements.isEmpty()) {
-                return Collections.emptyMap();
-            } else {
-                Map<String, Element> members = new LinkedHashMap<>(elements.size());
-                for (Element method : elements) {
-                    members.put(method.getSimpleName().toString(), method);
-                }
-                return Collections.unmodifiableMap(members);
-            }
-        }
-        return Collections.emptyMap();
-    }
-
-    @Override
-    protected boolean hasSimpleAnnotation(Element element, String simpleName) {
-        if (element != null) {
-            final List<? extends AnnotationMirror> mirrors = element.getAnnotationMirrors();
-            for (AnnotationMirror mirror : mirrors) {
-                final String s = mirror.getAnnotationType()
-                    .asElement()
-                    .getSimpleName().toString();
-                if (s.equalsIgnoreCase(simpleName)) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     @Override
@@ -407,7 +361,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     private boolean isValidationRequired(List<? extends AnnotationMirror> annotationMirrors) {
         for (AnnotationMirror annotationMirror : annotationMirrors) {
             final String annotationName = getAnnotationTypeName(annotationMirror);
-            if (annotationName.startsWith("javax.validation") || annotationName.startsWith("jakarta.validation")) {
+            if (annotationName.startsWith("jakarta.validation")) {
                 return true;
             } else if (!AnnotationUtil.INTERNAL_ANNOTATION_NAMES.contains(annotationName)) {
                 final Element element = getAnnotationMirror(annotationName).orElse(null);

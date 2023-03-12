@@ -15,7 +15,7 @@
  */
 package io.micronaut.kotlin.processing.aop.introduction
 
-import javax.validation.constraints.NotNull
+import jakarta.validation.constraints.NotNull
 
 interface DeleteByIdCrudRepo<ID> {
 

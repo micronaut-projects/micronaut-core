@@ -21,8 +21,8 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.validation.Validated;
 import org.reactivestreams.Publisher;
 import io.micronaut.core.async.annotation.SingleResult;
-import javax.validation.constraints.Min;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 // end::imports[]
 
 /**

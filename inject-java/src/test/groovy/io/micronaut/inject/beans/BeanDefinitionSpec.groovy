@@ -469,7 +469,7 @@ public class Test {
         given:
         BeanDefinition definition = buildBeanDefinition('test','Test','''
 package test;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.List;
 
 @jakarta.inject.Singleton
@@ -487,20 +487,21 @@ public class Test {
         def param3 = param2.getTypeParameters()[0]
 
         then:
-        param.getAnnotationMetadata().getAnnotationNames().size() == 0
+        param.getAnnotationMetadata().getAnnotationNames().size() == 1
+        param.getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.validation.annotation.ValidatedElement']
         param1.getAnnotationMetadata().getAnnotationNames().size() == 1
-        param1.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.Size$List']
+        param1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
         param2.getAnnotationMetadata().getAnnotationNames().size() == 1
-        param2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
+        param2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
         param3.getAnnotationMetadata().getAnnotationNames().size() == 1
-        param3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
+        param3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
     }
 
     void "test isTypeVariable"() {
         given:
         ApplicationContext context = buildContext( '''
 package test;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 import io.micronaut.core.annotation.*;
 import io.micronaut.context.annotation.*;
@@ -555,7 +556,7 @@ class SetTest<E> implements Serde<HashSet<E>> {
         given:
             BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
 package test;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.List;
 
 @jakarta.inject.Singleton

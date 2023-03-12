@@ -14,7 +14,7 @@ package test;
 
 import io.micronaut.aop.interceptors.*;
 import io.micronaut.context.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import javax.inject.Singleton;
 
 @Mutating("name")

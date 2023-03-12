@@ -75,8 +75,6 @@ import static javax.lang.model.element.ElementKind.ENUM;
 @SupportedOptions({AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_INCREMENTAL, AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_ANNOTATIONS, BeanDefinitionWriter.OMIT_CONFPROP_INJECTION_POINTS})
 public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProcessor {
 
-    private static final String AROUND_TYPE = AnnotationUtil.ANN_AROUND;
-    private static final String INTRODUCTION_TYPE = AnnotationUtil.ANN_INTRODUCTION;
     private static final String[] ANNOTATION_STEREOTYPES = new String[]{
         AnnotationUtil.POST_CONSTRUCT,
         AnnotationUtil.PRE_DESTROY,
@@ -93,10 +91,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         "io.micronaut.context.annotation.Value",
         "io.micronaut.context.annotation.Property",
         "io.micronaut.context.annotation.Executable",
-        AROUND_TYPE,
+        AnnotationUtil.ANN_AROUND,
         AnnotationUtil.ANN_INTERCEPTOR_BINDINGS,
         AnnotationUtil.ANN_INTERCEPTOR_BINDING,
-        INTRODUCTION_TYPE
+        AnnotationUtil.ANN_INTRODUCTION
     };
 
     private Set<String> beanDefinitions;
@@ -181,7 +179,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             beanDefinitions.add(name);
                         } else {
                             AnnotationMetadata annotationMetadata = annotationMetadataBuilder.lookupOrBuildForType(typeElement);
-                            if (annotationMetadata.hasStereotype(INTRODUCTION_TYPE) || annotationMetadata.hasStereotype(ConfigurationReader.class)) {
+                            if (BeanDefinitionCreatorFactory.isIntroduction(annotationMetadata) || annotationMetadata.hasStereotype(ConfigurationReader.class)) {
                                 beanDefinitions.add(name);
                             }
                         }

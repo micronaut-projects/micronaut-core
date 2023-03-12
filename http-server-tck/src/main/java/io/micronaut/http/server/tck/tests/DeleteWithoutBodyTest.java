@@ -26,11 +26,11 @@ import io.micronaut.http.annotation.Delete;
 import io.micronaut.http.annotation.Header;
 import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.Status;
-import static io.micronaut.http.server.tck.TestScenario.asserts;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
+import static io.micronaut.http.tck.TestScenario.asserts;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 

@@ -25,9 +25,9 @@ dependencies {
     testImplementation(projects.httpClient)
     testImplementation(libs.junit.platform.engine)
     testImplementation(libs.managed.logback.classic)
-    implementation platform(libs.test.boms.micronaut.validation)
-    implementation(libs.micronaut.validation) {
-        exclude group: 'io.micronaut'
+    testImplementation(platform(libs.test.boms.micronaut.validation))
+    testImplementation(libs.micronaut.validation) {
+        exclude(group: "io.micronaut")
     }
 
 }
@@ -52,6 +52,10 @@ tasks.named("check") { task ->
     if (graal) {
         task.dependsOn("nativeTest")
     }
+}
+
+tasks.named("test") {
+    useJUnitPlatform()
 }
 
 def openGraalModules = [

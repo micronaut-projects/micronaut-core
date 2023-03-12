@@ -28,9 +28,8 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
-import io.micronaut.http.server.tck.AssertionUtils;
-import io.micronaut.http.server.tck.HttpResponseAssertion;
-import static io.micronaut.http.server.tck.TestScenario.asserts;
+import io.micronaut.http.tck.AssertionUtils;
+import io.micronaut.http.tck.HttpResponseAssertion;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
@@ -38,6 +37,7 @@ import org.reactivestreams.Publisher;
 import java.io.IOException;
 import java.util.Collections;
 
+import static io.micronaut.http.tck.TestScenario.asserts;
 
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only

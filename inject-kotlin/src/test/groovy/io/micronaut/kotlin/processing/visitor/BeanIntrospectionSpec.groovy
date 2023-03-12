@@ -27,10 +27,10 @@ import javax.persistence.Column
 import javax.persistence.Entity
 import javax.persistence.Id
 import javax.persistence.Version
-import javax.validation.Constraint
-import javax.validation.constraints.Min
-import javax.validation.constraints.NotBlank
-import javax.validation.constraints.Size
+import jakarta.validation.Constraint
+import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Size
 import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractKotlinCompilerSpec {
@@ -414,7 +414,7 @@ data class Foo(val x: Int, val y: Int) {
 package test
 
 import io.micronaut.core.annotation.Creator
-import javax.validation.constraints.Min
+import jakarta.validation.constraints.Min
 
 @io.micronaut.core.annotation.Introspected
 data class Foo(val value: List<@Min(10) Long>)
@@ -437,7 +437,7 @@ data class Foo(val value: List<@Min(10) Long>)
         BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
 package test
 
-import javax.validation.constraints.Min
+import jakarta.validation.constraints.Min
 import kotlin.annotation.AnnotationTarget.*
 
 @io.micronaut.core.annotation.Introspected
@@ -466,7 +466,7 @@ annotation class SomeAnn
 package test
 
 @io.micronaut.core.annotation.Introspected
-data class Foo(@javax.validation.constraints.NotBlank val name: String, val age: Int)
+data class Foo(@jakarta.validation.constraints.NotBlank val name: String, val age: Int)
 ''')
         when:
         def test = introspection.instantiate("test", 20)
@@ -790,7 +790,7 @@ interface Test : io.micronaut.core.naming.Named {
         def classLoader = buildClassLoader('test.Address', '''
 package test
 
-import javax.validation.constraints.*
+import jakarta.validation.constraints.*
 
 @io.micronaut.core.annotation.Introspected
 class Address {
@@ -978,7 +978,7 @@ class Book {
 package test
 
 import io.micronaut.core.annotation.*
-import javax.validation.constraints.*
+import jakarta.validation.constraints.*
 import java.util.*
 import com.fasterxml.jackson.annotation.*
 
@@ -1038,7 +1038,7 @@ class Test {
 package test
 
 import io.micronaut.core.annotation.*
-import javax.validation.constraints.*
+import jakarta.validation.constraints.*
 import java.util.*
 
 @Introspected
@@ -1087,7 +1087,7 @@ class Test {
 package test
 
 import io.micronaut.core.annotation.*
-import javax.validation.constraints.*
+import jakarta.validation.constraints.*
 import java.util.*
 
 @Introspected
@@ -1134,7 +1134,7 @@ class Test {
         def classLoader = buildClassLoader('test.Test', '''
 package test
 
-import javax.validation.constraints.*
+import jakarta.validation.constraints.*
 import javax.persistence.*
 
 @Entity
@@ -1213,7 +1213,7 @@ class Test(
         def classLoader = buildClassLoader('test.Test', '''
 package test
 
-import javax.validation.constraints.*
+import jakarta.validation.constraints.*
 import javax.persistence.*
 
 @Entity
@@ -1344,7 +1344,7 @@ package test
 
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.convert.TypeConverter
-import javax.validation.constraints.Size
+import jakarta.validation.constraints.Size
 
 @Introspected
 class Test: ParentBean() {
@@ -1853,7 +1853,7 @@ class Test {
 package test
 
 import io.micronaut.core.annotation.Introspected
-import javax.validation.constraints.NotNull
+import jakarta.validation.constraints.NotNull
 
 interface IEmail {
     fun getEmail(): String?

@@ -170,7 +170,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     Type getProvidedType();
 
     /**
-     * Make the bean definition as validated by javax.validation.
+     * Make the bean definition as validated by jakarta.validation.
      *
      * @param validated Whether the bean definition is validated
      */

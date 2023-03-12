@@ -43,7 +43,7 @@ public abstract class BeanDefinitionCreatorFactory {
     @NonNull
     public static BeanDefinitionCreator produce(ClassElement classElement, VisitorContext visitorContext) {
         boolean isAbstract = classElement.isAbstract();
-        boolean isIntroduction = classElement.hasStereotype(AnnotationUtil.ANN_INTRODUCTION);
+        boolean isIntroduction = isIntroduction(classElement);
         if (ConfigurationReaderBeanElementCreator.isConfigurationProperties(classElement)) {
             if (classElement.isInterface()) {
                 return new IntroductionInterfaceBeanElementCreator(classElement, visitorContext);
@@ -121,6 +121,10 @@ public abstract class BeanDefinitionCreatorFactory {
         return concreteClassMetadata.hasDeclaredStereotype(Bean.class) ||
             concreteClassMetadata.hasStereotype(AnnotationUtil.SCOPE) ||
             concreteClassMetadata.hasStereotype(DefaultScope.class);
+    }
+
+    public static boolean isIntroduction(AnnotationMetadata metadata) {
+        return InterceptedMethodUtil.hasIntroductionStereotype(metadata);
     }
 
 }

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonClassDescription
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.ObjectMapper
+import groovy.transform.PackageScope
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.annotation.processing.test.JavaParser
@@ -39,12 +40,13 @@ import javax.persistence.Column
 import javax.persistence.Entity
 import javax.persistence.Id
 import javax.persistence.Version
-import javax.validation.Constraint
-import javax.validation.constraints.DecimalMin
-import javax.validation.constraints.Min
-import javax.validation.constraints.NotBlank
-import javax.validation.constraints.Size
+import jakarta.validation.Constraint
+import jakarta.validation.constraints.DecimalMin
+import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Size
 import java.lang.reflect.Field
+import java.time.Instant
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
@@ -859,7 +861,7 @@ package test;
 
 import io.micronaut.core.annotation.Creator;
 import java.util.List;
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 
 @io.micronaut.core.annotation.Introspected
 public record Foo(int x, int y){
@@ -888,7 +890,7 @@ package test;
 
 import io.micronaut.core.annotation.Creator;
 import java.util.List;
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 
 @io.micronaut.core.annotation.Introspected
 public record Foo(int x, int y){
@@ -921,7 +923,7 @@ package json.test;
 
 import io.micronaut.core.annotation.Creator;
 import java.util.List;
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -947,7 +949,7 @@ package test;
 
 import io.micronaut.core.annotation.Creator;
 import java.util.List;
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 
 @io.micronaut.core.annotation.Introspected
 public record Foo(int x, int y){
@@ -976,7 +978,7 @@ package test;
 
 import io.micronaut.core.annotation.Creator;
 import java.util.List;
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 
 @io.micronaut.core.annotation.Introspected
 public record Foo(List<@Min(10) Long> value){
@@ -1001,7 +1003,7 @@ package test;
 
 import io.micronaut.core.annotation.Creator;
 import java.util.List;
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 import java.lang.annotation.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.lang.annotation.ElementType.*;
@@ -1045,7 +1047,7 @@ package test;
 import io.micronaut.core.annotation.Creator;
 
 @io.micronaut.core.annotation.Introspected
-public record Foo(@javax.validation.constraints.NotBlank String name, int age){
+public record Foo(@jakarta.validation.constraints.NotBlank String name, int age){
 }
 ''')
         when:
@@ -1082,7 +1084,7 @@ public record Foo(@javax.validation.constraints.NotBlank String name, int age){
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 import io.micronaut.inject.visitor.beans.*;
 
@@ -1194,7 +1196,7 @@ class MyImpl implements MyInterface {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 import io.micronaut.inject.visitor.beans.*;
 
@@ -1429,8 +1431,8 @@ package test;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
@@ -1454,8 +1456,8 @@ package test;
 
 import io.micronaut.context.annotation.ConfigurationProperties;import io.micronaut.core.annotation.AccessorsStyle;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
@@ -1527,8 +1529,8 @@ package test;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
@@ -1571,8 +1573,8 @@ package test;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.annotation.AccessorsStyle;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
@@ -1613,8 +1615,8 @@ package test;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
@@ -1655,8 +1657,8 @@ package test;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
@@ -1689,8 +1691,8 @@ package test;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
@@ -1722,8 +1724,8 @@ package test;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
@@ -1772,8 +1774,8 @@ package test;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.annotation.AccessorsStyle;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
@@ -1822,8 +1824,8 @@ package test;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
@@ -1866,8 +1868,8 @@ package test;
 
 import io.micronaut.context.annotation.ConfigurationProperties;import io.micronaut.core.annotation.AccessorsStyle;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
@@ -1919,7 +1921,7 @@ class MyConfig {
     private int serverPort;
 
     @ConfigurationInject
-    MyConfig(@javax.validation.constraints.NotBlank String host, int serverPort) {
+    MyConfig(@jakarta.validation.constraints.NotBlank String host, int serverPort) {
         this.host = host;
         this.serverPort = serverPort;
     }
@@ -1952,7 +1954,7 @@ class MyConfig {
     private int serverPort;
 
     @ConfigurationInject
-    MyConfig(@javax.validation.constraints.NotBlank String host, int serverPort) {
+    MyConfig(@jakarta.validation.constraints.NotBlank String host, int serverPort) {
         this.host = host;
         this.serverPort = serverPort;
     }
@@ -2007,7 +2009,7 @@ public class Test {
         BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
 package test;
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.List;
 import java.util.Set;
 
@@ -2033,11 +2035,11 @@ public class Test {
 
         property.getAnnotationMetadata().getAnnotationNames().size() == 0
         param1.getAnnotationMetadata().getAnnotationNames().size() == 1
-        param1.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.Size$List']
+        param1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
         param2.getAnnotationMetadata().getAnnotationNames().size() == 1
-        param2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
+        param2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
         param3.getAnnotationMetadata().getAnnotationNames().size() == 1
-        param3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
+        param3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2083')
@@ -2107,7 +2109,7 @@ class Test extends RecursiveGenerics<Test> {
         def context = buildContext('test.Address', '''
 package test;
 
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 
 
 @io.micronaut.core.annotation.Introspected
@@ -2275,7 +2277,7 @@ class Book {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 import com.fasterxml.jackson.annotation.*;
 
@@ -2346,7 +2348,7 @@ class Test {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 
 @Introspected
@@ -2450,7 +2452,7 @@ class Test {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 
 @Introspected
@@ -2500,7 +2502,7 @@ class Test {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import javax.persistence.*;
 import java.util.*;
 
@@ -2616,7 +2618,7 @@ class Test {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import javax.persistence.*;
 import java.util.*;
 
@@ -2688,7 +2690,7 @@ class Test {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 import io.micronaut.inject.visitor.beans.*;
 
@@ -2722,7 +2724,7 @@ class Test {}
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 import io.micronaut.inject.visitor.beans.*;
 
@@ -2746,7 +2748,7 @@ class Test {}
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 import io.micronaut.inject.visitor.beans.*;
 
@@ -2771,7 +2773,7 @@ class Test {}
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 import io.micronaut.core.convert.TypeConverter;
 
@@ -2961,7 +2963,7 @@ class ParentBean {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 import io.micronaut.core.convert.TypeConverter;
 
@@ -3150,7 +3152,7 @@ class ParentBean {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 import com.fasterxml.jackson.annotation.*;
 
@@ -3822,7 +3824,7 @@ class Test {
 package test;
 
 import io.micronaut.core.annotation.Introspected;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 
 interface IEmail {
 String getEmail();
@@ -3853,7 +3855,7 @@ class Test extends SuperClass implements IEmail {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 
 interface IEmail {
 String readEmail();
@@ -4503,7 +4505,7 @@ package test;
 
 import io.micronaut.core.annotation.Creator;
 import java.util.List;
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -4519,8 +4521,8 @@ public record Foo(String name, String isSurname, boolean contains, Boolean purge
         BeanIntrospection beanIntrospection = buildBeanIntrospection('test.Book', '''
 package test;
 
-import javax.validation.Valid;
-import javax.validation.constraints.Size;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import java.util.List;
 import io.micronaut.core.annotation.Introspected;
 
@@ -4558,7 +4560,7 @@ class Book {
 
         then:
         property.name == "authors"
-        property.asArgument().getTypeParameters()[0].annotationMetadata.hasStereotype("javax.validation.Valid")
+        property.asArgument().getTypeParameters()[0].annotationMetadata.hasStereotype("jakarta.validation.Valid")
     }
 
     void "test type_use annotations"() {
@@ -4653,7 +4655,7 @@ class Holder<A extends Animal> {
             BeanIntrospection introspection = buildBeanIntrospection('test.OptionalDoubleHolder', '''
 package test;
 import io.micronaut.core.annotation.Introspected;
-import javax.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.DecimalMin;
 import java.util.List;
 import java.util.Collections;
 import java.util.OptionalDouble;
@@ -4678,7 +4680,7 @@ class OptionalDoubleHolder {
             BeanIntrospection introspection = buildBeanIntrospection('test.OptionalStringHolder', '''
 package test;
 import io.micronaut.core.annotation.Introspected;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 import java.util.Collections;
 import java.util.Optional;
@@ -4728,3 +4730,5 @@ class OptionalStringHolder {
         }
     }
 }
+
+

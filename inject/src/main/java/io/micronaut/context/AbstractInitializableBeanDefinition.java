@@ -2384,11 +2384,16 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
 
     private <K, R extends Collection<K>> R resolveBeansOfType(BeanResolutionContext resolutionContext, BeanContext context, Argument<R> returnType, Argument<K> beanType, Qualifier<K> qualifier) {
         if (beanType == null) {
-            throw new DependencyInjectionException(resolutionContext, "Type " + returnType.getType() + " has no generic argument");
+            throw noGenericsError(resolutionContext, returnType);
         }
         qualifier = qualifier == null ? resolveQualifier(resolutionContext, beanType, returnType) : qualifier;
         Collection<K> beansOfType = resolutionContext.getBeansOfType(resolveArgument(context, beanType), qualifier);
         return coerceCollectionToCorrectType(returnType.getType(), beansOfType, resolutionContext, returnType);
+    }
+
+    @NonNull
+    private static <K, R> DependencyInjectionException noGenericsError(BeanResolutionContext resolutionContext, Argument<R> returnType) {
+        return new DependencyInjectionException(resolutionContext, "Type " + returnType.getType() + " has no generic argument");
     }
 
     private <R> boolean isInnerConfiguration(@Nullable Argument<R> argument) {
@@ -2411,7 +2416,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
 
     private <K> Stream<K> resolveStreamOfType(BeanResolutionContext resolutionContext, Argument<K> returnType, Argument<K> beanType, Qualifier<K> qualifier) {
         if (beanType == null) {
-            throw new DependencyInjectionException(resolutionContext, "Type " + returnType.getType() + " has no generic argument");
+            throw noGenericsError(resolutionContext, returnType);
         }
         qualifier = qualifier == null ? resolveQualifier(resolutionContext, beanType, returnType) : qualifier;
         return resolutionContext.streamOfType(beanType, qualifier);
@@ -2423,7 +2428,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         Argument<V> beanType,
         Qualifier<V> qualifier) {
         if (beanType == null) {
-            throw new DependencyInjectionException(resolutionContext, "Type " + returnType.getType() + " has no generic returnType");
+            throw noGenericsError(resolutionContext, returnType);
         }
         qualifier = qualifier == null ? resolveQualifier(resolutionContext, beanType, returnType) : qualifier;
         Map<String, V> map = resolutionContext.mapOfType(beanType, qualifier);
@@ -2435,7 +2440,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
 
     private <K> Optional<K> resolveOptionalBean(BeanResolutionContext resolutionContext, Argument<K> returnType, Argument<K> beanType, Qualifier<K> qualifier) {
         if (beanType == null) {
-            throw new DependencyInjectionException(resolutionContext, "Type " + returnType.getType() + " has no generic argument");
+            throw noGenericsError(resolutionContext, returnType);
         }
         qualifier = qualifier == null ? resolveQualifier(resolutionContext, beanType, returnType) : qualifier;
         return resolutionContext.findBean(beanType, qualifier);

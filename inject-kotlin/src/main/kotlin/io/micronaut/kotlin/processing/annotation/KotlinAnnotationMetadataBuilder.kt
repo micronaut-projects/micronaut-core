@@ -35,7 +35,6 @@ import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.kotlin.processing.getBinaryName
 import io.micronaut.kotlin.processing.getClassDeclaration
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
-import java.lang.annotation.Inherited
 import java.lang.annotation.RetentionPolicy
 import java.lang.reflect.Method
 import java.util.*
@@ -295,7 +294,7 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
             return member.annotations.any {
                 val name = it.annotationType.resolve().declaration.qualifiedName?.asString()
                 if (name != null) {
-                    return name.startsWith("javax.validation") || name.startsWith("jakarta.validation")
+                    return name.startsWith("jakarta.validation")
                 } else {
                     return false
                 }
@@ -547,12 +546,6 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
             }
     }
 
-    override fun isInheritedAnnotation(annotationMirror: KSAnnotation): Boolean {
-        return annotationMirror.annotationType.resolve().declaration.annotations.any {
-            it.annotationType.resolve().declaration.qualifiedName?.asString() == Inherited::class.qualifiedName
-        }
-    }
-
     private fun populateTypeHierarchy(element: KSClassDeclaration, hierarchy: MutableList<KSAnnotated>) {
         element.superTypes.forEach {
             val t = it.resolve()
@@ -590,25 +583,4 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
          return value
     }
 
-    override fun getAnnotationMembers(annotationType: String): MutableMap<String, out KSAnnotated> {
-        val annotationMirror = getAnnotationMirror(annotationType)
-        val members = mutableMapOf<String, KSAnnotated>()
-        if (annotationMirror.isPresent) {
-            (annotationMirror.get().getClassDeclaration(visitorContext)).getDeclaredProperties()
-                .forEach {
-                    members[it.simpleName.asString()] = it
-                }
-        }
-        return members
-    }
-
-    override fun hasSimpleAnnotation(element: KSAnnotated, simpleName: String): Boolean {
-        val annotationMirrors: MutableList<KSAnnotation> = element.annotations.toMutableList()
-        if (element is KSPropertyDeclaration) {
-            annotationMirrors.addAll(element.getter!!.annotations)
-        }
-        return annotationMirrors.any {
-            it.annotationType.resolve().declaration.simpleName.asString() == simpleName
-        }
-    }
 }

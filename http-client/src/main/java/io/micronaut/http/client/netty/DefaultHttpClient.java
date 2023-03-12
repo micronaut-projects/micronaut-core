@@ -55,11 +55,11 @@ import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ProxyRequestOptions;
-import io.micronaut.http.client.ServiceHttpClientConfiguration;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.exceptions.ContentLengthExceededException;
 import io.micronaut.http.client.exceptions.HttpClientErrorDecoder;
 import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.exceptions.NoHostException;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
@@ -74,6 +74,7 @@ import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.context.ContextPathUtils;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.filter.FilterOrder;
 import io.micronaut.http.filter.FilterRunner;
@@ -82,7 +83,6 @@ import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.filter.HttpFilterResolver;
 import io.micronaut.http.multipart.MultipartException;
-import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
@@ -124,6 +124,9 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultithreadEventLoopGroup;
+import io.netty.channel.socket.DatagramChannel;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
@@ -141,7 +144,6 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
-import io.netty.handler.codec.http.HttpScheme;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
@@ -296,6 +298,7 @@ public class DefaultHttpClient implements
             new DefaultRequestBinderRegistry(conversionService),
             null,
             NioSocketChannel::new,
+            NioDatagramChannel::new,
             CompositeNettyClientCustomizer.EMPTY,
             invocationInstrumenterFactories,
             null,
@@ -304,7 +307,7 @@ public class DefaultHttpClient implements
 
     /**
      * Construct a client for the given arguments.
-     *  @param loadBalancer                    The {@link LoadBalancer} to use for selecting servers
+     * @param loadBalancer                    The {@link LoadBalancer} to use for selecting servers
      * @param explicitHttpVersion                     The HTTP version to use. Can be null and defaults to {@link io.micronaut.http.HttpVersion#HTTP_1_1}
      * @param configuration                   The {@link HttpClientConfiguration} object
      * @param contextPath                     The base URI to prepend to request uris
@@ -317,6 +320,7 @@ public class DefaultHttpClient implements
      * @param requestBinderRegistry           The request binder registry
      * @param eventLoopGroup                  The event loop group to use
      * @param socketChannelFactory            The socket channel factory
+     * @param udpChannelFactory               The UDP channel factory
      * @param clientCustomizer                The pipeline customizer
      * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument netty handlers execution with
      * @param informationalServiceId          Optional service ID that will be passed to exceptions created by this client
@@ -334,7 +338,8 @@ public class DefaultHttpClient implements
                              @NonNull WebSocketBeanRegistry webSocketBeanRegistry,
                              @NonNull RequestBinderRegistry requestBinderRegistry,
                              @Nullable EventLoopGroup eventLoopGroup,
-                             @NonNull ChannelFactory socketChannelFactory,
+                             @NonNull ChannelFactory<? extends SocketChannel> socketChannelFactory,
+                             @NonNull ChannelFactory<? extends DatagramChannel> udpChannelFactory,
                              NettyClientCustomizer clientCustomizer,
                              List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
                              @Nullable String informationalServiceId,
@@ -385,6 +390,7 @@ public class DefaultHttpClient implements
             explicitHttpVersion,
             combineFactories(),
             socketChannelFactory,
+            udpChannelFactory,
             nettyClientSslBuilder,
             clientCustomizer,
             informationalServiceId);
@@ -525,12 +531,12 @@ public class DefaultHttpClient implements
                 } else {
                     Optional<O> body = response.getBody();
                     if (!body.isPresent() && response.getBody(Argument.of(byte[].class)).isPresent()) {
-                        throw customizeException(new HttpClientResponseException(
+                        throw decorate(new HttpClientResponseException(
                             String.format("Failed to decode the body for the given content type [%s]", response.getContentType().orElse(null)),
                             response
                         ));
                     } else {
-                        return body.orElseThrow(() -> customizeException(new HttpClientResponseException(
+                        return body.orElseThrow(() -> decorate(new HttpClientResponseException(
                             "Empty body",
                             response
                         )));
@@ -667,7 +673,7 @@ public class DefaultHttpClient implements
                         if (t instanceof HttpClientException) {
                             emitter.error(t);
                         } else {
-                            emitter.error(customizeException(new HttpClientException("Error consuming Server Sent Events: " + t.getMessage(), t)));
+                            emitter.error(decorate(new HttpClientException("Error consuming Server Sent Events: " + t.getMessage(), t)));
                         }
                     }
 
@@ -804,12 +810,12 @@ public class DefaultHttpClient implements
             } else {
                 Optional<O> body = response.getBody();
                 if (!body.isPresent() && response.getBody(byte[].class).isPresent()) {
-                    throw customizeException(new HttpClientResponseException(
+                    throw decorate(new HttpClientResponseException(
                         String.format("Failed to decode the body for the given content type [%s]", response.getContentType().orElse(null)),
                         response
                     ));
                 } else {
-                    return body.orElseThrow(() -> customizeException(new HttpClientResponseException(
+                    return body.orElseThrow(() -> decorate(new HttpClientResponseException(
                         "Empty body",
                         response
                     )));
@@ -1218,21 +1224,6 @@ public class DefaultHttpClient implements
     }
 
     /**
-     * @param requestURI The request URI
-     * @return A URI that is prepended with the contextPath, if set
-     */
-    protected URI prependContextPath(URI requestURI) {
-        if (StringUtils.isNotEmpty(contextPath)) {
-            try {
-                return new URI(StringUtils.prependUri(contextPath, requestURI.toString()));
-            } catch (URISyntaxException e) {
-                throw customizeException(new HttpClientException("Failed to construct the request URI", e));
-            }
-        }
-        return requestURI;
-    }
-
-    /**
      * @return The discriminator to use when selecting a server for the purposes of load balancing (defaults to null)
      */
     protected Object getLoadBalancerDiscriminator() {
@@ -1415,7 +1406,7 @@ public class DefaultHttpClient implements
                     }
                     if (bodyContent == null) {
                         bodyContent = conversionService.convert(bodyValue, ByteBuf.class).orElseThrow(() ->
-                                customizeException(new HttpClientException("Body [" + bodyValue + "] cannot be encoded to content type [" + requestContentType + "]. No possible codecs or converters found."))
+                                decorate(new HttpClientException("Body [" + bodyValue + "] cannot be encoded to content type [" + requestContentType + "]. No possible codecs or converters found."))
                         );
                     }
                 }
@@ -1474,7 +1465,7 @@ public class DefaultHttpClient implements
                                         FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), buffer, nettyResponse.headers(), new DefaultHttpHeaders(true));
                                         final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, mediaTypeCodecRegistry, byteBufferFactory, (Argument<Object>) errorType, true, conversionService);
                                         fullNettyClientHttpResponse.onComplete();
-                                        emitter.error(customizeException(new HttpClientResponseException(
+                                        emitter.error(decorate(new HttpClientResponseException(
                                             fullHttpResponse.status().reasonPhrase(),
                                             null,
                                             fullNettyClientHttpResponse,
@@ -1502,7 +1493,7 @@ public class DefaultHttpClient implements
     private <I> Publisher<URI> resolveURI(io.micronaut.http.HttpRequest<I> request, boolean includeContextPath) {
         URI requestURI = request.getUri();
         if (loadBalancer == null) {
-            return Flux.error(customizeException(new NoHostException("Request URI specifies no host to connect to")));
+            return Flux.error(decorate(new NoHostException("Request URI specifies no host to connect to")));
         }
 
         return Flux.from(loadBalancer.select(getLoadBalancerDiscriminator())).map(server -> {
@@ -1510,7 +1501,12 @@ public class DefaultHttpClient implements
                     if (request instanceof MutableHttpRequest && authInfo.isPresent()) {
                         ((MutableHttpRequest) request).getHeaders().auth(authInfo.get());
                     }
-                    return server.resolve(includeContextPath ? prependContextPath(requestURI) : requestURI);
+
+                    try {
+                        return server.resolve(includeContextPath ? ContextPathUtils.prepend(requestURI, contextPath) : requestURI);
+                    } catch (URISyntaxException e) {
+                        throw decorate(new HttpClientException("Failed to construct the request URI", e));
+                    }
                 }
         );
     }
@@ -1591,7 +1587,7 @@ public class DefaultHttpClient implements
     ) {
         boolean errorStatus = response.code() >= 400;
         if (errorStatus && failOnError) {
-            return Flux.error(customizeException(new HttpClientResponseException(response.reason(), response)));
+            return Flux.error(decorate(new HttpClientResponseException(response.reason(), response)));
         } else {
             return Flux.just(response);
         }
@@ -1850,22 +1846,13 @@ public class DefaultHttpClient implements
         return io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(scheme) || SCHEME_WSS.equalsIgnoreCase(scheme);
     }
 
-    private <E extends HttpClientException> E customizeException(E exc) {
-        customizeException0(configuration, informationalServiceId, exc);
-        return exc;
-    }
-
-    static void customizeException0(HttpClientConfiguration configuration, String informationalServiceId, HttpClientException exc) {
-        if (informationalServiceId != null) {
-            exc.setServiceId(informationalServiceId);
-        } else if (configuration instanceof ServiceHttpClientConfiguration) {
-            exc.setServiceId(((ServiceHttpClientConfiguration) configuration).getServiceId());
-        }
-    }
-
     @FunctionalInterface
     interface ThrowingBiConsumer<T1, T2> {
         void accept(T1 t1, T2 t2) throws Exception;
+    }
+
+    private <E extends HttpClientException> E decorate(E exc) {
+        return HttpClientExceptionUtils.populateServiceId(exc, informationalServiceId, configuration);
     }
 
     /**
@@ -1888,7 +1875,7 @@ public class DefaultHttpClient implements
             if (host == null) {
                 host = requestURI.getAuthority();
                 if (host == null) {
-                    throw ctx.customizeException(new NoHostException("URI specifies no host to connect to"));
+                    throw decorate(ctx, new NoHostException("URI specifies no host to connect to"));
                 }
 
                 final int i = host.indexOf(':');
@@ -1898,7 +1885,7 @@ public class DefaultHttpClient implements
                     try {
                         port = Integer.parseInt(portStr);
                     } catch (NumberFormatException e) {
-                        throw ctx.customizeException(new HttpClientException("URI specifies an invalid port: " + portStr));
+                        throw decorate(ctx, new HttpClientException("URI specifies an invalid port: " + portStr));
                     }
                 } else {
                     port = requestURI.getPort() > -1 ? requestURI.getPort() : secure ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT;
@@ -1945,6 +1932,10 @@ public class DefaultHttpClient implements
         public int hashCode() {
             return ObjectUtils.hash(host, port, secure);
         }
+
+        private <E extends HttpClientException> E decorate(DefaultHttpClient ctx, E exc) {
+            return HttpClientExceptionUtils.populateServiceId(exc, ctx.informationalServiceId, ctx.configuration);
+        }
     }
 
     /**
@@ -1970,15 +1961,6 @@ public class DefaultHttpClient implements
          * @param emitter     The emitter
          */
         protected void write(ConnectionManager.PoolHandle poolHandle, boolean isSecure, FluxSink<?> emitter) {
-            if (poolHandle.http2) {
-                // todo: move to ConnectionManager, DefaultHttpClient shouldn't care about the scheme
-                if (isSecure) {
-                    nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTPS);
-                } else {
-                    nettyRequest.headers().add(AbstractNettyHttpRequest.HTTP2_SCHEME, HttpScheme.HTTP);
-                }
-            }
-
             Channel channel = poolHandle.channel;
             ChannelFuture writeFuture;
             if (encoder != null && encoder.isChunked()) {
@@ -2056,11 +2038,11 @@ public class DefaultHttpClient implements
 
             HttpClientException result;
             if (cause instanceof TooLongFrameException) {
-                result = customizeException(new ContentLengthExceededException(configuration.getMaxContentLength()));
+                result = decorate(new ContentLengthExceededException(configuration.getMaxContentLength()));
             } else if (cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
                 result = ReadTimeoutException.TIMEOUT_EXCEPTION;
             } else {
-                result = customizeException(new HttpClientException("Error occurred reading HTTP response: " + message, cause));
+                result = decorate(new HttpClientException("Error occurred reading HTTP response: " + message, cause));
             }
             responsePromise.tryFailure(result);
         }
@@ -2200,8 +2182,7 @@ public class DefaultHttpClient implements
                     msg.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
                 }
 
-                boolean convertBodyWithBodyType = msg.status().code() < 400 ||
-                        (!DefaultHttpClient.this.configuration.isExceptionOnErrorStatus() && bodyType.equalsType(errorType));
+                boolean convertBodyWithBodyType = shouldConvertWithBodyType(msg, DefaultHttpClient.this.configuration, bodyType, errorType);
                 FullNettyClientHttpResponse<O> response
                         = new FullNettyClientHttpResponse<>(msg, mediaTypeCodecRegistry, byteBufferFactory, bodyType, convertBodyWithBodyType, conversionService);
 
@@ -2231,12 +2212,23 @@ public class DefaultHttpClient implements
             }
         }
 
+        private static <O, E> boolean shouldConvertWithBodyType(FullHttpResponse msg,
+                                                                HttpClientConfiguration configuration,
+                                                                Argument<O> bodyType,
+                                                                Argument<E> errorType) {
+            if (msg.status().code() < 400) {
+                return true;
+            }
+            return !configuration.isExceptionOnErrorStatus() && bodyType.equalsType(errorType);
+
+        }
+
         /**
          * Create a {@link HttpClientResponseException} from a response with a failed HTTP status.
          */
         private HttpClientResponseException makeErrorFromRequestBody(HttpResponseStatus status, FullNettyClientHttpResponse<?> response) {
             if (errorType != null && errorType != HttpClient.DEFAULT_ERROR_TYPE) {
-                return customizeException(new HttpClientResponseException(
+                return decorate(new HttpClientResponseException(
                     status.reasonPhrase(),
                     null,
                     response,
@@ -2248,7 +2240,7 @@ public class DefaultHttpClient implements
                     }
                 ));
             } else {
-                return customizeException(new HttpClientResponseException(status.reasonPhrase(), response));
+                return decorate(new HttpClientResponseException(status.reasonPhrase(), response));
             }
         }
 
@@ -2266,7 +2258,7 @@ public class DefaultHttpClient implements
             );
             // this onComplete call disables further parsing by HttpClientResponseException
             errorResponse.onComplete();
-            return customizeException(new HttpClientResponseException(
+            return decorate(new HttpClientResponseException(
                 "Error decoding HTTP error response body: " + t.getMessage(),
                 t,
                 errorResponse,
@@ -2283,7 +2275,7 @@ public class DefaultHttpClient implements
                     false,
                     conversionService
             );
-            HttpClientResponseException clientResponseError = customizeException(new HttpClientResponseException(
+            HttpClientResponseException clientResponseError = decorate(new HttpClientResponseException(
                 "Error decoding HTTP response body: " + t.getMessage(),
                 t,
                 response,

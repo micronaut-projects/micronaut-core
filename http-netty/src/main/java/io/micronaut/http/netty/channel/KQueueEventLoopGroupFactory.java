@@ -20,9 +20,11 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.ServerChannel;
 import io.netty.channel.kqueue.KQueue;
+import io.netty.channel.kqueue.KQueueDatagramChannel;
 import io.netty.channel.kqueue.KQueueEventLoopGroup;
 import io.netty.channel.kqueue.KQueueServerDomainSocketChannel;
 import io.netty.channel.kqueue.KQueueServerSocketChannel;
@@ -130,4 +132,28 @@ public class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
         return group;
     }
 
+    @Override
+    public Class<? extends Channel> channelClass(NettyChannelType type) throws UnsupportedOperationException {
+        return switch (type) {
+            case SERVER_SOCKET -> KQueueServerSocketChannel.class;
+            case CLIENT_SOCKET -> KQueueSocketChannel.class;
+            case DOMAIN_SERVER_SOCKET -> KQueueServerDomainSocketChannel.class;
+            case DATAGRAM_SOCKET -> KQueueDatagramChannel.class;
+        };
+    }
+
+    @Override
+    public Class<? extends Channel> channelClass(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration) {
+        return channelClass(type);
+    }
+
+    @Override
+    public Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration) {
+        return switch (type) {
+            case SERVER_SOCKET -> new KQueueServerSocketChannel();
+            case CLIENT_SOCKET -> new KQueueSocketChannel();
+            case DOMAIN_SERVER_SOCKET -> new KQueueServerDomainSocketChannel();
+            case DATAGRAM_SOCKET -> new KQueueDatagramChannel();
+        };
+    }
 }

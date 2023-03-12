@@ -40,6 +40,7 @@ public final class LazyJsonNode implements ReferenceCounted {
     private ByteBuffer<?> buffer;
     private int refCnt = 1;
     @Nullable
+    @SuppressWarnings("java:S3077")
     private volatile JsonNode asNode;
     @Nullable
     private JsonSyntaxException syntaxException;

@@ -249,7 +249,7 @@ package test
 
 import io.micronaut.inject.annotation.*
 import io.micronaut.context.annotation.*
-import javax.validation.Valid
+import jakarta.validation.Valid
 import java.util.List
 import io.micronaut.kotlin.processing.beans.executable.*
 
@@ -361,7 +361,7 @@ package test
 import io.micronaut.inject.annotation.*
 import io.micronaut.context.annotation.*
 import io.micronaut.context.annotation.Executable
-import javax.validation.Valid
+import jakarta.validation.Valid
 import java.util.List
 import io.micronaut.kotlin.processing.beans.executable.*
 

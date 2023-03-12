@@ -30,6 +30,7 @@ dependencies {
     compileOnly project(":websocket")
     compileOnly libs.kotlin.stdlib
     compileOnly libs.managed.netty.transport.native.unix.common
+    compileOnly libs.managed.netty.incubator.codec.http3
 
     testImplementation libs.jmh.core
     testAnnotationProcessor libs.jmh.generator.annprocess
@@ -55,6 +56,7 @@ dependencies {
     testImplementation project(":inject-java-test")
     testImplementation project(":http-client")
     testImplementation libs.spotbugs
+    testImplementation libs.managed.netty.incubator.codec.http3
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
         testImplementation libs.bcpkix
     }

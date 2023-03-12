@@ -25,10 +25,10 @@ import java.time.Duration;
 
 @ConfigurationProperties("foo.bar")
 interface MyConfig extends Toggleable {
-    @javax.validation.constraints.NotBlank
+    @jakarta.validation.constraints.NotBlank
     String getHost();
 
-    @javax.validation.constraints.Min(10L)
+    @jakarta.validation.constraints.Min(10L)
     int getServerPort();
 
     @Bindable(defaultValue = "true")
@@ -75,7 +75,7 @@ interface MyConfig {
     @javax.annotation.Nullable
     String getHost();
 
-    @javax.validation.constraints.Min(10L)
+    @jakarta.validation.constraints.Min(10L)
     Optional<Integer> getServerPort();
 
     @io.micronaut.core.bind.annotation.Bindable(defaultValue = "http://default")
@@ -130,14 +130,14 @@ import java.time.Duration;
 interface MyConfig extends ParentConfig {
 
     @Executable
-    @javax.validation.constraints.Min(10L)
+    @jakarta.validation.constraints.Min(10L)
     int getServerPort();
 }
 
 @ConfigurationProperties("foo")
 interface ParentConfig {
     @Executable
-    @javax.validation.constraints.NotBlank
+    @jakarta.validation.constraints.NotBlank
     String getHost();
 }
 
@@ -175,11 +175,11 @@ import java.net.URL;
 @ConfigurationProperties("foo.bar")
 interface MyConfig {
     @Executable
-    @javax.validation.constraints.NotBlank
+    @jakarta.validation.constraints.NotBlank
     String getHost();
 
     @Executable
-    @javax.validation.constraints.Min(10L)
+    @jakarta.validation.constraints.Min(10L)
     int getServerPort();
 
     @ConfigurationProperties("child")
@@ -219,11 +219,11 @@ import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
 interface MyConfig {
-    @javax.validation.constraints.NotBlank
+    @jakarta.validation.constraints.NotBlank
     @Executable
     String getHost();
 
-    @javax.validation.constraints.Min(10L)
+    @jakarta.validation.constraints.Min(10L)
     @Executable
     int getServerPort();
 
@@ -268,10 +268,10 @@ import java.time.Duration;
 
 @ConfigurationProperties("foo.bar")
 interface MyConfig {
-    @javax.validation.constraints.NotBlank
+    @jakarta.validation.constraints.NotBlank
     String junk(String s);
 
-    @javax.validation.constraints.Min(10L)
+    @jakarta.validation.constraints.Min(10L)
     int getServerPort();
 }
 

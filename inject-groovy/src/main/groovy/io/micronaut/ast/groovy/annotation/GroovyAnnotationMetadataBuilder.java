@@ -60,7 +60,6 @@ import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
 import java.lang.annotation.Annotation;
-import java.lang.annotation.Inherited;
 import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -122,8 +121,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             final List<AnnotationNode> annotations = member.getAnnotations();
             if (CollectionUtils.isNotEmpty(annotations)) {
                 return annotations.stream().anyMatch((it) ->
-                    it.getClassNode().getName().startsWith("javax.validation")
-                        || it.getClassNode().getName().startsWith("jakarta.validation"));
+                    it.getClassNode().getName().startsWith("jakarta.validation"));
             }
         }
         return false;
@@ -438,7 +436,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
-    protected Object readAnnotationValue(AnnotatedNode originatingElement, AnnotatedNode member, String annotationName, String memberName, Object annotationValue) {
+    protected Object readAnnotationValue(AnnotatedNode originatingElement, AnnotatedNode member, String memberName, Object annotationValue) {
         if (annotationValue instanceof ConstantExpression constantExpression) {
             return readConstantExpression(originatingElement, annotationName, member, constantExpression);
         } else if (annotationValue instanceof PropertyExpression pe) {

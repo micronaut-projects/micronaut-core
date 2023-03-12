@@ -15,16 +15,6 @@
  */
 package io.micronaut.http.server.netty;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadFactory;
-
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
@@ -40,6 +30,7 @@ import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupFactory;
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
+import io.micronaut.http.netty.channel.NettyChannelType;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
 import io.micronaut.http.netty.channel.converters.DefaultChannelOptionFactory;
@@ -56,6 +47,7 @@ import io.micronaut.http.server.netty.websocket.WebSocketUpgradeHandlerFactory;
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.web.router.resource.StaticResourceResolver;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.ServerChannel;
@@ -64,6 +56,16 @@ import io.netty.channel.socket.ServerSocketChannel;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadFactory;
 
 /**
  * Default implementation of {@link io.micronaut.http.server.netty.NettyEmbeddedServerFactory}.
@@ -293,6 +295,11 @@ public class DefaultNettyEmbeddedServerFactory
     @Override
     public ServerChannel getDomainServerChannelInstance(EventLoopGroupConfiguration workerConfig) {
         return eventLoopGroupFactory.domainServerSocketChannelInstance(workerConfig);
+    }
+
+    @Override
+    public Channel getChannelInstance(NettyChannelType type, EventLoopGroupConfiguration workerConfig) {
+        return eventLoopGroupFactory.channelInstance(type, workerConfig);
     }
 
     @SuppressWarnings("unchecked")
