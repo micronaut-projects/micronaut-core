@@ -401,42 +401,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
-    protected boolean isInheritedAnnotation(@NonNull AnnotationNode annotationMirror) {
-        final List<AnnotationNode> annotations = annotationMirror.getClassNode().getAnnotations();
-        if (CollectionUtils.isNotEmpty(annotations)) {
-            return annotations.stream().anyMatch((ann) ->
-                    ann.getClassNode().getName().equals(Inherited.class.getName())
-            );
-        }
-        return false;
-    }
-
-    @Override
-    protected Map<String, ? extends AnnotatedNode> getAnnotationMembers(String annotationType) {
-        final AnnotatedNode node = getAnnotationMirror(annotationType).orElse(null);
-        if (node instanceof final ClassNode cn) {
-            if (cn.isAnnotationDefinition()) {
-                return cn.getDeclaredMethodsMap();
-            }
-        }
-        return Collections.emptyMap();
-    }
-
-    @Override
-    protected boolean hasSimpleAnnotation(AnnotatedNode element, String simpleName) {
-        if (element != null) {
-            final List<AnnotationNode> annotations = element.getAnnotations();
-            for (AnnotationNode ann : annotations) {
-                if (ann.getClassNode().getNameWithoutPackage().equalsIgnoreCase(simpleName)) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    @Override
-    protected Object readAnnotationValue(AnnotatedNode originatingElement, AnnotatedNode member, String memberName, Object annotationValue) {
+    protected Object readAnnotationValue(AnnotatedNode originatingElement, AnnotatedNode member, String annotationName, String memberName, Object annotationValue) {
         if (annotationValue instanceof ConstantExpression constantExpression) {
             return readConstantExpression(originatingElement, annotationName, member, constantExpression);
         } else if (annotationValue instanceof PropertyExpression pe) {
