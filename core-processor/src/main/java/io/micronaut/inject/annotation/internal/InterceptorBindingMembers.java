@@ -91,17 +91,14 @@ public final class InterceptorBindingMembers implements AnnotationRemapper {
                 newInterceptorBinding = AnnotationValue.builder(InterceptorBinding.class)
                         .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(annotationName))
                         .member("kind", InterceptorKind.AROUND);
-//                annotationValue = AnnotationValue.builder(annotationValue).removeStereotype(stereotype).build();
             } else if (Introduction.class.getName().equals(stereotypeName)) {
                 newInterceptorBinding = AnnotationValue.builder(InterceptorBinding.class)
                         .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(annotationName))
                         .member("kind", InterceptorKind.INTRODUCTION);
-//                annotationValue = AnnotationValue.builder(annotationValue).removeStereotype(stereotype).build();
             } else if (AroundConstruct.class.getName().equals(stereotypeName)) {
                 newInterceptorBinding = AnnotationValue.builder(InterceptorBinding.class)
                         .member(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(annotationName))
                         .member("kind", InterceptorKind.AROUND_CONSTRUCT);
-//                annotationValue = AnnotationValue.builder(annotationValue).removeStereotype(stereotype).build();
             }
             if (newInterceptorBinding != null) {
                 interceptorBindings.add(newInterceptorBinding);
@@ -125,7 +122,6 @@ public final class InterceptorBindingMembers implements AnnotationRemapper {
                             interceptorBinding.member("interceptorType", interceptorType);
                         }
                     }
-//                    annotationValue = AnnotationValue.builder(annotationValue).removeStereotype(av).build();
                     break;
                 }
             }
