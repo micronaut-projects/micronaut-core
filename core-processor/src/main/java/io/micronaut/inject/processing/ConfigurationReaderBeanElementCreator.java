@@ -146,6 +146,11 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
     }
 
     @Override
+    protected void makeInterceptedForValidationIfNeeded(MethodElement element) {
+        // Configuration beans are validated by the introspection
+    }
+
+    @Override
     protected boolean processAsProperties() {
         return true;
     }
