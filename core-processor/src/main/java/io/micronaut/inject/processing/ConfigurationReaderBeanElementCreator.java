@@ -146,11 +146,6 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
     }
 
     @Override
-    protected boolean visitAopMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
-        return false;
-    }
-
-    @Override
     protected boolean processAsProperties() {
         return true;
     }

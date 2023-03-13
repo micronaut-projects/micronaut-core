@@ -13,6 +13,7 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.NamedAnnotationMapper
 import io.micronaut.inject.annotation.NamedAnnotationTransformer
+import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import spock.lang.Issue
@@ -1099,6 +1100,67 @@ interface IBeanValidator<T> {
         noExceptionThrown()
         beanDefinition != null
         beanDefinition.getTypeArguments('test.BaseService')[0].type.name == 'test.BaseEntity'
+    }
+
+    void 'test around on @EachProperty'() {
+        given:
+            ApplicationContext context = buildContext('justaround.MyBean', '''
+package justaround;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.EachProperty;
+import jakarta.inject.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@EachProperty("somebeans.here")
+class MyBean {
+    @TestAnn
+    void test() {
+    }
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@Around
+@interface TestAnn {
+}
+
+@InterceptorBean(TestAnn.class)
+class TestInterceptor implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+}
+
+@Singleton
+class AnotherInterceptor implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+}
+''', false, [
+                    "somebeans.here.abc": "123",
+                    "somebeans.here.xyz": "123",
+])
+            def instance = getBean(context, 'justaround.MyBean', Qualifiers.byName("abc"))
+            def interceptor = getBean(context, 'justaround.TestInterceptor')
+            def anotherInterceptor = getBean(context, 'justaround.AnotherInterceptor')
+            instance.test()
+
+        expect:"the interceptor was invoked"
+            instance instanceof Intercepted
+            interceptor.invoked
+            !anotherInterceptor.invoked
+
+        cleanup:
+            context.close()
     }
 
     static class NamedTestAnnMapper implements NamedAnnotationMapper {
