@@ -2,6 +2,7 @@ package io.micronaut.http.server.netty.cors
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.util.CollectionUtils
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
@@ -61,7 +62,7 @@ class CrossOriginUtilSpec extends Specification {
         config.allowedOrigins == [ "https://foo.com" ]
         !config.allowedOriginsRegex
         config.allowedHeaders == CorsOriginConfiguration.ANY
-        config.exposedHeaders == CorsOriginConfiguration.NONE
+        CollectionUtils.isEmpty(config.exposedHeaders)
         config.allowedMethods == CorsOriginConfiguration.ANY_METHOD
         config.allowCredentials
         config.maxAge == 1800L
@@ -99,7 +100,7 @@ class CrossOriginUtilSpec extends Specification {
         config
         config.allowedOrigins == [ "https://bar.com" ]
         config.allowedHeaders == CorsOriginConfiguration.ANY
-        config.exposedHeaders == CorsOriginConfiguration.NONE
+        CollectionUtils.isEmpty(config.exposedHeaders)
         config.allowedMethods == CorsOriginConfiguration.ANY_METHOD
         config.allowCredentials
         config.maxAge == 1800L

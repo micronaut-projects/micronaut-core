@@ -35,7 +35,6 @@ public class CorsOriginConfiguration {
      * Constant to represent any value.
      */
     public static final List<String> ANY = Collections.singletonList("*");
-    public static final List<String> NONE = Collections.emptyList();
 
     /**
      * Constant to represent any method.
