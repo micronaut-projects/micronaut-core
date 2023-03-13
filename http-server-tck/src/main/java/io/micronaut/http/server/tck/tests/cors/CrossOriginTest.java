@@ -309,8 +309,7 @@ public class CrossOriginTest {
     static class AllowedOriginsRegex {
 
         @CrossOrigin(
-            value = "^http(|s):\\/\\/foo\\.com$",
-            allowedOriginsRegex = true
+            allowedOriginsRegex = "^http(|s):\\/\\/foo\\.com$"
         )
         @Produces(MediaType.TEXT_PLAIN)
         @Get("/foo")

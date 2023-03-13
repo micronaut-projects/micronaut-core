@@ -59,7 +59,7 @@ public class CorsOriginConverter implements TypeConverter<Map<String, Object>, C
             .ifPresent(configuration::setAllowedOrigins);
 
         convertibleValues
-            .get(ALLOWED_ORIGINS_REGEX, ConversionContext.BOOLEAN)
+            .get(ALLOWED_ORIGINS_REGEX, ConversionContext.STRING)
             .ifPresent(configuration::setAllowedOriginsRegex);
 
         convertibleValues

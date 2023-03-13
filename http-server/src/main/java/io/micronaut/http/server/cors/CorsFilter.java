@@ -335,19 +335,19 @@ public class CorsFilter implements HttpServerFilter {
     }
 
     private static boolean matchesOrigin(@NonNull CorsOriginConfiguration config, String requestOrigin) {
+        if (config.getAllowedOriginsRegex().map(regex -> matchesOrigin(regex, requestOrigin)).orElse(false)) {
+            return true;
+        }
         List<String> allowedOrigins = config.getAllowedOrigins();
-        return !allowedOrigins.isEmpty() && (isAny(allowedOrigins) || allowedOrigins.stream().anyMatch(origin -> matchesOrigin(origin, requestOrigin, config.isAllowedOriginsRegex())));
+        return !allowedOrigins.isEmpty() && (
+            (!config.getAllowedOriginsRegex().isPresent() && isAny(allowedOrigins)) ||
+                allowedOrigins.stream().anyMatch(origin -> origin.equals(requestOrigin))
+        );
     }
 
-    private static boolean matchesOrigin(@NonNull String origin, @NonNull String requestOrigin, boolean isAllowedOriginsRegex) {
-        return isAllowedOriginsRegex ?
-            matchesOrigin(requestOrigin, origin) :
-            origin.equals(requestOrigin);
-    }
-
-    private static boolean matchesOrigin(@NonNull String origin, @NonNull String regex) {
-        Pattern p = Pattern.compile(regex);
-        Matcher m = p.matcher(origin);
+    private static boolean matchesOrigin(@NonNull String originRegex, @NonNull String requestOrigin) {
+        Pattern p = Pattern.compile(originRegex);
+        Matcher m = p.matcher(requestOrigin);
         return m.matches();
     }
 

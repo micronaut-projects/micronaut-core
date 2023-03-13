@@ -39,7 +39,7 @@ class CrossOriginUtilSpec extends Specification {
         then:
         config
         config.allowedOrigins == [ "https://foo.com" ]
-        config.allowedOriginsRegex
+        !config.allowedOriginsRegex.isPresent()
         config.allowedHeaders == [ HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION ]
         config.exposedHeaders == [ HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION ]
         config.allowedMethods == [ HttpMethod.GET, HttpMethod.POST ]
@@ -110,12 +110,11 @@ class CrossOriginUtilSpec extends Specification {
 
     @Requires(property = 'spec.name', value = SPECNAME)
     @Controller
-    static class TestMethodController{
+    static class TestMethodController {
         CorsOriginConfiguration config
 
         @CrossOrigin(
                 allowedOrigins = "https://foo.com",
-                allowedOriginsRegex = true,
                 allowedHeaders = [ HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION ],
                 exposedHeaders = [ HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION ],
                 allowedMethods = [ HttpMethod.GET, HttpMethod.POST ],

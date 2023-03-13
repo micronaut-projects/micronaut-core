@@ -16,6 +16,7 @@
 package io.micronaut.http.server.cors;
 
 import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 
 import java.lang.annotation.Documented;
@@ -54,9 +55,9 @@ public @interface CrossOrigin {
 
     /**
      *
-     * @return whether regex is allowed for allowedOrigins
+     * @return regular expression to match allowed origins
      */
-    boolean allowedOriginsRegex() default false;
+    String allowedOriginsRegex() default StringUtils.EMPTY_STRING;
 
     /**
      *

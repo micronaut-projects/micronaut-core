@@ -15,11 +15,13 @@
  */
 package io.micronaut.http.server.cors;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
-
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Stores configuration for CORS.
@@ -29,14 +31,6 @@ import java.util.List;
  * @since 1.0
  */
 public class CorsOriginConfiguration {
-
-    /**
-     * The default enable value.
-     */
-    @SuppressWarnings("WeakerAccess")
-    public static final boolean DEFAULT_ALLOWED_ORIGINS_REGEX = false;
-
-
     /**
      * Constant to represent any value.
      */
@@ -49,7 +43,7 @@ public class CorsOriginConfiguration {
     public static final List<HttpMethod> ANY_METHOD = Collections.emptyList();
 
     private List<String> allowedOrigins = ANY;
-    private boolean allowedOriginsRegex = DEFAULT_ALLOWED_ORIGINS_REGEX;
+    private String allowedOriginsRegex;
     private List<HttpMethod> allowedMethods = ANY_METHOD;
     private List<String> allowedHeaders = ANY;
     private List<String> exposedHeaders = Collections.emptyList();
@@ -75,18 +69,22 @@ public class CorsOriginConfiguration {
     }
 
     /**
-     * @return Whether regex is allowed for allowedOrigins. Default value {@value #DEFAULT_ALLOWED_ORIGINS_REGEX}.
+     * @return a regular expression for matching Allowed Origins.
      */
-    public boolean isAllowedOriginsRegex() {
-        return allowedOriginsRegex;
+    @NonNull
+    public Optional<String> getAllowedOriginsRegex() {
+        if (allowedOriginsRegex == null || allowedOriginsRegex.equals(StringUtils.EMPTY_STRING)) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(allowedOriginsRegex);
     }
 
     /**
-     * Sets whether regex is allowed for allowedOrigins. Default value {@value #DEFAULT_ALLOWED_ORIGINS_REGEX}.
+     * Sets a regular expression for matching Allowed Origins.
      *
-     * @param allowedOriginsRegex regex allowed for origins
+     * @param allowedOriginsRegex a regular expression for matching Allowed Origins.
      */
-    public void setAllowedOriginsRegex(boolean allowedOriginsRegex) {
+    public void setAllowedOriginsRegex(String allowedOriginsRegex) {
         this.allowedOriginsRegex = allowedOriginsRegex;
     }
 

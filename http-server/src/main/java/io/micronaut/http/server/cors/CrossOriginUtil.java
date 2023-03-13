@@ -62,7 +62,7 @@ public final class CrossOriginUtil {
         }
         CorsOriginConfiguration config = new CorsOriginConfiguration();
         config.setAllowedOrigins(Arrays.asList(annotationMetadata.stringValues(CrossOrigin.class, MEMBER_ALLOWED_ORIGINS)));
-        annotationMetadata.booleanValue(CrossOrigin.class, MEMBER_ALLOWED_ORIGINS_REGEX)
+        annotationMetadata.stringValue(CrossOrigin.class, MEMBER_ALLOWED_ORIGINS_REGEX)
             .ifPresent(config::setAllowedOriginsRegex);
 
         String[] allowedHeaders = annotationMetadata.stringValues(CrossOrigin.class, MEMBER_ALLOWED_HEADERS);

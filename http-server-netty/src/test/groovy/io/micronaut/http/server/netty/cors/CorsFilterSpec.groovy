@@ -93,14 +93,13 @@ class CorsFilterSpec extends Specification {
     }
 
     @Unroll
-    void "regex matching configuration"(List<String> regex, String origin) {
+    void "regex matching configuration"(String regex, String origin) {
         given:
         HttpRequest request = createRequest(origin)
         request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class) >> Optional.empty()
 
         CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
-        originConfig.allowedOrigins = regex
-        originConfig.allowedOriginsRegex = true
+        originConfig.allowedOriginsRegex = regex
         HttpServerConfiguration.CorsConfiguration config = enabledCorsConfiguration([foo: originConfig])
         CorsFilter corsHandler = buildCorsHandler(config)
 
@@ -125,13 +124,13 @@ class CorsFilterSpec extends Specification {
 
         where:
         regex                               | origin
-        ['.*']                              | 'http://www.bar.com'
-        ['^http://www\\.(foo|bar)\\.com$']  | 'http://www.bar.com'
-        ['^http://www\\.(foo|bar)\\.com$']  | 'http://www.foo.com'
-        ['.*bar$', '.*foo$']                | 'asdfasdf foo'
-        ['.*bar$', '.*foo$']                | 'asdfasdf bar'
-        ['.*bar$', '.*foo$']                | 'http://asdfasdf.foo'
-        ['.*bar$', '.*foo$']                | 'http://asdfasdf.bar'
+        '.*'                                | 'http://www.bar.com'
+        '^http://www\\.(foo|bar)\\.com$'    | 'http://www.bar.com'
+        '^http://www\\.(foo|bar)\\.com$'    | 'http://www.foo.com'
+        '.*(bar|foo)$'                      | 'asdfasdf foo'
+        '.*(bar|foo)$'                      | 'asdfasdf bar'
+        '.*(bar|foo)$'                      | 'http://asdfasdf.foo'
+        '.*(bar|foo)$'                      | 'http://asdfasdf.bar'
     }
 
     void "test handleRequest with disallowed method"() {
