@@ -69,4 +69,11 @@ class BeanIntrospectorSpec extends Specification {
         then:
         def ex = thrown(IllegalArgumentException)
     }
+
+    void "test repeatable inner type annotation"() {
+        when:
+            BeanIntrospection<MapOfListsWithAutomaticUnwrapping> introspection = BeanIntrospection.getIntrospection(MapOfListsWithAutomaticUnwrapping)
+        then:
+            introspection.getAnnotationMetadata().findRepeatableAnnotation(MyMin).isPresent()
+    }
 }

@@ -822,8 +822,9 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     @Internal
     public static void contributeDefaults(AnnotationMetadata target, AnnotationMetadata source) {
         source = source.getTargetAnnotationMetadata();
-        if (source instanceof AnnotationMetadataHierarchy) {
-            source = ((AnnotationMetadataHierarchy) source).merge();
+        if (source instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
+            contributeDefaults(target, annotationMetadataHierarchy);
+            return;
         }
         if (target instanceof MutableAnnotationMetadata damTarget && source instanceof MutableAnnotationMetadata damSource) {
             final Map<String, Map<CharSequence, Object>> existingDefaults = damTarget.annotationDefaultValues;
@@ -842,6 +843,25 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         }
         // We don't need to contribute the default source annotation
         contributeRepeatable(target, source);
+    }
+
+    /**
+     * Contributes defaults to the given target.
+     *
+     * <p>WARNING: for internal use only be the framework</p>
+     *
+     * @param target The target
+     * @param source The source
+     * @since 4.0.0
+     */
+    @Internal
+    public static void contributeDefaults(AnnotationMetadata target, AnnotationMetadataHierarchy source) {
+        for (AnnotationMetadata annotationMetadata : source) {
+            if (annotationMetadata instanceof AnnotationMetadataReference) {
+                continue;
+            }
+            contributeDefaults(target, annotationMetadata);
+        }
     }
 
     /**
