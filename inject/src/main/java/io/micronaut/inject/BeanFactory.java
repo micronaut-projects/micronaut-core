@@ -26,10 +26,11 @@ import io.micronaut.core.annotation.NextMajorVersion;
  * instance.
  * This interface is generally implemented by a build time tool such as an AST transformation framework that will build
  * the code necessary to construct a valid bean instance.</p>
+ * <p>
+ * See io.micronaut.inject.writer.BeanDefinitionWriter.
  *
  * @param <T> The bean type
  * @author Graeme Rocher
- * @see io.micronaut.inject.writer.BeanDefinitionWriter
  * @since 1.0
  */
 @Deprecated(since = "4")

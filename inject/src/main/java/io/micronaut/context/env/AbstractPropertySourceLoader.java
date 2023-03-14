@@ -45,6 +45,8 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
 
     private static final Logger LOG = LoggerFactory.getLogger(AbstractPropertySourceLoader.class);
 
+    protected boolean logEnabled = true;
+
     @Override
     public int getOrder() {
         return DEFAULT_POSITION;
@@ -95,8 +97,8 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
     private Map<String, Object> loadProperties(ResourceLoader resourceLoader, String qualifiedName, String fileName) {
         Optional<InputStream> config = readInput(resourceLoader, fileName);
         if (config.isPresent()) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Found PropertySource for file name: " + fileName);
+            if (logEnabled) {
+                LOG.debug("Found PropertySource for file name: {}", fileName);
             }
             try (InputStream input = config.get()) {
                 return read(qualifiedName, input);
@@ -104,8 +106,8 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
                 throw new ConfigurationException("I/O exception occurred reading [" + fileName + "]: " + e.getMessage(), e);
             }
         } else {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("No PropertySource found for file name: " + fileName);
+            if (logEnabled) {
+                LOG.debug("No PropertySource found for file name: {}", fileName);
             }
         }
         return Collections.emptyMap();
@@ -151,5 +153,13 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
                 finalMap.put(prefix + key, value);
             }
         }
+    }
+
+    public boolean isLogEnabled() {
+        return logEnabled;
+    }
+
+    public void setLogEnabled(boolean logEnabled) {
+        this.logEnabled = logEnabled;
     }
 }

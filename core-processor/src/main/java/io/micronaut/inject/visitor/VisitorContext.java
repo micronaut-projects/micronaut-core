@@ -64,7 +64,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * Gets the element annotation metadata factory.
      *
      * @return The element annotation metadata factory
-     * @see 4.0.0
+     * @since  4.0.0
      */
     @NonNull
     ElementAnnotationMetadataFactory getElementAnnotationMetadataFactory();
@@ -73,7 +73,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * Gets the annotation metadata builder.
      *
      * @return The annotation metadata builder
-     * @see 4.0.0
+     * @since  4.0.0
      */
     @Internal
     @NonNull

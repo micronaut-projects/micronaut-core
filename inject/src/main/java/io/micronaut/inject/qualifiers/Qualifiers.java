@@ -133,7 +133,9 @@ public class Qualifiers {
     /**
      * Finds a name in the provided qualifier.
      *
-     * @return The qualifier
+     * @param qualifier The qualifier
+     *
+     * @return The qualifier name
      * @since 4.0.0
      */
     @Nullable
