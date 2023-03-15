@@ -20,7 +20,7 @@ import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.annotation.Nullable;
 
 /**
- * Abstraction to load resources from the the classpath.
+ * Abstraction to load resources from the classpath.
  *
  * @author James Kleeh
  * @author Graeme Rocher
