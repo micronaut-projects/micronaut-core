@@ -28,21 +28,22 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.client.multipart.MultipartBody;
-import io.micronaut.http.tck.AssertionUtils;
-import io.micronaut.http.tck.HttpResponseAssertion;
-import io.micronaut.http.tck.RequestSupplier;
-import io.micronaut.http.tck.ServerUnderTest;
+import io.micronaut.http.server.tck.CorsAssertion;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-
+import io.micronaut.http.tck.ServerUnderTest;
+import io.micronaut.http.tck.RequestSupplier;
 import java.io.IOException;
 import java.util.Collections;
 
+import io.micronaut.http.tck.AssertionUtils;
+import io.micronaut.http.tck.HttpResponseAssertion;
 import static io.micronaut.http.tck.TestScenario.asserts;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 @SuppressWarnings({
     "java:S2259", // The tests will show if it's null
@@ -199,14 +200,12 @@ public class CorsSimpleRequestTest {
 
                 AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                     .status(HttpStatus.OK)
-                    .assertResponse(response -> {
-                        assertNotNull(response.getHeaders().get("Access-Control-Allow-Origin"));
-                        assertNotNull(response.getHeaders().get("Vary"));
-                        assertNotNull(response.getHeaders().get("Access-Control-Allow-Credentials"));
-                        assertNull(response.getHeaders().get("Access-Control-Allow-Methods"));
-                        assertNull(response.getHeaders().get("Access-Control-Allow-Headers"));
-                        assertNull(response.getHeaders().get("Access-Control-Max-Age"));
-                    })
+                    .assertResponse(response -> CorsAssertion.builder()
+                        .vary("Origin")
+                        .allowCredentials()
+                        .allowOrigin("https://foo.com")
+                        .build()
+                        .validate(response))
                     .build());
                 assertEquals(1, refreshCounter.getRefreshCount());
             });

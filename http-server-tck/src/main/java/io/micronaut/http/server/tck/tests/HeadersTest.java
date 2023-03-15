@@ -40,7 +40,7 @@ public class HeadersTest {
     public static final String SPEC_NAME = "HeadersTest";
 
     /**
-     * Message header field names are case-insensitive
+     * Message header field names are case-insensitive.
      *
      * @see <a href="https://www.w3.org/Protocols/rfc2616/rfc2616-sec4.html#sec4.2">HTTP/1.1 Message Headers</a>
      */
