@@ -15,11 +15,13 @@
  */
 package io.micronaut.http.server.cors;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
-
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Stores configuration for CORS.
@@ -29,7 +31,6 @@ import java.util.List;
  * @since 1.0
  */
 public class CorsOriginConfiguration {
-
     /**
      * Constant to represent any value.
      */
@@ -41,6 +42,7 @@ public class CorsOriginConfiguration {
     public static final List<HttpMethod> ANY_METHOD = Collections.emptyList();
 
     private List<String> allowedOrigins = ANY;
+    private String allowedOriginsRegex;
     private List<HttpMethod> allowedMethods = ANY_METHOD;
     private List<String> allowedHeaders = ANY;
     private List<String> exposedHeaders = Collections.emptyList();
@@ -63,6 +65,26 @@ public class CorsOriginConfiguration {
         if (allowedOrigins != null) {
             this.allowedOrigins = allowedOrigins;
         }
+    }
+
+    /**
+     * @return a regular expression for matching Allowed Origins.
+     */
+    @NonNull
+    public Optional<String> getAllowedOriginsRegex() {
+        if (allowedOriginsRegex == null || allowedOriginsRegex.equals(StringUtils.EMPTY_STRING)) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(allowedOriginsRegex);
+    }
+
+    /**
+     * Sets a regular expression for matching Allowed Origins.
+     *
+     * @param allowedOriginsRegex a regular expression for matching Allowed Origins.
+     */
+    public void setAllowedOriginsRegex(String allowedOriginsRegex) {
+        this.allowedOriginsRegex = allowedOriginsRegex;
     }
 
     /**

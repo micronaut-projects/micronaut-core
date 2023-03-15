@@ -90,7 +90,8 @@ public class SelfSignedSslBuilder extends SslBuilder<SslContext> implements Serv
                 LOG.warn("HTTP Server is configured to use a self-signed certificate ('build-self-signed' is set to true). This configuration should not be used in a production environment as self-signed certificates are inherently insecure.");
             }
             SelfSignedCertificate ssc = new SelfSignedCertificate();
-            final SslContextBuilder sslBuilder = SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey());
+            final SslContextBuilder sslBuilder = SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey())
+                .trustManager(getTrustManagerFactory(ssl));
             CertificateProvidedSslBuilder.setupSslBuilder(sslBuilder, ssl, httpVersion);
             return Optional.of(sslBuilder.build());
         } catch (CertificateException | SSLException e) {
