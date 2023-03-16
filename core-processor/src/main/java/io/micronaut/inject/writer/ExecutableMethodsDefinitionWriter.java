@@ -97,10 +97,16 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
 
     private final Set<String> methodNames = new HashSet<>();
 
-    public ExecutableMethodsDefinitionWriter(String beanDefinitionClassName,
+    private final AnnotationMetadata annotationMetadataWithDefaults;
+
+    private ClassWriter classWriter;
+
+    public ExecutableMethodsDefinitionWriter(AnnotationMetadata annotationMetadataWithDefaults,
+                                             String beanDefinitionClassName,
                                              String beanDefinitionReferenceClassName,
                                              OriginatingElements originatingElements) {
         super(originatingElements);
+        this.annotationMetadataWithDefaults = annotationMetadataWithDefaults;
         this.className = beanDefinitionClassName + CLASS_SUFFIX;
         this.internalName = getInternalName(className);
         this.thisType = Type.getObjectType(internalName);
@@ -212,7 +218,16 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
 
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
-        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+        try (OutputStream outputStream = classWriterOutputVisitor.visitClass(className, getOriginatingElements())) {
+            outputStream.write(classWriter.toByteArray());
+        }
+    }
+
+    /**
+     * Invoke to build the class model.
+     */
+    public final void visitDefinitionEnd() {
+        classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         classWriter.visit(V1_8, ACC_SYNTHETIC | ACC_FINAL,
                 internalName,
                 null,
@@ -236,10 +251,6 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
         }
 
         classWriter.visitEnd();
-
-        try (OutputStream outputStream = classWriterOutputVisitor.visitClass(className, getOriginatingElements())) {
-            outputStream.write(classWriter.toByteArray());
-        }
     }
 
     private void buildStaticInit(ClassWriter classWriter, Type methodsFieldType) {
@@ -416,18 +427,19 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
             }
         }
 
-        pushAnnotationMetadata(classWriter, staticInit, annotationMetadata, defaultsStorage);
+        pushAnnotationMetadata(annotationMetadataWithDefaults, classWriter, staticInit, annotationMetadata, defaultsStorage);
         // 3: methodName
         staticInit.push(methodElement.getName());
         // 4: return argument
         ClassElement genericReturnType = methodElement.getGenericReturnType();
-        pushReturnTypeArgument(thisType, classWriter, staticInit, declaringType.getName(), genericReturnType, defaultsStorage, loadTypeMethods);
+        pushReturnTypeArgument(annotationMetadataWithDefaults, thisType, classWriter, staticInit, declaringType.getName(), genericReturnType, defaultsStorage, loadTypeMethods);
         // 5: arguments
         ParameterElement[] parameters = methodElement.getSuspendParameters();
         if (parameters.length == 0) {
             staticInit.visitInsn(ACONST_NULL);
         } else {
             pushBuildArgumentsForMethod(
+                    annotationMetadataWithDefaults,
                     typeReference.getClassName(),
                     thisType,
                     classWriter,
@@ -454,16 +466,23 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
                 boolean.class);
     }
 
-    private void pushAnnotationMetadata(ClassWriter classWriter,
+    private void pushAnnotationMetadata(AnnotationMetadata annotationMetadataWithDefaults,
+                                        ClassWriter classWriter,
                                         GeneratorAdapter staticInit,
                                         AnnotationMetadata annotationMetadata,
                                         Map<String, Integer> defaultsStorage) {
+
         if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA || annotationMetadata.isEmpty()) {
             staticInit.push((String) null);
         } else if (annotationMetadata instanceof AnnotationMetadataReference annotationMetadataReference) {
             String className = annotationMetadataReference.getClassName();
             staticInit.getStatic(getTypeReferenceForName(className), AbstractAnnotationMetadataWriter.FIELD_ANNOTATION_METADATA, Type.getType(AnnotationMetadata.class));
         } else if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
+            MutableAnnotationMetadata.contributeDefaults(
+                annotationMetadataWithDefaults,
+                annotationMetadataHierarchy
+            );
+
             AnnotationMetadataWriter.instantiateNewMetadataHierarchy(
                     thisType,
                     classWriter,
@@ -472,6 +491,11 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
                     defaultsStorage,
                     loadTypeMethods);
         } else if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
+            MutableAnnotationMetadata.contributeDefaults(
+                annotationMetadataWithDefaults,
+                annotationMetadata
+            );
+
             AnnotationMetadataWriter.instantiateNewMetadata(
                     thisType,
                     classWriter,
