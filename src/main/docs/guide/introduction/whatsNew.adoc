@@ -1,12 +1,15 @@
 //Micronaut {version} includes the following changes:
 == 4.0.0
 
+=== Kotlin 1.8.0
+
+Micronaut Framework 4.0 supports https://kotlinlang.org/docs/whatsnew18.html[Kotlin 1.8.0]
+
 === Apache Groovy 4.0
 
 Micronaut Framework 4.x supports https://groovy-lang.org/releasenotes/groovy-4.0.html[Apache Groovy 4.0].
 
 === Core Changes
-
 
 * <<virtualThreads, Support for Virtual Threads>>
 * <<filtermethods, Filter Methods>>
