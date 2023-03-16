@@ -129,6 +129,7 @@ httpServer:
     websocketServer: Using @ServerWebSocket
     websocketClient: Using @ClientWebSocket
   http2Server: HTTP/2 Support
+  http3Server: HTTP/3 Support
   serverEvents: Server Events
   serverConfiguration:
     title: Configuring the HTTP Server
@@ -142,6 +143,7 @@ httpServer:
     listener: Advanced Listener Configuration
     cors:
       title: Configuring CORS
+      annotationBasedCors: Annotation-based CORS Configuration
       corsConfiguration: CORS via Configuration
       corsAllowedOrigins: Allowed Origins
       corsAllowedMethods: Allowed Methods
@@ -160,6 +162,12 @@ httpServer:
   graphql: GraphQL Support
 httpClient:
   title: The HTTP Client
+  httpClientImplementations:
+    title: HTTP Client Implementations
+    nettyHttpClient: HTTP Client based on Netty
+    jdkHttpClient:
+      title: HTTP Client based on the Java HTTP Client
+  lowLevelOrHighLevel: Low-Level and High-Level APIs
   lowLevelHttpClient:
     title: Using the Low-Level HTTP Client
     clientBasics: Sending your first HTTP request
@@ -182,6 +190,7 @@ httpClient:
     netflixHystrix: Netflix Hystrix Support
   clientFilter: HTTP Client Filters
   clientHttp2: HTTP/2 Support
+  clientHttp3: HTTP/3 Support
   clientSample: HTTP Client Sample
 cloud:
   title: Cloud Native Features

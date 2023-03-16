@@ -17,6 +17,8 @@ dependencies {
     api project(":http-netty")
     api libs.managed.netty.handler.proxy
 
+    compileOnly libs.managed.netty.incubator.codec.http3
+
     testAnnotationProcessor platform(libs.test.boms.micronaut.validation)
     testAnnotationProcessor (libs.micronaut.validation.processor) {
         exclude group: 'io.micronaut'

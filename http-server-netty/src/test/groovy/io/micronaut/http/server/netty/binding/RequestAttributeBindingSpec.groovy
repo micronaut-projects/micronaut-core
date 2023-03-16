@@ -20,11 +20,10 @@ import javax.annotation.Nullable
 
 class RequestAttributeBindingSpec extends AbstractMicronautSpec {
 
-    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/2846")
     void "test request attribute binding from a filter"() {
         given:
         BlockingHttpClient client = rxClient.toBlocking()
-        
+
         expect:
         client.retrieve("/attribute/filter/implicit") == "Sally"
         client.retrieve("/attribute/filter/implicit/nonnull") == "Sally"

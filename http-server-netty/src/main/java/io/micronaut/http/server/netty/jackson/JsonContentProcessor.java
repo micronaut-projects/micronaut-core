@@ -146,7 +146,9 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
             try {
                 out.add(jsonMapper.readValue(wrapped, Argument.of(JsonNode.class)));
             } finally {
-                completedNode.release();
+                if (completedNode != null) {
+                    completedNode.release();
+                }
             }
         } else {
             out.add(new LazyJsonNode(wrapped));

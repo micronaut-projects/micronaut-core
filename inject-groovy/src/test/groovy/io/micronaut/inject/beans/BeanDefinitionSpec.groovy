@@ -243,7 +243,7 @@ class TestBean {
         given:
             BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
 package test;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.List;
 
 @jakarta.inject.Singleton
@@ -281,7 +281,7 @@ interface Deserializer<T> {
         given:
             BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
 package test;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.List;
 
 @jakarta.inject.Singleton

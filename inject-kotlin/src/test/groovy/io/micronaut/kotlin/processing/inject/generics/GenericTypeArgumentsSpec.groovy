@@ -6,7 +6,7 @@ import io.micronaut.context.event.BeanCreatedEventListener
 import io.micronaut.inject.BeanDefinition
 import spock.lang.Unroll
 
-import javax.validation.ConstraintViolationException
+import jakarta.validation.ConstraintViolationException
 import java.util.function.Function
 import java.util.function.Supplier
 
@@ -71,7 +71,7 @@ package exceptionhandler
 
 import io.micronaut.inject.annotation.*
 import io.micronaut.context.annotation.*
-import javax.validation.ConstraintViolationException
+import jakarta.validation.ConstraintViolationException
 
 @Context
 class Test : ExceptionHandler<ConstraintViolationException, java.util.function.Supplier<Foo>?> {

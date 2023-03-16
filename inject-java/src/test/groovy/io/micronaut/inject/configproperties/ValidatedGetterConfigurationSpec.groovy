@@ -21,7 +21,7 @@ import io.micronaut.context.env.PropertySource
 import io.micronaut.context.exceptions.BeanInstantiationException
 import spock.lang.Specification
 
-import javax.validation.Validation
+import jakarta.validation.Validation
 
 class ValidatedGetterConfigurationSpec extends Specification {
 

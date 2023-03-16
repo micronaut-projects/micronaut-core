@@ -147,7 +147,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
     }
 
     override fun onError() {
-
+        // do nothing
     }
 
     private fun start() {

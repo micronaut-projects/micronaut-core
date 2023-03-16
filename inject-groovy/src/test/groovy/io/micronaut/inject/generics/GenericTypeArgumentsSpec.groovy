@@ -22,7 +22,7 @@ import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import spock.lang.Unroll
 
-import javax.validation.ConstraintViolationException
+import jakarta.validation.ConstraintViolationException
 import java.util.function.Function
 import java.util.function.Supplier
 
@@ -35,7 +35,7 @@ package exceptionhandler;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.validation.ConstraintViolationException;
+import jakarta.validation.ConstraintViolationException;
 
 @Context
 class Test implements ExceptionHandler<ConstraintViolationException, java.util.function.Supplier<Foo>> {

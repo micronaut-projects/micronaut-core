@@ -53,6 +53,7 @@ dependencies {
     testImplementation project(":inject")
     testImplementation libs.jcache
     testImplementation project(":http-client")
+    testImplementation project(":http-client-jdk")
     testImplementation (libs.micronaut.session) {
         exclude group: 'io.micronaut'
     }

@@ -200,7 +200,7 @@ package test;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 import java.util.List;
 import io.micronaut.inject.executable.Book;
 

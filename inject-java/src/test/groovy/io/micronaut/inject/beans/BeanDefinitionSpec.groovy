@@ -469,7 +469,7 @@ public class Test {
         given:
         BeanDefinition definition = buildBeanDefinition('test','Test','''
 package test;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.List;
 
 @jakarta.inject.Singleton
@@ -487,20 +487,21 @@ public class Test {
         def param3 = param2.getTypeParameters()[0]
 
         then:
-        param.getAnnotationMetadata().getAnnotationNames().size() == 0
+        param.getAnnotationMetadata().getAnnotationNames().size() == 1
+        param.getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.validation.annotation.ValidatedElement']
         param1.getAnnotationMetadata().getAnnotationNames().size() == 1
-        param1.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.Size$List']
+        param1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
         param2.getAnnotationMetadata().getAnnotationNames().size() == 1
-        param2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
+        param2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
         param3.getAnnotationMetadata().getAnnotationNames().size() == 1
-        param3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
+        param3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
     }
 
     void "test isTypeVariable"() {
         given:
         ApplicationContext context = buildContext( '''
 package test;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 import io.micronaut.core.annotation.*;
 import io.micronaut.context.annotation.*;
@@ -555,7 +556,7 @@ class SetTest<E> implements Serde<HashSet<E>> {
         given:
             BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
 package test;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.List;
 
 @jakarta.inject.Singleton
@@ -590,5 +591,60 @@ interface Deserializer<T> {
             deserializerTypeParam.simpleName == "String[]"
             !deserializerTypeParam.isTypeVariable()
             !(deserializerTypeParam instanceof GenericPlaceholder)
+    }
+
+    void "test repeatable inner type annotation 1"() {
+        when:
+            def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
+            def beanDef = ctx.getBeanDefinition(MapOfListsBean1)
+        then:
+            beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin1).isPresent()
+
+        cleanup:
+            ctx.close()
+    }
+
+    void "test repeatable inner type annotation 2"() {
+        when:
+            def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
+            def beanDef = ctx.getBeanDefinition(MapOfListsBean2)
+        then:
+            beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin2).isPresent()
+
+        cleanup:
+            ctx.close()
+    }
+
+    void "test repeatable inner type annotation 3"() {
+        when:
+            def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
+            def beanDef = ctx.getBeanDefinition(MapOfListsBean3)
+        then:
+            beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin3).isPresent()
+
+        cleanup:
+            ctx.close()
+    }
+
+    void "test repeatable inner type annotation 4"() {
+        when:
+            def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
+            def beanDef = ctx.getBeanDefinition(MapOfListsBean4)
+        then:
+            beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin4).isPresent()
+
+        cleanup:
+            ctx.close()
+    }
+
+    void "test repeatable inner type annotation 5"() {
+        when:
+            def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
+            def beanDef = ctx.getBeanDefinition(MapOfListsBean5)
+        then:
+            beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin5).isPresent()
+
+        cleanup:
+            ctx.close()
     }
 }

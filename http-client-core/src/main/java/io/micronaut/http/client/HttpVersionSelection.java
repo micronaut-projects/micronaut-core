@@ -40,6 +40,11 @@ public final class HttpVersionSelection {
      * ALPN protocol ID for HTTP/2.
      */
     public static final String ALPN_HTTP_2 = "h2";
+    /**
+     * ALPN protocol ID for HTTP/3. When this is selected, it must be the only ALPN ID, since we
+     * will connect via UDP.
+     */
+    public static final String ALPN_HTTP_3 = "h3";
 
     private static final HttpVersionSelection LEGACY_1 = new HttpVersionSelection(
         PlaintextMode.HTTP_1,
@@ -59,12 +64,17 @@ public final class HttpVersionSelection {
     private final boolean alpn;
     private final String[] alpnSupportedProtocols;
     private final boolean http2CipherSuites;
+    private final boolean http3;
 
     private HttpVersionSelection(@NonNull PlaintextMode plaintextMode, boolean alpn, @NonNull String[] alpnSupportedProtocols, boolean http2CipherSuites) {
         this.plaintextMode = plaintextMode;
         this.alpn = alpn;
         this.alpnSupportedProtocols = alpnSupportedProtocols;
         this.http2CipherSuites = http2CipherSuites;
+        this.http3 = Arrays.asList(alpnSupportedProtocols).contains(ALPN_HTTP_3);
+        if (http3 && alpnSupportedProtocols.length != 1) {
+            throw new IllegalArgumentException("When using HTTP 3, h3 must be the only ALPN protocol");
+        }
     }
 
     /**
@@ -179,6 +189,11 @@ public final class HttpVersionSelection {
     @Internal
     public boolean isHttp2CipherSuites() {
         return http2CipherSuites;
+    }
+
+    @Internal
+    public boolean isHttp3() {
+        return http3;
     }
 
     /**

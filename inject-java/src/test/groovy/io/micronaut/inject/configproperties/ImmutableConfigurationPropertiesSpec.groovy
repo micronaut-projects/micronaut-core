@@ -4,10 +4,13 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.ApplicationContextBuilder
 import io.micronaut.context.annotation.Property
+import io.micronaut.context.visitor.ConfigurationReaderVisitor
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.ValidatedBeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
+import io.micronaut.inject.visitor.TypeElementVisitor
+import io.micronaut.validation.visitor.ValidationVisitor
 
 class ImmutableConfigurationPropertiesSpec extends AbstractTypeElementSpec {
 
@@ -17,10 +20,11 @@ class ImmutableConfigurationPropertiesSpec extends AbstractTypeElementSpec {
 package interfaceprops;
 
 import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Executable;
 
 @EachProperty("foo.bar")
 interface MyConfig {
-    @javax.validation.constraints.NotBlank
+    @jakarta.validation.constraints.NotBlank
     String getHost();
 
     int getPort();
@@ -49,7 +53,7 @@ class MyConfig {
     private int serverPort;
 
     @ConfigurationInject
-    MyConfig(@javax.validation.constraints.NotBlank String host, int serverPort) {
+    MyConfig(@jakarta.validation.constraints.NotBlank String host, int serverPort) {
         this.host = host;
         this.serverPort = serverPort;
     }
@@ -243,5 +247,10 @@ class MyConfig {
         cleanup:
         context.close()
 
+    }
+
+    @Override
+    protected Collection<TypeElementVisitor> getLocalTypeElementVisitors() {
+        [new ValidationVisitor(), new ConfigurationReaderVisitor()]
     }
 }

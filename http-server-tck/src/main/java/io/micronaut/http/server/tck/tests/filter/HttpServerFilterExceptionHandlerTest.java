@@ -30,9 +30,9 @@ import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
-import io.micronaut.http.server.tck.AssertionUtils;
-import io.micronaut.http.server.tck.ServerUnderTest;
-import io.micronaut.http.server.tck.TestScenario;
+import io.micronaut.http.tck.AssertionUtils;
+import io.micronaut.http.tck.ServerUnderTest;
+import io.micronaut.http.tck.TestScenario;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
@@ -54,7 +54,7 @@ public class HttpServerFilterExceptionHandlerTest {
     @Test
     public void exceptionHandlerTest() throws IOException {
         assertion(HttpRequest.GET("/foo"),
-            AssertionUtils.assertThrowsStatus(HttpStatus.UNPROCESSABLE_ENTITY));
+        AssertionUtils.assertThrowsStatus(HttpStatus.UNPROCESSABLE_ENTITY));
     }
 
     private static void assertion(HttpRequest<?> request, BiConsumer<ServerUnderTest, HttpRequest<?>> assertion) throws IOException {

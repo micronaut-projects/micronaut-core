@@ -59,7 +59,6 @@ import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
 import java.lang.annotation.Annotation;
-import java.lang.annotation.Inherited;
 import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -120,7 +119,8 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         if (member != null) {
             final List<AnnotationNode> annotations = member.getAnnotations();
             if (CollectionUtils.isNotEmpty(annotations)) {
-                return annotations.stream().anyMatch((it) -> it.getClassNode().getName().startsWith("javax.validation"));
+                return annotations.stream().anyMatch((it) ->
+                    it.getClassNode().getName().startsWith("jakarta.validation"));
             }
         }
         return false;
@@ -383,41 +383,6 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             }
         }
         return defaultValues;
-    }
-
-    @Override
-    protected boolean isInheritedAnnotation(@NonNull AnnotationNode annotationMirror) {
-        final List<AnnotationNode> annotations = annotationMirror.getClassNode().getAnnotations();
-        if (CollectionUtils.isNotEmpty(annotations)) {
-            return annotations.stream().anyMatch((ann) ->
-                    ann.getClassNode().getName().equals(Inherited.class.getName())
-            );
-        }
-        return false;
-    }
-
-    @Override
-    protected Map<String, ? extends AnnotatedNode> getAnnotationMembers(String annotationType) {
-        final AnnotatedNode node = getAnnotationMirror(annotationType).orElse(null);
-        if (node instanceof final ClassNode cn) {
-            if (cn.isAnnotationDefinition()) {
-                return cn.getDeclaredMethodsMap();
-            }
-        }
-        return Collections.emptyMap();
-    }
-
-    @Override
-    protected boolean hasSimpleAnnotation(AnnotatedNode element, String simpleName) {
-        if (element != null) {
-            final List<AnnotationNode> annotations = element.getAnnotations();
-            for (AnnotationNode ann : annotations) {
-                if (ann.getClassNode().getNameWithoutPackage().equalsIgnoreCase(simpleName)) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     @Override
