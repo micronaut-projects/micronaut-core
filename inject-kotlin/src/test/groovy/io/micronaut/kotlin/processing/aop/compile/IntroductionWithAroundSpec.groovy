@@ -17,7 +17,7 @@ package test;
 
 import io.micronaut.kotlin.processing.aop.introduction.Stub
 import io.micronaut.kotlin.processing.aop.simple.Mutating
-import javax.validation.constraints.*
+import jakarta.validation.constraints.*
 import jakarta.inject.Singleton
 
 @Stub

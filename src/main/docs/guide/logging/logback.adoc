@@ -2,6 +2,8 @@ To use the logback library, add the following dependency to your build.
 
 dependency:ch.qos.logback:logback-classic[gradleScope="implementation"]
 
+NOTE: Logback 1.3.x+ included a breaking binary change that may prevent it working with 3.8.x of the Micronaut framework. If you are using Logback 1.3.x+ and are experiencing issues, please downgrade to Logback 1.2.x.
+
 If it does not exist yet, place a link:https://logback.qos.ch/manual/configuration.html[logback.xml] file in the resources folder and modify the content for your needs. For example:
 
 .src/main/resources/logback.xml

@@ -22,7 +22,7 @@ import spock.lang.IgnoreIf
 import spock.util.environment.Jvm
 
 import javax.annotation.Nullable
-import javax.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotBlank
 
 class PropertyElementSpec extends AbstractTypeElementSpec {
     @IgnoreIf({ !jvm.isJava14Compatible() })
@@ -31,7 +31,7 @@ class PropertyElementSpec extends AbstractTypeElementSpec {
         ClassElement classElement = buildClassElement('''
 package test;
 
-record Book( @javax.validation.constraints.NotBlank String title, int pages) {}
+record Book( @jakarta.validation.constraints.NotBlank String title, int pages) {}
 ''')
         def beanProperties = classElement.getBeanProperties()
         def titleProp = beanProperties.find { it.name == 'title' }
@@ -75,7 +75,7 @@ public class TestController {
      * The age
      */
     @Get("/getMethod/{age}")
-    public int getAge( @javax.validation.constraints.NotBlank int age) {
+    public int getAge( @jakarta.validation.constraints.NotBlank int age) {
         return age;
     }
 
@@ -83,8 +83,8 @@ public class TestController {
         return name;
     }
 
-    @javax.validation.constraints.NotBlank
-    public void setName(@javax.validation.constraints.NotBlank String n) {
+    @jakarta.validation.constraints.NotBlank
+    public void setName(@jakarta.validation.constraints.NotBlank String n) {
         name = n;
     }
 
@@ -95,7 +95,7 @@ public class TestController {
         return description;
     }
 
-    public void setDescription(@javax.validation.constraints.NotBlank  String description) {
+    public void setDescription(@jakarta.validation.constraints.NotBlank  String description) {
         this.description = description;
     }
 }

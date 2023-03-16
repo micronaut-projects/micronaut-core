@@ -24,17 +24,16 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Status;
-import io.micronaut.http.server.tck.AssertionUtils;
-import io.micronaut.http.server.tck.HttpResponseAssertion;
+import io.micronaut.http.server.tck.CorsUtils;
 import io.micronaut.http.server.util.HttpHostResolver;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
-
+import static io.micronaut.http.tck.TestScenario.asserts;
+import io.micronaut.http.tck.AssertionUtils;
+import io.micronaut.http.tck.HttpResponseAssertion;
 import java.io.IOException;
 import java.util.Collections;
 
-import static io.micronaut.http.server.tck.TestScenario.asserts;
-import static org.junit.jupiter.api.Assertions.assertNull;
 
 @SuppressWarnings({
     "java:S2259", // The tests will show if it's null
@@ -46,7 +45,7 @@ public class CorsDisabledByDefaultTest {
     private static final String SPECNAME = "CorsDisabledByDefaultTest";
 
     /**
-     * By default CORS is disabled no cors headers are present in response.
+     * By default, CORS is disabled no cors headers are present in response.
      * @throws IOException may throw the try for resources
      */
     @Test
@@ -56,14 +55,7 @@ public class CorsDisabledByDefaultTest {
             (server, request) -> {
                 AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                     .status(HttpStatus.OK)
-                    .assertResponse(response -> {
-                        assertNull(response.getHeaders().get("Access-Control-Allow-Origin"));
-                        assertNull(response.getHeaders().get("Vary"));
-                        assertNull(response.getHeaders().get("Access-Control-Allow-Credentials"));
-                        assertNull(response.getHeaders().get("Access-Control-Allow-Methods"));
-                        assertNull(response.getHeaders().get("Access-Control-Allow-Headers"));
-                        assertNull(response.getHeaders().get("Access-Control-Max-Age"));
-                    })
+                    .assertResponse(CorsUtils::assertCorsHeadersNotPresent)
                     .build());
             });
     }

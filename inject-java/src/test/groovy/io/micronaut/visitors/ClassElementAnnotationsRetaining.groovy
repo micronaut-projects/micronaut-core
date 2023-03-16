@@ -16,8 +16,8 @@ class ClassElementAnnotationsRetaining extends AbstractTypeElementSpec {
             def code = '''
 package test;
 import java.util.List;
-import javax.validation.Valid;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import io.micronaut.core.annotation.Introspected;
 @Introspected
 class SaladWithSetter {
@@ -38,7 +38,7 @@ class SaladWithSetter {
 
         then:
             def propertyTypeArgument = propertyElement.type.typeArguments.get("E")
-            propertyTypeArgument.annotationMetadata.hasStereotype("javax.validation.Valid")
+            propertyTypeArgument.annotationMetadata.hasStereotype("jakarta.validation.Valid")
     }
 
     void 'test type argument annotation on the getter'() {
@@ -48,8 +48,8 @@ class SaladWithSetter {
             def code = '''
 package test;
 import java.util.List;
-import javax.validation.Valid;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import io.micronaut.core.annotation.Introspected;
 @Introspected
 class SaladWithSetter {
@@ -70,7 +70,7 @@ class SaladWithSetter {
 
         then:
             def propertyTypeArgument = propertyElement.type.typeArguments.get("E")
-            propertyTypeArgument.annotationMetadata.hasStereotype("javax.validation.Valid")
+            propertyTypeArgument.annotationMetadata.hasStereotype("jakarta.validation.Valid")
     }
 
     void 'test type argument annotation on the setter'() {
@@ -79,8 +79,8 @@ class SaladWithSetter {
             def code = '''
 package test;
 import java.util.List;
-import javax.validation.Valid;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import io.micronaut.core.annotation.Introspected;
 @Introspected
 class SaladWithSetter {
@@ -104,7 +104,7 @@ class SaladWithSetter {
 
         then:
             def propertyTypeArgument = propertyElement.type.typeArguments.get("E")
-            propertyTypeArgument.annotationMetadata.hasStereotype("javax.validation.Valid")
+            propertyTypeArgument.annotationMetadata.hasStereotype("jakarta.validation.Valid")
     }
 
     void 'test type argument annotation on the property with a setter'() {
@@ -114,8 +114,8 @@ class SaladWithSetter {
             def code = '''
 package test;
 import java.util.List;
-import javax.validation.Valid;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import io.micronaut.core.annotation.Introspected;
 @Introspected
 class SaladWithSetter {
@@ -139,7 +139,7 @@ class SaladWithSetter {
 
         then:
             def propertyTypeArgument = propertyElement.type.typeArguments.get("E")
-            propertyTypeArgument.annotationMetadata.hasStereotype("javax.validation.Valid")
+            propertyTypeArgument.annotationMetadata.hasStereotype("jakarta.validation.Valid")
     }
 
     void 'test annotation on the property with a setter'() {
@@ -148,8 +148,8 @@ class SaladWithSetter {
             // Define a setter
             def code = '''
 package test;
-import javax.validation.Valid;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import io.micronaut.core.annotation.Introspected;
 @Introspected
 class SaladWithSetter {
@@ -172,7 +172,7 @@ class SaladWithSetter {
             PropertyElement propertyElement = classElement.getBeanProperties().iterator().next()
 
         then:
-            propertyElement.annotationMetadata.hasStereotype("javax.validation.Valid")
+            propertyElement.annotationMetadata.hasStereotype("jakarta.validation.Valid")
     }
 
 }

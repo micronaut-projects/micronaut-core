@@ -1,8 +1,10 @@
 package io.micronaut.inject.beans
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Order
+import io.micronaut.core.type.Argument
 import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
@@ -467,7 +469,7 @@ public class Test {
         given:
         BeanDefinition definition = buildBeanDefinition('test','Test','''
 package test;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.List;
 
 @jakarta.inject.Singleton
@@ -485,24 +487,27 @@ public class Test {
         def param3 = param2.getTypeParameters()[0]
 
         then:
-        param.getAnnotationMetadata().getAnnotationNames().size() == 0
+        param.getAnnotationMetadata().getAnnotationNames().size() == 1
+        param.getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.validation.annotation.ValidatedElement']
         param1.getAnnotationMetadata().getAnnotationNames().size() == 1
-        param1.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.Size$List']
+        param1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
         param2.getAnnotationMetadata().getAnnotationNames().size() == 1
-        param2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
+        param2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
         param3.getAnnotationMetadata().getAnnotationNames().size() == 1
-        param3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
+        param3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
     }
 
     void "test isTypeVariable"() {
         given:
-            BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
+        ApplicationContext context = buildContext( '''
 package test;
-import javax.validation.constraints.*;
-import java.util.List;
+import jakarta.validation.constraints.*;
+import java.util.*;
+import io.micronaut.core.annotation.*;
+import io.micronaut.context.annotation.*;
 
 @jakarta.inject.Singleton
-public class Test implements Serde<Object> {
+class Test implements Serde<Object> {
 }
 
 interface Serde<T> extends Serializer<T>, Deserializer<T> {
@@ -514,29 +519,44 @@ interface Serializer<T> {
 interface Deserializer<T> {
 }
 
+@jakarta.inject.Singleton
+@Order(-100)
+class ArrayListTest<E> implements Serde<ArrayList<E>> {
+}
+
+@jakarta.inject.Singleton
+class SetTest<E> implements Serde<HashSet<E>> {
+}
 
         ''')
+
+        BeanDefinition<?> definition = getBeanDefinition(context, 'test.Test')
+
 
         when: "Micronaut Serialization use-case"
             def serdeTypeParam = definition.getTypeArguments("test.Serde")[0]
             def serializerTypeParam = definition.getTypeArguments("test.Serializer")[0]
             def deserializerTypeParam = definition.getTypeArguments("test.Deserializer")[0]
+            def listDeser = context.getBean(Argument.of(context.classLoader.loadClass('test.Deserializer'), Argument.listOf(String)))
+            def collectionDeser = context.getBean(Argument.of(context.classLoader.loadClass('test.Deserializer'), Argument.of(Collection.class, String)))
 
         then: "The first is a placeholder"
-            serdeTypeParam.isTypeVariable() //
-            (serdeTypeParam instanceof GenericPlaceholder)
+            listDeser.getClass().name == 'test.ArrayListTest'
+            listDeser.is(collectionDeser)
+            !serdeTypeParam.isTypeVariable() //
+            !(serdeTypeParam instanceof GenericPlaceholder)
         and: "threat resolved placeholder as not a type variable"
-            serializerTypeParam.isTypeVariable()
-            (serializerTypeParam instanceof GenericPlaceholder)
-            deserializerTypeParam.isTypeVariable()
-            (deserializerTypeParam instanceof GenericPlaceholder)
+            !serializerTypeParam.isTypeVariable()
+            !(serializerTypeParam instanceof GenericPlaceholder)
+            !deserializerTypeParam.isTypeVariable()
+            !(deserializerTypeParam instanceof GenericPlaceholder)
     }
 
     void "test isTypeVariable array"() {
         given:
             BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
 package test;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.List;
 
 @jakarta.inject.Singleton
@@ -571,5 +591,60 @@ interface Deserializer<T> {
             deserializerTypeParam.simpleName == "String[]"
             !deserializerTypeParam.isTypeVariable()
             !(deserializerTypeParam instanceof GenericPlaceholder)
+    }
+
+    void "test repeatable inner type annotation 1"() {
+        when:
+            def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
+            def beanDef = ctx.getBeanDefinition(MapOfListsBean1)
+        then:
+            beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin1).isPresent()
+
+        cleanup:
+            ctx.close()
+    }
+
+    void "test repeatable inner type annotation 2"() {
+        when:
+            def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
+            def beanDef = ctx.getBeanDefinition(MapOfListsBean2)
+        then:
+            beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin2).isPresent()
+
+        cleanup:
+            ctx.close()
+    }
+
+    void "test repeatable inner type annotation 3"() {
+        when:
+            def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
+            def beanDef = ctx.getBeanDefinition(MapOfListsBean3)
+        then:
+            beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin3).isPresent()
+
+        cleanup:
+            ctx.close()
+    }
+
+    void "test repeatable inner type annotation 4"() {
+        when:
+            def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
+            def beanDef = ctx.getBeanDefinition(MapOfListsBean4)
+        then:
+            beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin4).isPresent()
+
+        cleanup:
+            ctx.close()
+    }
+
+    void "test repeatable inner type annotation 5"() {
+        when:
+            def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
+            def beanDef = ctx.getBeanDefinition(MapOfListsBean5)
+        then:
+            beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin5).isPresent()
+
+        cleanup:
+            ctx.close()
     }
 }

@@ -116,21 +116,28 @@ public class GroovyVisitorContext implements VisitorContext {
 
     @Override
     public Optional<ClassElement> getClassElement(String name, ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        if (name == null || compilationUnit == null) {
+        if (name == null) {
             return Optional.empty();
+        } else if (compilationUnit == null) {
+            return Optional.ofNullable(classNodeFromClassLoader(name)).map(cn ->
+                groovyElementFactory.newClassElement(cn, annotationMetadataFactory)
+            );
         }
         ClassNode classNode = Optional.ofNullable(compilationUnit.getClassNode(name))
-            .orElseGet(() -> {
-                if (sourceUnit != null) {
-                    GroovyClassLoader classLoader = sourceUnit.getClassLoader();
-                    if (classLoader != null) {
-                        return ClassUtils.forName(name, classLoader).map(ClassHelper::make).orElse(null);
-                    }
-                }
-                return null;
-            });
+            .orElseGet(() -> classNodeFromClassLoader(name));
 
         return Optional.ofNullable(classNode).map(cn -> groovyElementFactory.newClassElement(cn, annotationMetadataFactory));
+    }
+
+    private ClassNode classNodeFromClassLoader(String name) {
+        ClassNode cn = null;
+        if (sourceUnit != null) {
+            GroovyClassLoader classLoader = sourceUnit.getClassLoader();
+            if (classLoader != null) {
+                cn = ClassUtils.forName(name, classLoader).map(ClassHelper::make).orElse(null);
+            }
+        }
+        return cn;
     }
 
     @Override

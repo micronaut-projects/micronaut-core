@@ -93,7 +93,7 @@ interface MyBean  {
 package test
 
 import io.micronaut.kotlin.processing.aop.introduction.*
-import javax.validation.constraints.NotNull
+import jakarta.validation.constraints.NotNull
 
 @RepoDef
 interface MyRepo : DeleteByIdCrudRepo<Int> {

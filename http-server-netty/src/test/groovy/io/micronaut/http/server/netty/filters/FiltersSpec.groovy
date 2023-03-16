@@ -6,12 +6,14 @@ import io.micronaut.core.annotation.Order
 import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
@@ -23,7 +25,6 @@ import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
-import spock.lang.Ignore
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -112,19 +113,19 @@ class FiltersSpec extends Specification {
             filter3.mapExecutedOn.startsWith "io-executor"
             filter3.filterOrder == 3
 
-            filter4.doFilterExecutedOn.startsWith "default-nioEventLoopGroup"
+            filter4.doFilterExecutedOn.startsWith "io-executor"
             filter4.mapExecutedOn.startsWith "io-executor"
             filter4.filterOrder == 4
 
-            filter5.doFilterExecutedOn.startsWith "default-nioEventLoopGroup"
+            filter5.doFilterExecutedOn.startsWith "io-executor"
             filter5.mapExecutedOn.startsWith "io-executor"
             filter5.filterOrder == 5
 
-            filter6.doFilterExecutedOn.startsWith "default-nioEventLoopGroup"
+            filter6.doFilterExecutedOn.startsWith "io-executor"
             filter6.mapExecutedOn.startsWith "io-executor"
             filter6.filterOrder == 6
 
-            filter7.doFilterExecutedOn.startsWith "default-nioEventLoopGroup"
+            filter7.doFilterExecutedOn.startsWith "io-executor"
             filter7.mapExecutedOn.startsWith "io-executor"
             filter7.filterOrder == 7
 
@@ -136,7 +137,6 @@ class FiltersSpec extends Specification {
             method << ["get", "getReactive"]
     }
 
-    @Ignore("Find a fix")
     void "test filter with exception"() {
         given:
             EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': FiltersSpec.simpleName, 'badFilter': true])
@@ -146,8 +146,8 @@ class FiltersSpec extends Specification {
         when:
             def response = client.get()
         then:
-            // TODO
-            response == "OK"
+            def e = thrown HttpClientResponseException
+            e.status == HttpStatus.INTERNAL_SERVER_ERROR
 
         cleanup:
             server.close()

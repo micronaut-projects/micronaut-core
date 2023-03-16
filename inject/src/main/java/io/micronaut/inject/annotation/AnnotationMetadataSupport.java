@@ -296,6 +296,19 @@ public final class AnnotationMetadataSupport {
     }
 
     /**
+     * Registers repeatable annotation containers.
+     *
+     * @param repeatable          the repeatable annotations
+     * @param repeatableContainer the repeatable annotation container
+     * @MyRepeatable -> @MyRepeatableContainer
+     * @since 4.0.0
+     */
+    @Internal
+    static void registerRepeatableAnnotation(@NonNull String repeatable, @NonNull String repeatableContainer) {
+        REPEATABLE_ANNOTATIONS_CONTAINERS.put(repeatable, repeatableContainer);
+    }
+
+    /**
      * @param annotation The annotation
      * @return The proxy class
      */
@@ -308,12 +321,15 @@ public final class AnnotationMetadataSupport {
     }
 
     /**
+     * Builds the annotation based on the annotation value.
+     *
      * @param annotationClass The annotation class
      * @param annotationValue The annotation value
      * @param <T>             The type
      * @return The annotation
      */
-    static <T extends Annotation> T buildAnnotation(Class<T> annotationClass, @Nullable AnnotationValue<T> annotationValue) {
+    @Internal
+    public static <T extends Annotation> T buildAnnotation(Class<T> annotationClass, @Nullable AnnotationValue<T> annotationValue) {
         Optional<Constructor<InvocationHandler>> proxyClass = getProxyClass(annotationClass);
         if (proxyClass.isPresent()) {
             Map<CharSequence, Object> values = new HashMap<>(getDefaultValues(annotationClass));

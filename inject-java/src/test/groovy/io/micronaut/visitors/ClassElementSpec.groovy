@@ -17,6 +17,7 @@ package io.micronaut.visitors
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.annotation.processing.visitor.JavaClassElement
+import io.micronaut.context.annotation.Replaces
 import io.micronaut.context.exceptions.BeanContextException
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Introspected
@@ -1695,7 +1696,7 @@ class Pet {
         ClassElement ce = buildClassElement('''
 package test;
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.List;
 
 class Test {
@@ -1709,28 +1710,28 @@ class Test {
             fieldType.getAnnotationMetadata().getAnnotationNames().size() == 0
 
             assertListGenericArgument(fieldType, { ClassElement listArg1 ->
-                assert listArg1.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.Size$List']
+                assert listArg1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
                 assertListGenericArgument(listArg1, { ClassElement listArg2 ->
-                    assert listArg2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
+                    assert listArg2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
                     assertListGenericArgument(listArg2, { ClassElement listArg3 ->
-                        assert listArg3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
+                        assert listArg3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
                     })
                 })
             })
 
             def level1 = fieldType.getTypeArguments()["E"]
-            level1.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.Size$List']
+            level1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
             def level2 = level1.getTypeArguments()["E"]
-            level2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
+            level2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
             def level3 = level2.getTypeArguments()["E"]
-            level3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
+            level3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
     }
 
     void "test annotation metadata present on deep type parameters for method"() {
         ClassElement ce = buildClassElement('''
 package test;
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.List;
 
 class Test {
@@ -1746,21 +1747,21 @@ class Test {
             theType.getAnnotationMetadata().getAnnotationNames().size() == 0
 
             assertListGenericArgument(theType, { ClassElement listArg1 ->
-                assert listArg1.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.Size$List']
+                assert listArg1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
                 assertListGenericArgument(listArg1, { ClassElement listArg2 ->
-                    assert listArg2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
+                    assert listArg2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
                     assertListGenericArgument(listArg2, { ClassElement listArg3 ->
-                        assert listArg3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
+                        assert listArg3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
                     })
                 })
             })
 
             def level1 = theType.getTypeArguments()["E"]
-            level1.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.Size$List']
+            level1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
             def level2 = level1.getTypeArguments()["E"]
-            level2.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotEmpty$List']
+            level2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
             def level3 = level2.getTypeArguments()["E"]
-            level3.getAnnotationMetadata().getAnnotationNames().asList() == ['javax.validation.constraints.NotNull$List']
+            level3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
     }
 
     void "test type annotations on a method and a field"() {
@@ -1851,7 +1852,7 @@ final class TrackedSortedSet<T extends java.lang.Comparable<? super T>> {
         ClassElement ce = buildClassElement('''
 package test;
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.List;
 
 class Test {
@@ -2300,6 +2301,57 @@ class MyBean {
         then:
             returnType.hasAnnotation(MyEntity.class)
             returnType.hasAnnotation(Introspected.class)
+    }
+
+    void "test alias for recursion"() {
+        given:
+            ClassElement ce = buildClassElement('''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+import io.micronaut.test.annotation.MockBean;
+import jakarta.inject.Singleton;
+import jakarta.inject.Inject;
+import java.util.List;
+import java.lang.Integer;
+
+@Singleton
+class MathInnerServiceSpec {
+
+    @Inject
+    MathService mathService;
+
+    @MockBean(MathService.class)
+    static class MyMock implements MathService {
+
+        @Override
+        public Integer compute(Integer num) {
+            return 50;
+        }
+    }
+}
+
+interface MathService {
+
+    Integer compute(Integer num);
+}
+
+
+@Singleton
+class MathServiceImpl implements MathService {
+
+    @Override
+    public Integer compute(Integer num) {
+        return num * 4; // should never be called
+    }
+}
+
+''')
+        when:
+            def replaces = ce.getEnclosedElements(ElementQuery.ALL_INNER_CLASSES).get(0).getAnnotation(Replaces)
+        then:
+            replaces.stringValue("bean").get() == "test.MathService"
     }
 
     void "test how the type annotations from the type are propagated"() {

@@ -28,7 +28,7 @@ import java.io.File
 import java.io.OutputStream
 import java.util.*
 
-class KotlinOutputVisitor(private val environment: SymbolProcessorEnvironment): AbstractClassWriterOutputVisitor(false) {
+internal class KotlinOutputVisitor(private val environment: SymbolProcessorEnvironment): AbstractClassWriterOutputVisitor(false) {
 
     override fun visitClass(classname: String, vararg originatingElements: Element): OutputStream {
         return environment.codeGenerator.createNewFile(
@@ -70,7 +70,7 @@ class KotlinOutputVisitor(private val environment: SymbolProcessorEnvironment): 
         val originatingFiles: MutableList<KSFile> = ArrayList(originatingElements.size)
         for (originatingElement in originatingElements) {
             if (originatingElement is AbstractKotlinElement<*>) {
-                val nativeType = originatingElement.nativeType.unwrap().containingFile
+                val nativeType = originatingElement.nativeType.element.containingFile
                 if (nativeType is KSFile) {
                     originatingFiles.add(nativeType)
                 }

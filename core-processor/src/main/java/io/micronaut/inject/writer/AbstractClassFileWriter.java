@@ -216,6 +216,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     /**
      * Pushes type arguments onto the stack.
      *
+     * @param annotationMetadataWithDefaults The annotation metadata with defaults
      * @param owningType           The owning type
      * @param owningTypeWriter     The declaring class writer
      * @param generatorAdapter     The generator adapter
@@ -225,6 +226,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param loadTypeMethods      The load type methods
      */
     protected static void pushTypeArgumentElements(
+            AnnotationMetadata annotationMetadataWithDefaults,
             Type owningType,
             ClassWriter owningTypeWriter,
             GeneratorAdapter generatorAdapter,
@@ -236,10 +238,12 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             generatorAdapter.visitInsn(ACONST_NULL);
             return;
         }
-        pushTypeArgumentElements(owningType, owningTypeWriter, generatorAdapter, declaringElementName, null, types, new HashSet<>(5), defaults, loadTypeMethods);
+        pushTypeArgumentElements(annotationMetadataWithDefaults, owningType, owningTypeWriter, generatorAdapter, declaringElementName, null, types, new HashSet<>(5), defaults, loadTypeMethods);
     }
 
+    @SuppressWarnings("java:S1872")
     private static void pushTypeArgumentElements(
+            AnnotationMetadata annotationMetadataWithDefaults,
             Type owningType,
             ClassWriter declaringClassWriter,
             GeneratorAdapter generatorAdapter,
@@ -250,7 +254,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             Set<Object> visitedTypes,
             Map<String, Integer> defaults,
             Map<String, GeneratorAdapter> loadTypeMethods) {
-        if (element == null || element.getClass().getSimpleName().equals("KotlinClassElement")) {
+        if (element == null) {
             if (visitedTypes.contains(declaringElementName)) {
                 generatorAdapter.getStatic(
                         TYPE_ARGUMENT,
@@ -276,6 +280,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             Map<String, ClassElement> typeArguments = classElement.getTypeArguments();
             if (CollectionUtils.isNotEmpty(typeArguments) || !classElement.getAnnotationMetadata().isEmpty()) {
                 buildArgumentWithGenerics(
+                        annotationMetadataWithDefaults,
                         owningType,
                         declaringClassWriter,
                         generatorAdapter,
@@ -368,6 +373,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     /**
      * Builds generic type arguments recursively.
      *
+     * @param annotationMetadataWithDefaults The annotation metadata with defaults
      * @param owningType        The owning type
      * @param owningClassWriter The declaring writer
      * @param generatorAdapter  The generator adapter to use
@@ -380,6 +386,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param loadTypeMethods   The load type methods
      */
     protected static void buildArgumentWithGenerics(
+            AnnotationMetadata annotationMetadataWithDefaults,
             Type owningType,
             ClassWriter owningClassWriter,
             GeneratorAdapter generatorAdapter,
@@ -402,10 +409,6 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
         // Persist only type annotations added to the type argument
         AnnotationMetadata annotationMetadata = MutableAnnotationMetadata.of(classElement.getTypeAnnotationMetadata());
-        if (classElement.getClass().getSimpleName().startsWith("Kotlin")) {
-            // Remove after KSP supports type annotations
-            annotationMetadata = MutableAnnotationMetadata.of(classElement.getAnnotationMetadata());
-        }
         boolean hasAnnotationMetadata = !annotationMetadata.isEmpty();
 
         boolean isRecursiveType = false;
@@ -434,6 +437,11 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         if (!hasAnnotationMetadata) {
             generatorAdapter.visitInsn(ACONST_NULL);
         } else {
+            MutableAnnotationMetadata.contributeDefaults(
+                annotationMetadataWithDefaults,
+                annotationMetadata
+            );
+
             AnnotationMetadataWriter.instantiateNewMetadata(
                     owningType,
                     owningClassWriter,
@@ -446,6 +454,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
         // 4th argument, more generics
         pushTypeArgumentElements(
+                annotationMetadataWithDefaults,
                 owningType,
                 owningClassWriter,
                 generatorAdapter,
@@ -506,15 +515,17 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     }
 
     /**
-     * @param declaringElementName The declaring element name
-     * @param owningType           The owning type
-     * @param declaringClassWriter The declaring class writer
-     * @param generatorAdapter     The {@link GeneratorAdapter}
-     * @param argumentTypes        The argument types
-     * @param defaults             The annotation defaults
-     * @param loadTypeMethods      The load type methods
+     * @param annotationMetadataWithDefaults The annotation metadata with defaults
+     * @param declaringElementName           The declaring element name
+     * @param owningType                     The owning type
+     * @param declaringClassWriter           The declaring class writer
+     * @param generatorAdapter               The {@link GeneratorAdapter}
+     * @param argumentTypes                  The argument types
+     * @param defaults                       The annotation defaults
+     * @param loadTypeMethods                The load type methods
      */
     protected static void pushBuildArgumentsForMethod(
+            AnnotationMetadata annotationMetadataWithDefaults,
             String declaringElementName,
             Type owningType,
             ClassWriter declaringClassWriter,
@@ -529,6 +540,15 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             // the array index position
             generatorAdapter.push(i);
 
+            MutableAnnotationMetadata.contributeDefaults(
+                annotationMetadataWithDefaults,
+                entry.getAnnotationMetadata()
+            );
+            MutableAnnotationMetadata.contributeDefaults(
+                annotationMetadataWithDefaults,
+                entry.getType().getTypeAnnotationMetadata()
+            );
+
             ClassElement classElement = entry.getGenericType();
             String argumentName = entry.getName();
             AnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(
@@ -537,6 +557,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             ).merge();
             Map<String, ClassElement> typeArguments = classElement.getTypeArguments();
             pushCreateArgument(
+                    annotationMetadataWithDefaults,
                     declaringElementName,
                     owningType,
                     declaringClassWriter,
@@ -559,15 +580,17 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     /**
      * Pushes an argument.
      *
-     * @param owningType           The owning type
-     * @param classWriter          The declaring class writer
-     * @param generatorAdapter     The generator adapter
-     * @param declaringTypeName     The declaring type name
-     * @param argument             The argument
-     * @param defaults             The annotation defaults
-     * @param loadTypeMethods      The load type methods
+     * @param annotationMetadataWithDefaults The annotation metadata with defaults
+     * @param owningType                     The owning type
+     * @param classWriter                    The declaring class writer
+     * @param generatorAdapter               The generator adapter
+     * @param declaringTypeName              The declaring type name
+     * @param argument                       The argument
+     * @param defaults                       The annotation defaults
+     * @param loadTypeMethods                The load type methods
      */
-    protected void pushReturnTypeArgument(Type owningType,
+    protected void pushReturnTypeArgument(AnnotationMetadata annotationMetadataWithDefaults,
+                                          Type owningType,
                                           ClassWriter classWriter,
                                           GeneratorAdapter generatorAdapter,
                                           String declaringTypeName,
@@ -577,23 +600,31 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         // Persist only type annotations added
         AnnotationMetadata annotationMetadata = argument.getTypeAnnotationMetadata();
 
-        if (annotationMetadata.isEmpty()) {
+        if (argument.isVoid()) {
             Type type = Type.getType(Argument.class);
-            if (argument.isPrimitive() && !argument.isArray()) {
-                String constantName = argument.getName().toUpperCase(Locale.ENGLISH);
-                // refer to constant for primitives
-                generatorAdapter.getStatic(type, constantName, type);
-                return;
-            }
-            if (!argument.isArray() && String.class.getName().equals(argument.getType().getName())
-                    && argument.getName().equals(argument.getType().getName())
-                    && argument.getAnnotationMetadata().isEmpty()) {
-                generatorAdapter.getStatic(type, "STRING", type);
-                return;
-            }
+            generatorAdapter.getStatic(type, "VOID", type);
+            return;
+        }
+        if (argument.isPrimitive() && !argument.isArray()) {
+            String constantName = argument.getName().toUpperCase(Locale.ENGLISH);
+            // refer to constant for primitives
+            Type type = Type.getType(Argument.class);
+            generatorAdapter.getStatic(type, constantName, type);
+            return;
+        }
+
+        if (annotationMetadata.isEmpty()
+                && !argument.isArray()
+                && String.class.getName().equals(argument.getType().getName())
+                && argument.getName().equals(argument.getType().getName())
+                && argument.getAnnotationMetadata().isEmpty()) {
+            Type type = Type.getType(Argument.class);
+            generatorAdapter.getStatic(type, "STRING", type);
+            return;
         }
 
         pushCreateArgument(
+                annotationMetadataWithDefaults,
                 declaringTypeName,
                 owningType,
                 classWriter,
@@ -610,6 +641,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
     /**
      * Pushes a new Argument creation.
      *
+     * @param annotationMetadataWithDefaults The annotation metadata with defaults
      * @param declaringTypeName    The declaring type name
      * @param owningType           The owning type
      * @param declaringClassWriter The declaring class writer
@@ -622,6 +654,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param loadTypeMethods      The load type methods
      */
     protected static void pushCreateArgument(
+            AnnotationMetadata annotationMetadataWithDefaults,
             String declaringTypeName,
             Type owningType,
             ClassWriter declaringClassWriter,
@@ -671,6 +704,11 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
 
         // 3rd argument: The annotation metadata
         if (hasAnnotations) {
+            MutableAnnotationMetadata.contributeDefaults(
+                annotationMetadataWithDefaults,
+                annotationMetadata
+            );
+
             AnnotationMetadataWriter.instantiateNewMetadata(
                     owningType,
                     declaringClassWriter,
@@ -686,6 +724,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
         // 4th argument: The generic types
         if (hasTypeArguments) {
             pushTypeArgumentElements(
+                    annotationMetadataWithDefaults,
                     owningType,
                     declaringClassWriter,
                     generatorAdapter,

@@ -24,8 +24,8 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 import jakarta.inject.Singleton
-import javax.validation.ConstraintViolationException
-import javax.validation.constraints.NotNull
+import jakarta.validation.ConstraintViolationException
+import jakarta.validation.constraints.NotNull
 
 class ValidatedWithJavaxAnnoationNonNullSpec extends Specification {
 

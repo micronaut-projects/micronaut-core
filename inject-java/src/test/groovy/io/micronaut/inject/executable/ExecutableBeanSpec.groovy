@@ -115,7 +115,7 @@ package test;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 import java.util.List;
 
 @jakarta.inject.Singleton
@@ -226,7 +226,7 @@ package test;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 import java.util.List;
 import io.micronaut.inject.executable.Book;
 import io.micronaut.inject.executable.TypeUseRuntimeAnn;

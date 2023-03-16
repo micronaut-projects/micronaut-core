@@ -35,7 +35,7 @@ class IntroductionAdviceWithNewInterfaceSpec extends AbstractTypeElementSpec {
 package test;
 
 import io.micronaut.aop.introduction.*;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 
 @RepoDef
 interface MyRepo extends DeleteByIdCrudRepo<Integer> {

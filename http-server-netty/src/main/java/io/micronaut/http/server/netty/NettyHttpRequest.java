@@ -28,6 +28,7 @@ import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpVersion;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpParameters;
@@ -204,6 +205,15 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     @Override
     public Optional<Object> getAttribute(CharSequence name) {
         return Optional.ofNullable(getAttributes().getValue(Objects.requireNonNull(name, "Name cannot be null").toString()));
+    }
+
+    @Override
+    public HttpVersion getHttpVersion() {
+        HttpPipelineBuilder.StreamPipeline pipeline = channelHandlerContext.channel().attr(HttpPipelineBuilder.STREAM_PIPELINE_ATTRIBUTE.get()).get();
+        if (pipeline != null) {
+            return pipeline.httpVersion;
+        }
+        return HttpVersion.HTTP_1_1;
     }
 
     @Override

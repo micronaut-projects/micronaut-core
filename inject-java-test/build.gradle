@@ -22,12 +22,19 @@ dependencies {
     testAnnotationProcessor project(":inject-java")
     testCompileOnly project(":inject-groovy")
     testImplementation project(":jackson-databind")
-    testImplementation libs.managed.validation
     testImplementation libs.javax.persistence
     testImplementation project(":runtime")
     testImplementation libs.javax.inject
     testImplementation libs.blaze.persistence.core
     testImplementation libs.smallrye
+
+    testImplementation platform(libs.test.boms.micronaut.validation)
+    testImplementation (libs.micronaut.validation.processor) {
+        exclude group: 'io.micronaut'
+    }
+    testImplementation (libs.micronaut.validation) {
+        exclude group: 'io.micronaut'
+    }
 }
 
 tasks.named("sourcesJar") {

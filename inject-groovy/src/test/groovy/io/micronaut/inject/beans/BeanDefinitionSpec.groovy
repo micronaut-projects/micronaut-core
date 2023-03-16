@@ -243,7 +243,7 @@ class TestBean {
         given:
             BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
 package test;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.List;
 
 @jakarta.inject.Singleton
@@ -268,20 +268,20 @@ interface Deserializer<T> {
             def deserializerTypeParam = definition.getTypeArguments("test.Deserializer")[0]
 
         then: "The first is a placeholder"
-            serdeTypeParam.isTypeVariable() //
-            (serdeTypeParam instanceof GenericPlaceholder)
+            !serdeTypeParam.isTypeVariable() //
+            !(serdeTypeParam instanceof GenericPlaceholder)
         and:
-            serializerTypeParam.isTypeVariable()
-            (serializerTypeParam instanceof GenericPlaceholder)
-            deserializerTypeParam.isTypeVariable()
-            (deserializerTypeParam instanceof GenericPlaceholder)
+            !serializerTypeParam.isTypeVariable()
+            !(serializerTypeParam instanceof GenericPlaceholder)
+            !deserializerTypeParam.isTypeVariable()
+            !(deserializerTypeParam instanceof GenericPlaceholder)
     }
 
     void "test isTypeVariable array"() {
         given:
             BeanDefinition definition = buildBeanDefinition('test', 'Test', '''
 package test;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.List;
 
 @jakarta.inject.Singleton

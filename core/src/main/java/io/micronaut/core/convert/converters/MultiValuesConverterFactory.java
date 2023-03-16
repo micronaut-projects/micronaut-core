@@ -257,15 +257,15 @@ public class MultiValuesConverterFactory {
             ArgumentConversionContext<T> context = (ArgumentConversionContext<T>) conversionContext;
 
             String format = conversionContext.getAnnotationMetadata()
-                    .getValue(Format.class, String.class).orElse(null);
+                    .stringValue(Format.class).orElse(null);
             if (format == null) {
                 return Optional.empty();
             }
 
-            String name = conversionContext.getAnnotationMetadata().getValue(Bindable.class, String.class)
+            String name = conversionContext.getAnnotationMetadata().stringValue(Bindable.class)
                     .orElse(context.getArgument().getName());
             String defaultValue = conversionContext.getAnnotationMetadata()
-                    .getValue(Bindable.class, "defaultValue", String.class)
+                    .stringValue(Bindable.class, "defaultValue")
                     .orElse(null);
 
             switch (normalizeFormatName(format)) {
@@ -524,7 +524,7 @@ public class MultiValuesConverterFactory {
                 Object[] constructorParameters = new Object[constructorArguments.length];
                 for (int i = 0; i < constructorArguments.length; ++i) {
                     Argument<?> argument = constructorArguments[i];
-                    String name = argument.getAnnotationMetadata().getValue(Bindable.class, String.class)
+                    String name = argument.getAnnotationMetadata().stringValue(Bindable.class)
                             .orElse(argument.getName());
                     constructorParameters[i] = conversionService.convert(values.get(name), ConversionContext.of(argument))
                             .orElse(null);
@@ -575,12 +575,12 @@ public class MultiValuesConverterFactory {
             // noinspection unchecked
             ArgumentConversionContext<Object> context = (ArgumentConversionContext<Object>) conversionContext;
 
-            String format = conversionContext.getAnnotationMetadata().getValue(Format.class, String.class).orElse(null);
+            String format = conversionContext.getAnnotationMetadata().stringValue(Format.class).orElse(null);
             if (format == null) {
                 return Optional.empty();
             }
 
-            String name = conversionContext.getAnnotationMetadata().getValue(Bindable.class, String.class)
+            String name = conversionContext.getAnnotationMetadata().stringValue(Bindable.class)
                     .orElse(context.getArgument().getName());
 
             MutableConvertibleMultiValuesMap<String> parameters = new MutableConvertibleMultiValuesMap<>();
@@ -775,7 +775,7 @@ public class MultiValuesConverterFactory {
             }
 
             for (BeanProperty<Object, Object> property: beanWrapper.getBeanProperties()) {
-                String key = property.getValue(Bindable.class, String.class).orElse(property.getName());
+                String key = property.stringValue(Bindable.class).orElse(property.getName());
                 ArgumentConversionContext<String> conversionContext =
                         ConversionContext.STRING.with(property.getAnnotationMetadata());
                 conversionService.convert(property.get(object), conversionContext).ifPresent(value -> {

@@ -25,7 +25,6 @@ $ mn create-app my-app --features config-consul
 
 To enable distributed configuration make sure <<bootstrap>> is enabled and create a `src/main/resources/bootstrap.[yml/toml/properties]` file with the following configuration:
 
-.bootstrap configuration
 [configuration]
 ----
 micronaut:

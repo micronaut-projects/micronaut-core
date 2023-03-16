@@ -34,17 +34,14 @@ import jakarta.inject.Singleton
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.Issue
-import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
-@Retry
 class BinaryWebSocketSpec extends Specification {
 
-    @Retry
     void "test binary websocket exchange"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.builder('micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
@@ -71,7 +68,6 @@ class BinaryWebSocketSpec extends Specification {
             fred.replies.size() == 1
         }
 
-
         when:"A message is sent"
         fred.send("Hello bob!".bytes)
 
@@ -88,7 +84,6 @@ class BinaryWebSocketSpec extends Specification {
 
         then:
         conditions.eventually {
-
             fred.replies.contains("[bob] Hi fred. How are things?")
             fred.replies.size() == 2
             bob.replies.contains("[fred] Hello bob!")
@@ -101,8 +96,6 @@ class BinaryWebSocketSpec extends Specification {
 
         when:
         bob.close()
-        sleep(1000)
-
 
         then:
         conditions.eventually {

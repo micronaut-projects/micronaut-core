@@ -41,7 +41,6 @@ import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.beans.AbstractInitializableBeanIntrospection;
 import io.micronaut.inject.processing.JavaModelUtils;
-import io.micronaut.inject.visitor.util.VisitorContextUtils;
 import io.micronaut.inject.writer.AbstractAnnotationMetadataWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.DispatchWriter;
@@ -135,7 +134,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         this.introspectionName = computeIntrospectionName(name);
         this.introspectionType = getTypeReferenceForName(introspectionName);
         this.beanType = getTypeReferenceForName(name);
-        this.dispatchWriter = new DispatchWriter(introspectionType);
+        this.dispatchWriter = new DispatchWriter(introspectionType, Type.getType(AbstractInitializableBeanIntrospection.class));
     }
 
     /**
@@ -201,19 +200,6 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             boolean isReadOnly,
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Map<String, ClassElement> typeArguments) {
-
-        MutableAnnotationMetadata.contributeDefaults(
-                this.annotationMetadata,
-                annotationMetadata
-        );
-        if (typeArguments != null) {
-            for (ClassElement element : typeArguments.values()) {
-                VisitorContextUtils.contributeRepeatable(
-                        this.annotationMetadata,
-                        element
-                );
-            }
-        }
 
         int readDispatchIndex = -1;
         if (readMember != null) {
@@ -312,12 +298,12 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             // Run only once
             executed = true;
 
-            // write the reference
-            writeIntrospectionReference(classWriterOutputVisitor);
-            loadTypeMethods.clear();
-            // write the introspection
+            // First write the introspection for the annotation metadata can be populated with defaults that reference will contain
             writeIntrospectionClass(classWriterOutputVisitor);
 
+            loadTypeMethods.clear();
+            // Second write the reference
+            writeIntrospectionReference(classWriterOutputVisitor);
         }
     }
 
@@ -334,6 +320,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                 Type args = Type.getType(Argument[].class);
                 classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_CONSTRUCTOR_ARGUMENTS, args.getDescriptor(), null, null);
                 pushBuildArgumentsForMethod(
+                        annotationMetadata,
                         introspectionType.getClassName(),
                         introspectionType,
                         classWriter,
@@ -414,6 +401,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         staticInit.dup();
 
         pushCreateArgument(
+                annotationMetadata,
                 beanType.getClassName(),
                 introspectionType,
                 classWriter,
@@ -449,7 +437,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         staticInit.dup();
         // 1: return argument
         ClassElement genericReturnType = beanMethodData.methodElement.getGenericReturnType();
-        pushReturnTypeArgument(introspectionType, classWriter, staticInit, classElement.getName(), genericReturnType, defaults, loadTypeMethods);
+        pushReturnTypeArgument(annotationMetadata, introspectionType, classWriter, staticInit, classElement.getName(), genericReturnType, defaults, loadTypeMethods);
         // 2: name
         staticInit.push(beanMethodData.methodElement.getName());
         // 3: annotation metadata
@@ -459,6 +447,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             staticInit.push((String) null);
         } else {
             pushBuildArgumentsForMethod(
+                    annotationMetadata,
                     beanType.getClassName(),
                     introspectionType,
                     classWriter,
@@ -574,6 +563,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
         dispatchWriter.buildDispatchOneMethod(classWriter);
         dispatchWriter.buildDispatchMethod(classWriter);
+        dispatchWriter.buildGetTargetMethodByIndex(classWriter);
         buildPropertyIndexOfMethod(classWriter);
         buildFindIndexedProperty(classWriter);
         buildGetIndexedProperties(classWriter);
@@ -916,6 +906,11 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     }
 
     private void pushAnnotationMetadata(ClassWriter classWriter, GeneratorAdapter staticInit, AnnotationMetadata annotationMetadata) {
+        MutableAnnotationMetadata.contributeDefaults(
+            this.annotationMetadata,
+            annotationMetadata
+        );
+
         annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         if (annotationMetadata.isEmpty()) {
             staticInit.push((String) null);
@@ -970,22 +965,6 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      */
     void visitConstructor(MethodElement constructor) {
         this.constructor = constructor;
-        processAnnotationDefaults(constructor);
-    }
-
-    private void processAnnotationDefaults(MethodElement constructor) {
-        if (constructor != null) {
-            MutableAnnotationMetadata.contributeDefaults(
-                this.annotationMetadata,
-                constructor.getAnnotationMetadata().getTargetAnnotationMetadata()
-            );
-            for (ParameterElement parameter : constructor.getParameters()) {
-                MutableAnnotationMetadata.contributeDefaults(
-                    this.annotationMetadata,
-                    parameter.getAnnotationMetadata().getTargetAnnotationMetadata()
-                );
-            }
-        }
     }
 
     /**
@@ -995,29 +974,20 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      */
     void visitDefaultConstructor(MethodElement constructor) {
         this.defaultConstructor = constructor;
-        processAnnotationDefaults(constructor);
     }
 
-    private static final class ExceptionDispatchTarget implements DispatchWriter.DispatchTarget {
+    private record ExceptionDispatchTarget(Class<?> exceptionType, String message) implements DispatchWriter.DispatchTarget {
 
-        private final Class<?> exceptionType;
-        private final String message;
+            @Override
+            public boolean supportsDispatchOne() {
+                return true;
+            }
 
-        private ExceptionDispatchTarget(Class<?> exceptionType, String message) {
-            this.exceptionType = exceptionType;
-            this.message = message;
+            @Override
+            public void writeDispatchOne(GeneratorAdapter writer, int index) {
+                writer.throwException(Type.getType(exceptionType), message);
+            }
         }
-
-        @Override
-        public boolean supportsDispatchOne() {
-            return true;
-        }
-
-        @Override
-        public void writeDispatchOne(GeneratorAdapter writer) {
-            writer.throwException(Type.getType(exceptionType), message);
-        }
-    }
 
     /**
      * Copy constructor "with" method writer.
@@ -1038,7 +1008,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         }
 
         @Override
-        public void writeDispatchOne(GeneratorAdapter writer) {
+        public void writeDispatchOne(GeneratorAdapter writer, int index) {
             // In this case we have to do the copy constructor approach
             Set<BeanPropertyData> constructorProps = new HashSet<>();
 
@@ -1148,7 +1118,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                         if (writeDispatch instanceof DispatchWriter.MethodDispatchTarget) {
                             MethodElement writeMethod = ((DispatchWriter.MethodDispatchTarget) writeDispatch).getMethodElement();
                             ClassElement writeReturnType = invokeMethod(writer, writeMethod);
-                            if (!writeReturnType.getName().equals("void")) {
+                            if (!writeReturnType.isVoid()) {
                                 writer.pop();
                             }
                         } else if (writeDispatch instanceof DispatchWriter.FieldSetDispatchTarget) {

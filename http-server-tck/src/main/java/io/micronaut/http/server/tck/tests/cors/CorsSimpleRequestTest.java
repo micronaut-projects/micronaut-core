@@ -28,20 +28,22 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.client.multipart.MultipartBody;
-import io.micronaut.http.server.tck.AssertionUtils;
-import io.micronaut.http.server.tck.HttpResponseAssertion;
-import io.micronaut.http.server.tck.RequestSupplier;
-import io.micronaut.http.server.tck.ServerUnderTest;
+import io.micronaut.http.server.tck.CorsAssertion;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-
+import io.micronaut.http.tck.ServerUnderTest;
+import io.micronaut.http.tck.RequestSupplier;
 import java.io.IOException;
 import java.util.Collections;
 
-import static io.micronaut.http.server.tck.TestScenario.asserts;
-import static org.junit.jupiter.api.Assertions.*;
+import io.micronaut.http.tck.AssertionUtils;
+import io.micronaut.http.tck.HttpResponseAssertion;
+import static io.micronaut.http.tck.TestScenario.asserts;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 @SuppressWarnings({
     "java:S2259", // The tests will show if it's null
@@ -52,6 +54,7 @@ public class CorsSimpleRequestTest {
 
     private static final String SPECNAME = "CorsSimpleRequestTest";
     private static final String PROPERTY_MICRONAUT_SERVER_CORS_ENABLED = "micronaut.server.cors.enabled";
+    private static final String PROPERTY_MICRONAUT_SERVER_CORS_LOCALHOST_PASS_THROUGH = "micronaut.server.cors.localhost-pass-through";
 
     /**
      * @see <a href="https://github.com/micronaut-projects/micronaut-core/security/advisories/GHSA-583g-g682-crxf">GHSA-583g-g682-crxf</a>
@@ -67,11 +70,31 @@ public class CorsSimpleRequestTest {
      * @throws IOException may throw the try for resources
      */
     @Test
+    @Tag("multipart")
     void corsSimpleRequestNotAllowedForLocalhostAndAny() throws IOException {
         asserts(SPECNAME,
             Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
             createRequest("https://foo.com"),
             CorsSimpleRequestTest::isForbidden
+        );
+    }
+
+    /**
+     * Test that a simple request is allowed for localhost and origin:any when specifically turned off.
+     * @see <a href="https://github.com/micronaut-projects/micronaut-core/pull/8751">PR-8751</a>
+     *
+     * @throws IOException
+     */
+    @Test
+    @Tag("multipart")
+    void corsSimpleRequestAllowedForLocalhostAndAnyWhenSpecificallyTurnedOff() throws IOException {
+        asserts(SPECNAME,
+            CollectionUtils.mapOf(
+                PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE,
+                PROPERTY_MICRONAUT_SERVER_CORS_LOCALHOST_PASS_THROUGH, StringUtils.TRUE
+            ),
+            createRequest("https://foo.com"),
+            CorsSimpleRequestTest::isSuccessful
         );
     }
 
@@ -89,6 +112,7 @@ public class CorsSimpleRequestTest {
      * @throws IOException may throw the try for resources
      */
     @Test
+    @Tag("multipart")
     void corsSimpleRequestNotAllowedFor127AndAny() throws IOException {
         asserts(SPECNAME,
             Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
@@ -102,6 +126,7 @@ public class CorsSimpleRequestTest {
      * @throws IOException scenario step fails
      */
     @Test
+    @Tag("multipart")
     void corsSimpleRequestAllowedForLocalhostAndOriginLocalhost() throws IOException {
         asserts(SPECNAME,
             Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
@@ -116,6 +141,7 @@ public class CorsSimpleRequestTest {
      * @throws IOException
      */
     @Test
+    @Tag("multipart")
     void corsSimpleRequestAllowedForLocalhostAnd127Origin() throws IOException {
         asserts(SPECNAME,
             Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
@@ -130,6 +156,7 @@ public class CorsSimpleRequestTest {
      * @throws IOException
      */
     @Test
+    @Tag("multipart")
     void corsSimpleRequestFailsForLocalhostAndSpoofed127Origin() throws IOException {
         asserts(SPECNAME,
             Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
@@ -144,6 +171,7 @@ public class CorsSimpleRequestTest {
      * @throws IOException
      */
     @Test
+    @Tag("multipart")
     void corsSimpleRequestAllowedFor127RequestAndLocalhostOrigin() throws IOException {
         asserts(SPECNAME,
             Collections.singletonMap(PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
@@ -157,6 +185,7 @@ public class CorsSimpleRequestTest {
      * @throws IOException may throw the try for resources
      */
     @Test
+    @Tag("multipart")
     void corsSimpleRequestForLocalhostCanBeAllowedViaConfiguration() throws IOException {
         asserts(SPECNAME,
             CollectionUtils.mapOf(
@@ -171,14 +200,12 @@ public class CorsSimpleRequestTest {
 
                 AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                     .status(HttpStatus.OK)
-                    .assertResponse(response -> {
-                        assertNotNull(response.getHeaders().get("Access-Control-Allow-Origin"));
-                        assertNotNull(response.getHeaders().get("Vary"));
-                        assertNotNull(response.getHeaders().get("Access-Control-Allow-Credentials"));
-                        assertNull(response.getHeaders().get("Access-Control-Allow-Methods"));
-                        assertNull(response.getHeaders().get("Access-Control-Allow-Headers"));
-                        assertNull(response.getHeaders().get("Access-Control-Max-Age"));
-                    })
+                    .assertResponse(response -> CorsAssertion.builder()
+                        .vary("Origin")
+                        .allowCredentials()
+                        .allowOrigin("https://foo.com")
+                        .build()
+                        .validate(response))
                     .build());
                 assertEquals(1, refreshCounter.getRefreshCount());
             });

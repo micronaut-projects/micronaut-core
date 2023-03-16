@@ -25,6 +25,6 @@ import io.micronaut.core.annotation.AnnotationMetadataProvider;
  * @author graemerocher
  * @since 2.0
  */
-public interface HttpServerFilterResolver<T extends AnnotationMetadataProvider> extends HttpFilterResolver<HttpFilter, T> {
+public interface HttpServerFilterResolver<T extends AnnotationMetadataProvider> extends HttpFilterResolver<T> {
 }
 

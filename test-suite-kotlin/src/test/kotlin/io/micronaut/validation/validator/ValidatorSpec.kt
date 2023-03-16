@@ -4,7 +4,7 @@ import io.micronaut.context.ApplicationContext
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.fail
-import javax.validation.ConstraintViolationException
+import jakarta.validation.ConstraintViolationException
 
 class ValidatorSpec {
 

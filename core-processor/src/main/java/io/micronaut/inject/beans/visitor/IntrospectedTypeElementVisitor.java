@@ -36,6 +36,8 @@ import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ClassGenerationException;
 
 import java.io.IOException;
+import java.lang.annotation.Annotation;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -43,6 +45,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 
 /**
  * A {@link TypeElementVisitor} that visits classes annotated with {@link Introspected} and produces
@@ -59,15 +62,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
      */
     public static final int POSITION = -100;
 
-    private static final String JAVAX_VALIDATION_CONSTRAINT = "javax.validation.Constraint";
-    private static final AnnotationValue<Introspected.IndexedAnnotation> ANN_CONSTRAINT = AnnotationValue.builder(Introspected.IndexedAnnotation.class)
-        .member("annotation", new AnnotationClassValue<>(JAVAX_VALIDATION_CONSTRAINT))
-        .build();
-    private static final String JAVAX_VALIDATION_VALID = "javax.validation.Valid";
-    private static final AnnotationValue<Introspected.IndexedAnnotation> ANN_VALID = AnnotationValue.builder(Introspected.IndexedAnnotation.class)
-        .member("annotation", new AnnotationClassValue<>(JAVAX_VALIDATION_VALID))
-        .build();
-
     private final Map<String, BeanIntrospectionWriter> writers = new LinkedHashMap<>(10);
 
     @Override
@@ -78,7 +72,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
-        if (!element.isPrivate() && element.hasStereotype(Introspected.class)) {
+        if (element.hasStereotype(Introspected.class)) {
             final AnnotationValue<Introspected> introspected = element.getAnnotation(Introspected.class);
             if (introspected != null && !writers.containsKey(element.getName())) {
                 processIntrospected(element, context, introspected);
@@ -92,44 +86,40 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
 
     private void processIntrospected(ClassElement element, VisitorContext context, AnnotationValue<Introspected> introspected) {
         final String[] packages = introspected.stringValues("packages");
-        final AnnotationClassValue[] classes = introspected.get("classes", AnnotationClassValue[].class, new AnnotationClassValue[0]);
+        final List<String> classes = Stream.concat(
+            Arrays.stream(introspected.annotationClassValues("classes")).map(AnnotationClassValue::getName),
+            Arrays.stream(introspected.stringValues("classNames"))
+        ).toList();
         final boolean metadata = introspected.booleanValue("annotationMetadata").orElse(true);
         final Set<String> includedAnnotations = CollectionUtils.setOf(introspected.stringValues("includedAnnotations"));
-        final Set<AnnotationValue> toIndex = CollectionUtils.setOf(introspected.get("indexed", AnnotationValue[].class, new AnnotationValue[0]));
-        final Set<AnnotationValue> indexedAnnotations;
-        if (CollectionUtils.isEmpty(toIndex)) {
-            indexedAnnotations = CollectionUtils.setOf(ANN_CONSTRAINT, ANN_VALID);
-        } else {
-            toIndex.addAll(CollectionUtils.setOf(ANN_CONSTRAINT, ANN_VALID));
-            indexedAnnotations = toIndex;
-        }
+        final Set<AnnotationValue<Annotation>> indexedAnnotations = CollectionUtils.setOf(introspected.get("indexed", AnnotationValue[].class, new AnnotationValue[0]));
 
-        if (ArrayUtils.isNotEmpty(classes)) {
+        if (!classes.isEmpty()) {
             AtomicInteger index = new AtomicInteger(0);
-            for (AnnotationClassValue aClass : classes) {
-                context.getClassElement(aClass.getName()).ifPresent(ce -> {
-                    if (ce.isPublic() && !isIntrospected(context, ce)) {
-                        final AnnotationMetadata typeMetadata = ce.getAnnotationMetadata();
-                        final AnnotationMetadata resolvedMetadata = typeMetadata == AnnotationMetadata.EMPTY_METADATA
-                            ? element.getAnnotationMetadata()
-                            : new AnnotationMetadataHierarchy(element.getAnnotationMetadata(), typeMetadata);
-                        final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
-                            element.getName(),
-                            index.getAndIncrement(),
-                            element,
-                            ce,
-                            metadata ? resolvedMetadata : null
-                        );
+            classes.stream().flatMap(className -> context.getClassElement(className).stream()).forEach(ce -> {
+                if (isIntrospected(context, ce)) {
+                    return;
+                }
+                final AnnotationMetadata typeMetadata = ce.getAnnotationMetadata();
+                final AnnotationMetadata resolvedMetadata = typeMetadata == AnnotationMetadata.EMPTY_METADATA
+                    ? element.getAnnotationMetadata()
+                    : new AnnotationMetadataHierarchy(element.getAnnotationMetadata(), typeMetadata);
+                final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
+                    element.getName(),
+                    index.getAndIncrement(),
+                    element,
+                    ce,
+                    metadata ? resolvedMetadata : null
+                );
 
-                        processElement(
-                            metadata,
-                            indexedAnnotations,
-                            ce,
-                            writer
-                        );
-                    }
-                });
-            }
+                processElement(
+                    metadata,
+                    indexedAnnotations,
+                    getExternalPropertyElementQuery(element, ce),
+                    ce,
+                    writer
+                );
+            });
         } else if (ArrayUtils.isNotEmpty(packages)) {
             if (includedAnnotations.isEmpty()) {
                 context.fail("When specifying 'packages' you must also specify 'includedAnnotations' to limit scanning", element);
@@ -149,7 +139,11 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                             metadata ? element.getAnnotationMetadata() : null
                         );
 
-                        processElement(metadata, indexedAnnotations, classElement, writer);
+                        processElement(metadata,
+                            indexedAnnotations,
+                            getExternalPropertyElementQuery(element, classElement),
+                            classElement,
+                            writer);
                     }
                 }
             }
@@ -160,6 +154,12 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             );
             processElement(metadata, indexedAnnotations, element, writer);
         }
+    }
+
+    @NonNull
+    private static PropertyElementQuery getExternalPropertyElementQuery(ClassElement defined, ClassElement current) {
+        AnnotationMetadataHierarchy hierarchy = new AnnotationMetadataHierarchy(defined, current);
+        return PropertyElementQuery.of(hierarchy).ignoreSettersWithDifferingType(true);
     }
 
     @NonNull
@@ -186,11 +186,22 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     }
 
     private void processElement(boolean metadata,
-                                Set<AnnotationValue> indexedAnnotations,
+                                Set<AnnotationValue<Annotation>> indexedAnnotations,
                                 ClassElement ce,
                                 BeanIntrospectionWriter writer) {
-        PropertyElementQuery query = PropertyElementQuery.of(ce).ignoreSettersWithDifferingType(true);
-        List<PropertyElement> beanProperties = ce.getBeanProperties(query).stream()
+        processElement(metadata,
+            indexedAnnotations,
+            PropertyElementQuery.of(ce).ignoreSettersWithDifferingType(true),
+            ce,
+            writer);
+    }
+
+    private void processElement(boolean metadata,
+                                Set<AnnotationValue<Annotation>> indexedAnnotations,
+                                PropertyElementQuery propertyElementQuery,
+                                ClassElement ce,
+                                BeanIntrospectionWriter writer) {
+        List<PropertyElement> beanProperties = ce.getBeanProperties(propertyElementQuery).stream()
             .filter(p -> !p.isExcluded())
             .toList();
         Optional<MethodElement> constructorElement = ce.getPrimaryConstructor();
@@ -261,9 +272,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             });
         }
         ElementQuery<MethodElement> query = ElementQuery.of(MethodElement.class)
-            .onlyAccessible()
-            .modifiers((modifiers) -> !modifiers.contains(ElementModifier.STATIC))
-            .annotated((am) -> am.hasStereotype(Executable.class));
+            .modifiers(modifiers -> !modifiers.contains(ElementModifier.STATIC))
+            .annotated(am -> am.hasStereotype(Executable.class));
         List<MethodElement> executableMethods = ce.getEnclosedElements(query);
         for (MethodElement executableMethod : executableMethods) {
             if (added.contains(executableMethod)) {

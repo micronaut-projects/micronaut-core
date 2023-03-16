@@ -46,7 +46,6 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
     private final DispatchedExecutableMethod<T, ?>[] executableMethods;
     private Environment environment;
     private List<DispatchedExecutableMethod<T, ?>> executableMethodsList;
-    private Method[] reflectiveMethods;
 
     protected AbstractExecutableMethodsDefinition(MethodReference[] methodsReferences) {
         this.methodsReferences = methodsReferences;
@@ -163,17 +162,11 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
     // this logic must allow reflection
     @SuppressWarnings("java:S3011")
     protected final Method getAccessibleTargetMethodByIndex(int index) {
-        if (reflectiveMethods == null) {
-            reflectiveMethods = new Method[methodsReferences.length];
+        Method method = getTargetMethodByIndex(index);
+        if (ClassUtils.REFLECTION_LOGGER.isDebugEnabled()) {
+            ClassUtils.REFLECTION_LOGGER.debug("Reflectively accessing method {} of type {}", method, method.getDeclaringClass());
         }
-        Method method = reflectiveMethods[index];
-        if (method == null) {
-            method = getTargetMethodByIndex(index);
-            if (ClassUtils.REFLECTION_LOGGER.isDebugEnabled()) {
-                ClassUtils.REFLECTION_LOGGER.debug("Reflectively accessing method {} of type {}", method, method.getDeclaringClass());
-            }
-            method.setAccessible(true);
-        }
+        method.setAccessible(true);
         return method;
     }
 

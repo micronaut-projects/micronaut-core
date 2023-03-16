@@ -468,4 +468,28 @@ public class ReflectionUtils {
             throw new InvocationException("Exception occurred getting a field [" + fieldName + "] of class [" + clazz + "]: " + e.getMessage(), e);
         }
     }
+
+    /**
+     * Sets the value of the given field reflectively.
+     * @param clazz The class
+     * @param fieldName The fieldName
+     * @param instance The instance
+     * @param value The value
+     * @since 4.0.0
+     */
+    public static void setField(@NonNull Class<?> clazz,
+                                @NonNull String fieldName,
+                                @NonNull Object instance,
+                                @Nullable Object value) {
+        try {
+            Field field = findField(clazz, fieldName)
+                .orElseThrow(() -> new IllegalStateException("Field with name: " + fieldName + " not found in class: " + clazz));
+            ClassUtils.REFLECTION_LOGGER.debug("Reflectively setting field {} to value {} on object {}", field, value, value);
+            field.setAccessible(true);
+            field.set(instance, value);
+        } catch (Throwable e) {
+            throw new InvocationException("Exception occurred setting field [" + fieldName + "]: " + e.getMessage(), e);
+        }
+    }
+
 }

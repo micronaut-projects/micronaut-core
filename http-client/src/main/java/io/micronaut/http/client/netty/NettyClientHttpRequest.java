@@ -65,7 +65,7 @@ import java.util.Set;
  * @since 1.0
  */
 @Internal
-class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpRequestBuilder {
+public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpRequestBuilder {
 
     static final CharSequence CHANNEL = "netty_channel";
     private final NettyHttpHeaders headers = new NettyHttpHeaders();

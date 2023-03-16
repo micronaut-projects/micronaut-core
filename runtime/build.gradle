@@ -13,8 +13,6 @@ dependencies {
     api project(':inject')
     api project(':retry')
 
-    api libs.managed.validation
-
     implementation libs.managed.reactor
 
     compileOnly libs.graal
@@ -49,8 +47,8 @@ spotless {
     }
 }
 
-tasks.withType(Test) {
-    if(JavaVersion.current().majorVersion.toInteger() >= 17) {
+tasks.withType(Test).configureEach {
+    if (JavaVersion.current().majorVersion.toInteger() >= 17) {
         logger.warn("Opening java.util, so SystemLambda can work")
         jvmArgs += ['--add-opens', 'java.base/java.util=ALL-UNNAMED']
     }

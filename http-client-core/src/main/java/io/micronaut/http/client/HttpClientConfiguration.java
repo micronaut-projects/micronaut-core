@@ -237,6 +237,8 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * [available in the Netty HTTP client].
+     *
      * @return The trace logging level
      */
     public Optional<LogLevel> getLogLevel() {
@@ -253,6 +255,8 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * [available in the Netty HTTP client].
+     *
      * @return The event loop group to use.
      */
     public String getEventLoopGroup() {
@@ -339,6 +343,8 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * [available in the Netty HTTP client].
+     *
      * @return The default charset to use
      */
     public Charset getDefaultCharset() {
@@ -355,6 +361,8 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * [available in the Netty HTTP client].
+     *
      * @return The Client channel options.
      */
     public Map<String, Object> getChannelOptions() {
@@ -378,6 +386,7 @@ public abstract class HttpClientConfiguration {
     /**
      * For streaming requests and WebSockets, the {@link #getReadTimeout()} method does not apply instead a configurable
      * idle timeout is applied.
+     * [available in the Netty HTTP client]
      *
      * @return The default amount of time to allow read operation connections  to remain idle
      */
@@ -386,6 +395,8 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * [available in the Netty HTTP client].
+     *
      * @return The idle timeout for connection in the client connection pool. Defaults to 0.
      */
     public Optional<Duration> getConnectionPoolIdleTimeout() {
@@ -400,6 +411,8 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * [available in the Netty HTTP client].
+     *
      * @return The connectTtl.
      */
     public Optional<Duration> getConnectTtl() {
@@ -408,6 +421,7 @@ public abstract class HttpClientConfiguration {
 
     /**
      * The amount of quiet period for shutdown.
+     * [available in the Netty HTTP client]
      *
      * @return The shutdown timeout
      */
@@ -417,6 +431,7 @@ public abstract class HttpClientConfiguration {
 
     /**
      * The amount of time to wait for shutdown.
+     * [available in the Netty HTTP client]
      *
      * @return The shutdown timeout
      */
@@ -490,6 +505,8 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * [available in the Netty HTTP client].
+     *
      * @return The number of threads the client should use for requests
      */
     public OptionalInt getNumOfThreads() {
@@ -506,6 +523,8 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * [available in the Netty HTTP client].
+     *
      * @return An {@link Optional} {@code ThreadFactory}
      */
     public Optional<Class<? extends ThreadFactory>> getThreadFactory() {
@@ -522,6 +541,8 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * [available in the Netty HTTP client].
+     *
      * @return The maximum content length the client can consume
      */
     public int getMaxContentLength() {
@@ -662,6 +683,8 @@ public abstract class HttpClientConfiguration {
      * <br>
      * <b>Note: If {@link #httpVersion} is set, this setting is ignored!</b>
      *
+     * [available in the Netty HTTP client].
+     *
      * @return The plaintext connection mode.
      * @since 4.0.0
      */
@@ -687,6 +710,7 @@ public abstract class HttpClientConfiguration {
      * TLS cipher suites to those supported by the HTTP 2 standard.
      * <br>
      * <b>Note: If {@link #httpVersion} is set, this setting is ignored!</b>
+     * [available in the Netty HTTP client].
      *
      * @return The supported ALPN protocols.
      * @since 4.0.0
@@ -738,7 +762,7 @@ public abstract class HttpClientConfiguration {
 
         /**
          * Whether connection pooling is enabled.
-         *
+         * [available in the Netty HTTP client]
          * @return True if connection pooling is enabled
          */
         @Override
@@ -757,7 +781,7 @@ public abstract class HttpClientConfiguration {
 
         /**
          * Maximum number of futures awaiting connection acquisition. Defaults to no maximum.
-         *
+         * [available in the Netty HTTP client]
          * @return The max pending requires
          */
         public int getMaxPendingAcquires() {
@@ -775,7 +799,7 @@ public abstract class HttpClientConfiguration {
 
         /**
          * The time to wait to acquire a connection.
-         *
+         * [available in the Netty HTTP client]
          * @return The timeout as a duration.
          */
         public Optional<Duration> getAcquireTimeout() {
@@ -794,7 +818,7 @@ public abstract class HttpClientConfiguration {
         /**
          * The maximum number of <i>pending</i> (new) connections before they are assigned to a
          * pool.
-         *
+         * [available in the Netty HTTP client]
          * @return The maximum number of pending connections
          * @since 4.0.0
          */
@@ -816,7 +840,7 @@ public abstract class HttpClientConfiguration {
         /**
          * The maximum number of requests (streams) that can run concurrently on one HTTP2
          * connection.
-         *
+         * [available in the Netty HTTP client]
          * @return The maximum concurrent request count
          * @since 4.0.0
          */
@@ -837,7 +861,7 @@ public abstract class HttpClientConfiguration {
 
         /**
          * The maximum number of concurrent HTTP1 connections in the pool.
-         *
+         * [available in the Netty HTTP client]
          * @return The maximum concurrent connection count
          * @since 4.0.0
          */
@@ -857,7 +881,7 @@ public abstract class HttpClientConfiguration {
 
         /**
          * The maximum number of concurrent HTTP2 connections in the pool.
-         *
+         * [available in the Netty HTTP client]
          * @return The maximum concurrent connection count
          * @since 4.0.0
          */
