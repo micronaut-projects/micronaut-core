@@ -359,7 +359,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                         //if oncomplete gets called before the message is written the promise
                         //set to lastWriteFuture shouldn't complete until the first content is written
                         lastWriteFuture = messageWritePromise;
-                        ctx.writeAndFlush(message).addListener(f -> super.onNext(httpContent, messageWritePromise));
+                        ctx.writeAndFlush(message).addListener(f -> onNext(httpContent, messageWritePromise));
                     } else {
                         super.onNext(httpContent);
                     }

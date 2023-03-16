@@ -27,10 +27,10 @@ micronaut:
         urls:
           - http://foo1
           - http://foo2
-        read-timeout: 5s # <1>
+        read-timeout: 5s
 ----
 
-<1> The read timeout is applied to the `foo` client.
+- The `read-timeout` is applied to the `foo` client.
 
 WARN: This client configuration can be used in conjunction with the `@Client` annotation, either by injecting an `HttpClient` directly or use on a client interface. In any case, all other attributes on the annotation *will be ignored* except the service id.
 
@@ -98,10 +98,13 @@ micronaut:
           - http://foo1
           - http://foo2
         pool:
-          max-concurrent-http1-connections: 50 # <1>
+          max-concurrent-http1-connections: 50
+          enabled: true
+          max-connections: 50
 ----
-
-<1> Limit maximum concurrent HTTP/1.1 connections
+- Limit maximum concurrent HTTP/1.1 connections
+- `max-concurrent-http1-connections` limits the maximum concurrent HTTP/1.1 connections to 50.
+- `pool` enables the pool and sets the maximum number of connections for it
 
 See the API for link:{api}/io/micronaut/http/client/HttpClientConfiguration.ConnectionPoolConfiguration.html[ConnectionPoolConfiguration] for details on available pool configuration options.
 

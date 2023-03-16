@@ -580,4 +580,11 @@ class Test {
             values["annotationsArray1"] == new AnnotationValue[0]
             values["annotationsArray2"] == new AnnotationValue[] { AnnotationValue.builder(MyAnnotation3).value("foo").build(), AnnotationValue.builder(MyAnnotation3).value("bar").build() }
     }
+
+    void "test synthesize"() {
+        when:
+            def annotationValue = AnnotationValue.builder(jakarta.inject.Named.class).value("Denis").build()
+        then:
+            AnnotationMetadataSupport.buildAnnotation(jakarta.inject.Named.class, annotationValue).value() == "Denis"
+    }
 }

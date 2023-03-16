@@ -31,7 +31,6 @@ import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.annotation.AnnotatedElementValidator;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -60,7 +59,6 @@ import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
 import java.lang.annotation.Annotation;
-import java.lang.annotation.Inherited;
 import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -121,7 +119,8 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         if (member != null) {
             final List<AnnotationNode> annotations = member.getAnnotations();
             if (CollectionUtils.isNotEmpty(annotations)) {
-                return annotations.stream().anyMatch((it) -> it.getClassNode().getName().startsWith("javax.validation"));
+                return annotations.stream().anyMatch((it) ->
+                    it.getClassNode().getName().startsWith("jakarta.validation"));
             }
         }
         return false;
@@ -376,9 +375,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
                 if (expression instanceof ConstantExpression constantExpression) {
                     final Object v = constantExpression.getValue();
                     if (v instanceof String s) {
-                        if (StringUtils.isNotEmpty(s)) {
-                            defaultValues.put(method, new ConstantExpression(v));
-                        }
+                        defaultValues.put(method, new ConstantExpression(s));
                     } else if (v != null) {
                         defaultValues.put(method, expression);
                     }
@@ -386,41 +383,6 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             }
         }
         return defaultValues;
-    }
-
-    @Override
-    protected boolean isInheritedAnnotation(@NonNull AnnotationNode annotationMirror) {
-        final List<AnnotationNode> annotations = annotationMirror.getClassNode().getAnnotations();
-        if (CollectionUtils.isNotEmpty(annotations)) {
-            return annotations.stream().anyMatch((ann) ->
-                    ann.getClassNode().getName().equals(Inherited.class.getName())
-            );
-        }
-        return false;
-    }
-
-    @Override
-    protected Map<String, ? extends AnnotatedNode> getAnnotationMembers(String annotationType) {
-        final AnnotatedNode node = getAnnotationMirror(annotationType).orElse(null);
-        if (node instanceof final ClassNode cn) {
-            if (cn.isAnnotationDefinition()) {
-                return cn.getDeclaredMethodsMap();
-            }
-        }
-        return Collections.emptyMap();
-    }
-
-    @Override
-    protected boolean hasSimpleAnnotation(AnnotatedNode element, String simpleName) {
-        if (element != null) {
-            final List<AnnotationNode> annotations = element.getAnnotations();
-            for (AnnotationNode ann : annotations) {
-                if (ann.getClassNode().getNameWithoutPackage().equalsIgnoreCase(simpleName)) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     @Override
@@ -555,6 +517,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         }
     }
 
+    @SuppressWarnings("java:S1872")
     private Object convertConstantValue(Object value) {
         if (value instanceof ClassNode classNode) {
             return new AnnotationClassValue<>(classNode.getName());
@@ -597,7 +560,8 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     @Override
     protected <K extends Annotation> Optional<AnnotationValue<K>> getAnnotationValues(AnnotatedNode originatingElement, AnnotatedNode member, Class<K> annotationType) {
         if (member != null) {
-            final List<AnnotationNode> anns = member.getAnnotations(ClassHelper.make(annotationType));
+            ClassNode annotationTypeNode = ClassHelper.make(annotationType);
+            final List<AnnotationNode> anns = member.getAnnotations(annotationTypeNode);
             if (CollectionUtils.isNotEmpty(anns)) {
                 AnnotationNode ann = anns.get(0);
                 Map<CharSequence, Object> converted = new LinkedHashMap<>();
@@ -607,6 +571,17 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
                     Expression value = entry.getValue();
                     AnnotatedNode annotationMember = annotationNode.getMethod(key, new Parameter[0]);
                     readAnnotationRawValues(originatingElement, annotationType.getName(), annotationMember, key, value, converted);
+                }
+                Map<CharSequence, Object> annotationDefaults = getCachedAnnotationDefaults(annotationType.getName(), annotationTypeNode);
+                if (!annotationDefaults.isEmpty()) {
+                    Iterator<Map.Entry<CharSequence, Object>> i = converted.entrySet().iterator();
+                    while (i.hasNext()) {
+                        Map.Entry<CharSequence, Object> next = i.next();
+                        Object v = annotationDefaults.get(next.getKey());
+                        if (v != null && v.equals(next.getValue())) {
+                            i.remove();
+                        }
+                    }
                 }
                 return Optional.of(AnnotationValue.builder(annotationType).members(converted).build());
             }

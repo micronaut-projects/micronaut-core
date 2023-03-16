@@ -34,6 +34,9 @@ import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+import io.netty.incubator.codec.http3.Http3;
+import io.netty.incubator.codec.quic.QuicSslContext;
+import io.netty.incubator.codec.quic.QuicSslContextBuilder;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -119,6 +122,24 @@ public final class NettyClientSslBuilder extends SslBuilder<SslContext> {
         } catch (SSLException ex) {
             throw new SslConfigurationException("An error occurred while setting up SSL", ex);
         }
+    }
+
+    public QuicSslContext buildHttp3(SslConfiguration ssl) {
+        QuicSslContextBuilder sslBuilder = QuicSslContextBuilder.forClient()
+            .keyManager(getKeyManagerFactory(ssl), ssl.getKeyStore().getPassword().orElse(null))
+            .trustManager(getTrustManagerFactory(ssl))
+            .applicationProtocols(Http3.supportedApplicationProtocols());
+        Optional<ClientAuthentication> clientAuthentication = ssl.getClientAuthentication();
+        if (clientAuthentication.isPresent()) {
+            ClientAuthentication clientAuth = clientAuthentication.get();
+            if (clientAuth == ClientAuthentication.NEED) {
+                sslBuilder.clientAuth(ClientAuth.REQUIRE);
+            } else if (clientAuth == ClientAuthentication.WANT) {
+                sslBuilder.clientAuth(ClientAuth.OPTIONAL);
+            }
+        }
+
+        return sslBuilder.build();
     }
 
     @Override

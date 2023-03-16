@@ -218,9 +218,9 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         return element
     }
 
-
+    @CompileStatic
     protected AnnotationMetadata writeAndLoadMetadata(String className, AnnotationMetadata toWrite) {
-        def stream = new ByteArrayOutputStream()
+        ByteArrayOutputStream stream = new ByteArrayOutputStream()
         new AnnotationMetadataWriter(className, null, toWrite, true)
                 .writeTo(stream)
         className = className + AnnotationMetadata.CLASS_NAME_SUFFIX
@@ -228,8 +228,8 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
             @Override
             protected Class<?> findClass(String name) throws ClassNotFoundException {
                 if (name == className) {
-                    def bytes = stream.toByteArray()
-                    return defineClass(name, bytes, 0, bytes.length)
+                    byte[] bytes = stream.toByteArray()
+                    return super.defineClass(name, bytes, 0, bytes.length)
                 }
                 return super.findClass(name)
             }

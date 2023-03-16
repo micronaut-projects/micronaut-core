@@ -17,7 +17,7 @@ package io.micronaut.docs.ioc.validation.custom
 
 import java.time.Duration
 import jakarta.inject.Singleton
-import javax.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotBlank
 
 // tag::class[]
 @Singleton

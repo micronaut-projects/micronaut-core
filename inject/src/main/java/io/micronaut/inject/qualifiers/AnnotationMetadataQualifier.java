@@ -34,7 +34,7 @@ import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -166,8 +166,8 @@ final class AnnotationMetadataQualifier<T> implements Qualifier<T> {
 
     @NonNull
     private static Set<String> resolveNonBindingMembers(AnnotationMetadata annotationMetadata) {
-        final String[] nonBindingArray = annotationMetadata.stringValues(AnnotationUtil.QUALIFIER, "nonBinding");
-        return ArrayUtils.isNotEmpty(nonBindingArray) ? new HashSet<>(Arrays.asList(nonBindingArray)) : Collections.emptySet();
+        final String[] nonBindingArray = annotationMetadata.stringValues(AnnotationUtil.QUALIFIER, AnnotationUtil.NON_BINDING_ATTRIBUTE);
+        return ArrayUtils.isNotEmpty(nonBindingArray) ? new LinkedHashSet<>(Arrays.asList(nonBindingArray)) : Collections.emptySet();
     }
 
     @Override

@@ -46,6 +46,7 @@ public @interface Replaces {
     /**
      * @return The bean type that this bean replaces
      */
+    @AliasFor(member = "value")
     Class<?> bean() default void.class;
 
     /**

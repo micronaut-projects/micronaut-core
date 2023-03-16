@@ -18,6 +18,7 @@ package io.micronaut.ast.groovy.visitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.FieldElement;
@@ -41,6 +42,12 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
 
     private final GroovyClassElement owningType;
     private final FieldNode fieldNode;
+    @Nullable
+    private GroovyClassElement declaringType;
+    @Nullable
+    private ClassElement type;
+    @Nullable
+    private ClassElement genericType;
 
     /**
      * @param visitorContext            The visitor context
@@ -145,24 +152,34 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     @NonNull
     @Override
     public ClassElement getType() {
-        return newClassElement(fieldNode.getType());
+        if (type == null) {
+            type = newClassElement(fieldNode.getType());
+        }
+        return type;
     }
 
     @Override
     public ClassElement getGenericType() {
-        return newClassElement(fieldNode.getType(), getDeclaringType().getTypeArguments());
+        if (genericType == null) {
+            genericType = newClassElement(fieldNode.getType(), getDeclaringType().getTypeArguments());
+        }
+        return genericType;
     }
 
     @Override
     public GroovyClassElement getDeclaringType() {
-        ClassNode declaringClass = fieldNode.getDeclaringClass();
-        if (declaringClass == null) {
-            throw new IllegalStateException("Declaring class could not be established");
+        if (declaringType == null) {
+            ClassNode declaringClass = fieldNode.getDeclaringClass();
+            if (declaringClass == null) {
+                throw new IllegalStateException("Declaring class could not be established");
+            }
+            if (owningType.getNativeType().annotatedNode().equals(declaringClass)) {
+                declaringType = owningType;
+            } else {
+                Map<String, ClassElement> typeArguments = getOwningType().getTypeArguments(declaringClass.getName());
+                declaringType = (GroovyClassElement) newClassElement(declaringClass, typeArguments);
+            }
         }
-        if (owningType.getNativeType().annotatedNode().equals(declaringClass)) {
-            return owningType;
-        }
-        Map<String, ClassElement> typeArguments = getOwningType().getTypeArguments(declaringClass.getName());
-        return (GroovyClassElement) newClassElement(declaringClass, typeArguments);
+        return declaringType;
     }
 }

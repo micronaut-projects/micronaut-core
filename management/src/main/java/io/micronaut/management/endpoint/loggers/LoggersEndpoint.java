@@ -28,7 +28,7 @@ import io.micronaut.management.endpoint.annotation.Write;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
 
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotBlank;
 import java.util.Map;
 
 /**

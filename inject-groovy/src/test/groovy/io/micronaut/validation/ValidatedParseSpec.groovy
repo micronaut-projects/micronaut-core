@@ -19,13 +19,13 @@ package validateparse1;
 class Test {
 
     @io.micronaut.context.annotation.Executable
-    public void setName(@javax.validation.constraints.NotBlank String name) {
-    
+    public void setName(@jakarta.validation.constraints.NotBlank String name) {
+
     }
-    
+
     @io.micronaut.context.annotation.Executable
-    public void setName2(@javax.validation.Valid String name) {
-    
+    public void setName2(@jakarta.validation.Valid String name) {
+
     }
 }
 ''')
@@ -42,7 +42,7 @@ class Test {
 package validateparse2;
 
 import io.micronaut.core.annotation.Introspected
-import javax.validation.Constraint
+import jakarta.validation.Constraint
 import java.lang.annotation.ElementType
 import java.lang.annotation.Retention
 import java.lang.annotation.RetentionPolicy
@@ -77,7 +77,7 @@ package validateparse3
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 
-import javax.validation.constraints.PastOrPresent
+import jakarta.validation.constraints.PastOrPresent
 import java.time.LocalDate
 
 @Client("https://exchangeratesapi.io")

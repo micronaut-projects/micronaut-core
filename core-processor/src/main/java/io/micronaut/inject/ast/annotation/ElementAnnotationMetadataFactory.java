@@ -57,15 +57,13 @@ public interface ElementAnnotationMetadataFactory {
     ElementAnnotationMetadata buildGenericTypeAnnotations(@NonNull GenericElement element);
 
     /**
-     * Build new element annotation metadata from the element with preloaded annotations.
-     * This method will avoid fetching default annotation metadata from cache.
+     * Build new mutable element annotation metadata.
      *
-     * @param element            The element
      * @param annotationMetadata The preloaded annotation
      * @return the element's metadata
      */
     @NonNull
-    ElementAnnotationMetadata build(@NonNull Element element, @NonNull AnnotationMetadata annotationMetadata);
+    ElementAnnotationMetadata buildMutable(@NonNull AnnotationMetadata annotationMetadata);
 
     /**
      * Makes this factory read-only. No modification to the annotation metadata should be persisted into the shared cache.

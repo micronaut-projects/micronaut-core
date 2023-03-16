@@ -9,8 +9,7 @@ compile-testing = "0.19"
 geb = "7.0"
 gorm = "7.3.2"
 # be sure to update graal version in gradle.properties as well
-# Intentionally pin to 22.0.0.2 see https://github.com/micronaut-projects/micronaut-kafka/pull/564 and https://github.com/micronaut-projects/micronaut-core/pull/7663
-graal-svm = "22.0.0.2"
+graal-svm = "22.3.1"
 h2 = "2.1.210"
 hibernate = "5.5.9.Final"
 hibernate-validator = "6.1.6.Final"
@@ -44,7 +43,8 @@ micronaut-session = "1.0.0-SNAPSHOT"
 micronaut-sql = "4.7.2"
 micronaut-test = "4.0.0-SNAPSHOT"
 micronaut-serde = "2.0.0-SNAPSHOT"
-micronaut-tracing = "4.5.0"
+micronaut-tracing = "5.0.0-SNAPSHOT"
+micronaut-validation = "4.0.0-SNAPSHOT"
 micrometer = "1.10.2"
 neo4j-java-driver = "1.4.5"
 selenium = "4.7.2"
@@ -60,19 +60,19 @@ wiremock = "2.33.2"
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
-managed-groovy = "4.0.6"
+managed-groovy = "4.0.9"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "2.14.0"
 managed-jackson-databind = "2.14.1"
 managed-maven-native-plugin = "0.9.13"
 managed-methvin-directory-watcher = "0.16.1"
-managed-netty = "4.1.86.Final"
+managed-netty = "4.1.87.Final"
+managed-netty-http3 = "0.0.16.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
 managed-reactor = "3.4.24"
 managed-slf4j = "2.0.4"
-managed-snakeyaml = "1.33"
-managed-validation = "2.0.1.Final"
+managed-snakeyaml = "2.0"
 managed-java-parser-core = "3.24.9"
 managed-ksp = "1.8.0-1.0.9"
 micronaut-docs = "2.0.0"
@@ -82,6 +82,7 @@ micronaut-docs = "2.0.0"
 test-boms-micronaut-aws = { module = "io.micronaut.aws:micronaut-aws-bom", version.ref = "micronaut-aws" }
 test-boms-micronaut-sql = { module = "io.micronaut.sql:micronaut-sql-bom", version.ref = "micronaut-sql" }
 test-boms-micronaut-tracing = { module = "io.micronaut.tracing:micronaut-tracing-bom", version.ref = "micronaut-tracing" }
+test-boms-micronaut-validation = { module = "io.micronaut.validation:micronaut-validation-bom", version.ref = "micronaut-validation" }
 
 boms-groovy = { module = "org.apache.groovy:groovy-bom", version.ref = "managed-groovy" }
 boms-netty = { module = "io.netty:netty-bom", version.ref = "managed-netty" }
@@ -115,6 +116,7 @@ managed-methvin-directoryWatcher = { module = "io.methvin:directory-watcher", ve
 managed-netty-buffer = { module = "io.netty:netty-buffer", version.ref = "managed-netty" }
 managed-netty-codec-http = { module = "io.netty:netty-codec-http", version.ref = "managed-netty" }
 managed-netty-codec-http2 = { module = "io.netty:netty-codec-http2", version.ref = "managed-netty" }
+managed-netty-incubator-codec-http3 = { module = "io.netty.incubator:netty-incubator-codec-http3", version.ref = "managed-netty-http3" }
 managed-netty-handler = { module = "io.netty:netty-handler", version.ref = "managed-netty" }
 managed-netty-handler-proxy = { module = "io.netty:netty-handler-proxy", version.ref = "managed-netty" }
 managed-netty-transport-native-epoll = { module = "io.netty:netty-transport-native-epoll", version.ref = "managed-netty" }
@@ -131,8 +133,6 @@ managed-slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "manag
 managed-logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "managed-logback" }
 
 managed-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "managed-snakeyaml" }
-
-managed-validation = { module = "javax.validation:validation-api", version.ref = "managed-validation" }
 
 #
 # Other libraries are used by Micronaut but will not appear in the BOM
@@ -183,6 +183,7 @@ jmh-generator-annprocess = { module = "org.openjdk.jmh:jmh-generator-annprocess"
 jsr107 = { module = "org.jsr107.ri:cache-ri-impl", version.ref = "jsr107" }
 jsr305 = { module = "com.google.code.findbugs:jsr305", version.ref = "jsr305" }
 
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit5" }
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit5" }
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "junit5" }
 junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params", version.ref = "junit5" }
@@ -248,6 +249,9 @@ systemlambda = { module = "com.github.stefanbirkner:system-lambda", version.ref 
 
 micronaut-tracing-jaeger = { module = "io.micronaut.tracing:micronaut-tracing-jaeger" }
 micronaut-tracing-zipkin = { module = "io.micronaut.tracing:micronaut-tracing-zipkin" }
+
+micronaut-validation = { module = "io.micronaut.validation:micronaut-validation" }
+micronaut-validation-processor = { module = "io.micronaut.validation:micronaut-validation-processor" }
 
 testcontainers-spock = { module = "org.testcontainers:spock", version.ref = "testcontainers" }
 

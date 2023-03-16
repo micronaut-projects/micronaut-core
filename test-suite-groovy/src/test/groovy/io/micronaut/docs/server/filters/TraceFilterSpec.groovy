@@ -15,6 +15,7 @@ class TraceFilterSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
             ApplicationContext.run(EmbeddedServer,['spec.name': HelloControllerSpec.simpleName,
+                                                   'spec.filter': 'TraceFilter',
                                                    'spec.lang': 'java'], Environment.TEST)
     @Shared @AutoCleanup HttpClient httpClient =
             embeddedServer.getApplicationContext()

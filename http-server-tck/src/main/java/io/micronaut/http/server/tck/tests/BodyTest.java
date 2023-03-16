@@ -16,6 +16,7 @@
 package io.micronaut.http.server.tck.tests;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
@@ -25,15 +26,16 @@ import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Status;
-import io.micronaut.http.server.tck.AssertionUtils;
-import io.micronaut.http.server.tck.BodyAssertion;
-import io.micronaut.http.server.tck.HttpResponseAssertion;
-import static io.micronaut.http.server.tck.TestScenario.asserts;
+import io.micronaut.http.tck.AssertionUtils;
+import io.micronaut.http.tck.BodyAssertion;
+import io.micronaut.http.tck.HttpResponseAssertion;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
 
 import java.io.IOException;
 import java.util.Objects;
+
+import static io.micronaut.http.tck.TestScenario.asserts;
 
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
@@ -138,6 +140,7 @@ public class BodyTest {
         }
     }
 
+    @Introspected
     static class Point {
         private Integer x;
         private Integer y;

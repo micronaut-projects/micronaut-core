@@ -15,28 +15,62 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
+import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.NonNull
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.ast.ArrayableClassElement
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.WildcardElement
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
+import io.micronaut.inject.ast.annotation.WildcardElementAnnotationMetadata
 import java.util.function.Function
 
-class KotlinWildcardElement(
+internal class KotlinWildcardElement(
+    private val internalGenericNativeType: KotlinTypeArgumentNativeElement,
+    private var upper: KotlinClassElement,
     private val upperBounds: List<KotlinClassElement?>,
     private val lowerBounds: List<KotlinClassElement?>,
     elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
     visitorContext: KotlinVisitorContext,
+    private val isRawType: Boolean,
     arrayDimensions: Int = 0
 ) : KotlinClassElement(
-    upperBounds[0]!!.nativeType,
+    upper.nativeType,
     elementAnnotationMetadataFactory,
+    upper.resolvedTypeArguments,
     visitorContext,
     arrayDimensions,
-    false
+    true
 ), WildcardElement {
 
-    override fun foldBoundGenericTypes(@NonNull fold: Function<ClassElement?, ClassElement>): ClassElement? {
+    private val resolvedTypeAnnotationMetadata: ElementAnnotationMetadata by lazy {
+        WildcardElementAnnotationMetadata(this, upper)
+    }
+    private val resolvedAnnotationMetadata: AnnotationMetadata by lazy {
+        AnnotationMetadataHierarchy(
+            true,
+            upper.annotationMetadata,
+            resolvedGenericTypeAnnotationMetadata
+        )
+    }
+    private val resolvedGenericTypeAnnotationMetadata: ElementAnnotationMetadata by lazy {
+        elementAnnotationMetadataFactory.buildGenericTypeAnnotations(this)
+    }
+
+    override fun getAnnotationMetadataToWrite() = resolvedGenericTypeAnnotationMetadata
+
+    override fun getGenericTypeAnnotationMetadata() = resolvedGenericTypeAnnotationMetadata
+
+    override fun getTypeAnnotationMetadata() = resolvedTypeAnnotationMetadata
+
+    override fun getAnnotationMetadata() = resolvedAnnotationMetadata
+
+    override fun isRawType() = isRawType
+
+    override fun getGenericNativeType() = internalGenericNativeType
+
+    override fun foldBoundGenericTypes(@NonNull fold: Function<ClassElement?, ClassElement?>): ClassElement? {
         val upperBounds: List<KotlinClassElement?> = this.upperBounds
             .map { ele ->
                 toKotlinClassElement(
@@ -51,7 +85,14 @@ class KotlinWildcardElement(
             }.toList()
         return fold.apply(
             if (upperBounds.contains(null) || lowerBounds.contains(null)) null else KotlinWildcardElement(
-                upperBounds, lowerBounds, elementAnnotationMetadataFactory, visitorContext, arrayDimensions
+                genericNativeType,
+                upper,
+                upperBounds,
+                lowerBounds,
+                elementAnnotationMetadataFactory,
+                visitorContext,
+                isRawType,
+                arrayDimensions
             )
         )
     }
@@ -68,13 +109,21 @@ class KotlinWildcardElement(
         return list
     }
 
-    private fun toKotlinClassElement(element: ClassElement?): KotlinClassElement {
-        return if (element == null || element is KotlinClassElement) {
-            element as KotlinClassElement
-        } else {
-            if (element.isWildcard || element.isGenericPlaceholder) {
+    private fun toKotlinClassElement(element: ClassElement?): KotlinClassElement? {
+        return when {
+            element == null -> {
+                null
+            }
+
+            element is KotlinClassElement -> {
+                element
+            }
+
+            element.isWildcard || element.isGenericPlaceholder -> {
                 throw UnsupportedOperationException("Cannot convert wildcard / free type variable to JavaClassElement")
-            } else {
+            }
+
+            else -> {
                 (visitorContext.getClassElement(element.name, elementAnnotationMetadataFactory)
                     .orElseThrow {
                         UnsupportedOperationException(
@@ -82,7 +131,7 @@ class KotlinWildcardElement(
                         )
                     } as ArrayableClassElement)
                     .withArrayDimensions(element.arrayDimensions)
-                    .withBoundGenericTypes(element.boundGenericTypes) as KotlinClassElement
+                    .withTypeArguments(element.typeArguments) as KotlinClassElement
             }
         }
     }

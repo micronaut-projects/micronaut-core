@@ -24,14 +24,13 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.WildcardElement;
-import io.micronaut.inject.ast.annotation.AbstractElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.GenericPlaceholderElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 
 import javax.lang.model.element.TypeParameterElement;
 import javax.lang.model.type.TypeVariable;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -98,31 +97,7 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
         this.resolved = resolved;
         this.bounds = bounds;
         this.isRawType = isRawType;
-        typeAnnotationMetadata = new AbstractElementAnnotationMetadata() {
-
-            AnnotationMetadata annotationMetadata;
-
-            public AnnotationMetadata getReturnInstance() {
-                return getAnnotationMetadata();
-            }
-
-            @Override
-            protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
-                return getGenericTypeAnnotationMetadata();
-            }
-
-            @Override
-            public AnnotationMetadata getAnnotationMetadata() {
-                if (annotationMetadata == null) {
-                    List<AnnotationMetadata> allAnnotationMetadata = new ArrayList<>();
-                    getBounds().forEach(ce -> allAnnotationMetadata.add(ce.getTypeAnnotationMetadata()));
-                    allAnnotationMetadata.add(JavaGenericPlaceholderElement.super.getTypeAnnotationMetadata());
-                    allAnnotationMetadata.add(getGenericTypeAnnotationMetadata());
-                    annotationMetadata = new AnnotationMetadataHierarchy(true, allAnnotationMetadata.toArray(AnnotationMetadata[]::new));
-                }
-                return annotationMetadata;
-            }
-        };
+        typeAnnotationMetadata = new GenericPlaceholderElementAnnotationMetadata(this, classElementRepresentingThisPlaceholder);
     }
 
     private static JavaClassElement selectClassElementRepresentingThisPlaceholder(@Nullable JavaClassElement resolved,
@@ -212,4 +187,5 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
     public JavaClassElement getResolvedInternal() {
         return resolved;
     }
+
 }

@@ -16,7 +16,9 @@
 package io.micronaut.core.io.service;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.IOUtils;
+import org.graalvm.nativeimage.ImageSingletons;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -30,10 +32,13 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.ServiceConfigurationError;
 import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
@@ -79,20 +84,48 @@ final class ServiceScanner<S> {
      */
     @SuppressWarnings("java:S3398")
     private static Set<String> computeMicronautServiceTypeNames(URI uri, String path) {
-        Set<String> typeNames = new HashSet<>();
-        // Keep the anonymous class instead of Lambda to reduce the Lambda invocation overhead during the startup
-        Consumer<Path> consumer = new Consumer<>() {
+        final StaticServiceDefinitions ssd = findStaticServiceDefinitions();
+        if (ssd != null) {
+            return ssd.serviceTypeMap.getOrDefault(
+                path,
+                Collections.emptySet()
+            );
+        } else {
+            Set<String> typeNames = new HashSet<>();
+            // Keep the anonymous class instead of Lambda to reduce the Lambda invocation overhead during the startup
+            @SuppressWarnings({"Convert2Lambda", "java:S1604"}) Consumer<Path> consumer = new Consumer<>() {
 
-            @Override
-            public void accept(Path currentPath) {
-                if (Files.isRegularFile(currentPath)) {
-                    final String typeName = currentPath.getFileName().toString();
-                    typeNames.add(typeName);
+                @Override
+                public void accept(Path currentPath) {
+                    if (Files.isRegularFile(currentPath)) {
+                        final String typeName = currentPath.getFileName().toString();
+                        typeNames.add(typeName);
+                    }
                 }
-            }
-        };
-        IOUtils.eachFile(uri, path, consumer);
-        return typeNames;
+            };
+            IOUtils.eachFile(uri, path, consumer);
+            return typeNames;
+        }
+    }
+
+    @Nullable
+    private static StaticServiceDefinitions findStaticServiceDefinitions() {
+        if (hasImageSingletons()) {
+            return ImageSingletons.contains(StaticServiceDefinitions.class) ? ImageSingletons.lookup(StaticServiceDefinitions.class) : null;
+        } else {
+            return null;
+        }
+    }
+
+    @SuppressWarnings("java:S1181")
+    private static boolean hasImageSingletons() {
+        try {
+            //noinspection ConstantValue
+            return ImageSingletons.class != null;
+        } catch (Throwable e) {
+            // not present or not a GraalVM JDK
+            return false;
+        }
     }
 
     @SuppressWarnings("java:S3398")
@@ -333,4 +366,14 @@ final class ServiceScanner<S> {
         public abstract void collect(Collection<S> values);
 
     }
+
+    @Internal
+    record StaticServiceDefinitions(Map<String, Set<String>> serviceTypeMap) {
+        StaticServiceDefinitions {
+            if (serviceTypeMap == null) {
+                serviceTypeMap = new HashMap<>();
+            }
+        }
+    }
+
 }

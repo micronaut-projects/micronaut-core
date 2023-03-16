@@ -28,7 +28,6 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.value.OptionalValues;
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MemberElement;
@@ -101,14 +100,11 @@ abstract class AbstractBeanElementCreator implements BeanDefinitionCreator {
         }
     }
 
-    public static AnnotationMetadata getElementAnnotationMetadata(MemberElement methodElement) {
-        // NOTE: if annotation processor modified the method's annotation
-        // annotationUtils.getAnnotationMetadata(method) will return AnnotationMetadataHierarchy of both method+class metadata
-        AnnotationMetadata annotationMetadata = methodElement.getTargetAnnotationMetadata();
-        if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
-            return annotationMetadata.getDeclaredMetadata();
+    public static AnnotationMetadata getElementAnnotationMetadata(MemberElement memberElement) {
+        if (memberElement instanceof MethodElement methodElement) {
+            return methodElement.getMethodAnnotationMetadata();
         }
-        return annotationMetadata;
+        return memberElement.getAnnotationMetadata();
     }
 
     protected boolean visitIntrospectedMethod(BeanDefinitionVisitor visitor, ClassElement typeElement, MethodElement methodElement) {

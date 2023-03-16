@@ -22,14 +22,23 @@ repositories {
 dependencies {
     testImplementation libs.managed.netty.codec.http
     testImplementation project(":http-client")
+    testImplementation project(":http-client-jdk")
     testImplementation project(":inject-groovy")
     testImplementation project(":http-server-netty")
     testImplementation project(":jackson-databind")
     testImplementation project(":runtime")
-    testImplementation project(":validation")
+    testImplementation platform(libs.test.boms.micronaut.validation)
+    testImplementation (libs.micronaut.validation) {
+        exclude group: 'io.micronaut'
+    }
+    testImplementation (libs.micronaut.validation.processor) {
+        exclude group: 'io.micronaut'
+    }
     testImplementation project(":inject")
     testImplementation project(":management")
-    testImplementation(libs.micronaut.session)
+    testImplementation (libs.micronaut.session) {
+        exclude group: 'io.micronaut'
+    }
     testImplementation libs.jcache
     testImplementation libs.managed.groovy.sql
     testImplementation libs.managed.groovy.templates

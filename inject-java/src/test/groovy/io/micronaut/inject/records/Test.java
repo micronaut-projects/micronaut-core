@@ -6,7 +6,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.convert.ConversionService;
 import jakarta.inject.Inject;
 
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 
 @Requires(property = "spec.name", value = "RecordBeansSpec")
 @ConfigurationProperties("foo")

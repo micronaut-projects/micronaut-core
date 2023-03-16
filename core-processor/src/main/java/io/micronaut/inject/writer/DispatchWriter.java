@@ -16,6 +16,7 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ast.ClassElement;
@@ -32,7 +33,6 @@ import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 import org.objectweb.asm.commons.TableSwitchGenerator;
 
-import javax.validation.constraints.NotNull;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -69,13 +69,27 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
     private static final org.objectweb.asm.commons.Method METHOD_INVOKE_METHOD = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "invokeMethod", Object.class, java.lang.reflect.Method.class, Object[].class));
 
+    private static final org.objectweb.asm.commons.Method METHOD_GET_FIELD_VALUE = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "getField", Class.class, String.class, Object.class));
+
+    private static final org.objectweb.asm.commons.Method METHOD_SET_FIELD_VALUE = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "setField", Class.class, String.class, Object.class, Object.class));
+
     private final List<DispatchTarget> dispatchTargets = new ArrayList<>();
     private final Type thisType;
+
+    private final Type dispatchSuperType;
+
     private boolean hasInterceptedMethod;
 
     public DispatchWriter(Type thisType) {
+        this(thisType, ExecutableMethodsDefinitionWriter.SUPER_TYPE);
+    }
+
+    public DispatchWriter(Type thisType, Type dispatchSuperType) {
         super();
         this.thisType = thisType;
+        this.dispatchSuperType = dispatchSuperType;
     }
 
     /**
@@ -118,7 +132,7 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
      * @return the target index
      */
     public int addMethod(TypedElement declaringType, MethodElement methodElement, boolean useOneDispatch) {
-        return addDispatchTarget(new MethodDispatchTarget(declaringType, methodElement, useOneDispatch, !useOneDispatch));
+        return addDispatchTarget(new MethodDispatchTarget(dispatchSuperType, declaringType, methodElement, useOneDispatch, !useOneDispatch));
     }
 
     /**
@@ -136,6 +150,7 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
                                     String interceptedProxyBridgeMethodName) {
         hasInterceptedMethod = true;
         return addDispatchTarget(new InterceptableMethodDispatchTarget(
+                dispatchSuperType,
                 declaringType,
                 methodElement,
                 interceptedProxyClassName,
@@ -227,7 +242,7 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
             @Override
             public void generateCase(int key, Label end) {
                 DispatchTarget method = dispatchTargets.get(key);
-                method.writeDispatchOne(dispatchMethod);
+                method.writeDispatchOne(dispatchMethod, key);
                 dispatchMethod.returnValue();
             }
 
@@ -346,10 +361,11 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
 
         /**
          * Generate dispatch one.
+         * @param methodIndex The method index
          *
          * @param writer The writer
          */
-        default void writeDispatchOne(GeneratorAdapter writer) {
+        default void writeDispatchOne(GeneratorAdapter writer, int methodIndex) {
             throw new IllegalStateException("Not supported");
         }
 
@@ -377,7 +393,7 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
      */
     @Internal
     public static final class FieldGetDispatchTarget implements DispatchTarget {
-        @NotNull
+        @NonNull
         final FieldElement beanField;
 
         public FieldGetDispatchTarget(FieldElement beanField) {
@@ -395,24 +411,34 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
         }
 
         @Override
-        public void writeDispatchOne(GeneratorAdapter writer) {
+        public void writeDispatchOne(GeneratorAdapter writer, int fieldIndex) {
             final Type propertyType = JavaModelUtils.getTypeReference(beanField.getType());
             final Type beanType = JavaModelUtils.getTypeReference(beanField.getOwningType());
 
-            // load this
-            writer.loadArg(1);
-            pushCastToType(writer, beanType);
+            if (beanField.isReflectionRequired()) {
+                writer.push(beanType); // Bean class
+                writer.push(beanField.getName()); // Field name
+                writer.loadArg(1); // Bean instance
+                writer.invokeStatic(TYPE_REFLECTION_UTILS, METHOD_GET_FIELD_VALUE);
+                if (beanField.isPrimitive()) {
+                    pushCastToType(writer, propertyType);
+                }
+            } else {
+                // load this
+                writer.loadArg(1);
+                pushCastToType(writer, beanType);
 
-            // get field value
-            writer.getField(
+                // get field value
+                writer.getField(
                     JavaModelUtils.getTypeReference(beanField.getOwningType()),
                     beanField.getName(),
                     propertyType);
+            }
 
             pushBoxPrimitiveIfNecessary(propertyType, writer);
         }
 
-        @NotNull
+        @NonNull
         public FieldElement getField() {
             return beanField;
         }
@@ -423,7 +449,7 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
      */
     @Internal
     public static final class FieldSetDispatchTarget implements DispatchTarget {
-        @NotNull
+        @NonNull
         final FieldElement beanField;
 
         public FieldSetDispatchTarget(FieldElement beanField) {
@@ -441,29 +467,37 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
         }
 
         @Override
-        public void writeDispatchOne(GeneratorAdapter writer) {
+        public void writeDispatchOne(GeneratorAdapter writer, int fieldIndex) {
             final Type propertyType = JavaModelUtils.getTypeReference(beanField.getType());
             final Type beanType = JavaModelUtils.getTypeReference(beanField.getOwningType());
 
-            // load this
-            writer.loadArg(1);
-            pushCastToType(writer, beanType);
+            if (beanField.isReflectionRequired()) {
+                writer.push(beanType); // Bean class
+                writer.push(beanField.getName()); // Field name
+                writer.loadArg(1); // Bean instance
+                writer.loadArg(2); // Field value
+                writer.invokeStatic(TYPE_REFLECTION_UTILS, METHOD_SET_FIELD_VALUE);
+            } else {
+                // load this
+                writer.loadArg(1);
+                pushCastToType(writer, beanType);
 
-            // load value
-            writer.loadArg(2);
-            pushCastToType(writer, propertyType);
+                // load value
+                writer.loadArg(2);
+                pushCastToType(writer, propertyType);
 
-            // get field value
-            writer.putField(
+                // get field value
+                writer.putField(
                     beanType,
                     beanField.getName(),
                     propertyType);
 
+            }
             // push null return type
             writer.push((String) null);
         }
 
-        @NotNull
+        @NonNull
         public FieldElement getField() {
             return beanField;
         }
@@ -475,15 +509,17 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
     @Internal
     @SuppressWarnings("FinalClass")
     public static class MethodDispatchTarget implements DispatchTarget {
+        final Type dispatchSuperType;
         final TypedElement declaringType;
         final MethodElement methodElement;
         final boolean oneDispatch;
         final boolean multiDispatch;
 
-        private MethodDispatchTarget(TypedElement declaringType,
+        private MethodDispatchTarget(Type dispatchSuperType, TypedElement declaringType,
                                      MethodElement methodElement,
                                      boolean oneDispatch,
                                      boolean multiDispatch) {
+            this.dispatchSuperType = dispatchSuperType;
             this.declaringType = declaringType;
             this.methodElement = methodElement;
             this.oneDispatch = oneDispatch;
@@ -506,6 +542,15 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
 
         @Override
         public void writeDispatchMulti(GeneratorAdapter writer, int methodIndex) {
+            writeDispatch(writer, methodIndex, true);
+        }
+
+        @Override
+        public void writeDispatchOne(GeneratorAdapter writer, int methodIndex) {
+            writeDispatch(writer, methodIndex, false);
+        }
+
+        private void writeDispatch(GeneratorAdapter writer, int methodIndex, boolean isMulti) {
             String methodName = methodElement.getName();
 
             List<ParameterElement> argumentTypes = Arrays.asList(methodElement.getSuspendParameters());
@@ -528,9 +573,18 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
                 }
                 writer.loadThis();
                 writer.push(methodIndex);
-                writer.invokeVirtual(ExecutableMethodsDefinitionWriter.SUPER_TYPE, GET_ACCESSIBLE_TARGET_METHOD);
+                writer.invokeVirtual(dispatchSuperType, GET_ACCESSIBLE_TARGET_METHOD);
                 if (hasArgs) {
-                    writer.loadArg(2);
+                    if (isMulti) {
+                        writer.loadArg(2);
+                    } else {
+                        writer.push(1);
+                        writer.newArray(Type.getType(Object.class)); // new Object[1]
+                        writer.dup(); // one ref to store and one to return
+                        writer.push(0);
+                        writer.loadArg(2);
+                        writer.visitInsn(AASTORE); // objects[0] = argumentAtIndex2
+                    }
                 } else {
                     writer.getStatic(Type.getType(ArrayUtils.class), "EMPTY_OBJECT_ARRAY", Type.getType(Object[].class));
                 }
@@ -540,14 +594,20 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
                     pushCastToType(writer, declaringTypeObject);
                 }
                 if (hasArgs) {
-                    int argCount = argumentTypes.size();
-                    Iterator<ParameterElement> argIterator = argumentTypes.iterator();
-                    for (int i = 0; i < argCount; i++) {
+                    if (isMulti) {
+                        int argCount = argumentTypes.size();
+                        Iterator<ParameterElement> argIterator = argumentTypes.iterator();
+                        for (int i = 0; i < argCount; i++) {
+                            writer.loadArg(2);
+                            writer.push(i);
+                            writer.visitInsn(AALOAD);
+                            // cast the argument value to the correct type
+                            pushCastToType(writer, argIterator.next());
+                        }
+                    } else {
                         writer.loadArg(2);
-                        writer.push(i);
-                        writer.visitInsn(AALOAD);
-                        // cast the return value to the correct type
-                        pushCastToType(writer, argIterator.next());
+                        // cast the argument value to the correct type
+                        pushCastToType(writer, argumentTypes.iterator().next());
                     }
                 }
                 String methodDescriptor = getMethodDescriptor(returnType, argumentTypes);
@@ -567,35 +627,6 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
             }
         }
 
-        @Override
-        public void writeDispatchOne(GeneratorAdapter writer) {
-            String methodName = methodElement.getName();
-
-            List<ParameterElement> argumentTypes = Arrays.asList(methodElement.getSuspendParameters());
-            Type declaringTypeObject = JavaModelUtils.getTypeReference(declaringType);
-
-            ClassElement returnType = methodElement.isSuspend() ? ClassElement.of(Object.class) : methodElement.getReturnType();
-            boolean isInterface = declaringType.getType().isInterface();
-            Type returnTypeObject = JavaModelUtils.getTypeReference(returnType);
-
-            writer.loadArg(1);
-            pushCastToType(writer, declaringType);
-            boolean hasArgs = !argumentTypes.isEmpty();
-            if (hasArgs) {
-                writer.loadArg(2);
-                pushCastToType(writer, argumentTypes.get(0));
-            }
-
-            writer.visitMethodInsn(isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL,
-                    declaringTypeObject.getInternalName(), methodName,
-                    getMethodDescriptor(returnType, argumentTypes), isInterface);
-
-            if (returnTypeObject.equals(Type.VOID_TYPE)) {
-                writer.visitInsn(ACONST_NULL);
-            } else {
-                pushBoxPrimitiveIfNecessary(returnType, writer);
-            }
-        }
     }
 
     /**
@@ -607,12 +638,13 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
         final String interceptedProxyBridgeMethodName;
         final Type thisType;
 
-        private InterceptableMethodDispatchTarget(TypedElement declaringType,
+        private InterceptableMethodDispatchTarget(Type dispatchSuperType,
+                                                  TypedElement declaringType,
                                                   MethodElement methodElement,
                                                   String interceptedProxyClassName,
                                                   String interceptedProxyBridgeMethodName,
                                                   Type thisType) {
-            super(declaringType, methodElement, false, true);
+            super(dispatchSuperType, declaringType, methodElement, false, true);
             this.interceptedProxyClassName = interceptedProxyClassName;
             this.interceptedProxyBridgeMethodName = interceptedProxyBridgeMethodName;
             this.thisType = thisType;

@@ -20,20 +20,24 @@ import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.Modifier
 import io.micronaut.context.annotation.ConfigurationInject
 import io.micronaut.context.annotation.ConfigurationReader
-import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.inject.ast.*
+import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ConstructorElement
+import io.micronaut.inject.ast.MemberElement
+import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 
-class KotlinConstructorElement(method: KSFunctionDeclaration,
-                               declaringType: ClassElement,
-                               elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
-                               visitorContext: KotlinVisitorContext,
-                               returnType: ClassElement
-): ConstructorElement, KotlinMethodElement(method, declaringType, returnType, elementAnnotationMetadataFactory, visitorContext) {
+internal class KotlinConstructorElement(
+    owningType: ClassElement,
+    method: KSFunctionDeclaration,
+    elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory,
+    visitorContext: KotlinVisitorContext,
+) : ConstructorElement,
+    KotlinMethodElement(owningType, method, elementAnnotationMetadataFactory, visitorContext) {
 
     init {
         if (method.closestClassDeclaration()?.modifiers?.contains(Modifier.DATA) == true &&
-            declaringType.hasDeclaredStereotype(ConfigurationReader::class.java)) {
+            owningType.hasDeclaredStereotype(ConfigurationReader::class.java)
+        ) {
             annotate(ConfigurationInject::class.java)
         }
     }

@@ -18,7 +18,7 @@ package io.micronaut.docs.config.mapFormat
 // tag::imports[]
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.core.convert.format.MapFormat
-import javax.validation.constraints.Min
+import jakarta.validation.constraints.Min
 // end::imports[]
 
 // tag::class[]

@@ -56,7 +56,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static javax.lang.model.element.ElementKind.ANNOTATION_TYPE;
 import static javax.lang.model.element.ElementKind.ENUM;
 
 /**
@@ -73,8 +72,6 @@ import static javax.lang.model.element.ElementKind.ENUM;
 @SupportedOptions({AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_INCREMENTAL, AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_ANNOTATIONS, BeanDefinitionWriter.OMIT_CONFPROP_INJECTION_POINTS})
 public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProcessor {
 
-    private static final String AROUND_TYPE = AnnotationUtil.ANN_AROUND;
-    private static final String INTRODUCTION_TYPE = AnnotationUtil.ANN_INTRODUCTION;
     private static final String[] ANNOTATION_STEREOTYPES = new String[]{
         AnnotationUtil.POST_CONSTRUCT,
         AnnotationUtil.PRE_DESTROY,
@@ -91,10 +88,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         "io.micronaut.context.annotation.Value",
         "io.micronaut.context.annotation.Property",
         "io.micronaut.context.annotation.Executable",
-        AROUND_TYPE,
+        AnnotationUtil.ANN_AROUND,
         AnnotationUtil.ANN_INTERCEPTOR_BINDINGS,
         AnnotationUtil.ANN_INTERCEPTOR_BINDING,
-        INTRODUCTION_TYPE
+        AnnotationUtil.ANN_INTRODUCTION
     };
 
     private Set<String> beanDefinitions;
@@ -154,19 +151,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
                 TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
                 // accumulate all the class elements for all annotated elements
-                annotations.forEach(annotation -> roundEnv.getElementsAnnotatedWith(annotation)
-                    .stream()
-                    // filtering annotation definitions, which are not processed
-                    .filter(element -> element.getKind() != ANNOTATION_TYPE)
-                    .forEach(element -> {
-                        TypeElement typeElement = modelUtils.classElementFor(element);
-                        if (typeElement == null) {
-                            return;
-                        }
-                        if (element.getKind() == ENUM) {
-                            final AnnotationMetadata am = annotationMetadataBuilder.lookupOrBuildForType(element);
+                annotations.forEach(annotation -> modelUtils.resolveTypeElements(
+                        roundEnv.getElementsAnnotatedWith(annotation)
+                    )
+                    .forEach(typeElement -> {
+                        if (typeElement.getKind() == ENUM) {
+                            final AnnotationMetadata am = annotationMetadataBuilder.lookupOrBuildForType(typeElement);
                             if (BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(am)) {
-                                error(element, "Enum types cannot be defined as beans");
+                                error(typeElement, "Enum types cannot be defined as beans");
                             }
                             return;
                         }
@@ -184,7 +176,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             beanDefinitions.add(name);
                         } else {
                             AnnotationMetadata annotationMetadata = annotationMetadataBuilder.lookupOrBuildForType(typeElement);
-                            if (annotationMetadata.hasStereotype(INTRODUCTION_TYPE) || annotationMetadata.hasStereotype(ConfigurationReader.class)) {
+                            if (BeanDefinitionCreatorFactory.isIntroduction(annotationMetadata) || annotationMetadata.hasStereotype(ConfigurationReader.class)) {
                                 beanDefinitions.add(name);
                             }
                         }

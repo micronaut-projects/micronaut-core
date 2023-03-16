@@ -16,8 +16,8 @@
 package io.micronaut.validation.validator
 
 import io.micronaut.core.annotation.Introspected
-import javax.validation.constraints.Min
-import javax.validation.constraints.NotBlank
+import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.NotBlank
 
 @Introspected
 data class Person(

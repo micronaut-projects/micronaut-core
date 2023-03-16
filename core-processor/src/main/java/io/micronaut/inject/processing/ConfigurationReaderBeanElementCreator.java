@@ -146,8 +146,8 @@ final class ConfigurationReaderBeanElementCreator extends DeclaredBeanElementCre
     }
 
     @Override
-    protected boolean visitAopMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
-        return false;
+    protected void makeInterceptedForValidationIfNeeded(MethodElement element) {
+        // Configuration beans are validated by the introspection
     }
 
     @Override

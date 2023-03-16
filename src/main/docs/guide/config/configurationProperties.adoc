@@ -8,7 +8,7 @@ For example:
 snippet::io.micronaut.docs.config.properties.EngineConfig[tags="imports,class",indent=0,title="@ConfigurationProperties Example"]
 
 <1> The `@ConfigurationProperties` annotation takes the configuration prefix
-<2> You can use `javax.validation` annotations to validate the configuration
+<2> You can use `jakarta.validation` annotations to validate the configuration
 <3> Default values can be assigned to the property
 <4> Static inner classes can provide nested configuration
 <5> Optional configuration values can be wrapped in `java.util.Optional`
@@ -84,7 +84,7 @@ public class EngineConfig {
 <1> Micronaut will use an empty prefix for getters and setters.
 <2> Define the getters and setters with an empty prefix.
 
-Now you can inject `EngineConfig` and use it with `engineConfig.manufacturer()` and `engineConfig.cylinders() to retrieve the values from configuration.
+Now you can inject `EngineConfig` and use it with `engineConfig.manufacturer()` and `engineConfig.cylinders()` to retrieve the values from configuration.
 
 == Property Type Conversion
 

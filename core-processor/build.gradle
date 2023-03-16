@@ -13,5 +13,4 @@ dependencies {
     }
 
     compileOnly libs.kotlin.stdlib.jdk8
-    compileOnly libs.managed.validation
 }

@@ -16,6 +16,7 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import io.micronaut.core.annotation.NonNull;
@@ -34,10 +35,18 @@ import java.util.List;
  * similar in function, for example {@code javax.annotation.Nullable} and {@code io.micronaut.core.annotation.Nullable}. One can
  * remap these to a single annotation internally at compilation time.</p>
  *
+ * NOTE: Remapping all packages is an experimental feature and might be replaced in the future with more efficient way.
+ *
  * @author graemerocher
  * @since 1.2.0
  */
 public interface AnnotationRemapper {
+
+    /**
+     * Return this value in {@link #getPackageName()} to trigger remap on all annotations.
+     */
+    @Experimental
+    String ALL_PACKAGES = "*";
 
     /**
      * @return The package name of the annotation.

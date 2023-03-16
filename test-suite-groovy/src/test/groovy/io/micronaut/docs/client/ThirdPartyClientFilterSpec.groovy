@@ -6,24 +6,21 @@ import io.micronaut.context.annotation.Value
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MutableHttpRequest
+import io.micronaut.http.annotation.ClientFilter
 import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
+import io.micronaut.http.annotation.RequestFilter
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
-import io.micronaut.http.filter.ClientFilterChain
-import io.micronaut.http.filter.HttpClientFilter
 import io.micronaut.runtime.server.EmbeddedServer
-import org.reactivestreams.Publisher
+import jakarta.inject.Singleton
 import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
-
-import jakarta.inject.Singleton
 
 @Retry
 class ThirdPartyClientFilterSpec extends Specification {
@@ -94,8 +91,8 @@ class BintrayService {
 
 @Requires(property = "spec.name", value = "ThirdPartyClientFilterSpec")
 //tag::bintrayFilter[]
-@Filter('/repos/**') // <1>
-class BintrayFilter implements HttpClientFilter {
+@ClientFilter('/repos/**') // <1>
+class BintrayFilter {
 
     final String username
     final String token
@@ -107,12 +104,9 @@ class BintrayFilter implements HttpClientFilter {
         this.token = token
     }
 
-    @Override
-    Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request,
-                                                  ClientFilterChain chain) {
-        chain.proceed(
-                request.basicAuth(username, token) // <3>
-        )
+    @RequestFilter
+    void filter(MutableHttpRequest<?> request) {
+        request.basicAuth(username, token) // <3>
     }
 }
 //end::bintrayFilter[]

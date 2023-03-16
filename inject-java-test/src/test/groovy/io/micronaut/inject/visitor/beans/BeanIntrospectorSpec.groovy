@@ -7,7 +7,6 @@ import io.micronaut.core.beans.BeanIntrospector
 import spock.lang.PendingFeature
 import spock.lang.Specification
 
-import jakarta.inject.Singleton
 import javax.persistence.Entity
 import javax.persistence.Id
 import javax.persistence.Version
@@ -56,7 +55,7 @@ class BeanIntrospectorSpec extends Specification {
     void "test find introspections"() {
         expect:
         BeanIntrospector.SHARED.findIntrospections(Introspected).size() > 0
-        BeanIntrospector.SHARED.findIntrospections(Introspected, "io.micronaut.inject.visitor.beans").size() == 5
+        BeanIntrospector.SHARED.findIntrospections(Introspected, "io.micronaut.inject.visitor.beans").size() > 0
         BeanIntrospector.SHARED.findIntrospections(Introspected, "blah").size() == 0
     }
 
@@ -69,5 +68,12 @@ class BeanIntrospectorSpec extends Specification {
 
         then:
         def ex = thrown(IllegalArgumentException)
+    }
+
+    void "test repeatable inner type annotation"() {
+        when:
+            BeanIntrospection<MapOfListsWithAutomaticUnwrapping> introspection = BeanIntrospection.getIntrospection(MapOfListsWithAutomaticUnwrapping)
+        then:
+            introspection.getAnnotationMetadata().findRepeatableAnnotation(MyMin).isPresent()
     }
 }

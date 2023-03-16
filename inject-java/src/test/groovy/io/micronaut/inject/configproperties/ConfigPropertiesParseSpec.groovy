@@ -17,6 +17,46 @@ import java.time.Duration
 
 class ConfigPropertiesParseSpec extends AbstractTypeElementSpec {
 
+    void "test configuration properties implementing interface"() {
+        when:
+        def context = buildContext('''
+package jdbctest;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+
+@ConfigurationProperties("jdbc")
+class TestConfiguration extends AbstractConfiguration implements BasicJdbcConfiguration {
+    private String url;
+    @Override public void setUrl(String url) {
+        this.url = url;
+    }
+    @Override public String getUrl() {
+        return url;
+    }
+}
+class AbstractConfiguration {
+    private String username;
+    public String getUsername() {
+        return username;
+    }
+    public void setUsername(String username) {
+        this.username = username;
+    }
+}
+interface BasicJdbcConfiguration {
+    String getUrl();
+    void setUrl(String url);
+    String getUsername();
+    void setUsername(String username);
+}
+''')
+        def bean = getBean(context, 'jdbctest.TestConfiguration')
+
+        then:
+        bean.url == 'test'
+        bean.username == 'foo'
+    }
+
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/8574")
     void "test configuration properties inherited from parent with multiple overloads"() {
         when:
@@ -208,6 +248,8 @@ class MyConfig {
     protected void configureContext(ApplicationContextBuilder contextBuilder) {
         contextBuilder.properties(
                 'foo.bar.host':'bar',
+                'jdbc.url':'test',
+                'jdbc.username':'foo',
                 "micronaut.session.http.test.write-mode": "test",
                 "micronaut.session.http.test.uri": "http://localhost:9999",
                 "micronaut.session.http.test.uris": "http://localhost:9999",

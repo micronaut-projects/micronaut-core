@@ -91,7 +91,6 @@ The above instead injects the value of the `my.url` property resolved from appli
 
 You can also use this feature to resolve sub maps. For example, consider the following configuration:
 
-.Example `application.yml` configuration
 [configuration]
 ----
 datasources:

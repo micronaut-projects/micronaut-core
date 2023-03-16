@@ -500,7 +500,8 @@ public final class RouteExecutor {
             }
         } else {
             HttpStatus defaultHttpStatus = routeInfo.isErrorRoute() ? HttpStatus.INTERNAL_SERVER_ERROR : HttpStatus.OK;
-            boolean isReactive = routeInfo.isAsyncOrReactive() || Publishers.isConvertibleToPublisher(body);
+            // special case HttpResponse because FullNettyClientHttpResponse implements Completable...
+            boolean isReactive = routeInfo.isAsyncOrReactive() || (Publishers.isConvertibleToPublisher(body) && !(body instanceof HttpResponse<?>));
             if (isReactive) {
                 outgoingResponse = ReactiveExecutionFlow.fromPublisher(
                     fromReactiveExecute(request, body, routeInfo, defaultHttpStatus)

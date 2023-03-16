@@ -19,7 +19,7 @@ package io.micronaut.docs.server.binding
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import javax.validation.Valid
+import jakarta.validation.Valid
 // end::imports[]
 
 // tag::class[]

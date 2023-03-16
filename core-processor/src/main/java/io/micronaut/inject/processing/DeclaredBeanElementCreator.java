@@ -234,7 +234,11 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         return claimed;
     }
 
-    private static void makeInterceptedForValidationIfNeeded(MethodElement element) {
+    /**
+     * Makes the method intercepted by the validation advice.
+     * @param element The method element
+     */
+    protected void makeInterceptedForValidationIfNeeded(MethodElement element) {
         // The method with constrains should be intercepted with the validation interceptor
         if (element.hasDeclaredAnnotation(ANN_REQUIRES_VALIDATION)) {
             element.annotate(ANN_VALIDATED);
@@ -305,7 +309,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         if (visitInjectAndLifecycleMethod(visitor, writeElement)) {
             makeInterceptedForValidationIfNeeded(writeElement);
             return true;
-        } else if (!writeElement.isStatic() && getElementAnnotationMetadata(writeElement).hasStereotype(AnnotationUtil.QUALIFIER)) {
+        } else if (!writeElement.isStatic() && writeElement.getMethodAnnotationMetadata().hasStereotype(AnnotationUtil.QUALIFIER)) {
             if (propertyElement.getReadMethod().isPresent() && writeElement.hasStereotype(ANN_REQUIRES_VALIDATION)) {
                 visitor.setValidated(true);
             }
@@ -413,7 +417,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
      */
     protected boolean visitAopMethod(BeanDefinitionVisitor visitor, MethodElement methodElement) {
         boolean aopDefinedOnClassAndPublicMethod = isAopProxy && (methodElement.isPublic() || methodElement.isPackagePrivate());
-        AnnotationMetadata methodAnnotationMetadata = getElementAnnotationMetadata(methodElement);
+        AnnotationMetadata methodAnnotationMetadata = methodElement.getMethodAnnotationMetadata();
 
         if (aopDefinedOnClassAndPublicMethod ||
             !isAopProxy && InterceptedMethodUtil.hasAroundStereotype(methodAnnotationMetadata) ||
@@ -481,7 +485,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     }
 
     private static boolean isExplicitlyAnnotatedAsExecutable(MethodElement methodElement) {
-        return !getElementAnnotationMetadata(methodElement).hasDeclaredAnnotation(Executable.class);
+        return !methodElement.getMethodAnnotationMetadata().hasDeclaredAnnotation(Executable.class);
     }
 
     /**
@@ -534,7 +538,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
             // Synthetic methods cannot be executable as @Executable cannot be put on a field
             return false;
         }
-        if (getElementAnnotationMetadata(methodElement).hasStereotype(Executable.class)) {
+        if (methodElement.getMethodAnnotationMetadata().hasStereotype(Executable.class)) {
             // @Executable annotated on the method
             // Throw error if it cannot be accessed without the reflection
             if (!methodElement.isAccessible()) {
