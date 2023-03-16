@@ -51,7 +51,7 @@ public class LocaleArgumentBinder implements TypedRequestArgumentBinder<Locale> 
 
     @Override
     public BindingResult<Locale> bind(ArgumentConversionContext<Locale> context, HttpRequest<?> source) {
-        final Optional<Locale> locale = localeResolver.resolve(source);
+        final Optional<Locale> locale = localeResolver.resolveOrDefault(source);
         if (locale.isPresent()) {
             return () -> locale;
         } else {
