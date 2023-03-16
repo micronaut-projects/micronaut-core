@@ -592,4 +592,59 @@ interface Deserializer<T> {
             !deserializerTypeParam.isTypeVariable()
             !(deserializerTypeParam instanceof GenericPlaceholder)
     }
+
+    void "test repeatable inner type annotation 1"() {
+        when:
+            def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
+            def beanDef = ctx.getBeanDefinition(MapOfListsBean1)
+        then:
+            beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin1).isPresent()
+
+        cleanup:
+            ctx.close()
+    }
+
+    void "test repeatable inner type annotation 2"() {
+        when:
+            def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
+            def beanDef = ctx.getBeanDefinition(MapOfListsBean2)
+        then:
+            beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin2).isPresent()
+
+        cleanup:
+            ctx.close()
+    }
+
+    void "test repeatable inner type annotation 3"() {
+        when:
+            def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
+            def beanDef = ctx.getBeanDefinition(MapOfListsBean3)
+        then:
+            beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin3).isPresent()
+
+        cleanup:
+            ctx.close()
+    }
+
+    void "test repeatable inner type annotation 4"() {
+        when:
+            def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
+            def beanDef = ctx.getBeanDefinition(MapOfListsBean4)
+        then:
+            beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin4).isPresent()
+
+        cleanup:
+            ctx.close()
+    }
+
+    void "test repeatable inner type annotation 5"() {
+        when:
+            def ctx = ApplicationContext.builder().properties(["repeatabletest": "true"]).build().start()
+            def beanDef = ctx.getBeanDefinition(MapOfListsBean5)
+        then:
+            beanDef.getAnnotationMetadata().findRepeatableAnnotation(MyMin5).isPresent()
+
+        cleanup:
+            ctx.close()
+    }
 }

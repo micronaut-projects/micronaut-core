@@ -16,16 +16,12 @@
 package io.micronaut.inject.visitor.util;
 
 import io.micronaut.context.env.CachedEnvironment;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.inject.annotation.MutableAnnotationMetadata;
-import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import java.util.AbstractMap;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -78,27 +74,4 @@ public class VisitorContextUtils {
                 .orElse(Collections.emptyMap());
     }
 
-    /**
-     * Contributes repeatable annotation metadata to the given class element.
-     *
-     * <p>WARNING: for internal use only be the framework</p>
-     *
-     * @param target        The target
-     * @param classElement  The source
-     */
-    @Internal
-    public static void contributeRepeatable(AnnotationMetadata target, ClassElement classElement) {
-        contributeRepeatable(target, classElement, new HashSet<>());
-    }
-
-    private static void contributeRepeatable(AnnotationMetadata target, ClassElement classElement, Set<ClassElement> alreadySeen) {
-        alreadySeen.add(classElement);
-        MutableAnnotationMetadata.contributeRepeatable(target, classElement.getAnnotationMetadata());
-        for (ClassElement element : classElement.getTypeArguments().values()) {
-            if (alreadySeen.contains(classElement)) {
-                continue;
-            }
-            contributeRepeatable(target, element);
-        }
-    }
 }
