@@ -321,12 +321,15 @@ public final class AnnotationMetadataSupport {
     }
 
     /**
+     * Builds the annotation based on the annotation value.
+     *
      * @param annotationClass The annotation class
      * @param annotationValue The annotation value
      * @param <T>             The type
      * @return The annotation
      */
-    static <T extends Annotation> T buildAnnotation(Class<T> annotationClass, @Nullable AnnotationValue<T> annotationValue) {
+    @Internal
+    public static <T extends Annotation> T buildAnnotation(Class<T> annotationClass, @Nullable AnnotationValue<T> annotationValue) {
         Optional<Constructor<InvocationHandler>> proxyClass = getProxyClass(annotationClass);
         if (proxyClass.isPresent()) {
             Map<CharSequence, Object> values = new HashMap<>(getDefaultValues(annotationClass));
