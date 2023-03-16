@@ -9,5 +9,5 @@ micronaut:
       enabled: true
       configurations:
         web:
-          maxAge: 3600 # 1 hour
+          max-age: 3600 # 1 hour
 ----

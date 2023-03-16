@@ -234,7 +234,11 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
         return claimed;
     }
 
-    private static void makeInterceptedForValidationIfNeeded(MethodElement element) {
+    /**
+     * Makes the method intercepted by the validation advice.
+     * @param element The method element
+     */
+    protected void makeInterceptedForValidationIfNeeded(MethodElement element) {
         // The method with constrains should be intercepted with the validation interceptor
         if (element.hasDeclaredAnnotation(ANN_REQUIRES_VALIDATION)) {
             element.annotate(ANN_VALIDATED);

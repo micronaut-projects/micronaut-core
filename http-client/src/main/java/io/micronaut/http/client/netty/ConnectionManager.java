@@ -995,31 +995,25 @@ class ConnectionManager {
                     requestKey.getPort()
                 );
             } else {
-                switch (httpVersion.getPlaintextMode()) {
-                    case HTTP_1:
-                        initializer = new ChannelInitializer<Channel>() {
-                            @Override
-                            protected void initChannel(@NonNull Channel ch) throws Exception {
-                                configureProxy(ch.pipeline(), false, requestKey.getHost(), requestKey.getPort());
-                                initHttp1(ch);
-                                ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_ACTIVITY_LISTENER, new ChannelInboundHandlerAdapter() {
-                                    @Override
-                                    public void channelActive(@NonNull ChannelHandlerContext ctx) throws Exception {
-                                        super.channelActive(ctx);
-                                        ctx.pipeline().remove(this);
-                                        NettyClientCustomizer channelCustomizer = clientCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
-                                        new Http1ConnectionHolder(ch, channelCustomizer).init(true);
-                                    }
-                                });
-                            }
-                        };
-                        break;
-                    case H2C:
-                        initializer = new Http2UpgradeInitializer(this);
-                        break;
-                    default:
-                        throw new AssertionError("Unknown plaintext mode");
-                }
+                initializer = switch (httpVersion.getPlaintextMode()) {
+                    case HTTP_1 -> new ChannelInitializer<>() {
+                        @Override
+                        protected void initChannel(@NonNull Channel ch) throws Exception {
+                            configureProxy(ch.pipeline(), false, requestKey.getHost(), requestKey.getPort());
+                            initHttp1(ch);
+                            ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_ACTIVITY_LISTENER, new ChannelInboundHandlerAdapter() {
+                                @Override
+                                public void channelActive(@NonNull ChannelHandlerContext ctx) throws Exception {
+                                    super.channelActive(ctx);
+                                    ctx.pipeline().remove(this);
+                                    NettyClientCustomizer channelCustomizer = clientCustomizer.specializeForChannel(ch, NettyClientCustomizer.ChannelRole.CONNECTION);
+                                    new Http1ConnectionHolder(ch, channelCustomizer).init(true);
+                                }
+                            });
+                        }
+                    };
+                    case H2C -> new Http2UpgradeInitializer(this);
+                };
             }
             return doConnect(requestKey, initializer);
         }
