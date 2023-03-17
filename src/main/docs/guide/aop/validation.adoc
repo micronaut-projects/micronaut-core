@@ -4,10 +4,12 @@ Validation advice is built on https://beanvalidation.org/2.0/spec/[Bean Validati
 
 Micronaut provides native support for the `jakarta.validation` annotations with the `micronaut-validation` dependency:
 
-dependency::micronaut-validation[]
+dependency:micronaut-validation-processor[groupId="io.micronaut.validation",scope="annotationProcessor"]
 
-Or full JSR 380 compliance with the `micronaut-hibernate-validator` dependency:
+dependency:micronaut-validation[groupId="io.micronaut.validation"]
 
-dependency::micronaut-hibernate-validator[]
+Or full https://beanvalidation.org/2.0/spec/[JSR 380] compliance with the `micronaut-hibernate-validator` dependency:
+
+dependency::micronaut-hibernate-validator[groupId="io.micronaut.beanvalidation"]
 
 See the section on <<beanValidation, Bean Validation>> for more information on how to apply validation rules to your bean classes.
