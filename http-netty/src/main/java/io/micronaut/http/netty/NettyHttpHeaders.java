@@ -20,6 +20,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpHeaderValues;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
@@ -241,5 +242,18 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     @Override
     public void setConversionService(ConversionService conversionService) {
         this.conversionService = conversionService;
+    }
+
+    @Override
+    public Optional<MediaType> contentType() {
+        // optimization to avoid ConversionService
+        String str = get(HttpHeaders.CONTENT_TYPE);
+        if (str != null) {
+            try {
+                return Optional.of(MediaType.of(str));
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        return Optional.empty();
     }
 }
