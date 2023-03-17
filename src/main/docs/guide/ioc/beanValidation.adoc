@@ -1,4 +1,4 @@
-Since Micronaut 1.2, Micronaut has built-in support for validating beans annotated with `jakarta.validation` annotations. At a minimum include the `micronaut-validation` module as a compile dependency:
+Since 1.2, Micronaut framework has built-in support for validating beans annotated with `jakarta.validation` annotations. At a minimum include the `micronaut-validation` module as a compile dependency:
 
 dependency::micronaut-validation[]
 
@@ -7,7 +7,7 @@ Note that Micronaut's implementation is not currently fully compliant with the h
 The following features are unsupported at this time:
 
 * Annotations on generic argument types, since only the Java language supports this feature.
-* Any interaction with the https://beanvalidation.org/2.0/spec/#constraintmetadata[constraint metadata API], since Micronaut uses compile-time generated metadata.
+* Any interaction with the https://beanvalidation.org/2.0/spec/#constraintmetadata[constraint metadata API], since the Micronaut framework uses compile-time generated metadata.
 * XML-based configuration
 * Instead of using `jakarta.validation.ConstraintValidator`, use api:validation.validator.constraints.ConstraintValidator[] (io.micronaut.validation.validator.constraints.ConstraintValidator) to define custom constraints, which supports validating annotations at compile time.
 
@@ -34,7 +34,7 @@ snippet::io.micronaut.docs.ioc.validation.PersonService[tags="imports,class",ind
 
 The above example declares that the `@NotBlank` annotation will be validated when invoking the `sayHello` method.
 
-WARNING: If you use Kotlin, the class and method must be declared `open` so Micronaut can create a compile-time subclass. Alternatively you can annotate the class with ann:validation.Validated[] and configure the Kotlin `all-open` plugin to open classes annotated with this type. See the https://kotlinlang.org/docs/reference/compiler-plugins.html[Compiler plugins] section.
+WARNING: If you use Kotlin, the class and method must be declared `open` so Micronaut framework can create a compile-time subclass. Alternatively you can annotate the class with ann:validation.Validated[] and configure the Kotlin `all-open` plugin to open classes annotated with this type. See the https://kotlinlang.org/docs/reference/compiler-plugins.html[Compiler plugins] section.
 
 A `jakarta.validation.ConstraintViolationException` is thrown if a validation error occurs. For example:
 
@@ -90,7 +90,7 @@ To define additional constraints, create a new annotation, for example:
 snippet::io.micronaut.docs.ioc.validation.custom.DurationPattern[tags="imports,class", indent="0"]
 
 <1> The annotation should be annotated with `jakarta.validation.Constraint`
-<2> A `message` template can be provided in a hard-coded manner as above. If none is specified, Micronaut tries to find a message using `ClassName.message` using the api:context.MessageSource[] interface (optional)
+<2> A `message` template can be provided in a hard-coded manner as above. If none is specified, Micronaut framework tries to find a message using `ClassName.message` using the api:context.MessageSource[] interface (optional)
 <3> To support repeated annotations you can define an inner annotation (optional)
 
 TIP: You can add messages and message bundles using the api:context.MessageSource[] and api:context.i18n.ResourceBundleMessageSource[] classes. See <<bundle, Resource Bundles>> documentation.
@@ -127,12 +127,12 @@ You can use Micronaut's validator to validate annotation elements at compile tim
 
 dependency::micronaut-validation[scope="annotationProcessor"]
 
-Then Micronaut will at compile time validate annotation values that are themselves annotated with `jakarta.validation`. For example consider the following annotation:
+Then Micronaut framework will at compile time validate annotation values that are themselves annotated with `jakarta.validation`. For example consider the following annotation:
 
 .Annotation Validation
 snippet::io.micronaut.docs.ioc.validation.custom.TimeOff[tags="imports,class", indent="0"]
 
-If you attempt to use `@TimeOff(duration="junk")` in your source, Micronaut will fail compilation due to the `duration` value violating the `DurationPattern` constraint.
+If you attempt to use `@TimeOff(duration="junk")` in your source, Micronaut framework will fail compilation due to the `duration` value violating the `DurationPattern` constraint.
 
 NOTE: If `duration` is a property placeholder such as `@TimeOff(duration="${my.value}")`, validation is deferred until runtime.
 

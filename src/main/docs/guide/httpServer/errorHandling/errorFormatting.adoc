@@ -1,4 +1,4 @@
-Micronaut produces error response bodies via beans of type api:http.server.exceptions.response.ErrorResponseProcessor[].
+The Micronaut framework produces error response bodies via beans of type api:http.server.exceptions.response.ErrorResponseProcessor[].
 
 The default response body is link:https://github.com/blongden/vnd.error[vnd.error], however you can create your own implementation of type api:http.server.exceptions.response.ErrorResponseProcessor[] to control the responses.
 

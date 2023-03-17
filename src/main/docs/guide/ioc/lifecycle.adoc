@@ -19,7 +19,7 @@ snippet::io.micronaut.docs.lifecycle.PreDestroyBean[tags="class", indent=0]
 <1> The `PreDestroy` annotation is imported
 <2> A method is annotated with `@PreDestroy` and will be invoked when the context is closed.
 
-For factory beans, the `preDestroy` value in the api:context.annotation.Bean[] annotation tells Micronaut which method to invoke.
+For factory beans, the `preDestroy` value in the api:context.annotation.Bean[] annotation tells Micronaut framework which method to invoke.
 
 snippet::io.micronaut.docs.lifecycle.ConnectionFactory[tags="class", indent=0]
 

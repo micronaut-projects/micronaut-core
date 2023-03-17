@@ -9,7 +9,7 @@ $ mn create-app my-app --features mongo-reactive
 ----
 ====
 
-Micronaut can automatically configure the native MongoDB Java driver. To use this, add the following dependency to your build:
+The Micronaut framework can automatically configure the native MongoDB Java driver. To use this, add the following dependency to your build:
 
 dependency:micronaut-mongo-reactive[groupId="io.micronaut.mongodb"]
 

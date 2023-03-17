@@ -1,6 +1,6 @@
 https://projectlombok.org[Project Lombok] is a popular java library that adds a number of useful AST transformations to the Java language via annotation processors.
 
-Since both Micronaut and Lombok use annotation processors, special care must be taken when configuring Lombok to ensure that the Lombok processor runs *before* Micronaut's processor.
+Since both the Micronaut framework and Lombok use annotation processors, special care must be taken when configuring Lombok to ensure that the Lombok processor runs *before* Micronaut's processor.
 
 If you use Gradle, add the following dependencies:
 

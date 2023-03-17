@@ -1,4 +1,4 @@
-Since 1.1.x, Micronaut supports API versioning via a dedicated ann:core.version.annotation.Version[] annotation.
+Since 1.1.x, the Micronaut framework supports API versioning via a dedicated ann:core.version.annotation.Version[] annotation.
 
 The following example demonstrates how to version an API:
 
@@ -18,7 +18,7 @@ micronaut:
       enabled: true
 ----
 
-By default Micronaut has two strategies for resolving the version based on an HTTP header named `X-API-VERSION` or a request parameter named `api-version`, however this is configurable. A full configuration example can be seen below:
+By default, the Micronaut framework has two strategies for resolving the version based on an HTTP header named `X-API-VERSION` or a request parameter named `api-version`, however this is configurable. A full configuration example can be seen below:
 
 .Configuring Versioning
 [configuration]

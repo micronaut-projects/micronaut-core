@@ -1,4 +1,4 @@
-Like Spring and Grails, Micronaut features a api:scheduling.annotation.Scheduled[] annotation for scheduling background tasks.
+Like Spring and Grails, the Micronaut framework features a api:scheduling.annotation.Scheduled[] annotation for scheduling background tasks.
 
 == Using the @Scheduled Annotation
 
@@ -71,6 +71,6 @@ include::{includedir}configurationProperties/io.micronaut.scheduling.executor.Us
 
 == Handling Exceptions
 
-By default, Micronaut includes a api:io.micronaut.scheduling.DefaultTaskExceptionHandler[] bean that implements the api:io.micronaut.scheduling.TaskExceptionHandler[] interface and simply logs the exception if an error occurs invoking a scheduled task.
+By default, the Micronaut framework includes a api:io.micronaut.scheduling.DefaultTaskExceptionHandler[] bean that implements the api:io.micronaut.scheduling.TaskExceptionHandler[] interface and simply logs the exception if an error occurs invoking a scheduled task.
 
 If you have custom requirements you can replace this bean with your own implementation (for example to send an email or shutdown the context to fail fast). To do so, write your own api:io.micronaut.scheduling.TaskExceptionHandler[] and annotate it with `@Replaces(DefaultTaskExceptionHandler.class)`.
