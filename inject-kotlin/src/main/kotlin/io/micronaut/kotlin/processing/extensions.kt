@@ -99,6 +99,28 @@ internal fun KSAnnotated.getClassDeclaration(visitorContext: KotlinVisitorContex
             val declaration = this.type.resolve().declaration
             return declaration.getClassDeclaration(visitorContext)
         }
+        is KSValueParameter -> {
+            val p = this.parent
+            if (p is KSDeclaration) {
+                return p.getClassDeclaration(visitorContext)
+            } else {
+                return visitorContext.resolver.getJavaClassByName(Object::class.java.name)!!
+            }
+        }
+        is KSFunctionDeclaration -> {
+            val parentDeclaration = this.parentDeclaration
+            if (parentDeclaration != null) {
+                return parentDeclaration.getClassDeclaration(visitorContext)
+            }
+            return visitorContext.resolver.getJavaClassByName(Object::class.java.name)!!
+        }
+        is KSPropertyDeclaration -> {
+            val parentDeclaration = this.parentDeclaration
+            if (parentDeclaration != null) {
+                return parentDeclaration.getClassDeclaration(visitorContext)
+            }
+            return visitorContext.resolver.getJavaClassByName(Object::class.java.name)!!
+        }
         else -> {
             return visitorContext.resolver.getJavaClassByName(Object::class.java.name)!!
         }

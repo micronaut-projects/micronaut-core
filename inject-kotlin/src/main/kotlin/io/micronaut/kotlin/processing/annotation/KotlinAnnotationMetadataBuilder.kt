@@ -325,7 +325,18 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
             is Array<*> -> {
                 toArray(annotationValue.toList(), originatingElement)
             }
-            else -> readAnnotationValue(originatingElement, annotationValue)
+            else -> {
+                if (isEvaluatedExpression(annotationValue)) {
+                    return buildEvaluatedExpressionReference(
+                        originatingElement,
+                        annotationName,
+                        memberName,
+                        annotationValue
+                    )
+                } else {
+                    return readAnnotationValue(originatingElement, annotationValue)
+                }
+            }
         }
     }
 
@@ -367,8 +378,13 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
         }
     }
 
-    override fun getOriginatingClassName(orginatingElement: KSAnnotated?): String {
-        TODO("Not yet implemented")
+    override fun getOriginatingClassName(orginatingElement: KSAnnotated): String {
+        return if (orginatingElement is KSClassDeclaration) {
+            orginatingElement.getBinaryName(resolver, visitorContext)
+        } else {
+            val classDeclaration = orginatingElement.getClassDeclaration(visitorContext)
+            classDeclaration.getBinaryName(resolver, visitorContext)
+        }
     }
 
     private fun readDefaultValuesReflectively(classDeclaration : KSClassDeclaration, annotationType: KSAnnotated, vararg path : String): MutableMap<KSDeclaration, Any> {
@@ -446,12 +462,21 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
                 val values: Map<out KSDeclaration, *> = readAnnotationRawValues(annotationMirror)
                 val converted: MutableMap<CharSequence, Any> = mutableMapOf()
                 for ((key, value1) in values) {
-                    val value = value1!!
+                    var value = value1!!
+                    val memberName = key.simpleName.asString()
+                    if (isEvaluatedExpression(value)) {
+                        value = buildEvaluatedExpressionReference(
+                            originatingElement,
+                            annotationName,
+                            memberName,
+                            value
+                        )
+                    }
                     readAnnotationRawValues(
                         originatingElement,
                         annotationName,
                         key,
-                        key.simpleName.asString(),
+                        memberName,
                         value,
                         converted
                     )
