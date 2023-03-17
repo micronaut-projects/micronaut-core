@@ -17,12 +17,16 @@ package io.micronaut.http.server.netty.cors
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Nullable
-import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.core.util.StringUtils
-import io.micronaut.http.*
+import io.micronaut.http.HttpAttributes
+import io.micronaut.http.HttpHeaders
+import io.micronaut.http.HttpMethod
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.http.server.HttpServerConfiguration
 import io.micronaut.http.server.cors.CorsFilter
 import io.micronaut.http.server.cors.CorsOriginConfiguration
@@ -32,8 +36,6 @@ import io.micronaut.web.router.RouteMatch
 import io.micronaut.web.router.Router
 import io.micronaut.web.router.UriRouteMatch
 import org.apache.http.client.utils.URIBuilder
-import org.reactivestreams.Publisher
-import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -41,7 +43,13 @@ import spock.lang.Unroll
 
 import java.util.stream.Collectors
 
-import static io.micronaut.http.HttpHeaders.*
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_MAX_AGE
+import static io.micronaut.http.HttpHeaders.VARY
 
 class CorsFilterSpec extends Specification {
 
@@ -56,7 +64,7 @@ class CorsFilterSpec extends Specification {
         HttpRequest request = createRequest(null as String)
 
         when:
-        Optional<MutableHttpResponse<?>> result = Mono.from(corsHandler.doFilter(request, okChain())).blockOptional()
+        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
 
         then: "the request is passed through"
         result.isPresent()
@@ -79,7 +87,7 @@ class CorsFilterSpec extends Specification {
         CorsFilter corsHandler = buildCorsHandler(config)
 
         when:
-        Optional<MutableHttpResponse<?>> result = Mono.from(corsHandler.doFilter(request, okChain())).blockOptional()
+        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
 
         then:
         result.isPresent()
@@ -104,7 +112,7 @@ class CorsFilterSpec extends Specification {
         CorsFilter corsHandler = buildCorsHandler(config)
 
         when:
-        Optional<MutableHttpResponse<?>> result = Mono.from(corsHandler.doFilter(request, okChain())).blockOptional()
+        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
 
         then:
         result.isPresent()
@@ -146,7 +154,7 @@ class CorsFilterSpec extends Specification {
         CorsFilter corsHandler = buildCorsHandler(config)
 
         when:
-        Optional<MutableHttpResponse<?>> result = Mono.from(corsHandler.doFilter(request, okChain())).blockOptional()
+        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
 
         then:
         result.isPresent()
@@ -172,7 +180,7 @@ class CorsFilterSpec extends Specification {
         CorsFilter corsHandler = buildCorsHandler(config)
 
         when:
-        Optional<MutableHttpResponse<?>> result = Mono.from(corsHandler.doFilter(request, okChain())).blockOptional()
+        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
 
         then:
         result.isPresent()
@@ -219,7 +227,7 @@ class CorsFilterSpec extends Specification {
         CorsFilter corsHandler = buildCorsHandler(config)
 
         when:
-        Optional<MutableHttpResponse<?>> result = Mono.from(corsHandler.doFilter(request, okChain())).blockOptional()
+        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
 
         then:
         result.isPresent()
@@ -260,7 +268,7 @@ class CorsFilterSpec extends Specification {
 
 
         when:
-        Optional<MutableHttpResponse<?>> result = Mono.from(corsHandler.doFilter(request, okChain())).blockOptional()
+        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
 
         then:
         result.isPresent()
@@ -301,7 +309,7 @@ class CorsFilterSpec extends Specification {
         }
 
         when:
-        Optional<MutableHttpResponse<?>> result = Mono.from(corsHandler.doFilter(request, okChain())).blockOptional()
+        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
 
         then:
         notThrown(NullPointerException)
@@ -339,7 +347,7 @@ class CorsFilterSpec extends Specification {
         CorsFilter corsHandler = buildCorsHandler(config)
 
         when:
-        Optional<MutableHttpResponse<?>> result = Mono.from(corsHandler.doFilter(request, okChain())).blockOptional()
+        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
 
         then:
         result.isPresent()
@@ -383,7 +391,7 @@ class CorsFilterSpec extends Specification {
         CorsFilter corsHandler = buildCorsHandler(config)
 
         when:
-        Optional<MutableHttpResponse<?>> result = Mono.from(corsHandler.doFilter(request, okChain())).blockOptional()
+        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
 
         then:
         result.isPresent()
@@ -431,7 +439,7 @@ class CorsFilterSpec extends Specification {
         request.getAttribute(HttpAttributes.AVAILABLE_HTTP_METHODS, _) >> Optional.of(routes.stream().map(route->route.getHttpMethod()).collect(Collectors.toList()))
 
         when:
-        Optional<MutableHttpResponse<?>> result = Mono.from(corsHandler.doFilter(request, okChain())).blockOptional()
+        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
 
         then:
         result.isPresent()
@@ -481,7 +489,7 @@ class CorsFilterSpec extends Specification {
         CorsFilter corsHandler = buildCorsHandler(config)
 
         when:
-        Optional<MutableHttpResponse<?>> result = Mono.from(corsHandler.doFilter(request, okChain())).blockOptional()
+        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
 
         then:
         result.isPresent()
@@ -522,7 +530,7 @@ class CorsFilterSpec extends Specification {
         request.getAttribute(HttpAttributes.AVAILABLE_HTTP_METHODS, _) >> Optional.of(routes.stream().map(route->route.getHttpMethod()).collect(Collectors.toList()))
 
         when:
-        Optional<MutableHttpResponse<?>> result = Mono.from(corsHandler.doFilter(request, okChain())).blockOptional()
+        Optional<MutableHttpResponse<?>> result = filterOk(corsHandler, request)
 
         then:
         result.isPresent()
@@ -554,13 +562,14 @@ class CorsFilterSpec extends Specification {
         }
     }
 
-    private ServerFilterChain okChain() {
-        new ServerFilterChain() {
-            @Override
-            Publisher<MutableHttpResponse<?>> proceed(HttpRequest<?> req) {
-                Publishers.just(HttpResponse.ok())
-            }
+    private Optional<HttpResponse<?>> filterOk(CorsFilter filter, HttpRequest<?> req) {
+        def earlyResponse = filter.filterRequest(req)
+        if (earlyResponse != null) {
+            return Optional.of(earlyResponse)
         }
+        MutableHttpResponse<?> response = HttpResponse.ok()
+        filter.filterResponse(req, response)
+        return Optional.of(response)
     }
 
     private HttpServerConfiguration.CorsConfiguration enabledCorsConfiguration(Map<String, CorsOriginConfiguration> corsConfigurationMap = null) {
