@@ -57,7 +57,7 @@ public class FullHttpStackBenchmark {
 
         Options opt = new OptionsBuilder()
             .include(FullHttpStackBenchmark.class.getName() + ".*")
-            .warmupIterations(4)
+            .warmupIterations(15)
             .measurementIterations(30)
             .mode(Mode.AverageTime)
             .timeUnit(TimeUnit.NANOSECONDS)
@@ -83,6 +83,8 @@ public class FullHttpStackBenchmark {
             Stack stack = this.stack.openChannel();
             ctx = stack.closeable;
             channel = stack.serverChannel;
+
+            channel.freezeTime();
 
             EmbeddedChannel clientChannel = new EmbeddedChannel();
             clientChannel.pipeline().addLast(new HttpClientCodec());
@@ -126,6 +128,7 @@ public class FullHttpStackBenchmark {
 
         private ByteBuf exchange() {
             channel.writeInbound(requestBytes.retainedDuplicate());
+            channel.runPendingTasks();
             CompositeByteBuf response = PooledByteBufAllocator.DEFAULT.compositeBuffer();
             while (true) {
                 ByteBuf part = channel.readOutbound();
