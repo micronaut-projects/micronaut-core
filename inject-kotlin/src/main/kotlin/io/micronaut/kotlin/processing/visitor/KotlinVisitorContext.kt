@@ -25,6 +25,8 @@ import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.convert.value.MutableConvertibleValues
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
 import io.micronaut.core.util.StringUtils
+import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory
+import io.micronaut.expressions.context.ExpressionCompilationContextFactory
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
@@ -51,6 +53,7 @@ internal open class KotlinVisitorContext(
     private val outputVisitor = KotlinOutputVisitor(environment)
     val annotationMetadataBuilder: KotlinAnnotationMetadataBuilder
     private val elementAnnotationMetadataFactory: KotlinElementAnnotationMetadataFactory
+    private val expressionCompilationContextFactory : ExpressionCompilationContextFactory
 
     init {
         visitorAttributes = MutableConvertibleValuesMap()
@@ -58,6 +61,7 @@ internal open class KotlinVisitorContext(
         elementFactory = KotlinElementFactory(this)
         elementAnnotationMetadataFactory =
             KotlinElementAnnotationMetadataFactory(false, annotationMetadataBuilder)
+        expressionCompilationContextFactory = DefaultExpressionCompilationContextFactory(this)
     }
 
     override fun <T : Any?> get(
@@ -173,6 +177,10 @@ internal open class KotlinVisitorContext(
     override fun getElementFactory(): KotlinElementFactory = elementFactory
     override fun getElementAnnotationMetadataFactory(): ElementAnnotationMetadataFactory {
         return elementAnnotationMetadataFactory
+    }
+
+    override fun getExpressionCompilationContextFactory(): ExpressionCompilationContextFactory {
+        return expressionCompilationContextFactory
     }
 
     override fun getAnnotationMetadataBuilder(): AbstractAnnotationMetadataBuilder<*, *> {
