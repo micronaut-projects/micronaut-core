@@ -1,0 +1,1 @@
+Read the link:{micronautupgradedocs}[Micronaut Upgrade] documentation for instructions to update from previous Micronaut versions.

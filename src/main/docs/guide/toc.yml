@@ -1,6 +1,6 @@
+upgradeToMN4: Update to Micronaut framework 4.0
 introduction:
   title: Introduction
-  whatsNew: What's New?
   upgrading: Upgrading to Micronaut 3.x
 quickStart:
   title: Quick Start
@@ -339,4 +339,7 @@ appendix:
   faq: Frequently Asked Questions (FAQ)
   usingsnapshots: Using Snapshots
   problems: Common Problems
+releases:
+  title: Releases
+  whatsNew: What's New?
   breaks: Breaking Changes
