@@ -30,7 +30,6 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.VersionUtils;
-import io.micronaut.expressions.context.ExpressionCompilationContextRegistry;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.EnumConstantElement;
@@ -296,7 +295,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = javaVisitorContext.getBeanElementBuilders();
         if (CollectionUtils.isNotEmpty(beanDefinitionBuilders)) {
             try {
-//                EvaluatedExpressionContextInitializer.initEvaluatedExpressionContext(roundEnv, modelUtils, javaVisitorContext);
                 AbstractBeanDefinitionBuilder.writeBeanDefinitionBuilders(classWriterOutputVisitor, beanDefinitionBuilders);
             } catch (IOException e) {
                 // raise a compile error
@@ -308,7 +306,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         if (roundEnv.processingOver()) {
             javaVisitorContext.finish();
             writeBeanDefinitionsToMetaInf();
-            ExpressionCompilationContextRegistry.reset();
         }
         return false;
     }

@@ -28,9 +28,7 @@ import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.expressions.EvaluatedExpressionWriter;
-import io.micronaut.expressions.context.ExpressionCompilationContextRegistry;
 import io.micronaut.expressions.context.ExpressionWithContext;
-import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.processing.BeanDefinitionCreator;
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
@@ -261,9 +259,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     }
                 }
             } finally {
-                AbstractAnnotationMetadataBuilder.clearMutated();
-                JavaAnnotationMetadataBuilder.clearCaches();
-                ExpressionCompilationContextRegistry.reset();
+                BeanDefinitionWriter.finish();
             }
         }
 

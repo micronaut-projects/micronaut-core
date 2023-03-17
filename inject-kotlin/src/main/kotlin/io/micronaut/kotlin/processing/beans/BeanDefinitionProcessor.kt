@@ -27,6 +27,7 @@ import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
 import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
+import io.micronaut.inject.writer.BeanDefinitionWriter
 import io.micronaut.kotlin.processing.KotlinOutputVisitor
 import io.micronaut.kotlin.processing.visitor.KotlinClassElement
 import io.micronaut.kotlin.processing.visitor.KotlinNativeElement
@@ -103,7 +104,7 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
         } catch (e: ProcessingException) {
             handleProcessingException(environment, e)
         } finally {
-            AbstractAnnotationMetadataBuilder.clearMutated()
+            BeanDefinitionWriter.finish()
             beanDefinitionMap.clear()
         }
     }

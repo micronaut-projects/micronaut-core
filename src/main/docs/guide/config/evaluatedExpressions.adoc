@@ -224,27 +224,41 @@ Type Reference can be used to invoke a static method of a class
 
 By default, the only methods you can invoke inside Evaluated Expressions are static methods using type references.
 
-To invoke non-static methods, you need to place `@EvaluatedExpressionContext` annotation on a class owning the
-method you want to invoke inside expression. In this case the annotated class is registered within evaluation context
-which makes its methods and properties available for referencing in evaluated expressions. Any context reference
+The available methods can be extended by extended the evaluation context. There are two ways to extend the evaluation context. The first involves registering new context class via a custom api:TypeElementVisitor[].
+
+NOTE: The api:TypeElementVisitor[] has to be on the annotation processor classpath, therefore needs to be defined in a separate module that can be included on this classpath.
+
+Once a class is registered within evaluation context the methods and properties of the class are available for referencing in evaluated expressions. Any context reference
 needs to be prefixed with `#` sign.
 
 Consider the following example:
 
 .User-defined evaluated expression context
-[source, java]
+[source,java]
 ----
-import io.micronaut.context.annotation.EvaluatedExpressionContext;
 import jakarta.inject.Singleton;
 import java.util.Random;
 
-@EvaluatedExpressionContext
+@Singleton
 public class CustomEvaluationContext {
-
     public int generateRandom(int min, int max) {
         return new Random().nextInt(max - min) + min;
     }
+}
+----
 
+NOTE: The class should be resolvable as a bean can use `jakarta.inject` annotations to inject other types if necessary.
+
+Registering this class can be achieved with a custom implementation of api:expressions.context.ExpressionEvaluationContextRegistrar[] that is registered via service loader as a api:inject.visitor.TypeElementVisitor[] (create a new `META-INF/services/io.micronaut.inject.visitor.TypeElementVisitor` file referencing the new class) and placed on the annotation processor classpath:
+
+[source,java]
+----
+public class ContextRegistrar implements ExpressionEvaluationContextRegistrar {
+        @Override
+        public String getContextClassName() {
+            return "example.CustomEvaluationContext"
+        }
+    }
 }
 ----
 
@@ -265,23 +279,21 @@ public class ContextConsumer {
 }
 ----
 
-Note that annotating a class with `@EvaluatedExpressionContext` makes it a bean. By default, it will be treated as
-singleton, but you can specify an alternative scope if required. At runtime, the bean will be retrieved from
+At runtime, the bean will be retrieved from
 application context and respective method will be invoked.
 
 If a matching method is not found within evaluation context at compilation time, the compilation will fail. A
 compilation error will also occur if multiple suitable methods are found in the evaluation context, keep that in mind
-if you annotate multiple classes with `@EvaluatedExpressionContext`.
+if you provide multiple api:expressions.context.ExpressionEvaluationContextRegistrar[] that a conflict can occur as these types are effectively global.
 
 The methods will be considered ambiguous (leading to compilation failure) when their names are the same and list of
 provided arguments matches multiple methods parameters.
 
-The class annotated with `@EvaluatedExpressionContext` needs to reside within the same module as the classes referencing
-its methods or properties.
+Using a api:expressions.context.ExpressionEvaluationContextRegistrar[] makes its methods and properties available for evaluated
+expressions within any annotation in a global manner.
 
-Annotating a class with `@EvaluatedExpressionContext` makes its methods and properties available for evaluated
-expressions within any annotation. However, you can also specify evaluation context scoped to concrete annotation or
-annotation member using `@AnnotationExpressionContext`.
+However, you can also specify evaluation context scoped to concrete annotation or
+annotation member using ann:context.annotation.AnnotationExpressionContext[].
 
 .Usage of annotation level evaluated expression context
 [source, java]
@@ -316,7 +328,7 @@ class AnnotationMemberContext {
 }
 ----
 
-In this case the context classes need to be explicitly defined as beans to make them available for retrieval from
+Again context classes need to be explicitly defined as beans to make them available for retrieval from
 application context at runtime.
 
 === Method Invocation
@@ -325,13 +337,12 @@ You can invoke both static methods using type references, methods from evaluatio
 which means method chaining is supported.
 
 .Chaining methods in expression
-[source, java]
+[source,java]
 ----
-import io.micronaut.context.annotation.EvaluatedExpressionContext;
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Singleton;
 
-@EvaluatedExpressionContext
+@Singleton
 class CustomEvaluationContext {
 
     public String stringValue() {
@@ -354,13 +365,12 @@ invoke it providing list of arguments separated by comma without explicitly wrap
 it will be treated in same way as if last method argument was explicitly specified as varargs parameter.
 
 .Invoking varargs methods in expressions
-[source, java]
+[source,java]
 ----
-import io.micronaut.context.annotation.EvaluatedExpressionContext;
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Singleton;
 
-@EvaluatedExpressionContext
+@Singleton
 class CustomEvaluationContext {
 
     public int countIntegers(int... values) {
@@ -391,13 +401,13 @@ JavaBean properties can be accessed simply be referencing their names from evalu
 properties can also be chained with dot in the same way as methods.
 
 .Accessing bean properties in expressions
-[source, java]
+[source,java]
 ----
-import io.micronaut.context.annotation.EvaluatedExpressionContext;
+
 import io.micronaut.context.annotation.Value;
 import jakarta.inject.Singleton;
 
-@EvaluatedExpressionContext
+@Singleton
 class CustomEvaluationContext {
 
     public String getName() {

@@ -118,14 +118,13 @@ class TestExpressionsInjectionSpec extends AbstractEvaluatedExpressionsSpec {
             package test;
 
             import io.micronaut.context.annotation.Bean;
-            import io.micronaut.context.annotation.EvaluatedExpressionContext;
             import io.micronaut.context.annotation.Factory;
             import jakarta.inject.Inject;
             import jakarta.inject.Singleton;
             import io.micronaut.context.annotation.Value;
 
-            @EvaluatedExpressionContext
-            class TestContext {
+            @jakarta.inject.Singleton
+            class Context {
                 public String getContextValue() {
                     return "context value";
                 }

@@ -35,14 +35,14 @@ import static io.micronaut.inject.ast.ElementQuery.ALL_METHODS;
 import static java.util.function.Predicate.not;
 
 /**
- * Default implementation of {@link ExtendableExpressionCompilationContext}. Extending
+ * Default implementation of {@link ExtensibleExpressionCompilationContext}. Extending
  * this context will always return new instance instead of modifying the existing one.
  *
  * @since 4.0.0
  * @author Sergey Gavrilov
  */
 @Internal
-public class DefaultExpressionCompilationContext implements ExtendableExpressionCompilationContext {
+public class DefaultExpressionCompilationContext implements ExtensibleExpressionCompilationContext {
 
     private final Collection<ClassElement> classElements;
     private final MethodElement methodElement;

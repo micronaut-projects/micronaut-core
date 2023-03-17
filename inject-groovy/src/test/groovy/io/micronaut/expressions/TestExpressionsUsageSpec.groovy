@@ -64,7 +64,6 @@ class TestExpressionsUsageSpec extends AbstractBeanDefinitionSpec {
             package test
 
             import io.micronaut.context.annotation.ConfigurationProperties
-            import io.micronaut.context.annotation.EvaluatedExpressionContext
             import io.micronaut.context.annotation.Requires
 
             import jakarta.inject.Singleton
@@ -75,8 +74,8 @@ class TestExpressionsUsageSpec extends AbstractBeanDefinitionSpec {
             }
 
             @ConfigurationProperties('test')
-            @EvaluatedExpressionContext
-            class TestContext {
+            @jakarta.inject.Singleton
+            class Context {
                 boolean enabled
             }
         """)
@@ -100,7 +99,6 @@ class TestExpressionsUsageSpec extends AbstractBeanDefinitionSpec {
             package test
 
             import io.micronaut.context.annotation.ConfigurationProperties
-            import io.micronaut.context.annotation.EvaluatedExpressionContext
             import io.micronaut.context.annotation.Requires
 
             import jakarta.inject.Singleton
@@ -111,8 +109,8 @@ class TestExpressionsUsageSpec extends AbstractBeanDefinitionSpec {
             }
 
             @ConfigurationProperties('test')
-            @EvaluatedExpressionContext
-            class TestContext {
+            @jakarta.inject.Singleton
+            class Context {
                 boolean enabled
             }
         """)

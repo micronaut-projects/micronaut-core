@@ -8,7 +8,7 @@ class ArrayMethodsExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
         given:
         Object expr1 = evaluateAgainstContext("#{ #countValues(1, 2, 3) }",
                 """
-            @EvaluatedExpressionContext
+            @jakarta.inject.Singleton
             class Context {
                 int countValues(int... array) {
                     return array.length;
@@ -18,7 +18,7 @@ class ArrayMethodsExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
 
         Object expr2 = evaluateAgainstContext("#{ #countValues(1) }",
                 """
-            @EvaluatedExpressionContext
+            @jakarta.inject.Singleton
             class Context {
                 int countValues(int... array) {
                     return array.length;
@@ -28,7 +28,7 @@ class ArrayMethodsExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
 
         Object expr3 = evaluateAgainstContext("#{ #countValues() }",
                 """
-            @EvaluatedExpressionContext
+            @jakarta.inject.Singleton
             class Context {
                 int countValues(int... array) {
                     return array.length;
@@ -38,7 +38,7 @@ class ArrayMethodsExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
 
         Object expr4 = evaluateAgainstContext("#{ #countValues(1, 2, T(Integer).valueOf('3')) }",
                 """
-            @EvaluatedExpressionContext
+            @jakarta.inject.Singleton
             class Context {
                 int countValues(Integer... array) {
                     return array.length;
@@ -57,7 +57,7 @@ class ArrayMethodsExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
         given:
         Object expr1 = evaluateAgainstContext("#{ #countValues('a', 'b', 'c') }",
                 """
-            @EvaluatedExpressionContext
+            @jakarta.inject.Singleton
             class Context {
                 int countValues(String... values) {
                     return values.length;
@@ -67,7 +67,7 @@ class ArrayMethodsExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
 
         Object expr2 = evaluateAgainstContext("#{ #countValues('a') }",
                 """
-            @EvaluatedExpressionContext
+            @jakarta.inject.Singleton
             class Context {
                 int countValues(String... values) {
                     return values.length;
@@ -77,7 +77,7 @@ class ArrayMethodsExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
 
         Object expr3 = evaluateAgainstContext("#{ #countValues() }",
                 """
-            @EvaluatedExpressionContext
+            @jakarta.inject.Singleton
             class Context {
                 int countValues(String... values) {
                     return values.length;
@@ -95,7 +95,7 @@ class ArrayMethodsExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
         given:
         Object expr1 = evaluateAgainstContext("#{ #multiplyLength(3, '1', 8, null) }",
                 """
-            @EvaluatedExpressionContext
+            @jakarta.inject.Singleton
             class Context {
                 int multiplyLength(int time, Object... values) {
                     return values.length * time;
@@ -111,7 +111,7 @@ class ArrayMethodsExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
         given:
         Object expr1 = evaluateAgainstContext("#{ #multiplyLength(3, '1', 8, null) }",
                 """
-            @EvaluatedExpressionContext
+            @jakarta.inject.Singleton
             class Context {
                 int multiplyLength(Integer time, Object[] values) {
                     return values.length * time;
@@ -127,7 +127,7 @@ class ArrayMethodsExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
         given:
         Object expr1 = evaluateAgainstContext("#{ #countLength(#values()) }",
                 """
-            @EvaluatedExpressionContext
+            @jakarta.inject.Singleton
             class Context {
                 String[] values() {
                     return new String[]{"a", "b", "c"};
@@ -141,7 +141,7 @@ class ArrayMethodsExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
 
         Object expr2 = evaluateAgainstContext("#{ #multiplyLength(#values(), 3) }",
                 """
-            @EvaluatedExpressionContext
+            @jakarta.inject.Singleton
             class Context {
                 String[] values() {
                     return new String[]{"a", "b"};
@@ -155,7 +155,7 @@ class ArrayMethodsExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
 
         Object expr3 = evaluateAgainstContext("#{ #multiplyLength(#values(), 1) }",
                 """
-            @EvaluatedExpressionContext
+            @jakarta.inject.Singleton
             class Context {
                 int[] values() {
                     return new int[]{1, 2};
@@ -179,7 +179,7 @@ class ArrayMethodsExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
                 """
             import java.util.Arrays;
 
-            @EvaluatedExpressionContext
+            @jakarta.inject.Singleton
             class Context {
                 String[][] values() {
                     return new String[][]{new String[]{"a", "b", "c"}, new String[]{"a", "b"}};
@@ -197,7 +197,7 @@ class ArrayMethodsExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
                 """
             import java.util.Arrays;
 
-            @EvaluatedExpressionContext
+            @jakarta.inject.Singleton
             class Context {
                 int[][] values() {
                     return new int[][]{new int[]{1, 2, 3}, new int[]{1, 2, 3, 4}};

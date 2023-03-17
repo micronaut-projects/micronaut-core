@@ -26,7 +26,7 @@ class TypeIdentifierExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
         given:
         Object expr1 = evaluateAgainstContext("#{ #getType(T(java.lang.String)) }",
                 """
-            @EvaluatedExpressionContext
+            @jakarta.inject.Singleton
             class Context {
                 Class<?> getType(Class<?> type) {
                     return type;
@@ -36,7 +36,7 @@ class TypeIdentifierExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
 
         Object expr2 = evaluateAgainstContext("#{ #getType(T(String), T(Object)) }",
                 """
-            @EvaluatedExpressionContext
+            @jakarta.inject.Singleton
             class Context {
                 Class<?> getType(Class<?>... types) {
                     return types[1];

@@ -66,7 +66,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.expressions.context.ExpressionCompilationContext;
 import io.micronaut.expressions.context.ExpressionWithContext;
-import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
+import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory;
 import io.micronaut.expressions.util.EvaluatedExpressionsUtils;
 import io.micronaut.inject.AdvisedBeanType;
 import io.micronaut.inject.BeanDefinition;
@@ -78,6 +78,7 @@ import io.micronaut.inject.InjectableBeanDefinition;
 import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
 import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.ValidatedBeanDefinition;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
@@ -581,7 +582,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private ExecutableMethodsDefinitionWriter executableMethodsDefinitionWriter;
 
     private final Collection<ExpressionWithContext> evaluatedExpressions = new ArrayList<>(2);
-    private final ExpressionCompilationContextFactory expressionCompilationContextFactory;
+    private final DefaultExpressionCompilationContextFactory expressionCompilationContextFactory;
 
     private Object constructor; // MethodElement or FieldElement
     private boolean disabled = false;
@@ -717,7 +718,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.isConfigurationProperties = isConfigurationProperties(annotationMetadata);
         validateExposedTypes(annotationMetadata, visitorContext);
         this.visitorContext = visitorContext;
-        this.expressionCompilationContextFactory = new ExpressionCompilationContextFactory(visitorContext);
+        this.expressionCompilationContextFactory = new DefaultExpressionCompilationContextFactory(visitorContext);
         processEvaluatedExpressions(this.annotationMetadata);
 
         beanTypeInnerClasses = beanTypeElement.getEnclosedElements(ElementQuery.of(ClassElement.class))
@@ -4631,6 +4632,17 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @Override
     public boolean isProxiedBean() {
         return proxiedBean;
+    }
+
+
+    /**
+     * Finish any work writing beans.
+     */
+    @Internal
+    public static void finish() {
+        AbstractAnnotationMetadataBuilder.clearMutated();
+        AbstractAnnotationMetadataBuilder.clearCaches();
+        DefaultExpressionCompilationContextFactory.reset();
     }
 
     @Internal

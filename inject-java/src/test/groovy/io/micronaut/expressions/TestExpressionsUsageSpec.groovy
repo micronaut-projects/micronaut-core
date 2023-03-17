@@ -63,7 +63,6 @@ class TestExpressionsUsageSpec extends AbstractEvaluatedExpressionsSpec {
             package test;
 
             import io.micronaut.context.annotation.ConfigurationProperties;
-            import io.micronaut.context.annotation.EvaluatedExpressionContext;
             import io.micronaut.context.annotation.Requires;
 
             import jakarta.inject.Singleton;
@@ -74,8 +73,8 @@ class TestExpressionsUsageSpec extends AbstractEvaluatedExpressionsSpec {
             }
 
             @ConfigurationProperties("test")
-            @EvaluatedExpressionContext
-            class TestContext {
+            @jakarta.inject.Singleton
+            class Context {
                 private boolean enabled;
 
                 public void setEnabled(boolean enabled) {

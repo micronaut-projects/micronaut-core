@@ -17,9 +17,6 @@ import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
 import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.inject.ExecutableMethod
-import io.micronaut.inject.beans.visitor.MappedSuperClassIntrospectionMapper
-import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
-import io.micronaut.inject.beans.visitor.EvaluatedExpressionContextTypeElementVisitor
 import io.micronaut.kotlin.processing.elementapi.SomeEnum
 import io.micronaut.kotlin.processing.elementapi.TestClass
 

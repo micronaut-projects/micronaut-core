@@ -19,9 +19,17 @@ import io.micronaut.context.expressions.AbstractEvaluatedExpression
 import io.micronaut.context.expressions.DefaultExpressionEvaluationContext
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.core.expressions.EvaluatedExpressionReference
+import io.micronaut.expressions.context.ExpressionEvaluationContextRegistrar
+import io.micronaut.inject.visitor.TypeElementVisitor
+import io.micronaut.inject.visitor.VisitorContext
 import org.intellij.lang.annotations.Language
 
 abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec {
+
+    @Override
+    protected Collection<TypeElementVisitor> getLocalTypeElementVisitors() {
+        return [new ContextRegistrar()]
+    }
 
     List<Object> evaluateMultiple(String... expressions) {
 
@@ -38,7 +46,6 @@ abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec 
         def cls = """
             package test;
             import io.micronaut.context.annotation.Value;
-            import io.micronaut.context.annotation.EvaluatedExpressionContext;
 
             class Expr {
                 ${classContent}
@@ -75,7 +82,6 @@ abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec 
         def cls = """
             package test;
             import io.micronaut.context.annotation.Value;
-            import io.micronaut.context.annotation.EvaluatedExpressionContext;
             import jakarta.inject.Singleton;
 
             ${contextClass}
@@ -122,6 +128,29 @@ abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec 
             return exprClass.evaluate(new DefaultExpressionEvaluationContext(args, applicationContext, null))
         } catch (ClassNotFoundException e) {
             return null
+        }
+    }
+
+    static class ContextRegistrar implements TypeElementVisitor<Object, Object> {
+        static final List<String> CLASSES = ["test.Context"]
+
+        static void setClasses(String...classes) {
+            CLASSES.clear()
+            CLASSES.addAll(classes)
+        }
+
+        static void reset() {
+            CLASSES.clear()
+            CLASSES.add("test.Context")
+        }
+
+        @Override
+        void start(VisitorContext visitorContext) {
+            for (cls in CLASSES) {
+                visitorContext.getClassElement(cls).ifPresent {
+                    visitorContext.expressionCompilationContextFactory.registerContextClass(it)
+                }
+            }
         }
     }
 }

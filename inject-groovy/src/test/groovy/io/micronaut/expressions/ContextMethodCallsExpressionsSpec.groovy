@@ -8,8 +8,8 @@ class ContextMethodCallsExpressionsSpec extends AbstractEvaluatedExpressionsSpec
         given:
         Object expr1 = evaluateAgainstContext("#{ #getIntValue() }",
         """
-            @EvaluatedExpressionContext
-            class ExpressionContext {
+            @jakarta.inject.Singleton
+            class Context {
                 public int getIntValue() {
                     return 15
                 }
@@ -18,8 +18,8 @@ class ContextMethodCallsExpressionsSpec extends AbstractEvaluatedExpressionsSpec
 
         Object expr2 = evaluateAgainstContext("#{ #getStringValue().toUpperCase() }",
         """
-            @EvaluatedExpressionContext
-            class ExpressionContext {
+            @jakarta.inject.Singleton
+            class Context {
                 String getStringValue() {
                     return "test"
                 }
@@ -30,8 +30,8 @@ class ContextMethodCallsExpressionsSpec extends AbstractEvaluatedExpressionsSpec
         """
             import java.util.Random
 
-            @EvaluatedExpressionContext
-            class ExpressionContext {
+            @jakarta.inject.Singleton
+            class Context {
                 Random randomizer() {
                     return new Random()
                 }
@@ -42,40 +42,46 @@ class ContextMethodCallsExpressionsSpec extends AbstractEvaluatedExpressionsSpec
         """
             import java.util.Random
 
-            @EvaluatedExpressionContext
-            class ExpressionContext {
+            @jakarta.inject.Singleton
+            class Context {
                 String lowercase(String value) {
                     return value.toLowerCase()
                 }
             }
         """)
 
+        ContextRegistrar.setClasses(
+                "test.FirstContext",
+                "test.SecondContext",
+                "test.ThirdContext",
+                "test.FourthContext"
+        )
         Object expr5 = evaluateAgainstContext("#{ #transform(#getName(), #getRepeat(), #toLower()) }",
         """
             import java.util.Random
 
-            @EvaluatedExpressionContext
+            @jakarta.inject.Singleton
             class FirstContext {
                 String transform(String value, int repeat, Boolean toLower) {
                     return (toLower ? value.toLowerCase() : value).repeat(repeat)
                 }
             }
 
-            @EvaluatedExpressionContext
+            @jakarta.inject.Singleton
             class SecondContext {
                 String getName() {
                     return "TEST"
                 }
             }
 
-            @EvaluatedExpressionContext
+            @jakarta.inject.Singleton
             class ThirdContext {
                 Integer getRepeat() {
                     return 2
                 }
             }
 
-            @EvaluatedExpressionContext
+            @jakarta.inject.Singleton
             class FourthContext {
                 boolean toLower() {
                     return true
@@ -83,12 +89,13 @@ class ContextMethodCallsExpressionsSpec extends AbstractEvaluatedExpressionsSpec
             }
         """)
 
+        ContextRegistrar.reset()
         Object expr6 = evaluateAgainstContext("#{ #getTestObject().name }",
                 """
             import java.util.Random
 
-            @EvaluatedExpressionContext
-            class ExpressionContext {
+            @jakarta.inject.Singleton
+            class Context {
                 TestObject getTestObject() {
                     return new TestObject()
                 }
@@ -108,8 +115,8 @@ class ContextMethodCallsExpressionsSpec extends AbstractEvaluatedExpressionsSpec
             import java.util.Collection
             import java.util.concurrent.ThreadLocalRandom
 
-            @EvaluatedExpressionContext
-            class ExpressionContext {
+            @jakarta.inject.Singleton
+            class Context {
                 TestObject getTestObject() {
                     return new TestObject();
                 }

@@ -21,7 +21,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
-import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
+import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory;
 import io.micronaut.expressions.context.ExpressionCompilationContext;
 import io.micronaut.expressions.context.ExpressionWithContext;
 import io.micronaut.expressions.util.EvaluatedExpressionsUtils;
@@ -104,7 +104,7 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
     private final DispatchWriter methodDispatchWriter;
 
     private final Set<String> methodNames = new HashSet<>();
-    private final ExpressionCompilationContextFactory expressionCompilationContextFactory;
+    private final DefaultExpressionCompilationContextFactory expressionCompilationContextFactory;
     private final Set<ExpressionWithContext> evaluatedExpressions = new HashSet<>();
     private final AnnotationMetadata annotationMetadataWithDefaults;
     private ClassWriter classWriter;
@@ -121,7 +121,7 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
         this.thisType = Type.getObjectType(internalName);
         this.beanDefinitionReferenceClassName = beanDefinitionReferenceClassName;
         this.methodDispatchWriter = new DispatchWriter(thisType);
-        this.expressionCompilationContextFactory = new ExpressionCompilationContextFactory(visitorContext);
+        this.expressionCompilationContextFactory = new DefaultExpressionCompilationContextFactory(visitorContext);
     }
 
     /**

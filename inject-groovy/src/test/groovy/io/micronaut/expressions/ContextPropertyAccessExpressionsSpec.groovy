@@ -8,8 +8,8 @@ class ContextPropertyAccessExpressionsSpec extends AbstractEvaluatedExpressionsS
         given:
         Object expr1 = evaluateAgainstContext("#{ #intValue }",
                 """
-            @EvaluatedExpressionContext
-            class ExpressionContext {
+            @jakarta.inject.Singleton
+            class Context {
                 int getIntValue() {
                     return 15
                 }
@@ -18,8 +18,8 @@ class ContextPropertyAccessExpressionsSpec extends AbstractEvaluatedExpressionsS
 
         Object expr2 = evaluateAgainstContext("#{ #boolean }",
                 """
-            @EvaluatedExpressionContext
-            class ExpressionContext {
+            @jakarta.inject.Singleton
+            class Context {
                 Boolean isBoolean() {
                     return false
                 }
@@ -28,8 +28,8 @@ class ContextPropertyAccessExpressionsSpec extends AbstractEvaluatedExpressionsS
 
         Object expr3 = evaluateAgainstContext("#{ #stringValue }",
                 """
-            @EvaluatedExpressionContext
-            class ExpressionContext {
+            @jakarta.inject.Singleton
+            class Context {
                 String getStringValue() {
                     return "test value"
                 }
@@ -38,8 +38,8 @@ class ContextPropertyAccessExpressionsSpec extends AbstractEvaluatedExpressionsS
 
         Object expr4 = evaluateAgainstContext("#{ #customClass.customProperty }",
                 """
-            @EvaluatedExpressionContext
-            class ExpressionContext {
+            @jakarta.inject.Singleton
+            class Context {
                 CustomClass getCustomClass() {
                     return new CustomClass()
                 }

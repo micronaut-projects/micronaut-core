@@ -27,7 +27,7 @@ import io.micronaut.inject.ast.MethodElement;
  * @author Sergey Gavrilov
  */
 @Internal
-public interface ExtendableExpressionCompilationContext extends ExpressionCompilationContext {
+public interface ExtensibleExpressionCompilationContext extends ExpressionCompilationContext {
     /**
      * Extends compilation context with method element. Compilation context can only include
      * one method at the same time, so this method will return the context which will
@@ -37,7 +37,7 @@ public interface ExtendableExpressionCompilationContext extends ExpressionCompil
      * @return extended context
      */
     @NonNull
-    ExtendableExpressionCompilationContext extendWith(@NonNull MethodElement methodElement);
+    ExtensibleExpressionCompilationContext extendWith(@NonNull MethodElement methodElement);
 
     /**
      * Extends compilation context with class element. Compilation context can include
@@ -47,6 +47,6 @@ public interface ExtendableExpressionCompilationContext extends ExpressionCompil
      * @return extended context
      */
     @NonNull
-    ExtendableExpressionCompilationContext extendWith(@NonNull ClassElement classElement);
+    ExtensibleExpressionCompilationContext extendWith(@NonNull ClassElement classElement);
 
 }

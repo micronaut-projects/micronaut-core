@@ -38,7 +38,6 @@ class AbstractEvaluatedExpressionsSpec extends AbstractBeanDefinitionSpec {
         def cls = """
             package test
             import io.micronaut.context.annotation.Value
-            import io.micronaut.context.annotation.EvaluatedExpressionContext
 
             class Expr {
                 ${classContent}
@@ -76,7 +75,6 @@ class AbstractEvaluatedExpressionsSpec extends AbstractBeanDefinitionSpec {
             package test
             import io.micronaut.context.annotation.Value
             import jakarta.inject.Singleton
-            import io.micronaut.context.annotation.EvaluatedExpressionContext
 
             ${contextClass}
 
