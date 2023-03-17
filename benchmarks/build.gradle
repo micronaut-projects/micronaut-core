@@ -22,6 +22,8 @@ dependencies {
     api project(":inject")
     api project(":inject-java-test")
     api project(":http-server")
+    api project(":http-server-netty")
+    api project(":jackson-databind")
     api project(":router")
     api project(":runtime")
 
