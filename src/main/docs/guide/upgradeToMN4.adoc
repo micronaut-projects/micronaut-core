@@ -1,0 +1,1 @@
+NOTE: Update to Micronaut Framework 4.0!. Read about <<whatsNew, what is new with the Micronaut Framework 4.0>> and 4.0 <<breaks, breaking changes>>.
