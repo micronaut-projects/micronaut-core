@@ -230,7 +230,12 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
                 currentlyStreamedMessage = inMsg;
                 // It has a body, stream it
-                HandlerPublisher<? extends HttpContent> publisher = new HandlerPublisher<HttpContent>(ctx.executor(), HttpContent.class) {
+                HandlerPublisher<? extends HttpContent> publisher = new HandlerPublisher<HttpContent>(ctx.executor()) {
+                    @Override
+                    protected boolean acceptInboundMessage(Object msg) {
+                        return msg instanceof HttpContent;
+                    }
+
                     @Override
                     protected void cancelled() {
                         if (ctx.executor().inEventLoop()) {
