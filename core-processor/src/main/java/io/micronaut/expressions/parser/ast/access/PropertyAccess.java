@@ -42,8 +42,8 @@ import static java.util.function.Predicate.not;
  */
 @Internal
 public final class PropertyAccess extends ElementMethodCall {
-    public PropertyAccess(ExpressionNode callee, String name) {
-        super(callee, name, emptyList());
+    public PropertyAccess(ExpressionNode callee, String name, boolean nullSafe) {
+        super(callee, name, emptyList(), nullSafe);
     }
 
     @Override

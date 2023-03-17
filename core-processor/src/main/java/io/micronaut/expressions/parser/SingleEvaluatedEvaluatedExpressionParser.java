@@ -89,6 +89,7 @@ import static io.micronaut.expressions.parser.token.TokenType.PLUS;
 import static io.micronaut.expressions.parser.token.TokenType.POW;
 import static io.micronaut.expressions.parser.token.TokenType.QMARK;
 import static io.micronaut.expressions.parser.token.TokenType.R_PAREN;
+import static io.micronaut.expressions.parser.token.TokenType.SAFE_NAV;
 import static io.micronaut.expressions.parser.token.TokenType.STRING;
 
 /**
@@ -306,13 +307,14 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
     // PostfixExpression
     //  : PrimaryExpression
     //  | PostfixExpression '.'  MethodOrPropertyAccess
+    //  | PostfixExpression '?.'  MethodOrPropertyAccess with safe navigation
     //  | PostfixExpression '++'
     //  | PostfixExpression '--'
     //  ;
     private ExpressionNode postfixExpression() {
         ExpressionNode leftNode = primaryExpression();
         while (lookahead != null && (lookahead.type()
-                                         .isOneOf(DOT, L_SQUARE, INCREMENT, DECREMENT))) {
+                                         .isOneOf(DOT, SAFE_NAV, L_SQUARE, INCREMENT, DECREMENT))) {
             TokenType tokenType = lookahead.type();
             if (tokenType == INCREMENT) {
                 throw new ExpressionParsingException("Postfix increment operation is not " +
@@ -322,7 +324,10 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
                                                          "supported");
             } else if (tokenType == DOT) {
                 eat(DOT);
-                leftNode = methodOrPropertyAccess(leftNode);
+                leftNode = methodOrPropertyAccess(leftNode, false);
+            } else if (tokenType == SAFE_NAV) {
+                eat(SAFE_NAV);
+                leftNode = methodOrPropertyAccess(leftNode, true);
             } else {
                 throw new ExpressionParsingException("Unexpected token: " + lookahead.value());
             }
@@ -370,13 +375,13 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
     //  : SimpleIdentifier
     //  | SimpleIdentifier MethodArguments
     //  ;
-    private ExpressionNode methodOrPropertyAccess(ExpressionNode callee) {
+    private ExpressionNode methodOrPropertyAccess(ExpressionNode callee, boolean nullSafe) {
         String identifier = identifier();
         if (lookahead != null && lookahead.type() == L_PAREN) {
             List<ExpressionNode> methodArguments = methodArguments();
-            return new ElementMethodCall(callee, identifier, methodArguments);
+            return new ElementMethodCall(callee, identifier, methodArguments, nullSafe);
         }
-        return new PropertyAccess(callee, identifier);
+        return new PropertyAccess(callee, identifier, nullSafe);
     }
 
     // MethodArguments:

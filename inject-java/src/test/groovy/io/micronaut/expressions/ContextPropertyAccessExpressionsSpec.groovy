@@ -58,4 +58,26 @@ class ContextPropertyAccessExpressionsSpec extends AbstractEvaluatedExpressionsS
         expr3 instanceof String && expr3 == "test value"
         expr4 instanceof String && expr4 == "custom property"
     }
+
+    void "test multi-level context property access - records"() {
+        given:
+        Object expr = evaluateAgainstContext("#{ #foo.bar.name }",
+                """
+            @jakarta.inject.Singleton
+            class Context {
+                Foo getFoo() {
+                    return new Foo(new Bar("test"));
+                }
+            }
+
+            record Foo(Bar bar) {
+            }
+
+            record Bar(String name) {
+            }
+        """)
+
+        expect:
+        expr instanceof String && expr == "test"
+    }
 }

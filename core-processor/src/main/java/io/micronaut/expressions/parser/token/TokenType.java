@@ -30,6 +30,7 @@ public enum TokenType {
 
     EXPRESSION_CONTEXT_REF,
     DOT,
+    SAFE_NAV,
     COMMA,
     COLON,
     L_PAREN,

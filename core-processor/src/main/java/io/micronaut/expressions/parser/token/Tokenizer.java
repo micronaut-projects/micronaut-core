@@ -62,6 +62,7 @@ import static io.micronaut.expressions.parser.token.TokenType.QMARK;
 import static io.micronaut.expressions.parser.token.TokenType.R_CURLY;
 import static io.micronaut.expressions.parser.token.TokenType.R_PAREN;
 import static io.micronaut.expressions.parser.token.TokenType.R_SQUARE;
+import static io.micronaut.expressions.parser.token.TokenType.SAFE_NAV;
 import static io.micronaut.expressions.parser.token.TokenType.STRING;
 import static io.micronaut.expressions.parser.token.TokenType.WHITESPACE;
 
@@ -112,6 +113,7 @@ public final class Tokenizer {
 
         // SYMBOLS
         "^#", EXPRESSION_CONTEXT_REF,
+        "^\\?\\.", SAFE_NAV,
         "^\\?", QMARK,
         "^\\.", DOT,
         "^,", COMMA,

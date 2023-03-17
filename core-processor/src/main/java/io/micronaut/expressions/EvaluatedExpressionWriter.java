@@ -113,7 +113,7 @@ public final class EvaluatedExpressionWriter extends AbstractClassFileWriter {
             failCompilation(ex, annotationValue);
         }
 
-        evaluateMethodVisitor.visitMaxs(2, 1);
+        evaluateMethodVisitor.visitMaxs(2, 3);
         evaluateMethodVisitor.returnValue();
         return classWriter;
     }

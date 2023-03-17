@@ -24,6 +24,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.VisitorContext;
+import org.objectweb.asm.Label;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
@@ -31,6 +32,7 @@ import org.objectweb.asm.commons.Method;
 import java.util.List;
 
 import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.getRequiredClassElement;
+import static org.objectweb.asm.Opcodes.ACONST_NULL;
 import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 
 /**
@@ -45,12 +47,15 @@ import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 public sealed class ElementMethodCall extends AbstractMethodCall permits PropertyAccess {
 
     protected final ExpressionNode callee;
+    private final boolean nullSafe;
 
     public ElementMethodCall(ExpressionNode callee,
                              String name,
-                             List<ExpressionNode> arguments) {
+                             List<ExpressionNode> arguments,
+                             boolean nullSafe) {
         super(name, arguments);
         this.callee = callee;
+        this.nullSafe = nullSafe;
     }
 
     @Override
@@ -72,6 +77,18 @@ public sealed class ElementMethodCall extends AbstractMethodCall permits Propert
             }
         } else {
             callee.compile(ctx);
+            if (nullSafe) {
+                // null safe operator is used so we need to check the result is null
+                Type returnType = method.getReturnType();
+                mv.storeLocal(2, returnType);
+                mv.loadLocal(2, returnType);
+                Label proceed = new Label();
+                mv.ifNonNull(proceed);
+                mv.visitInsn(ACONST_NULL);
+                mv.returnValue();
+                mv.visitLabel(proceed);
+                mv.loadLocal(2, returnType);
+            }
             compileArguments(ctx);
             if (calleeClass.isInterface()) {
                 mv.invokeInterface(calleeType, method);
