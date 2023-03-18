@@ -3,7 +3,7 @@ asm = "9.4"
 awaitility = "4.2.0"
 bcpkix = "1.70"
 blaze = "1.6.8"
-caffeine = "2.9.3"
+caffeine = "3.1.5"
 compile-testing = "0.19"
 
 geb = "7.0"
