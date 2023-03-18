@@ -36,7 +36,6 @@ kotlin-coroutines = "1.6.4"
 ktor = "1.6.8"
 managed-logback = "1.4.6"
 logbook-netty = "2.14.0"
-log4j = "2.19.0"
 micronaut-aws = "3.9.2"
 micronaut-groovy = "4.0.0-SNAPSHOT"
 micronaut-session = "1.0.0-SNAPSHOT"
@@ -72,6 +71,7 @@ managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
 managed-reactor = "3.4.24"
 managed-slf4j = "2.0.4"
+managed-log4j = "2.19.0"
 managed-snakeyaml = "2.0"
 managed-java-parser-core = "3.24.9"
 managed-ksp = "1.8.0-1.0.9"
@@ -87,6 +87,7 @@ test-boms-micronaut-validation = { module = "io.micronaut.validation:micronaut-v
 boms-groovy = { module = "org.apache.groovy:groovy-bom", version.ref = "managed-groovy" }
 boms-netty = { module = "io.netty:netty-bom", version.ref = "managed-netty" }
 boms-jackson = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "managed-jackson" }
+boms-log4j = { module = "org.apache.logging.log4j:log4j-bom", version.ref = "managed-log4j" }
 
 #
 # Libraries which start with managed- are managed by Micronaut in the sense
@@ -130,7 +131,18 @@ managed-reactor-test = { module = "io.projectreactor:reactor-test", version.ref 
 
 managed-slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "managed-slf4j" }
 managed-slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "managed-slf4j" }
+managed-slf4j-nop = { module = "org.slf4j:slf4j-nop", version.ref = "managed-slf4j" }
+managed-slf4j-log4j12 = { module = "org.slf4j:slf4j-log4j12", version.ref = "managed-slf4j" }
+managed-slf4j-reload4j = { module = "org.slf4j:slf4j-reload4j", version.ref = "managed-slf4j" }
+managed-slf4j-ext = { module = "org.slf4j:slf4j-ext", version.ref = "managed-slf4j" }
+managed-slf4j-jcl-over-slf4j = { module = "org.slf4j:jcl-over-slf4j", version.ref = "managed-slf4j" }
+managed-slf4j-log4j-over-slf4j = { module = "org.slf4j:log4j-over-slf4j", version.ref = "managed-slf4j" }
+managed-slf4j-jul-to-slf4j = { module = "org.slf4j:jul-to-slf4j", version.ref = "managed-slf4j" }
+managed-slf4j-osgi-over-slf4j = { module = "org.slf4j:osgi-over-slf4j", version.ref = "managed-slf4j" }
+
 managed-logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "managed-logback" }
+managed-logback-core = { module = "ch.qos.logback:logback-core", version.ref = "managed-logback" }
+managed-logback-access = { module = "ch.qos.logback:logback-access", version.ref = "managed-logback" }
 
 managed-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "managed-snakeyaml" }
 
@@ -207,7 +219,7 @@ kotlinx-coroutines-rx2 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-rx
 kotlinx-coroutines-slf4j = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-slf4j", version.ref = "kotlin-coroutines" }
 kotlinx-coroutines-reactor = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactor", version.ref = "kotlin-coroutines" }
 
-log4j = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" }
+log4j = { module = "org.apache.logging.log4j:log4j-core", version.ref = "managed-log4j" }
 
 logbook-netty = { module = "org.zalando:logbook-netty", version.ref = "logbook-netty" }
 
