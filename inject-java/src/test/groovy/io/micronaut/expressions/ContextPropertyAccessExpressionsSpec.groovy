@@ -1,6 +1,7 @@
 package io.micronaut.expressions
 
 import io.micronaut.annotation.processing.test.AbstractEvaluatedExpressionsSpec
+import io.micronaut.context.exceptions.ExpressionEvaluationException
 
 class ContextPropertyAccessExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
 
@@ -79,5 +80,96 @@ class ContextPropertyAccessExpressionsSpec extends AbstractEvaluatedExpressionsS
 
         expect:
         expr instanceof String && expr == "test"
+    }
+
+    void "test multi-level context property access"() {
+        given:
+        Object expr = evaluateAgainstContext("#{ #foo.bar.name }",
+                """
+            @jakarta.inject.Singleton
+            class Context {
+                public Foo getFoo() {
+                    return new Foo();
+                }
+            }
+
+            class Foo {
+                private Bar bar = new Bar();
+                public Bar getBar() {
+                    return bar;
+                }
+            }
+
+            class Bar {
+                private String name = "test";
+                public String getName() {
+                    return name;
+                }
+            }
+        """)
+
+        expect:
+        expr instanceof String && expr == "test"
+    }
+
+    void "test multi-level context property access safe navigation"() {
+        given:
+        Object expr = evaluateAgainstContext("#{ #foo?.bar?.name }",
+                """
+            @jakarta.inject.Singleton
+            class Context {
+                public Foo getFoo() {
+                    return new Foo();
+                }
+            }
+
+            class Foo {
+                private Bar bar;
+                public Bar getBar() {
+                    return bar;
+                }
+            }
+
+            class Bar {
+                private String name = "test";
+                public String getName() {
+                    return name;
+                }
+            }
+        """)
+
+        expect:
+        expr == null
+    }
+
+    void "test multi-level context property access non-safe navigation"() {
+        when:
+        Object expr = evaluateAgainstContext("#{ #foo.bar.name }",
+                """
+            @jakarta.inject.Singleton
+            class Context {
+                public Foo getFoo() {
+                    return new Foo();
+                }
+            }
+
+            class Foo {
+                private Bar bar;
+                public Bar getBar() {
+                    return bar;
+                }
+            }
+
+            class Bar {
+                private String name = "test";
+                public String getName() {
+                    return name;
+                }
+            }
+        """)
+
+        then:
+        def e = thrown(ExpressionEvaluationException)
+        e.message.startsWith('Can not evaluate expression [null]')
     }
 }
