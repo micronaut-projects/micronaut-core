@@ -287,7 +287,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             synchronized (this) { // double check
                 attributes = this.attributes;
                 if (attributes == null) {
-                    attributes = new MutableConvertibleValuesMap<>(new HashMap<>(4));
+                    attributes = new MutableConvertibleValuesMap<>(new HashMap<>(8));
                     this.attributes = attributes;
                 }
             }
