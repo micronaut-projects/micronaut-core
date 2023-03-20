@@ -26,8 +26,8 @@ jetty = "9.4.48.v20220622"
 jmh = "1.35"
 jsr107 = "1.1.1"
 jsr305 = "3.0.2"
-javax-el = "3.0.1-b12"
-javax-el-impl = "2.2.1-b05"
+jakarta-el = "5.0.1"
+jakarta-el-impl = "5.0.0-M1"
 jcache = "1.1.1"
 junit5 = "5.9.1"
 junit-platform="1.9.1"
@@ -168,8 +168,8 @@ jakarta-inject-api = { module = "jakarta.inject:jakarta.inject-api", version.ref
 jakarta-inject-tck = { module = "jakarta.inject:jakarta.inject-tck", version.ref = "jakarta-inject-tck" }
 
 javax-annotation-api = { module = "javax.annotation:javax.annotation-api", version.ref = "javax-annotation-api" }
-javax-el = { module = "org.glassfish:javax.el", version.ref = "javax-el" }
-javax-el-impl = { module = "org.glassfish:javax.el", version.ref = "javax-el" }
+jakarta-el = { module = "jakarta.el:jakarta.el-api", version.ref = "jakarta-el" }
+jakarta-el-impl = { module = "org.glassfish:jakarta.el", version.ref = "jakarta-el-impl" }
 javax-inject = { module = "javax.inject:javax.inject", version.ref = "javax-inject" }
 javax-persistence = { module = "javax.persistence:javax.persistence-api", version.ref = "javax-persistence" }
 
