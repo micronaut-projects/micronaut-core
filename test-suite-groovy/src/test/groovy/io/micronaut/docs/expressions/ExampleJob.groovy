@@ -9,7 +9,7 @@ class ExampleJob {
 
     @Scheduled(
             fixedRate = "1s",
-            condition = "#{ #jobControl.paused != true }") // <1>
+            condition = "#{!jobControl.paused}") // <1>
     void run(ExampleJobControl jobControl) {
         System.out.println("Job Running")
         this.jobRan = true

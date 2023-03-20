@@ -7,7 +7,7 @@ class ContextPropertyAccessExpressionsSpec extends AbstractEvaluatedExpressionsS
 
     void "test context property access"() {
         given:
-        Object expr1 = evaluateAgainstContext("#{ #intValue }",
+        Object expr1 = evaluateAgainstContext("#{intValue}",
                 """
             @jakarta.inject.Singleton
             class Context {
@@ -17,7 +17,7 @@ class ContextPropertyAccessExpressionsSpec extends AbstractEvaluatedExpressionsS
             }
         """)
 
-        Object expr2 = evaluateAgainstContext("#{ #boolean }",
+        Object expr2 = evaluateAgainstContext("#{ boolean }",
                 """
             @jakarta.inject.Singleton
             class Context {
@@ -27,7 +27,7 @@ class ContextPropertyAccessExpressionsSpec extends AbstractEvaluatedExpressionsS
             }
         """)
 
-        Object expr3 = evaluateAgainstContext("#{ #stringValue }",
+        Object expr3 = evaluateAgainstContext("#{ stringValue }",
                 """
             @jakarta.inject.Singleton
             class Context {
@@ -37,7 +37,7 @@ class ContextPropertyAccessExpressionsSpec extends AbstractEvaluatedExpressionsS
             }
         """)
 
-        Object expr4 = evaluateAgainstContext("#{ #customClass.customProperty }",
+        Object expr4 = evaluateAgainstContext("#{ customClass.customProperty }",
                 """
             @jakarta.inject.Singleton
             class Context {
@@ -62,7 +62,7 @@ class ContextPropertyAccessExpressionsSpec extends AbstractEvaluatedExpressionsS
 
     void "test multi-level context property access - records"() {
         given:
-        Object expr = evaluateAgainstContext("#{ #foo.bar.name }",
+        Object expr = evaluateAgainstContext("#{ foo.bar.name }",
                 """
             @jakarta.inject.Singleton
             class Context {
@@ -84,7 +84,7 @@ class ContextPropertyAccessExpressionsSpec extends AbstractEvaluatedExpressionsS
 
     void "test multi-level context property access"() {
         given:
-        Object expr = evaluateAgainstContext("#{ #foo.bar.name }",
+        Object expr = evaluateAgainstContext("#{ foo.bar.name }",
                 """
             @jakarta.inject.Singleton
             class Context {
@@ -114,7 +114,7 @@ class ContextPropertyAccessExpressionsSpec extends AbstractEvaluatedExpressionsS
 
     void "test multi-level context property access safe navigation"() {
         given:
-        Object expr = evaluateAgainstContext("#{ #foo?.bar?.name }",
+        Object expr = evaluateAgainstContext("#{ foo?.bar?.name }",
                 """
             @jakarta.inject.Singleton
             class Context {
@@ -144,7 +144,7 @@ class ContextPropertyAccessExpressionsSpec extends AbstractEvaluatedExpressionsS
 
     void "test multi-level context property access non-safe navigation"() {
         when:
-        Object expr = evaluateAgainstContext("#{ #foo.bar.name }",
+        Object expr = evaluateAgainstContext("#{ foo.bar.name }",
                 """
             @jakarta.inject.Singleton
             class Context {

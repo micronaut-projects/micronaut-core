@@ -8,7 +8,7 @@ class ExampleJob {
     private var jobRan = false
     @Scheduled(
         fixedRate = "1s",
-        condition = "#{ #jobControl.paused != true }") // <1>
+        condition = "#{!jobControl.paused}") // <1>
     fun run(jobControl: ExampleJobControl) {
         println("Job Running")
         jobRan = true

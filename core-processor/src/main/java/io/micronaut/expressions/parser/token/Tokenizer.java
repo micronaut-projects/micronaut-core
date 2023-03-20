@@ -35,10 +35,11 @@ import static io.micronaut.expressions.parser.token.TokenType.DOT;
 import static io.micronaut.expressions.parser.token.TokenType.DOUBLE;
 import static io.micronaut.expressions.parser.token.TokenType.EQ;
 import static io.micronaut.expressions.parser.token.TokenType.EXPRESSION_CONTEXT_REF;
+import static io.micronaut.expressions.parser.token.TokenType.IDENTIFIER;
 import static io.micronaut.expressions.parser.token.TokenType.FLOAT;
 import static io.micronaut.expressions.parser.token.TokenType.GT;
 import static io.micronaut.expressions.parser.token.TokenType.GTE;
-import static io.micronaut.expressions.parser.token.TokenType.IDENTIFIER;
+import static io.micronaut.expressions.parser.token.TokenType.TYPE_IDENTIFIER;
 import static io.micronaut.expressions.parser.token.TokenType.INCREMENT;
 import static io.micronaut.expressions.parser.token.TokenType.INSTANCEOF;
 import static io.micronaut.expressions.parser.token.TokenType.INT;
@@ -147,8 +148,8 @@ public final class Tokenizer {
         "^\\^", POW,
 
         // IDENTIFIERS
-        "^\\w+", IDENTIFIER
-                                                                              );
+        "^T\\(", TYPE_IDENTIFIER,
+        "\\w+", IDENTIFIER);
 
     private static final List<TokenPattern> PATTERNS =
         TOKENS.entrySet()

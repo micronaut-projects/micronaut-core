@@ -68,7 +68,7 @@ import static io.micronaut.expressions.parser.token.TokenType.EXPRESSION_CONTEXT
 import static io.micronaut.expressions.parser.token.TokenType.FLOAT;
 import static io.micronaut.expressions.parser.token.TokenType.GT;
 import static io.micronaut.expressions.parser.token.TokenType.GTE;
-import static io.micronaut.expressions.parser.token.TokenType.IDENTIFIER;
+import static io.micronaut.expressions.parser.token.TokenType.TYPE_IDENTIFIER;
 import static io.micronaut.expressions.parser.token.TokenType.INCREMENT;
 import static io.micronaut.expressions.parser.token.TokenType.INSTANCEOF;
 import static io.micronaut.expressions.parser.token.TokenType.INT;
@@ -344,7 +344,8 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
     private ExpressionNode primaryExpression() {
         return switch (lookahead.type()) {
             case EXPRESSION_CONTEXT_REF -> contextAccess();
-            case IDENTIFIER -> typeIdentifier();
+            case IDENTIFIER -> identifier();
+            case TYPE_IDENTIFIER -> typeIdentifier();
             case L_PAREN -> parenthesizedExpression();
             case STRING, INT, LONG, DOUBLE, FLOAT, BOOL, NULL -> literal();
             default -> throw new ExpressionParsingException("Unexpected token: " + lookahead.value());
@@ -357,13 +358,11 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
     //  ;
     private ExpressionNode contextAccess() {
         eat(EXPRESSION_CONTEXT_REF);
-        String identifier = identifier();
+        return primaryExpression();
+    }
 
-        // Ambiguous case when 'T(' can be considered as method call
-        if (identifier.equals("T") && lookahead != null && lookahead.type() == L_PAREN) {
-            throw new ExpressionParsingException("Expected identifier, got type reference");
-        }
-
+    private ExpressionNode identifier() {
+        String identifier = eat(TokenType.IDENTIFIER).value();
         if (lookahead != null && lookahead.type() == L_PAREN) {
             List<ExpressionNode> methodArguments = methodArguments();
             return new ContextMethodCall(identifier, methodArguments);
@@ -376,7 +375,7 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
     //  | SimpleIdentifier MethodArguments
     //  ;
     private ExpressionNode methodOrPropertyAccess(ExpressionNode callee, boolean nullSafe) {
-        String identifier = identifier();
+        String identifier = eat(TokenType.IDENTIFIER).value();
         if (lookahead != null && lookahead.type() == L_PAREN) {
             List<ExpressionNode> methodArguments = methodArguments();
             return new ElementMethodCall(callee, identifier, methodArguments, nullSafe);
@@ -418,22 +417,16 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
     // TypeReference
     //   : 'T(' ChainedIdentifier')'
     //   ;
-    private TypeIdentifier typeIdentifier() {
-        eat(IDENTIFIER);
-        eat(L_PAREN);
+    private TypeIdentifier  typeIdentifier() {
+        eat(TYPE_IDENTIFIER);
         List<String> parts = new ArrayList<>();
-        parts.add(identifier());
+        parts.add(eat(TokenType.IDENTIFIER).value());
         while (lookahead != null && lookahead.type() == DOT) {
             eat(DOT);
-            parts.add(identifier());
+            parts.add(eat(TokenType.IDENTIFIER).value());
         }
         eat(R_PAREN);
         return new TypeIdentifier(String.join(".", parts));
-    }
-
-    private String identifier() {
-        Token token = eat(IDENTIFIER);
-        return token.value();
     }
 
     // ParenthesizedExpression
