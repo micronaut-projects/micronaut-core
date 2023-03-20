@@ -57,7 +57,7 @@ public class FullHttpStackBenchmark {
 
         Options opt = new OptionsBuilder()
             .include(FullHttpStackBenchmark.class.getName() + ".*")
-            .warmupIterations(15)
+            .warmupIterations(20)
             .measurementIterations(30)
             .mode(Mode.AverageTime)
             .timeUnit(TimeUnit.NANOSECONDS)
