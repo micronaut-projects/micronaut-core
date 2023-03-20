@@ -9,9 +9,8 @@ import java.util.concurrent.TimeUnit
 @MicronautTest
 class ExampleJobTest {
     @Test
-    @Throws(InterruptedException::class)
     fun testJobCondition(exampleJob: ExampleJob, exampleJobControl: ExampleJobControl) {
-        Assertions.assertTrue(exampleJobControl.isPaused)
+        Assertions.assertTrue(exampleJobControl.paused)
         Assertions.assertFalse(exampleJob.hasJobRun())
         Thread.sleep(5000)
         Assertions.assertFalse(exampleJob.hasJobRun())

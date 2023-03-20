@@ -17,10 +17,10 @@ package io.micronaut.scheduling.processor;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.Qualifier;
 import io.micronaut.context.bind.DefaultExecutableBeanContextBinder;
 import io.micronaut.context.bind.ExecutableBeanContextBinder;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.bind.BoundExecutable;
 import io.micronaut.core.convert.ConversionService;
@@ -117,28 +117,23 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
             }
 
             TaskScheduler taskScheduler = optionalTaskScheduler.orElseThrow(() -> new SchedulerConfigurationException(method, "No scheduler of type TaskScheduler configured for name: " + scheduler));
-
+            Argument<Object> beanType = (Argument<Object>) beanDefinition.asArgument();
+            Qualifier<Object> declaredQualifier = (Qualifier<Object>) beanDefinition.getDeclaredQualifier();
             Runnable task = () -> {
                 try {
                     ExecutableBeanContextBinder binder = new DefaultExecutableBeanContextBinder();
                     BoundExecutable<?, ?> boundExecutable = binder.bind(method, beanContext);
-                    Object bean = beanContext.getBean(beanDefinition);
+                    Object bean = beanContext.getBean(beanType, declaredQualifier);
                      AnnotationValue<Scheduled> finalAnnotationValue = scheduledAnnotation;
                     if (finalAnnotationValue instanceof EvaluatedAnnotationValue<Scheduled> evaluated) {
                         finalAnnotationValue = evaluated.withArguments(boundExecutable.getBoundArguments());
                     }
                     boolean shouldRun = finalAnnotationValue.booleanValue(MEMBER_CONDITION).orElse(true);
                     if (shouldRun) {
-                        io.micronaut.context.Qualifier<Object> qualifier = beanDefinition
-                            .getAnnotationTypeByStereotype(AnnotationUtil.QUALIFIER)
-                            .map(type -> Qualifiers.byAnnotation(beanDefinition, type))
-                            .orElse(null);
-
                         try {
                             ((BoundExecutable<Object, Object>) boundExecutable).invoke(bean);
                         } catch (Throwable e) {
-                            Class<Object> beanType = (Class<Object>) beanDefinition.getBeanType();
-                            handleException(beanType, bean, e);
+                            handleException(beanType.getType(), bean, e);
                         }
                     }
                 } catch (Exception e) {

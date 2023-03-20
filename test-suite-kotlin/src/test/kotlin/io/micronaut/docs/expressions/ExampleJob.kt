@@ -21,14 +21,13 @@ class ExampleJob {
 
 @Singleton
 class ExampleJobControl { // <2>
-    var isPaused = true
-        private set
+    var paused : Boolean = true
 
     fun unpause() {
-        isPaused = false
+        paused = false
     }
 
     fun pause() {
-        isPaused = true
+        paused = true
     }
 }
