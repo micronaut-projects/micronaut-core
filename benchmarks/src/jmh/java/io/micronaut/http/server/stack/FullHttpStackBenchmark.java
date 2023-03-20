@@ -19,6 +19,7 @@ import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpVersion;
+import io.netty.util.concurrent.FastThreadLocalThread;
 import org.junit.jupiter.api.Assertions;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Mode;
@@ -47,13 +48,18 @@ public class FullHttpStackBenchmark {
     }
 
     public static void main(String[] args) throws Exception {
-        // simple test that everything works properly
-        for (StackFactory stack : StackFactory.values()) {
-            Holder holder = new Holder();
-            holder.stack = stack;
-            holder.setUp();
-            holder.tearDown();
-        }
+        JmhFastThreadLocalExecutor exec = new JmhFastThreadLocalExecutor(1, "init-test");
+        exec.submit(() -> {
+            // simple test that everything works properly
+            for (StackFactory stack : StackFactory.values()) {
+                Holder holder = new Holder();
+                holder.stack = stack;
+                holder.setUp();
+                holder.tearDown();
+            }
+            return null;
+        }).get();
+        exec.shutdown();
 
         Options opt = new OptionsBuilder()
             .include(FullHttpStackBenchmark.class.getName() + ".*")
@@ -63,6 +69,7 @@ public class FullHttpStackBenchmark {
             .timeUnit(TimeUnit.NANOSECONDS)
             .addProfiler(AsyncProfiler.class, "libPath=/home/yawkat/bin/async-profiler-2.9-linux-x64/build/libasyncProfiler.so;output=flamegraph")
             .forks(1)
+            .jvmArgsAppend("-Djmh.executor=CUSTOM", "-Djmh.executor.class=" + JmhFastThreadLocalExecutor.class.getName())
             .build();
 
         new Runner(opt).run();
@@ -80,6 +87,10 @@ public class FullHttpStackBenchmark {
 
         @Setup
         public void setUp() {
+            if (!(Thread.currentThread() instanceof FastThreadLocalThread)) {
+                throw new IllegalStateException("Should run on a netty FTL thread");
+            }
+
             Stack stack = this.stack.openChannel();
             ctx = stack.closeable;
             channel = stack.serverChannel;
