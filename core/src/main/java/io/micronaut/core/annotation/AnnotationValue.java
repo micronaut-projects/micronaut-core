@@ -751,7 +751,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
     @Override
     public OptionalLong longValue(@NonNull String member) {
-        return longValue(member, null);
+        return longValue(member, valueMapper);
     }
 
     /**
@@ -788,7 +788,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
     @Override
     public Optional<Short> shortValue(@NonNull String member) {
-        return shortValue(member, null);
+        return shortValue(member, valueMapper);
     }
 
     /**
@@ -971,7 +971,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
     @Override
     public Optional<Boolean> booleanValue(@NonNull String member) {
-        return booleanValue(member, null);
+        return booleanValue(member, valueMapper);
     }
 
     /**

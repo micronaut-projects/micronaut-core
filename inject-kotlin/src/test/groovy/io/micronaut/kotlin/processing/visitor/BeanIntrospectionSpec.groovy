@@ -1331,7 +1331,7 @@ class Test
 
         then:"The reference is valid"
         reference != null
-        reference.getBeanType() == EvaluatedExpressionContextTypeElementVisitor
+        reference.getBeanType() == io.micronaut.inject.beans.visitor.MappedSuperClassIntrospectionMapper
     }
 
     void "test write bean introspection data"() {

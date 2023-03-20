@@ -40,10 +40,9 @@ import java.util.concurrent.ConcurrentHashMap;
 @Internal
 public final class DefaultExpressionCompilationContextFactory implements ExpressionCompilationContextFactory {
 
+    private static final Collection<ClassElement> CONTEXT_TYPES = ConcurrentHashMap.newKeySet();
     private ExtensibleExpressionCompilationContext sharedContext;
     private final VisitorContext visitorContext;
-
-    private static final Collection<ClassElement> CONTEXT_TYPES = ConcurrentHashMap.newKeySet();
 
     public DefaultExpressionCompilationContextFactory(VisitorContext visitorContext) {
         this.sharedContext = recreateContext();

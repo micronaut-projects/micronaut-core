@@ -43,6 +43,7 @@ import java.util.function.Supplier;
 public abstract class MappingAnnotationMetadataDelegate implements AnnotationMetadataDelegate {
     public abstract <T extends Annotation> AnnotationValue<T> mapAnnotationValue(AnnotationValue<T> av);
 
+
     @Override
     public Optional<String> stringValue(String annotation, String member) {
         return findAnnotation(annotation)

@@ -23,7 +23,6 @@ import io.micronaut.context.expressions.DefaultExpressionEvaluationContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.expressions.EvaluatedExpression;
 import io.micronaut.inject.BeanDefinition;
 
 import java.lang.annotation.Annotation;
@@ -54,7 +53,7 @@ public final class EvaluatedAnnotationMetadata extends MappingAnnotationMetadata
      * @param args arguments passed to method
      * @return copy of annotation metadata
      */
-    public EvaluatedAnnotationMetadata copyWithArgs(Object[] args) {
+    public EvaluatedAnnotationMetadata withArguments(Object[] args) {
         return new EvaluatedAnnotationMetadata(
             delegateAnnotationMetadata,
             evaluationContext.setArguments(args));
@@ -94,15 +93,6 @@ public final class EvaluatedAnnotationMetadata extends MappingAnnotationMetadata
 
     @Override
     public <T extends Annotation> AnnotationValue<T> mapAnnotationValue(AnnotationValue<T> av) {
-        return new AnnotationValue<T>(
-            av,
-            AnnotationMetadataSupport.getDefaultValues(av.getAnnotationName()),
-            new EvaluatedConvertibleValuesMap<>(evaluationContext, av.getConvertibleValues()),
-            value -> {
-                if (value instanceof EvaluatedExpression expression) {
-                    return expression.evaluate(evaluationContext);
-                }
-                return value;
-            });
+        return new EvaluatedAnnotationValue<>(av, evaluationContext);
     }
 }

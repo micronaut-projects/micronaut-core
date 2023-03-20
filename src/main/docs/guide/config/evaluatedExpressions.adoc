@@ -36,10 +36,19 @@ Note that, for security reasons expressions cannot be dynamically compiled at ru
 input. All expressions are compiled and checked statically during the compilation process of the application with
 errors reported as compilation failures.
 
-In general, Evaluated Expression can be treated as statement written using a programming language with reduced
+In general, expressions can be treated as statement written using a programming language with reduced
 set of available features. Even though the complexity of expression is only limited by the list of supported syntax
 constructs, it is in general not recommended to place complex logic inside an expression as there are usually better
 ways to achieve the same result.
+
+== Example Use Case
+
+Expressions can be used anywhere throughout the Micronaut framework and associated modules, but as an example, you can use them to implement simple scheduled job control, for example:
+
+snippet::io.micronaut.docs.expressions.ExampleJob[title="Job Control with Expressions"]
+
+<1> Here the `condition` member of the ann:scheduling.annotation.Scheduled[] annotation is used to only execute the job if a pre-condition is met.
+<2> The `condition` invokes a method of a parameter which is another bean called `ExampleJobControl` which can be used to pause and resume execution of the job as desired.
 
 == Evaluated Expression Language Reference
 
@@ -171,6 +180,25 @@ limited.
 ----
 #{ 15 > 10 ? 'a' : 'b' }    // 'a'
 #{ 15 >= 16 ? 'a' : 'b' }   // 'b'
+----
+
+=== Dot and Safe Navigation Operator
+
+The dot operator can be use to access methods and properties of a value within an expression. For example:
+
+.Dot operator usage
+[source]
+----
+#{ collection.size() > 0 }
+#{ foo.bar.name == "Fred" }
+----
+
+You can also use the safe dereference operator `?.` to navigate paths in a null safe way:
+
+.Safe dereference operator
+[source]
+----
+#{ foo?.bar?.name == "Fred" }
 ----
 
 === Type References

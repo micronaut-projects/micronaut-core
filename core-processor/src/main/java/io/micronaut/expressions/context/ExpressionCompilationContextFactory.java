@@ -16,15 +16,11 @@
 package io.micronaut.expressions.context;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.VisitorContext;
-
-import java.io.Closeable;
-import java.io.IOException;
 
 /**
  * Factory interface for producing expression evaluation context.
@@ -59,6 +55,7 @@ public interface ExpressionCompilationContextFactory {
      * <p>This method should be invoked from the {@link io.micronaut.inject.visitor.TypeElementVisitor#start(VisitorContext)} of a {@link io.micronaut.inject.visitor.TypeElementVisitor}</p>
      *
      * @param contextClass context class element
+     * @return This context factory
      */
     ExpressionCompilationContextFactory registerContextClass(@NonNull ClassElement contextClass);
 
