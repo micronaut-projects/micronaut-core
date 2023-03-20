@@ -17,7 +17,6 @@ package io.micronaut.http.reactive.execution;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
 import org.reactivestreams.Publisher;
@@ -129,8 +128,6 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
     static <R> Mono<Object> toMono(ExecutionFlow<R> next) {
         if (next instanceof ReactorExecutionFlowImpl reactiveFlowImpl) {
             return reactiveFlowImpl.value;
-        } else if (next instanceof CompletableFutureExecutionFlow<?> completableFutureFlow) {
-            return Mono.fromCompletionStage(completableFutureFlow.toCompletableFuture());
         } else if (next instanceof ImperativeExecutionFlow<?> imperativeFlow) {
             Mono<Object> m;
             if (imperativeFlow.getError() != null) {
@@ -150,8 +147,9 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
                 });
             }
             return m;
+        } else {
+            return Mono.fromCompletionStage(next.toCompletableFuture());
         }
-        throw new IllegalStateException();
     }
 
     static <R> Mono<Object> toMono(Supplier<ExecutionFlow<R>> next) {
