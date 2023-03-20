@@ -21,6 +21,7 @@ dependencies {
 
     testImplementation project(":runtime")
     testImplementation project(":websocket")
+    testImplementation project(":jackson-databind")
 }
 
 spotless {
