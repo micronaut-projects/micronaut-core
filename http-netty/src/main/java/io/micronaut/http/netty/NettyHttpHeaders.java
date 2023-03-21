@@ -134,6 +134,11 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     }
 
     @Override
+    public Optional<String> findFirst(CharSequence name) {
+        return Optional.ofNullable(get(name));
+    }
+
+    @Override
     public MutableHttpHeaders add(CharSequence header, CharSequence value) {
         nettyHeaders.add(header, value);
         return this;
@@ -255,5 +260,10 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
             }
         }
         return Optional.empty();
+    }
+
+    @Override
+    public Optional<String> getOrigin() {
+        return findFirst(HttpHeaderNames.ORIGIN);
     }
 }

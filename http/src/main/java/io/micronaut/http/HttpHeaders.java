@@ -24,7 +24,12 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+import java.util.OptionalLong;
 
 /**
  * Constants for common HTTP headers. See https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html.
@@ -710,7 +715,7 @@ public interface HttpHeaders extends Headers {
      * @return Whether the {@link HttpHeaders#CONNECTION} header is set to Keep-Alive
      */
     default boolean isKeepAlive() {
-        return getFirst(CONNECTION, ConversionContext.STRING)
+        return findFirst(CONNECTION)
                  .map(val -> val.equalsIgnoreCase(HttpHeaderValues.CONNECTION_KEEP_ALIVE)).orElse(false);
     }
 
