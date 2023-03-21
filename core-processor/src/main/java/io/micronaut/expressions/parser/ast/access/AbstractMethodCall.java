@@ -60,8 +60,16 @@ public abstract sealed class AbstractMethodCall extends ExpressionNode permits C
 
     @Override
     protected Type doResolveType(ExpressionVisitorContext ctx) {
-        usedMethod = resolveUsedMethod(ctx);
+        if (usedMethod == null) {
+            usedMethod = resolveUsedMethod(ctx);
+        }
         return usedMethod.getReturnType();
+    }
+
+    @Override
+    protected ClassElement doResolveClassElement(ExpressionVisitorContext ctx) {
+        doResolveType(ctx);
+        return usedMethod.getMethodElement().getGenericReturnType();
     }
 
     /**

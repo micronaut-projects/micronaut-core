@@ -18,6 +18,7 @@ package io.micronaut.expressions.parser.ast;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
+import io.micronaut.inject.ast.ClassElement;
 import org.objectweb.asm.Type;
 
 /**
@@ -30,6 +31,7 @@ import org.objectweb.asm.Type;
 public abstract class ExpressionNode {
 
     protected Type nodeType;
+    protected ClassElement classElement;
 
     /**
      * Compiles this expression AST node against passes compilation context.
@@ -64,6 +66,29 @@ public abstract class ExpressionNode {
         }
         return nodeType;
     }
+
+    /**
+     * On resolution stage type information is collected and node validity is checked. Once type
+     * is resolved, type resolution result is cached.
+     *
+     * @param ctx expression compilation context
+     *
+     * @return resolved type
+     */
+    @NonNull
+    public final ClassElement resolveClassElement(@NonNull ExpressionVisitorContext ctx) {
+        if (classElement == null) {
+            classElement = doResolveClassElement(ctx);
+        }
+        return classElement;
+    }
+
+    /**
+     * Resolves the class element for this node.
+     * @param ctx The expression compilation context
+     * @return The resolved type
+     */
+    protected abstract ClassElement doResolveClassElement(ExpressionVisitorContext ctx);
 
     /**
      * Resolves expression AST node type.

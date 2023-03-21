@@ -63,6 +63,13 @@ final class CandidateMethod {
     }
 
     /**
+     * @return The method element.
+     */
+    public MethodElement getMethodElement() {
+        return methodElement;
+    }
+
+    /**
      * Whether candidate method is vargars method.
      *
      * @return true if it is

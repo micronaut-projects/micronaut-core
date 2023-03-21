@@ -20,10 +20,13 @@ import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.processing.JavaModelUtils;
 import org.objectweb.asm.Type;
 
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Expression node for type identifier. Bytecode for identifier is not generated
@@ -57,6 +60,20 @@ public final class TypeIdentifier extends ExpressionNode {
     @Override
     public void generateBytecode(ExpressionVisitorContext ctx) {
         ctx.methodVisitor().push(resolveType(ctx));
+    }
+
+    @Override
+    protected ClassElement doResolveClassElement(ExpressionVisitorContext ctx) {
+        String name = this.toString();
+        if (PRIMITIVES.containsKey(name)) {
+            return PrimitiveElement.valueOf(name);
+        }
+        Optional<ClassElement> resolvedType = ctx.visitorContext().getClassElement(name);
+        if (resolvedType.isEmpty() && !name.contains(".")) {
+            resolvedType = ctx.visitorContext().getClassElement("java.lang." + name);
+        }
+        return resolvedType
+            .orElseThrow(() -> new ExpressionCompilationException("Unknown type identifier: " + name));
     }
 
     @Override

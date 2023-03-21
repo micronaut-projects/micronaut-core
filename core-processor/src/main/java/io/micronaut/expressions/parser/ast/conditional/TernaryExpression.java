@@ -101,6 +101,11 @@ public final class TernaryExpression extends ExpressionNode {
     }
 
     @Override
+    protected ClassElement doResolveClassElement(ExpressionVisitorContext ctx) {
+        return ClassElement.of(doResolveType(ctx).getClassName());
+    }
+
+    @Override
     protected Type doResolveType(ExpressionVisitorContext ctx) {
         if (!isOneOf(condition.resolveType(ctx), BOOLEAN, BOOLEAN_WRAPPER)) {
             throw new ExpressionCompilationException("Invalid ternary operator. Condition should resolve to boolean type");

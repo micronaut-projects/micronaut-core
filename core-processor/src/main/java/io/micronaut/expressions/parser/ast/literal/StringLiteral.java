@@ -18,6 +18,7 @@ package io.micronaut.expressions.parser.ast.literal;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
+import io.micronaut.inject.ast.ClassElement;
 import org.objectweb.asm.Type;
 
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.STRING;
@@ -31,6 +32,7 @@ import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.STRING;
 @Internal
 public final class StringLiteral extends ExpressionNode {
 
+    private static final ClassElement STRING_ELEMENT = ClassElement.of(String.class);
     private final String value;
 
     public StringLiteral(String value) {
@@ -44,6 +46,11 @@ public final class StringLiteral extends ExpressionNode {
     @Override
     public void generateBytecode(ExpressionVisitorContext ctx) {
         ctx.methodVisitor().push(value);
+    }
+
+    @Override
+    protected ClassElement doResolveClassElement(ExpressionVisitorContext ctx) {
+        return STRING_ELEMENT;
     }
 
     @Override

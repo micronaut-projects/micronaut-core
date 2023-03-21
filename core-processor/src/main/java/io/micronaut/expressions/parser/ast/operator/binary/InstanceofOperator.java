@@ -20,6 +20,8 @@ import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.types.TypeIdentifier;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 
@@ -59,6 +61,11 @@ public final class InstanceofOperator extends ExpressionNode {
         pushBoxPrimitiveIfNecessary(expressionType, mv);
 
         mv.visitTypeInsn(INSTANCEOF, targetType.getInternalName());
+    }
+
+    @Override
+    protected ClassElement doResolveClassElement(ExpressionVisitorContext ctx) {
+        return PrimitiveElement.BOOLEAN;
     }
 
     @Override

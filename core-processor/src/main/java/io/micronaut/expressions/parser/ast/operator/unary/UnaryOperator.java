@@ -18,6 +18,8 @@ package io.micronaut.expressions.parser.ast.operator.unary;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import org.objectweb.asm.Type;
 
 /**
@@ -39,5 +41,15 @@ public abstract sealed class UnaryOperator extends ExpressionNode permits NegOpe
     @Override
     public Type doResolveType(ExpressionVisitorContext ctx) {
         return operand.resolveType(ctx);
+    }
+
+    @Override
+    protected ClassElement doResolveClassElement(ExpressionVisitorContext ctx) {
+        Type type = doResolveType(ctx);
+        try {
+            return PrimitiveElement.valueOf(type.getClassName());
+        } catch (IllegalArgumentException e) {
+            return ClassElement.of(type.getClassName());
+        }
     }
 }

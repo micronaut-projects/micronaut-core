@@ -20,6 +20,8 @@ import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.access.ContextElementAccess;
 import io.micronaut.expressions.parser.ast.access.ContextMethodCall;
 import io.micronaut.expressions.parser.ast.access.ElementMethodCall;
+import io.micronaut.expressions.parser.ast.access.ListOrArrayAccess;
+import io.micronaut.expressions.parser.ast.access.MapAccess;
 import io.micronaut.expressions.parser.ast.access.PropertyAccess;
 import io.micronaut.expressions.parser.ast.conditional.TernaryExpression;
 import io.micronaut.expressions.parser.ast.literal.BoolLiteral;
@@ -68,6 +70,7 @@ import static io.micronaut.expressions.parser.token.TokenType.EXPRESSION_CONTEXT
 import static io.micronaut.expressions.parser.token.TokenType.FLOAT;
 import static io.micronaut.expressions.parser.token.TokenType.GT;
 import static io.micronaut.expressions.parser.token.TokenType.GTE;
+import static io.micronaut.expressions.parser.token.TokenType.R_SQUARE;
 import static io.micronaut.expressions.parser.token.TokenType.TYPE_IDENTIFIER;
 import static io.micronaut.expressions.parser.token.TokenType.INCREMENT;
 import static io.micronaut.expressions.parser.token.TokenType.INSTANCEOF;
@@ -328,6 +331,9 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
             } else if (tokenType == SAFE_NAV) {
                 eat(SAFE_NAV);
                 leftNode = methodOrPropertyAccess(leftNode, true);
+            } else if (tokenType == L_SQUARE) {
+                eat(L_SQUARE);
+                leftNode = mapOrListAccess(leftNode);
             } else {
                 throw new ExpressionParsingException("Unexpected token: " + lookahead.value());
             }
@@ -381,6 +387,31 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
             return new ElementMethodCall(callee, identifier, methodArguments, nullSafe);
         }
         return new PropertyAccess(callee, identifier, nullSafe);
+    }
+
+    // MapOrListAccess
+    //  : SimpleIdentifier
+    //  | SimpleIdentifier []
+    //  ;
+    private ExpressionNode mapOrListAccess(ExpressionNode callee) {
+        if (lookahead != null) {
+            if (lookahead.type() == INT) {
+                ListOrArrayAccess listOrArrayAccess = new ListOrArrayAccess(
+                    callee,
+                    intLiteral().getValue()
+                );
+                eat(R_SQUARE);
+                return listOrArrayAccess;
+            } else if (lookahead.type() == STRING) {
+                MapAccess mapAccess = new MapAccess(callee, stringLiteral().getValue());
+                eat(R_SQUARE);
+                return mapAccess;
+            } else {
+                throw new ExpressionParsingException("Unexpected token: " + lookahead.value());
+            }
+        } else {
+            throw new ExpressionParsingException("Unclosed subscript operator");
+        }
     }
 
     // MethodArguments:

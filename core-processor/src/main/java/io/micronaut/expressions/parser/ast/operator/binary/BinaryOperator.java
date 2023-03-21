@@ -18,6 +18,8 @@ package io.micronaut.expressions.parser.ast.operator.binary;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import org.objectweb.asm.Type;
 
 /**
@@ -46,6 +48,16 @@ public abstract sealed class BinaryOperator extends ExpressionNode permits Logic
         Type leftType = leftOperand.resolveType(ctx);
         Type rightType = rightOperand.resolveType(ctx);
         return resolveOperationType(leftType, rightType);
+    }
+
+    @Override
+    protected ClassElement doResolveClassElement(ExpressionVisitorContext ctx) {
+        Type type = doResolveType(ctx);
+        try {
+            return PrimitiveElement.valueOf(type.getClassName());
+        } catch (IllegalArgumentException e) {
+            return ClassElement.of(type.getClassName());
+        }
     }
 
     protected abstract Type resolveOperationType(Type leftOperandType,

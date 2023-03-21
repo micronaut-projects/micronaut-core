@@ -20,6 +20,8 @@ import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.literal.StringLiteral;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
@@ -55,6 +57,11 @@ public final class MatchesOperator extends ExpressionNode {
         operand.compile(ctx);
         pattern.compile(ctx);
         mv.invokeVirtual(STRING, MATCHES);
+    }
+
+    @Override
+    protected ClassElement doResolveClassElement(ExpressionVisitorContext ctx) {
+        return PrimitiveElement.BOOLEAN;
     }
 
     @Override

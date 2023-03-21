@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.types.TypeIdentifier;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
+import io.micronaut.inject.ast.ClassElement;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 
@@ -82,8 +83,13 @@ public final class OneDimensionalArray extends ExpressionNode {
     }
 
     @Override
+    protected ClassElement doResolveClassElement(ExpressionVisitorContext ctx) {
+        return getRequiredClassElement(elementTypeIdentifier.resolveType(ctx), ctx.visitorContext())
+                    .toArray();
+    }
+
+    @Override
     protected Type doResolveType(ExpressionVisitorContext ctx) {
-        return getTypeReference(getRequiredClassElement(elementTypeIdentifier.resolveType(ctx), ctx.visitorContext())
-                                    .toArray());
+        return getTypeReference(doResolveClassElement(ctx));
     }
 }

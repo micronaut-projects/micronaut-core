@@ -18,6 +18,7 @@ package io.micronaut.expressions.parser.ast.literal;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
+import io.micronaut.inject.ast.ClassElement;
 import org.objectweb.asm.Type;
 
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.OBJECT;
@@ -34,6 +35,11 @@ public final class NullLiteral extends ExpressionNode {
     @Override
     public void generateBytecode(ExpressionVisitorContext ctx) {
         ctx.methodVisitor().visitInsn(ACONST_NULL);
+    }
+
+    @Override
+    protected ClassElement doResolveClassElement(ExpressionVisitorContext ctx) {
+        return ClassElement.of(Object.class);
     }
 
     @Override

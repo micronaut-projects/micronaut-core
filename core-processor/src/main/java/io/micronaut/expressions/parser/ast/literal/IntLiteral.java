@@ -18,6 +18,8 @@ package io.micronaut.expressions.parser.ast.literal;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import org.objectweb.asm.Type;
 
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.INT;
@@ -43,7 +45,19 @@ public final class IntLiteral extends ExpressionNode {
     }
 
     @Override
+    protected ClassElement doResolveClassElement(ExpressionVisitorContext ctx) {
+        return PrimitiveElement.INT;
+    }
+
+    @Override
     protected Type doResolveType(ExpressionVisitorContext ctx) {
         return INT;
+    }
+
+    /**
+     * @return The value
+     */
+    public int getValue() {
+        return value;
     }
 }

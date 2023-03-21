@@ -6,7 +6,7 @@ class ContextMethodCallsExpressionsSpec extends AbstractEvaluatedExpressionsSpec
 {
     void "test context method calls"() {
         given:
-        Object expr1 = evaluateAgainstContext("#{ #getIntValue() }",
+        Object expr1 = evaluateAgainstContext("#{ getIntValue() }",
                 """
             @jakarta.inject.Singleton
             class Context {
@@ -16,7 +16,7 @@ class ContextMethodCallsExpressionsSpec extends AbstractEvaluatedExpressionsSpec
             }
         """)
 
-        Object expr2 = evaluateAgainstContext("#{ #getStringValue().toUpperCase() }",
+        Object expr2 = evaluateAgainstContext("#{ getStringValue().toUpperCase() }",
                 """
             @jakarta.inject.Singleton
             class Context {
@@ -26,7 +26,7 @@ class ContextMethodCallsExpressionsSpec extends AbstractEvaluatedExpressionsSpec
             }
         """)
 
-        Object expr3 = evaluateAgainstContext("#{ #randomizer().nextInt(10) }",
+        Object expr3 = evaluateAgainstContext("#{ randomizer().nextInt(10) }",
                 """
             import java.util.Random;
 
@@ -38,7 +38,7 @@ class ContextMethodCallsExpressionsSpec extends AbstractEvaluatedExpressionsSpec
             }
         """)
 
-        Object expr4 = evaluateAgainstContext("#{ #lowercase('TEST') }",
+        Object expr4 = evaluateAgainstContext("#{ lowercase('TEST') }",
                 """
             import java.util.Random;
 
@@ -56,7 +56,7 @@ class ContextMethodCallsExpressionsSpec extends AbstractEvaluatedExpressionsSpec
                 "test.ThirdContext",
                 "test.FourthContext"
         )
-        Object expr5 = evaluateAgainstContext("#{ #transform(#getName(), #getRepeat(), #toLower()) }",
+        Object expr5 = evaluateAgainstContext("#{ transform(getName(), getRepeat(), toLower()) }",
                 """
             import java.util.Random;
 
@@ -90,7 +90,7 @@ class ContextMethodCallsExpressionsSpec extends AbstractEvaluatedExpressionsSpec
         """)
         ContextRegistrar.reset()
 
-        Object expr6 = evaluateAgainstContext("#{ #getTestObject().name }",
+        Object expr6 = evaluateAgainstContext("#{ getTestObject().name }",
                 """
             import java.util.Random;
 
@@ -108,7 +108,7 @@ class ContextMethodCallsExpressionsSpec extends AbstractEvaluatedExpressionsSpec
             }
         """)
 
-        Object expr7 = evaluateAgainstContext("#{ #values().get(#random(#values())) }",
+        Object expr7 = evaluateAgainstContext("#{ values().get(random(values())) }",
                 """
             import java.util.Random;
             import java.util.List;

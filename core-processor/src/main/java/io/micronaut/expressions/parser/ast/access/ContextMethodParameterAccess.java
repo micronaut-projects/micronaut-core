@@ -20,6 +20,7 @@ import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
@@ -62,7 +63,7 @@ final class ContextMethodParameterAccess extends ExpressionNode {
     }
 
     @Override
-    protected Type doResolveType(ExpressionVisitorContext ctx) {
+    protected ClassElement doResolveClassElement(ExpressionVisitorContext ctx) {
         String parameterName = parameterElement.getName();
         ParameterElement[] methodParameters = parameterElement.getMethodElement().getParameters();
 
@@ -81,6 +82,12 @@ final class ContextMethodParameterAccess extends ExpressionNode {
         }
 
         this.parameterIndex = paramIndex;
+        return parameterElement.getGenericType();
+    }
+
+    @Override
+    protected Type doResolveType(ExpressionVisitorContext ctx) {
+        doResolveClassElement(ctx);
         return getTypeReference(parameterElement.getType());
     }
 }
