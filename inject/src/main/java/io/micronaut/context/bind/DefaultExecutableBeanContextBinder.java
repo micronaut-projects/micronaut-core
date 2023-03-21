@@ -46,7 +46,7 @@ public final class DefaultExecutableBeanContextBinder implements ExecutableBeanC
 
     @Override
     public <T, R> BoundExecutable<T, R> bind(Executable<T, R> target, ArgumentBinderRegistry<BeanContext> registry, BeanContext source) throws UnsatisfiedArgumentException {
-        return bind(target, registry, source);
+        return bind(target, source);
     }
 
     @Override
@@ -174,6 +174,14 @@ public final class DefaultExecutableBeanContextBinder implements ExecutableBeanC
             int result = Objects.hash(target);
             result = 31 * result + Arrays.hashCode(bound);
             return result;
+        }
+
+        @Override
+        public String toString() {
+            return "ContextBoundExecutable{" +
+                "target=" + target +
+                ", bound=" + Arrays.toString(bound) +
+                '}';
         }
     }
 }

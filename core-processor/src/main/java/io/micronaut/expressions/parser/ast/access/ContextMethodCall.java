@@ -83,7 +83,7 @@ public final class ContextMethodCall extends AbstractMethodCall {
         pushGetBeanFromContext(mv, calleeType);
         compileArguments(ctx);
         if (calleeClass.isInterface()) {
-            mv.invokeVirtual(calleeType, usedMethod.toAsmMethod());
+            mv.invokeInterface(calleeType, usedMethod.toAsmMethod());
         } else {
             mv.invokeVirtual(calleeType, usedMethod.toAsmMethod());
         }
