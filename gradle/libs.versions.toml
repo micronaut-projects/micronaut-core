@@ -26,15 +26,15 @@ jetty = "9.4.48.v20220622"
 jmh = "1.35"
 jsr107 = "1.1.1"
 jsr305 = "3.0.2"
-javax-el = "3.0.1-b12"
-javax-el-impl = "2.2.1-b05"
+jakarta-el = "5.0.1"
+jakarta-el-impl = "5.0.0-M1"
 jcache = "1.1.1"
 junit5 = "5.9.1"
 junit-platform="1.9.1"
 kotlin = "1.8.10"
 kotlin-coroutines = "1.6.4"
 ktor = "1.6.8"
-managed-logback = "1.4.5"
+managed-logback = "1.4.6"
 logbook-netty = "2.14.0"
 log4j = "2.19.0"
 micronaut-aws = "3.9.2"
@@ -60,7 +60,7 @@ wiremock = "2.33.2"
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
-managed-groovy = "4.0.9"
+managed-groovy = "4.0.10"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "2.14.0"
 managed-jackson-databind = "2.14.1"
@@ -168,8 +168,8 @@ jakarta-inject-api = { module = "jakarta.inject:jakarta.inject-api", version.ref
 jakarta-inject-tck = { module = "jakarta.inject:jakarta.inject-tck", version.ref = "jakarta-inject-tck" }
 
 javax-annotation-api = { module = "javax.annotation:javax.annotation-api", version.ref = "javax-annotation-api" }
-javax-el = { module = "org.glassfish:javax.el", version.ref = "javax-el" }
-javax-el-impl = { module = "org.glassfish:javax.el", version.ref = "javax-el" }
+jakarta-el = { module = "jakarta.el:jakarta.el-api", version.ref = "jakarta-el" }
+jakarta-el-impl = { module = "org.glassfish:jakarta.el", version.ref = "jakarta-el-impl" }
 javax-inject = { module = "javax.inject:javax.inject", version.ref = "javax-inject" }
 javax-persistence = { module = "javax.persistence:javax.persistence-api", version.ref = "javax-persistence" }
 

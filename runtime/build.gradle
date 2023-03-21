@@ -18,7 +18,7 @@ dependencies {
     compileOnly libs.graal
     compileOnly libs.jcache
 
-    compileOnly libs.javax.el
+    compileOnly libs.jakarta.el
     compileOnly libs.caffeine
     compileOnly libs.kotlinx.coroutines.core
     compileOnly libs.kotlinx.coroutines.reactive
