@@ -246,7 +246,12 @@ public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, Ht
         } else {
             // First, insert new handlers in the chain after us for handling the websocket
             ChannelPipeline pipeline = ctx.pipeline();
-            HandlerPublisher<WebSocketFrame> publisher = new HandlerPublisher<>(ctx.executor(), WebSocketFrame.class);
+            HandlerPublisher<WebSocketFrame> publisher = new HandlerPublisher<>(ctx.executor()) {
+                @Override
+                protected boolean acceptInboundMessage(Object msg) {
+                    return msg instanceof WebSocketFrame;
+                }
+            };
             HandlerSubscriber<WebSocketFrame> subscriber = new HandlerSubscriber<>(ctx.executor());
             pipeline.addAfter(ctx.executor(), ctx.name(), "websocket-subscriber", subscriber);
             pipeline.addAfter(ctx.executor(), ctx.name(), "websocket-publisher", publisher);

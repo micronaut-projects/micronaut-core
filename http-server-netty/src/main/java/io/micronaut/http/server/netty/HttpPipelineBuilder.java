@@ -550,7 +550,10 @@ final class HttpPipelineBuilder {
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_COMPRESSOR, contentCompressor);
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
 
-            pipeline.addLast(NettyServerWebSocketUpgradeHandler.COMPRESSION_HANDLER, new WebSocketServerCompressionHandler());
+            Optional<SimpleChannelInboundHandler<NettyHttpRequest<?>>> webSocketUpgradeHandler = embeddedServices.getWebSocketUpgradeHandler(server);
+            if (webSocketUpgradeHandler.isPresent()) {
+                pipeline.addLast(NettyServerWebSocketUpgradeHandler.COMPRESSION_HANDLER, new WebSocketServerCompressionHandler());
+            }
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, new HttpStreamsServerHandler());
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK, new ChunkedWriteHandler());
             pipeline.addLast(HttpRequestDecoder.ID, requestDecoder);
@@ -561,9 +564,7 @@ final class HttpPipelineBuilder {
                 pipeline.addLast("request-certificate-handler", new HttpRequestCertificateHandler(sslHandler));
             }
             pipeline.addLast(HttpResponseEncoder.ID, responseEncoder);
-            embeddedServices.getWebSocketUpgradeHandler(server).ifPresent(websocketHandler ->
-                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_WEBSOCKET_UPGRADE, websocketHandler)
-            );
+            webSocketUpgradeHandler.ifPresent(h -> pipeline.addLast(ChannelPipelineCustomizer.HANDLER_WEBSOCKET_UPGRADE, h));
 
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, routingInBoundHandler);
         }
