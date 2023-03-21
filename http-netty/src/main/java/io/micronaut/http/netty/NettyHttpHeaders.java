@@ -38,6 +38,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -135,6 +136,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
 
     @Override
     public Optional<String> findFirst(CharSequence name) {
+        // optimization to avoid ConversionService
         return Optional.ofNullable(get(name));
     }
 
@@ -260,6 +262,19 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
             }
         }
         return Optional.empty();
+    }
+
+    @Override
+    public OptionalLong contentLength() {
+        // optimization to avoid ConversionService
+        Optional<String> str = findFirst(HttpHeaderNames.CONTENT_LENGTH);
+        if (str.isPresent()) {
+            try {
+                return OptionalLong.of(Long.parseLong(str.get()));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return OptionalLong.empty();
     }
 
     @Override
