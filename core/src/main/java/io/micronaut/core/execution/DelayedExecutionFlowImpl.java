@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2023 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.core.execution;
 
 import io.micronaut.core.annotation.NonNull;
@@ -309,14 +324,14 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
     /**
      * Mock step used as the head of the linked list of steps.
      */
-    private static class Head extends Step {
+    private static final class Head extends Step {
         @Override
         Object apply(Object input) {
             throw new UnsupportedOperationException();
         }
     }
 
-    private static class Map extends Step {
+    private static final class Map extends Step {
         private final Function transformer;
 
         private Map(Function transformer) {
@@ -340,7 +355,7 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
         }
     }
 
-    private static class FlatMap extends Step {
+    private static final class FlatMap extends Step {
         private final Function<Object, ? extends ExecutionFlow> transformer;
 
         private FlatMap(Function<Object, ? extends ExecutionFlow> transformer) {
@@ -365,7 +380,7 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
         }
     }
 
-    private static class Then<R> extends Step {
+    private static final class Then<R> extends Step {
         private final Supplier<? extends ExecutionFlow<? extends R>> transformer;
 
         private Then(Supplier<? extends ExecutionFlow<? extends R>> transformer) {
@@ -386,7 +401,7 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
         }
     }
 
-    private static class OnErrorResume extends Step {
+    private static final class OnErrorResume extends Step {
         private final Function<? super Throwable, ? extends ExecutionFlow<?>> fallback;
 
         private OnErrorResume(Function<? super Throwable, ? extends ExecutionFlow<?>> fallback) {
@@ -407,7 +422,7 @@ final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
         }
     }
 
-    private static class OnComplete<E> extends Step {
+    private static final class OnComplete<E> extends Step {
         private final BiConsumer<? super E, Throwable> consumer;
 
         public OnComplete(BiConsumer<? super E, Throwable> consumer) {
