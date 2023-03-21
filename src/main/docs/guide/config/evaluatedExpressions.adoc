@@ -261,51 +261,17 @@ needs to be prefixed with `#` sign.
 
 Consider the following example:
 
-.User-defined evaluated expression context
-[source,java]
-----
-import jakarta.inject.Singleton;
-import java.util.Random;
-
-@Singleton
-public class CustomEvaluationContext {
-    public int generateRandom(int min, int max) {
-        return new Random().nextInt(max - min) + min;
-    }
-}
-----
+snippet::io.micronaut.docs.expressions.CustomEvaluationContext[title="User-defined evaluated expression context"]
 
 NOTE: The class should be resolvable as a bean can use `jakarta.inject` annotations to inject other types if necessary.
 
 Registering this class can be achieved with a custom implementation of api:expressions.context.ExpressionEvaluationContextRegistrar[] that is registered via service loader as a api:inject.visitor.TypeElementVisitor[] (create a new `META-INF/services/io.micronaut.inject.visitor.TypeElementVisitor` file referencing the new class) and placed on the annotation processor classpath:
 
-[source,java]
-----
-public class ContextRegistrar implements ExpressionEvaluationContextRegistrar {
-        @Override
-        public String getContextClassName() {
-            return "example.CustomEvaluationContext"
-        }
-    }
-}
-----
+snippet::io.micronaut.docs.expressions.ContextRegistrar[title="Defining a ExpressionEvaluationContextRegistrar"]
 
 Method `generateRandom(int, int)` can now be used within Evaluated Expression in the following way:
 
-.Usage of user-defined evaluated expression context
-[source, java]
-----
-import io.micronaut.context.annotation.Value;
-import jakarta.inject.Singleton;
-
-@Singleton
-public class ContextConsumer {
-
-    @Value("#{ #generateRandom(1, 10) }")
-    public int randomField;
-
-}
-----
+snippet::io.micronaut.docs.expressions.ContextConsumer[title="Usage of user-defined evaluated expression context"]
 
 At runtime, the bean will be retrieved from
 application context and respective method will be invoked.
@@ -323,38 +289,13 @@ expressions within any annotation in a global manner.
 However, you can also specify evaluation context scoped to concrete annotation or
 annotation member using ann:context.annotation.AnnotationExpressionContext[].
 
-.Usage of annotation level evaluated expression context
-[source, java]
-----
-import jakarta.inject.Singleton;
-import io.micronaut.context.annotation.AnnotationExpressionContext;
+snippet::io.micronaut.docs.expressions.AnnotationContextExample[title="Usage of annotation level evaluated expression context"]
 
-@Singleton
-@CustomAnnotation(value = "#{ #firstValue() + #secondValue() }")
-class Expr {
-}
-
-@Singleton
-class AnnotationContext {
-    String firstValue() {
-        return "fist value";
-    }
-}
-
-@Singleton
-class AnnotationMemberContext {
-    String secondValue() {
-        return "second value";
-    }
-}
-
-@AnnotationExpressionContext(AnnotationContext.class)
-@interface CustomAnnotation {
-
-    @AnnotationExpressionContext(AnnotationMemberContext.class)
-    String value();
-}
-----
+<1> Here two new methods are introduced to the context called `firstValue()` and `secondValue()` only for the scope of the `@CustomAnnotation`
+<2> The `firstValue()` method is defined in a bean called `AnnotationContext`
+<3> The `secondValue()` method is defined in a bean called `AnnotationMemberContext`
+<4> On the `@CustomAnnotation` annotation the methods of the `AnnotationContext` type are exposed to all members of the annotation (type level context).
+<5> On the `value()` member of the `@CustomAnnotation` annotation the methods of the `AnnotationContextExample` are made available but scoped only to the `value()` member.
 
 Again context classes need to be explicitly defined as beans to make them available for retrieval from
 application context at runtime.
