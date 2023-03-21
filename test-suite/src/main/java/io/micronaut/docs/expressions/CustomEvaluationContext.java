@@ -15,11 +15,13 @@
  */
 package io.micronaut.docs.expressions;
 
-import io.micronaut.expressions.context.ExpressionEvaluationContextRegistrar;
+import jakarta.inject.Singleton;
 
-public class ContextRegistrar implements ExpressionEvaluationContextRegistrar {
-    @Override
-    public String getContextClassName() {
-        return "io.micronaut.docs.expressions.CustomEvaluationContext";
+import java.util.Random;
+
+@Singleton
+public class CustomEvaluationContext {
+    public int generateRandom(int min, int max) {
+        return new Random().nextInt(max - min) + min;
     }
 }
