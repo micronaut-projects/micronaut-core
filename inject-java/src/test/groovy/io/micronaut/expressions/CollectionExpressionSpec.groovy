@@ -1,13 +1,13 @@
 package io.micronaut.expressions
 
 import io.micronaut.annotation.processing.test.AbstractEvaluatedExpressionsSpec
+import org.intellij.lang.annotations.Language
 
 class CollectionExpressionSpec extends AbstractEvaluatedExpressionsSpec {
 
     void "test list dereference"() {
         given:
-        Object result = evaluateAgainstContext("#{list[1]}",
-                """
+        @Language("java") def context = """
             import java.util.*;
             @jakarta.inject.Singleton
             class Context {
@@ -15,10 +15,13 @@ class CollectionExpressionSpec extends AbstractEvaluatedExpressionsSpec {
                     return List.of(1, 2, 3);
                 }
             }
-        """)
+        """
+        Object result = evaluateAgainstContext("#{list[1]}", context)
+        Object result2 = evaluateAgainstContext("#{not empty list}", context)
 
         expect:
         result == 2
+        result2 == true
     }
 
     void "test primitive array dereference"() {
@@ -40,8 +43,7 @@ class CollectionExpressionSpec extends AbstractEvaluatedExpressionsSpec {
 
     void "test map dereference"() {
         given:
-        Object result = evaluateAgainstContext("#{map['foo']}",
-                """
+        @Language("java") def context = """
             import java.util.*;
             @jakarta.inject.Singleton
             class Context {
@@ -52,9 +54,12 @@ class CollectionExpressionSpec extends AbstractEvaluatedExpressionsSpec {
                     );
                 }
             }
-        """)
+        """
+        Object result = evaluateAgainstContext("#{map['foo']}",context)
+        Object result2 = evaluateAgainstContext("#{not empty map}",context)
 
         expect:
         result == "bar"
+        result2 == true
     }
 }

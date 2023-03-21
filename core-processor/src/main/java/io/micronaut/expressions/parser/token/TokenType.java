@@ -73,7 +73,9 @@ public enum TokenType {
     LT,
     LTE,
     INSTANCEOF,
-    MATCHES;
+    MATCHES,
+
+    EMPTY;
 
     public boolean isOneOf(TokenType... others) {
         for (TokenType comparedType: others) {

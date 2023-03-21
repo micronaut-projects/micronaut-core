@@ -146,8 +146,14 @@ be specified as string literal. The regular expression itself will be checked fo
 
 === Logical Operators
 
-The following logical operators are supported: `&&` (can be aliased with `and`), `||` (can be aliased with `or`),
-`!`. Logical operations are performed in order enforced by standard operator precedence.
+The following logical operators are supported:
+
+* `&&` (can be aliased with `and`)
+* `||` (can be aliased with `or`),
+* `!` (can be aliaded with `not`)
+* `empty` / `not empty` (works with strings, collections, arrays, and maps)
+
+Logical operations are performed in order enforced by standard operator precedence.
 You can also change evaluation order by using brackets `()`.
 
 .Logical operators examples
@@ -161,6 +167,9 @@ You can also change evaluation order by using brackets `()`.
 
 #{ !false }                // true
 #{ !!true }                // true
+
+#{ empty '' }              // true
+#{ not empty '' }          // false
 ----
 
 === Ternary Operator

@@ -47,6 +47,7 @@ import io.micronaut.expressions.parser.ast.operator.binary.GteOperator;
 import io.micronaut.expressions.parser.ast.operator.binary.LtOperator;
 import io.micronaut.expressions.parser.ast.operator.binary.LteOperator;
 import io.micronaut.expressions.parser.ast.operator.binary.NeqOperator;
+import io.micronaut.expressions.parser.ast.operator.unary.EmptyOperator;
 import io.micronaut.expressions.parser.ast.operator.unary.NegOperator;
 import io.micronaut.expressions.parser.ast.operator.unary.NotOperator;
 import io.micronaut.expressions.parser.ast.operator.unary.PosOperator;
@@ -65,6 +66,7 @@ import static io.micronaut.expressions.parser.token.TokenType.DECREMENT;
 import static io.micronaut.expressions.parser.token.TokenType.DIV;
 import static io.micronaut.expressions.parser.token.TokenType.DOT;
 import static io.micronaut.expressions.parser.token.TokenType.DOUBLE;
+import static io.micronaut.expressions.parser.token.TokenType.EMPTY;
 import static io.micronaut.expressions.parser.token.TokenType.EQ;
 import static io.micronaut.expressions.parser.token.TokenType.EXPRESSION_CONTEXT_REF;
 import static io.micronaut.expressions.parser.token.TokenType.FLOAT;
@@ -298,6 +300,9 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
         } else if (tokenType == NOT) {
             eat(NOT);
             return new NotOperator(unaryExpression());
+        } else if (tokenType == EMPTY) {
+            eat(EMPTY);
+            return new EmptyOperator(unaryExpression());
         } else if (tokenType == INCREMENT) {
             throw new ExpressionParsingException("Prefix increment operation is not supported");
         } else if (tokenType == DECREMENT) {

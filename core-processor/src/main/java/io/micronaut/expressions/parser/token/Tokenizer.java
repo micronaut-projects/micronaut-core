@@ -33,6 +33,7 @@ import static io.micronaut.expressions.parser.token.TokenType.DECREMENT;
 import static io.micronaut.expressions.parser.token.TokenType.DIV;
 import static io.micronaut.expressions.parser.token.TokenType.DOT;
 import static io.micronaut.expressions.parser.token.TokenType.DOUBLE;
+import static io.micronaut.expressions.parser.token.TokenType.EMPTY;
 import static io.micronaut.expressions.parser.token.TokenType.EQ;
 import static io.micronaut.expressions.parser.token.TokenType.EXPRESSION_CONTEXT_REF;
 import static io.micronaut.expressions.parser.token.TokenType.IDENTIFIER;
@@ -91,6 +92,7 @@ public final class Tokenizer {
         // KEYWORDS
         "^instanceof\\b", INSTANCEOF,
         "^matches\\b", MATCHES,
+        "^empty\\b", EMPTY,
 
         // LITERALS
         "^null\\b", NULL,          // NULL
@@ -130,6 +132,7 @@ public final class Tokenizer {
 
         // LOGICAL OPERATORS
         "^!", NOT,
+        "^not\\b", NOT,
         "^&&", AND,
         "^and\\b", AND,
         "^\\|\\|", OR,

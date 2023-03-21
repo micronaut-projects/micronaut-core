@@ -817,6 +817,26 @@ class OperatorExpressionSpec extends AbstractEvaluatedExpressionsSpec {
         results[5] instanceof Boolean && results[5] == false
     }
 
+    void "test 'empty' operator"() {
+        given:
+        List<Object> results = evaluateMultiple(
+                "#{ empty '' }",    // 0
+                "#{ not empty '' }",              // 1
+                "#{ empty null }",              // 2
+                "#{ not empty null }",             // 3
+                "#{ empty 'foo' }",            // 4
+                "#{ not empty 'foo' }"              // 5
+        )
+
+        expect:
+        results[0] == true
+        results[1] == false
+        results[2] == true
+        results[3] == false
+        results[4] == false
+        results[5] == true
+    }
+
     void "test '!' operator"() {
         given:
         List<Object> results = evaluateMultiple(

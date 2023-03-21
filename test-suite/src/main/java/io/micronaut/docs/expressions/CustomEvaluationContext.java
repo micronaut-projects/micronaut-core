@@ -21,7 +21,9 @@ import java.util.Random;
 
 @Singleton
 public class CustomEvaluationContext {
+    private Random random = random = new Random();
+
     public int generateRandom(int min, int max) {
-        return new Random().nextInt(max - min) + min;
+        return random.nextInt(max - min) + min;
     }
 }

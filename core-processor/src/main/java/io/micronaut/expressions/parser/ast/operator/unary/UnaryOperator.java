@@ -29,9 +29,7 @@ import org.objectweb.asm.Type;
  * @since 4.0.0
  */
 @Internal
-public abstract sealed class UnaryOperator extends ExpressionNode permits NegOperator,
-                                                                          NotOperator,
-                                                                          PosOperator {
+public abstract sealed class UnaryOperator extends ExpressionNode permits EmptyOperator, NegOperator, NotOperator, PosOperator {
     protected final ExpressionNode operand;
 
     public UnaryOperator(ExpressionNode operand) {
