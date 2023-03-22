@@ -405,6 +405,7 @@ class Test {
             def method = ce.findMethod("deepList").get()
             def theType = method.getGenericReturnType()
 
+
             def level1 = theType.getTypeArguments()["E"]
             level1.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.Size$List')
             level1.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.Size$List')
