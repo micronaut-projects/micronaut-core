@@ -2647,12 +2647,15 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             this.methodName = methodName;
             this.isPostConstructMethod = isPostConstructMethod;
             this.isPreDestroyMethod = isPreDestroyMethod;
-
-            this.arguments = arguments == null
-                                 ? arguments
-                                 : Arrays.stream(arguments)
-                                       .map(argument -> ExpressionsAwareArgument.wrapIfNecessary(argument))
-                                       .toArray(Argument[]::new);
+            if (arguments != null) {
+                for (int i = 0; i < arguments.length; i++) {
+                    Argument<?> argument = arguments[i];
+                    if (argument.getAnnotationMetadata().hasEvaluatedExpressions()) {
+                        arguments[i] = ExpressionsAwareArgument.wrapIfNecessary(argument);
+                    }
+                }
+            }
+            this.arguments = arguments;
 
             this.annotationMetadata =
                 annotationMetadata == null

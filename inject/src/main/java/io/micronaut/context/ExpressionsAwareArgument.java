@@ -41,7 +41,7 @@ final class ExpressionsAwareArgument<T> extends DefaultArgument<T> implements Co
     private ExpressionsAwareArgument(Argument<T> argument,
                                      EvaluatedAnnotationMetadata annotationMetadata) {
         super(argument.getType(), argument.getName(), argument.getAnnotationMetadata(),
-            argument.getTypeVariables(), argument.getTypeParameters());
+            argument.getTypeVariables(), argument.getTypeParameters(), argument.isTypeVariable());
         this.annotationMetadata = annotationMetadata;
     }
 

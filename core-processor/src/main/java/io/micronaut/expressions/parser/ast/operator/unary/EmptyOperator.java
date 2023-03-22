@@ -15,6 +15,7 @@
  */
 package io.micronaut.expressions.parser.ast.operator.unary;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -35,7 +36,11 @@ import java.util.Optional;
 /**
  * The empty operator.
  */
+@Internal
 public final class EmptyOperator extends UnaryOperator {
+
+    private static final String IS_EMPTY = "isEmpty";
+
     public EmptyOperator(ExpressionNode operand) {
         super(operand);
     }
@@ -53,7 +58,7 @@ public final class EmptyOperator extends UnaryOperator {
                 Method.getMethod(
                     ReflectionUtils.getRequiredMethod(
                         StringUtils.class,
-                        "isEmpty",
+                        IS_EMPTY,
                         CharSequence.class
                     )
                 )
@@ -64,7 +69,7 @@ public final class EmptyOperator extends UnaryOperator {
                 Method.getMethod(
                     ReflectionUtils.getRequiredMethod(
                         CollectionUtils.class,
-                        "isEmpty",
+                        IS_EMPTY,
                         Collection.class
                     )
                 )
@@ -75,7 +80,7 @@ public final class EmptyOperator extends UnaryOperator {
                 Method.getMethod(
                     ReflectionUtils.getRequiredMethod(
                         CollectionUtils.class,
-                        "isEmpty",
+                        IS_EMPTY,
                         Map.class
                     )
                 )
@@ -86,7 +91,7 @@ public final class EmptyOperator extends UnaryOperator {
                 Method.getMethod(
                     ReflectionUtils.getRequiredMethod(
                         Optional.class,
-                        "isEmpty"
+                        IS_EMPTY
                     )
                 )
             );
@@ -96,11 +101,14 @@ public final class EmptyOperator extends UnaryOperator {
                 Method.getMethod(
                     ReflectionUtils.getRequiredMethod(
                         ArrayUtils.class,
-                        "isEmpty",
+                        IS_EMPTY,
                         Object[].class
                     )
                 )
             );
+        } else if (type.isPrimitive()) {
+            // primitives are never empty
+            mv.push(false);
         } else {
             mv.invokeStatic(
                 Type.getType(Objects.class),
