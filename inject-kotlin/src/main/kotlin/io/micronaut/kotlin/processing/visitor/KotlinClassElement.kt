@@ -489,16 +489,17 @@ internal open class KotlinClassElement(
                 return true
             }
         }
+        return isAssignable2(type)
+    }
+
+    // Second attempt to check if the class is assignable, the method is public for testing
+    @OptIn(KspExperimental::class)
+    fun isAssignable2(type: String): Boolean {
         val kotlinName = visitorContext.resolver.mapJavaNameToKotlin(
             visitorContext.resolver.getKSNameFromString(type)
-        )
-        if (kotlinName != null) {
-            val kotlinClassByName = visitorContext.resolver.getKotlinClassByName(kotlinName)
-            if (kotlinClassByName != null && kotlinType.starProjection().isAssignableFrom(kotlinClassByName.asStarProjectedType())) {
-                return true
-            }
-        }
-        return false
+        ) ?: return false
+        val kotlinClassByName = visitorContext.resolver.getKotlinClassByName(kotlinName) ?: return false
+        return kotlinClassByName.asStarProjectedType().isAssignableFrom(kotlinType.starProjection())
     }
 
     override fun isAssignable(type: ClassElement): Boolean {
