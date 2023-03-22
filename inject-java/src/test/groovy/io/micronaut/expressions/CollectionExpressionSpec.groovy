@@ -14,14 +14,35 @@ class CollectionExpressionSpec extends AbstractEvaluatedExpressionsSpec {
                 List<Integer> getList() {
                     return List.of(1, 2, 3);
                 }
+
+                int index() {
+                    return 1;
+                }
+
+                List<Foo> foos() {
+                    List<Foo> list = new ArrayList<>();
+                    list.add(new Foo("one"));
+                    list.add(new Foo("two"));
+                    list.add(null);
+                    return list;
+                }
             }
+
+            record Foo(String name) {}
         """
+
         Object result = evaluateAgainstContext("#{list[1]}", context)
-        Object result2 = evaluateAgainstContext("#{not empty list}", context)
+        Object result2 = evaluateAgainstContext("#{list[index()]}", context)
+        Object result3 = evaluateAgainstContext("#{not empty list}", context)
+        Object result4 = evaluateAgainstContext("#{foos()[1].name()}", context)
+        Object result5 = evaluateAgainstContext("#{foos()[2]?.name()}", context)
 
         expect:
         result == 2
-        result2 == true
+        result2 == 2
+        result3 == true
+        result4 == 'two'
+        result5 == null
     }
 
     void "test primitive array dereference"() {

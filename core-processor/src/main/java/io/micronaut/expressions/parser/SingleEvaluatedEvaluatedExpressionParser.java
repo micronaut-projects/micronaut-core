@@ -20,8 +20,7 @@ import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.access.ContextElementAccess;
 import io.micronaut.expressions.parser.ast.access.ContextMethodCall;
 import io.micronaut.expressions.parser.ast.access.ElementMethodCall;
-import io.micronaut.expressions.parser.ast.access.ListOrArrayAccess;
-import io.micronaut.expressions.parser.ast.access.MapAccess;
+import io.micronaut.expressions.parser.ast.access.SubscriptOperator;
 import io.micronaut.expressions.parser.ast.access.PropertyAccess;
 import io.micronaut.expressions.parser.ast.conditional.TernaryExpression;
 import io.micronaut.expressions.parser.ast.literal.BoolLiteral;
@@ -338,7 +337,7 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
                 leftNode = methodOrPropertyAccess(leftNode, true);
             } else if (tokenType == L_SQUARE) {
                 eat(L_SQUARE);
-                leftNode = mapOrListAccess(leftNode);
+                leftNode = subscriptOperator(leftNode);
             } else {
                 throw new ExpressionParsingException("Unexpected token: " + lookahead.value());
             }
@@ -394,26 +393,19 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
         return new PropertyAccess(callee, identifier, nullSafe);
     }
 
-    // MapOrListAccess
+    // SubscriptOperator
     //  : SimpleIdentifier
-    //  | SimpleIdentifier []
+    //  | SimpleIdentifier [index]
     //  ;
-    private ExpressionNode mapOrListAccess(ExpressionNode callee) {
+    private ExpressionNode subscriptOperator(ExpressionNode callee) {
         if (lookahead != null) {
-            if (lookahead.type() == INT) {
-                ListOrArrayAccess listOrArrayAccess = new ListOrArrayAccess(
-                    callee,
-                    intLiteral().getValue()
-                );
-                eat(R_SQUARE);
-                return listOrArrayAccess;
-            } else if (lookahead.type() == STRING) {
-                MapAccess mapAccess = new MapAccess(callee, stringLiteral().getValue());
-                eat(R_SQUARE);
-                return mapAccess;
-            } else {
-                throw new ExpressionParsingException("Unexpected token: " + lookahead.value());
-            }
+            ExpressionNode indexExpression = expression();
+            SubscriptOperator subscriptOperator = new SubscriptOperator(
+                callee,
+                indexExpression
+            );
+            eat(R_SQUARE);
+            return subscriptOperator;
         } else {
             throw new ExpressionParsingException("Unclosed subscript operator");
         }

@@ -21,28 +21,34 @@ import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.processing.JavaModelUtils;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
 import java.util.List;
+import java.util.Map;
 
 /**
- * Handles list and array de-referencing.
+ * Handles list, map and array de-referencing.
  */
 @Internal
-public class ListOrArrayAccess extends ExpressionNode {
+public class SubscriptOperator extends ExpressionNode {
 
-    private static final Method GET_METHOD = Method.getMethod(
+    private static final Method LIST_GET_METHOD = Method.getMethod(
         ReflectionUtils.getRequiredMethod(List.class, "get", int.class)
+    );
+    private static final Method MAP_GET_METHOD = Method.getMethod(
+        ReflectionUtils.getRequiredMethod(Map.class, "get", Object.class)
     );
 
     private final ExpressionNode callee;
-    private final int index;
+    private final ExpressionNode index;
     private boolean isArray = false;
+    private boolean isMap = false;
 
-    public ListOrArrayAccess(ExpressionNode callee, int index) {
+    public SubscriptOperator(ExpressionNode callee, ExpressionNode index) {
         this.callee = callee;
         this.index = index;
     }
@@ -51,14 +57,33 @@ public class ListOrArrayAccess extends ExpressionNode {
     protected void generateBytecode(ExpressionVisitorContext ctx) {
         callee.compile(ctx);
         GeneratorAdapter methodVisitor = ctx.methodVisitor();
-        methodVisitor.push(index);
-        if (isArray) {
-            methodVisitor.arrayLoad(resolveType(ctx));
+        ClassElement indexType = index.resolveClassElement(ctx);
+        index.compile(ctx);
+
+        if (isMap) {
+            if (!indexType.isAssignable(String.class)) {
+                throw new ExpressionCompilationException("Invalid subscript operator. Map key must be a string.");
+            } else {
+                methodVisitor.invokeInterface(
+                    Type.getType(Map.class),
+                    MAP_GET_METHOD
+                );
+            }
         } else {
-            methodVisitor.invokeInterface(
-                Type.getType(List.class),
-                GET_METHOD
-            );
+            if (!indexType.equals(PrimitiveElement.INT)) {
+                throw new ExpressionCompilationException("Invalid subscript operator. Index must be an integer.");
+            }
+            if (isArray) {
+                methodVisitor.arrayLoad(resolveType(ctx));
+            } else {
+                methodVisitor.invokeInterface(
+                    Type.getType(List.class),
+                    LIST_GET_METHOD
+                );
+            }
+        }
+        if (!isArray) {
+            methodVisitor.checkCast(resolveType(ctx));
         }
     }
 
@@ -66,11 +91,19 @@ public class ListOrArrayAccess extends ExpressionNode {
     protected ClassElement doResolveClassElement(ExpressionVisitorContext ctx) {
         ClassElement classElement = callee.resolveClassElement(ctx);
         this.isArray = classElement.isArray();
-        if (!classElement.isAssignable(List.class) && !isArray) {
+        this.isMap = classElement.isAssignable(Map.class);
+        if (!isMap && !classElement.isAssignable(List.class) && !isArray) {
             throw new ExpressionCompilationException("Invalid subscript operator. Subscript operator can only be applied to maps, lists and arrays");
         }
         if (isArray) {
             return classElement.fromArray();
+        } else if (isMap) {
+            Map<String, ClassElement> typeArguments = classElement.getTypeArguments();
+            if (typeArguments.containsKey("V")) {
+                return typeArguments.get("V");
+            } else {
+                return ClassElement.of(Object.class);
+            }
         } else {
             return classElement.getFirstTypeArgument()
                 .orElseGet(() -> ClassElement.of(Object.class));
@@ -79,7 +112,7 @@ public class ListOrArrayAccess extends ExpressionNode {
 
     @Override
     protected Type doResolveType(ExpressionVisitorContext ctx) {
-        ClassElement listElement = resolveClassElement(ctx);
-        return JavaModelUtils.getTypeReference(listElement);
+        ClassElement valueElement = resolveClassElement(ctx);
+        return JavaModelUtils.getTypeReference(valueElement);
     }
 }
