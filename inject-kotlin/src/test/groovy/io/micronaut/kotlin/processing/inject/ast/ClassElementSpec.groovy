@@ -1853,6 +1853,38 @@ class Test {
             ce.findMethod("helloWorld\$main").isPresent()
     }
 
+    void "test type isAssignable"() {
+        boolean isAssignable = buildClassElementMapped('test.Test', '''
+package test
+import io.micronaut.context.annotation.Executable
+import io.micronaut.context.annotation.Prototype
+import jakarta.inject.Singleton
+import java.util.List
+
+@Prototype
+class Test {
+    @Executable
+    fun method1() : kotlin.collections.List<String> {
+        return listOf()
+    }
+
+    @Executable
+    fun method2() : java.util.List<String>? {
+        return null
+    }
+}
+
+''', ce -> {
+            return ce.findMethod("method1").get().getReturnType().isAssignable(Iterable.class)
+                    && ce.findMethod("method2").get().getReturnType().isAssignable(Iterable.class)
+                    && ((KotlinClassElement) ce.findMethod("method1").get().getReturnType()).isAssignable2(Iterable.class.name)
+                    && ((KotlinClassElement) ce.findMethod("method2").get().getReturnType()).isAssignable2(Iterable.class.name)
+        })
+
+        expect:
+            isAssignable
+    }
+
 
     private void assertListGenericArgument(ClassElement type, Closure cl) {
         def arg1 = type.getAllTypeArguments().get(List.class.name).get("E")
