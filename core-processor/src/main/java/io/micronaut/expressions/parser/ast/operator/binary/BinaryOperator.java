@@ -17,6 +17,7 @@ package io.micronaut.expressions.parser.ast.operator.binary;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
+import io.micronaut.expressions.parser.ast.conditional.ElvisOperator;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PrimitiveElement;
@@ -29,12 +30,7 @@ import org.objectweb.asm.Type;
  * @since 4.0.0
  */
 @Internal
-public abstract sealed class BinaryOperator extends ExpressionNode permits LogicalOperator,
-                                                                           RelationalOperator,
-                                                                           PowOperator,
-                                                                           AddOperator,
-                                                                           EqOperator,
-                                                                           MathOperator {
+public abstract sealed class BinaryOperator extends ExpressionNode permits AddOperator, EqOperator, LogicalOperator, MathOperator, PowOperator, RelationalOperator {
     protected final ExpressionNode leftOperand;
     protected final ExpressionNode rightOperand;
 

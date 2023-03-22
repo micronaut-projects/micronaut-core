@@ -16,6 +16,8 @@
 package io.micronaut.expressions.parser.ast.conditional;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
@@ -23,6 +25,7 @@ import io.micronaut.inject.ast.ClassElement;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
+import org.objectweb.asm.commons.Method;
 
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.BOOLEAN;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.BOOLEAN_WRAPPER;
@@ -46,7 +49,10 @@ import static org.objectweb.asm.commons.GeneratorAdapter.NE;
  * @since 4.0.0
  */
 @Internal
-public final class TernaryExpression extends ExpressionNode {
+public class TernaryExpression extends ExpressionNode {
+    private static final Method COERCE_TO_BOOLEAN = Method.getMethod(
+        ReflectionUtils.getRequiredMethod(ObjectUtils.class, "coerceToBoolean", Object.class)
+    );
     private final ExpressionNode condition;
     private final ExpressionNode trueExpr;
     private final ExpressionNode falseExpr;
@@ -77,7 +83,15 @@ public final class TernaryExpression extends ExpressionNode {
         Type conditionType = condition.resolveType(ctx);
 
         condition.compile(ctx);
-        pushUnboxPrimitiveIfNecessary(conditionType, mv);
+        if (shouldCoerceConditionToBoolean()) {
+            pushBoxPrimitiveIfNecessary(conditionType, mv);
+            mv.invokeStatic(
+                Type.getType(ObjectUtils.class),
+                COERCE_TO_BOOLEAN
+            );
+        } else {
+            pushUnboxPrimitiveIfNecessary(conditionType, mv);
+        }
 
         mv.ifCmp(BOOLEAN, NE, falseLabel);
         trueExpr.compile(ctx);
@@ -105,9 +119,16 @@ public final class TernaryExpression extends ExpressionNode {
         return ClassElement.of(doResolveType(ctx).getClassName());
     }
 
+    /**
+     * @return Whether the condition should be coerced to a boolean type.
+     */
+    protected boolean shouldCoerceConditionToBoolean() {
+        return false;
+    }
+
     @Override
     protected Type doResolveType(ExpressionVisitorContext ctx) {
-        if (!isOneOf(condition.resolveType(ctx), BOOLEAN, BOOLEAN_WRAPPER)) {
+        if (!shouldCoerceConditionToBoolean() && !isOneOf(condition.resolveType(ctx), BOOLEAN, BOOLEAN_WRAPPER)) {
             throw new ExpressionCompilationException("Invalid ternary operator. Condition should resolve to boolean type");
         }
 

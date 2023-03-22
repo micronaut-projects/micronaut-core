@@ -4,6 +4,22 @@ import io.micronaut.annotation.processing.test.AbstractEvaluatedExpressionsSpec
 
 class TernaryOperationExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
 
+    void "test elvis operator"() {
+        given:
+        List<Object> results = evaluateMultiple(
+                "#{  10 ?: 5 }",
+                "#{ -10 ?: 5 }",
+                "#{ '' ?: 'test' }",
+                "#{ 'foo' ?: 'test' }"
+        )
+
+        expect:
+        results[0] instanceof Integer && results[0] == 10
+        results[1] instanceof Integer && results[1] == 5
+        results[2] instanceof String && results[2] == 'test'
+        results[3] instanceof String && results[3] == 'foo'
+    }
+
     void "test ternary operator"() {
         given:
         List<Object> results = evaluateMultiple(

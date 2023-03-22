@@ -33,6 +33,7 @@ import static io.micronaut.expressions.parser.token.TokenType.DECREMENT;
 import static io.micronaut.expressions.parser.token.TokenType.DIV;
 import static io.micronaut.expressions.parser.token.TokenType.DOT;
 import static io.micronaut.expressions.parser.token.TokenType.DOUBLE;
+import static io.micronaut.expressions.parser.token.TokenType.ELVIS;
 import static io.micronaut.expressions.parser.token.TokenType.EMPTY;
 import static io.micronaut.expressions.parser.token.TokenType.EQ;
 import static io.micronaut.expressions.parser.token.TokenType.EXPRESSION_CONTEXT_REF;
@@ -117,6 +118,7 @@ public final class Tokenizer {
         // SYMBOLS
         "^#", EXPRESSION_CONTEXT_REF,
         "^\\?\\.", SAFE_NAV,
+        "^\\?\\:", ELVIS,
         "^\\?", QMARK,
         "^\\.", DOT,
         "^,", COMMA,

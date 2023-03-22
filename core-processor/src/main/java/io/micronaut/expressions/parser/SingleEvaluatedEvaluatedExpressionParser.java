@@ -22,6 +22,7 @@ import io.micronaut.expressions.parser.ast.access.ContextMethodCall;
 import io.micronaut.expressions.parser.ast.access.ElementMethodCall;
 import io.micronaut.expressions.parser.ast.access.SubscriptOperator;
 import io.micronaut.expressions.parser.ast.access.PropertyAccess;
+import io.micronaut.expressions.parser.ast.conditional.ElvisOperator;
 import io.micronaut.expressions.parser.ast.conditional.TernaryExpression;
 import io.micronaut.expressions.parser.ast.literal.BoolLiteral;
 import io.micronaut.expressions.parser.ast.literal.DoubleLiteral;
@@ -65,6 +66,7 @@ import static io.micronaut.expressions.parser.token.TokenType.DECREMENT;
 import static io.micronaut.expressions.parser.token.TokenType.DIV;
 import static io.micronaut.expressions.parser.token.TokenType.DOT;
 import static io.micronaut.expressions.parser.token.TokenType.DOUBLE;
+import static io.micronaut.expressions.parser.token.TokenType.ELVIS;
 import static io.micronaut.expressions.parser.token.TokenType.EMPTY;
 import static io.micronaut.expressions.parser.token.TokenType.EQ;
 import static io.micronaut.expressions.parser.token.TokenType.EXPRESSION_CONTEXT_REF;
@@ -146,12 +148,18 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
     //  ;
     private ExpressionNode ternaryExpression() {
         ExpressionNode orExpression = orExpression();
-        if (lookahead != null && lookahead.type() == QMARK) {
-            eat(QMARK);
-            ExpressionNode trueExpr = expression();
-            eat(COLON);
-            ExpressionNode falseExpr = expression();
-            return new TernaryExpression(orExpression, trueExpr, falseExpr);
+        if (lookahead != null) {
+            if (lookahead.type() == QMARK) {
+                eat(QMARK);
+                ExpressionNode trueExpr = expression();
+                eat(COLON);
+                ExpressionNode falseExpr = expression();
+                return new TernaryExpression(orExpression, trueExpr, falseExpr);
+            } else if (lookahead.type() == ELVIS) {
+                eat(ELVIS);
+                ExpressionNode falseExpr = expression();
+                return new ElvisOperator(orExpression, falseExpr);
+            }
         }
         return orExpression;
     }
