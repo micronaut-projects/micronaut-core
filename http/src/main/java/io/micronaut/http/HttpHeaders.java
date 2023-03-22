@@ -17,14 +17,12 @@ package io.micronaut.http;
 
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.type.Headers;
-import io.micronaut.core.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -693,22 +691,7 @@ public interface HttpHeaders extends Headers {
      * @return A list of zero or many {@link MediaType} instances
      */
     default List<MediaType> accept() {
-        final List<String> values = getAll(HttpHeaders.ACCEPT);
-        if (!values.isEmpty()) {
-            List<MediaType> mediaTypes = new ArrayList<>(10);
-            for (String value : values) {
-                for (String token : StringUtils.splitOmitEmptyStrings(value, ',')) {
-                    try {
-                        mediaTypes.add(MediaType.of(token));
-                    } catch (IllegalArgumentException e) {
-                        // ignore
-                    }
-                }
-            }
-            return mediaTypes;
-        } else {
-            return Collections.emptyList();
-        }
+        return MediaType.orderedOf(getAll(HttpHeaders.ACCEPT));
     }
 
     /**

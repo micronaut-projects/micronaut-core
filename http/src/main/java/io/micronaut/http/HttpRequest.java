@@ -15,15 +15,18 @@
  */
 package io.micronaut.http;
 
-import io.micronaut.http.cookie.Cookies;
-
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.cookie.Cookies;
+
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.security.Principal;
 import java.security.cert.Certificate;
-import java.util.*;
+import java.util.Collection;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
  * <p>Common interface for HTTP request implementations.</p>
@@ -87,13 +90,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return A list of zero or many {@link MediaType} instances
      */
     default Collection<MediaType> accept() {
-        final HttpHeaders headers = getHeaders();
-        if (headers.contains(HttpHeaders.ACCEPT)) {
-            return MediaType.orderedOf(
-                    headers.getAll(HttpHeaders.ACCEPT)
-            );
-        }
-        return Collections.emptySet();
+        return getHeaders().accept();
     }
 
     /**
