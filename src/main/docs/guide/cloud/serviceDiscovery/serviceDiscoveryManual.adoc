@@ -38,4 +38,4 @@ micronaut:
 - `health-check-interval` is the interval between checks
 - `health-check-uri` specifies the endpoint URI of the health check request
 
-Micronaut starts a background thread to check the health status of the service and if any of the configured services respond with an error code, they are removed from the list of available services.
+The Micronaut framework starts a background thread to check the health status of the service and if any of the configured services respond with an error code, they are removed from the list of available services.

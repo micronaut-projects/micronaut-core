@@ -14,7 +14,7 @@ void onStartup(StartupEvent event) {
 }
 ----
 
-The presence of the ann:runtime.event.annotation.EventListener[] annotation causes Micronaut to create a new class that implements api:context.event.ApplicationEventListener[] and invokes the `onStartup` method defined in the bean above.
+The presence of the ann:runtime.event.annotation.EventListener[] annotation causes the Micronaut framework to create a new class that implements api:context.event.ApplicationEventListener[] and invokes the `onStartup` method defined in the bean above.
 
 The actual implementation of the ann:runtime.event.annotation.EventListener[] is trivial; it simply uses the ann:aop.Adapter[] annotation to specify which SAM (single abstract method) type it adapts:
 
@@ -27,6 +27,6 @@ include::context/src/main/java/io/micronaut/runtime/event/annotation/EventListen
 
 <1> The ann:aop.Adapter[] annotation indicates which SAM type to adapt, in this case api:context.event.ApplicationEventListener[].
 
-NOTE: Micronaut also automatically aligns the generic types for the SAM interface if they are specified.
+NOTE: The Micronaut framework also automatically aligns the generic types for the SAM interface if they are specified.
 
 Using this mechanism you can define custom annotations that use the ann:aop.Adapter[] annotation and a SAM interface to automatically implement beans for you at compile time.
