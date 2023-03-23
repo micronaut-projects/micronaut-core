@@ -26,6 +26,7 @@ import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
@@ -216,6 +217,19 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
             }
         }
         return attributes;
+    }
+
+    @Override
+    public io.micronaut.http.HttpResponse<B> setAttribute(CharSequence name, Object value) {
+        // This is the copy from the super method to avoid the type pollution
+        if (StringUtils.isNotEmpty(name)) {
+            if (value == null) {
+                getAttributes().remove(name.toString());
+            } else {
+                getAttributes().put(name.toString(), value);
+            }
+        }
+        return this;
     }
 
     @Override

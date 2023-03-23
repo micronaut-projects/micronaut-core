@@ -72,10 +72,10 @@ public interface ExecutionHandle<T, R> extends AnnotationMetadataDelegate {
      * @return The execution handle
      */
     static <T2, R2> MethodExecutionHandle<T2, R2> of(T2 bean, ExecutableMethod<T2, R2> method) {
-        return new MethodExecutionHandle<T2, R2>() {
+        return new MethodExecutionHandle<>() {
             @NonNull
             @Override
-            public ExecutableMethod<?, R2> getExecutableMethod() {
+            public ExecutableMethod<T2, R2> getExecutableMethod() {
                 return method;
             }
 

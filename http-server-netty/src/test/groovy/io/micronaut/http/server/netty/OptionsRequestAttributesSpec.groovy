@@ -3,7 +3,6 @@ package io.micronaut.http.server.netty
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpAttributes
-import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MutableHttpResponse
@@ -19,7 +18,6 @@ import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
 import org.spockframework.util.Assert
 import spock.lang.Specification
-
 
 class OptionsRequestAttributesSpec extends Specification {
 
@@ -53,7 +51,6 @@ class OptionsRequestAttributesSpec extends Specification {
 
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-            Assert.that(request.getAttributes().contains(HttpAttributes.ROUTE.toString()))
             Assert.that(request.getAttributes().contains(HttpAttributes.ROUTE_MATCH.toString()))
             Assert.that(request.getAttributes().contains(HttpAttributes.ROUTE_INFO.toString()))
             Assert.that(request.getAttributes().contains(HttpAttributes.URI_TEMPLATE.toString()))

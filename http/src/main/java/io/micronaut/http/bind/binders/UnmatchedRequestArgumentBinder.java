@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,19 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router;
-
-import io.micronaut.core.bind.ArgumentBinder;
-
-import java.util.function.Supplier;
+package io.micronaut.http.bind.binders;
 
 /**
- * Represents an unresolved argument to a {@link io.micronaut.web.router.Route}.
- *
- * @param <T> The Type
- * @author Graeme Rocher
- * @since 1.0
+ * Marker interface for unmatched request argument binder.
+ * @author Denis Stepanov
+ * @since 4.0.0
  */
-@FunctionalInterface
-public interface UnresolvedArgument<T> extends Supplier<ArgumentBinder.BindingResult<T>> {
+public interface UnmatchedRequestArgumentBinder {
 }

@@ -82,11 +82,6 @@ public abstract sealed class MicronautHttpData<D extends HttpData> extends Abstr
     long definedSize = 0;
     Charset charset;
 
-    /**
-     * Additional data for {@link FormRouteCompleter}.
-     */
-    FormRouteCompleter.HttpDataAttachment attachment;
-
     @Nullable
     @SuppressWarnings("rawtypes")
     private final ResourceLeakTracker<MicronautHttpData> tracker = LEAK_DETECTOR.get().track(this);
@@ -619,7 +614,7 @@ public abstract sealed class MicronautHttpData<D extends HttpData> extends Abstr
          *
          * @return The contents of this chunk
          */
-        ByteBuf claim() {
+        public ByteBuf claim() {
             lock.lock();
             if (buf == null) {
                 return Unpooled.EMPTY_BUFFER;

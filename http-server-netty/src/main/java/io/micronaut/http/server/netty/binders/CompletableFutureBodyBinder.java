@@ -17,21 +17,13 @@ package io.micronaut.http.server.netty.binders;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.netty.HttpContentProcessor;
-import io.micronaut.http.server.netty.HttpContentProcessorAsReactiveProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.NettyHttpRequest;
-import io.netty.buffer.ByteBufHolder;
-import io.netty.util.ReferenceCountUtil;
-import org.reactivestreams.Subscription;
 
 import java.util.Arrays;
 import java.util.List;
@@ -47,19 +39,16 @@ import java.util.concurrent.Future;
  * @since 1.0
  */
 @Internal
-public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<CompletableFuture>
-    implements NonBlockingBodyArgumentBinder<CompletableFuture> {
+public class CompletableFutureBodyBinder implements NonBlockingBodyArgumentBinder<CompletableFuture<?>>, StreamedNettyRequestArgumentBinder<CompletableFuture<?>> {
 
-    private static final Argument<CompletableFuture> TYPE = Argument.of(CompletableFuture.class);
+    private static final Argument<CompletableFuture<?>> TYPE = (Argument) Argument.of(CompletableFuture.class);
 
     private final HttpContentProcessorResolver httpContentProcessorResolver;
 
     /**
      * @param httpContentProcessorResolver The http content processor resolver
-     * @param conversionService            The conversion service
      */
-    public CompletableFutureBodyBinder(HttpContentProcessorResolver httpContentProcessorResolver, ConversionService conversionService) {
-        super(conversionService);
+    public CompletableFutureBodyBinder(HttpContentProcessorResolver httpContentProcessorResolver) {
         this.httpContentProcessorResolver = httpContentProcessorResolver;
     }
 
@@ -70,69 +59,39 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
     }
 
     @Override
-    public Argument<CompletableFuture> argumentType() {
+    public Argument<CompletableFuture<?>> argumentType() {
         return TYPE;
     }
 
     @Override
-    public BindingResult<CompletableFuture> bind(ArgumentConversionContext<CompletableFuture> context, HttpRequest<?> source) {
-        if (source instanceof NettyHttpRequest) {
-            NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) source;
-            io.netty.handler.codec.http.HttpRequest nativeRequest = ((NettyHttpRequest) source).getNativeRequest();
-            if (nativeRequest instanceof StreamedHttpRequest) {
+    public BindingResult<CompletableFuture<?>> bindForStreamedNettyRequest(ArgumentConversionContext<CompletableFuture<?>> context,
+                                                                           StreamedHttpRequest streamedHttpRequest,
+                                                                           NettyHttpRequest<?> nettyHttpRequest) {
+        CompletableFuture<Object> future = new CompletableFuture<>();
+        Argument<?> targetType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
 
-                CompletableFuture future = new CompletableFuture();
-                Argument<?> targetType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+        nettyHttpRequest.setUsesHttpContentProcessor();
+        HttpContentProcessor processor = httpContentProcessorResolver.resolve(nettyHttpRequest, targetType);
 
-                HttpContentProcessor processor = httpContentProcessorResolver.resolve(nettyHttpRequest, targetType);
-
-                HttpContentProcessorAsReactiveProcessor.asPublisher(processor, nettyHttpRequest).subscribe(new CompletionAwareSubscriber<Object>() {
-                    @Override
-                    protected void doOnSubscribe(Subscription subscription) {
-                        subscription.request(1);
-                    }
-
-                    @Override
-                    protected void doOnNext(Object message) {
-                        if (message instanceof ByteBufHolder) {
-                            nettyHttpRequest.addContent((ByteBufHolder) message);
-                        } else {
-                            nettyHttpRequest.setBody(message);
-                        }
-                        // upstream producer gave us control of the message. release it now, if we still need it,
-                        // nettyHttpRequest will have retained it
-                        ReferenceCountUtil.release(message);
-                        subscription.request(1);
-                    }
-
-                    @Override
-                    protected void doOnError(Throwable t) {
-                        future.completeExceptionally(t);
-                    }
-
-                    @Override
-                    protected void doOnComplete() {
-                        Optional<Argument<?>> firstTypeParameter = context.getFirstTypeVariable();
-                        if (firstTypeParameter.isPresent()) {
-                            Argument<?> arg = firstTypeParameter.get();
-                            Optional converted = nettyHttpRequest.getBody(arg);
-                            if (converted.isPresent()) {
-                                future.complete(converted.get());
-                            } else {
-                                future.completeExceptionally(new IllegalArgumentException("Cannot bind body to argument type: " + arg.getType().getName()));
-                            }
-                        } else {
-                            future.complete(nettyHttpRequest.getBody().orElse(null));
-                        }
-                    }
-                });
-
-                return () -> Optional.of(future);
+        nettyHttpRequest.readRequestBody(processor).onComplete((httpRequest, throwable) -> {
+            if (throwable != null) {
+                future.complete(throwable);
             } else {
-                return BindingResult.EMPTY;
+                Optional<Argument<?>> firstTypeParameter = context.getFirstTypeVariable();
+                if (firstTypeParameter.isPresent()) {
+                    Argument<?> arg = firstTypeParameter.get();
+                    Optional<?> converted = nettyHttpRequest.getBody(arg);
+                    if (converted.isPresent()) {
+                        future.complete(converted.get());
+                    } else {
+                        future.completeExceptionally(new IllegalArgumentException("Cannot bind body to argument type: " + arg.getType().getName()));
+                    }
+                } else {
+                    future.complete(nettyHttpRequest.getBody().orElse(null));
+                }
             }
-        } else {
-            return BindingResult.EMPTY;
-        }
+        });
+
+        return () -> Optional.of(future);
     }
 }

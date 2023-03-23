@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.stream.StreamedHttpMessage;
+import io.netty.handler.codec.http.HttpContent;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
@@ -50,8 +51,8 @@ public final class HttpContentProcessorAsReactiveProcessor {
      */
     @SuppressWarnings("unchecked")
     public static <T> Publisher<T> asPublisher(HttpContentProcessor processor, NettyHttpRequest<?> request) {
-        StreamedHttpMessage streamed = (StreamedHttpMessage) request.getNativeRequest();
-        return Flux.concat(Flux.from(streamed)
+        Flux<HttpContent> start = request.getNativeRequest() instanceof StreamedHttpMessage s ? Flux.from(s) : Flux.empty();
+        return Flux.concat(start
             .doOnError(e -> {
                 try {
                     processor.cancel();

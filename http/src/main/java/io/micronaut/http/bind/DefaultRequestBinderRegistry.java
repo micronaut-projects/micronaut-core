@@ -35,19 +35,21 @@ import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
 import io.micronaut.http.bind.binders.CookieAnnotationBinder;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.HeaderAnnotationBinder;
-import io.micronaut.http.bind.binders.ParameterAnnotationBinder;
 import io.micronaut.http.bind.binders.PartAnnotationBinder;
 import io.micronaut.http.bind.binders.PathVariableAnnotationBinder;
+import io.micronaut.http.bind.binders.QueryValueArgumentBinder;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.bind.binders.RequestAttributeAnnotationBinder;
 import io.micronaut.http.bind.binders.RequestBeanAnnotationBinder;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
+import io.micronaut.http.bind.binders.DefaultUnmatchedRequestArgumentBinder;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import java.lang.annotation.Annotation;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -73,6 +75,8 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
     private final ConversionService conversionService;
     private final Map<TypeAndAnnotation, Optional<RequestArgumentBinder>> argumentBinderCache =
         new ConcurrentLinkedHashMap.Builder<TypeAndAnnotation, Optional<RequestArgumentBinder>>().maximumWeightedCapacity(CACHE_MAX_SIZE).build();
+    private final List<RequestArgumentBinder<Object>> unmatchedBinders = new ArrayList<>();
+    private final DefaultUnmatchedRequestArgumentBinder defaultUnmatchedRequestArgumentBinder;
 
     /**
      * @param conversionService The conversion service
@@ -92,7 +96,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
 
         if (CollectionUtils.isNotEmpty(binders)) {
             for (RequestArgumentBinder binder : binders) {
-                addRequestArgumentBinder(binder);
+                addArgumentBinder(binder);
             }
         }
 
@@ -113,19 +117,19 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         byType.put(Argument.of(PushCapableHttpRequest.class).typeHashCode(), (RequestArgumentBinder<PushCapableHttpRequest>) (argument, source) -> {
             if (source instanceof PushCapableHttpRequest) {
                 Optional<Argument<?>> typeVariable = argument.getFirstTypeVariable()
-                        .filter(arg -> arg.getType() != Object.class)
-                        .filter(arg -> arg.getType() != Void.class);
+                    .filter(arg -> arg.getType() != Object.class)
+                    .filter(arg -> arg.getType() != Void.class);
                 if (typeVariable.isPresent() && HttpMethod.permitsRequestBody(source.getMethod())) {
                     if (source.getBody().isPresent()) {
                         return () -> Optional.of(new PushCapableFullHttpRequest((PushCapableHttpRequest) source, typeVariable.get()));
                     } else {
-                        return ArgumentBinder.BindingResult.EMPTY;
+                        return ArgumentBinder.BindingResult.empty();
                     }
                 } else {
                     return () -> Optional.of((PushCapableHttpRequest) source);
                 }
             } else {
-                return ArgumentBinder.BindingResult.UNSATISFIED;
+                return ArgumentBinder.BindingResult.unsatisfied();
             }
         });
         byType.put(Argument.of(HttpParameters.class).typeHashCode(), (RequestArgumentBinder<HttpParameters>) (argument, source) -> () -> Optional.of(source.getParameters()));
@@ -140,16 +144,26 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
             Cookie finalCookie = cookie;
             return () -> finalCookie != null ? Optional.of(finalCookie) : Optional.empty();
         });
+
+        defaultUnmatchedRequestArgumentBinder = new DefaultUnmatchedRequestArgumentBinder<>(
+            List.of(
+                new QueryValueArgumentBinder<>(conversionService),
+                new RequestAttributeAnnotationBinder<>(conversionService)
+            ),
+            unmatchedBinders,
+            List.of(
+                new DefaultBodyAnnotationBinder<>(conversionService)
+            )
+        );
     }
 
     @SuppressWarnings("rawtypes")
     @Override
-    public <T, ST> void addRequestArgumentBinder(ArgumentBinder<T, ST> binder) {
+    public <T> void addArgumentBinder(ArgumentBinder<T, HttpRequest<?>> binder) {
         if (binder instanceof AnnotatedRequestArgumentBinder) {
             AnnotatedRequestArgumentBinder<?, ?> annotatedRequestArgumentBinder = (AnnotatedRequestArgumentBinder) binder;
             Class<? extends Annotation> annotationType = annotatedRequestArgumentBinder.getAnnotationType();
-            if (binder instanceof TypedRequestArgumentBinder) {
-                TypedRequestArgumentBinder<?> typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
+            if (binder instanceof TypedRequestArgumentBinder<?> typedRequestArgumentBinder) {
                 Argument argumentType = typedRequestArgumentBinder.argumentType();
                 byTypeAndAnnotation.put(new TypeAndAnnotation(argumentType, annotationType), (RequestArgumentBinder) binder);
                 List<Class<?>> superTypes = typedRequestArgumentBinder.superTypes();
@@ -162,14 +176,18 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                 byAnnotation.put(annotationType, annotatedRequestArgumentBinder);
             }
 
-        } else if (binder instanceof TypedRequestArgumentBinder) {
-            TypedRequestArgumentBinder typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
+        } else if (binder instanceof TypedRequestArgumentBinder typedRequestArgumentBinder) {
             byType.put(typedRequestArgumentBinder.argumentType().typeHashCode(), typedRequestArgumentBinder);
         }
     }
 
     @Override
-    public <T> Optional<ArgumentBinder<T, HttpRequest<?>>> findArgumentBinder(Argument<T> argument, HttpRequest<?> source) {
+    public void addUnmatchedRequestArgumentBinder(RequestArgumentBinder<Object> binder) {
+        unmatchedBinders.add(binder);
+    }
+
+    @Override
+    public <T> Optional<ArgumentBinder<T, HttpRequest<?>>> findArgumentBinder(Argument<T> argument) {
         Optional<Class<? extends Annotation>> opt = argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Bindable.class);
         if (opt.isPresent()) {
             Class<? extends Annotation> annotationType = opt.get();
@@ -191,7 +209,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                 }
             }
         }
-        return Optional.of(new ParameterAnnotationBinder<>(conversionService));
+        return Optional.of(defaultUnmatchedRequestArgumentBinder);
     }
 
     /**
@@ -234,8 +252,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
      * @param byAnnotation The request argument binder
      */
     protected void registerDefaultAnnotationBinders(Map<Class<? extends Annotation>, RequestArgumentBinder> byAnnotation) {
-        DefaultBodyAnnotationBinder bodyBinder = new DefaultBodyAnnotationBinder(conversionService);
-        byAnnotation.put(Body.class, bodyBinder);
+        byAnnotation.put(Body.class, new DefaultBodyAnnotationBinder<>(conversionService));
 
         CookieAnnotationBinder<Object> cookieAnnotationBinder = new CookieAnnotationBinder<>(conversionService);
         byAnnotation.put(cookieAnnotationBinder.getAnnotationType(), cookieAnnotationBinder);
@@ -243,8 +260,8 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         HeaderAnnotationBinder<Object> headerAnnotationBinder = new HeaderAnnotationBinder<>(conversionService);
         byAnnotation.put(headerAnnotationBinder.getAnnotationType(), headerAnnotationBinder);
 
-        ParameterAnnotationBinder<Object> parameterAnnotationBinder = new ParameterAnnotationBinder<>(conversionService);
-        byAnnotation.put(parameterAnnotationBinder.getAnnotationType(), parameterAnnotationBinder);
+        QueryValueArgumentBinder<Object> queryValueAnnotationBinder = new QueryValueArgumentBinder<>(conversionService);
+        byAnnotation.put(queryValueAnnotationBinder.getAnnotationType(), queryValueAnnotationBinder);
 
         RequestAttributeAnnotationBinder<Object> requestAttributeAnnotationBinder = new RequestAttributeAnnotationBinder<>(conversionService);
         byAnnotation.put(requestAttributeAnnotationBinder.getAnnotationType(), requestAttributeAnnotationBinder);
@@ -252,10 +269,10 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         PathVariableAnnotationBinder<Object> pathVariableAnnotationBinder = new PathVariableAnnotationBinder<>(conversionService);
         byAnnotation.put(pathVariableAnnotationBinder.getAnnotationType(), pathVariableAnnotationBinder);
 
-        RequestBeanAnnotationBinder<Object> requestBeanAnnotationBinder = new RequestBeanAnnotationBinder<>(this, conversionService);
+        RequestBeanAnnotationBinder<Object> requestBeanAnnotationBinder = new RequestBeanAnnotationBinder<>(this);
         byAnnotation.put(requestBeanAnnotationBinder.getAnnotationType(), requestBeanAnnotationBinder);
 
-        PartAnnotationBinder<Object> partAnnotationBinder = new PartAnnotationBinder<>(conversionService);
+        PartAnnotationBinder<Object> partAnnotationBinder = new PartAnnotationBinder<>();
         byAnnotation.put(partAnnotationBinder.getAnnotationType(), partAnnotationBinder);
 
         if (KOTLIN_COROUTINES_SUPPORTED) {

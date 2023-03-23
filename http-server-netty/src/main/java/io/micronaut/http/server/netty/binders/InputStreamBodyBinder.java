@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.netty.HttpContentProcessor;
@@ -51,7 +50,7 @@ import java.util.concurrent.ExecutorService;
  * @since 2.5.0
  */
 @Internal
-public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<InputStream> {
+public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<InputStream>, StreamedNettyRequestArgumentBinder<InputStream> {
 
     public static final Argument<InputStream> TYPE = Argument.of(InputStream.class);
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
@@ -61,7 +60,7 @@ public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<Inpu
 
     /**
      * @param processorResolver The http content processor resolver
-     * @param executorService  The executor service to use
+     * @param executorService   The executor service to use
      */
     public InputStreamBodyBinder(HttpContentProcessorResolver processorResolver,
                                  ExecutorService executorService) {
@@ -74,96 +73,95 @@ public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<Inpu
         return TYPE;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
-    public BindingResult<InputStream> bind(ArgumentConversionContext<InputStream> context, HttpRequest<?> source) {
-        if (source instanceof NettyHttpRequest) {
-            NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) source;
-            io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
-            if (nativeRequest instanceof StreamedHttpRequest) {
-                PipedOutputStream outputStream = new PipedOutputStream();
-                try {
-                    PipedInputStream inputStream = new PipedInputStream(outputStream) {
-                        private volatile HttpContentProcessor processor;
+    public BindingResult<InputStream> bindForStreamedNettyRequest(ArgumentConversionContext<InputStream> context,
+                                                                  StreamedHttpRequest streamedHttpRequest,
+                                                                  NettyHttpRequest<?> nettyHttpRequest) {
 
-                        private synchronized void init() {
-                            if (processor == null) {
-                                processor = processorResolver.resolve(nettyHttpRequest, context.getArgument());
-                                Flux.from(HttpContentProcessorAsReactiveProcessor.<ByteBufHolder>asPublisher(processor, nettyHttpRequest))
-                                        .publishOn(Schedulers.fromExecutor(executorService))
-                                        .subscribe(new CompletionAwareSubscriber<ByteBufHolder>() {
+        nettyHttpRequest.setUsesHttpContentProcessor();
 
-                                    @Override
-                                    protected void doOnSubscribe(Subscription subscription) {
-                                        subscription.request(1);
+        PipedOutputStream outputStream = new PipedOutputStream();
+        try {
+            PipedInputStream inputStream = new PipedInputStream(outputStream) {
+                private volatile HttpContentProcessor processor;
+
+                private synchronized void init() {
+                    if (processor == null) {
+                        processor = processorResolver.resolve(nettyHttpRequest, context.getArgument());
+                        Flux.from(HttpContentProcessorAsReactiveProcessor.<ByteBufHolder>asPublisher(processor, nettyHttpRequest))
+                            .publishOn(Schedulers.fromExecutor(executorService))
+                            .subscribe(new CompletionAwareSubscriber<ByteBufHolder>() {
+
+                                @Override
+                                protected void doOnSubscribe(Subscription subscription) {
+                                    subscription.request(1);
+                                }
+
+                                @Override
+                                protected synchronized void doOnNext(ByteBufHolder message) {
+                                    if (LOG.isTraceEnabled()) {
+                                        LOG.trace("Server received streaming message for argument [{}]: {}", context.getArgument(), message);
                                     }
-
-                                    @Override
-                                    protected synchronized void doOnNext(ByteBufHolder message) {
-                                        if (LOG.isTraceEnabled()) {
-                                            LOG.trace("Server received streaming message for argument [{}]: {}", context.getArgument(), message);
-                                        }
-                                        ByteBuf content = message.content();
-                                        if (!(content instanceof EmptyByteBuf)) {
-                                            try {
-                                                byte[] bytes = ByteBufUtil.getBytes(content);
-                                                outputStream.write(bytes, 0, bytes.length);
-                                            } catch (IOException e) {
-                                                subscription.cancel();
-                                                return;
-                                            } finally {
-                                                content.release();
-                                            }
-                                        }
-                                        subscription.request(1);
-                                    }
-
-                                    @Override
-                                    protected synchronized void doOnError(Throwable t) {
-                                        if (LOG.isTraceEnabled()) {
-                                            LOG.trace("Server received error for argument [" + context.getArgument() + "]: " + t.getMessage(), t);
-                                        }
+                                    ByteBuf content = message.content();
+                                    if (!(content instanceof EmptyByteBuf)) {
                                         try {
-                                            outputStream.close();
-                                        } catch (IOException ignored) {
-                                        } finally {
+                                            byte[] bytes = ByteBufUtil.getBytes(content);
+                                            outputStream.write(bytes, 0, bytes.length);
+                                        } catch (IOException e) {
                                             subscription.cancel();
+                                            return;
+                                        } finally {
+                                            content.release();
                                         }
                                     }
+                                    subscription.request(1);
+                                }
 
-                                    @Override
-                                    protected synchronized void doOnComplete() {
-                                        if (LOG.isTraceEnabled()) {
-                                            LOG.trace("Done receiving messages for argument: {}", context.getArgument());
-                                        }
-                                        try {
-                                            outputStream.close();
-                                        } catch (IOException ignored) {
-                                        }
+                                @Override
+                                protected synchronized void doOnError(Throwable t) {
+                                    if (LOG.isTraceEnabled()) {
+                                        LOG.trace("Server received error for argument [" + context.getArgument() + "]: " + t.getMessage(), t);
                                     }
-                                });
-                            }
-                        }
+                                    try {
+                                        outputStream.close();
+                                    } catch (IOException ignored) {
+                                    } finally {
+                                        subscription.cancel();
+                                    }
+                                }
 
-                        @Override
-                        public synchronized int read(byte[] b, int off, int len) throws IOException {
-                            init();
-                            return super.read(b, off, len);
-                        }
-
-                        @Override
-                        public synchronized int read() throws IOException {
-                            init();
-                            return super.read();
-                        }
-                    };
-
-                    return () -> Optional.of(inputStream);
-                } catch (IOException e) {
-                    context.reject(e);
+                                @Override
+                                protected synchronized void doOnComplete() {
+                                    if (LOG.isTraceEnabled()) {
+                                        LOG.trace("Done receiving messages for argument: {}", context.getArgument());
+                                    }
+                                    try {
+                                        outputStream.close();
+                                    } catch (IOException ignored) {
+                                    }
+                                }
+                            });
+                    }
                 }
-            }
+
+                @Override
+                public synchronized int read(byte[] b, int off, int len) throws IOException {
+                    init();
+                    return super.read(b, off, len);
+                }
+
+                @Override
+                public synchronized int read() throws IOException {
+                    init();
+                    return super.read();
+                }
+            };
+
+            return () -> Optional.of(inputStream);
+        } catch (IOException e) {
+            context.reject(e);
         }
         return BindingResult.EMPTY;
     }
+
 }

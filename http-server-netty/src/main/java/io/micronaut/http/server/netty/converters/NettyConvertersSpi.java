@@ -160,7 +160,7 @@ public final class NettyConvertersSpi implements TypeConverterRegistrar {
     private TypeConverter<Attribute, CompletedPart> attributeToCompletedPartConverter() {
         return (object, targetType, context) -> {
             try {
-                if (!object.isCompleted()) {
+                if (!object.isCompleted() || !targetType.isAssignableFrom(NettyCompletedAttribute.class)) {
                     return Optional.empty();
                 }
 

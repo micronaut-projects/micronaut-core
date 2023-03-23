@@ -38,6 +38,8 @@ public interface Route {
      */
     List<MediaType> DEFAULT_PRODUCES = Collections.singletonList(MediaType.APPLICATION_JSON_TYPE);
 
+    RouteInfo<Object> toRouteInfo();
+
     /**
      * Applies the given accepted media type the route.
      *

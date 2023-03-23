@@ -26,6 +26,7 @@ import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.multipart.MultipartBodyArgumentBinder;
+import io.micronaut.http.server.netty.multipart.NettyStreamingFileUpload;
 import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Named;
 
@@ -50,7 +51,6 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
     /**
      * Default constructor.
      *
-     * @param conversionService            The conversion service
      * @param httpContentProcessorResolver The processor resolver
      * @param beanLocator                  The bean locator
      * @param httpServerConfiguration      The server config
@@ -71,18 +71,34 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
     @Override
     public RequestBinderRegistry onCreated(BeanCreatedEvent<RequestBinderRegistry> event) {
         RequestBinderRegistry registry = event.getBean();
-        registry.addRequestArgumentBinder(new CompletableFutureBodyBinder(
-                httpContentProcessorResolver,
-                conversionService
+        registry.addArgumentBinder(new CompletableFutureBodyBinder(
+                httpContentProcessorResolver
         ));
-        registry.addRequestArgumentBinder(new MultipartBodyArgumentBinder(
+        registry.addArgumentBinder(new MultipartBodyArgumentBinder(
                 beanLocator,
                 httpServerConfiguration
         ));
-        registry.addRequestArgumentBinder(new InputStreamBodyBinder(
+        registry.addArgumentBinder(new InputStreamBodyBinder(
                 httpContentProcessorResolver,
                 executorService.get()
         ));
+        NettyStreamingFileUpload.Factory fileUploadFactory = new NettyStreamingFileUpload.Factory(httpServerConfiguration.get().getMultipart(), executorService.get());
+        registry.addArgumentBinder(new StreamingFileUploadBinder(
+            conversionService,
+            fileUploadFactory)
+        );
+        CompletedFileUploadBinder completedFileUploadBinder = new CompletedFileUploadBinder(conversionService);
+        registry.addArgumentBinder(completedFileUploadBinder);
+        PublisherPartUploadBinder publisherPartUploadBinder = new PublisherPartUploadBinder(conversionService, fileUploadFactory);
+        registry.addArgumentBinder(publisherPartUploadBinder);
+        PartUploadAnnotationBinder<Object> partUploadAnnotationBinder = new PartUploadAnnotationBinder<>(
+            conversionService,
+            completedFileUploadBinder,
+            publisherPartUploadBinder
+        );
+        registry.addArgumentBinder(partUploadAnnotationBinder);
+
+        registry.addUnmatchedRequestArgumentBinder(partUploadAnnotationBinder);
         return registry;
     }
 }

@@ -16,7 +16,7 @@
 package io.micronaut.http.bind.binders;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.bind.annotation.AbstractAnnotatedArgumentBinder;
+import io.micronaut.core.bind.annotation.AbstractArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
@@ -34,12 +34,12 @@ import java.util.Optional;
 /**
  * Used for binding a parameter exclusively from a path variable.
  *
- * @author graemerocher
- * @since 1.0.3
- * @see PathVariable
  * @param <T>
+ * @author graemerocher
+ * @see PathVariable
+ * @since 1.0.3
  */
-public class PathVariableAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<PathVariable, T, HttpRequest<?>> implements AnnotatedRequestArgumentBinder<PathVariable, T> {
+public class PathVariableAnnotationBinder<T> extends AbstractArgumentBinder<T> implements AnnotatedRequestArgumentBinder<PathVariable, T> {
 
     /**
      * @param conversionService The conversion service
@@ -59,46 +59,33 @@ public class PathVariableAnnotationBinder<T> extends AbstractAnnotatedArgumentBi
         Argument<T> argument = context.getArgument();
 
         AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
-        boolean hasAnnotation = annotationMetadata.hasAnnotation(PathVariable.class);
         String parameterName = annotationMetadata.stringValue(PathVariable.class).orElse(argument.getName());
         // If we need to bind all request params to command object
         // checks if the variable is defined with modifier char *
         // eg. ?pojo*
         final Optional<UriMatchInfo> matchInfo = source.getAttribute(HttpAttributes.ROUTE_MATCH, UriMatchInfo.class);
         boolean bindAll = matchInfo
-                .flatMap(umi -> umi.getVariables()
-                        .stream()
-                        .filter(v -> v.getName().equals(parameterName))
-                        .findFirst()
-                        .map(UriMatchVariable::isExploded)).orElse(false);
+            .flatMap(umi -> umi.getVariables()
+                .stream()
+                .filter(v -> v.getName().equals(parameterName))
+                .findFirst()
+                .map(UriMatchVariable::isExploded)).orElse(false);
 
-
-        BindingResult<T> result;
-        // if the annotation is present or the HTTP method doesn't allow a request body
-        // attempt to bind from request parameters. This avoids allowing the request URI to
-        // be manipulated to override POST or JSON variables
-        if (hasAnnotation && matchInfo.isPresent()) {
-            final ConvertibleValues<Object> variableValues = ConvertibleValues.of(matchInfo.get().getVariableValues(), conversionService);
-            if (bindAll) {
-                Object value;
-                // Only maps and POJOs will "bindAll", lists work like normal
-                if (Iterable.class.isAssignableFrom(argument.getType())) {
-                    value = doResolve(context, variableValues, parameterName);
-                    if (value == null) {
-                        value = Collections.emptyList();
-                    }
-                } else {
-                    value = parameters.asMap();
+        final ConvertibleValues<Object> variableValues = ConvertibleValues.of(matchInfo.get().getVariableValues(), conversionService);
+        if (bindAll) {
+            Object value;
+            // Only maps and POJOs will "bindAll", lists work like normal
+            if (Iterable.class.isAssignableFrom(argument.getType())) {
+                value = doResolve(context, variableValues, parameterName);
+                if (value == null) {
+                    value = Collections.emptyList();
                 }
-                result = doConvert(value, context);
             } else {
-                result = doBind(context, variableValues, parameterName);
+                value = parameters.asMap();
             }
-        } else {
-            //noinspection unchecked
-            result = BindingResult.EMPTY;
+            return doConvert(value, context);
         }
-
-        return result;
+        return doBind(context, variableValues, parameterName, BindingResult.unsatisfied());
     }
+
 }

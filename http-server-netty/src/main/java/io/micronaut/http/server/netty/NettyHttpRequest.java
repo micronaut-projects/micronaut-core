@@ -23,8 +23,12 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
+import io.micronaut.core.execution.DelayedExecutionFlow;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.SupplierUtil;
+import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -47,6 +51,7 @@ import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.exceptions.InternalServerException;
+import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
@@ -75,8 +80,12 @@ import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ReferenceCounted;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
+import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.CoreSubscriber;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Sinks;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -159,11 +168,9 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private NettyCookies nettyCookies;
     private final List<ByteBufHolder> receivedContent = new ArrayList<>();
     private final Map<IdentityWrapper, HttpData> receivedData = new LinkedHashMap<>();
-
+    private boolean bodyFullyRead;
     private T bodyUnwrapped;
     private Supplier<Optional<T>> body;
-    private RouteMatch<?> matchedRoute;
-    private boolean bodyRequired;
 
     /**
      * Set to {@code true} when the {@link #headers} may have been mutated. If this is not the case,
@@ -177,6 +184,11 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private final String origin;
 
     private final BodyConvertor bodyConvertor = newBodyConvertor();
+
+    @Nullable
+    private List<Sinks.Many<MicronautHttpData<?>>> fileUploadSinks = new ArrayList<>();
+
+    private boolean usesHttpContentProcessor;
 
     /**
      * @param nettyRequest        The {@link io.netty.handler.codec.http.HttpRequest}
@@ -319,7 +331,23 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     }
 
     @Override
+    public HttpRequest<T> setAttribute(CharSequence name, Object value) {
+        // This is the copy from the super method to avoid the type pollution
+        if (StringUtils.isNotEmpty(name)) {
+            if (value == null) {
+                getAttributes().remove(name.toString());
+            } else {
+                getAttributes().put(name.toString(), value);
+            }
+        }
+        return this;
+    }
+
+    @Override
     public Optional<T> getBody() {
+        if (!bodyFullyRead) {
+            return Optional.empty();
+        }
         return this.body.get();
     }
 
@@ -330,7 +358,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         if (!receivedData.isEmpty()) {
             Map body = new LinkedHashMap(receivedData.size());
 
-            for (HttpData data: receivedData.values()) {
+            for (HttpData data : receivedData.values()) {
                 String newValue = getContent(data);
                 //noinspection unchecked
                 body.compute(data.getName(), (key, oldValue) -> {
@@ -384,6 +412,9 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     @SuppressWarnings("unchecked")
     @Override
     public <T1> Optional<T1> getBody(ArgumentConversionContext<T1> conversionContext) {
+        if (!bodyFullyRead) {
+            return Optional.empty();
+        }
         return getBody().flatMap(t -> bodyConvertor.convert(conversionContext, t));
     }
 
@@ -392,6 +423,21 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     public void release() {
+        RouteMatch<?> routeMatch = (RouteMatch<?>) getAttribute(HttpAttributes.ROUTE_MATCH).orElse(null);
+        if (routeMatch != null) {
+            // discard parameters that have already been bound
+            for (Object toDiscard : routeMatch.getVariableValues().values()) {
+                if (toDiscard instanceof io.micronaut.core.io.buffer.ReferenceCounted rc) {
+                    rc.release();
+                }
+                if (toDiscard instanceof io.netty.util.ReferenceCounted rc) {
+                    rc.release();
+                }
+                if (toDiscard instanceof NettyCompletedFileUpload fu) {
+                    fu.discard();
+                }
+            }
+        }
         destroyed = true;
         Consumer<Object> releaseIfNecessary = this::releaseIfNecessary;
         receivedContent.forEach(releaseIfNecessary);
@@ -432,14 +478,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     }
 
     /**
-     * @return Obtains the matched route
-     */
-    @Internal
-    public RouteMatch<?> getMatchedRoute() {
-        return matchedRoute;
-    }
-
-    /**
      * @param httpContent The HttpContent as {@link ByteBufHolder}
      */
     @Internal
@@ -458,27 +496,186 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     }
 
     /**
-     * @param matchedRoute The matched route
+     * @return The flux with backpressure to observe
      */
-    @Internal
-    void setMatchedRoute(RouteMatch<?> matchedRoute) {
-        this.matchedRoute = matchedRoute;
+    public Flux<MicronautHttpData<?>> observeFileUploadWithBackPressure() {
+        Sinks.Many<MicronautHttpData<?>> sink = Sinks.many().multicast().onBackpressureBuffer();
+        fileUploadSinks.add(sink);
+        return sink.asFlux();
     }
 
     /**
-     * @param bodyRequired Sets the body as required
+     * @return The flux without backpressure to observe
      */
-    @Internal
-    void setBodyRequired(boolean bodyRequired) {
-        this.bodyRequired = bodyRequired;
+    public Flux<MicronautHttpData<?>> observeFileUpload() {
+        Sinks.Many<MicronautHttpData<?>> sink = Sinks.many().unicast().onBackpressureError();
+        fileUploadSinks.add(sink);
+        return sink.asFlux();
     }
 
     /**
-     * @return Whether the body is required
+     * Reads the request body.
+     * @param processor The processor to use
+     * @return the executable flow after the body is read
      */
-    @Internal
-    boolean isBodyRequired() {
-        return bodyRequired || HttpMethod.requiresRequestBody(getMethod());
+    public ExecutionFlow<HttpRequest<?>> readRequestBody(HttpContentProcessor processor) {
+        final DelayedExecutionFlow<HttpRequest<?>> completion = DelayedExecutionFlow.create();
+        HttpContentProcessorAsReactiveProcessor.asPublisher(processor, this).subscribe(new CoreSubscriber<>() {
+
+            boolean flowCompleted;
+            Subscription subscription;
+
+            @Override
+            public void onSubscribe(Subscription subscription) {
+                this.subscription = subscription;
+                subscription.request(1);
+            }
+
+            @Override
+            public void onNext(Object message) {
+                try {
+                    if (destroyed) {
+                        // we don't want this message anymore
+                        ReferenceCountUtil.release(message);
+                        return;
+                    }
+
+                    if (message instanceof ByteBufHolder bbh) {
+                        addContent(bbh);
+                    } else {
+                        setBody((T) message);
+                    }
+
+                    // the upstream processor gives us ownership of the message, so we need to release it.
+                    ReferenceCountUtil.release(message);
+
+                    subscription.request(1);
+
+                    // now, a pseudo try-finally with addSuppressed.
+                } catch (Throwable t) {
+                    try {
+                        ReferenceCountUtil.release(message);
+                    } catch (Throwable u) {
+                        t.addSuppressed(u);
+                    }
+                    throw t;
+                }
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                if (!flowCompleted) {
+                    completion.completeExceptionally(t);
+                }
+            }
+
+            @Override
+            public void onComplete() {
+                bodyFullyRead = true;
+                if (!flowCompleted) {
+                    completion.complete(NettyHttpRequest.this);
+                }
+            }
+        });
+        return completion;
+    }
+
+    /**
+     * Initiate the file upload.
+     * @param processor The processor to read body
+     * @param routeMatch The route match
+     * @return the executable flow
+     */
+    public ExecutionFlow<HttpRequest<?>> onFileUpload(HttpContentProcessor processor, RouteMatch<?> routeMatch) {
+        // NOTE: now both "observeFileUpload" and "observeFileUploadWithBackPressure" add to the same collection
+        // but we can have two collection and have the implementation below different
+        // "observeFileUpload" doesn't require buffering so it can be represented by one sink - flow
+        final DelayedExecutionFlow<HttpRequest<?>> completion = DelayedExecutionFlow.create();
+        boolean formData = isFormData();
+        HttpContentProcessorAsReactiveProcessor.asPublisher(processor, this).subscribe(new CoreSubscriber<>() {
+
+            boolean flowCompleted;
+            Subscription subscription;
+
+            @Override
+            public void onSubscribe(Subscription subscription) {
+                this.subscription = subscription;
+                subscription.request(1);
+            }
+
+            @Override
+            public void onNext(Object message) {
+                try {
+                    if (destroyed) {
+                        // we don't want this message anymore
+                        ReferenceCountUtil.release(message);
+                        return;
+                    }
+
+                    if (message instanceof ByteBufHolder bbh) {
+                        if (message instanceof MicronautHttpData<?> micronautHttpData) {
+                            for (Sinks.Many<MicronautHttpData<?>> fileUploadSink : fileUploadSinks) {
+                                fileUploadSink.tryEmitNext(micronautHttpData);
+                            }
+                            if (formData && micronautHttpData.isCompleted()) {
+                                addContent(bbh);
+                            } else if (!formData) {
+                                addContent(bbh);
+                            }
+                        } else {
+                            addContent(bbh);
+                        }
+                    } else {
+                        setBody((T) message);
+                    }
+                    if (!flowCompleted) {
+                        try {
+                            if (routeMatch.isFulfilled()) {
+                                completion.complete(NettyHttpRequest.this);
+                                flowCompleted = true;
+                            }
+                        } catch (Throwable throwable) {
+                            completion.completeExceptionally(throwable);
+                        }
+                    }
+                    subscription.request(1);
+
+                    // the upstream processor gives us ownership of the message, so we need to release it.
+                    ReferenceCountUtil.release(message);
+
+                    // now, a pseudo try-finally with addSuppressed.
+                } catch (Throwable t) {
+                    try {
+                        ReferenceCountUtil.release(message);
+                    } catch (Throwable u) {
+                        t.addSuppressed(u);
+                    }
+                    throw t;
+                }
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                for (Sinks.Many<MicronautHttpData<?>> fileUploadSink : fileUploadSinks) {
+                    fileUploadSink.tryEmitError(t);
+                }
+                if (!flowCompleted) {
+                    completion.completeExceptionally(t);
+                }
+            }
+
+            @Override
+            public void onComplete() {
+                bodyFullyRead = true;
+                for (Sinks.Many<MicronautHttpData<?>> fileUploadSink : fileUploadSinks) {
+                    fileUploadSink.tryEmitComplete();
+                }
+                if (!flowCompleted) {
+                    completion.complete(NettyHttpRequest.this);
+                }
+            }
+        });
+        return completion;
     }
 
     @Nullable
@@ -550,51 +747,51 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
             // request used to compute the headers for the PUSH_PROMISE frame
             io.netty.handler.codec.http.HttpRequest outboundRequest = new DefaultHttpRequest(
-                    inboundRequest.protocolVersion(),
-                    inboundRequest.method(),
-                    fixedUri.toString(),
-                    inboundRequest.headers()
+                inboundRequest.protocolVersion(),
+                inboundRequest.method(),
+                fixedUri.toString(),
+                inboundRequest.headers()
             );
 
             int ourStream = ((Http2StreamChannel) channelHandlerContext.channel()).stream().id();
             HttpPipelineBuilder.StreamPipeline originalStreamPipeline = channelHandlerContext.channel().attr(HttpPipelineBuilder.STREAM_PIPELINE_ATTRIBUTE.get()).get();
 
             new Http2StreamChannelBootstrap(channelHandlerContext.channel().parent())
-                    .handler(new ChannelInitializer<Http2StreamChannel>() {
-                        @Override
-                        protected void initChannel(@NonNull Http2StreamChannel ch) throws Exception {
-                            int newStream = ch.stream().id();
+                .handler(new ChannelInitializer<Http2StreamChannel>() {
+                    @Override
+                    protected void initChannel(@NonNull Http2StreamChannel ch) throws Exception {
+                        int newStream = ch.stream().id();
 
-                            channelHandlerContext.write(new DefaultHttp2PushPromiseFrame(HttpConversionUtil.toHttp2Headers(outboundRequest, false))
-                                    .stream(((Http2StreamChannel) channelHandlerContext.channel()).stream())
-                                    .pushStream(ch.stream()));
+                        channelHandlerContext.write(new DefaultHttp2PushPromiseFrame(HttpConversionUtil.toHttp2Headers(outboundRequest, false))
+                            .stream(((Http2StreamChannel) channelHandlerContext.channel()).stream())
+                            .pushStream(ch.stream()));
 
-                            originalStreamPipeline.initializeChildPipelineForPushPromise(ch);
+                        originalStreamPipeline.initializeChildPipelineForPushPromise(ch);
 
-                            inboundRequest.headers().setInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), newStream);
-                            inboundRequest.headers().setInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_PROMISE_ID.text(), ourStream);
+                        inboundRequest.headers().setInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), newStream);
+                        inboundRequest.headers().setInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_PROMISE_ID.text(), ourStream);
 
-                            // delay until our handling is complete
-                            connectionHandlerContext.executor().execute(() -> {
-                                try {
-                                    ch.pipeline().context(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER).fireChannelRead(inboundRequest);
-                                } catch (Exception e) {
-                                    LOG.warn("Failed to complete push promise", e);
-                                }
-                            });
-                        }
-                    })
-                    .open()
-                    .addListener((GenericFutureListener<Future<Http2StreamChannel>>) future -> {
-                        try {
-                            future.sync();
-                        } catch (Exception e) {
-                            if (e instanceof InterruptedException) {
-                                Thread.currentThread().interrupt();
+                        // delay until our handling is complete
+                        connectionHandlerContext.executor().execute(() -> {
+                            try {
+                                ch.pipeline().context(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER).fireChannelRead(inboundRequest);
+                            } catch (Exception e) {
+                                LOG.warn("Failed to complete push promise", e);
                             }
-                            LOG.warn("Failed to complete push promise", e);
+                        });
+                    }
+                })
+                .open()
+                .addListener((GenericFutureListener<Future<Http2StreamChannel>>) future -> {
+                    try {
+                        future.sync();
+                    } catch (Exception e) {
+                        if (e instanceof InterruptedException) {
+                            Thread.currentThread().interrupt();
                         }
-                    });
+                        LOG.warn("Failed to complete push promise", e);
+                    }
+                });
             return this;
         } else {
             throw new UnsupportedOperationException("Server push not supported by this client: Not a HTTP2 client");
@@ -610,7 +807,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      * @return Return true if the request is form data.
      */
     @Internal
-    final boolean isFormOrMultipartData() {
+    public final boolean isFormOrMultipartData() {
         MediaType ct = getContentType().orElse(null);
         return ct != null && (ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) || ct.equals(MediaType.MULTIPART_FORM_DATA_TYPE));
     }
@@ -619,7 +816,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      * @return Return true if the request is form data.
      */
     @Internal
-    final boolean isFormData() {
+    public final boolean isFormData() {
         MediaType ct = getContentType().orElse(null);
         return ct != null && (ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE));
     }
@@ -671,6 +868,20 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         } else {
             return contentLength;
         }
+    }
+
+    /**
+     * Register to use custom http content processor.
+     */
+    public void setUsesHttpContentProcessor() {
+        usesHttpContentProcessor = true;
+    }
+
+    /**
+     * @return Is registered to use custom http content processor.
+     */
+    public boolean isUsingHttpContentProcessor() {
+        return usesHttpContentProcessor;
     }
 
     /**
@@ -783,12 +994,12 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
                 return (io.netty.handler.codec.http.FullHttpRequest) NettyHttpRequest.this.nettyRequest;
             } else {
                 return new DefaultFullHttpRequest(
-                        nr.protocolVersion(),
-                        nr.method(),
-                        nr.uri(),
-                        Unpooled.EMPTY_BUFFER,
-                        nr.headers(),
-                        EmptyHttpHeaders.INSTANCE
+                    nr.protocolVersion(),
+                    nr.method(),
+                    nr.uri(),
+                    Unpooled.EMPTY_BUFFER,
+                    nr.headers(),
+                    EmptyHttpHeaders.INSTANCE
                 );
             }
         }
@@ -801,11 +1012,11 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             } else {
                 io.netty.handler.codec.http.FullHttpRequest fullHttpRequest = toFullHttpRequest();
                 DefaultStreamedHttpRequest request = new DefaultStreamedHttpRequest(
-                        fullHttpRequest.protocolVersion(),
-                        fullHttpRequest.method(),
-                        fullHttpRequest.uri(),
-                        true,
-                        Publishers.just(new DefaultLastHttpContent(fullHttpRequest.content()))
+                    fullHttpRequest.protocolVersion(),
+                    fullHttpRequest.method(),
+                    fullHttpRequest.uri(),
+                    true,
+                    Publishers.just(new DefaultLastHttpContent(fullHttpRequest.content()))
                 );
                 request.headers().setAll(fullHttpRequest.headers());
                 return request;

@@ -15,19 +15,14 @@
  */
 package io.micronaut.http.bind.binders;
 
-import java.util.*;
-import java.util.stream.Collectors;
-
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.bind.ArgumentBinder;
-import io.micronaut.core.bind.annotation.AbstractAnnotatedArgumentBinder;
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
@@ -35,26 +30,30 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.RequestBean;
 import io.micronaut.http.bind.RequestBinderRegistry;
 
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
 /**
  * Used to bind Bindable parameters to a Bean object.
- *
+ * NOTE: The binder is annotates as postponed to allow injecting values added by filters.
+
  * @author Anze Sodja
  * @author graemerocher
  * @since 2.0
  * @see RequestBean
  * @param <T>
  */
-public class RequestBeanAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<RequestBean, T, HttpRequest<?>>
-        implements AnnotatedRequestArgumentBinder<RequestBean, T> {
+public class RequestBeanAnnotationBinder<T> implements AnnotatedRequestArgumentBinder<RequestBean, T>, PostponedRequestArgumentBinder<T> {
 
     private final RequestBinderRegistry requestBinderRegistry;
 
     /**
      * @param requestBinderRegistry Original request binder registry
-     * @param conversionService The conversion service
      */
-    public RequestBeanAnnotationBinder(RequestBinderRegistry requestBinderRegistry, ConversionService conversionService) {
-        super(conversionService);
+    public RequestBeanAnnotationBinder(RequestBinderRegistry requestBinderRegistry) {
         this.requestBinderRegistry = requestBinderRegistry;
     }
 
@@ -121,8 +120,8 @@ public class RequestBeanAnnotationBinder<T> extends AbstractAnnotatedArgumentBin
 
     private Optional<Object> getBindableResult(ArgumentConversionContext<Object> conversionContext, HttpRequest<?> source) {
         Argument<Object> argument = conversionContext.getArgument();
-        Optional<ArgumentBinder<Object, HttpRequest<?>>> binder = requestBinderRegistry.findArgumentBinder(argument, source);
-        if (!binder.isPresent()) {
+        Optional<ArgumentBinder<Object, HttpRequest<?>>> binder = requestBinderRegistry.findArgumentBinder(argument);
+        if (binder.isEmpty()) {
             throw new UnsatisfiedArgumentException(argument);
         }
         BindingResult<Object> result = binder.get().bind(conversionContext, source);
