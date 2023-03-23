@@ -163,7 +163,7 @@ public class CollectionUtils {
      * @return True if it is empty or null
      */
     public static boolean isEmpty(@Nullable Map map) {
-        return map == null || map.isEmpty();
+        return !isNotEmpty(map);
     }
 
     /**
@@ -173,7 +173,7 @@ public class CollectionUtils {
      * @return True if it is not null and not empty
      */
     public static boolean isNotEmpty(@Nullable Map map) {
-        return map != null && !map.isEmpty();
+        return ObjectUtils.coerceToBoolean(map);
     }
 
     /**
@@ -183,7 +183,7 @@ public class CollectionUtils {
      * @return True if it is empty or null
      */
     public static boolean isEmpty(@Nullable Collection collection) {
-        return collection == null || collection.isEmpty();
+        return !isNotEmpty(collection);
     }
 
     /**
@@ -193,7 +193,7 @@ public class CollectionUtils {
      * @return True if it is not null and not empty
      */
     public static boolean isNotEmpty(@Nullable Collection collection) {
-        return collection != null && !collection.isEmpty();
+        return ObjectUtils.coerceToBoolean(collection);
     }
 
     /**

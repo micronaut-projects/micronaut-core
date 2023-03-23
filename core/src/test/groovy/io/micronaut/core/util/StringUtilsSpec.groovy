@@ -110,6 +110,30 @@ class StringUtilsSpec extends Specification {
         'aa'     | 'a' | ''
     }
 
+    void "test isEmpty"(CharSequence sequence) {
+        expect:
+        StringUtils.isEmpty(sequence) == expected
+
+        where:
+        sequence || expected
+        ''    || true
+        null  || true
+        'foo' || false
+    }
+
+
+    void "test isNotEmpty"(CharSequence sequence) {
+        expect:
+        StringUtils.isNotEmpty(sequence) == expected
+
+        where:
+        sequence || expected
+        ''       || false
+        null     || false
+        'foo'    || true
+    }
+
+
     @Unroll
     void "test split string omit empty #string = #expected"() {
         expect:
