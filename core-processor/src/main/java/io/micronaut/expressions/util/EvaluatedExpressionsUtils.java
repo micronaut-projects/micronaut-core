@@ -50,8 +50,8 @@ public final class EvaluatedExpressionsUtils {
                    .map(annotationMetadata::getAnnotation)
                    .flatMap(annotation -> getNestedAnnotationValues(annotation).stream())
                    .flatMap(av -> av.getValues().values().stream())
-                   .filter(value -> value instanceof EvaluatedExpressionReference)
-                   .map(value -> (EvaluatedExpressionReference) value)
+                   .filter(EvaluatedExpressionReference.class::isInstance)
+                   .map(EvaluatedExpressionReference.class::cast)
                    .distinct()
                    .toList();
     }
