@@ -20,8 +20,8 @@ dependencies {
 
     compileOnly libs.jakarta.el
     compileOnly libs.caffeine
-    compileOnly libs.kotlinx.coroutines.core
-    compileOnly libs.kotlinx.coroutines.reactive
+    compileOnly libs.managed.kotlinx.coroutines.core
+    compileOnly libs.managed.kotlinx.coroutines.reactive
     testImplementation libs.managed.logback.classic
     testImplementation libs.managed.snakeyaml
     testAnnotationProcessor project(":inject-java")

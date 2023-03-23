@@ -9,8 +9,8 @@ dependencies {
     api project(":context")
     api project(":core-reactive")
     implementation libs.managed.reactor
-    compileOnly libs.kotlinx.coroutines.core
-    compileOnly libs.kotlinx.coroutines.reactor
+    compileOnly libs.managed.kotlinx.coroutines.core
+    compileOnly libs.managed.kotlinx.coroutines.reactor
 
     compileOnly libs.managed.jackson.annotations
 
