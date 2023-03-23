@@ -157,13 +157,20 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private final HttpServerConfiguration serverConfiguration;
     private MutableConvertibleValues<Object> attributes;
     private NettyCookies nettyCookies;
-    private List<ByteBufHolder> receivedContent = new ArrayList<>();
-    private Map<IdentityWrapper, HttpData> receivedData = new LinkedHashMap<>();
+    private final List<ByteBufHolder> receivedContent = new ArrayList<>();
+    private final Map<IdentityWrapper, HttpData> receivedData = new LinkedHashMap<>();
 
     private T bodyUnwrapped;
     private Supplier<Optional<T>> body;
     private RouteMatch<?> matchedRoute;
     private boolean bodyRequired;
+
+    /**
+     * Set to {@code true} when the {@link #headers} may have been mutated. If this is not the case,
+     * we can cache some values.
+     */
+    private boolean headersMutated = false;
+    private final long contentLength;
 
     private final BodyConvertor bodyConvertor = newBodyConvertor();
 
@@ -194,6 +201,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             this.bodyUnwrapped = built;
             return Optional.ofNullable(built);
         });
+        this.contentLength = headers.contentLength().orElse(-1);
     }
 
     @Override
@@ -631,6 +639,15 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         };
     }
 
+    @Override
+    public long getContentLength() {
+        if (headersMutated) {
+            return super.getContentLength();
+        } else {
+            return contentLength;
+        }
+    }
+
     /**
      * Mutable version of the request.
      */
@@ -677,6 +694,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
         @Override
         public MutableHttpHeaders getHeaders() {
+            headersMutated = true;
             return headers;
         }
 
