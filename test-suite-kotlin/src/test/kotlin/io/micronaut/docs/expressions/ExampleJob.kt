@@ -21,7 +21,7 @@ class ExampleJob {
 
 @Singleton
 class ExampleJobControl { // <2>
-    var paused : Boolean = true
+    var paused = true
 
     fun unpause() {
         paused = false
