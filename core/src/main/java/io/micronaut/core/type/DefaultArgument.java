@@ -230,7 +230,8 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     public boolean isReactive() {
         Boolean reactive = this.reactive;
         if (reactive == null) {
-            this.reactive = reactive = Argument.super.isReactive();
+            reactive = Argument.super.isReactive();
+            this.reactive = reactive;
         }
         return reactive;
     }
