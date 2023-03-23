@@ -171,6 +171,8 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     private boolean headersMutated = false;
     private final long contentLength;
+    @Nullable
+    private final MediaType contentType;
 
     private final BodyConvertor bodyConvertor = newBodyConvertor();
 
@@ -202,6 +204,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             return Optional.ofNullable(built);
         });
         this.contentLength = headers.contentLength().orElse(-1);
+        this.contentType = headers.contentType().orElse(null);
     }
 
     @Override
@@ -596,7 +599,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     final boolean isFormOrMultipartData() {
-        MediaType ct = headers.contentType().orElse(null);
+        MediaType ct = getContentType().orElse(null);
         return ct != null && (ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) || ct.equals(MediaType.MULTIPART_FORM_DATA_TYPE));
     }
 
@@ -605,8 +608,18 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     final boolean isFormData() {
-        MediaType ct = headers.contentType().orElse(null);
+        MediaType ct = getContentType().orElse(null);
         return ct != null && (ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE));
+    }
+
+    @Override
+    public Optional<MediaType> getContentType() {
+        // this is better than the caching we can do in AbstractNettyHttpRequest
+        if (headersMutated) {
+            return headers.contentType();
+        } else {
+            return Optional.ofNullable(contentType);
+        }
     }
 
     /**
