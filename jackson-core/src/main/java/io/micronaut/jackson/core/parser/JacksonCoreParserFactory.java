@@ -44,7 +44,7 @@ public final class JacksonCoreParserFactory {
     static {
         boolean hasNettyBuffer;
         try {
-            Class.forName("io.netty.buffer.ByteBuf", false, null);
+            Class.forName("io.netty.buffer.ByteBuf", false, JacksonCoreParserFactory.class.getClassLoader());
             hasNettyBuffer = true;
         } catch (ClassNotFoundException e) {
             hasNettyBuffer = false;
