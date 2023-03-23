@@ -74,6 +74,7 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     private final AnnotationMetadata annotationMetadata;
     private final boolean isTypeVar;
     private String namePrecalculated;
+    private Boolean reactive;
 
     /**
      * @param type               The type
@@ -223,6 +224,15 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     @NonNull
     public Class<T> getType() {
         return type;
+    }
+
+    @Override
+    public boolean isReactive() {
+        Boolean reactive = this.reactive;
+        if (reactive == null) {
+            this.reactive = reactive = Argument.super.isReactive();
+        }
+        return reactive;
     }
 
     @Override
