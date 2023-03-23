@@ -143,12 +143,27 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
                                      ConversionService conversionService) {
         this.httpVersion = httpVersion;
         this.httpResponseStatus = httpResponseStatus;
-        this.nettyHeaders = nettyHeaders;
         this.trailingNettyHeaders = trailingNettyHeaders;
         this.decoderResult = decoderResult;
         this.conversionService = conversionService;
+
+        boolean hasHeaders = nettyHeaders != null;
+        if (!hasHeaders) {
+            nettyHeaders = new DefaultHttpHeaders();
+        }
+        this.nettyHeaders = nettyHeaders;
         this.headers = new NettyHttpHeaders(nettyHeaders, conversionService);
-        setBody(body);
+        if (body == null) {
+            this.body = null;
+            this.optionalBody = Optional.empty();
+        } else {
+            this.body = body;
+            this.optionalBody = Optional.of(body);
+            Optional<MediaType> mediaType = MediaType.fromType(body.getClass());
+            if (mediaType.isPresent() && (!hasHeaders || !nettyHeaders.contains(HttpHeaderNames.CONTENT_TYPE))) {
+                contentType(mediaType.get());
+            }
+        }
     }
 
     /**
