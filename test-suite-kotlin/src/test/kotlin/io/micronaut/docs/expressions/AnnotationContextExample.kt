@@ -9,16 +9,12 @@ class Example
 
 @Singleton
 class AnnotationContext { // <2>
-    fun firstValue(): String {
-        return "first value"
-    }
+    fun firstValue() = "first value"
 }
 
 @Singleton
 class AnnotationMemberContext { // <3>
-    fun secondValue(): String {
-        return "second value"
-    }
+    fun secondValue() = "second value"
 }
 
 @AnnotationExpressionContext(AnnotationContext::class) // <4>
