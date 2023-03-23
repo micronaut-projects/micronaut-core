@@ -173,6 +173,8 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private final long contentLength;
     @Nullable
     private final MediaType contentType;
+    @Nullable
+    private final String origin;
 
     private final BodyConvertor bodyConvertor = newBodyConvertor();
 
@@ -205,6 +207,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         });
         this.contentLength = headers.contentLength().orElse(-1);
         this.contentType = headers.contentType().orElse(null);
+        this.origin = headers.getOrigin().orElse(null);
     }
 
     @Override
@@ -284,6 +287,15 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     public boolean isSecure() {
         ChannelHandlerContext channelHandlerContext = getChannelHandlerContext();
         return channelHandlerContext.pipeline().get(SslHandler.class) != null;
+    }
+
+    @Override
+    public Optional<String> getOrigin() {
+        if (headersMutated) {
+            return getHeaders().getOrigin();
+        } else {
+            return Optional.ofNullable(origin);
+        }
     }
 
     @Override

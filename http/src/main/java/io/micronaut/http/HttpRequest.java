@@ -196,6 +196,16 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     }
 
     /**
+     * Get the origin header.
+     *
+     * @return The origin header
+     * @see HttpHeaders#getOrigin()
+     */
+    default Optional<String> getOrigin() {
+        return getHeaders().getOrigin();
+    }
+
+    /**
      * Return a {@link MutableHttpRequest} for a {@link HttpMethod#GET} request for the given URI.
      *
      * @param uri The URI
