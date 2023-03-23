@@ -392,6 +392,7 @@ public class MediaType implements CharSequence {
     private static final List<Pattern> textTypePatterns = new ArrayList<>(4);
 
     protected final String name;
+    private final String lowerName;
     protected final String subtype;
     protected final String type;
     protected final String extension;
@@ -488,6 +489,7 @@ public class MediaType implements CharSequence {
             withoutArgs = name;
         }
         this.name = withoutArgs;
+        this.lowerName = withoutArgs.toLowerCase(Locale.ROOT);
         int i = withoutArgs.indexOf('/');
         if (i > -1) {
             this.type = withoutArgs.substring(0, i);
@@ -733,12 +735,12 @@ public class MediaType implements CharSequence {
 
         MediaType mediaType = (MediaType) o;
 
-        return name.equalsIgnoreCase(mediaType.name);
+        return lowerName.equals(mediaType.lowerName);
     }
 
     @Override
     public int hashCode() {
-        return name.hashCode();
+        return lowerName.hashCode();
     }
 
     /**
