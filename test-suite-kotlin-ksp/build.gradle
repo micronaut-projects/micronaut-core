@@ -86,7 +86,7 @@ dependencies {
 configurations.testRuntimeClasspath {
     resolutionStrategy.eachDependency {
         if (it.requested.group == 'org.jetbrains.kotlin') {
-            it.useVersion(libs.versions.kotlin.asProvider().get())
+            it.useVersion(libs.versions.managed.kotlin.asProvider().get())
         }
     }
 }
