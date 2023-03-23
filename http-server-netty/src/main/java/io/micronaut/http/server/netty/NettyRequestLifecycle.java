@@ -50,7 +50,6 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -166,11 +165,11 @@ final class NettyRequestLifecycle extends RequestLifecycle {
             return false;
         }
         if (routeMatch instanceof MethodBasedRouteMatch<?, ?> methodBasedRouteMatch) {
-            if (Arrays.stream(methodBasedRouteMatch.getArguments()).anyMatch(argument -> MultipartBody.class.equals(argument.getType()))) {
+            if (hasArg(methodBasedRouteMatch, MultipartBody.class)) {
                 // MultipartBody will subscribe to the request body in MultipartBodyArgumentBinder
                 return false;
             }
-            if (Arrays.stream(methodBasedRouteMatch.getArguments()).anyMatch(argument -> HttpRequest.class.equals(argument.getType()))) {
+            if (hasArg(methodBasedRouteMatch, HttpRequest.class)) {
                 // HttpRequest argument in the method
                 return true;
             }
@@ -183,6 +182,15 @@ final class NettyRequestLifecycle extends RequestLifecycle {
         }
         // Might be some body parts
         return !routeMatch.isExecutable();
+    }
+
+    private static boolean hasArg(MethodBasedRouteMatch<?, ?> methodBasedRouteMatch, Class<?> type) {
+        for (Argument<?> argument : methodBasedRouteMatch.getArguments()) {
+            if (argument.getType() == type) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static class StreamingDataSubscriber implements Subscriber<ByteBufHolder> {
