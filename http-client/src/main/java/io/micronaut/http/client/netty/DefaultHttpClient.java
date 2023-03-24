@@ -22,7 +22,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.beans.BeanMap;
+import io.micronaut.core.beans.internal.BeanMap;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.ConversionServiceAware;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -35,7 +35,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.util.ObjectUtils;
+import io.micronaut.core.util.internal.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpResponse;
@@ -1846,14 +1846,15 @@ public class DefaultHttpClient implements
         return io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(scheme) || SCHEME_WSS.equalsIgnoreCase(scheme);
     }
 
+    private <E extends HttpClientException> E decorate(E exc) {
+        return HttpClientExceptionUtils.populateServiceId(exc, informationalServiceId, configuration);
+    }
+
     @FunctionalInterface
     interface ThrowingBiConsumer<T1, T2> {
         void accept(T1 t1, T2 t2) throws Exception;
     }
 
-    private <E extends HttpClientException> E decorate(E exc) {
-        return HttpClientExceptionUtils.populateServiceId(exc, informationalServiceId, configuration);
-    }
 
     /**
      * Key used for connection pooling and determining host/port.

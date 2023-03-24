@@ -16,7 +16,7 @@
 package io.micronaut.inject.beans;
 
 import io.micronaut.core.annotation.*;
-import io.micronaut.core.beans.AbstractBeanMethod;
+import io.micronaut.core.beans.internal.AbstractBeanMethod;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;

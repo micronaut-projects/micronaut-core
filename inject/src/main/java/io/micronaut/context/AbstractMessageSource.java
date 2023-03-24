@@ -17,7 +17,7 @@ package io.micronaut.context;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
-import io.micronaut.core.util.ObjectUtils;
+import io.micronaut.core.util.internal.ObjectUtils;
 
 import java.util.Locale;
 

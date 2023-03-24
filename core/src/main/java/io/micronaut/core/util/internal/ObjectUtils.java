@@ -13,10 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.util;
+package io.micronaut.core.util.internal;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
+
+import java.util.Objects;
 
 /**
  * <p>Utility methods for working with objects</p>.

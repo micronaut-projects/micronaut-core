@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.execution;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import org.slf4j.Logger;
@@ -24,6 +25,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+@Internal
 @SuppressWarnings("rawtypes")
 final class DelayedExecutionFlowImpl<T> implements DelayedExecutionFlow<T> {
     private static final Logger LOG = LoggerFactory.getLogger(DelayedExecutionFlowImpl.class);

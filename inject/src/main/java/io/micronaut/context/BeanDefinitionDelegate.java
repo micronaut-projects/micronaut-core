@@ -25,7 +25,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.ObjectUtils;
+import io.micronaut.core.util.internal.ObjectUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanFactory;
 import io.micronaut.inject.DelegatingBeanDefinition;
@@ -64,7 +64,6 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
 
     @Nullable
     private final ConfigurationPath configurationPath;
-
 
     private BeanDefinitionDelegate(BeanDefinition<T> definition, @Nullable Qualifier<T> qualifier, @Nullable ConfigurationPath configurationPath) {
         this.definition = definition;
@@ -220,7 +219,7 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
                             Object bean = context.findBean(resolutionContext, argument, configurationPath.beanQualifier()).orElse(null);
                             fulfilled.put(argumentName, bean);
                         } else {
-                            ConfigurationPath old = resolutionContext.setConfigurationPath(null);// reset
+                            ConfigurationPath old = resolutionContext.setConfigurationPath(null); // reset
                             try {
                                 Qualifier<Object> q = qualifier != null ? (Qualifier<Object>) qualifier : configurationPath.beanQualifier();
                                 Object bean = context.findBean(resolutionContext, argument, q).orElse(null);

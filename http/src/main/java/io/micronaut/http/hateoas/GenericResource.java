@@ -19,7 +19,7 @@ import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.util.ObjectUtils;
+import io.micronaut.core.util.internal.ObjectUtils;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

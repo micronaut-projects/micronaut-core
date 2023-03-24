@@ -1613,12 +1613,13 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * Method Reference class with names and a list of argument types. Used as the targets.
      */
     private static final class MethodRef {
+
+        int methodIndex;
         private final String name;
         private final List<ClassElement> argumentTypes;
         private final List<ClassElement> genericArgumentTypes;
         private final Type returnType;
         private final List<String> rawTypes;
-        int methodIndex;
 
         public MethodRef(String name, List<ParameterElement> parameterElements, Type returnType) {
             this.name = name;

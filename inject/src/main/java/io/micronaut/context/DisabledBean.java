@@ -91,4 +91,9 @@ public record DisabledBean<T>(
     public int hashCode() {
         return type.typeHashCode();
     }
+
+    @Override
+    public boolean equals(Object o) {
+        return type.equals(o);
+    }
 }

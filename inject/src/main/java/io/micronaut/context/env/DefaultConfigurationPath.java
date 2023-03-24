@@ -380,7 +380,7 @@ final class DefaultConfigurationPath implements ConfigurationPath {
         String qualifiedName = computeName(strIndex);
         list.add(new DefaultConfigurationSegment(
             configurationType(),
-            "["+ strIndex + "]",
+            "[" + strIndex + "]",
             p,
             ConfigurationSegment.ConfigurationKind.INDEX,
             qualifiedName,

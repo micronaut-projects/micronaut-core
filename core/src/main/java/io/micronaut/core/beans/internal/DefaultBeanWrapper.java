@@ -13,13 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.beans;
+package io.micronaut.core.beans.internal;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.beans.BeanWrapper;
 import io.micronaut.core.util.ArgumentUtils;
 
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.util.ObjectUtils;
+import io.micronaut.core.util.internal.ObjectUtils;
 
 import java.util.Objects;
 
@@ -31,7 +33,7 @@ import java.util.Objects;
  * @since 1.1
  */
 @Internal
-final class DefaultBeanWrapper<T> implements BeanWrapper<T> {
+public final class DefaultBeanWrapper<T> implements BeanWrapper<T> {
 
     private final T bean;
     private final BeanIntrospection<T> introspection;
@@ -41,7 +43,7 @@ final class DefaultBeanWrapper<T> implements BeanWrapper<T> {
      * @param bean The bean.
      * @param introspection The introspection.
      */
-    DefaultBeanWrapper(@NonNull T bean, @NonNull BeanIntrospection<T> introspection) {
+    public DefaultBeanWrapper(@NonNull T bean, @NonNull BeanIntrospection<T> introspection) {
         ArgumentUtils.requireNonNull("bean", bean);
         ArgumentUtils.requireNonNull("introspection", introspection);
         this.bean = bean;

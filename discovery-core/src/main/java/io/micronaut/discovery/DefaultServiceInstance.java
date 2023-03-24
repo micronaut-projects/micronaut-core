@@ -16,7 +16,7 @@
 package io.micronaut.discovery;
 
 import io.micronaut.core.convert.value.ConvertibleValues;
-import io.micronaut.core.util.ObjectUtils;
+import io.micronaut.core.util.internal.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.http.HttpHeaders;

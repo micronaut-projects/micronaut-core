@@ -13,8 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.beans;
+package io.micronaut.core.beans.internal;
 
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.util.ArgumentUtils;
 
 import io.micronaut.core.annotation.NonNull;
@@ -27,6 +30,7 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public interface BeanMap<T> extends Map<String, Object> {
 
     /**

@@ -143,12 +143,13 @@ public final class RandomPropertyExpressionResolver implements PropertyExpressio
         }
     }
 
-    static class LazyInit {
-        private LazyInit() {}
+    static final class LazyInit {
         private static final SecureRandom RANDOM = new SecureRandom();
         private static final String RANDOM_UPPER_LIMIT = "(\\(-?\\d+(\\.\\d+)?\\))";
         private static final String RANDOM_RANGE = "(\\[-?\\d+(\\.\\d+)?,\\s?-?\\d+(\\.\\d+)?])";
         private static final Pattern RANGE_PATTERN = Pattern.compile("\\s?(\\S+?)(" + RANDOM_UPPER_LIMIT + "|" + RANDOM_RANGE + ")");
+
+        private LazyInit() { }
     }
 
 }

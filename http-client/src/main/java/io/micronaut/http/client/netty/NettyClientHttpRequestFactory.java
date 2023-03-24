@@ -16,7 +16,7 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.beans.BeanMap;
+import io.micronaut.core.beans.internal.BeanMap;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequestFactory;
 import io.micronaut.http.MutableHttpRequest;

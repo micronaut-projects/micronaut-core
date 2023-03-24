@@ -1009,6 +1009,13 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         return Collections.emptyList();
     }
 
+    /**
+     * instantiates a new annotation with the given values as parameters.
+     * @param annotationType the type of the annotation
+     * @param values a map of parameter names and values which will be reflected on the annotation
+     * @return the new annotation
+     * @param <T> The type of the annotation
+     */
     @NonNull
     protected  <T extends Annotation> AnnotationValue<T> newAnnotationValue(String annotationType, Map<CharSequence, Object> values) {
         return new AnnotationValue<>(annotationType, values, AnnotationMetadataSupport.getDefaultValuesOrNull(annotationType));

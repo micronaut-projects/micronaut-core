@@ -49,15 +49,15 @@ import java.util.stream.Collectors;
  */
 public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
 
-    private boolean hasPropertyExpressions = false;
+    @Nullable
+    Map<String, String> annotationRepeatableContainer;
     @Nullable
     Map<String, Map<CharSequence, Object>> annotationDefaultValues;
+    private boolean hasPropertyExpressions = false;
     @Nullable
     private Set<String> sourceRetentionAnnotations;
     @Nullable
     private Map<String, Map<CharSequence, Object>> sourceAnnotationDefaultValues;
-    @Nullable
-    Map<String, String> annotationRepeatableContainer;
 
     /**
      * Default constructor.

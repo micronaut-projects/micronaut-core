@@ -2399,7 +2399,6 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         return null;
     }
 
-
     @SuppressWarnings("unchecked")
     private <I, K extends Collection<I>> K coerceCollectionToCorrectType(Class<K> collectionType, Collection<I> beansOfType, BeanResolutionContext resolutionContext, Argument<?> argument) {
         if (argument.isArray() || collectionType.isInstance(beansOfType)) {

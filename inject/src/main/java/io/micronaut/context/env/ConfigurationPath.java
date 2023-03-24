@@ -160,14 +160,14 @@ public sealed interface ConfigurationPath
     }
 
     /**
-     * Push a new configuration segment for the given name and kind
+     * Push a new configuration segment for the given name and kind.
      *
      * @param beanDefinition The bean definition
      */
     void pushEachPropertyRoot(@NonNull BeanDefinition<?> beanDefinition);
 
     /**
-     * Push a new configuration segment for the given name and kind
+     * Push a new configuration segment for the given name and kind.
      *
      * @param beanDefinition The bean definition
      */
@@ -191,9 +191,9 @@ public sealed interface ConfigurationPath
      * remove last entry.
      *
      * @throws java.util.NoSuchElementException if there isn't any remaining elements.
+     * @return The removed entry
      */
     @NonNull ConfigurationSegment removeLast();
-
 
     /**
      * @return Whether the path is not empty.

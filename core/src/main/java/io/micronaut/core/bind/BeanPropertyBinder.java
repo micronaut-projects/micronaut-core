@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.bind;
 
-import io.micronaut.core.beans.BeanMap;
+import io.micronaut.core.beans.internal.BeanMap;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 

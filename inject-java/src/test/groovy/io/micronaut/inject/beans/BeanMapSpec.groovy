@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.beans
 
-import io.micronaut.core.beans.BeanMap
+import io.micronaut.core.beans.internal.BeanMap
 import io.micronaut.core.beans.exceptions.IntrospectionException
 import spock.lang.Specification
 

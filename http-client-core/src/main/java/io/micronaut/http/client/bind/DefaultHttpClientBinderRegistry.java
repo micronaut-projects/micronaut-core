@@ -56,7 +56,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
-import static io.micronaut.core.util.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
+import static io.micronaut.core.util.internal.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
 
 /**
  * Default implementation of {@link HttpClientBinderRegistry} that searches by
