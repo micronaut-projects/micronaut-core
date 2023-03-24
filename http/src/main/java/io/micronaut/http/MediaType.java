@@ -392,12 +392,12 @@ public class MediaType implements CharSequence {
     private static final List<Pattern> textTypePatterns = new ArrayList<>(4);
 
     protected final String name;
-    private final String lowerName;
     protected final String subtype;
     protected final String type;
     protected final String extension;
     protected final Map<CharSequence, String> parameters;
     private final String strRepr;
+    private final String lowerName;
 
     private BigDecimal qualityNumberField = BigDecimal.ONE;
 
