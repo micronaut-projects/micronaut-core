@@ -15,14 +15,22 @@
  */
 package io.micronaut.http.bind.binders;
 
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.Body;
+import io.micronaut.http.codec.CodecException;
+import io.micronaut.http.codec.MediaTypeCodec;
+import io.micronaut.http.codec.MediaTypeCodecRegistry;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -37,12 +45,22 @@ import java.util.Optional;
 public class DefaultBodyAnnotationBinder<T> implements BodyArgumentBinder<T> {
 
     protected final ConversionService conversionService;
+    private final MediaTypeCodecRegistry codecRegistry;
 
     /**
      * @param conversionService The conversion service
      */
     public DefaultBodyAnnotationBinder(ConversionService conversionService) {
         this.conversionService = conversionService;
+        this.codecRegistry = null;
+    }
+
+    /**
+     * @param conversionService The conversion service
+     */
+    public DefaultBodyAnnotationBinder(ConversionService conversionService, MediaTypeCodecRegistry mediaTypeCodecRegistry) {
+        this.conversionService = conversionService;
+        this.codecRegistry = mediaTypeCodecRegistry;
     }
 
     @Override
@@ -68,14 +86,66 @@ public class DefaultBodyAnnotationBinder<T> implements BodyArgumentBinder<T> {
             //noinspection unchecked
             return BindingResult.EMPTY;
         }
-        Optional<?> body = source.getBody();
-        if (body.isEmpty()) {
+        Object body = source.getBody().orElse(null);
+        if (body == null) {
             //noinspection unchecked
             return BindingResult.EMPTY;
+        } else {
+            Argument<T> bodyType = context.getArgument();
+            T decoded;
+            try {
+                decoded = decodeBody(source, body, bodyType, codecRegistry);
+            } catch (Exception e) {
+                context.reject(e);
+                return newResult(null, context);
+            }
+            if (decoded != null) {
+                return newResult(decoded, context);
+            } else {
+                Optional<T> converted = conversionService.convert(body, context);
+                return newResult(converted.orElse(null), context);
+            }
         }
-        Object o = body.get();
-        Optional<T> converted = conversionService.convert(o, context);
-        return newResult(converted.orElse(null), context);
+    }
+
+    /**
+     * Decodes the body given the source and the arguments.
+     * @param source The request
+     * @param body The body
+     * @param targetType The body type
+     * @param mediaTypeCodecRegistry The coded registry
+     * @return The decoded body or null
+     * @param <T1> The target type
+     */
+    @Nullable
+    @Internal
+    public static <T1> T1 decodeBody(HttpRequest<?> source, Object body, Argument<T1> targetType, MediaTypeCodecRegistry mediaTypeCodecRegistry) {
+        try {
+            T1 decoded = null;
+            if (targetType.isInstance(body)) {
+                decoded = (T1) body;
+            } else if (body instanceof ByteBuffer<?> byteBuffer && byteBuffer.readableBytes() > 0) {
+                if (targetType.isAssignableFrom(String.class)) {
+                    decoded = (T1) byteBuffer.toString(StandardCharsets.UTF_8);
+                } else if (targetType.isAssignableFrom(byte[].class)) {
+                    decoded = (T1) byteBuffer.toByteArray();
+                } else {
+                    if (mediaTypeCodecRegistry != null) {
+                        MediaTypeCodec codec = source.getContentType().flatMap(mediaTypeCodecRegistry::findCodec).orElse(null);
+                        if (codec != null) {
+                            decoded = codec.decode(targetType, byteBuffer);
+                        }
+                    }
+                }
+            }
+            return decoded;
+        } catch (CodecException e) {
+            if(e.getCause() instanceof RuntimeException r) {
+                throw r;
+            } else {
+                throw e;
+            }
+        }
     }
 
     @SuppressWarnings("java:S3655") // false positive

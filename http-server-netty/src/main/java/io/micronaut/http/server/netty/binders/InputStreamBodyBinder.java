@@ -29,8 +29,10 @@ import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
+import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.EmptyByteBuf;
+import io.netty.handler.codec.http.FullHttpRequest;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -161,6 +163,16 @@ public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<Inpu
                     return () -> Optional.of(inputStream);
                 } catch (IOException e) {
                     context.reject(e);
+                }
+            } else if (nativeRequest instanceof FullHttpRequest fullHttpRequest) {
+                ByteBuf content = fullHttpRequest.content();
+                int i = content.readableBytes();
+                if (i == 0) {
+                    return BindingResult.EMPTY;
+                } else {
+                    @SuppressWarnings("S2095")
+                    ByteBufInputStream bufInputStream = new ByteBufInputStream(content.retain(), true);
+                    return () -> Optional.of(bufInputStream);
                 }
             }
         }

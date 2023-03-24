@@ -30,6 +30,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.http.filter.GenericHttpFilter;
+import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
@@ -67,6 +68,7 @@ public class RequestLifecycle {
     private static final Logger LOG = LoggerFactory.getLogger(RequestLifecycle.class);
 
     private final RouteExecutor routeExecutor;
+    private final RequestArgumentSatisfier requestArgumentSatisfier;
     private HttpRequest<?> request;
     private Context context = Context.empty();
     private boolean multipartEnabled = true;
@@ -78,6 +80,7 @@ public class RequestLifecycle {
     protected RequestLifecycle(RouteExecutor routeExecutor, HttpRequest<?> request) {
         this.routeExecutor = Objects.requireNonNull(routeExecutor, "routeExecutor");
         this.request = Objects.requireNonNull(request, "request");
+        this.requestArgumentSatisfier = routeExecutor.getRequestArgumentSatisfier();
     }
 
     /**
@@ -417,6 +420,18 @@ public class RequestLifecycle {
      */
     protected ExecutionFlow<RouteMatch<?>> fulfillArguments(RouteMatch<?> routeMatch) {
         // try to fulfill the argument requirements of the route
-        return ExecutionFlow.just(routeExecutor.requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, request(), false));
+        HttpRequest<?> r = request();
+        return ExecutionFlow.just(requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, r, shouldSatisfyOptionals(r)));
+    }
+
+    /**
+     * Whether optionals should be satisfied from the request.
+     *
+     * <p>In general if the request body reading is delayed this should return false.</p>
+     * @param r The request
+     * @return Whether to satisfy optionals
+     */
+    protected boolean shouldSatisfyOptionals(HttpRequest<?> r) {
+        return false;
     }
 }

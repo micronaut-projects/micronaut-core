@@ -562,8 +562,7 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
 
             io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
 
-            if (nativeRequest instanceof StreamedHttpRequest && !((StreamedHttpRequest) nativeRequest).isConsumed()) {
-                StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) nativeRequest;
+            if (nativeRequest instanceof StreamedHttpRequest streamedHttpRequest && !streamedHttpRequest.isConsumed()) {
                 // We have to clear the buffer of FlowControlHandler before writing the response
                 // If this is a streamed request and there is still content to consume then subscribe
                 // and write the buffer is empty.

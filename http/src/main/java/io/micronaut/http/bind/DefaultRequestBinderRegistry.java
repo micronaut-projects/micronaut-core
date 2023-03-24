@@ -42,6 +42,7 @@ import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.bind.binders.RequestAttributeAnnotationBinder;
 import io.micronaut.http.bind.binders.RequestBeanAnnotationBinder;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
+import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import jakarta.inject.Inject;
@@ -73,23 +74,33 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
     private final ConversionService conversionService;
     private final Map<TypeAndAnnotation, Optional<RequestArgumentBinder>> argumentBinderCache =
         new ConcurrentLinkedHashMap.Builder<TypeAndAnnotation, Optional<RequestArgumentBinder>>().maximumWeightedCapacity(CACHE_MAX_SIZE).build();
+    private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
 
     /**
      * @param conversionService The conversion service
      * @param binders           The request argument binders
      */
     public DefaultRequestBinderRegistry(ConversionService conversionService, RequestArgumentBinder... binders) {
-        this(conversionService, Arrays.asList(binders));
+        this(null, conversionService, Arrays.asList(binders));
     }
 
     /**
      * @param conversionService The conversion service
      * @param binders           The request argument binders
      */
-    @Inject
-    public DefaultRequestBinderRegistry(ConversionService conversionService, List<RequestArgumentBinder> binders) {
-        this.conversionService = conversionService;
+    public DefaultRequestBinderRegistry(MediaTypeCodecRegistry mediaTypeCodecRegistry, ConversionService conversionService, RequestArgumentBinder... binders) {
+        this(null, conversionService, Arrays.asList(binders));
+    }
 
+    /**
+     * @param mediaTypeCodecRegistry the media type codec registry
+     * @param conversionService      The conversion service
+     * @param binders                The request argument binders
+     */
+    @Inject
+    public DefaultRequestBinderRegistry(MediaTypeCodecRegistry mediaTypeCodecRegistry, ConversionService conversionService, List<RequestArgumentBinder> binders) {
+        this.conversionService = conversionService;
+        this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         if (CollectionUtils.isNotEmpty(binders)) {
             for (RequestArgumentBinder binder : binders) {
                 addRequestArgumentBinder(binder);
@@ -113,8 +124,8 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         byType.put(Argument.of(PushCapableHttpRequest.class).typeHashCode(), (RequestArgumentBinder<PushCapableHttpRequest>) (argument, source) -> {
             if (source instanceof PushCapableHttpRequest) {
                 Optional<Argument<?>> typeVariable = argument.getFirstTypeVariable()
-                        .filter(arg -> arg.getType() != Object.class)
-                        .filter(arg -> arg.getType() != Void.class);
+                    .filter(arg -> arg.getType() != Object.class)
+                    .filter(arg -> arg.getType() != Void.class);
                 if (typeVariable.isPresent() && HttpMethod.permitsRequestBody(source.getMethod())) {
                     if (source.getBody().isPresent()) {
                         return () -> Optional.of(new PushCapableFullHttpRequest((PushCapableHttpRequest) source, typeVariable.get()));
@@ -145,11 +156,9 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
     @SuppressWarnings("rawtypes")
     @Override
     public <T, ST> void addRequestArgumentBinder(ArgumentBinder<T, ST> binder) {
-        if (binder instanceof AnnotatedRequestArgumentBinder) {
-            AnnotatedRequestArgumentBinder<?, ?> annotatedRequestArgumentBinder = (AnnotatedRequestArgumentBinder) binder;
+        if (binder instanceof AnnotatedRequestArgumentBinder<?, ?> annotatedRequestArgumentBinder) {
             Class<? extends Annotation> annotationType = annotatedRequestArgumentBinder.getAnnotationType();
-            if (binder instanceof TypedRequestArgumentBinder) {
-                TypedRequestArgumentBinder<?> typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
+            if (binder instanceof TypedRequestArgumentBinder<?> typedRequestArgumentBinder) {
                 Argument argumentType = typedRequestArgumentBinder.argumentType();
                 byTypeAndAnnotation.put(new TypeAndAnnotation(argumentType, annotationType), (RequestArgumentBinder) binder);
                 List<Class<?>> superTypes = typedRequestArgumentBinder.superTypes();
@@ -162,8 +171,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                 byAnnotation.put(annotationType, annotatedRequestArgumentBinder);
             }
 
-        } else if (binder instanceof TypedRequestArgumentBinder) {
-            TypedRequestArgumentBinder typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
+        } else if (binder instanceof TypedRequestArgumentBinder<?> typedRequestArgumentBinder) {
             byType.put(typedRequestArgumentBinder.argumentType().typeHashCode(), typedRequestArgumentBinder);
         }
     }
@@ -234,7 +242,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
      * @param byAnnotation The request argument binder
      */
     protected void registerDefaultAnnotationBinders(Map<Class<? extends Annotation>, RequestArgumentBinder> byAnnotation) {
-        DefaultBodyAnnotationBinder bodyBinder = new DefaultBodyAnnotationBinder(conversionService);
+        DefaultBodyAnnotationBinder bodyBinder = new DefaultBodyAnnotationBinder(conversionService, mediaTypeCodecRegistry);
         byAnnotation.put(Body.class, bodyBinder);
 
         CookieAnnotationBinder<Object> cookieAnnotationBinder = new CookieAnnotationBinder<>(conversionService);

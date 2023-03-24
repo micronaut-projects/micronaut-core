@@ -38,8 +38,8 @@ public class HttpRequestTest extends TestCase {
                 nettyRequest,
                 new DetachedMockFactory().Mock(ChannelHandlerContext.class),
                 ConversionService.SHARED,
-                new HttpServerConfiguration()
-        );
+                new HttpServerConfiguration(),
+            null);
         final HttpHeaders headers = request.getHeaders();
 
         headers.forEach((name, values) -> {
@@ -59,8 +59,8 @@ public class HttpRequestTest extends TestCase {
                 nettyRequest,
                 new DetachedMockFactory().Mock(ChannelHandlerContext.class),
                 ConversionService.SHARED,
-                new HttpServerConfiguration()
-        );
+                new HttpServerConfiguration(),
+            null);
         final HttpHeaders headers = request.getHeaders();
 
         headers.forEach((name, values) -> {

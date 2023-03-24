@@ -15,10 +15,13 @@
  */
 package io.micronaut.http.server.netty.decoders;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.core.type.GenericArgument;
+import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
@@ -57,6 +60,7 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
     private final ConversionService conversionService;
     private final HttpServerConfiguration configuration;
     private final ApplicationEventPublisher<HttpRequestReceivedEvent> httpRequestReceivedEventPublisher;
+    private final BeanProvider<MediaTypeCodecRegistry> mediaCodecRegistry;
 
     /**
      * @param embeddedServer    The embedded service
@@ -64,11 +68,19 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
      * @param configuration     The Http server configuration
      * @param httpRequestReceivedEventPublisher The publisher of {@link HttpRequestReceivedEvent}
      */
-    public HttpRequestDecoder(EmbeddedServer embeddedServer, ConversionService conversionService, HttpServerConfiguration configuration, ApplicationEventPublisher<HttpRequestReceivedEvent> httpRequestReceivedEventPublisher) {
+    public HttpRequestDecoder(
+        EmbeddedServer embeddedServer,
+        ConversionService conversionService,
+        HttpServerConfiguration configuration,
+        ApplicationEventPublisher<HttpRequestReceivedEvent> httpRequestReceivedEventPublisher) {
         this.embeddedServer = embeddedServer;
         this.conversionService = conversionService;
         this.configuration = configuration;
         this.httpRequestReceivedEventPublisher = httpRequestReceivedEventPublisher;
+        //noinspection Convert2Diamond
+        this.mediaCodecRegistry = embeddedServer.getApplicationContext()
+            .getBean(new GenericArgument<BeanProvider<MediaTypeCodecRegistry>>() {
+            });
     }
 
     @Override
@@ -77,7 +89,7 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
             LOG.trace("Server {}:{} Received Request: {} {}", embeddedServer.getHost(), embeddedServer.getPort(), msg.method(), msg.uri());
         }
         try {
-            NettyHttpRequest<Object> request = new NettyHttpRequest<>(msg, ctx, conversionService, configuration);
+            NettyHttpRequest<Object> request = new NettyHttpRequest<>(msg, ctx, conversionService, configuration, mediaCodecRegistry.orElse(null));
             if (httpRequestReceivedEventPublisher != ApplicationEventPublisher.NO_OP) {
                 try {
                     ctx.executor().execute(() -> {
@@ -102,13 +114,14 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
                     new DefaultHttpRequest(msg.protocolVersion(), msg.method(), "/"),
                     ctx,
                     conversionService,
-                    configuration
+                    configuration,
+                    mediaCodecRegistry.orElse(null)
             );
             final Throwable cause = e.getCause();
             ctx.fireExceptionCaught(cause != null ? cause : e);
-            if (msg instanceof StreamedHttpRequest) {
+            if (msg instanceof StreamedHttpRequest streamedHttpRequest) {
                 // discard any data that may come in
-                ((StreamedHttpRequest) msg).closeIfNoSubscriber();
+                streamedHttpRequest.closeIfNoSubscriber();
             }
         }
     }

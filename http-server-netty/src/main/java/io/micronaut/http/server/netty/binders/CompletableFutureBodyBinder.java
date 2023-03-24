@@ -30,6 +30,7 @@ import io.micronaut.http.server.netty.HttpContentProcessorAsReactiveProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.netty.buffer.ByteBufHolder;
+import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Subscription;
 
@@ -47,7 +48,7 @@ import java.util.concurrent.Future;
  * @since 1.0
  */
 @Internal
-public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<CompletableFuture>
+public class CompletableFutureBodyBinder
     implements NonBlockingBodyArgumentBinder<CompletableFuture> {
 
     private static final Argument<CompletableFuture> TYPE = Argument.of(CompletableFuture.class);
@@ -59,7 +60,6 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
      * @param conversionService            The conversion service
      */
     public CompletableFutureBodyBinder(HttpContentProcessorResolver httpContentProcessorResolver, ConversionService conversionService) {
-        super(conversionService);
         this.httpContentProcessorResolver = httpContentProcessorResolver;
     }
 
@@ -79,10 +79,14 @@ public class CompletableFutureBodyBinder extends DefaultBodyAnnotationBinder<Com
         if (source instanceof NettyHttpRequest) {
             NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) source;
             io.netty.handler.codec.http.HttpRequest nativeRequest = ((NettyHttpRequest) source).getNativeRequest();
-            if (nativeRequest instanceof StreamedHttpRequest) {
+            CompletableFuture future = new CompletableFuture();
+            Argument<?> targetType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            if (nativeRequest instanceof FullHttpRequest) {
+                return () -> Optional.of(CompletableFuture.completedFuture(
+                    nettyHttpRequest.getBody(targetType).orElse(null)
+                ));
+            } else if (nativeRequest instanceof StreamedHttpRequest) {
 
-                CompletableFuture future = new CompletableFuture();
-                Argument<?> targetType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
 
                 HttpContentProcessor processor = httpContentProcessorResolver.resolve(nettyHttpRequest, targetType);
 

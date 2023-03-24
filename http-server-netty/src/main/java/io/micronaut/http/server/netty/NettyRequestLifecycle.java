@@ -40,6 +40,7 @@ import io.netty.buffer.ByteBufHolder;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
+import io.netty.handler.codec.http.FullHttpRequest;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -139,28 +140,34 @@ final class NettyRequestLifecycle extends RequestLifecycle {
      * This method also sometimes fulfills more controller parameters with form data.
      */
     private ExecutionFlow<RouteMatch<?>> waitForBody(RouteMatch<?> routeMatch) {
-        if (!shouldReadBody(routeMatch)) {
+        io.netty.handler.codec.http.HttpRequest nativeRequest = nettyRequest.getNativeRequest();
+        if (!shouldReadBody(routeMatch, nativeRequest)) {
             ctx.read();
             return ExecutionFlow.just(routeMatch);
         }
-        BaseRouteCompleter completer = nettyRequest.isFormOrMultipartData() ?
-            new FormRouteCompleter(new NettyStreamingFileUpload.Factory(rib.serverConfiguration.getMultipart(), rib.getIoExecutor()), rib.conversionService, nettyRequest, routeMatch) :
-            new BaseRouteCompleter(nettyRequest, routeMatch);
-        HttpContentProcessor processor = rib.httpContentProcessorResolver.resolve(nettyRequest, routeMatch);
-        StreamingDataSubscriber pr = new StreamingDataSubscriber(completer, processor);
-        ((StreamedHttpRequest) nettyRequest.getNativeRequest()).subscribe(pr);
-        return pr.completion;
+        if (nativeRequest instanceof FullHttpRequest) {
+            // body already ready, so just return
+            return ExecutionFlow.just(routeMatch);
+        } else {
+            BaseRouteCompleter completer = nettyRequest.isFormOrMultipartData() ?
+                new FormRouteCompleter(new NettyStreamingFileUpload.Factory(rib.serverConfiguration.getMultipart(), rib.getIoExecutor()), rib.conversionService, nettyRequest, routeMatch) :
+                new BaseRouteCompleter(nettyRequest, routeMatch);
+            HttpContentProcessor processor = rib.httpContentProcessorResolver.resolve(nettyRequest, routeMatch);
+            StreamingDataSubscriber pr = new StreamingDataSubscriber(completer, processor);
+            ((StreamedHttpRequest) nativeRequest).subscribe(pr);
+            return pr.completion;
+        }
     }
 
     void handleException(Throwable cause) {
         onError(cause).onComplete((response, throwable) -> rib.writeResponse(ctx, nettyRequest, response, throwable));
     }
 
-    private boolean shouldReadBody(RouteMatch<?> routeMatch) {
+    private boolean shouldReadBody(RouteMatch<?> routeMatch, io.netty.handler.codec.http.HttpRequest nativeRequest) {
         if (!HttpMethod.permitsRequestBody(request().getMethod())) {
             return false;
         }
-        if (!(nettyRequest.getNativeRequest() instanceof StreamedHttpRequest)) {
+        if (!(nativeRequest instanceof StreamedHttpRequest)) {
             // Illegal state: The request body is required, so at this point we must have a StreamedHttpRequest
             return false;
         }
@@ -311,5 +318,10 @@ final class NettyRequestLifecycle extends RequestLifecycle {
             completion.complete(completer.routeMatch);
             completed = true;
         }
+    }
+
+    @Override
+    protected boolean shouldSatisfyOptionals(HttpRequest<?> r) {
+        return ((NettyHttpRequest<?>) r).getNativeRequest() instanceof FullHttpRequest;
     }
 }

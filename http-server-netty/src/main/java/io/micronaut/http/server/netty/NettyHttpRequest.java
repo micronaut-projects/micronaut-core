@@ -15,14 +15,17 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpHeaders;
@@ -34,6 +37,9 @@ import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpParameters;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.PushCapableHttpRequest;
+import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
+import io.micronaut.http.codec.CodecException;
+import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
@@ -47,6 +53,7 @@ import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.exceptions.InternalServerException;
+import io.micronaut.json.convert.LazyJsonNode;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
@@ -60,6 +67,7 @@ import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
+import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
@@ -150,6 +158,9 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         // we do copy the weight and dependency id
     }
 
+    private final boolean isFull;
+    private final MediaTypeCodecRegistry codecRegistry;
+
     boolean destroyed = false;
 
     private final NettyHttpHeaders headers;
@@ -157,8 +168,8 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private final HttpServerConfiguration serverConfiguration;
     private MutableConvertibleValues<Object> attributes;
     private NettyCookies nettyCookies;
-    private final List<ByteBufHolder> receivedContent = new ArrayList<>();
-    private final Map<IdentityWrapper, HttpData> receivedData = new LinkedHashMap<>();
+    private List<ByteBufHolder> receivedContent;
+    private Map<IdentityWrapper, HttpData> receivedData;
 
     private T bodyUnwrapped;
     private Supplier<Optional<T>> body;
@@ -179,16 +190,18 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private final BodyConvertor bodyConvertor = newBodyConvertor();
 
     /**
-     * @param nettyRequest        The {@link io.netty.handler.codec.http.HttpRequest}
-     * @param ctx                 The {@link ChannelHandlerContext}
-     * @param environment         The Environment
-     * @param serverConfiguration The {@link HttpServerConfiguration}
+     * @param nettyRequest           The {@link io.netty.handler.codec.http.HttpRequest}
+     * @param ctx                    The {@link ChannelHandlerContext}
+     * @param environment            The Environment
+     * @param serverConfiguration    The {@link HttpServerConfiguration}
+     * @param mediaTypeCodecRegistry the codec registry
      */
     @SuppressWarnings("MagicNumber")
     public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest,
                             ChannelHandlerContext ctx,
                             ConversionService environment,
-                            HttpServerConfiguration serverConfiguration) {
+                            HttpServerConfiguration serverConfiguration,
+                            MediaTypeCodecRegistry mediaTypeCodecRegistry) {
         super(nettyRequest, environment);
         Objects.requireNonNull(nettyRequest, "Netty request cannot be null");
         Objects.requireNonNull(ctx, "ChannelHandlerContext cannot be null");
@@ -197,9 +210,19 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         if (channel != null) {
             channel.attr(ServerAttributeKeys.REQUEST_KEY).set(this);
         }
+        this.codecRegistry = mediaTypeCodecRegistry;
         this.serverConfiguration = serverConfiguration;
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
+        if (nettyRequest instanceof FullHttpRequest fullHttpRequest) {
+            this.isFull = true;
+             // released by NettyHttpRequest.release()
+            fullHttpRequest.retain();
+        } else {
+            this.receivedContent = new ArrayList<>();
+            this.receivedData = new LinkedHashMap<>();
+            this.isFull = false;
+        }
         this.body = SupplierUtil.memoizedNonEmpty(() -> {
             T built = (T) buildBody();
             this.bodyUnwrapped = built;
@@ -327,7 +350,10 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      * @return A {@link CompositeByteBuf}
      */
     protected Object buildBody() {
-        if (!receivedData.isEmpty()) {
+        if (this.isFull) {
+            FullHttpRequest fullHttpRequest = (FullHttpRequest) this.nettyRequest;
+            return NettyByteBufferFactory.DEFAULT.wrap(fullHttpRequest.content());
+        } else if (!receivedData.isEmpty()) {
             Map body = new LinkedHashMap(receivedData.size());
 
             for (HttpData data: receivedData.values()) {
@@ -393,15 +419,19 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     @Internal
     public void release() {
         destroyed = true;
-        Consumer<Object> releaseIfNecessary = this::releaseIfNecessary;
-        receivedContent.forEach(releaseIfNecessary);
-        receivedData.values().forEach(releaseIfNecessary);
-        releaseIfNecessary(bodyUnwrapped);
-        if (attributes != null) {
-            attributes.values().forEach(releaseIfNecessary);
-        }
-        if (nettyRequest instanceof StreamedHttpRequest) {
-            ((StreamedHttpRequest) nettyRequest).closeIfNoSubscriber();
+        if (isFull) {
+            releaseIfNecessary(this.nettyRequest);
+        } else {
+            Consumer<Object> releaseIfNecessary = this::releaseIfNecessary;
+            receivedContent.forEach(releaseIfNecessary);
+            receivedData.values().forEach(releaseIfNecessary);
+            releaseIfNecessary(bodyUnwrapped);
+            if (attributes != null) {
+                attributes.values().forEach(releaseIfNecessary);
+            }
+            if (nettyRequest instanceof StreamedHttpRequest streamedHttpRequest) {
+                streamedHttpRequest.closeIfNoSubscriber();
+            }
         }
     }
 
@@ -409,8 +439,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      * @param value An object with a value
      */
     protected void releaseIfNecessary(Object value) {
-        if (value instanceof ReferenceCounted) {
-            ReferenceCounted referenceCounted = (ReferenceCounted) value;
+        if (value instanceof ReferenceCounted referenceCounted) {
             int i = referenceCounted.refCnt();
             if (i != 0) {
                 referenceCounted.release();
@@ -444,16 +473,18 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     public void addContent(ByteBufHolder httpContent) {
-        httpContent.touch();
-        if (httpContent instanceof MicronautHttpData<?>) {
-            receivedData.computeIfAbsent(new IdentityWrapper(httpContent), key -> {
+        if (receivedData != null) {
+            httpContent.touch();
+            if (httpContent instanceof MicronautHttpData<?>) {
+                receivedData.computeIfAbsent(new IdentityWrapper(httpContent), key -> {
+                    // released in release()
+                    httpContent.retain();
+                    return (HttpData) httpContent;
+                });
+            } else {
                 // released in release()
-                httpContent.retain();
-                return (HttpData) httpContent;
-            });
-        } else {
-            // released in release()
-            receivedContent.add(httpContent.retain());
+                receivedContent.add(httpContent.retain());
+            }
         }
     }
 
@@ -655,8 +686,30 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
                 if (value == null) {
                     return Optional.empty();
                 }
-                if (Argument.OBJECT_ARGUMENT.equalsType(conversionContext.getArgument())) {
+                Argument argument = conversionContext.getArgument();
+                if (argument.isInstance(value)) {
                     return Optional.of(value);
+                } else if (value instanceof ByteBuffer<?> byteBuffer) {
+                    if (argument.isAssignableFrom(ConvertibleValues.class)) {
+                        LazyJsonNode lazyJsonNode = new LazyJsonNode(byteBuffer);
+                        return convertFromNext(conversionService, conversionContext, lazyJsonNode);
+                    } else {
+                        Object decoded;
+                        try {
+                            decoded = DefaultBodyAnnotationBinder.decodeBody(
+                                NettyHttpRequest.this,
+                                byteBuffer,
+                                argument,
+                                codecRegistry
+                            );
+                        } catch (Exception e) {
+                            conversionContext.reject(e);
+                            return Optional.empty();
+                        }
+                        if (decoded != null) {
+                            return Optional.of(decoded);
+                        }
+                    }
                 }
                 return convertFromNext(conversionService, conversionContext, value);
             }

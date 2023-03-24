@@ -22,7 +22,6 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.netty.HttpContentProcessor;
@@ -33,12 +32,14 @@ import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.EmptyByteBuf;
+import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.util.ReferenceCounted;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Mono;
 
 import java.util.Optional;
 
@@ -49,12 +50,14 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
-public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> implements NonBlockingBodyArgumentBinder<Publisher> {
+public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publisher> {
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
     private static final Argument<Publisher> TYPE = Argument.of(Publisher.class);
+    public static final String MSG_CONVERT_DEBUG = "Cannot convert message for argument [{}] and value: {}";
 
     private final HttpContentProcessorResolver httpContentProcessorResolver;
+    private final ConversionService conversionService;
 
     /**
      * @param conversionService            The conversion service
@@ -62,8 +65,8 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
      */
     public PublisherBodyBinder(ConversionService conversionService,
                                HttpContentProcessorResolver httpContentProcessorResolver) {
-        super(conversionService);
         this.httpContentProcessorResolver = httpContentProcessorResolver;
+        this.conversionService = conversionService;
     }
 
     @Override
@@ -116,12 +119,12 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                                 Optional<ConversionError> lastError = conversionContext.getLastError();
                                 if (lastError.isPresent()) {
                                     if (LOG.isDebugEnabled()) {
-                                        LOG.debug("Cannot convert message for argument [" + context.getArgument() + "] and value: " + message, lastError.get());
+                                        LOG.debug(MSG_CONVERT_DEBUG, context.getArgument(), lastError.get());
                                     }
                                     subscriber.onError(new ConversionErrorException(context.getArgument(), lastError.get()));
                                 } else {
                                     if (LOG.isDebugEnabled()) {
-                                        LOG.debug("Cannot convert message for argument [{}] and value: {}", context.getArgument(), message);
+                                        LOG.debug(MSG_CONVERT_DEBUG, context.getArgument(), message);
                                     }
                                     subscriber.onError(UnsatisfiedRouteException.create(context.getArgument()));
                                 }
@@ -156,6 +159,29 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                     }
 
                 }));
+            } else if (nativeRequest instanceof FullHttpRequest fullHttpRequest) {
+                Argument<?> targetType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+                return () -> Optional.of(Mono.just(fullHttpRequest)
+                    .flatMap(request -> {
+                        ArgumentConversionContext<Object> conversionContext = (ArgumentConversionContext<Object>) context.with(targetType);
+                        Object result = source.getBody(conversionContext).orElse(null);
+                        if (result != null) {
+                            return Mono.just(result);
+                        } else {
+                            Optional<ConversionError> lastError = conversionContext.getLastError();
+                            if (lastError.isPresent()) {
+                                if (LOG.isDebugEnabled()) {
+                                    LOG.debug(MSG_CONVERT_DEBUG, context.getArgument(), lastError.get());
+                                }
+                                return Mono.error(new ConversionErrorException(context.getArgument(), lastError.get()));
+                            } else {
+                                if (LOG.isDebugEnabled()) {
+                                    LOG.debug(MSG_CONVERT_DEBUG, context.getArgument(), fullHttpRequest.content());
+                                }
+                                return Mono.error(UnsatisfiedRouteException.create(context.getArgument()));
+                            }
+                        }
+                    }));
             }
         }
         return BindingResult.EMPTY;
