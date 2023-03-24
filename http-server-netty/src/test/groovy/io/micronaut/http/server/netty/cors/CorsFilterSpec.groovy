@@ -49,6 +49,8 @@ import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_MAX_AGE
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS
 import static io.micronaut.http.HttpHeaders.VARY
 
 class CorsFilterSpec extends Specification {
