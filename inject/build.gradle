@@ -18,7 +18,7 @@ dependencies {
 
     compileOnly libs.managed.snakeyaml
     compileOnly libs.managed.groovy
-    compileOnly libs.kotlin.stdlib.jdk8
+    compileOnly libs.managed.kotlin.stdlib.jdk8
 
     testImplementation project(":context")
     testImplementation project(":inject-groovy")
