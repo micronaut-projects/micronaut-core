@@ -57,6 +57,7 @@ public interface ExpressionCompilationContextFactory {
      * @param contextClass context class element
      * @return This context factory
      */
+    @NonNull
     ExpressionCompilationContextFactory registerContextClass(@NonNull ClassElement contextClass);
 
 }

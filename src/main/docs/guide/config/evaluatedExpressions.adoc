@@ -1,4 +1,4 @@
-Since 4.0 Micronaut supports embedding evaluated expressions in annotation values using `#{...}` syntax which
+Since 4.0, Micronaut framework supports embedding evaluated expressions in annotation values using `#{...}` syntax which
 allows to achieve even more flexibility while configuring your application.
 
 .Evaluated Expression example
