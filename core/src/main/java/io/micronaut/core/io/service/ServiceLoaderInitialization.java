@@ -16,6 +16,7 @@
 package io.micronaut.core.io.service;
 
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.beans.BeanInfo;
 import io.micronaut.core.graal.GraalReflectionConfigurer;
@@ -54,6 +55,7 @@ import java.util.Set;
  * @since 3.5.0
  */
 @SuppressWarnings("unused")
+@Internal
 final class ServiceLoaderFeature implements Feature {
 
     @Override

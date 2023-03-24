@@ -18,6 +18,8 @@ package io.micronaut.core.util;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 
+import java.util.Objects;
+
 /**
  * <p>Utility methods for working with objects</p>.
  *

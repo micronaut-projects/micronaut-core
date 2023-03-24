@@ -1846,14 +1846,15 @@ public class DefaultHttpClient implements
         return io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(scheme) || SCHEME_WSS.equalsIgnoreCase(scheme);
     }
 
+    private <E extends HttpClientException> E decorate(E exc) {
+        return HttpClientExceptionUtils.populateServiceId(exc, informationalServiceId, configuration);
+    }
+
     @FunctionalInterface
     interface ThrowingBiConsumer<T1, T2> {
         void accept(T1 t1, T2 t2) throws Exception;
     }
 
-    private <E extends HttpClientException> E decorate(E exc) {
-        return HttpClientExceptionUtils.populateServiceId(exc, informationalServiceId, configuration);
-    }
 
     /**
      * Key used for connection pooling and determining host/port.

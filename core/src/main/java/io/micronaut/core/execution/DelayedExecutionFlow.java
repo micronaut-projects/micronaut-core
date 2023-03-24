@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.execution;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 
 /**
@@ -23,6 +24,7 @@ import io.micronaut.core.annotation.Nullable;
  *
  * @param <T> The type of this flow
  */
+@Internal
 public sealed interface DelayedExecutionFlow<T> extends ExecutionFlow<T> permits DelayedExecutionFlowImpl {
     static <T> DelayedExecutionFlow<T> create() {
         return new DelayedExecutionFlowImpl<>();

@@ -17,6 +17,7 @@ package io.micronaut.core.util;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import kotlin.coroutines.intrinsics.IntrinsicsKt;
 
 import io.micronaut.core.annotation.Nullable;

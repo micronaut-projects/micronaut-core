@@ -258,7 +258,7 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
          * @return This builder
          */
         @NonNull
-        Builder<B> exposedTypes(Class<?>...types);
+        Builder<B> exposedTypes(Class<?>... types);
 
         /**
          * The type arguments for the type.

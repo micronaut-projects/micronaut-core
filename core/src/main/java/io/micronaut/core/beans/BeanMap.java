@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.beans;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArgumentUtils;
 
 import io.micronaut.core.annotation.NonNull;
@@ -27,6 +28,7 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public interface BeanMap<T> extends Map<String, Object> {
 
     /**

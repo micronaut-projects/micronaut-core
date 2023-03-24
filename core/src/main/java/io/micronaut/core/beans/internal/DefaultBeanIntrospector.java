@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.beans;
+package io.micronaut.core.beans.internal;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -25,7 +25,11 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.beans.BeanIntrospectionReference;
+import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.reflect.ClassUtils;
@@ -40,18 +44,19 @@ import org.slf4j.Logger;
  * @see BeanIntrospector
  * @see BeanIntrospection
  */
-class DefaultBeanIntrospector implements BeanIntrospector {
+@Internal
+public class DefaultBeanIntrospector implements BeanIntrospector {
 
     private static final Logger LOG = ClassUtils.getLogger(DefaultBeanIntrospector.class);
 
     private Map<String, BeanIntrospectionReference<Object>> introspectionMap;
     private final ClassLoader classLoader;
 
-    DefaultBeanIntrospector() {
+    public DefaultBeanIntrospector() {
         this.classLoader = DefaultBeanIntrospector.class.getClassLoader();
     }
 
-    DefaultBeanIntrospector(ClassLoader classLoader) {
+    public DefaultBeanIntrospector(ClassLoader classLoader) {
         this.classLoader = classLoader;
     }
 

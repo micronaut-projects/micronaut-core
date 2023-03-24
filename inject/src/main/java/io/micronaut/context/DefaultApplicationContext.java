@@ -388,7 +388,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         return chain;
     }
 
-
     @NonNull
     private String resolveEachPropertyMissingBeanMessage(BeanResolutionContext resolutionContext, Qualifier<?> qualifier, BeanDefinition<?> definition) {
         List<BeanDefinition<?>> chain = calculateEachPropertyChain(resolutionContext, definition);
@@ -417,7 +416,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     @Override
     protected <T> void collectIterableBeans(BeanResolutionContext resolutionContext, BeanDefinition<T> iterableBean, Set<BeanDefinition<T>> targetSet) {
-        try(BeanResolutionContext rc = newResolutionContext(iterableBean, resolutionContext)) {
+        try (BeanResolutionContext rc = newResolutionContext(iterableBean, resolutionContext)) {
             if (iterableBean.hasDeclaredStereotype(EachProperty.class)) {
                 transformEachPropertyBeanDefinition(rc, iterableBean, targetSet);
             } else if (iterableBean.hasDeclaredStereotype(EachBean.class)) {

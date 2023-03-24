@@ -17,6 +17,7 @@ package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.beans.exceptions.IntrospectionException;
+import io.micronaut.core.beans.internal.DefaultBeanWrapper;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;

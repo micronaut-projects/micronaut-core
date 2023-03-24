@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.beans.BeanIntrospectionReference;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
@@ -49,7 +50,7 @@ import java.util.stream.Stream;
 
 /**
  * A {@link TypeElementVisitor} that visits classes annotated with {@link Introspected} and produces
- * {@link io.micronaut.core.beans.BeanIntrospectionReference} instances at compilation time.
+ * {@link BeanIntrospectionReference} instances at compilation time.
  *
  * @author graemerocher
  * @since 1.1

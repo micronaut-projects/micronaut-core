@@ -611,6 +611,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     /**
      * A segment that represents a method.
+     *
+     * @param <B> the declaring type
+     * @param <T> the injected type
      */
     public static class MethodSegment<B, T> extends AbstractSegment<B, T> implements CallableInjectionPoint<B> {
 
@@ -658,6 +661,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     /**
      * A segment that represents a field.
+     *
+     * @param <B> the declaring type
+     * @param <T> the injected type
      */
     public static class FieldSegment<B, T> extends AbstractSegment<B, T> implements InjectionPoint<B>, ArgumentCoercible<T>, ArgumentInjectionPoint<B, T> {
 
@@ -703,6 +709,8 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     /**
      * A segment that represents annotation.
      *
+     * @param <B> the declaring and injected type
+     *
      * @since 3.3.0
      */
     public static final class AnnotationSegment<B> extends AbstractSegment<B, B> implements InjectionPoint<B> {
@@ -732,6 +740,9 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     /**
      * Abstract class for a Segment.
+     *
+     * @param <B> the declaring type
+     * @param <T> the injected type
      */
     abstract static class AbstractSegment<B, T> implements Segment<B, T>, Named {
         private final BeanDefinition<B> declaringComponent;

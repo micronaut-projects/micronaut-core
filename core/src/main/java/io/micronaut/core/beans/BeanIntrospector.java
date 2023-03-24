@@ -16,6 +16,7 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.beans.exceptions.IntrospectionException;
+import io.micronaut.core.beans.internal.DefaultBeanIntrospector;
 import io.micronaut.core.util.ArgumentUtils;
 
 import io.micronaut.core.annotation.NonNull;

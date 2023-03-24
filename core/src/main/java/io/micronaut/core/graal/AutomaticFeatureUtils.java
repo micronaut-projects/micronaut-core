@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.graal;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArrayUtils;
 import org.graalvm.nativeimage.hosted.Feature.BeforeAnalysisAccess;
 import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
@@ -38,6 +39,7 @@ import java.util.Optional;
  * @deprecated Use GraalVM's own public API under {@code org.graalvm} or conditional metadata in JSON format instead
  */
 @Deprecated
+@Internal
 public final class AutomaticFeatureUtils {
 
     /**

@@ -25,7 +25,7 @@ import io.micronaut.core.type.Argument;
 import java.util.Map;
 
 /**
- * <p>An type of {@link BeanDefinition} that can build a new instance, construction requires additional (possibly user supplied) parameters in order construct a bean</p>
+ * <p>An type of {@link BeanDefinition} that can build a new instance, construction requires additional (possibly user supplied) parameters in order construct a bean.</p>
  *
  * @param <T> The bean type
  * @author Denis Stepanov

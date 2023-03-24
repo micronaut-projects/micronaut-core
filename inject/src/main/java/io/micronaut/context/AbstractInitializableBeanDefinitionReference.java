@@ -87,10 +87,11 @@ public abstract class AbstractInitializableBeanDefinitionReference<T> extends Ab
      * @param isProxiedBean             Is the bean proxied
      * @param isProxyTarget             Is the bean a retained proxy target
      */
+    @SuppressWarnings("checkstyle:ParameterNumber")
     protected AbstractInitializableBeanDefinitionReference(String beanTypeName, String beanDefinitionTypeName, AnnotationMetadata annotationMetadata,
-                                                        boolean isPrimary, boolean isContextScope, boolean isConditional,
-                                                        boolean isContainerType, boolean isSingleton, boolean isConfigurationProperties,
-                                                        boolean hasExposedTypes, boolean requiresMethodProcessing, boolean isProxiedBean, boolean isProxyTarget) {
+                                                           boolean isPrimary, boolean isContextScope, boolean isConditional,
+                                                           boolean isContainerType, boolean isSingleton, boolean isConfigurationProperties,
+                                                           boolean hasExposedTypes, boolean requiresMethodProcessing, boolean isProxiedBean, boolean isProxyTarget) {
         this.beanTypeName = beanTypeName;
         this.beanDefinitionTypeName = beanDefinitionTypeName;
         this.annotationMetadata = annotationMetadata;
