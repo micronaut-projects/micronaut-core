@@ -21,7 +21,6 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.EventExecutor;
-import io.netty.util.internal.TypeParameterMatcher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -32,7 +31,15 @@ import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import static io.micronaut.http.netty.reactive.HandlerPublisher.State.*;
+import static io.micronaut.http.netty.reactive.HandlerPublisher.State.BUFFERING;
+import static io.micronaut.http.netty.reactive.HandlerPublisher.State.DEMANDING;
+import static io.micronaut.http.netty.reactive.HandlerPublisher.State.DONE;
+import static io.micronaut.http.netty.reactive.HandlerPublisher.State.DRAINING;
+import static io.micronaut.http.netty.reactive.HandlerPublisher.State.IDLE;
+import static io.micronaut.http.netty.reactive.HandlerPublisher.State.NO_CONTEXT;
+import static io.micronaut.http.netty.reactive.HandlerPublisher.State.NO_SUBSCRIBER;
+import static io.micronaut.http.netty.reactive.HandlerPublisher.State.NO_SUBSCRIBER_ERROR;
+import static io.micronaut.http.netty.reactive.HandlerPublisher.State.NO_SUBSCRIBER_OR_CONTEXT;
 
 /**
  * Publisher for a Netty Handler.
@@ -62,7 +69,7 @@ import static io.micronaut.http.netty.reactive.HandlerPublisher.State.*;
  * @since 1.0
  */
 @Internal
-public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObservable<T> {
+public abstract class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObservable<T> {
     private static final Logger LOG = LoggerFactory.getLogger(HandlerPublisher.class);
     /**
      * Used for buffering a completion signal.
@@ -76,7 +83,6 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
     private final AtomicBoolean completed = new AtomicBoolean(false);
 
     private final EventExecutor executor;
-    private final TypeParameterMatcher matcher;
 
     private final Queue<Object> buffer = new LinkedList<>();
 
@@ -100,11 +106,9 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
      * with, if not, an exception will be thrown when the handler is registered.
      *
      * @param executor              The executor to execute asynchronous events from the subscriber on.
-     * @param subscriberMessageType The type of message this publisher accepts.
      */
-    public HandlerPublisher(EventExecutor executor, Class<? extends T> subscriberMessageType) {
+    public HandlerPublisher(EventExecutor executor) {
         this.executor = executor;
-        this.matcher = TypeParameterMatcher.get(subscriberMessageType);
     }
 
     @Override
@@ -139,9 +143,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements HotObse
      * @param msg The message to check.
      * @return True if the message should be accepted.
      */
-    protected boolean acceptInboundMessage(Object msg) {
-        return matcher.match(msg);
-    }
+    protected abstract boolean acceptInboundMessage(Object msg);
 
     /**
      * Override to handle when a subscriber cancels the subscription.

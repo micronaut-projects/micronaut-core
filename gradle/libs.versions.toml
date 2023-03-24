@@ -26,15 +26,13 @@ jetty = "9.4.48.v20220622"
 jmh = "1.35"
 jsr107 = "1.1.1"
 jsr305 = "3.0.2"
-javax-el = "3.0.1-b12"
-javax-el-impl = "2.2.1-b05"
+jakarta-el = "5.0.1"
+jakarta-el-impl = "5.0.0-M1"
 jcache = "1.1.1"
 junit5 = "5.9.1"
 junit-platform="1.9.1"
-kotlin = "1.8.10"
-kotlin-coroutines = "1.6.4"
 ktor = "1.6.8"
-managed-logback = "1.4.5"
+managed-logback = "1.4.6"
 logbook-netty = "2.14.0"
 log4j = "2.19.0"
 micronaut-aws = "3.9.2"
@@ -60,10 +58,12 @@ wiremock = "2.33.2"
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
-managed-groovy = "4.0.9"
+managed-groovy = "4.0.10"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "2.14.0"
 managed-jackson-databind = "2.14.1"
+managed-kotlin = "1.8.10"
+managed-kotlin-coroutines = "1.6.4"
 managed-maven-native-plugin = "0.9.13"
 managed-methvin-directory-watcher = "0.16.1"
 managed-netty = "4.1.87.Final"
@@ -85,6 +85,8 @@ test-boms-micronaut-tracing = { module = "io.micronaut.tracing:micronaut-tracing
 test-boms-micronaut-validation = { module = "io.micronaut.validation:micronaut-validation-bom", version.ref = "micronaut-validation" }
 
 boms-groovy = { module = "org.apache.groovy:groovy-bom", version.ref = "managed-groovy" }
+boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "managed-kotlin" }
+boms-kotlin-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-bom", version.ref = "managed-kotlin-coroutines" }
 boms-netty = { module = "io.netty:netty-bom", version.ref = "managed-netty" }
 boms-jackson = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "managed-jackson" }
 
@@ -108,6 +110,21 @@ managed-jackson-datatype-jsr310 = { module = "com.fasterxml.jackson.datatype:jac
 managed-jackson-module-afterburner = { module = "com.fasterxml.jackson.module:jackson-module-afterburner", version.ref = "managed-jackson" }
 managed-jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "managed-jackson" }
 managed-jackson-module-parameterNames = { module = "com.fasterxml.jackson.module:jackson-module-parameter-names", version.ref = "managed-jackson" }
+
+managed-kotlin-annotation-processing-embeddable = { module = "org.jetbrains.kotlin:kotlin-annotation-processing-embeddable", version.ref = "managed-kotlin" }
+managed-kotlin-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-compiler-embeddable", version.ref = "managed-kotlin" }
+managed-kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "managed-kotlin" }
+managed-kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "managed-kotlin" }
+managed-kotlin-stdlib-jdk8 = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8", version.ref = "managed-kotlin" }
+managed-kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "managed-kotlin" }
+
+managed-kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "managed-kotlin-coroutines" }
+managed-kotlinx-coroutines-jdk8 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8", version.ref = "managed-kotlin-coroutines" }
+managed-kotlinx-coroutines-reactive = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactive", version.ref = "managed-kotlin-coroutines" }
+managed-kotlinx-coroutines-rx2 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-rx2", version.ref = "managed-kotlin-coroutines" }
+managed-kotlinx-coroutines-slf4j = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-slf4j", version.ref = "managed-kotlin-coroutines" }
+managed-kotlinx-coroutines-reactor = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactor", version.ref = "managed-kotlin-coroutines" }
+
 managed-ksp-api = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "managed-ksp" }
 managed-ksp = { module = "com.google.devtools.ksp:symbol-processing", version.ref = "managed-ksp" }
 managed-java-parser-core = { module = "com.github.javaparser:javaparser-symbol-solver-core", version.ref = "managed-java-parser-core" }
@@ -168,8 +185,8 @@ jakarta-inject-api = { module = "jakarta.inject:jakarta.inject-api", version.ref
 jakarta-inject-tck = { module = "jakarta.inject:jakarta.inject-tck", version.ref = "jakarta-inject-tck" }
 
 javax-annotation-api = { module = "javax.annotation:javax.annotation-api", version.ref = "javax-annotation-api" }
-javax-el = { module = "org.glassfish:javax.el", version.ref = "javax-el" }
-javax-el-impl = { module = "org.glassfish:javax.el", version.ref = "javax-el" }
+jakarta-el = { module = "jakarta.el:jakarta.el-api", version.ref = "jakarta-el" }
+jakarta-el-impl = { module = "org.glassfish:jakarta.el", version.ref = "jakarta-el-impl" }
 javax-inject = { module = "javax.inject:javax.inject", version.ref = "javax-inject" }
 javax-persistence = { module = "javax.persistence:javax.persistence-api", version.ref = "javax-persistence" }
 
@@ -192,20 +209,7 @@ junit-vintage = { module = "org.junit.vintage:junit-vintage-engine", version.ref
 
 jetbrains-annotations = { module = "org.jetbrains:annotations", version.ref = "jetbrains-annotations" }
 
-kotlin-annotation-processing-embeddable = { module = "org.jetbrains.kotlin:kotlin-annotation-processing-embeddable", version.ref = "kotlin" }
-kotlin-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-compiler-embeddable", version.ref = "kotlin" }
 kotlin-kotest-junit5 = { module = "io.kotest:kotest-runner-junit5-jvm" }
-kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin" }
-kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
-kotlin-stdlib-jdk8 = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8", version.ref = "kotlin" }
-kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
-
-kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlin-coroutines" }
-kotlinx-coroutines-jdk8 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8", version.ref = "kotlin-coroutines" }
-kotlinx-coroutines-reactive = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactive", version.ref = "kotlin-coroutines" }
-kotlinx-coroutines-rx2 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-rx2", version.ref = "kotlin-coroutines" }
-kotlinx-coroutines-slf4j = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-slf4j", version.ref = "kotlin-coroutines" }
-kotlinx-coroutines-reactor = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactor", version.ref = "kotlin-coroutines" }
 
 log4j = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" }
 

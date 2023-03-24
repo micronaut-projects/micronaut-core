@@ -9,4 +9,4 @@ In modern Java applications, declaring advice typically takes the form of an ann
 
 The disadvantage of traditional approaches to AOP is the heavy reliance on runtime proxy creation and reflection, which slows application performance, makes debugging harder and increases memory consumption.
 
-Micronaut tries to address these concerns by providing a simple compile-time AOP API that does not use reflection.
+Micronaut framework tries to address these concerns by providing a simple compile-time AOP API that does not use reflection.

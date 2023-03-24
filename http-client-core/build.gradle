@@ -11,7 +11,7 @@ dependencies {
     api project(":json-core")
     api project(":discovery-core")
 
-    compileOnly libs.kotlin.stdlib
+    compileOnly libs.managed.kotlin.stdlib
 
     testImplementation project(":jackson-databind")
 }

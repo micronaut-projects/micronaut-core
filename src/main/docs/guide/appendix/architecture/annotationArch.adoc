@@ -1,4 +1,4 @@
-Micronaut is an implementation of an annotation-based programming model. That is to say annotations form a fundamental part of the API design of the framework.
+Micronaut framework is an implementation of an annotation-based programming model. That is to say annotations form a fundamental part of the API design of the framework.
 
 Given this design decision, a compilation-time model was formulated to address the challenges of evaluating annotations at runtime. 
 

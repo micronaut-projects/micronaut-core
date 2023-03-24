@@ -28,7 +28,7 @@ dependencies {
     implementation libs.managed.reactor
     compileOnly project(":jackson-databind")
     compileOnly project(":websocket")
-    compileOnly libs.kotlin.stdlib
+    compileOnly libs.managed.kotlin.stdlib
     compileOnly libs.managed.netty.transport.native.unix.common
     compileOnly libs.managed.netty.incubator.codec.http3
 

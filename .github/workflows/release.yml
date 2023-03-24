@@ -161,18 +161,18 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: Download artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
           name: gradle-build-outputs
           path: build/repo
+      - name: Create artifacts archive
+        shell: bash
+        run: find build/repo -regextype sed -regex '\(.*\.jar\|.*\.pom\|.*\.module\|.*\.toml\)' | xargs zip artifacts.zip
       - name: Upload assets
-        # Upload the artifacts and SLSA L3 provenance as assets to the existing
-        # release. Note that the provenance will attest to each artifact file and
-        # not the aggregated ZIP file.
-        run: |
-          find build/repo -regextype sed -regex '\(.*\.jar\|.*\.pom\|.*\.module\|.*\.toml\)' | xargs zip artifacts.zip
-          gh release upload ${{ github.ref_name }} artifacts.zip
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Upload the artifacts to the existing release. Note that the SLSA provenance will
+        # attest to each artifact file and not the aggregated ZIP file.
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v0.1.15
+        with:
+          files: artifacts.zip

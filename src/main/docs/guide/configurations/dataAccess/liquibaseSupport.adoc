@@ -1,2 +1,2 @@
-To configure Micronaut integration with https://www.liquibase.org[Liquibase], please follow
+To configure the Micronaut integration with https://www.liquibase.org[Liquibase], please follow
 https://micronaut-projects.github.io/micronaut-liquibase/latest/guide/index.html[these instructions].

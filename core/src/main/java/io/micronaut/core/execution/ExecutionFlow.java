@@ -83,7 +83,7 @@ public interface ExecutionFlow<T> {
      */
     @NonNull
     static <T> ExecutionFlow<T> async(@NonNull Executor executor, @NonNull Supplier<? extends ExecutionFlow<T>> supplier) {
-        CompletableFuture<T> completableFuture = new CompletableFuture<>();
+        DelayedExecutionFlow<T> completableFuture = DelayedExecutionFlow.create();
         executor.execute(() -> supplier.get().onComplete((t, throwable) -> {
             if (throwable != null) {
                 if (throwable instanceof CompletionException completionException) {
@@ -94,7 +94,7 @@ public interface ExecutionFlow<T> {
                 completableFuture.complete(t);
             }
         }));
-        return CompletableFutureExecutionFlow.just(completableFuture);
+        return completableFuture;
     }
 
     /**
@@ -176,9 +176,10 @@ public interface ExecutionFlow<T> {
                 if (throwable instanceof CompletionException completionException) {
                     throwable = completionException.getCause();
                 }
-                CompletableFuture.failedFuture(throwable);
+                completableFuture.completeExceptionally(throwable);
+            } else {
+                completableFuture.complete(value);
             }
-            CompletableFuture.completedFuture(value);
         });
         return completableFuture;
     }

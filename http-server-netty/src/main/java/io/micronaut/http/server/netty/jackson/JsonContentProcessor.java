@@ -48,7 +48,8 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
 
     private final JsonMapper jsonMapper;
     private final JsonCounter counter = new JsonCounter();
-    private CompositeByteBuf buffer;
+    private ByteBuf singleBuffer;
+    private CompositeByteBuf compositeBuffer;
 
     /**
      * @param nettyHttpRequest The Netty Http request
@@ -98,13 +99,21 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
         try {
             countLoop(out, content);
         } catch (Exception e) {
-            if (this.buffer != null) {
-                this.buffer.release();
-                this.buffer = null;
-            }
+            releaseBuffers();
             throw e;
         } finally {
             content.release();
+        }
+    }
+
+    private void releaseBuffers() {
+        if (this.singleBuffer != null) {
+            this.singleBuffer.release();
+            this.singleBuffer = null;
+        }
+        if (this.compositeBuffer != null) {
+            this.compositeBuffer.release();
+            this.compositeBuffer = null;
         }
     }
 
@@ -116,49 +125,54 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
             JsonCounter.BufferRegion bufferRegion = counter.pollFlushedRegion();
             if (bufferRegion != null) {
                 long start = Math.max(initialPosition, bufferRegion.start());
-                flush(out, content.retainedSlice(
+                buffer(content.retainedSlice(
                     Math.toIntExact(start - bias),
                     Math.toIntExact(bufferRegion.end() - start)
                 ));
+                flush(out);
             }
         }
         if (counter.isBuffering()) {
             int currentBufferStart = Math.toIntExact(Math.max(initialPosition, counter.bufferStart()) - bias);
-            bufferForNextRun(content.retainedSlice(currentBufferStart, content.writerIndex() - currentBufferStart));
+            content.readerIndex(currentBufferStart);
+            buffer(content.retain());
         }
     }
 
-    private void bufferForNextRun(ByteBuf buffer) {
-        if (this.buffer == null) {
-            // number of components should not be too small to avoid unnecessary consolidation
-            this.buffer = buffer.alloc().compositeBuffer(((NettyHttpServerConfiguration) configuration).getJsonBufferMaxComponents());
+    private void buffer(ByteBuf buffer) {
+        if (this.singleBuffer == null && this.compositeBuffer == null) {
+            this.singleBuffer = buffer;
+        } else {
+            if (this.compositeBuffer == null) {
+                // number of components should not be too small to avoid unnecessary consolidation
+                this.compositeBuffer = buffer.alloc().compositeBuffer(((NettyHttpServerConfiguration) configuration).getJsonBufferMaxComponents());
+                this.compositeBuffer.addComponent(true, this.singleBuffer);
+                this.singleBuffer = null;
+            }
+            this.compositeBuffer.addComponent(true, buffer);
         }
-        this.buffer.addComponent(true, buffer);
     }
 
-    private void flush(Collection<Object> out, ByteBuf completedNode) throws IOException {
-        if (this.buffer != null) {
-            completedNode = completedNode == null ? this.buffer : this.buffer.addComponent(true, completedNode);
-            this.buffer = null;
-        }
+    private void flush(Collection<Object> out) throws IOException {
+        ByteBuf completedNode = compositeBuffer == null ? singleBuffer : compositeBuffer;
         ByteBuffer<ByteBuf> wrapped = NettyByteBufferFactory.DEFAULT.wrap(completedNode);
         if (((NettyHttpServerConfiguration) configuration).isEagerParsing()) {
             try {
                 out.add(jsonMapper.readValue(wrapped, Argument.of(JsonNode.class)));
             } finally {
-                if (completedNode != null) {
-                    completedNode.release();
-                }
+                releaseBuffers();
             }
         } else {
             out.add(new LazyJsonNode(wrapped));
+            compositeBuffer = null;
+            singleBuffer = null;
         }
     }
 
     @Override
     public void complete(Collection<Object> out) throws Throwable {
-        if (this.buffer != null) {
-            flush(out, null);
+        if (this.singleBuffer != null || this.compositeBuffer != null) {
+            flush(out);
         }
     }
 }

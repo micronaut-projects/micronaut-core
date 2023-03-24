@@ -14,7 +14,7 @@ micronautBuild {
 dependencies {
     compileOnly libs.managed.jakarta.annotation.api
     compileOnly libs.graal
-    compileOnly libs.kotlin.stdlib
+    compileOnly libs.managed.kotlin.stdlib
 }
 
 spotless {

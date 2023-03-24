@@ -58,8 +58,8 @@ dependencies {
     }
     testImplementation libs.javax.annotation.api
     testImplementation libs.managed.snakeyaml
-    testRuntimeOnly libs.javax.el.impl
-    testRuntimeOnly libs.javax.el
+    testRuntimeOnly libs.jakarta.el.impl
+    testRuntimeOnly libs.jakarta.el
 }
 //compileTestJava.options.fork = true
 //compileTestJava.options.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

@@ -53,6 +53,15 @@ The instrumentation features for Reactor have been moved to the `micronaut-react
 
 dependency:micronaut-reactor[groupId="io.micronaut.reactor"]
 
+
+==== Validation Support Moved to Validation Module
+
+The validation features link:{micronautvalidationdocs}[have been moved to a separate module]. Moreover, the new validation module requires you to use `micronaut-validation-processor` in the annotation processor classpath.
+
+dependency:micronaut-validation-processor[groupId="io.micronaut.validation",scope="annotationProcessor"]
+
+dependency:micronaut-validation[groupId="io.micronaut.validation"]
+
 ==== Session Support Moved to Session Module
 
 The Session handling features link:{micronautsessiondocs}[have been moved to its own module]. If you use the HTTP session module, change the maven coordinates from `io.micronaut:micronaut-session` to `io.micronaut.session:micronaut-session`.

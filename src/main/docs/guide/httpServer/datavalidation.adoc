@@ -1,10 +1,12 @@
 It is easy to validate incoming data with Micronaut controllers using <<validation, Validation Advice>>.
 
-Micronaut provides native support for the `jakarta.validation` annotations with the `micronaut-validation` dependency:
+The Micronaut framework provides native support for the `jakarta.validation` annotations with the `micronaut-validation` dependency:
 
-dependency::micronaut-validation[]
+dependency:micronaut-validation-processor[groupId="io.micronaut.validation",scope="annotationProcessor"]
 
-Or full JSR 380 compliance with the `micronaut-hibernate-validator` dependency:
+dependency:micronaut-validation[groupId="io.micronaut.validation"]
+
+Or full https://beanvalidation.org/2.0/spec/[JSR 380] compliance with the `micronaut-hibernate-validator` dependency:
 
 dependency:micronaut-hibernate-validator[groupId="io.micronaut.beanvalidation"]
 

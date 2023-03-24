@@ -113,6 +113,21 @@ class AbstractKotlinCompilerSpec extends Specification {
         return elements.first()
     }
 
+    /**
+     * Builds a class element for the given source code.
+     * @param cls The source
+     * @return The class element
+     */
+    <V> V buildClassElementMapped(String className, @Language("kotlin") String cls, @NonNull Function<ClassElement, V> processor) {
+        List<V> elements = []
+        KotlinCompiler.compile(className, cls,  {
+            if (it.name == className) {
+                elements.add(processor.apply(it))
+            }
+        })
+        return elements.first()
+    }
+
     Object getBean(ApplicationContext context, String className, Qualifier qualifier = null) {
         context.getBean(context.classLoader.loadClass(className), qualifier)
     }

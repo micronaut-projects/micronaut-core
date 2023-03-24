@@ -32,4 +32,4 @@ logger:
 - This will disable ALL logging for the class `io.verbose.logger.who.CriedWolf`
 
 
-Note that the ability to control log levels via config is controlled via the api:logging.LoggingSystem[] interface. Currently, Micronaut includes a single implementation that allows setting log levels for the Logback library. If you use another library, you should provide a bean that implements this interface.
+Note that the ability to control log levels via config is controlled via the api:logging.LoggingSystem[] interface. Currently, the Micronaut framework includes a single implementation that allows setting log levels for the Logback library. If you use another library, you should provide a bean that implements this interface.
