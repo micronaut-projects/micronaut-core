@@ -1,7 +1,17 @@
 plugins {
     id "io.micronaut.build.internal.convention-core-library"
+    alias(libs.plugins.extra.javamodule.info)
 }
 
+//modularizes libs that do not implement the JPMS
+//kotlin seems like it wont implement it so it should be consider to remove kotlin support
+//from this module and somehow move it to inject-kotlin
+extraJavaModuleInfo {
+    module("javax.inject:javax.inject","javax.inject") {
+        exports("javax.inject")
+    }
+    automaticModule("org.jetbrains.kotlin:kotlin-stdlib-common","kotlin.stdlib.common")
+}
 micronautBuild {
     core {
         documented = false
@@ -11,11 +21,12 @@ micronautBuild {
 }
 
 dependencies {
-    compileOnly libs.javax.inject
     api libs.jakarta.inject.api
     api libs.managed.jakarta.annotation.api
     api project(':core')
+    api libs.jetbrains.annotations
 
+    compileOnly libs.javax.inject
     compileOnly libs.managed.snakeyaml
     compileOnly libs.managed.groovy
     compileOnly libs.kotlin.stdlib.jdk8

@@ -30,7 +30,7 @@ jakarta-el = "5.0.1"
 jakarta-el-impl = "5.0.0-M1"
 jcache = "1.1.1"
 junit5 = "5.9.1"
-junit-platform="1.9.1"
+junit-platform = "1.9.1"
 kotlin = "1.8.10"
 kotlin-coroutines = "1.6.4"
 ktor = "1.6.8"
@@ -264,3 +264,6 @@ wiremock = { module = "com.github.tomakehurst:wiremock-jre8", version.ref = "wir
 
 [bundles]
 asm = ["asm", "asm-commons"]
+
+[plugins]
+extra-javamodule-info = { id = 'org.gradlex.extra-java-module-info', version = '1.3' }

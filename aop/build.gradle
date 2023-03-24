@@ -19,4 +19,11 @@ dependencies {
 tasks.named("compileKotlin") {
     kotlinOptions.jvmTarget = "17"
     kotlinOptions.languageVersion = "1.7"
+    //see https://youtrack.jetbrains.com/issue/KT-55200
+    //TL;DR Kotlin does not play too well with JPMS and its not documented anywhere - this is a cumulative fix from stackoverflow (https://stackoverflow.com/a/69746917/7910536)
+    //Should the issue ever be closed - read the docs and do what they say
+    destinationDirectory.set(compileJava.destinationDirectory)
+}
+tasks.named("jar") {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }

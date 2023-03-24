@@ -40,7 +40,7 @@ class NamedThreadFactory implements ThreadFactory {
      */
     NamedThreadFactory(String name) {
         ArgumentUtils.check("name", name).notNull();
-        SecurityManager s = System.getSecurityManager();
+        SecurityManager s = System.getSecurityManager(); //will be deprecated in java 17 for removal!
         group = (s != null) ? s.getThreadGroup() : Thread.currentThread().getThreadGroup();
         namePrefix = name + "-thread-";
     }
