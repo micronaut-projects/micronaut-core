@@ -1,4 +1,4 @@
-https://www.consul.io[Consul] is a popular Service Discovery and Distributed Configuration server provided by HashiCorp. Micronaut features a native link:{micronautdiscoveryapi}/io/micronaut/discovery/consul/client/v1/ConsulClient.html[ConsulClient] that uses Micronaut's support for <<clientAnnotation, Declarative HTTP Clients>>.
+https://www.consul.io[Consul] is a popular Service Discovery and Distributed Configuration server provided by HashiCorp. The Micronaut framework features a native link:{micronautdiscoveryapi}/io/micronaut/discovery/consul/client/v1/ConsulClient.html[ConsulClient] that uses Micronaut's support for <<clientAnnotation, Declarative HTTP Clients>>.
 
 == Starting Consul
 
@@ -41,7 +41,7 @@ After enabling distributed configuration, store the configuration to share in Co
 
 == Storing Configuration as Key/Value Pairs
 
-One way is to store the keys and values directly in Consul. In this case by default Micronaut looks for configuration in the Consul `/config` directory.
+One way is to store the keys and values directly in Consul. In this case by default the Micronaut framework looks for configuration in the Consul `/config` directory.
 
 TIP: You can alter the path searched for by setting `consul.client.config.path`
 
@@ -79,7 +79,7 @@ If you now define a `@Value("${foo.bar}")` or call `environment.getProperty(..)`
 
 == Storing Configuration in YAML, JSON etc.
 
-Some Consul users prefer storing configuration in blobs of a certain format, such as YAML. Micronaut supports this mode and supports storing configuration in either YAML, JSON, or Java properties format.
+Some Consul users prefer storing configuration in blobs of a certain format, such as YAML. The Micronaut framework supports this mode and supports storing configuration in either YAML, JSON, or Java properties format.
 
 TIP: The api:discovery.config.ConfigDiscoveryConfiguration[] has a number of configuration options for configuring how distributed configuration is discovered.
 

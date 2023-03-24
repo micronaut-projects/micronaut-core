@@ -1,4 +1,4 @@
-Micronaut supports a reactive and non-blocking client to connect to Postgres using https://github.com/eclipse-vertx/vertx-sql-client/tree/master/vertx-pg-client[vertx-pg-client], which can handle many database connections with a single thread.
+The Micronaut framework supports a reactive and non-blocking client to connect to Postgres using https://github.com/eclipse-vertx/vertx-sql-client/tree/master/vertx-pg-client[vertx-pg-client], which can handle many database connections with a single thread.
 
 == Configuring the Reactive Postgres Client
 

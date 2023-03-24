@@ -1,4 +1,4 @@
-You may need to resolve the host name of the current server. Micronaut includes an implementation of the api:http.server.util.HttpHostResolver[] interface.
+You may need to resolve the host name of the current server. The Micronaut framework includes an implementation of the api:http.server.util.HttpHostResolver[] interface.
 
 The default implementation looks for host information in the following places in order:
 

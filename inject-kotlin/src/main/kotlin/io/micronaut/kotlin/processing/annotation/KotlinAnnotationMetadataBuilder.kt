@@ -224,7 +224,7 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
                     } else {
                         val parameters = parent.parameters
                         val parameterIndex =
-                            parameters.indexOf(parameters.find { it.name == element.name })
+                            parameters.indexOf(parameters.find { it.name!!.asString() == element.name!!.asString() })
                         methodsHierarchy(parent)
                             .map { if (it == parent) element else it.parameters[parameterIndex] }
                             .toMutableList()

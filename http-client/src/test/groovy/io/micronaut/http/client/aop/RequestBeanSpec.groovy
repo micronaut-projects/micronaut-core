@@ -68,7 +68,7 @@ class RequestBeanSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.response.getBody(Map).get()._embedded.errors[0].message.contains("Field must have value first or second.")
+        ex.response.getBody(Map).get()._embedded.errors[0].message == "bean.validatedValue: Field must have value 'first' or 'second'."
     }
 
     void "test validated value returns ok when valid"() {
@@ -112,7 +112,7 @@ class RequestBeanSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.response.getBody(Map).get()._embedded.errors[0].message.contains("Field must have value first or second.")
+        ex.response.getBody(Map).get()._embedded.errors[0].message == "bean.validatedValue: Field must have value 'first' or 'second'."
     }
 
     void "test Immutable Bean gets injected Typed Value"() {

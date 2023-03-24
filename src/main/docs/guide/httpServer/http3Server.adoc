@@ -1,4 +1,4 @@
-Since Micronaut 4.x, Micronaut's Netty-based HTTP server can be configured to support HTTP/3. This support is experimental and may change without notice.
+Since Micronaut framework 4.x, Micronaut's Netty-based HTTP server can be configured to support HTTP/3. This support is experimental and may change without notice.
 
 ==== Configuring the Server for HTTP/3
 

@@ -1,4 +1,4 @@
-TIP: The <<cli, Command Line Interface>> for Micronaut includes special support for Kotlin. To create a Kotlin application use the `kotlin` lang option. For example:
+TIP: The <<cli, Command Line Interface>> for Micronaut framework includes special support for Kotlin. To create a Kotlin application use the `kotlin` lang option. For example:
 
 [source,bash]
 .Create a Micronaut Kotlin application
@@ -6,7 +6,7 @@ TIP: The <<cli, Command Line Interface>> for Micronaut includes special support 
 $ mn create-app hello-world --lang kotlin
 ----
 
-Since the 4.0 release, Micronaut Framework offers support for Kotlin via https://kotlinlang.org/docs/reference/kapt.html[Kapt] or https://kotlinlang.org/docs/ksp-overview.html[Kotlin Symbol Processing API].
+Since the 4.0 release, Micronaut framework offers support for Kotlin via https://kotlinlang.org/docs/reference/kapt.html[Kapt] or https://kotlinlang.org/docs/ksp-overview.html[Kotlin Symbol Processing API].
 
 
 

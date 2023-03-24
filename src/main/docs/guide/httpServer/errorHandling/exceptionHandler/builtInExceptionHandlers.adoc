@@ -1,4 +1,4 @@
-Micronaut ships with several built-in handlers:
+The Micronaut framework ships with several built-in handlers:
 
 |===
 |Exception|Handler

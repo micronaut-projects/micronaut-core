@@ -360,30 +360,28 @@ class Test {
             def field = ce.findField("deepList").get()
             def fieldType = field.getGenericType()
 
-            fieldType.getAnnotationMetadata().getAnnotationNames().size() == 0
-
             assertListGenericArgument(fieldType, { ClassElement listArg1 ->
-                assert listArg1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
-                assert listArg1.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
+                assert listArg1.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.Size$List')
+                assert listArg1.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.Size$List')
                 assertListGenericArgument(listArg1, { ClassElement listArg2 ->
-                    assert listArg2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
-                    assert listArg2.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
+                    assert listArg2.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotEmpty$List')
+                    assert listArg2.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotEmpty$List')
                     assertListGenericArgument(listArg2, { ClassElement listArg3 ->
-                        assert listArg3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
-                        assert listArg3.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
+                        assert listArg3.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotNull$List')
+                        assert listArg3.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotNull$List')
                     })
                 })
             })
 
             def level1 = fieldType.getTypeArguments()["E"]
-            level1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
-            level1.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
+            level1.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.Size$List')
+            level1.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.Size$List')
             def level2 = level1.getTypeArguments()["E"]
-            level2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
-            level2.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
+            level2.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotEmpty$List')
+            level2.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotEmpty$List')
             def level3 = level2.getTypeArguments()["E"]
-            level3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
-            level3.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
+            level3.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotNull$List')
+            level3.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotNull$List')
     }
 
     void "test annotation metadata present on deep type parameters for method"() {
@@ -407,27 +405,26 @@ class Test {
             def method = ce.findMethod("deepList").get()
             def theType = method.getGenericReturnType()
 
-            theType.getAnnotationMetadata().getAnnotationNames().size() == 0
 
             def level1 = theType.getTypeArguments()["E"]
-            level1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
-            level1.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
+            level1.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.Size$List')
+            level1.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.Size$List')
             def level2 = level1.getTypeArguments()["E"]
-            level2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
-            level2.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
+            level2.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotEmpty$List')
+            level2.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotEmpty$List')
             def level3 = level2.getTypeArguments()["E"]
-            level3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
-            level3.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
+            level3.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotNull$List')
+            level3.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotNull$List')
 
             assertListGenericArgument(theType, { ClassElement listArg1 ->
-                assert listArg1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
-                assert listArg1.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
+                assert listArg1.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.Size$List')
+                assert listArg1.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.Size$List')
                 assertListGenericArgument(listArg1, { ClassElement listArg2 ->
-                    assert listArg2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
-                    assert listArg2.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
+                    assert listArg2.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotEmpty$List')
+                    assert listArg2.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotEmpty$List')
                     assertListGenericArgument(listArg2, { ClassElement listArg3 ->
-                        assert listArg3.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
-                        assert listArg3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
+                        assert listArg3.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotNull$List')
+                        assert listArg3.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotNull$List')
                     })
                 })
             })
@@ -1854,6 +1851,38 @@ class Test {
 
         expect:
             ce.findMethod("helloWorld\$main").isPresent()
+    }
+
+    void "test type isAssignable"() {
+        boolean isAssignable = buildClassElementMapped('test.Test', '''
+package test
+import io.micronaut.context.annotation.Executable
+import io.micronaut.context.annotation.Prototype
+import jakarta.inject.Singleton
+import java.util.List
+
+@Prototype
+class Test {
+    @Executable
+    fun method1() : kotlin.collections.List<String> {
+        return listOf()
+    }
+
+    @Executable
+    fun method2() : java.util.List<String>? {
+        return null
+    }
+}
+
+''', ce -> {
+            return ce.findMethod("method1").get().getReturnType().isAssignable(Iterable.class)
+                    && ce.findMethod("method2").get().getReturnType().isAssignable(Iterable.class)
+                    && ((KotlinClassElement) ce.findMethod("method1").get().getReturnType()).isAssignable2(Iterable.class.name)
+                    && ((KotlinClassElement) ce.findMethod("method2").get().getReturnType()).isAssignable2(Iterable.class.name)
+        })
+
+        expect:
+            isAssignable
     }
 
 

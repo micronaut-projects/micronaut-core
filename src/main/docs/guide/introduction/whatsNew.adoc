@@ -3,15 +3,15 @@
 
 === Kotlin 1.8.0
 
-Micronaut Framework 4.0 supports https://kotlinlang.org/docs/whatsnew18.html[Kotlin 1.8.0]
+Micronaut framework 4.0 supports https://kotlinlang.org/docs/whatsnew18.html[Kotlin 1.8.0]
 
 === Experimental Support for Kotlin Symbol Processing (KSP)
 
-Micronaut Framework has offered support for Kotlin via <<kapt, KAPT>>. With version 4.0, Micronaut Framework supports Kotlin also via <<ksp, Kotlin Symbol Processing (KSP) API>>.
+Micronaut framework has offered support for Kotlin via <<kapt, KAPT>>. With version 4.0, Micronaut framework supports Kotlin also via <<ksp, Kotlin Symbol Processing (KSP) API>>.
 
 === Apache Groovy 4.0
 
-Micronaut Framework 4.x supports https://groovy-lang.org/releasenotes/groovy-4.0.html[Apache Groovy 4.0].
+Micronaut framework 4.x supports https://groovy-lang.org/releasenotes/groovy-4.0.html[Apache Groovy 4.0].
 
 === Core Changes
 
@@ -38,5 +38,5 @@ The disabled beans are also now visible via the <<beansEndpoint, Beans Endpoint>
 
 - Kotlin 1.7.10
 
-<<breaks, Breaking changes in Micronaut Framework 4.0>>
+<<breaks, Breaking changes in Micronaut framework 4.0>>
 

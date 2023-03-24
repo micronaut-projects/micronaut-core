@@ -1,4 +1,4 @@
-Micronaut includes an extensible type conversion mechanism. To add additional type converters you register beans of type api:core.convert.TypeConverter[].
+The Micronaut framework includes an extensible type conversion mechanism. To add additional type converters you register beans of type api:core.convert.TypeConverter[].
 
 The following example shows how to use one of the built-in converters (Map to an Object) or create your own.
 

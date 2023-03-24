@@ -1,4 +1,4 @@
-The following documentation describes Micronaut's architecture and is designed for those who are looking for information on the internal workings of Micronaut and how it is architected. This is not intended as end-user developer documentation, but for those interested in the inner workings of Micronaut.
+The following documentation describes the Micronaut framework's architecture and is designed for those who are looking for information on the internal workings of the Micronaut framework and how it is architected. This is not intended as end-user developer documentation, but for those interested in the inner workings of the Micronaut framework.
 
 This documentation is divided into sections that describe the compiler, introspections, application container, dependency injection and so on.
 

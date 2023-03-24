@@ -1,4 +1,4 @@
-Micronaut supports tracing context propagation. If you use `suspend` functions all the way from your controller actions down to all your services,
+The Micronaut framework supports tracing context propagation. If you use `suspend` functions all the way from your controller actions down to all your services,
 you don't have to do anything special. However, when you create coroutines within a regular function, tracing propagation won't happen automatically.
 You have to use a `HttpCoroutineContextFactory<CoroutineTracingDispatcher>` to create a new `CoroutineTracingDispatcher` and use it as a `CoroutineContext`.
 

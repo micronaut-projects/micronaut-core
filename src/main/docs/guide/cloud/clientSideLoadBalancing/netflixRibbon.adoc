@@ -39,4 +39,4 @@ ribbon:
       ServerListRefreshInterval: 2000
 ----
 
-By default Micronaut registers a link:{micronautribbonapi}/io/micronaut/configuration/ribbon/DiscoveryClientServerList.html[DiscoveryClientServerList] for each client that integrates Ribbon with Micronaut's api:discovery.DiscoveryClient[].
+By default, the Micronaut framework registers a link:{micronautribbonapi}/io/micronaut/configuration/ribbon/DiscoveryClientServerList.html[DiscoveryClientServerList] for each client that integrates Ribbon with the Micronaut framework's api:discovery.DiscoveryClient[].

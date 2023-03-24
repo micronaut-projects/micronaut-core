@@ -28,7 +28,7 @@ snippet::io.micronaut.docs.server.routes.IssuesController[tags="imports,class", 
 <3> The method argument can optionally be annotated with link:{api}/io/micronaut/http/annotation/PathVariable.html[PathVariable]
 <4> The value of the URI variable is referenced in the implementation
 
-Micronaut maps the URI `/issues/{number}` for the above controller. We can assert this is the case by writing unit tests:
+The Micronaut framework maps the URI `/issues/{number}` for the above controller. We can assert this is the case by writing unit tests:
 
 snippet::io.micronaut.docs.server.routes.IssuesControllerTest[tags="imports,class", indent=0, title="Testing URI Variables"]
 
@@ -130,7 +130,7 @@ NOTE: Route validation is more complicated with multiple templates. If a variabl
 
 == Building Routes Programmatically
 
-If you prefer to not use annotations and instead declare all routes in code then never fear, Micronaut has a flexible link:{api}/io/micronaut/web/router/RouteBuilder.html[RouteBuilder] API that makes it a breeze to define routes programmatically.
+If you prefer to not use annotations and instead declare all routes in code then never fear, the Micronaut framework has a flexible link:{api}/io/micronaut/web/router/RouteBuilder.html[RouteBuilder] API that makes it a breeze to define routes programmatically.
 
 To start, subclass link:{api}/io/micronaut/web/router/DefaultRouteBuilder.html[DefaultRouteBuilder] and inject the controller to route to into the method, and define your routes:
 
@@ -144,7 +144,7 @@ TIP: Unfortunately due to type erasure, a Java method lambda reference cannot be
 
 == Route Compile-Time Validation
 
-Micronaut supports validating route arguments at compile time with the validation library. To get started, add the `micronaut-http-validation` dependency to your build:
+The Micronaut framework supports validating route arguments at compile time with the validation library. To get started, add the `micronaut-http-validation` dependency to your build:
 
 dependency:io.micronaut:micronaut-http-validation[scope='annotationProcessor']
 
