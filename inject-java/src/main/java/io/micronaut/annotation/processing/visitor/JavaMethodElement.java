@@ -162,19 +162,19 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
 
     @Override
     public boolean overrides(MethodElement overridden) {
-//        if (this.equals(overridden) || isStatic() || overridden.isStatic()) {
-//            return false;
-//        }
-//        if (overridden instanceof JavaMethodElement) {
-//            boolean overrides = visitorContext.getElements().overrides(
-//                executableElement,
-//                ((JavaMethodElement) overridden).executableElement,
-//                owningType.classElement
-//            );
-//            if (overrides) {
-//                return true;
-//            }
-//        }
+        if (this.equals(overridden) || isStatic() || overridden.isStatic()) {
+            return false;
+        }
+        if (overridden instanceof JavaMethodElement javaMethodElement) {
+            boolean overrides = visitorContext.getElements().overrides(
+                executableElement,
+                javaMethodElement.executableElement,
+                owningType.classElement
+            );
+            if (overrides) {
+                return true;
+            }
+        }
         return MethodElement.super.overrides(overridden);
     }
 
