@@ -338,9 +338,7 @@ class CorsFilterSpec extends Specification {
             getOrigin() >> Optional.of(origin)
             contains(ACCESS_CONTROL_REQUEST_METHOD) >> true
         }
-        HttpRequest request = Stub(HttpRequest) {
-            getHeaders() >> headers
-        }
+        HttpRequest request = createRequest(headers)
 
         CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
         originConfig.exposedHeaders = ['Foo-Header', 'Bar-Header']
@@ -380,6 +378,7 @@ class CorsFilterSpec extends Specification {
             getHeaders() >> headers
             getMethod() >> HttpMethod.OPTIONS
             getUri() >> uri
+            getOrigin() >> headers.getOrigin()
         }
         List<UriRouteMatch<?,?>> routes = embeddedServer.getApplicationContext().getBean(Router).
                 findAny(uri.toString(), request)
@@ -434,6 +433,7 @@ class CorsFilterSpec extends Specification {
             getHeaders() >> headers
             getMethod() >> HttpMethod.OPTIONS
             getUri() >> uri
+            getOrigin() >> headers.getOrigin()
         }
         List<UriRouteMatch<?,?>> routes = embeddedServer.getApplicationContext().getBean(Router).
                 findAny(request.getUri().toString(), request)
@@ -561,6 +561,8 @@ class CorsFilterSpec extends Specification {
     private HttpRequest<?> createRequest(HttpHeaders headers) {
         Stub(HttpRequest) {
             getHeaders() >> headers
+
+            getOrigin() >> headers.getOrigin()
         }
     }
 

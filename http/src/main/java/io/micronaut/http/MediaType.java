@@ -23,7 +23,6 @@ import io.micronaut.core.convert.ImmutableArgumentConversionContext;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.http.annotation.Produces;
@@ -42,7 +41,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -399,6 +397,7 @@ public class MediaType implements CharSequence {
     protected final String extension;
     protected final Map<CharSequence, String> parameters;
     private final String strRepr;
+    private final String lowerName;
 
     private BigDecimal qualityNumberField = BigDecimal.ONE;
 
@@ -490,6 +489,7 @@ public class MediaType implements CharSequence {
             withoutArgs = name;
         }
         this.name = withoutArgs;
+        this.lowerName = withoutArgs.toLowerCase(Locale.ROOT);
         int i = withoutArgs.indexOf('/');
         if (i > -1) {
             this.type = withoutArgs.substring(0, i);
@@ -735,12 +735,12 @@ public class MediaType implements CharSequence {
 
         MediaType mediaType = (MediaType) o;
 
-        return name.equalsIgnoreCase(mediaType.name);
+        return lowerName.equals(mediaType.lowerName);
     }
 
     @Override
     public int hashCode() {
-        return name.hashCode();
+        return lowerName.hashCode();
     }
 
     /**
@@ -760,35 +760,49 @@ public class MediaType implements CharSequence {
      * @since 1.3.3
      */
     public static List<MediaType> orderedOf(List<? extends CharSequence> values) {
-        if (CollectionUtils.isNotEmpty(values)) {
-            List<MediaType> mediaTypes = new LinkedList<>();
-            for (CharSequence value : values) {
-                for (String token : StringUtils.splitOmitEmptyStrings(value, ',')) {
-                    try {
-                        mediaTypes.add(MediaType.of(token));
-                    } catch (IllegalArgumentException e) {
-                        // ignore
-                    }
+        if (values == null) {
+            return Collections.emptyList();
+        }
+        int headerCount = values.size();
+        if (headerCount == 0) {
+            return Collections.emptyList();
+        }
+        if (headerCount == 1) {
+            // fast path for single header with single media type
+            String singleHeader = values.get(0).toString();
+            if (singleHeader.indexOf(',') == -1) {
+                try {
+                    return List.of(MediaType.of(singleHeader));
+                } catch (IllegalArgumentException ignored) {
                 }
             }
-            mediaTypes = new ArrayList<>(mediaTypes);
-            mediaTypes.sort((o1, o2) -> {
-                //The */* type is always last
-                if (o1.type.equals("*")) {
-                    return 1;
-                } else if (o2.type.equals("*")) {
-                    return -1;
-                }
-                if (o2.subtype.equals("*") && !o1.subtype.equals("*")) {
-                    return -1;
-                } else if (o1.subtype.equals("*") && !o2.subtype.equals("*")) {
-                    return 1;
-                }
-                return o2.getQualityAsNumber().compareTo(o1.getQualityAsNumber());
-            });
-            return Collections.unmodifiableList(mediaTypes);
         }
-        return Collections.emptyList();
+
+        List<MediaType> mediaTypes = new ArrayList<>();
+        for (CharSequence value : values) {
+            for (String token : StringUtils.splitOmitEmptyStrings(value, ',')) {
+                try {
+                    mediaTypes.add(MediaType.of(token));
+                } catch (IllegalArgumentException e) {
+                    // ignore
+                }
+            }
+        }
+        mediaTypes.sort((o1, o2) -> {
+            //The */* type is always last
+            if (o1.type.equals("*")) {
+                return 1;
+            } else if (o2.type.equals("*")) {
+                return -1;
+            }
+            if (o2.subtype.equals("*") && !o1.subtype.equals("*")) {
+                return -1;
+            } else if (o1.subtype.equals("*") && !o2.subtype.equals("*")) {
+                return 1;
+            }
+            return o2.getQualityAsNumber().compareTo(o1.getQualityAsNumber());
+        });
+        return Collections.unmodifiableList(mediaTypes);
     }
 
     /**

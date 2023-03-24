@@ -92,7 +92,7 @@ public class CorsFilter implements Ordered {
     @Nullable
     @Internal
     public final HttpResponse<?> filterRequest(HttpRequest<?> request) {
-        String origin = request.getHeaders().getOrigin().orElse(null);
+        String origin = request.getOrigin().orElse(null);
         if (origin == null) {
             LOG.trace("Http Header " + HttpHeaders.ORIGIN + " not present. Proceeding with the request.");
             return null; // proceed
@@ -144,7 +144,7 @@ public class CorsFilter implements Ordered {
         if (httpHostResolver == null) {
             return false;
         }
-        String origin = request.getHeaders().getOrigin().orElse(null);
+        String origin = request.getOrigin().orElse(null);
         if (origin == null) {
             return false;
         }
@@ -307,7 +307,7 @@ public class CorsFilter implements Ordered {
 
     @NonNull
     private Optional<CorsOriginConfiguration> getConfiguration(@NonNull HttpRequest<?> request) {
-        String requestOrigin = request.getHeaders().getOrigin().orElse(null);
+        String requestOrigin = request.getOrigin().orElse(null);
         if (requestOrigin == null) {
             return Optional.empty();
         }
@@ -390,8 +390,7 @@ public class CorsFilter implements Ordered {
     private void decorateResponseWithHeaders(@NonNull HttpRequest<?> request,
                                              @NonNull MutableHttpResponse<?> response,
                                              @NonNull CorsOriginConfiguration config) {
-        HttpHeaders headers = request.getHeaders();
-        setOrigin(headers.getOrigin().orElse(null), response);
+        setOrigin(request.getOrigin().orElse(null), response);
         setVary(response);
         setExposeHeaders(config.getExposedHeaders(), response);
         setAllowCredentials(config, response);
