@@ -27,7 +27,7 @@ import io.micronaut.core.util.ArgumentUtils;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.util.internal.ObjectUtils;
+import io.micronaut.core.util.ObjectUtils;
 
 import java.util.Objects;
 

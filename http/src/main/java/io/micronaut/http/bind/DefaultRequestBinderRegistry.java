@@ -54,7 +54,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static io.micronaut.core.util.internal.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
+import static io.micronaut.core.util.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
 
 /**
  * Default implementation of the {@link RequestBinderRegistry} interface.

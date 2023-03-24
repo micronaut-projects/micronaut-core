@@ -23,7 +23,7 @@ import io.micronaut.aop.util.KotlinInterceptedMethodHelper;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.internal.KotlinUtils;
+import io.micronaut.core.util.KotlinUtils;
 import kotlin.coroutines.Continuation;
 import kotlin.coroutines.CoroutineContext;
 

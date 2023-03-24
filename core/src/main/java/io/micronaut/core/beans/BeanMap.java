@@ -13,11 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.beans.internal;
+package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.beans.BeanIntrospection;
-import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.util.ArgumentUtils;
 
 import io.micronaut.core.annotation.NonNull;

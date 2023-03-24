@@ -22,7 +22,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
-import io.micronaut.core.util.internal.ObjectUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
 
 import io.micronaut.core.annotation.NonNull;

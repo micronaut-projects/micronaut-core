@@ -25,7 +25,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.util.internal.ObjectUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.DelegatingBeanDefinition;

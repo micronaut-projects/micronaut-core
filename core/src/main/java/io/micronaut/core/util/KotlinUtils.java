@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.util.internal;
+package io.micronaut.core.util;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import kotlin.coroutines.intrinsics.IntrinsicsKt;
 
 import io.micronaut.core.annotation.Nullable;

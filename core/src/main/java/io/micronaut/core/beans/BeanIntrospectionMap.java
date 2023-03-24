@@ -13,15 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.beans.internal;
+package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.CollectionUtils;
 
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.util.internal.ObjectUtils;
+import io.micronaut.core.util.ObjectUtils;
 
 import java.util.*;
 import java.util.stream.Collectors;

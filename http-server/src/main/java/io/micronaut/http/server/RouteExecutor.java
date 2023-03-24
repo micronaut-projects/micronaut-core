@@ -74,7 +74,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
-import static io.micronaut.core.util.internal.KotlinUtils.isKotlinCoroutineSuspended;
+import static io.micronaut.core.util.KotlinUtils.isKotlinCoroutineSuspended;
 import static io.micronaut.http.HttpAttributes.AVAILABLE_HTTP_METHODS;
 import static io.micronaut.inject.beans.KotlinExecutableMethodUtils.isKotlinFunctionReturnTypeUnit;
 

@@ -27,7 +27,7 @@ import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
-import io.micronaut.core.util.internal.ObjectUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;

@@ -23,7 +23,7 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArgumentUtils;
-import io.micronaut.core.util.internal.ObjectUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 

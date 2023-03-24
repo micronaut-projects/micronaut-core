@@ -1,6 +1,6 @@
 package io.micronaut.core.util
 
-import io.micronaut.core.util.internal.ObjectUtils
+
 import spock.lang.Specification
 
 class ObjectUtilsSpec extends Specification {

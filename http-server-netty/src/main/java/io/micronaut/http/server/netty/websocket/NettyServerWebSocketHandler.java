@@ -25,7 +25,7 @@ import io.micronaut.core.bind.ExecutableBinder;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
-import io.micronaut.core.util.internal.KotlinUtils;
+import io.micronaut.core.util.KotlinUtils;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;

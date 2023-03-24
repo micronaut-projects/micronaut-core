@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.uri;
 
-import io.micronaut.core.util.internal.ObjectUtils;
+import io.micronaut.core.util.ObjectUtils;
 
 import java.util.ArrayList;
 import java.util.Collections;

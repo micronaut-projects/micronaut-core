@@ -28,7 +28,7 @@ import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.util.internal.EnvironmentProperties;
+import io.micronaut.core.util.EnvironmentProperties;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.MapPropertyResolver;
 import io.micronaut.core.value.PropertyResolver;

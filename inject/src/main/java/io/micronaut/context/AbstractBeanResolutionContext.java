@@ -29,7 +29,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentCoercible;
-import io.micronaut.core.util.internal.ObjectUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.*;
 
 import java.util.*;

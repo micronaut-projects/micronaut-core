@@ -17,7 +17,7 @@ package io.micronaut.core.convert;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.internal.ObjectUtils;
+import io.micronaut.core.util.ObjectUtils;
 
 import java.nio.charset.Charset;
 import java.util.*;

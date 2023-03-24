@@ -22,7 +22,7 @@ import kotlin.Unit;
 
 import io.micronaut.core.annotation.NonNull;
 
-import static io.micronaut.core.util.internal.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
+import static io.micronaut.core.util.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
 
 /**
  * <p>Internal Utility methods for working with Kotlin <code>suspend</code> functions</p>.

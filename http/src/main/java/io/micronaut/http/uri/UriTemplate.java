@@ -15,9 +15,9 @@
  */
 package io.micronaut.http.uri;
 
-import io.micronaut.core.beans.internal.BeanMap;
+import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.reflect.ClassUtils;
-import io.micronaut.core.util.internal.ObjectUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
 
 import java.io.UnsupportedEncodingException;
