@@ -19,7 +19,7 @@ class TernaryOperationExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
         results[1] instanceof Integer && results[1] == -10
         results[2] instanceof String && results[2] == 'test'
         results[3] instanceof String && results[3] == 'foo'
-        results[4] instanceof Integer && results[1] == 5
+        results[4] instanceof Integer && results[4] == 5
     }
 
     void "test ternary operator"() {
