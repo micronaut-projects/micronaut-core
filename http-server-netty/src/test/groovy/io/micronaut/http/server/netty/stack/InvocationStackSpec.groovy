@@ -178,7 +178,7 @@ class InvocationStackSpec extends Specification {
         }
 
         boolean isKnownStack(String className, boolean allowExecutor) {
-            if (allowExecutor && className.startsWith("java.util.concurrent")) {
+            if (className.startsWith("java.util.concurrent")) {
                 return true
             }
             if (className.startsWith("io.netty")) {
