@@ -180,13 +180,18 @@ public class FilterRunner {
     private ExecutionFlow<HttpResponse<?>> filterRequest(FilterContext context,
                                                          ListIterator<GenericHttpFilter> iterator,
                                                          Map<GenericHttpFilter, Map.Entry<ExecutionFlow<FilterContext>, FilterContinuationImpl<?>>> suspended) {
-        return filterRequest0(context, iterator, suspended)
-                .flatMap(newContext -> {
-                    if (newContext.response != null) {
-                        return filterResponse(newContext, iterator, null, suspended);
-                    }
-                    return ExecutionFlow.error(new IllegalStateException("Request filters didn't produce any response!"));
-                });
+        GenericHttpFilter filter = iterator.next();
+        return processRequestFilter(filter, context, suspended, f -> f.flatMap(newContext -> filterRequest0(newContext, iterator, suspended))
+            .onErrorResume(throwable -> {
+                // Un-suspend possibly awaiting filter and exception filtering scenario of the http client
+                return filterResponse(context, iterator, throwable, suspended).map(context::withResponse);
+            })
+            .flatMap(newContext -> {
+                if (newContext.response != null) {
+                    return filterResponse(newContext, iterator, null, suspended);
+                }
+                return ExecutionFlow.error(new IllegalStateException("Request filters didn't produce any response!"));
+            }));
     }
 
     private ExecutionFlow<FilterContext> filterRequest0(FilterContext context,
@@ -197,12 +202,11 @@ public class FilterRunner {
         }
         if (iterator.hasNext()) {
             GenericHttpFilter filter = iterator.next();
-            return processRequestFilter(filter, context, suspended)
-                    .flatMap(newContext -> filterRequest0(newContext, iterator, suspended))
-                    .onErrorResume(throwable -> {
-                        // Un-suspend possibly awaiting filter and exception filtering scenario of the http client
-                        return filterResponse(context, iterator, throwable, suspended).map(context::withResponse);
-                    });
+            return processRequestFilter(filter, context, suspended, f -> f.flatMap(newContext -> filterRequest0(newContext, iterator, suspended))
+                .onErrorResume(throwable -> {
+                    // Un-suspend possibly awaiting filter and exception filtering scenario of the http client
+                    return filterResponse(context, iterator, throwable, suspended).map(context::withResponse);
+                }));
         } else {
             return ExecutionFlow.error(new IllegalStateException("Request filters didn't produce any response!"));
         }
@@ -241,10 +245,11 @@ public class FilterRunner {
         "java:S2259", // false positive
         "java:S1181" // this is a framework not an application
     })
-    private ExecutionFlow<FilterContext> processRequestFilter(GenericHttpFilter filter,
+    private <R> ExecutionFlow<R> processRequestFilter(GenericHttpFilter filter,
                                                               FilterContext context,
                                                               Map<GenericHttpFilter, Map.Entry<ExecutionFlow<FilterContext>,
-                                                                      FilterContinuationImpl<?>>> suspended) {
+                                                                      FilterContinuationImpl<?>>> suspended,
+                                                              Function<ExecutionFlow<FilterContext>, ExecutionFlow<R>> downstream) {
         Executor executeOn;
         if (filter instanceof GenericHttpFilter.Async async) {
             executeOn = async.executor();
@@ -256,10 +261,19 @@ public class FilterRunner {
         if (filter instanceof FilterMethod<?> before) {
             if (before.isResponseFilter) {
                 // skip filter, only used for response
-                return ExecutionFlow.just(context);
+                return downstream.apply(ExecutionFlow.just(context));
             }
             ExecutionFlow<FilterContext> filterMethodFlow;
-            FilterContinuationImpl<?> continuation = before.isSuspended() ? before.createContinuation(context) : null;
+            FilterContinuationImpl<?> continuation;
+            ExecutionFlow<R> downstreamFlow;
+            if (before.isSuspended()) {
+                continuation = before.createContinuation(context);
+                downstreamFlow = downstream.apply(continuation.nextFilterFlow());
+                suspended.put(filter, Map.entry(continuation.filterProcessedFlow(), continuation));
+            } else {
+                continuation = null;
+                downstreamFlow = null;
+            }
             FilterMethodContext filterMethodContext = new FilterMethodContext(
                     context.request,
                     context.response,
@@ -275,32 +289,23 @@ public class FilterRunner {
                 filterMethodFlow = ExecutionFlow.async(executeOn, () -> before.filter(context, filterMethodContext));
             }
             if (before.isSuspended()) {
-                if (continuation instanceof ReactiveResultAwareReactiveContinuationImpl<?>) {
-                    // Method consumes reactive continuation and returns reactive result
-                    suspended.put(filter, Map.entry(continuation.filterProcessedFlow(), continuation));
-                } else if (continuation instanceof ReactiveContinuationImpl<?>) {
-                    // Method consumes reactive continuation and doesn't return reactive result
-                    throw new IllegalStateException("Not supported use-case with reactive continuation and non-reactive return type");
-                } else {
-                    // Method consumes blocking continuation
-                    suspended.put(filter, Map.entry(filterMethodFlow, continuation));
-                }
                 // Continue executing other filters while this one is suspended
-                return continuation.nextFilterFlow();
+                return downstreamFlow;
             }
-            return filterMethodFlow;
+            return downstream.apply(filterMethodFlow);
         } else if (filter instanceof GenericHttpFilter.AroundLegacy around) {
             FilterChainImpl chainSuspensionPoint = new FilterChainImpl(conversionService, context);
             // Legacy `Publisher<HttpResponse> proceed(..)` filters are always suspended
             suspended.put(around, Map.entry(chainSuspensionPoint.filterProcessedFlow(), chainSuspensionPoint));
             chainSuspensionPoint.completeOn = executeOn;
+            ExecutionFlow<R> downstreamFlow = downstream.apply(chainSuspensionPoint.nextFilterFlow());
             if (executeOn == null) {
                 try {
                     around.bean().doFilter(context.request, chainSuspensionPoint).subscribe(chainSuspensionPoint);
                 } catch (Throwable e) {
                     chainSuspensionPoint.triggerFilterProcessed(context, null, e);
                 }
-                return chainSuspensionPoint.nextFilterFlow();
+                return downstreamFlow;
             } else {
                 return ExecutionFlow.async(executeOn, () -> {
                     try {
@@ -308,7 +313,7 @@ public class FilterRunner {
                     } catch (Throwable e) {
                         chainSuspensionPoint.triggerFilterProcessed(context, null, e);
                     }
-                    return chainSuspensionPoint.nextFilterFlow();
+                    return downstreamFlow;
                 });
             }
         } else if (filter instanceof GenericHttpFilter.TerminalReactive || filter instanceof GenericHttpFilter.Terminal || filter instanceof GenericHttpFilter.TerminalWithReactorContext) {
@@ -335,7 +340,7 @@ public class FilterRunner {
                 terminalFlow = ReactiveExecutionFlow.fromPublisher(Mono.from(((GenericHttpFilter.TerminalReactive) filter).responsePublisher())
                         .contextWrite(context.reactorContext));
             }
-            return terminalFlow.flatMap(response -> ExecutionFlow.just(context.withResponse(response)));
+            return downstream.apply(terminalFlow.flatMap(response -> ExecutionFlow.just(context.withResponse(response))));
         } else {
             throw new IllegalStateException("Unknown filter type");
         }
