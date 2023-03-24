@@ -86,11 +86,11 @@ public final class ObjectUtils {
         } else if (object instanceof CharSequence charSequence) {
             return charSequence.length() > 0;
         } else if (object instanceof Number n) {
-            return n.doubleValue() > 0;
+            return n.doubleValue() != 0;
         } else if (object instanceof Collection<?> col) {
             return !col.isEmpty();
         } else if (object instanceof Map<?, ?> col) {
-            return col.size() > 0;
+            return !col.isEmpty();
         } else if (object instanceof Object[] array) {
             return array.length > 0;
         } else if (object instanceof Optional<?> opt) {

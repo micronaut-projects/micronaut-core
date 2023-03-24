@@ -40,7 +40,7 @@ class ObjectUtilsSpec extends Specification {
         true     | 1L
         true     | new BigDecimal("0.1")
         true     | 1
-        false    | -1
+        true    | -1
         true     | 0.1f
         false    | Collections.emptyList()
         true     | Collections.singletonList("1")
