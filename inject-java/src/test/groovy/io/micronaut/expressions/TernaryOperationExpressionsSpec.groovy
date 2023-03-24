@@ -10,14 +10,16 @@ class TernaryOperationExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
                 "#{  10 ?: 5 }",
                 "#{ -10 ?: 5 }",
                 "#{ '' ?: 'test' }",
-                "#{ 'foo' ?: 'test' }"
+                "#{ 'foo' ?: 'test' }",
+                "#{ 0 ?: 5 }"
         )
 
         expect:
         results[0] instanceof Integer && results[0] == 10
-        results[1] instanceof Integer && results[1] == 5
+        results[1] instanceof Integer && results[1] == -10
         results[2] instanceof String && results[2] == 'test'
         results[3] instanceof String && results[3] == 'foo'
+        results[4] instanceof Integer && results[1] == 5
     }
 
     void "test ternary operator"() {
