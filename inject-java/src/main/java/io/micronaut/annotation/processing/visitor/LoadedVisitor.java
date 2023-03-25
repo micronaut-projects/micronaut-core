@@ -58,17 +58,38 @@ public class LoadedVisitor implements Ordered {
         TypeElement typeElement = processingEnvironment.getElementUtils().getTypeElement(aClass.getName());
         if (typeElement != null) {
             List<? extends TypeMirror> generics = genericUtils.interfaceGenericTypesFor(typeElement, TypeElementVisitor.class.getName());
-            String typeName = generics.get(0).toString();
-            if (typeName.equals(OBJECT_CLASS)) {
-                classAnnotation = visitor.getClassType();
+            if (generics.size() == 2) {
+                String typeName = generics.get(0).toString();
+                if (typeName.equals(OBJECT_CLASS)) {
+                    classAnnotation = visitor.getClassType();
+                } else {
+                    classAnnotation = typeName;
+                }
+                String elementName = generics.get(1).toString();
+                if (elementName.equals(OBJECT_CLASS)) {
+                    elementAnnotation = visitor.getElementType();
+                } else {
+                    elementAnnotation = elementName;
+                }
             } else {
-                classAnnotation = typeName;
-            }
-            String elementName = generics.get(1).toString();
-            if (elementName.equals(OBJECT_CLASS)) {
-                elementAnnotation = visitor.getElementType();
-            } else {
-                elementAnnotation = elementName;
+                Class<?>[] classes = GenericTypeUtils.resolveInterfaceTypeArguments(aClass, TypeElementVisitor.class);
+                if (classes != null && classes.length == 2) {
+                    Class<?> classGeneric = classes[0];
+                    if (classGeneric == Object.class) {
+                        classAnnotation = visitor.getClassType();
+                    } else {
+                        classAnnotation = classGeneric.getName();
+                    }
+                    Class<?> elementGeneric = classes[1];
+                    if (elementGeneric == Object.class) {
+                        elementAnnotation = visitor.getElementType();
+                    } else {
+                        elementAnnotation = elementGeneric.getName();
+                    }
+                } else {
+                    classAnnotation = Object.class.getName();
+                    elementAnnotation = Object.class.getName();
+                }
             }
         } else {
             Class<?>[] classes = GenericTypeUtils.resolveInterfaceTypeArguments(aClass, TypeElementVisitor.class);

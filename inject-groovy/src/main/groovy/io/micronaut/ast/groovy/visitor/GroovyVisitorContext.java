@@ -29,6 +29,8 @@ import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory;
+import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
@@ -75,6 +77,7 @@ public class GroovyVisitorContext implements VisitorContext {
     private final GroovyElementFactory groovyElementFactory;
     private final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = new ArrayList<>();
     private final GroovyElementAnnotationMetadataFactory elementAnnotationMetadataFactory;
+    private final ExpressionCompilationContextFactory expressionCompilationContextFactory;
 
     /**
      * @param sourceUnit      The source unit
@@ -96,6 +99,7 @@ public class GroovyVisitorContext implements VisitorContext {
         this.attributes = VISITOR_ATTRIBUTES;
         this.groovyElementFactory = new GroovyElementFactory(this);
         this.elementAnnotationMetadataFactory = new GroovyElementAnnotationMetadataFactory(false, new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit));
+        this.expressionCompilationContextFactory = new DefaultExpressionCompilationContextFactory(this);
     }
 
     @NonNull
@@ -177,6 +181,11 @@ public class GroovyVisitorContext implements VisitorContext {
     @Override
     public GroovyElementAnnotationMetadataFactory getElementAnnotationMetadataFactory() {
         return elementAnnotationMetadataFactory;
+    }
+
+    @Override
+    public ExpressionCompilationContextFactory getExpressionCompilationContextFactory() {
+        return this.expressionCompilationContextFactory;
     }
 
     @Override

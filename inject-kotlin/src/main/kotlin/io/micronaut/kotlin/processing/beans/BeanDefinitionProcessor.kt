@@ -21,12 +21,13 @@ import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.context.annotation.Context
 import io.micronaut.core.annotation.Generated
-import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
+import io.micronaut.expressions.EvaluatedExpressionWriter
 import io.micronaut.inject.processing.BeanDefinitionCreator
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
 import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
+import io.micronaut.inject.writer.BeanDefinitionWriter
 import io.micronaut.kotlin.processing.KotlinOutputVisitor
 import io.micronaut.kotlin.processing.visitor.KotlinClassElement
 import io.micronaut.kotlin.processing.visitor.KotlinNativeElement
@@ -36,9 +37,10 @@ import java.io.IOException
 internal class BeanDefinitionProcessor(private val environment: SymbolProcessorEnvironment): SymbolProcessor {
 
     private val beanDefinitionMap = mutableMapOf<String, BeanDefinitionCreator>()
+    private var visitorContext : KotlinVisitorContext? = null
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
-        val visitorContext = KotlinVisitorContext(environment, resolver)
+        visitorContext = KotlinVisitorContext(environment, resolver)
 
         val elements = resolver.getAllFiles()
             .flatMap { file: KSFile ->
@@ -53,7 +55,7 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
             .toList()
 
         try {
-            processClassDeclarations(elements, visitorContext)
+            processClassDeclarations(elements, visitorContext!!)
         } catch (e: ProcessingException) {
             handleProcessingException(environment, e)
         }
@@ -92,7 +94,7 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
             for (beanDefinitionCreator in beanDefinitionMap.values) {
                 for (writer in beanDefinitionCreator.build()) {
                     if (processed.add(writer.beanDefinitionName)) {
-                        processBeanDefinitions(writer, outputVisitor, processed)
+                        processBeanDefinitions(writer, outputVisitor, visitorContext!!, processed)
                         count++
                     }
                 }
@@ -103,7 +105,7 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
         } catch (e: ProcessingException) {
             handleProcessingException(environment, e)
         } finally {
-            AbstractAnnotationMetadataBuilder.clearMutated()
+            BeanDefinitionWriter.finish()
             beanDefinitionMap.clear()
         }
     }
@@ -134,12 +136,14 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
     private fun processBeanDefinitions(
         beanDefinitionWriter: BeanDefinitionVisitor,
         outputVisitor: KotlinOutputVisitor,
+        visitorContext: KotlinVisitorContext,
         processed: HashSet<String>
     ) {
         try {
             beanDefinitionWriter.visitBeanDefinitionEnd()
             if (beanDefinitionWriter.isEnabled) {
                 beanDefinitionWriter.accept(outputVisitor)
+                processEvaluatedExpressions(beanDefinitionWriter, visitorContext, outputVisitor)
                 val beanDefinitionReferenceWriter = BeanDefinitionReferenceWriter(beanDefinitionWriter)
                 beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing())
                 val className = beanDefinitionReferenceWriter.beanDefinitionQualifiedClassName
@@ -153,6 +157,21 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
             // raise a compile error
             val message = e.message
             error("Unexpected error ${e.javaClass.simpleName}:" + (message ?: e.javaClass.simpleName))
+        }
+    }
+
+    private fun processEvaluatedExpressions(
+        beanDefinitionWriter: BeanDefinitionVisitor,
+        visitorContext: KotlinVisitorContext,
+        outputVisitor: KotlinOutputVisitor
+    ) {
+        for (expressionMetadata in beanDefinitionWriter.evaluatedExpressions) {
+            val expressionWriter = EvaluatedExpressionWriter(
+                expressionMetadata,
+                visitorContext,
+                beanDefinitionWriter.originatingElement
+            )
+            expressionWriter.accept(outputVisitor)
         }
     }
 

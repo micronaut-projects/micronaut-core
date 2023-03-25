@@ -156,6 +156,29 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
     }
 
     @Override
+    public boolean isVarArgs() {
+        return executableElement.isVarArgs();
+    }
+
+    @Override
+    public boolean overrides(MethodElement overridden) {
+        if (this.equals(overridden) || isStatic() || overridden.isStatic()) {
+            return false;
+        }
+        if (overridden instanceof JavaMethodElement javaMethodElement) {
+            boolean overrides = visitorContext.getElements().overrides(
+                executableElement,
+                javaMethodElement.executableElement,
+                owningType.classElement
+            );
+            if (overrides) {
+                return true;
+            }
+        }
+        return MethodElement.super.overrides(overridden);
+    }
+
+    @Override
     public boolean hides(MemberElement hidden) {
         if (isStatic() && getDeclaringType().isInterface()) {
             return false;

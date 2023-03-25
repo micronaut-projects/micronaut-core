@@ -281,7 +281,7 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
         annotationValues: MutableMap<CharSequence, Any>
     ) {
         if (!annotationValues.containsKey(memberName)) {
-            val value = readAnnotationValue(originatingElement, member, memberName, annotationValue)
+            val value = readAnnotationValue(originatingElement, member, annotationName, memberName, annotationValue)
             if (value != null) {
                 validateAnnotationValue(originatingElement, annotationName, member, memberName, value)
                 annotationValues[memberName] = value
@@ -314,6 +314,7 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
     override fun readAnnotationValue(
         originatingElement: KSAnnotated,
         member: KSAnnotated,
+        annotationName: String,
         memberName: String,
         annotationValue: Any
     ): Any? {
@@ -324,7 +325,18 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
             is Array<*> -> {
                 toArray(annotationValue.toList(), originatingElement)
             }
-            else -> readAnnotationValue(originatingElement, annotationValue)
+            else -> {
+                if (isEvaluatedExpression(annotationValue)) {
+                    return buildEvaluatedExpressionReference(
+                        originatingElement,
+                        annotationName,
+                        memberName,
+                        annotationValue
+                    )
+                } else {
+                    return readAnnotationValue(originatingElement, annotationValue)
+                }
+            }
         }
     }
 
@@ -363,6 +375,15 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
             }
         } else {
             mutableMapOf<KSDeclaration, Any>()
+        }
+    }
+
+    override fun getOriginatingClassName(orginatingElement: KSAnnotated): String {
+        return if (orginatingElement is KSClassDeclaration) {
+            orginatingElement.getBinaryName(resolver, visitorContext)
+        } else {
+            val classDeclaration = orginatingElement.getClassDeclaration(visitorContext)
+            classDeclaration.getBinaryName(resolver, visitorContext)
         }
     }
 
@@ -441,12 +462,21 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
                 val values: Map<out KSDeclaration, *> = readAnnotationRawValues(annotationMirror)
                 val converted: MutableMap<CharSequence, Any> = mutableMapOf()
                 for ((key, value1) in values) {
-                    val value = value1!!
+                    var value = value1!!
+                    val memberName = key.simpleName.asString()
+                    if (isEvaluatedExpression(value)) {
+                        value = buildEvaluatedExpressionReference(
+                            originatingElement,
+                            annotationName,
+                            memberName,
+                            value
+                        )
+                    }
                     readAnnotationRawValues(
                         originatingElement,
                         annotationName,
                         key,
-                        key.simpleName.asString(),
+                        memberName,
                         value,
                         converted
                     )
@@ -574,6 +604,7 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
         if (value is KSAnnotation) {
             return readNestedAnnotationValue(originatingElement, value)
         }
+
          return value
     }
 
