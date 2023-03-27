@@ -70,6 +70,7 @@ include "test-suite-graal"
 include "test-suite-groovy"
 include "test-suite-groovy"
 include "test-suite-logback"
+include "test-suite-logback-external-configuration"
 include "test-utils"
 
 // benchmarks

@@ -23,8 +23,11 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.logging.LoggingSystem;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.slf4j.LoggerFactory;
+
+import java.util.Optional;
 
 /**
  * An implementation of {@link LoggingSystem} that works with logback.
@@ -41,8 +44,24 @@ public final class LogbackLoggingSystem implements LoggingSystem {
 
     private final String logbackXmlLocation;
 
+    /**
+     * @deprecated Use {@link LogbackLoggingSystem#LogbackLoggingSystem(Optional, Optional)} instead
+     * @param logbackXmlLocation
+     */
+    @Deprecated
     public LogbackLoggingSystem(@Nullable @Property(name = "logger.config") String logbackXmlLocation) {
-        this.logbackXmlLocation = logbackXmlLocation != null ? logbackXmlLocation : DEFAULT_LOGBACK_LOCATION;
+        this(
+            Optional.ofNullable(System.getProperty("logback.configurationFile")),
+            Optional.ofNullable(logbackXmlLocation)
+        );
+    }
+
+    @Inject
+    public LogbackLoggingSystem(
+        @Property(name = "logback.configurationFile") Optional<String> logbackExternalConfigLocation,
+        @Property(name = "logger.config") Optional<String> logbackXmlLocation
+    ) {
+        this.logbackXmlLocation = logbackExternalConfigLocation.orElseGet(() -> logbackXmlLocation.orElse(DEFAULT_LOGBACK_LOCATION));
     }
 
     @Override
