@@ -420,18 +420,6 @@ public class RequestLifecycle {
      */
     protected ExecutionFlow<RouteMatch<?>> fulfillArguments(RouteMatch<?> routeMatch) {
         // try to fulfill the argument requirements of the route
-        HttpRequest<?> r = request();
-        return ExecutionFlow.just(requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, r, shouldSatisfyOptionals(r)));
-    }
-
-    /**
-     * Whether optionals should be satisfied from the request.
-     *
-     * <p>In general if the request body reading is delayed this should return false.</p>
-     * @param r The request
-     * @return Whether to satisfy optionals
-     */
-    protected boolean shouldSatisfyOptionals(HttpRequest<?> r) {
-        return false;
+        return ExecutionFlow.just(requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, request(), false));
     }
 }

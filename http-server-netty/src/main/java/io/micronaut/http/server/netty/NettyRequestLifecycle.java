@@ -132,7 +132,12 @@ final class NettyRequestLifecycle extends RequestLifecycle {
         if (decoderResult.isFailure()) {
             return ExecutionFlow.error(decoderResult.cause());
         }
-        return super.fulfillArguments(routeMatch).flatMap(this::waitForBody);
+        if (nettyRequest.getNativeRequest() instanceof FullHttpRequest) {
+            // will do the fulfillment later
+            return waitForBody(routeMatch);
+        } else {
+            return super.fulfillArguments(routeMatch).flatMap(this::waitForBody);
+        }
     }
 
     /**
@@ -140,22 +145,39 @@ final class NettyRequestLifecycle extends RequestLifecycle {
      * This method also sometimes fulfills more controller parameters with form data.
      */
     private ExecutionFlow<RouteMatch<?>> waitForBody(RouteMatch<?> routeMatch) {
-        io.netty.handler.codec.http.HttpRequest nativeRequest = nettyRequest.getNativeRequest();
-        if (!shouldReadBody(routeMatch, nativeRequest)) {
+        if (!shouldReadBody(routeMatch)) {
             ctx.read();
             return ExecutionFlow.just(routeMatch);
         }
-        if (nativeRequest instanceof FullHttpRequest) {
-            // body already ready, so just return
+        BaseRouteCompleter completer = nettyRequest.isFormOrMultipartData() ?
+            new FormRouteCompleter(new NettyStreamingFileUpload.Factory(rib.serverConfiguration.getMultipart(), rib.getIoExecutor()), rib.conversionService, nettyRequest, routeMatch) :
+            new BaseRouteCompleter(nettyRequest, routeMatch);
+        HttpContentProcessor processor = rib.httpContentProcessorResolver.resolve(nettyRequest, routeMatch);
+        io.netty.handler.codec.http.HttpRequest nativeRequest = nettyRequest.getNativeRequest();
+        if (nativeRequest instanceof FullHttpRequest full) {
+            List<Object> bufferList = new ArrayList<>(1);
+            try {
+                processor.add(full.retain(), bufferList);
+                processor.complete(bufferList);
+                for (Object o : bufferList) {
+                    completer.add(o);
+                }
+                completer.completeSuccess();
+            } catch (Throwable e) {
+                try {
+                    processor.cancel();
+                } catch (Throwable f) {
+                    e.addSuppressed(f);
+                }
+                completer.completeFailure(e);
+            }
             return ExecutionFlow.just(routeMatch);
-        } else {
-            BaseRouteCompleter completer = nettyRequest.isFormOrMultipartData() ?
-                new FormRouteCompleter(new NettyStreamingFileUpload.Factory(rib.serverConfiguration.getMultipart(), rib.getIoExecutor()), rib.conversionService, nettyRequest, routeMatch) :
-                new BaseRouteCompleter(nettyRequest, routeMatch);
-            HttpContentProcessor processor = rib.httpContentProcessorResolver.resolve(nettyRequest, routeMatch);
+        } else if (nativeRequest instanceof StreamedHttpRequest streamed) {
             StreamingDataSubscriber pr = new StreamingDataSubscriber(completer, processor);
-            ((StreamedHttpRequest) nativeRequest).subscribe(pr);
+            streamed.subscribe(pr);
             return pr.completion;
+        } else {
+            throw new AssertionError();
         }
     }
 
@@ -163,12 +185,8 @@ final class NettyRequestLifecycle extends RequestLifecycle {
         onError(cause).onComplete((response, throwable) -> rib.writeResponse(ctx, nettyRequest, response, throwable));
     }
 
-    private boolean shouldReadBody(RouteMatch<?> routeMatch, io.netty.handler.codec.http.HttpRequest nativeRequest) {
+    private boolean shouldReadBody(RouteMatch<?> routeMatch) {
         if (!HttpMethod.permitsRequestBody(request().getMethod())) {
-            return false;
-        }
-        if (!(nativeRequest instanceof StreamedHttpRequest)) {
-            // Illegal state: The request body is required, so at this point we must have a StreamedHttpRequest
             return false;
         }
         if (routeMatch instanceof MethodBasedRouteMatch<?, ?> methodBasedRouteMatch) {
@@ -318,10 +336,5 @@ final class NettyRequestLifecycle extends RequestLifecycle {
             completion.complete(completer.routeMatch);
             completed = true;
         }
-    }
-
-    @Override
-    protected boolean shouldSatisfyOptionals(HttpRequest<?> r) {
-        return ((NettyHttpRequest<?>) r).getNativeRequest() instanceof FullHttpRequest;
     }
 }

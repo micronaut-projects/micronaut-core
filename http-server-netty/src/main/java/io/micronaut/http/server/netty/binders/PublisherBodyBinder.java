@@ -39,8 +39,11 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -79,13 +82,11 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
         if (source instanceof NettyHttpRequest) {
             NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) source;
             io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
+
+            Argument<?> targetType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            HttpContentProcessor processor = httpContentProcessorResolver.resolve(nettyHttpRequest, targetType).resultType(context.getArgument());
             if (nativeRequest instanceof StreamedHttpRequest) {
-                Argument<?> targetType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-
-                HttpContentProcessor processor = httpContentProcessorResolver.resolve(nettyHttpRequest, targetType);
-
-                //noinspection unchecked
-                return () -> Optional.of(subscriber -> HttpContentProcessorAsReactiveProcessor.asPublisher(processor.resultType(context.getArgument()), nettyHttpRequest).subscribe(new CompletionAwareSubscriber<>() {
+                return () -> Optional.of(subscriber -> HttpContentProcessorAsReactiveProcessor.asPublisher(processor, nettyHttpRequest).subscribe(new CompletionAwareSubscriber<>() {
 
                     Subscription s;
 
@@ -116,18 +117,7 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
                         } else {
 
                             try {
-                                Optional<ConversionError> lastError = conversionContext.getLastError();
-                                if (lastError.isPresent()) {
-                                    if (LOG.isDebugEnabled()) {
-                                        LOG.debug(MSG_CONVERT_DEBUG, context.getArgument(), lastError.get());
-                                    }
-                                    subscriber.onError(new ConversionErrorException(context.getArgument(), lastError.get()));
-                                } else {
-                                    if (LOG.isDebugEnabled()) {
-                                        LOG.debug(MSG_CONVERT_DEBUG, context.getArgument(), message);
-                                    }
-                                    subscriber.onError(UnsatisfiedRouteException.create(context.getArgument()));
-                                }
+                                subscriber.onError(extractError(message, conversionContext));
                             } finally {
                                 s.cancel();
                             }
@@ -160,30 +150,48 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
 
                 }));
             } else if (nativeRequest instanceof FullHttpRequest fullHttpRequest) {
-                Argument<?> targetType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-                return () -> Optional.of(Mono.just(fullHttpRequest)
-                    .flatMap(request -> {
-                        ArgumentConversionContext<Object> conversionContext = (ArgumentConversionContext<Object>) context.with(targetType);
-                        Object result = source.getBody(conversionContext).orElse(null);
-                        if (result != null) {
-                            return Mono.just(result);
-                        } else {
-                            Optional<ConversionError> lastError = conversionContext.getLastError();
-                            if (lastError.isPresent()) {
-                                if (LOG.isDebugEnabled()) {
-                                    LOG.debug(MSG_CONVERT_DEBUG, context.getArgument(), lastError.get());
-                                }
-                                return Mono.error(new ConversionErrorException(context.getArgument(), lastError.get()));
+                return () -> {
+                    List<Object> buffer = new ArrayList<>(1);
+                    try {
+                        processor.add(fullHttpRequest, buffer);
+                        processor.complete(buffer);
+                        for (int i = 0; i < buffer.size(); i++) {
+                            ArgumentConversionContext<?> conversionContext = context.with(targetType);
+                            Optional<?> converted = conversionService.convert(buffer.get(i), conversionContext);
+                            if (converted.isPresent()) {
+                                buffer.set(i, converted.get());
                             } else {
-                                if (LOG.isDebugEnabled()) {
-                                    LOG.debug(MSG_CONVERT_DEBUG, context.getArgument(), fullHttpRequest.content());
-                                }
-                                return Mono.error(UnsatisfiedRouteException.create(context.getArgument()));
+                                // handled below
+                                throw extractError(buffer.get(i), conversionContext);
                             }
                         }
-                    }));
+                        return Optional.of(Flux.fromIterable(buffer));
+                    } catch (Throwable t) {
+                        try {
+                            processor.cancel();
+                        } catch (Throwable u) {
+                            t.addSuppressed(u);
+                        }
+                        return Optional.of(Mono.error(t));
+                    }
+                };
             }
         }
         return BindingResult.EMPTY;
+    }
+
+    private static Exception extractError(Object message, ArgumentConversionContext<?> conversionContext) {
+        Optional<ConversionError> lastError = conversionContext.getLastError();
+        if (lastError.isPresent()) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug(MSG_CONVERT_DEBUG, conversionContext.getArgument(), lastError.get());
+            }
+            return new ConversionErrorException(conversionContext.getArgument(), lastError.get());
+        } else {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug(MSG_CONVERT_DEBUG, conversionContext.getArgument(), message);
+            }
+            return UnsatisfiedRouteException.create(conversionContext.getArgument());
+        }
     }
 }
