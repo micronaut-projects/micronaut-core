@@ -32,11 +32,10 @@ jcache = "1.1.1"
 junit5 = "5.9.1"
 junit-platform="1.9.1"
 ktor = "1.6.8"
-managed-logback = "1.4.6"
 logbook-netty = "2.14.0"
-log4j = "2.19.0"
 micronaut-aws = "3.9.2"
 micronaut-groovy = "4.0.0-SNAPSHOT"
+micronaut-logging = "1.0.0-SNAPSHOT"
 micronaut-session = "1.0.0-SNAPSHOT"
 micronaut-sql = "4.7.2"
 micronaut-test = "4.0.0-SNAPSHOT"
@@ -71,7 +70,6 @@ managed-netty-http3 = "0.0.16.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
 managed-reactor = "3.4.24"
-managed-slf4j = "2.0.4"
 managed-snakeyaml = "2.0"
 managed-java-parser-core = "3.24.9"
 managed-ksp = "1.8.0-1.0.9"
@@ -89,6 +87,8 @@ boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "manag
 boms-kotlin-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-bom", version.ref = "managed-kotlin-coroutines" }
 boms-netty = { module = "io.netty:netty-bom", version.ref = "managed-netty" }
 boms-jackson = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "managed-jackson" }
+
+boms-micronaut-logging = { module = "io.micronaut.logging:micronaut-logging-bom", version.ref = "micronaut-logging" }
 
 #
 # Libraries which start with managed- are managed by Micronaut in the sense
@@ -145,9 +145,9 @@ managed-reactive-streams = { module = "org.reactivestreams:reactive-streams", ve
 managed-reactor = { module = "io.projectreactor:reactor-core", version.ref = "managed-reactor" }
 managed-reactor-test = { module = "io.projectreactor:reactor-test", version.ref = "managed-reactor" }
 
-managed-slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "managed-slf4j" }
-managed-slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "managed-slf4j" }
-managed-logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "managed-logback" }
+slf4j-api = { module = "org.slf4j:slf4j-api" }
+slf4j-simple = { module = "org.slf4j:slf4j-simple" }
+logback-classic = { module = "ch.qos.logback:logback-classic" }
 
 managed-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "managed-snakeyaml" }
 
@@ -211,7 +211,7 @@ jetbrains-annotations = { module = "org.jetbrains:annotations", version.ref = "j
 
 kotlin-kotest-junit5 = { module = "io.kotest:kotest-runner-junit5-jvm" }
 
-log4j = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" }
+log4j = { module = "org.apache.logging.log4j:log4j-core" }
 
 logbook-netty = { module = "org.zalando:logbook-netty", version.ref = "logbook-netty" }
 

@@ -24,7 +24,7 @@ dependencies {
     testImplementation(projects.httpServerNetty)
     testImplementation(projects.httpClient)
     testImplementation(libs.junit.platform.engine)
-    testImplementation(libs.managed.logback.classic)
+    testImplementation(libs.logback.classic)
     testImplementation(platform(libs.test.boms.micronaut.validation))
     testImplementation(libs.micronaut.validation) {
         exclude(group: "io.micronaut")
