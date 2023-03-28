@@ -67,8 +67,8 @@ class ClientRedirectSpec extends Specification {
         when:
         HttpResponse<String> response = client.toBlocking().exchange('/test/redirect-relative', String)
 
-        then: "Client should correctly redirect relatively to /test/direct the same way as "
-        "# curl localhost:17320/test/redirect-relative -vvv -L"
+        then: "Client should correctly redirect relatively to /test/direct the same way as curl localhost:17320/test/redirect-relative -vvv -L"
+        noExceptionThrown()
         response.status() == HttpStatus.OK
         response.body() == "It works!"
 

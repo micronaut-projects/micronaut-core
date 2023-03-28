@@ -16,6 +16,7 @@
 package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaClassElement;
+import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.Context;
@@ -26,14 +27,14 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.expressions.EvaluatedExpressionWriter;
+import io.micronaut.expressions.context.ExpressionWithContext;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.processing.BeanDefinitionCreator;
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.BeanElementVisitor;
-import io.micronaut.inject.visitor.VisitorConfiguration;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
@@ -56,7 +57,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static javax.lang.model.element.ElementKind.ANNOTATION_TYPE;
 import static javax.lang.model.element.ElementKind.ENUM;
 
 /**
@@ -73,8 +73,6 @@ import static javax.lang.model.element.ElementKind.ENUM;
 @SupportedOptions({AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_INCREMENTAL, AbstractInjectAnnotationProcessor.MICRONAUT_PROCESSING_ANNOTATIONS, BeanDefinitionWriter.OMIT_CONFPROP_INJECTION_POINTS})
 public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProcessor {
 
-    private static final String AROUND_TYPE = AnnotationUtil.ANN_AROUND;
-    private static final String INTRODUCTION_TYPE = AnnotationUtil.ANN_INTRODUCTION;
     private static final String[] ANNOTATION_STEREOTYPES = new String[]{
         AnnotationUtil.POST_CONSTRUCT,
         AnnotationUtil.PRE_DESTROY,
@@ -91,10 +89,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         "io.micronaut.context.annotation.Value",
         "io.micronaut.context.annotation.Property",
         "io.micronaut.context.annotation.Executable",
-        AROUND_TYPE,
+        AnnotationUtil.ANN_AROUND,
         AnnotationUtil.ANN_INTERCEPTOR_BINDINGS,
         AnnotationUtil.ANN_INTERCEPTOR_BINDING,
-        INTRODUCTION_TYPE
+        AnnotationUtil.ANN_INTRODUCTION
     };
 
     private Set<String> beanDefinitions;
@@ -131,18 +129,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             filer,
             visitorAttributes,
             getVisitorKind()
-        ) {
-            @NonNull
-            @Override
-            public VisitorConfiguration getConfiguration() {
-                return new VisitorConfiguration() {
-                    @Override
-                    public boolean includeTypeLevelAnnotationsInGenericArguments() {
-                        return false;
-                    }
-                };
-            }
-        };
+        );
     }
 
     @Override
@@ -165,19 +152,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
                 TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
                 // accumulate all the class elements for all annotated elements
-                annotations.forEach(annotation -> roundEnv.getElementsAnnotatedWith(annotation)
-                    .stream()
-                    // filtering annotation definitions, which are not processed
-                    .filter(element -> element.getKind() != ANNOTATION_TYPE)
-                    .forEach(element -> {
-                        TypeElement typeElement = modelUtils.classElementFor(element);
-                        if (typeElement == null) {
-                            return;
-                        }
-                        if (element.getKind() == ENUM) {
-                            final AnnotationMetadata am = annotationMetadataBuilder.lookupOrBuildForType(element);
+                annotations.forEach(annotation -> modelUtils.resolveTypeElements(
+                        roundEnv.getElementsAnnotatedWith(annotation)
+                    )
+                    .forEach(typeElement -> {
+                        if (typeElement.getKind() == ENUM) {
+                            final AnnotationMetadata am = annotationMetadataBuilder.lookupOrBuildForType(typeElement);
                             if (BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(am)) {
-                                error(element, "Enum types cannot be defined as beans");
+                                error(typeElement, "Enum types cannot be defined as beans");
                             }
                             return;
                         }
@@ -195,7 +177,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             beanDefinitions.add(name);
                         } else {
                             AnnotationMetadata annotationMetadata = annotationMetadataBuilder.lookupOrBuildForType(typeElement);
-                            if (annotationMetadata.hasStereotype(INTRODUCTION_TYPE) || annotationMetadata.hasStereotype(ConfigurationReader.class)) {
+                            if (BeanDefinitionCreatorFactory.isIntroduction(annotationMetadata) || annotationMetadata.hasStereotype(ConfigurationReader.class)) {
                                 beanDefinitions.add(name);
                             }
                         }
@@ -235,7 +217,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 }
                             }
                         } catch (ProcessingException ex) {
-                            error((Element) ex.getOriginatingElement(), ex.getMessage());
+                            error(((JavaNativeElement) ex.getOriginatingElement()).element(), ex.getMessage());
                         } catch (PostponeToNextRoundException e) {
                             processed.remove(className);
                             postponed.put(className, e);
@@ -277,8 +259,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     }
                 }
             } finally {
-                AbstractAnnotationMetadataBuilder.clearMutated();
-                JavaAnnotationMetadataBuilder.clearCaches();
+                BeanDefinitionWriter.finish();
             }
         }
 
@@ -286,7 +267,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     }
 
     /**
-     * Writes {@link io.micronaut.inject.BeanDefinitionReference} into /META-INF/services/io.micronaut.inject.BeanDefinitionReference.
+     * Writes {@link io.micronaut.inject.BeanDefinitionReference} into /META-INF/services/io
+     * .micronaut.inject.BeanDefinitionReference.
      */
     private void writeBeanDefinitionsToMetaInf() {
         try {
@@ -302,6 +284,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             beanDefinitionWriter.visitBeanDefinitionEnd();
             if (beanDefinitionWriter.isEnabled()) {
                 beanDefinitionWriter.accept(classWriterOutputVisitor);
+
+                processEvaluatedExpressions(beanDefinitionWriter);
+
                 BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
                     new BeanDefinitionReferenceWriter(beanDefinitionWriter);
                 beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing());
@@ -317,6 +302,17 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             // raise a compile error
             String message = e.getMessage();
             error("Unexpected error: %s", message != null ? message : e.getClass().getSimpleName());
+        }
+    }
+
+    private void processEvaluatedExpressions(BeanDefinitionVisitor beanDefinitionWriter) throws IOException {
+        for (ExpressionWithContext expressionMetadata: beanDefinitionWriter.getEvaluatedExpressions()) {
+            EvaluatedExpressionWriter expressionWriter = new EvaluatedExpressionWriter(
+                expressionMetadata,
+                javaVisitorContext,
+                beanDefinitionWriter.getOriginatingElement());
+
+            expressionWriter.accept(classWriterOutputVisitor);
         }
     }
 

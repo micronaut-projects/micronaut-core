@@ -56,6 +56,7 @@ import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupFactory;
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
+import io.micronaut.http.netty.channel.NettyChannelType;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.json.JsonFeatures;
@@ -65,8 +66,11 @@ import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.websocket.WebSocketClient;
 import io.micronaut.websocket.WebSocketClientRegistry;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFactory;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.socket.DatagramChannel;
+import io.netty.channel.socket.SocketChannel;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -418,7 +422,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                         new DefaultRequestBinderRegistry(conversionService)
                 ),
                 eventLoopGroup,
-                resolveSocketChannelFactory(configuration, beanContext),
+                resolveSocketChannelFactory(NettyChannelType.CLIENT_SOCKET, SocketChannel.class, configuration, beanContext),
+                resolveSocketChannelFactory(NettyChannelType.DATAGRAM_SOCKET, DatagramChannel.class, configuration, beanContext),
                 clientCustomizer,
                 invocationInstrumenterFactories,
                 clientId,
@@ -461,7 +466,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         }
     }
 
-    private ChannelFactory resolveSocketChannelFactory(HttpClientConfiguration configuration, BeanContext beanContext) {
+    private <C extends Channel> ChannelFactory<? extends C> resolveSocketChannelFactory(NettyChannelType type, Class<C> channelClass, HttpClientConfiguration configuration, BeanContext beanContext) {
         final String eventLoopGroup = configuration.getEventLoopGroup();
 
         final EventLoopGroupConfiguration eventLoopGroupConfiguration = beanContext.findBean(EventLoopGroupConfiguration.class, Qualifiers.byName(eventLoopGroup))
@@ -473,7 +478,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                     }
                 });
 
-        return () -> eventLoopGroupFactory.clientSocketChannelInstance(eventLoopGroupConfiguration);
+        return () -> channelClass.cast(eventLoopGroupFactory.channelInstance(type, eventLoopGroupConfiguration));
     }
 
     private ClientKey getClientKey(AnnotationMetadata metadata) {

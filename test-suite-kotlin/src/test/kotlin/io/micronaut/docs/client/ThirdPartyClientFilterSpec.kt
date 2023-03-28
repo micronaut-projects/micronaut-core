@@ -1,26 +1,20 @@
 package io.micronaut.docs.client
 
-import io.kotest.matchers.shouldBe
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.shouldBe
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.annotation.Value
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MutableHttpRequest
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Filter
-import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Header
+import io.micronaut.http.annotation.*
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
-import io.micronaut.http.filter.ClientFilterChain
-import io.micronaut.http.filter.HttpClientFilter
 import io.micronaut.runtime.server.EmbeddedServer
-import org.reactivestreams.Publisher
-import java.util.Base64
 import jakarta.inject.Singleton
 import reactor.core.publisher.Flux
+import java.util.*
 
 class ThirdPartyClientFilterSpec: StringSpec() {
     private var result: String? = null
@@ -81,16 +75,15 @@ internal class BintrayService(
 
 @Requires(property = "spec.name", value = "ThirdPartyClientFilterSpec")
 //tag::bintrayFilter[]
-@Filter("/repos/**") // <1>
+@ClientFilter("/repos/**") // <1>
 internal class BintrayFilter(
         @param:Value("\${bintray.username}") val username: String, // <2>
-        @param:Value("\${bintray.token}") val token: String)// <2>
-    : HttpClientFilter {
+        @param:Value("\${bintray.token}") val token: String // <2>
+) {
 
-    override fun doFilter(request: MutableHttpRequest<*>, chain: ClientFilterChain): Publisher<out HttpResponse<*>> {
-        return chain.proceed(
-            request.basicAuth(username, token) // <3>
-        )
+    @RequestFilter
+    fun filter(request: MutableHttpRequest<*>) {
+        request.basicAuth(username, token) // <3>
     }
 }
 //end::bintrayFilter[]

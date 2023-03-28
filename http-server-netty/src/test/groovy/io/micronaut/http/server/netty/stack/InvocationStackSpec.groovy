@@ -178,7 +178,7 @@ class InvocationStackSpec extends Specification {
         }
 
         boolean isKnownStack(String className, boolean allowExecutor) {
-            if (allowExecutor && className.startsWith("java.util.concurrent")) {
+            if (className.startsWith("java.util.concurrent")) {
                 return true
             }
             if (className.startsWith("io.netty")) {
@@ -193,8 +193,8 @@ class InvocationStackSpec extends Specification {
             if (className.startsWith("org.codehaus.groovy") || className.startsWith("org.apache.groovy")) {
                 return true // Spock
             }
-            if (className == "reactor.core.publisher.MonoDeferContextual" || className == "reactor.core.publisher.Mono") {
-                return true // added for reactive filters
+            if (className == "reactor.core.publisher.Mono" || className == "reactor.core.publisher.MonoFromPublisher") {
+                return true // added for kotlin context filters
             }
             return false
         }

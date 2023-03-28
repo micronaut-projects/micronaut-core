@@ -19,6 +19,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.expressions.EvaluatedExpression;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -43,6 +44,9 @@ import java.util.stream.Stream;
  * <p>If a member is not present then the methods of the class will attempt to resolve the default value for a given annotation member. In this sense the behaviour of this class is similar to how
  * a implementation of {@link Annotation} behaves.</p>
  *
+ * NOTE: During the mapping or remapping, nullable stereotypes value means that
+ * the stereotypes will be filled from the annotation definition, when empty collection will skip it.
+ *
  * @param <A> The annotation type
  * @author Graeme Rocher
  * @since 1.0
@@ -52,9 +56,11 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     private final String annotationName;
     private final ConvertibleValues<Object> convertibleValues;
     private final Map<CharSequence, Object> values;
-    private final Map<String, Object> defaultValues;
+    @Nullable
+    private final Map<CharSequence, Object> defaultValues;
     private final Function<Object, Object> valueMapper;
     private final RetentionPolicy retentionPolicy;
+    @Nullable
     private final List<AnnotationValue<?>> stereotypes;
 
     /**
@@ -64,7 +70,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     @UsedByGeneratedCode
     @Internal
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values) {
-        this(annotationName, values, Collections.emptyMap());
+        this(annotationName, values, null, RetentionPolicy.RUNTIME);
     }
 
     /**
@@ -74,7 +80,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @Internal
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
-        this(annotationName, values, Collections.emptyMap(), retentionPolicy, null);
+        this(annotationName, values, null, retentionPolicy, null);
     }
 
     /**
@@ -85,7 +91,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @Internal
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy, List<AnnotationValue<?>> stereotypes) {
-        this(annotationName, values, Collections.emptyMap(), retentionPolicy, stereotypes);
+        this(annotationName, values, null, retentionPolicy, stereotypes);
     }
 
 
@@ -96,7 +102,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @UsedByGeneratedCode
     @Internal
-    public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<String, Object> defaultValues) {
+    public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<CharSequence, Object> defaultValues) {
         this(annotationName, values, defaultValues, RetentionPolicy.RUNTIME, null);
     }
 
@@ -108,7 +114,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @UsedByGeneratedCode
     @Internal
-    public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<String, Object> defaultValues, RetentionPolicy retentionPolicy) {
+    public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<CharSequence, Object> defaultValues, RetentionPolicy retentionPolicy) {
         this(annotationName, values, defaultValues, retentionPolicy, null);
     }
 
@@ -120,11 +126,11 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @param stereotypes     The stereotypes of the annotation
      */
     @Internal
-    public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<String, Object> defaultValues, RetentionPolicy retentionPolicy, List<AnnotationValue<?>> stereotypes) {
+    public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<CharSequence, Object> defaultValues, RetentionPolicy retentionPolicy, List<AnnotationValue<?>> stereotypes) {
         this.annotationName = annotationName;
         this.convertibleValues = newConvertibleValues(values);
         this.values = values;
-        this.defaultValues = defaultValues != null ? defaultValues : Collections.emptyMap();
+        this.defaultValues = defaultValues;
         this.valueMapper = null;
         this.retentionPolicy = retentionPolicy != null ? retentionPolicy : RetentionPolicy.RUNTIME;
         this.stereotypes = stereotypes;
@@ -147,17 +153,14 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     public AnnotationValue(String annotationName, ConvertibleValues<Object> convertibleValues) {
         this.annotationName = annotationName;
         this.convertibleValues = convertibleValues;
-        Map<String, Object> existing = convertibleValues.asMap();
-        this.values = new HashMap<>(existing);
-        this.defaultValues = Collections.emptyMap();
+        this.values = new LinkedHashMap<>(convertibleValues.asMap());
+        this.defaultValues = null;
         this.valueMapper = null;
         this.retentionPolicy = RetentionPolicy.RUNTIME;
         this.stereotypes = null;
     }
 
     /**
-     * Internal copy constructor.
-     *
      * @param target            The target
      * @param defaultValues     The default values
      * @param convertibleValues The convertible values
@@ -165,18 +168,27 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @Internal
     @UsedByGeneratedCode
-    protected AnnotationValue(
-            AnnotationValue<A> target,
-            Map<String, Object> defaultValues,
-            ConvertibleValues<Object> convertibleValues,
-            Function<Object, Object> valueMapper) {
+    public AnnotationValue(AnnotationValue<A> target,
+                           Map<CharSequence, Object> defaultValues,
+                           ConvertibleValues<Object> convertibleValues,
+                           Function<Object, Object> valueMapper) {
         this.annotationName = target.annotationName;
-        this.defaultValues = defaultValues != null ? defaultValues : target.defaultValues;
+        this.defaultValues = defaultValues;
         this.values = target.values;
         this.convertibleValues = convertibleValues;
         this.valueMapper = valueMapper;
         this.retentionPolicy = RetentionPolicy.RUNTIME;
         this.stereotypes = null;
+    }
+
+    /**
+     * Creates a builder with the initial value of this annotation.
+     *
+     * @return The builder with this annotation value
+     * @since 4.0.0
+     */
+    public AnnotationValueBuilder<A> mutate() {
+        return builder(this);
     }
 
     /**
@@ -193,6 +205,16 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     @Nullable
     public List<AnnotationValue<?>> getStereotypes() {
         return stereotypes;
+    }
+
+    /**
+     * The default values.
+     * @return The default of the annotation or null if not specified.
+     * @since 4.0.0
+     */
+    @Nullable
+    public Map<CharSequence, Object> getDefaultValues() {
+        return defaultValues;
     }
 
     /**
@@ -256,7 +278,6 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return An {@link Optional} of the enum value
      */
     @Override
-    @SuppressWarnings("unchecked")
     public <E extends Enum> Optional<E> enumValue(@NonNull String member, @NonNull Class<E> enumType) {
         return enumValue(member, enumType, valueMapper);
     }
@@ -730,7 +751,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
     @Override
     public OptionalLong longValue(@NonNull String member) {
-        return longValue(member, null);
+        return longValue(member, valueMapper);
     }
 
     /**
@@ -767,7 +788,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
     @Override
     public Optional<Short> shortValue(@NonNull String member) {
-        return shortValue(member, null);
+        return shortValue(member, valueMapper);
     }
 
     /**
@@ -950,7 +971,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
     @Override
     public Optional<Boolean> booleanValue(@NonNull String member) {
-        return booleanValue(member, null);
+        return booleanValue(member, valueMapper);
     }
 
     /**
@@ -1025,8 +1046,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      *
      * @return The annotation name
      */
-    public @NonNull
-    final String getAnnotationName() {
+    @NonNull
+    public final String getAnnotationName() {
         return annotationName;
     }
 
@@ -1045,8 +1066,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      *
      * @return The names of the members
      */
-    public @NonNull
-    final Set<CharSequence> getMemberNames() {
+    @NonNull
+    public final Set<CharSequence> getMemberNames() {
         return values.keySet();
     }
 
@@ -1054,17 +1075,16 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The attribute values
      */
     @Override
-    @SuppressWarnings("unchecked")
-    public @NonNull
-    Map<CharSequence, Object> getValues() {
+    @NonNull
+    public Map<CharSequence, Object> getValues() {
         return Collections.unmodifiableMap(values);
     }
 
     /**
      * @return The convertible values
      */
-    public @NonNull
-    ConvertibleValues<Object> getConvertibleValues() {
+    @NonNull
+    public ConvertibleValues<Object> getConvertibleValues() {
         return convertibleValues;
     }
 
@@ -1074,9 +1094,11 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         if (result.isPresent()) {
             return result;
         }
-        Object dv = defaultValues.get(member.toString());
-        if (dv != null) {
-            return ConversionService.SHARED.convert(dv, conversionContext);
+        if (defaultValues != null) {
+            Object dv = defaultValues.get(member.toString());
+            if (dv != null) {
+                return ConversionService.SHARED.convert(dv, conversionContext);
+            }
         }
         return result;
     }
@@ -1122,8 +1144,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The result
      * @throws IllegalStateException If no member is available that conforms to the given type
      */
-    public @NonNull
-    final <T> T getRequiredValue(Class<T> type) {
+    @NonNull
+    public final <T> T getRequiredValue(Class<T> type) {
         return getRequiredValue(AnnotationMetadata.VALUE_MEMBER, type);
     }
 
@@ -1136,8 +1158,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The result
      * @throws IllegalStateException If no member is available that conforms to the given name and type
      */
-    public @NonNull
-    final <T> T getRequiredValue(String member, Class<T> type) {
+    @NonNull
+    public final <T> T  getRequiredValue(String member, Class<T> type) {
         return get(member, ConversionContext.of(type)).orElseThrow(() -> new IllegalStateException("No value available for annotation member @" + annotationName + "[" + member + "] of type: " + type));
     }
 
@@ -1150,7 +1172,9 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The result
      * @throws IllegalStateException If no member is available that conforms to the given name and type
      */
-    public final @NonNull <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member, Class<T> type) {
+    @NonNull
+    @SuppressWarnings("java:S2259") // false positive
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member, Class<T> type) {
         ArgumentUtils.requireNonNull("type", type);
         String typeName = type.getName();
 
@@ -1172,17 +1196,18 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         }
         if (CollectionUtils.isEmpty(values)) {
             return Collections.emptyList();
-        }
-        List<AnnotationValue<T>> list = new ArrayList<>(values.size());
-        for (AnnotationValue<?> value : values) {
-            if (value == null) {
-                continue;
+        } else {
+            List<AnnotationValue<T>> list = new ArrayList<>(values.size());
+            for (AnnotationValue<?> value : values) {
+                if (value == null) {
+                    continue;
+                }
+                if (value.getAnnotationName().equals(typeName)) {
+                    list.add((AnnotationValue<T>) value);
+                }
             }
-            if (value.getAnnotationName().equals(typeName)) {
-                list.add((AnnotationValue<T>) value);
-            }
+            return list;
         }
-        return list;
     }
 
     /**
@@ -1195,7 +1220,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @SuppressWarnings("unchecked")
     @NonNull
-    public final <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member) {
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member) {
         ArgumentUtils.requireNonNull("member", member);
         Object v = values.get(member);
         if (v instanceof AnnotationValue annotationValue) {
@@ -1226,7 +1251,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @throws IllegalStateException If no member is available that conforms to the given name and type
      */
     @NonNull
-    public final <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(String member, Class<T> type) {
+    public <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(String member, Class<T> type) {
         ArgumentUtils.requireNonNull("type", type);
         String typeName = type.getName();
 
@@ -1260,7 +1285,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @since 3.3.0
      */
     @NonNull
-    public final <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(@NonNull String member) {
+    public <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(@NonNull String member) {
         ArgumentUtils.requireNonNull("member", member);
         Object v = values.get(member);
         if (v instanceof AnnotationValue av) {
@@ -1273,6 +1298,17 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             return Optional.empty();
         }
         return Optional.empty();
+    }
+
+    /**
+     * If this AnnotationValue contains Evaluated Expressions.
+     *
+     * @return true if it is
+     * @since 4.0.0
+     */
+    public boolean hasEvaluatedExpressions() {
+        return values.values().stream()
+            .anyMatch(value -> value instanceof EvaluatedExpression);
     }
 
     @Override
@@ -1368,6 +1404,19 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     public static <T extends Annotation> AnnotationValueBuilder<T> builder(Class<T> annotation) {
         return new AnnotationValueBuilder<>(annotation);
+    }
+
+    /**
+     * Start building a new annotation existing value.
+     *
+     * @param annotation      The annotation name
+     * @param <T>             The annotation type
+     * @return The builder
+     * @since 4.0.0
+     */
+    public static <T extends Annotation> AnnotationValueBuilder<T> builder(@NonNull AnnotationValue<T> annotation) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        return new AnnotationValueBuilder<>(annotation, annotation.getRetentionPolicy());
     }
 
     /**
@@ -1566,7 +1615,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
                 }
             }
         }
-        if (valueMapper != null && rawValue instanceof String) {
+        if (valueMapper != null && (rawValue instanceof String || rawValue instanceof EvaluatedExpression)) {
             return valueMapper.apply(rawValue);
         }
         return rawValue;

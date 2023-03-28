@@ -204,7 +204,7 @@ package test;
 import io.micronaut.aop.introduction.*;
 import io.micronaut.context.annotation.*;
 import java.net.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 
 interface MyInterface{
     @Executable
@@ -242,7 +242,7 @@ package test;
 import io.micronaut.aop.introduction.*;
 import io.micronaut.context.annotation.*;
 import java.net.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 
 interface MyInterface {
     @Executable
@@ -280,7 +280,7 @@ package test;
 import io.micronaut.aop.introduction.*;
 import io.micronaut.context.annotation.*;
 import java.net.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 
 interface MyInterface {
     @Executable

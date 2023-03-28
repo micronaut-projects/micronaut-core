@@ -4,9 +4,9 @@
 
 The most common data interchange format nowadays is JSON.
 
-In fact, the defaults in the api:http.annotation.Controller[] annotation specify that the controllers in Micronaut consume and produce JSON by default.
+In fact, the defaults in the api:http.annotation.Controller[] annotation specify that the controllers in Micronaut framework consume and produce JSON by default.
 
-To do so in a non-blocking manner, Micronaut builds on the https://github.com/FasterXML/jackson[Jackson] Asynchronous JSON parsing API and Netty, such that the reading of incoming JSON is done in a non-blocking manner.
+To do so in a non-blocking manner, Micronaut framework builds on the https://github.com/FasterXML/jackson[Jackson] Asynchronous JSON parsing API and Netty, such that the reading of incoming JSON is done in a non-blocking manner.
 
 == Binding using Reactive Frameworks
 
@@ -39,7 +39,7 @@ Note however you can just as easily write:
 
 snippet::io.micronaut.docs.server.json.PersonController[tags="class,regular,endclass", indent=0, title="Binding JSON POJOs"]
 
-Micronaut only executes your method once the data has been read in a non-blocking manner.
+The Micronaut framework only executes your method once the data has been read in a non-blocking manner.
 
 TIP: The output produced by Jackson can be customized in a variety of ways, from defining Jackson modules to using https://github.com/FasterXML/jackson-annotations/wiki/Jackson-Annotations[Jackson annotations]
 

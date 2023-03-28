@@ -18,21 +18,18 @@ dependencies {
 
     compileOnly libs.managed.snakeyaml
     compileOnly libs.managed.groovy
-    compileOnly libs.kotlin.stdlib.jdk8
-    compileOnly libs.managed.validation
+    compileOnly libs.managed.kotlin.stdlib.jdk8
 
-//    testImplementation libs.managed.validation
     testImplementation project(":context")
     testImplementation project(":inject-groovy")
     testImplementation project(":inject-test-utils")
     testImplementation libs.systemlambda
     testImplementation libs.managed.snakeyaml
     testRuntimeOnly libs.junit.jupiter.engine
-
 }
 
-tasks.withType(Test) {
-    if(JavaVersion.current().majorVersion.toInteger() >= 17) {
+tasks.withType(Test).configureEach {
+    if (JavaVersion.current().majorVersion.toInteger() >= 17) {
         logger.warn("Opening java.util, so SystemLambda can work")
         jvmArgs += ['--add-opens', 'java.base/java.util=ALL-UNNAMED']
     }

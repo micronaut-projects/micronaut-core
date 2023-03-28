@@ -1,0 +1,26 @@
+Suppose you wish to trace each request to the "Hello World" example using some external system. This system could be a database or a distributed tracing service, and may require I/O operations.
+
+You should not block the underlying Netty event loop in your filter; instead the filter should proceed with execution once any I/O is complete.
+
+As an example, consider this `TraceService` that uses https://projectreactor.io[Project Reactor] to compose an I/O operation:
+
+snippet::io.micronaut.docs.server.filters.TraceService[tags="imports,class", indent=0, title="A TraceService Example using Reactive Streams"]
+
+<1> The reactor:Mono[] type creates logic that executes potentially blocking operations to write the trace data from the request
+<2> Since this is just an example, the logic does nothing yet
+<3> The `Schedulers.boundedElastic` executes the logic
+
+The following code sample shows how to implement the api:http.filter.HttpServerFilter[] interface.
+
+snippet::io.micronaut.docs.server.filters.TraceFilter[tags="imports,clazz", indent=0, title="An Example HttpServerFilter"]
+
+<1> The api:http.annotation.Filter[] annotation defines the URI pattern(s) the filter matches
+<2> The class implements the api:http.filter.HttpServerFilter[] interface
+<3> The previously defined `TraceService` is injected via constructor
+<4> `TraceService` is invoked to trace the request
+<5> If the call succeeds, the filter resumes request processing using https://projectreactor.io[Project Reactor]'s `switchMap` method, which invokes the `proceed` method of the api:http.filter.ServerFilterChain[]
+<6> Finally, the https://projectreactor.io[Project Reactor]'s `doOnNext` method adds a `X-Trace-Enabled` header to the response.
+
+The previous example demonstrates some key concepts such as executing logic in a non-blocking manner before proceeding with the request and modifying the outgoing response.
+
+TIP: The examples use https://projectreactor.io[Project Reactor], however you can use any reactive framework that supports the Reactive streams specifications

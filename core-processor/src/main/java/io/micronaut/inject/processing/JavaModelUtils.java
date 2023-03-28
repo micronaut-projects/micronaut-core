@@ -267,11 +267,19 @@ public class JavaModelUtils {
      */
     public static Type getTypeReference(TypedElement type) {
         ClassElement classElement = type.getType();
-        if (type.isPrimitive()) {
-            String internalName = NAME_TO_TYPE_MAP.get(classElement.getName());
-            if (type.isArray()) {
+        if (classElement.isPrimitive()) {
+            String internalName;
+            if (classElement.isVoid()) {
+                internalName = NAME_TO_TYPE_MAP.get("void");
+            } else {
+                internalName = NAME_TO_TYPE_MAP.get(classElement.getName());
+            }
+            if (internalName == null) {
+                throw new IllegalStateException("Unrecognized primitive type: " + classElement.getName());
+            }
+            if (classElement.isArray()) {
                 StringBuilder name = new StringBuilder(internalName);
-                for (int i = 0; i < type.getArrayDimensions(); i++) {
+                for (int i = 0; i < classElement.getArrayDimensions(); i++) {
                     name.insert(0, "[");
                 }
                 return Type.getObjectType(name.toString());
@@ -279,18 +287,18 @@ public class JavaModelUtils {
                 return Type.getType(internalName);
             }
         } else {
-            Object nativeType = type.getNativeType();
+            Object nativeType = classElement.getNativeType();
             if (nativeType instanceof Class<?> t) {
                 return Type.getType(t);
             } else {
-                String internalName = type.getType().getName().replace('.', '/');
+                String internalName = classElement.getName().replace('.', '/');
                 if (internalName.isEmpty()) {
                     return Type.getType(Object.class);
                 }
-                if (type.isArray()) {
+                if (classElement.isArray()) {
                     StringBuilder name = new StringBuilder(internalName);
                     name.insert(0, "L");
-                    for (int i = 0; i < type.getArrayDimensions(); i++) {
+                    for (int i = 0; i < classElement.getArrayDimensions(); i++) {
                         name.insert(0, "[");
                     }
                     name.append(";");

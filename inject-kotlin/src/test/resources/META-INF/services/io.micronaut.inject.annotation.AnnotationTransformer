@@ -1,0 +1,2 @@
+io.micronaut.kotlin.processing.aop.compile.TestStereotypeAnnTransformer
+io.micronaut.kotlin.processing.aop.compile.AroundConstructAnnTransformer

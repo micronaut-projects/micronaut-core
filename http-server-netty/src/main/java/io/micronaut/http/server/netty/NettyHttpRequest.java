@@ -28,6 +28,7 @@ import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpVersion;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpParameters;
@@ -156,13 +157,24 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private final HttpServerConfiguration serverConfiguration;
     private MutableConvertibleValues<Object> attributes;
     private NettyCookies nettyCookies;
-    private List<ByteBufHolder> receivedContent = new ArrayList<>();
-    private Map<IdentityWrapper, HttpData> receivedData = new LinkedHashMap<>();
+    private final List<ByteBufHolder> receivedContent = new ArrayList<>();
+    private final Map<IdentityWrapper, HttpData> receivedData = new LinkedHashMap<>();
 
     private T bodyUnwrapped;
     private Supplier<Optional<T>> body;
     private RouteMatch<?> matchedRoute;
     private boolean bodyRequired;
+
+    /**
+     * Set to {@code true} when the {@link #headers} may have been mutated. If this is not the case,
+     * we can cache some values.
+     */
+    private boolean headersMutated = false;
+    private final long contentLength;
+    @Nullable
+    private final MediaType contentType;
+    @Nullable
+    private final String origin;
 
     private final BodyConvertor bodyConvertor = newBodyConvertor();
 
@@ -193,6 +205,9 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             this.bodyUnwrapped = built;
             return Optional.ofNullable(built);
         });
+        this.contentLength = headers.contentLength().orElse(-1);
+        this.contentType = headers.contentType().orElse(null);
+        this.origin = headers.getOrigin().orElse(null);
     }
 
     @Override
@@ -204,6 +219,15 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     @Override
     public Optional<Object> getAttribute(CharSequence name) {
         return Optional.ofNullable(getAttributes().getValue(Objects.requireNonNull(name, "Name cannot be null").toString()));
+    }
+
+    @Override
+    public HttpVersion getHttpVersion() {
+        HttpPipelineBuilder.StreamPipeline pipeline = channelHandlerContext.channel().attr(HttpPipelineBuilder.STREAM_PIPELINE_ATTRIBUTE.get()).get();
+        if (pipeline != null) {
+            return pipeline.httpVersion;
+        }
+        return HttpVersion.HTTP_1_1;
     }
 
     @Override
@@ -266,6 +290,15 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     }
 
     @Override
+    public Optional<String> getOrigin() {
+        if (headersMutated) {
+            return getHeaders().getOrigin();
+        } else {
+            return Optional.ofNullable(origin);
+        }
+    }
+
+    @Override
     public HttpHeaders getHeaders() {
         return headers;
     }
@@ -277,7 +310,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             synchronized (this) { // double check
                 attributes = this.attributes;
                 if (attributes == null) {
-                    attributes = new MutableConvertibleValuesMap<>(new HashMap<>(4));
+                    attributes = new MutableConvertibleValuesMap<>(new HashMap<>(8));
                     this.attributes = attributes;
                 }
             }
@@ -578,7 +611,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     final boolean isFormOrMultipartData() {
-        MediaType ct = headers.contentType().orElse(null);
+        MediaType ct = getContentType().orElse(null);
         return ct != null && (ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) || ct.equals(MediaType.MULTIPART_FORM_DATA_TYPE));
     }
 
@@ -587,8 +620,18 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     final boolean isFormData() {
-        MediaType ct = headers.contentType().orElse(null);
+        MediaType ct = getContentType().orElse(null);
         return ct != null && (ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE));
+    }
+
+    @Override
+    public Optional<MediaType> getContentType() {
+        // this is better than the caching we can do in AbstractNettyHttpRequest
+        if (headersMutated) {
+            return headers.contentType();
+        } else {
+            return Optional.ofNullable(contentType);
+        }
     }
 
     /**
@@ -619,6 +662,15 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             }
 
         };
+    }
+
+    @Override
+    public long getContentLength() {
+        if (headersMutated) {
+            return super.getContentLength();
+        } else {
+            return contentLength;
+        }
     }
 
     /**
@@ -667,6 +719,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
         @Override
         public MutableHttpHeaders getHeaders() {
+            headersMutated = true;
             return headers;
         }
 

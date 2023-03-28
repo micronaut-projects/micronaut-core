@@ -25,7 +25,7 @@ jobs:
           java-version: '17'
       - name: Set the current release version
         id: release_version
-        run: echo ::set-output name=release_version::${GITHUB_REF:11}
+        run: echo "release_version=${GITHUB_REF:11}" >> $GITHUB_OUTPUT
       - name: Run pre-release
         uses: micronaut-projects/github-actions/pre-release@master
         env:
@@ -66,23 +66,25 @@ jobs:
           # Store the hash in a file, which is uploaded as a workflow artifact.
           echo $(sha256sum $ARTIFACTS | base64 -w0) > artifacts-sha256
       - name: Upload build artifacts
-        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
+        uses: actions/upload-artifact@v3
         with:
           name: gradle-build-outputs
           path: build/repo/${{ steps.publish.outputs.group }}/*/${{ steps.publish.outputs.version }}/*
           retention-days: 5
       - name: Upload artifacts-sha256
-        uses: actions/upload-artifact@3cea5372237819ed00197afe530f5a7ea3e805c8 # v3.1.0
+        uses: actions/upload-artifact@v3
         with:
           name: artifacts-sha256
           path: artifacts-sha256
           retention-days: 5
       - name: Generate docs
+        run: ./gradlew docs
         env:
           GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
           GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
           GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
-        run: ./gradlew docs
+          GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
+          GH_USERNAME: ${{ secrets.GH_USERNAME }}
       - name: Export Gradle Properties
         uses: micronaut-projects/github-actions/export-gradle-properties@master
       - name: Publish to Github Pages
@@ -128,7 +130,7 @@ jobs:
       artifacts-sha256: ${{ steps.set-hash.outputs.artifacts-sha256 }}
     steps:
       - name: Download artifacts-sha256
-        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
+        uses: actions/download-artifact@v3
         with:
           name: artifacts-sha256
       # The SLSA provenance generator expects the hash digest of artifacts to be passed as a job
@@ -147,7 +149,7 @@ jobs:
       actions: read # To read the workflow path.
       id-token: write # To sign the provenance.
       contents: write # To add assets to a release.
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.4.0
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.5.0
     with:
       base64-subjects: "${{ needs.provenance-subject.outputs.artifacts-sha256 }}"
       upload-assets: true # Upload to a new release.
@@ -159,18 +161,18 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Checkout repository
-        uses: actions/checkout@2541b1294d2704b0964813337f33b291d3f8596b # v3.0.2
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: Download artifacts
-        uses: actions/download-artifact@9782bd6a9848b53b110e712e20e42d89988822b7 # v3.0.1
+        uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
           name: gradle-build-outputs
           path: build/repo
+      - name: Create artifacts archive
+        shell: bash
+        run: find build/repo -regextype sed -regex '\(.*\.jar\|.*\.pom\|.*\.module\|.*\.toml\)' | xargs zip artifacts.zip
       - name: Upload assets
-        # Upload the artifacts and SLSA L3 provenance as assets to the existing
-        # release. Note that the provenance will attest to each artifact file and
-        # not the aggregated ZIP file.
-        run: |
-          find build/repo -regextype sed -regex '\(.*\.jar\|.*\.pom\|.*\.module\|.*\.toml\)' | xargs zip artifacts.zip
-          gh release upload ${{ github.ref_name }} artifacts.zip
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # Upload the artifacts to the existing release. Note that the SLSA provenance will
+        # attest to each artifact file and not the aggregated ZIP file.
+        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v0.1.15
+        with:
+          files: artifacts.zip

@@ -29,6 +29,8 @@ import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory;
+import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
@@ -64,6 +66,7 @@ import java.util.Set;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class GroovyVisitorContext implements VisitorContext {
     private static final MutableConvertibleValues<Object> VISITOR_ATTRIBUTES = new MutableConvertibleValuesMap<>();
     private final CompilationUnit compilationUnit;
@@ -74,6 +77,7 @@ public class GroovyVisitorContext implements VisitorContext {
     private final GroovyElementFactory groovyElementFactory;
     private final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = new ArrayList<>();
     private final GroovyElementAnnotationMetadataFactory elementAnnotationMetadataFactory;
+    private final ExpressionCompilationContextFactory expressionCompilationContextFactory;
 
     /**
      * @param sourceUnit      The source unit
@@ -95,6 +99,7 @@ public class GroovyVisitorContext implements VisitorContext {
         this.attributes = VISITOR_ATTRIBUTES;
         this.groovyElementFactory = new GroovyElementFactory(this);
         this.elementAnnotationMetadataFactory = new GroovyElementAnnotationMetadataFactory(false, new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit));
+        this.expressionCompilationContextFactory = new DefaultExpressionCompilationContextFactory(this);
     }
 
     @NonNull
@@ -115,21 +120,28 @@ public class GroovyVisitorContext implements VisitorContext {
 
     @Override
     public Optional<ClassElement> getClassElement(String name, ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        if (name == null || compilationUnit == null) {
+        if (name == null) {
             return Optional.empty();
+        } else if (compilationUnit == null) {
+            return Optional.ofNullable(classNodeFromClassLoader(name)).map(cn ->
+                groovyElementFactory.newClassElement(cn, annotationMetadataFactory)
+            );
         }
         ClassNode classNode = Optional.ofNullable(compilationUnit.getClassNode(name))
-            .orElseGet(() -> {
-                if (sourceUnit != null) {
-                    GroovyClassLoader classLoader = sourceUnit.getClassLoader();
-                    if (classLoader != null) {
-                        return ClassUtils.forName(name, classLoader).map(ClassHelper::make).orElse(null);
-                    }
-                }
-                return null;
-            });
+            .orElseGet(() -> classNodeFromClassLoader(name));
 
         return Optional.ofNullable(classNode).map(cn -> groovyElementFactory.newClassElement(cn, annotationMetadataFactory));
+    }
+
+    private ClassNode classNodeFromClassLoader(String name) {
+        ClassNode cn = null;
+        if (sourceUnit != null) {
+            GroovyClassLoader classLoader = sourceUnit.getClassLoader();
+            if (classLoader != null) {
+                cn = ClassUtils.forName(name, classLoader).map(ClassHelper::make).orElse(null);
+            }
+        }
+        return cn;
     }
 
     @Override
@@ -145,7 +157,7 @@ public class GroovyVisitorContext implements VisitorContext {
         ArgumentUtils.requireNonNull("stereotypes", stereotypes);
 
         if (compilationUnit == null) {
-            return new ClassElement[0];
+            return ClassElement.ZERO_CLASS_ELEMENTS;
         }
 
         ClassPathAnnotationScanner scanner = new ClassPathAnnotationScanner(compilationUnit.getClassLoader());
@@ -172,6 +184,11 @@ public class GroovyVisitorContext implements VisitorContext {
     }
 
     @Override
+    public ExpressionCompilationContextFactory getExpressionCompilationContextFactory() {
+        return this.expressionCompilationContextFactory;
+    }
+
+    @Override
     public AbstractAnnotationMetadataBuilder getAnnotationMetadataBuilder() {
         return new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit);
     }
@@ -179,8 +196,8 @@ public class GroovyVisitorContext implements VisitorContext {
     @Override
     public void info(String message, @Nullable Element element) {
         StringBuilder msg = new StringBuilder("Note: ").append(message);
-        if (element != null) {
-            ASTNode expr = (ASTNode) element.getNativeType();
+        if (element instanceof AbstractGroovyElement abstractGroovyElement) {
+            ASTNode expr = abstractGroovyElement.getNativeType().annotatedNode();
             final String sample = sourceUnit.getSample(expr.getLineNumber(), expr.getColumnNumber(), new Janitor());
             msg.append("\n\n").append(sample);
         }
@@ -194,8 +211,8 @@ public class GroovyVisitorContext implements VisitorContext {
 
     @Override
     public void fail(String message, @Nullable Element element) {
-        if (element instanceof AbstractGroovyElement) {
-            AstMessageUtils.error(sourceUnit, ((AbstractGroovyElement) element).getNativeType(), message);
+        if (element instanceof AbstractGroovyElement abstractGroovyElement) {
+            AstMessageUtils.error(sourceUnit, abstractGroovyElement.getNativeType().annotatedNode(), message);
         } else {
             AstMessageUtils.error(sourceUnit, null, message);
         }
@@ -207,8 +224,8 @@ public class GroovyVisitorContext implements VisitorContext {
 
     @Override
     public void warn(String message, @Nullable Element element) {
-        if (element instanceof AbstractGroovyElement) {
-            AstMessageUtils.warning(sourceUnit, ((AbstractGroovyElement) element).getNativeType(), message);
+        if (element instanceof AbstractGroovyElement abstractGroovyElement) {
+            AstMessageUtils.warning(sourceUnit, abstractGroovyElement.getNativeType().annotatedNode(), message);
         } else {
             AstMessageUtils.warning(sourceUnit, null, message);
         }

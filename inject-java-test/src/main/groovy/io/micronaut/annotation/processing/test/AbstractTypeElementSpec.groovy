@@ -145,7 +145,8 @@ abstract class AbstractTypeElementSpec extends Specification {
     * @return the introspection if it is correct
     **/
     protected BeanIntrospection buildBeanIntrospection(String className, @Language("java") String cls) {
-        def beanDefName= (className.startsWith('$') ? '' : '$') + NameUtils.getSimpleName(className) + '$Introspection'
+        def simpleName = NameUtils.getSimpleName(className)
+        def beanDefName = (simpleName.startsWith('$') ? '' : '$') + simpleName + '$Introspection'
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
@@ -239,13 +240,14 @@ class Test {
      * @param cls The class data
      * @return The context. Should be shutdown after use
      */
-    ApplicationContext buildContext(String className, @Language("java") String cls, boolean includeAllBeans = false) {
+    ApplicationContext buildContext(String className, @Language("java") String cls, boolean includeAllBeans = false, Map properties = [:]) {
         def files = newJavaParser().generate(className, cls)
         ClassLoader classLoader = new JavaFileObjectClassLoader(files)
 
         def builder = ApplicationContext.builder()
         builder.classLoader(classLoader)
         builder.environments("test")
+        builder.properties(properties)
         configureContext(builder)
         def env = builder.build().environment
         def context = new DefaultApplicationContext((ApplicationContextConfiguration) builder) {
@@ -471,8 +473,9 @@ class Test {
         return new JavaFileObjectClassLoader(files)
     }
 
+    @CompileStatic
     protected AnnotationMetadata writeAndLoadMetadata(String className, AnnotationMetadata toWrite) {
-        def stream = new ByteArrayOutputStream()
+        ByteArrayOutputStream stream = new ByteArrayOutputStream()
         new AnnotationMetadataWriter(className, null, toWrite, true)
                 .writeTo(stream)
         className = className + AnnotationMetadata.CLASS_NAME_SUFFIX
@@ -480,7 +483,7 @@ class Test {
             @Override
             protected Class<?> findClass(String name) throws ClassNotFoundException {
                 if (name == className) {
-                    def bytes = stream.toByteArray()
+                    byte[] bytes = stream.toByteArray()
                     return defineClass(name, bytes, 0, bytes.length)
                 }
                 return super.findClass(name)
@@ -567,13 +570,15 @@ class Test {
         if (classElement.isArray()) {
             return reconstructTypeSignature(classElement.fromArray()) + "[]"
         } else if (classElement.isGenericPlaceholder()) {
-            def freeVar = (GenericPlaceholderElement) classElement
-            def name = freeVar.variableName
+            def genericPlaceholderElement = (GenericPlaceholderElement) classElement
+            def name = genericPlaceholderElement.variableName
             if (typeVarsAsDeclarations) {
-                def bounds = freeVar.bounds
+                def bounds = genericPlaceholderElement.bounds
                 if (reconstructTypeSignature(bounds[0]) != 'Object') {
                     name += bounds.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", " extends ", ""))
                 }
+            } else if (genericPlaceholderElement.resolved) {
+                return reconstructTypeSignature(genericPlaceholderElement.resolved.get())
             }
             return name
         } else if (classElement.isWildcard()) {
@@ -586,12 +591,13 @@ class Test {
                 return we.upperBounds.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", "? extends ", ""))
             }
         } else {
-            def boundTypeArguments = classElement.getBoundGenericTypes()
-            if (boundTypeArguments.isEmpty()) {
+            def typeArguments = classElement.getTypeArguments().values()
+            if (typeArguments.isEmpty()) {
+                return classElement.getSimpleName()
+            } else if (typeArguments.stream().allMatch { it.isRawType() }) {
                 return classElement.getSimpleName()
             } else {
-                return classElement.getSimpleName() +
-                        boundTypeArguments.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(", ", "<", ">"))
+                return classElement.getSimpleName() + typeArguments.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(", ", "<", ">"))
             }
         }
     }

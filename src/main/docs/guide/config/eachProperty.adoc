@@ -1,6 +1,6 @@
 The link:{api}/io/micronaut/context/annotation/ConfigurationProperties.html[@ConfigurationProperties] annotation is great for a single configuration class, but sometimes you want multiple instances, each with its own distinct configuration. That is where link:{api}/io/micronaut/context/annotation/EachProperty.html[EachProperty] comes in.
 
-The ann:context.annotation.EachProperty[] annotation creates a `ConfigurationProperties` bean for each sub-property within the given property. As an example consider the following class:
+The ann:context.annotation.EachProperty[] annotation creates a `ConfigurationProperties` bean for each sub-property within the given name. As an example consider the following class:
 
 snippet::io.micronaut.docs.config.env.DataSourceConfiguration[tags="eachProperty", indent=0, title="Using @EachProperty"]
 
@@ -21,7 +21,7 @@ snippet::io.micronaut.docs.config.env.EachPropertyTest[tags="beans", indent=0, t
 
 === List-Based Binding
 
-The default behavior of ann:context.annotation.EachProperty[] is to bind from a map style of configuration, where the key is the named qualifier of the bean and the value is the data to bind from. For cases where map style configuration doesn't make sense, it is possible to inform Micronaut that the class is bound from a list. Simply set the `list` member on the annotation to true.
+The default behavior of ann:context.annotation.EachProperty[] is to bind from a map style of configuration, where the key is the named qualifier of the bean and the value is the data to bind from. For cases where map style configuration doesn't make sense, it is possible to inform the Micronaut framework that the class is bound from a list. Simply set the `list` member on the annotation to true.
 
 snippet::io.micronaut.docs.config.env.RateLimitsConfiguration[tags="clazz", indent=0, title="@EachProperty List Example"]
 

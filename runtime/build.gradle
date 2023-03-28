@@ -13,17 +13,15 @@ dependencies {
     api project(':inject')
     api project(':retry')
 
-    api libs.managed.validation
-
     implementation libs.managed.reactor
 
     compileOnly libs.graal
     compileOnly libs.jcache
 
-    compileOnly libs.javax.el
+    compileOnly libs.jakarta.el
     compileOnly libs.caffeine
-    compileOnly libs.kotlinx.coroutines.core
-    compileOnly libs.kotlinx.coroutines.reactive
+    compileOnly libs.managed.kotlinx.coroutines.core
+    compileOnly libs.managed.kotlinx.coroutines.reactive
     testImplementation libs.managed.logback.classic
     testImplementation libs.managed.snakeyaml
     testAnnotationProcessor project(":inject-java")
@@ -49,8 +47,8 @@ spotless {
     }
 }
 
-tasks.withType(Test) {
-    if(JavaVersion.current().majorVersion.toInteger() >= 17) {
+tasks.withType(Test).configureEach {
+    if (JavaVersion.current().majorVersion.toInteger() >= 17) {
         logger.warn("Opening java.util, so SystemLambda can work")
         jvmArgs += ['--add-opens', 'java.base/java.util=ALL-UNNAMED']
     }

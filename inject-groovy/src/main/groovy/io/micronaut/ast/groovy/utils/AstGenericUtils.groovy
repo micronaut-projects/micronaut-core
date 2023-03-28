@@ -235,7 +235,7 @@ class AstGenericUtils {
         }
     }
 
-    /**
+        /**
      * Builds all the generic information for the given type
      * @param classNode
      * @return

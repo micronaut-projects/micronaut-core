@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.CopyOnWriteMap;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
@@ -35,7 +36,8 @@ import jakarta.inject.Singleton;
 import java.io.InputStream;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Supplier;
+import java.util.concurrent.ConcurrentMap;
+import java.util.function.Function;
 
 
 /**
@@ -55,8 +57,9 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
 
     private static final Set<Class<?>> RAW_BODY_TYPES = CollectionUtils.setOf(String.class, byte[].class, ByteBuffer.class, InputStream.class);
 
-    private final BeanLocator beanLocator;
     private final BeanProvider<NettyHttpServerConfiguration> serverConfiguration;
+    private final ConcurrentMap<MediaType, Optional<HttpContentSubscriberFactory>> subscriberFactoryCache = new CopyOnWriteMap<>(128);
+    private final Function<MediaType, Optional<HttpContentSubscriberFactory>> findSubscriberFactory;
     private NettyHttpServerConfiguration nettyServerConfiguration;
 
     /**
@@ -65,8 +68,8 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
      */
     DefaultHttpContentProcessorResolver(BeanLocator beanLocator,
                                         BeanProvider<NettyHttpServerConfiguration> serverConfiguration) {
-        this.beanLocator = beanLocator;
         this.serverConfiguration = serverConfiguration;
+        this.findSubscriberFactory = mt -> beanLocator.findBean(HttpContentSubscriberFactory.class, new ConsumesMediaTypeQualifier<>(mt));
     }
 
     @Override
@@ -117,20 +120,16 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
     }
 
     private HttpContentProcessor resolve(NettyHttpRequest<?> request, boolean rawBodyType) {
-        Supplier<DefaultHttpContentProcessor> defaultHttpContentProcessor = () -> new DefaultHttpContentProcessor(request, getServerConfiguration());
-
-        if (rawBodyType) {
-            return defaultHttpContentProcessor.get();
-        } else {
+        if (!rawBodyType) {
             Optional<MediaType> contentType = request.getContentType();
-            return contentType
-                    .flatMap(type ->
-                            beanLocator.findBean(HttpContentSubscriberFactory.class,
-                                    new ConsumesMediaTypeQualifier<>(type))
-                    ).map(factory ->
-                            factory.build(request)
-                    ).orElseGet(defaultHttpContentProcessor);
+            if (contentType.isPresent()) {
+                Optional<HttpContentSubscriberFactory> factory = subscriberFactoryCache.computeIfAbsent(contentType.get(), findSubscriberFactory);
+                if (factory.isPresent()) {
+                    return factory.get().build(request);
+                }
+            }
         }
+        return new DefaultHttpContentProcessor(request, getServerConfiguration());
     }
 
     private NettyHttpServerConfiguration getServerConfiguration() {

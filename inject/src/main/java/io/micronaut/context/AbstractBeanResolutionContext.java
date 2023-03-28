@@ -44,6 +44,7 @@ import java.util.stream.Stream;
 @Internal
 public abstract class AbstractBeanResolutionContext implements BeanResolutionContext {
 
+    private static final String CONSTRUCTOR_METHOD_NAME = "<init>";
     protected final DefaultBeanContext context;
     protected final BeanDefinition<?> rootDefinition;
     protected final Path path;
@@ -361,12 +362,12 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             if (constructor instanceof MethodInjectionPoint<?, ?> methodInjectionPoint) {
                 return pushConstructorResolve(declaringType, methodInjectionPoint.getName(), argument, constructor.getArguments());
             }
-            return pushConstructorResolve(declaringType, "<init>", argument, constructor.getArguments());
+            return pushConstructorResolve(declaringType, CONSTRUCTOR_METHOD_NAME, argument, constructor.getArguments());
         }
 
         @Override
         public Path pushConstructorResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments) {
-            if ("<init>".equals(methodName)) {
+            if (CONSTRUCTOR_METHOD_NAME.equals(methodName)) {
                 ConstructorSegment constructorSegment = new ConstructorArgumentSegment(declaringType, methodName, argument, arguments);
                 detectCircularDependency(declaringType, argument, constructorSegment);
             } else {
@@ -533,7 +534,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         @Override
         public String toString() {
             StringBuilder baseString;
-            if ("<init>".equals(methodName)) {
+            if (CONSTRUCTOR_METHOD_NAME.equals(methodName)) {
                 baseString = new StringBuilder("new ");
                 baseString.append(getDeclaringType().getBeanType().getSimpleName());
             } else {
@@ -726,6 +727,11 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         @Override
         public BeanDefinition<B> getDeclaringBean() {
             return getDeclaringType();
+        }
+
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return getArgument().getAnnotationMetadata();
         }
     }
 

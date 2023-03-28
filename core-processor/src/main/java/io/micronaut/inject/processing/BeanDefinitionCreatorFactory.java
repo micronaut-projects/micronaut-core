@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.processing;
 
+import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.DefaultScope;
@@ -42,7 +43,7 @@ public abstract class BeanDefinitionCreatorFactory {
     @NonNull
     public static BeanDefinitionCreator produce(ClassElement classElement, VisitorContext visitorContext) {
         boolean isAbstract = classElement.isAbstract();
-        boolean isIntroduction = classElement.hasStereotype(AnnotationUtil.ANN_INTRODUCTION);
+        boolean isIntroduction = isIntroduction(classElement);
         if (ConfigurationReaderBeanElementCreator.isConfigurationProperties(classElement)) {
             if (classElement.isInterface()) {
                 return new IntroductionInterfaceBeanElementCreator(classElement, visitorContext);
@@ -69,6 +70,9 @@ public abstract class BeanDefinitionCreatorFactory {
         if (isDeclaredBean(classElement) || (!isAbstract && (containsInjectMethod(classElement) || containsInjectField(classElement)))) {
             if (classElement.hasStereotype("groovy.lang.Singleton")) {
                 throw new ProcessingException(classElement, "Class annotated with groovy.lang.Singleton instead of jakarta.inject.Singleton. Import jakarta.inject.Singleton to use Micronaut Dependency Injection.");
+            }
+            if (classElement.isEnum()) {
+                throw new ProcessingException(classElement, "Enum types cannot be defined as beans");
             }
             return new DeclaredBeanElementCreator(classElement, visitorContext, false);
         }
@@ -110,13 +114,17 @@ public abstract class BeanDefinitionCreatorFactory {
     }
 
     private static boolean isAopProxyType(ClassElement classElement) {
-        return !classElement.isAssignable("io.micronaut.aop.Interceptor") && InterceptedMethodUtil.hasAroundStereotype(classElement.getAnnotationMetadata());
+        return !classElement.isAssignable(Interceptor.class) && InterceptedMethodUtil.hasAroundStereotype(classElement.getAnnotationMetadata());
     }
 
     public static boolean isDeclaredBeanInMetadata(AnnotationMetadata concreteClassMetadata) {
         return concreteClassMetadata.hasDeclaredStereotype(Bean.class) ||
             concreteClassMetadata.hasStereotype(AnnotationUtil.SCOPE) ||
             concreteClassMetadata.hasStereotype(DefaultScope.class);
+    }
+
+    public static boolean isIntroduction(AnnotationMetadata metadata) {
+        return InterceptedMethodUtil.hasIntroductionStereotype(metadata);
     }
 
 }

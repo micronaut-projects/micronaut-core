@@ -15,6 +15,7 @@
  */
 package io.micronaut.annotation.processing;
 
+import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.writer.AbstractClassWriterOutputVisitor;
@@ -96,8 +97,8 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
                 List<Element> list = new ArrayList<>(originatingElements.length);
                 for (io.micronaut.inject.ast.Element originatingElement : originatingElements) {
                     Object nativeType = originatingElement.getNativeType();
-                    if (nativeType instanceof Element) {
-                        list.add((Element) nativeType);
+                    if (nativeType instanceof JavaNativeElement javaNativeElement) {
+                        list.add(javaNativeElement.element());
                     }
                 }
                 nativeOriginatingElements = list.toArray(new Element[0]);
@@ -118,7 +119,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
                     StandardLocation.CLASS_OUTPUT,
                     "",
                     path,
-                    (Element) originatingElement.getNativeType()
+                    ((JavaNativeElement) originatingElement.getNativeType()).element()
             );
             try (Writer w = fileObject.openWriter()) {
                 w.write("");
@@ -133,7 +134,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
         return metaInfFiles.computeIfAbsent(path, s -> {
             String finalPath = "META-INF/" + path;
             Element[] nativeOriginatingElements = Arrays.stream(originatingElements)
-                    .map(e -> (Element) e.getNativeType()).toArray(Element[]::new);
+                    .map(e -> ((JavaNativeElement) e.getNativeType()).element()).toArray(Element[]::new);
             return Optional.of(new GeneratedFileObject(finalPath, nativeOriginatingElements));
         });
     }

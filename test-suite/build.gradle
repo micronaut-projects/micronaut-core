@@ -31,6 +31,11 @@ repositories {
 
 dependencies {
     annotationProcessor project(":inject-java")
+    annotationProcessor platform(libs.test.boms.micronaut.validation)
+    annotationProcessor (libs.micronaut.validation.processor) {
+        exclude group: 'io.micronaut'
+    }
+
     api project(":core-processor")
 
     testImplementation project(":context")
@@ -38,7 +43,14 @@ dependencies {
     testImplementation project(":http-server-netty")
     testImplementation project(":jackson-databind")
     testImplementation project(":http-client")
-    testImplementation project(":validation")
+    testImplementation project(":http-client-jdk")
+    testImplementation platform(libs.test.boms.micronaut.validation)
+    testImplementation (libs.micronaut.validation) {
+        exclude group: 'io.micronaut'
+    }
+    testImplementation (libs.micronaut.validation.processor) { // For Groovy
+        exclude group: 'io.micronaut'
+    }
     testImplementation project(":inject-groovy")
     testImplementation project(":inject-java")
     testImplementation project(":inject-java-test")
@@ -47,7 +59,9 @@ dependencies {
     testImplementation project(":inject")
     testImplementation project(":function-client")
     testImplementation project(":function-web")
-    testImplementation(libs.micronaut.session)
+    testImplementation (libs.micronaut.session) {
+        exclude group: 'io.micronaut'
+    }
 
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation libs.junit.jupiter.api
@@ -55,10 +69,7 @@ dependencies {
     testImplementation libs.jcache
     testImplementation(platform(libs.test.boms.micronaut.tracing))
     testImplementation(libs.micronaut.tracing.jaeger) {
-        exclude module: 'micronaut-bom'
-        exclude module: 'micronaut-http-client'
-        exclude module: 'micronaut-inject'
-        exclude module: 'micronaut-runtime'
+        exclude group: 'io.micronaut'
     }
     testImplementation libs.managed.groovy.json
     testImplementation libs.managed.groovy.templates
@@ -70,6 +81,10 @@ dependencies {
     testAnnotationProcessor project(":test-suite-helper")
     testAnnotationProcessor project(":inject-java")
     testAnnotationProcessor project(":test-suite")
+    testAnnotationProcessor platform(libs.test.boms.micronaut.validation)
+    testAnnotationProcessor (libs.micronaut.validation.processor) {
+        exclude group: 'io.micronaut'
+    }
 
     testRuntimeOnly(platform(libs.test.boms.micronaut.aws))
     testRuntimeOnly libs.h2
@@ -86,6 +101,7 @@ dependencies {
             classifier = Os.isFamily(Os.FAMILY_MAC) ? (Os.isArch("aarch64") ? "osx-aarch_64" : "osx-x86_64") : 'linux-x86_64'
         }
     }
+    testImplementation libs.managed.netty.incubator.codec.http3
     testImplementation libs.logbook.netty
     testImplementation libs.managed.logback.classic
 

@@ -88,7 +88,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -139,7 +138,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     }
 
     /**
-     * Interceptor to apply headers, cookies, parameter and body arguements.
+     * Interceptor to apply headers, cookies, parameter and body arguments.
      *
      * @param context The context
      * @return httpClient or future
@@ -343,18 +342,23 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                         Publisher<?> csPublisher = httpClientResponsePublisher(httpClient, request, returnType, errorType, valueType);
                         CompletableFuture<Object> future = new CompletableFuture<>();
                         csPublisher.subscribe(new CompletionAwareSubscriber<Object>() {
-                            AtomicReference<Object> reference = new AtomicReference<>();
+                            Object message;
+                            Subscription subscription;
 
                             @Override
                             protected void doOnSubscribe(Subscription subscription) {
-                                subscription.request(1);
+                                this.subscription = subscription;
+                                subscription.request(Long.MAX_VALUE);
                             }
 
                             @Override
                             protected void doOnNext(Object message) {
                                 if (Void.class != reactiveValueType) {
-                                    reference.set(message);
+                                    this.message = message;
                                 }
+                                // we only want the first item
+                                subscription.cancel();
+                                doOnComplete();
                             }
 
                             @Override
@@ -380,7 +384,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
                             @Override
                             protected void doOnComplete() {
-                                future.complete(reference.get());
+                                // can be called twice
+                                future.complete(message);
                             }
                         });
                         return interceptedMethod.handleResult(future);

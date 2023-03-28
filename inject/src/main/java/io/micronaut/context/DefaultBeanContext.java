@@ -109,6 +109,7 @@ import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
 import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.QualifiedBeanType;
 import io.micronaut.inject.ValidatedBeanDefinition;
+import io.micronaut.inject.provider.AbstractProviderDefinition;
 import io.micronaut.inject.proxy.InterceptedBeanProxy;
 import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.Qualified;
@@ -168,6 +169,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
         int order2 = OrderUtil.getOrder(o2.getBeanDefinition(), o2.getBean());
         return Integer.compare(order1, order2);
     };
+    private static final String MSG_COULD_NOT_BE_LOADED = "] could not be loaded: ";
+    public static final String MSG_BEAN_DEFINITION = "Bean definition [";
 
 
     protected final AtomicBoolean running = new AtomicBoolean(false);
@@ -1628,6 +1631,14 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return (Collection<BeanDefinition<?>>) Collections.emptyMap();
     }
 
+    @Override
+    public Collection<DisabledBean<?>> getDisabledBeans() {
+        return disabledBeans.values().stream()
+            .map(producer -> (DisabledBean<?>) producer.reference)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
+    }
+
     @SuppressWarnings("unchecked")
     @NonNull
     @Override
@@ -1945,6 +1956,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
                 // The supplier can be triggered concurrently.
                 // We allow for the listeners collection to be initialized multiple times.
+                @SuppressWarnings("java:S3077")
                 private volatile List<T> listeners;
 
                 @Override
@@ -2011,7 +2023,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 try {
                     loadEagerBeans(contextScopeBean, eagerInit);
                 } catch (Throwable e) {
-                    throw new BeanInstantiationException("Bean definition [" + contextScopeBean.getReference().getName() + "] could not be loaded: " + e.getMessage(), e);
+                    throw new BeanInstantiationException(MSG_BEAN_DEFINITION + contextScopeBean.getReference().getName() + MSG_COULD_NOT_BE_LOADED + e.getMessage(), e);
                 }
             }
             filterReplacedBeans(null, eagerInit);
@@ -2024,7 +2036,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                         AbstractBeanContextConditional.ConditionLog.LOG.debug("Bean of type [{}] disabled for reason: {}", eagerInitDefinition.getBeanType().getSimpleName(), e.getMessage());
                     }
                 } catch (Throwable e) {
-                    throw new BeanInstantiationException("Bean definition [" + eagerInitDefinition.getName() + "] could not be loaded: " + e.getMessage(), e);
+                    throw new BeanInstantiationException(MSG_BEAN_DEFINITION + eagerInitDefinition.getName() + MSG_COULD_NOT_BE_LOADED + e.getMessage(), e);
                 }
             }
         }
@@ -2408,15 +2420,17 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                                   @NonNull BeanDefinition<T> beanDefinition,
                                                   @NonNull T bean,
                                                   @Nullable Qualifier<T> finalQualifier) {
-        Class<T> beanType = beanDefinition.getBeanType();
-        if (!(bean instanceof BeanCreatedEventListener) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
-            for (Map.Entry<Class<?>, ListenersSupplier<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
-                if (entry.getKey().isAssignableFrom(beanType)) {
-                    BeanKey<T> beanKey = new BeanKey<>(beanDefinition, finalQualifier);
-                    for (BeanCreatedEventListener<?> listener : entry.getValue().get(resolutionContext)) {
-                        bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, beanKey, bean));
-                        if (bean == null) {
-                            throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
+        if (!(beanDefinition instanceof AbstractProviderDefinition<?>)) {
+            Class<T> beanType = beanDefinition.getBeanType();
+            if (!(bean instanceof BeanCreatedEventListener) && CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
+                for (Map.Entry<Class<?>, ListenersSupplier<BeanCreatedEventListener>> entry : beanCreationEventListeners) {
+                    if (entry.getKey().isAssignableFrom(beanType)) {
+                        BeanKey<T> beanKey = new BeanKey<>(beanDefinition, finalQualifier);
+                        for (BeanCreatedEventListener<?> listener : entry.getValue().get(resolutionContext)) {
+                            bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, beanKey, bean));
+                            if (bean == null) {
+                                throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
+                            }
                         }
                     }
                 }
@@ -2502,7 +2516,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                             loadEagerBeans(producer, parallelDefinitions);
                         } catch (Throwable e) {
                             BeanDefinitionReference<Object> beanDefinitionReference = producer.getReference();
-                            LOG.error("Parallel Bean definition [" + beanDefinitionReference.getName() + "] could not be loaded: " + e.getMessage(), e);
+                            LOG.error("Parallel Bean definition [" + beanDefinitionReference.getName() + MSG_COULD_NOT_BE_LOADED + e.getMessage(), e);
                             Boolean shutdownOnError = beanDefinitionReference.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
                             if (shutdownOnError) {
                                 stop();
@@ -2516,7 +2530,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                         try {
                             initializeEagerBean(beanDefinition);
                         } catch (Throwable e) {
-                            LOG.error("Parallel Bean definition [" + beanDefinition.getName() + "] could not be loaded: " + e.getMessage(), e);
+                            LOG.error("Parallel Bean definition [" + beanDefinition.getName() + MSG_COULD_NOT_BE_LOADED + e.getMessage(), e);
                             Boolean shutdownOnError = beanDefinition.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
                             if (shutdownOnError) {
                                 stop();
@@ -2694,7 +2708,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 initializingBeanDefinition.initialize(resolutionContext, this, instance);
             }
         } else {
-            throw new BeanContextException("Bean definition [" + beanDefinition + "] doesn't support injection!");
+            throw new BeanContextException(MSG_BEAN_DEFINITION + beanDefinition + "] doesn't support injection!");
         }
     }
 
@@ -3335,6 +3349,9 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
         reference:
         for (BeanDefinitionProducer beanDefinitionProducer : producers) {
+            if (beanDefinitionProducer.isDisabled()) {
+                continue;
+            }
             BeanDefinitionReference beanDefinitionReference = beanDefinitionProducer.reference;
             for (BeanConfiguration disableConfiguration : configurationsDisabled) {
                 if (disableConfiguration.isWithin(beanDefinitionReference)) {
@@ -4004,8 +4021,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
         @Override
         public String getName() {
-            if (qualifier instanceof Named) {
-                return ((Named) qualifier).getName();
+            if (qualifier instanceof Named named) {
+                return named.getName();
             }
             return Primary.SIMPLE_NAME;
         }
@@ -4092,16 +4109,18 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     /**
      * The class adds the caching of the enabled decision + the definition instance.
-     * NOTE: The class can be accesed in multiple threads, we do allow for the fields to be possibly intitialized concurrently - multiple times.
+     * NOTE: The class can be accessed in multiple threads, we do allow for the fields to be possibly initialized concurrently - multiple times.
      *
      * @since 4.0.0
      */
     @Internal
-    final static class BeanDefinitionProducer {
+    static final class BeanDefinitionProducer {
 
         @Nullable
+        @SuppressWarnings("java:S3077")
         private volatile BeanDefinitionReference reference;
         @Nullable
+        @SuppressWarnings("java:S3077")
         private volatile BeanDefinition definition;
         @Nullable
         private volatile Boolean referenceEnabled;
@@ -4191,7 +4210,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 }
                 return def;
             } catch (Throwable e) {
-                throw new BeanInstantiationException("Bean definition [" + reference.getName() + "] could not be loaded: " + e.getMessage(), e);
+                throw new BeanInstantiationException(MSG_BEAN_DEFINITION + reference.getName() + MSG_COULD_NOT_BE_LOADED + e.getMessage(), e);
             }
         }
 

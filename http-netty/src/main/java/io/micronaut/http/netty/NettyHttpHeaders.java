@@ -20,6 +20,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpHeaderValues;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
@@ -37,6 +38,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -130,6 +132,12 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     @Override
     public String get(CharSequence name) {
         return nettyHeaders.get(name);
+    }
+
+    @Override
+    public Optional<String> findFirst(CharSequence name) {
+        // optimization to avoid ConversionService
+        return Optional.ofNullable(get(name));
     }
 
     @Override
@@ -241,5 +249,36 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     @Override
     public void setConversionService(ConversionService conversionService) {
         this.conversionService = conversionService;
+    }
+
+    @Override
+    public Optional<MediaType> contentType() {
+        // optimization to avoid ConversionService
+        String str = get(HttpHeaders.CONTENT_TYPE);
+        if (str != null) {
+            try {
+                return Optional.of(MediaType.of(str));
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public OptionalLong contentLength() {
+        // optimization to avoid ConversionService
+        Optional<String> str = findFirst(HttpHeaderNames.CONTENT_LENGTH);
+        if (str.isPresent()) {
+            try {
+                return OptionalLong.of(Long.parseLong(str.get()));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return OptionalLong.empty();
+    }
+
+    @Override
+    public Optional<String> getOrigin() {
+        return findFirst(HttpHeaderNames.ORIGIN);
     }
 }

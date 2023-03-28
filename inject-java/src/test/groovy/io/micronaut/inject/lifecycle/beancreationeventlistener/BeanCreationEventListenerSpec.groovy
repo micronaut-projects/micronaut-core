@@ -94,6 +94,13 @@ class BeanCreationEventListenerSpec extends Specification {
         OffendingInterfaceListener.executed == true
         OffendingMethodListener.initialized == true
         OffendingMethodListener.executed == true
+        AllBeansListener.executed == true
+
+        when:
+        C c = context.getBean(C)
+
+        then:
+        c != null
 
         cleanup:
         context.close()

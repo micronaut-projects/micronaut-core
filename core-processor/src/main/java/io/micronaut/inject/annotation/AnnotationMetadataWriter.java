@@ -19,12 +19,14 @@ import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.context.expressions.AbstractEvaluatedExpression;
 import io.micronaut.inject.writer.AbstractAnnotationMetadataWriter;
 import io.micronaut.inject.writer.AbstractClassFileWriter;
 import io.micronaut.inject.writer.ClassGenerationException;
@@ -64,7 +66,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     private static final Type TYPE_DEFAULT_ANNOTATION_METADATA_HIERARCHY = Type.getType(AnnotationMetadataHierarchy.class);
     private static final Type TYPE_ANNOTATION_CLASS_VALUE = Type.getType(AnnotationClassValue.class);
 
-    private static final org.objectweb.asm.commons.Method METHOD_LIST_OF = org.objectweb.asm.commons.Method.getMethod(
+    private static final org.objectweb.asm.commons.Method METHOD_LIST_OF = Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(
                     AnnotationUtil.class,
                     "internListOf",
@@ -72,7 +74,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             )
     );
 
-    private static final org.objectweb.asm.commons.Method METHOD_REGISTER_ANNOTATION_DEFAULTS = org.objectweb.asm.commons.Method.getMethod(
+    private static final org.objectweb.asm.commons.Method METHOD_REGISTER_ANNOTATION_DEFAULTS = Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(
                     DefaultAnnotationMetadata.class,
                     "registerAnnotationDefaults",
@@ -81,7 +83,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             )
     );
 
-    private static final org.objectweb.asm.commons.Method METHOD_REGISTER_ANNOTATION_TYPE = org.objectweb.asm.commons.Method.getMethod(
+    private static final org.objectweb.asm.commons.Method METHOD_REGISTER_ANNOTATION_TYPE = Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(
                     DefaultAnnotationMetadata.class,
                     "registerAnnotationType",
@@ -89,7 +91,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             )
     );
 
-    private static final org.objectweb.asm.commons.Method METHOD_REGISTER_REPEATABLE_ANNOTATIONS = org.objectweb.asm.commons.Method.getMethod(
+    private static final org.objectweb.asm.commons.Method METHOD_REGISTER_REPEATABLE_ANNOTATIONS = Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(
                     DefaultAnnotationMetadata.class,
                     "registerRepeatableAnnotations",
@@ -97,7 +99,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             )
     );
 
-    private static final org.objectweb.asm.commons.Method METHOD_GET_DEFAULT_VALUES = org.objectweb.asm.commons.Method.getMethod(
+    private static final org.objectweb.asm.commons.Method METHOD_GET_DEFAULT_VALUES = Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(
                     AnnotationMetadataSupport.class,
                     "getDefaultValues",
@@ -105,7 +107,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             )
     );
 
-    private static final org.objectweb.asm.commons.Method CONSTRUCTOR_ANNOTATION_METADATA = org.objectweb.asm.commons.Method.getMethod(
+    private static final org.objectweb.asm.commons.Method CONSTRUCTOR_ANNOTATION_METADATA = Method.getMethod(
             ReflectionUtils.getRequiredInternalConstructor(
                     DefaultAnnotationMetadata.class,
                     Map.class,
@@ -113,6 +115,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                     Map.class,
                     Map.class,
                     Map.class,
+                    boolean.class,
                     boolean.class
             )
     );
@@ -154,6 +157,12 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             )
     );
 
+    private static final org.objectweb.asm.commons.Method CONSTRUCTOR_CONTEXT_EVALUATED_EXPRESSION = org.objectweb.asm.commons.Method.getMethod(
+        ReflectionUtils.getRequiredInternalConstructor(
+            AbstractEvaluatedExpression.class,
+            Object.class
+        ));
+
     private static final Type ANNOTATION_UTIL_TYPE = Type.getType(AnnotationUtil.class);
     private static final Type LIST_TYPE = Type.getType(List.class);
     private static final String EMPTY_LIST = "EMPTY_LIST";
@@ -186,9 +195,8 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         }
         if (annotationMetadata instanceof DefaultAnnotationMetadata) {
             this.annotationMetadata = annotationMetadata;
-        } else if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
-            final AnnotationMetadataHierarchy hierarchy = (AnnotationMetadataHierarchy) annotationMetadata;
-            this.annotationMetadata = hierarchy.getDeclaredMetadata();
+        } else if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
+            this.annotationMetadata = annotationMetadataHierarchy.getDeclaredMetadata();
         } else {
             throw new ClassGenerationException("Compile time metadata required to generate class: " + className);
         }
@@ -251,7 +259,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     }
 
     /**
-     * Writes out the byte code necessary to instantiate the given {@link DefaultAnnotationMetadata}.
+     * Writes out the byte code necessary to instantiate the given {@link MutableAnnotationMetadata}.
      *
      * @param owningType           The owning type
      * @param declaringClassWriter The declaring class writer
@@ -262,7 +270,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
      */
     @Internal
     @UsedByGeneratedCode
-    public static void instantiateNewMetadata(Type owningType, ClassWriter declaringClassWriter, GeneratorAdapter generatorAdapter, DefaultAnnotationMetadata annotationMetadata, Map<String, Integer> defaultsStorage, Map<String, GeneratorAdapter> loadTypeMethods) {
+    public static void instantiateNewMetadata(Type owningType, ClassWriter declaringClassWriter, GeneratorAdapter generatorAdapter, MutableAnnotationMetadata annotationMetadata, Map<String, Integer> defaultsStorage, Map<String, GeneratorAdapter> loadTypeMethods) {
         instantiateInternal(owningType, declaringClassWriter, generatorAdapter, annotationMetadata, true, defaultsStorage, loadTypeMethods);
     }
 
@@ -338,12 +346,12 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         if (annotationMetadata.isEmpty()) {
             generatorAdapter.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
-        } else if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+        } else if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {
             instantiateNewMetadata(
                     owningType,
                     classWriter,
                     generatorAdapter,
-                    (DefaultAnnotationMetadata) annotationMetadata,
+                    mutableAnnotationMetadata,
                     defaultsStorage,
                     loadTypeMethods
             );
@@ -355,7 +363,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     }
 
     /**
-     * Writes out the byte code necessary to instantiate the given {@link DefaultAnnotationMetadata}.
+     * Writes out the byte code necessary to instantiate the given {@link MutableAnnotationMetadata}.
      *
      * @param annotationMetadata The annotation metadata
      * @param classWriter        The class writer
@@ -364,7 +372,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
      * @param loadTypeMethods    The generated load type methods
      */
     @Internal
-    public static void writeAnnotationDefaults(DefaultAnnotationMetadata annotationMetadata, ClassWriter classWriter, Type owningType, Map<String, Integer> defaultsStorage, Map<String, GeneratorAdapter> loadTypeMethods) {
+    public static void writeAnnotationDefaults(MutableAnnotationMetadata annotationMetadata, ClassWriter classWriter, Type owningType, Map<String, Integer> defaultsStorage, Map<String, GeneratorAdapter> loadTypeMethods) {
         final Map<String, Map<CharSequence, Object>> annotationDefaultValues = annotationMetadata.annotationDefaultValues;
         if (CollectionUtils.isNotEmpty(annotationDefaultValues)) {
 
@@ -394,10 +402,10 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             Type owningType,
             ClassWriter classWriter,
             GeneratorAdapter staticInit,
-            DefaultAnnotationMetadata annotationMetadata,
+            MutableAnnotationMetadata annotationMetadata,
             Map<String, Integer> defaultsStorage,
             Map<String, GeneratorAdapter> loadTypeMethods) {
-        final Map<String, Map<CharSequence, Object>> annotationDefaultValues = annotationMetadata.annotationDefaultValues;
+            final Map<String, Map<CharSequence, Object>> annotationDefaultValues = annotationMetadata.annotationDefaultValues;
         if (CollectionUtils.isNotEmpty(annotationDefaultValues)) {
             for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationDefaultValues.entrySet()) {
                 final Map<CharSequence, Object> annotationValues = entry.getValue();
@@ -453,7 +461,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             Type owningType,
             ClassWriter declaringClassWriter,
             GeneratorAdapter generatorAdapter,
-            DefaultAnnotationMetadata annotationMetadata,
+            MutableAnnotationMetadata annotationMetadata,
             boolean isNew,
             Map<String, Integer> defaultsStorage,
             Map<String, GeneratorAdapter> loadTypeMethods) {
@@ -482,6 +490,8 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         pushStringMapOf(generatorAdapter, annotationsByStereotype, false, Collections.emptyList(), list -> pushListOfString(generatorAdapter, list));
         // 6th argument: has property expressions
         generatorAdapter.push(annotationMetadata.hasPropertyExpressions());
+        // 7th argument: has evaluated expressions
+        generatorAdapter.push(annotationMetadata.hasEvaluatedExpressions());
 
         // invoke the constructor
         generatorAdapter.invokeConstructor(TYPE_DEFAULT_ANNOTATION_METADATA, CONSTRUCTOR_ANNOTATION_METADATA);
@@ -494,7 +504,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         startClass(classWriter, getInternalName(className), TYPE_DEFAULT_ANNOTATION_METADATA);
 
         GeneratorAdapter constructor = startConstructor(classWriter);
-        DefaultAnnotationMetadata annotationMetadata = (DefaultAnnotationMetadata) this.annotationMetadata;
+        MutableAnnotationMetadata annotationMetadata = (MutableAnnotationMetadata) this.annotationMetadata;
 
         Map<String, Integer> defaultsStorage = new HashMap<>(3);
         final HashMap<String, GeneratorAdapter> loadTypeMethods = new HashMap<>(5);
@@ -509,6 +519,8 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         constructor.visitInsn(RETURN);
         constructor.visitMaxs(1, 1);
         constructor.visitEnd();
+        defaultsStorage.clear(); // Defaults were valid only in the constructor scope
+
         if (writeAnnotationDefaults) {
             writeAnnotationDefaults(annotationMetadata, classWriter, owningType, defaultsStorage, loadTypeMethods);
         }
@@ -668,6 +680,28 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 methodVisitor.loadLocal(defaultIndex);
             }
             methodVisitor.invokeConstructor(annotationValueType, CONSTRUCTOR_ANNOTATION_VALUE_AND_MAP);
+        } else if (value instanceof EvaluatedExpressionReference expressionReference) {
+            Type type = Type.getType(getTypeDescriptor(expressionReference.expressionClassName()));
+
+            methodVisitor.visitTypeInsn(NEW, type.getInternalName());
+            methodVisitor.visitInsn(DUP);
+
+            Object annotationValue = expressionReference.annotationValue();
+            if (annotationValue instanceof String str) {
+                methodVisitor.push(str);
+            } else if (annotationValue instanceof String[] strings) {
+                int len = Array.getLength(strings);
+                pushNewArray(methodVisitor, String.class, len);
+                for (int i = 0; i < len; i++) {
+                    final Object v = Array.get(strings, i);
+                    pushStoreInArray(methodVisitor, Type.getType(String.class), i, len,
+                        () -> pushValue(declaringType, declaringClassWriter, methodVisitor, v,
+                            defaultsStorage, loadTypeMethods, false));
+                }
+            }
+
+            methodVisitor.invokeConstructor(type, CONSTRUCTOR_CONTEXT_EVALUATED_EXPRESSION);
+
         } else {
             methodVisitor.visitInsn(ACONST_NULL);
         }

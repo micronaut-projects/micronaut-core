@@ -40,9 +40,7 @@ import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 import reactor.core.publisher.Flux
-import spock.lang.Ignore
 import spock.lang.Issue
-import spock.lang.PendingFeature
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
@@ -52,7 +50,7 @@ import java.util.concurrent.TimeUnit
 @MicronautTest
 @Property(name = "micronaut.server.http-version", value = "2.0")
 //@Property(name = "micronaut.server.port", value = "8912")
-@Property(name = "micronaut.http.client.http-version", value = "2.0")
+@Property(name = "micronaut.http.client.plaintext-mode", value = "h2c")
 @Property(name = "micronaut.server.ssl.enabled", value = "false")
 @Issue('https://github.com/micronaut-projects/micronaut-core/issues/5005')
 class H2cSpec extends Specification {
@@ -150,6 +148,7 @@ class H2cSpec extends Specification {
         streamingHttpClient.dataStream(HttpRequest.GET(url)).subscribe(new Subscriber<ByteBuffer<?>>() {
             @Override
             void onSubscribe(Subscription s) {
+                s.request(Long.MAX_VALUE)
             }
 
             @Override
@@ -171,19 +170,12 @@ class H2cSpec extends Specification {
         return composed.toString(StandardCharsets.UTF_8)
     }
 
-    @PendingFeature
-    @Ignore
-    // todo: streaming h2c is currently broken. This is because addFinalHandler is called after the stream receivers
-    //  have been registered to the pipeline. This means that http2 messages aren't transformed to http messages
-    //  properly.
     void 'test using micronaut http client: stream'() {
         expect:
         stream("http://localhost:${embeddedServer.port}/h2c/test") == 'foo'
         stream("http://localhost:${embeddedServer.port}/h2c/testStream") == 'foo'
     }
 
-    @PendingFeature
-    @Ignore
     void 'test using micronaut http client: stream reverse'() {
         // order matters because the client reuses connections
         expect:

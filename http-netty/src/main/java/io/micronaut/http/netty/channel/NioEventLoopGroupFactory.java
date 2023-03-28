@@ -19,10 +19,12 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.channel.unix.ServerDomainSocketChannel;
@@ -103,5 +105,30 @@ public class NioEventLoopGroupFactory implements EventLoopGroupFactory {
             group.setIoRatio(ioRatio);
         }
         return group;
+    }
+
+    @Override
+    public Class<? extends Channel> channelClass(NettyChannelType type) throws UnsupportedOperationException {
+        return switch (type) {
+            case SERVER_SOCKET -> NioServerSocketChannel.class;
+            case CLIENT_SOCKET -> NioSocketChannel.class;
+            case DOMAIN_SERVER_SOCKET -> throw new UnsupportedOperationException("NIO does not support domain sockets");
+            case DATAGRAM_SOCKET -> NioDatagramChannel.class;
+        };
+    }
+
+    @Override
+    public Class<? extends Channel> channelClass(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration) {
+        return channelClass(type);
+    }
+
+    @Override
+    public Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration) {
+        return switch (type) {
+            case SERVER_SOCKET -> new NioServerSocketChannel();
+            case CLIENT_SOCKET -> new NioSocketChannel();
+            case DOMAIN_SERVER_SOCKET -> throw new UnsupportedOperationException("NIO does not support domain sockets");
+            case DATAGRAM_SOCKET -> new NioDatagramChannel();
+        };
     }
 }

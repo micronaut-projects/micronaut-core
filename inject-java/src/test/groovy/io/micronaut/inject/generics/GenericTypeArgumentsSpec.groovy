@@ -25,7 +25,7 @@ import zipkin2.Span
 import zipkin2.reporter.AsyncReporter
 import zipkin2.reporter.Reporter
 
-import javax.validation.ConstraintViolationException
+import jakarta.validation.ConstraintViolationException
 import java.util.function.Function
 import java.util.function.Supplier
 
@@ -39,7 +39,7 @@ package innergenerics;
 class Outer {
 
     interface Foo<T extends CharSequence> {}
-    
+
     @jakarta.inject.Singleton
     class FooImpl implements Foo<String> {}
 }
@@ -89,7 +89,7 @@ package exceptionhandler;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.validation.ConstraintViolationException;
+import jakarta.validation.ConstraintViolationException;
 
 @Context
 class Test implements ExceptionHandler<ConstraintViolationException, java.util.function.Supplier<Foo>> {

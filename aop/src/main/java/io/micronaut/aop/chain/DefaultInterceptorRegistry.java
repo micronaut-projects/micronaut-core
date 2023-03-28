@@ -34,6 +34,8 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.context.ContextConfigurable;
+import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,8 +43,6 @@ import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-
-import static io.micronaut.inject.qualifiers.InterceptorBindingQualifier.META_MEMBER_MEMBERS;
 
 /**
  * Default implementation of the interceptor registry interface.
@@ -179,7 +179,7 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
 
     private boolean matches(AnnotationValue<?> interceptorAnnotationValue, Collection<AnnotationValue<?>> interceptPointBindings) {
         final AnnotationValue<Annotation> memberBinding = interceptorAnnotationValue
-            .getAnnotation(META_MEMBER_MEMBERS).orElse(null);
+            .getAnnotation(InterceptorBindingQualifier.META_BINDING_VALUES).orElse(null);
         final String annotationName = interceptorAnnotationValue.stringValue().orElse(null);
         if (annotationName == null) {
             // This shouldn't happen
@@ -194,7 +194,7 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
                 return true;
             }
             AnnotationValue<Annotation> otherMembers =
-                applicableValue.getAnnotation(META_MEMBER_MEMBERS).orElse(null);
+                applicableValue.getAnnotation(InterceptorBindingQualifier.META_BINDING_VALUES).orElse(null);
             if (!memberBinding.equals(otherMembers)) {
                 continue;
             }
@@ -239,6 +239,9 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
     }
 
     private static void instrumentAnnotationMetadata(BeanContext beanContext, Object method) {
+        if (method instanceof ContextConfigurable ctxConfigurable) {
+            ctxConfigurable.configure(beanContext);
+        }
         if (beanContext instanceof ApplicationContext applicationContext && method instanceof EnvironmentConfigurable environmentConfigurable) {
             // ensure metadata is environment aware
             if (environmentConfigurable.hasPropertyExpressions()) {

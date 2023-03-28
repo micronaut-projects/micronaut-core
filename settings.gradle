@@ -14,7 +14,7 @@ pluginManagement {
 }
 
 plugins {
-    id 'io.micronaut.build.shared.settings' version '6.2.0'
+    id 'io.micronaut.build.shared.settings' version '6.3.5'
 }
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
@@ -36,16 +36,20 @@ include "graal"
 include "http"
 include "http-client-core"
 include "http-client"
+include "http-client-jdk"
+include "http-client-tck"
 include "http-netty"
 include "http-server"
 include "http-server-tck"
 include "http-server-netty"
+include "http-tck"
 include "http-validation"
 include "inject"
 include "inject-groovy"
 include "inject-groovy-test"
 include "inject-java"
 include "inject-java-test"
+include 'inject-kotlin'
 include 'inject-kotlin-test'
 include "inject-test-utils"
 include "jackson-core"
@@ -57,19 +61,24 @@ include "retry"
 include "router"
 include "runtime"
 include "runtime-osx"
-include "validation"
 include "websocket"
 
 // test suites
 include "test-suite"
 include "test-suite-geb"
 include "test-suite-helper"
+include "test-suite-http-client-jdk-ssl"
+include "test-suite-http-client-tck-netty"
+include "test-suite-http-client-tck-jdk"
 include "test-suite-javax-inject"
 include "test-suite-jakarta-inject-bean-import"
+include "test-suite-http-server-tck-jdk"
 include "test-suite-http-server-tck-netty"
 include "test-suite-kotlin"
-include "test-suite-graal"
+include "test-suite-kotlin-ksp"
 include "test-suite-groovy"
+include "test-suite-groovy"
+include "test-suite-logback"
 include "test-utils"
 
 // benchmarks

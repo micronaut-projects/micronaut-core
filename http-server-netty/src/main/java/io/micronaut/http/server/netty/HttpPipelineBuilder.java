@@ -16,8 +16,10 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.util.SupplierUtil;
+import io.micronaut.http.HttpVersion;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
@@ -26,6 +28,7 @@ import io.micronaut.http.server.netty.decoders.HttpRequestDecoder;
 import io.micronaut.http.server.netty.encoders.HttpResponseEncoder;
 import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
 import io.micronaut.http.server.netty.ssl.HttpRequestCertificateHandler;
+import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
 import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
 import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.http.ssl.ServerSslConfiguration;
@@ -62,6 +65,11 @@ import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslHandshakeCompletionEvent;
 import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateHandler;
+import io.netty.incubator.codec.http3.Http3;
+import io.netty.incubator.codec.http3.Http3FrameToHttpObjectCodec;
+import io.netty.incubator.codec.http3.Http3ServerConnectionHandler;
+import io.netty.incubator.codec.quic.QuicSslContext;
+import io.netty.incubator.codec.quic.QuicStreamChannel;
 import io.netty.util.AsciiString;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
@@ -102,25 +110,28 @@ final class HttpPipelineBuilder {
 
     private final LoggingHandler loggingHandler;
     private final SslContext sslContext;
+    private final QuicSslContext quicSslContext;
     private final HttpAccessLogHandler accessLogHandler;
     private final HttpRequestDecoder requestDecoder;
     private final HttpResponseEncoder responseEncoder;
 
-    private final HttpRequestCertificateHandler requestCertificateHandler = new HttpRequestCertificateHandler();
-
     private final NettyServerCustomizer serverCustomizer;
 
-    HttpPipelineBuilder(NettyHttpServer server, NettyEmbeddedServices embeddedServices, ServerSslConfiguration sslConfiguration, RoutingInBoundHandler routingInBoundHandler, HttpHostResolver hostResolver, NettyServerCustomizer serverCustomizer) {
+    private final boolean quic;
+
+    HttpPipelineBuilder(NettyHttpServer server, NettyEmbeddedServices embeddedServices, ServerSslConfiguration sslConfiguration, RoutingInBoundHandler routingInBoundHandler, HttpHostResolver hostResolver, NettyServerCustomizer serverCustomizer, boolean quic) {
         this.server = server;
         this.embeddedServices = embeddedServices;
         this.sslConfiguration = sslConfiguration;
         this.routingInBoundHandler = routingInBoundHandler;
         this.hostResolver = hostResolver;
         this.serverCustomizer = serverCustomizer;
+        this.quic = quic;
 
         Optional<LogLevel> logLevel = server.getServerConfiguration().getLogLevel();
         loggingHandler = logLevel.map(level -> new LoggingHandler(NettyHttpServer.class, level)).orElse(null);
-        sslContext = embeddedServices.getServerSslBuilder() != null ? embeddedServices.getServerSslBuilder().build().orElse(null) : null;
+        sslContext = embeddedServices.getServerSslBuilder() != null && !quic ? embeddedServices.getServerSslBuilder().build().orElse(null) : null;
+        quicSslContext = quic ? embeddedServices.getServerSslBuilder().buildQuic().orElse(null) : null;
 
         NettyHttpServerConfiguration.AccessLogger accessLogger = server.getServerConfiguration().getAccessLogger();
         if (accessLogger != null && accessLogger.isEnabled()) {
@@ -130,9 +141,9 @@ final class HttpPipelineBuilder {
         }
 
         requestDecoder = new HttpRequestDecoder(server,
-                server.getEnvironment(),
-                server.getServerConfiguration(),
-                embeddedServices.getEventPublisher(HttpRequestReceivedEvent.class));
+            server.getEnvironment(),
+            server.getServerConfiguration(),
+            embeddedServices.getEventPublisher(HttpRequestReceivedEvent.class));
         responseEncoder = new HttpResponseEncoder(
                 embeddedServices.getMediaTypeCodecRegistry(),
                 server.getServerConfiguration(),
@@ -147,18 +158,26 @@ final class HttpPipelineBuilder {
         private final Channel channel;
         private final ChannelPipeline pipeline;
 
-        private final boolean ssl;
+        @Nullable
+        private final SslHandler sslHandler;
+        private final boolean https;
 
         private final NettyServerCustomizer connectionCustomizer;
 
-        ConnectionPipeline(Channel channel, boolean ssl) {
+        /**
+         * @param channel The channel of this connection
+         * @param tls     Whether to add a TLS handler
+         * @param https   Whether this connection is HTTPS (usually same as {@code tls}, except for HTTP/3)
+         */
+        ConnectionPipeline(Channel channel, boolean tls, boolean https) {
             this.channel = channel;
             this.pipeline = channel.pipeline();
-            this.ssl = ssl;
+            this.sslHandler = tls ? sslContext.newHandler(channel.alloc()) : null;
+            this.https = https;
             this.connectionCustomizer = serverCustomizer.specializeForChannel(channel, NettyServerCustomizer.ChannelRole.CONNECTION);
         }
 
-        void insertPcapLoggingHandler(String qualifier) {
+        void insertPcapLoggingHandler(Channel ch, String qualifier) {
             String pattern = server.getServerConfiguration().getPcapLoggingPathPattern();
             if (pattern == null) {
                 return;
@@ -166,8 +185,16 @@ final class HttpPipelineBuilder {
 
             String path = pattern;
             path = path.replace("{qualifier}", qualifier);
-            path = path.replace("{localAddress}", resolveIfNecessary(pipeline.channel().localAddress()));
-            path = path.replace("{remoteAddress}", resolveIfNecessary(pipeline.channel().remoteAddress()));
+            if (ch.localAddress() != null) {
+                path = path.replace("{localAddress}", resolveIfNecessary(ch.localAddress()));
+            }
+            if (ch.remoteAddress() != null) {
+                path = path.replace("{remoteAddress}", resolveIfNecessary(ch.remoteAddress()));
+            }
+            if (quic && ch instanceof QuicStreamChannel qsc) {
+                path = path.replace("{localAddress}", resolveIfNecessary(qsc.parent().localAddress()));
+                path = path.replace("{remoteAddress}", resolveIfNecessary(qsc.parent().remoteAddress()));
+            }
             path = path.replace("{random}", Long.toHexString(ThreadLocalRandom.current().nextLong()));
             path = path.replace("{timestamp}", Instant.now().toString());
 
@@ -176,7 +203,13 @@ final class HttpPipelineBuilder {
             LOG.warn("Logging *full* request data, as configured. This will contain sensitive information! Path: '{}'", path);
 
             try {
-                pipeline.addLast(new PcapWriteHandler(new FileOutputStream(path)));
+                PcapWriteHandler.Builder builder = PcapWriteHandler.builder();
+
+                if (quic && ch instanceof QuicStreamChannel qsc) {
+                    builder.forceTcpChannel((InetSocketAddress) qsc.parent().localAddress(), (InetSocketAddress) qsc.parent().remoteAddress(), true);
+                }
+
+                ch.pipeline().addLast(builder.build(new FileOutputStream(path)));
             } catch (FileNotFoundException e) {
                 LOG.warn("Failed to create target pcap at '{}', not logging.", path, e);
             }
@@ -211,7 +244,7 @@ final class HttpPipelineBuilder {
             if (server.getServerConfiguration().getHttpVersion() != io.micronaut.http.HttpVersion.HTTP_2_0) {
                 configureForHttp1();
             } else {
-                if (ssl) {
+                if (sslHandler != null) {
                     configureForAlpn();
                 } else {
                     configureForH2cSupport();
@@ -219,18 +252,44 @@ final class HttpPipelineBuilder {
             }
         }
 
+        void initHttp3Channel() {
+            insertPcapLoggingHandler(channel, "udp-encapsulated");
+
+            pipeline.addLast(Http3.newQuicServerCodecBuilder()
+                .sslContext(quicSslContext)
+                .initialMaxData(server.getServerConfiguration().getHttp3().getInitialMaxData())
+                .initialMaxStreamDataBidirectionalLocal(server.getServerConfiguration().getHttp3().getInitialMaxStreamDataBidirectionalLocal())
+                .initialMaxStreamDataBidirectionalRemote(server.getServerConfiguration().getHttp3().getInitialMaxStreamDataBidirectionalRemote())
+                .initialMaxStreamsBidirectional(server.getServerConfiguration().getHttp3().getInitialMaxStreamsBidirectional())
+                .tokenHandler(QuicTokenHandlerImpl.create(channel.alloc()))
+                .handler(new ChannelInitializer<Channel>() {
+                    @Override
+                    protected void initChannel(@NonNull Channel ch) throws Exception {
+                        insertPcapLoggingHandler(ch, "quic-decapsulated");
+                        ch.pipeline().addLast(new Http3ServerConnectionHandler(new ChannelInitializer<QuicStreamChannel>() {
+                            @Override
+                            protected void initChannel(@NonNull QuicStreamChannel ch) throws Exception {
+                                StreamPipeline streamPipeline = new StreamPipeline(ch, sslHandler, https, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
+                                streamPipeline.insertHttp3FrameHandlers();
+                                streamPipeline.streamCustomizer.onStreamPipelineBuilt();
+                            }
+                        }));
+                    }
+                })
+                .build());
+        }
+
         /**
          * Insert handlers that wrap the outermost TCP stream. This is SSL and potentially packet capture.
          */
         void insertOuterTcpHandlers() {
-            insertPcapLoggingHandler("encapsulated");
+            insertPcapLoggingHandler(channel, "encapsulated");
 
-            if (ssl) {
-                SslHandler sslHandler = sslContext.newHandler(channel.alloc());
+            if (sslHandler != null) {
                 sslHandler.setHandshakeTimeoutMillis(sslConfiguration.getHandshakeTimeout().toMillis());
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_SSL, sslHandler);
 
-                insertPcapLoggingHandler("ssl-decapsulated");
+                insertPcapLoggingHandler(channel, "ssl-decapsulated");
             }
 
             if (loggingHandler != null) {
@@ -264,7 +323,7 @@ final class HttpPipelineBuilder {
 
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_SERVER_CODEC, createServerCodec());
 
-            new StreamPipeline(channel, ssl, connectionCustomizer).insertHttp1DownstreamHandlers();
+            new StreamPipeline(channel, sslHandler, https, connectionCustomizer).insertHttp1DownstreamHandlers();
 
             connectionCustomizer.onInitialPipelineBuilt();
             connectionCustomizer.onStreamPipelineBuilt();
@@ -281,7 +340,7 @@ final class HttpPipelineBuilder {
             pipeline.addLast(new Http2MultiplexHandler(new ChannelInitializer<Channel>() {
                 @Override
                 protected void initChannel(@NonNull Channel ch) {
-                    StreamPipeline streamPipeline = new StreamPipeline(ch, ssl, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
+                    StreamPipeline streamPipeline = new StreamPipeline(ch, sslHandler, https, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
                     streamPipeline.insertHttp2FrameHandlers();
                     streamPipeline.streamCustomizer.onStreamPipelineBuilt();
                 }
@@ -364,7 +423,7 @@ final class HttpPipelineBuilder {
                     return new Http2ServerUpgradeCodec(connectionHandler, new Http2MultiplexHandler(new ChannelInitializer<Http2StreamChannel>() {
                         @Override
                         protected void initChannel(@NonNull Http2StreamChannel ch) {
-                            StreamPipeline streamPipeline = new StreamPipeline(ch, ssl, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
+                            StreamPipeline streamPipeline = new StreamPipeline(ch, sslHandler, https, connectionCustomizer.specializeForChannel(ch, NettyServerCustomizer.ChannelRole.REQUEST_STREAM));
                             streamPipeline.insertHttp2FrameHandlers();
                             streamPipeline.streamCustomizer.onStreamPipelineBuilt();
                         }
@@ -403,7 +462,7 @@ final class HttpPipelineBuilder {
 
                     // reconfigure for http1
                     // note: we have to reuse the serverCodec in case it still has some data buffered
-                    new StreamPipeline(channel, ssl, connectionCustomizer).insertHttp1DownstreamHandlers();
+                    new StreamPipeline(channel, sslHandler, https, connectionCustomizer).insertHttp1DownstreamHandlers();
                     connectionCustomizer.onStreamPipelineBuilt();
                     onRequestPipelineBuilt();
                     cp.fireChannelRead(ReferenceCountUtil.retain(msg));
@@ -425,21 +484,25 @@ final class HttpPipelineBuilder {
     }
 
     final class StreamPipeline {
+        HttpVersion httpVersion = HttpVersion.HTTP_1_1;
         private final Channel channel;
         private final ChannelPipeline pipeline;
-        private final boolean ssl;
+        @Nullable
+        private final SslHandler sslHandler;
+        private final boolean https;
 
         private final NettyServerCustomizer streamCustomizer;
 
-        private StreamPipeline(Channel channel, boolean ssl, NettyServerCustomizer streamCustomizer) {
+        private StreamPipeline(Channel channel, @Nullable SslHandler sslHandler, boolean https, NettyServerCustomizer streamCustomizer) {
             this.channel = channel;
             this.pipeline = channel.pipeline();
-            this.ssl = ssl;
+            this.sslHandler = sslHandler;
+            this.https = https;
             this.streamCustomizer = streamCustomizer;
         }
 
         void initializeChildPipelineForPushPromise(Channel childChannel) {
-            StreamPipeline promisePipeline = new StreamPipeline(childChannel, ssl, streamCustomizer.specializeForChannel(childChannel, NettyServerCustomizer.ChannelRole.PUSH_PROMISE_STREAM));
+            StreamPipeline promisePipeline = new StreamPipeline(childChannel, sslHandler, https, streamCustomizer.specializeForChannel(childChannel, NettyServerCustomizer.ChannelRole.PUSH_PROMISE_STREAM));
             promisePipeline.insertHttp2FrameHandlers();
             promisePipeline.streamCustomizer.onStreamPipelineBuilt();
         }
@@ -450,11 +513,19 @@ final class HttpPipelineBuilder {
             insertHttp2DownstreamHandlers();
         }
 
+        private void insertHttp3FrameHandlers() {
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new Http3FrameToHttpObjectCodec(true, server.getServerConfiguration().isValidateHeaders()));
+
+            insertHttp2DownstreamHandlers();
+        }
+
         /**
          * Insert the handlers downstream of the {@value ChannelPipelineCustomizer#HANDLER_HTTP2_CONNECTION}. Used both
          * for ALPN HTTP 2 and h2c.
          */
         private void insertHttp2DownstreamHandlers() {
+            httpVersion = HttpVersion.HTTP_2_0;
+
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_FLOW_CONTROL, new FlowControlHandler());
             if (accessLogHandler != null) {
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER, accessLogHandler);
@@ -462,33 +533,38 @@ final class HttpPipelineBuilder {
 
             registerMicronautChannelHandlers();
 
-            insertMicronautHandlers();
+            insertMicronautHandlers(false);
         }
 
         /**
          * Insert the handlers that manage the micronaut message handling, e.g. conversion between micronaut requests
          * and netty requests, and routing.
          */
-        private void insertMicronautHandlers() {
+        private void insertMicronautHandlers(boolean zeroCopySupported) {
             channel.attr(STREAM_PIPELINE_ATTRIBUTE.get()).set(this);
 
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_COMPRESSOR, new SmartHttpContentCompressor(embeddedServices.getHttpCompressionStrategy()));
+            SmartHttpContentCompressor contentCompressor = new SmartHttpContentCompressor(embeddedServices.getHttpCompressionStrategy());
+            if (zeroCopySupported) {
+                channel.attr(NettySystemFileCustomizableResponseType.ZERO_COPY_PREDICATE.get()).set(contentCompressor);
+            }
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_COMPRESSOR, contentCompressor);
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
 
-            pipeline.addLast(NettyServerWebSocketUpgradeHandler.COMPRESSION_HANDLER, new WebSocketServerCompressionHandler());
+            Optional<SimpleChannelInboundHandler<NettyHttpRequest<?>>> webSocketUpgradeHandler = embeddedServices.getWebSocketUpgradeHandler(server);
+            if (webSocketUpgradeHandler.isPresent()) {
+                pipeline.addLast(NettyServerWebSocketUpgradeHandler.COMPRESSION_HANDLER, new WebSocketServerCompressionHandler());
+            }
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, new HttpStreamsServerHandler());
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK, new ChunkedWriteHandler());
             pipeline.addLast(HttpRequestDecoder.ID, requestDecoder);
-            if (server.getServerConfiguration().isDualProtocol() && server.getServerConfiguration().isHttpToHttpsRedirect() && !ssl) {
+            if (server.getServerConfiguration().isDualProtocol() && server.getServerConfiguration().isHttpToHttpsRedirect() && !https) {
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_TO_HTTPS_REDIRECT, new HttpToHttpsRedirectHandler(sslConfiguration, hostResolver));
             }
-            if (ssl) {
-                pipeline.addLast("request-certificate-handler", requestCertificateHandler);
+            if (sslHandler != null) {
+                pipeline.addLast("request-certificate-handler", new HttpRequestCertificateHandler(sslHandler));
             }
             pipeline.addLast(HttpResponseEncoder.ID, responseEncoder);
-            embeddedServices.getWebSocketUpgradeHandler(server).ifPresent(websocketHandler ->
-                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_WEBSOCKET_UPGRADE, websocketHandler)
-            );
+            webSocketUpgradeHandler.ifPresent(h -> pipeline.addLast(ChannelPipelineCustomizer.HANDLER_WEBSOCKET_UPGRADE, h));
 
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, routingInBoundHandler);
         }
@@ -499,6 +575,7 @@ final class HttpPipelineBuilder {
          * after a H2C negotiation failure.
          */
         private void insertHttp1DownstreamHandlers() {
+            httpVersion = HttpVersion.HTTP_1_1;
             if (accessLogHandler != null) {
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER, accessLogHandler);
             }
@@ -506,7 +583,7 @@ final class HttpPipelineBuilder {
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_FLOW_CONTROL, new FlowControlHandler());
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_KEEP_ALIVE, new HttpServerKeepAliveHandler());
 
-            insertMicronautHandlers();
+            insertMicronautHandlers(sslHandler == null && !https);
         }
 
         /**

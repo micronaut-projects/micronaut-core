@@ -20,14 +20,15 @@ import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
 import io.micronaut.ast.groovy.utils.InMemoryClassWriterOutputVisitor
+import io.micronaut.ast.groovy.visitor.GroovyNativeElement
 import io.micronaut.ast.groovy.visitor.GroovyPackageElement
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.context.annotation.Configuration
 import io.micronaut.context.annotation.Context
-import io.micronaut.inject.processing.ProcessingException
+import io.micronaut.expressions.context.ExpressionWithContext
 import io.micronaut.inject.processing.BeanDefinitionCreator
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
-import io.micronaut.inject.visitor.VisitorConfiguration
+import io.micronaut.inject.processing.ProcessingException
 import io.micronaut.inject.writer.BeanConfigurationWriter
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor
@@ -39,6 +40,7 @@ import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.InnerClassNode
 import org.codehaus.groovy.ast.ModuleNode
 import org.codehaus.groovy.ast.PackageNode
+import io.micronaut.expressions.EvaluatedExpressionWriter
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
@@ -73,6 +75,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         } else {
             outputVisitor = new DirectoryClassWriterOutputVisitor(classesDir)
         }
+
         List<ClassNode> classes = moduleNode.getClasses()
         if (classes.size() == 1) {
             ClassNode classNode = classes[0]
@@ -97,17 +100,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
-        GroovyVisitorContext groovyVisitorContext = new GroovyVisitorContext(source, unit) {
-            @Override
-            VisitorConfiguration getConfiguration() {
-                new VisitorConfiguration() {
-                    @Override
-                    boolean includeTypeLevelAnnotationsInGenericArguments() {
-                        return false
-                    }
-                }
-            }
-        }
+        GroovyVisitorContext groovyVisitorContext = new GroovyVisitorContext(source, unit)
         def elementAnnotationMetadataFactory = groovyVisitorContext
                 .getElementAnnotationMetadataFactory()
                 .readOnly()
@@ -126,7 +119,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     }
                 })
             } catch (ProcessingException ex) {
-                groovyVisitorContext.fail(ex.getMessage(), ex.getOriginatingElement() as ASTNode)
+                groovyVisitorContext.fail(ex.getMessage(), (ex.getOriginatingElement() as GroovyNativeElement).annotatedNode())
             }
         }
 
@@ -135,6 +128,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             String beanTypeName = beanDefWriter.beanTypeName
             AnnotatedNode beanClassNode = entry.key
             try {
+                for (ExpressionWithContext expression: beanDefWriter.evaluatedExpressions) {
+                    new EvaluatedExpressionWriter(expression, new GroovyVisitorContext(source, unit), beanDefWriter.originatingElement)
+                            .accept(outputVisitor);
+                }
+
                 BeanDefinitionReferenceWriter beanReferenceWriter = new BeanDefinitionReferenceWriter(beanDefWriter)
                 beanReferenceWriter.setRequiresMethodProcessing(beanDefWriter.requiresMethodProcessing())
                 beanReferenceWriter.setContextScope(beanDefWriter.getAnnotationMetadata().hasDeclaredAnnotation(Context))

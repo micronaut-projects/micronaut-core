@@ -15,12 +15,14 @@
  */
 package io.micronaut.http.server.cors;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ImmutableArgumentConversionContext;
+import io.micronaut.core.io.socket.SocketUtils;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
@@ -28,17 +30,17 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.annotation.Filter;
-import io.micronaut.http.filter.HttpServerFilter;
-import io.micronaut.http.filter.ServerFilterChain;
+import io.micronaut.http.annotation.RequestFilter;
+import io.micronaut.http.annotation.ResponseFilter;
+import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.util.HttpHostResolver;
 import org.jetbrains.annotations.NotNull;
-import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -47,7 +49,16 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static io.micronaut.http.HttpAttributes.AVAILABLE_HTTP_METHODS;
-import static io.micronaut.http.HttpHeaders.*;
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS;
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS;
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS;
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN;
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS;
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_MAX_AGE;
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS;
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD;
+import static io.micronaut.http.HttpHeaders.ORIGIN;
+import static io.micronaut.http.HttpHeaders.VARY;
 import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
 
 /**
@@ -57,11 +68,10 @@ import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Filter(MATCH_ALL_PATTERN)
-public class CorsFilter implements HttpServerFilter {
+@ServerFilter(MATCH_ALL_PATTERN)
+public class CorsFilter implements Ordered {
     private static final Logger LOG = LoggerFactory.getLogger(CorsFilter.class);
     private static final ArgumentConversionContext<HttpMethod> CONVERSION_CONTEXT_HTTP_METHOD = ImmutableArgumentConversionContext.of(HttpMethod.class);
-    private static final String LOCALHOST = "http://localhost";
 
     protected final HttpServerConfiguration.CorsConfiguration corsConfiguration;
 
@@ -78,17 +88,19 @@ public class CorsFilter implements HttpServerFilter {
         this.httpHostResolver = httpHostResolver;
     }
 
-    @Override
-    public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-        String origin = request.getHeaders().getOrigin().orElse(null);
+    @RequestFilter
+    @Nullable
+    @Internal
+    public final HttpResponse<?> filterRequest(HttpRequest<?> request) {
+        String origin = request.getOrigin().orElse(null);
         if (origin == null) {
             LOG.trace("Http Header " + HttpHeaders.ORIGIN + " not present. Proceeding with the request.");
-            return chain.proceed(request);
+            return null; // proceed
         }
-        CorsOriginConfiguration corsOriginConfiguration = getConfiguration(origin).orElse(null);
+        CorsOriginConfiguration corsOriginConfiguration = getConfiguration(request).orElse(null);
         if (corsOriginConfiguration != null) {
             if (CorsUtil.isPreflightRequest(request)) {
-                return handlePreflightRequest(request, chain, corsOriginConfiguration);
+                return handlePreflightRequest(request, corsOriginConfiguration);
             }
             if (!validateMethodToMatch(request, corsOriginConfiguration).isPresent()) {
                 return forbidden();
@@ -97,51 +109,106 @@ public class CorsFilter implements HttpServerFilter {
                 LOG.trace("The resolved configuration allows any origin. To prevent drive-by-localhost attacks the request is forbidden");
                 return forbidden();
             }
-            return Publishers.then(chain.proceed(request), resp -> decorateResponseWithHeaders(request, resp, corsOriginConfiguration));
+            return null; // proceed
         } else if (shouldDenyToPreventDriveByLocalhostAttack(origin, request)) {
             LOG.trace("the request specifies an origin different than localhost. To prevent drive-by-localhost attacks the request is forbidden");
             return forbidden();
         }
         LOG.trace("CORS configuration not found for {} origin", origin);
-        return chain.proceed(request);
+        return null; // proceed
+    }
+
+    @ResponseFilter
+    @Internal
+    public final void filterResponse(HttpRequest<?> request, MutableHttpResponse<?> response) {
+        CorsOriginConfiguration corsOriginConfiguration = getConfiguration(request).orElse(null);
+        if (corsOriginConfiguration != null) {
+            if (CorsUtil.isPreflightRequest(request)) {
+                decorateResponseWithHeadersForPreflightRequest(request, response, corsOriginConfiguration);
+            }
+            decorateResponseWithHeaders(request, response, corsOriginConfiguration);
+        }
     }
 
     /**
      *
      * @param corsOriginConfiguration CORS Origin configuration for request's HTTP Header origin.
      * @param request HTTP Request
-     * @return {@literal true} if the resolved host starts with {@literal http://localhost} and the CORS configuration has any for allowed origins.
+     * @return {@literal true} if the resolved host is localhost or 127.0.0.1 address and the CORS configuration has any for allowed origins.
      */
     protected boolean shouldDenyToPreventDriveByLocalhostAttack(@NonNull CorsOriginConfiguration corsOriginConfiguration,
                                                                 @NonNull HttpRequest<?> request) {
+        if (corsConfiguration.isLocalhostPassThrough()) {
+            return false;
+        }
         if (httpHostResolver == null) {
             return false;
         }
-        String origin = request.getHeaders().getOrigin().orElse(null);
+        String origin = request.getOrigin().orElse(null);
         if (origin == null) {
             return false;
         }
-        if (origin.startsWith(LOCALHOST)) {
+        if (isOriginLocal(origin)) {
             return false;
         }
         String host = httpHostResolver.resolve(request);
-        return isAny(corsOriginConfiguration.getAllowedOrigins()) && host.startsWith(LOCALHOST);
-
+        return isAny(corsOriginConfiguration.getAllowedOrigins()) && isHostLocal(host);
     }
 
     /**
      *
      * @param origin HTTP Header {@link HttpHeaders#ORIGIN} value.
      * @param request HTTP Request
-     * @return {@literal true} if the resolved host starts with {@literal http://localhost} and origin does not start with localhost deny it.
+     * @return {@literal true} if the resolved host is localhost or 127.0.0.1 and origin is not one of these then deny it.
      */
     protected boolean shouldDenyToPreventDriveByLocalhostAttack(@NonNull String origin,
                                                                 @NonNull HttpRequest<?> request) {
+        if (corsConfiguration.isLocalhostPassThrough()) {
+            return false;
+        }
         if (httpHostResolver == null) {
             return false;
         }
         String host = httpHostResolver.resolve(request);
-        return !origin.startsWith(LOCALHOST) && host.startsWith(LOCALHOST);
+        return !isOriginLocal(origin) && isHostLocal(host);
+    }
+
+    /*
+     * We only need to check host for starting with "localhost" "127." (as there are multiple loopback addresses on linux)
+     *
+     * This is fine for host, as the request had to get here.
+     *
+     * We check the first character as a performance optimization prior to calling startsWith.
+     */
+    private boolean isHostLocal(@NonNull String hostString) {
+        if (hostString.isEmpty()) {
+            return false;
+        }
+        char initialChar = hostString.charAt(0);
+        if (initialChar != 'h' && initialChar != 'w') {
+            return false;
+        }
+        return hostString.startsWith("http://localhost")
+            || hostString.startsWith("https://localhost")
+            || hostString.startsWith("http://127.")
+            || hostString.startsWith("https://127.")
+            || hostString.startsWith("ws://localhost")
+            || hostString.startsWith("wss://localhost")
+            || hostString.startsWith("ws://127.")
+            || hostString.startsWith("wss://127.");
+    }
+
+    /*
+     * For Origin, we need to be more strict as otherwise an address like 127.malicious.com would be allowed.
+     */
+    private boolean isOriginLocal(@NonNull String hostString) {
+        try {
+            URI uri = URI.create(hostString);
+            String host = uri.getHost();
+            return SocketUtils.LOCALHOST.equals(host) || "127.0.0.1".equals(host);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 
     @Override
@@ -239,31 +306,45 @@ public class CorsFilter implements HttpServerFilter {
     }
 
     @NonNull
-    private Optional<CorsOriginConfiguration> getConfiguration(@NonNull String requestOrigin) {
+    private Optional<CorsOriginConfiguration> getConfiguration(@NonNull HttpRequest<?> request) {
+        String requestOrigin = request.getOrigin().orElse(null);
+        if (requestOrigin == null) {
+            return Optional.empty();
+        }
+        Optional<CorsOriginConfiguration> originConfiguration = CrossOriginUtil.getCorsOriginConfigurationForRequest(request);
+        if (originConfiguration.isPresent() && matchesOrigin(originConfiguration.get(), requestOrigin)) {
+            return originConfiguration;
+        }
         if (!corsConfiguration.isEnabled()) {
             return Optional.empty();
         }
         return corsConfiguration.getConfigurations().values().stream()
-            .filter(config -> {
-                List<String> allowedOrigins = config.getAllowedOrigins();
-                return !allowedOrigins.isEmpty() && (isAny(allowedOrigins) || allowedOrigins.stream().anyMatch(origin -> matchesOrigin(origin, requestOrigin)));
-            }).findFirst();
+            .filter(config -> matchesOrigin(config, requestOrigin))
+            .findFirst();
     }
 
-    private boolean matchesOrigin(@NonNull String origin, @NonNull String requestOrigin) {
-        if (origin.equals(requestOrigin)) {
+    private static boolean matchesOrigin(@NonNull CorsOriginConfiguration config, String requestOrigin) {
+        if (config.getAllowedOriginsRegex().map(regex -> matchesOrigin(regex, requestOrigin)).orElse(false)) {
             return true;
         }
-        Pattern p = Pattern.compile(origin);
+        List<String> allowedOrigins = config.getAllowedOrigins();
+        return !allowedOrigins.isEmpty() && (
+            (!config.getAllowedOriginsRegex().isPresent() && isAny(allowedOrigins)) ||
+                allowedOrigins.stream().anyMatch(origin -> origin.equals(requestOrigin))
+        );
+    }
+
+    private static boolean matchesOrigin(@NonNull String originRegex, @NonNull String requestOrigin) {
+        Pattern p = Pattern.compile(originRegex);
         Matcher m = p.matcher(requestOrigin);
         return m.matches();
     }
 
-    private boolean isAny(List<String> values) {
+    private static boolean isAny(List<String> values) {
         return values == CorsOriginConfiguration.ANY;
     }
 
-    private boolean isAnyMethod(List<HttpMethod> allowedMethods) {
+    private static boolean isAnyMethod(List<HttpMethod> allowedMethods) {
         return allowedMethods == CorsOriginConfiguration.ANY_METHOD;
     }
 
@@ -289,8 +370,8 @@ public class CorsFilter implements HttpServerFilter {
     }
 
     @NotNull
-    private static Publisher<MutableHttpResponse<?>> forbidden() {
-        return Publishers.just(HttpResponse.status(HttpStatus.FORBIDDEN));
+    private static MutableHttpResponse<Object> forbidden() {
+        return HttpResponse.status(HttpStatus.FORBIDDEN);
     }
 
     @NonNull
@@ -309,32 +390,27 @@ public class CorsFilter implements HttpServerFilter {
     private void decorateResponseWithHeaders(@NonNull HttpRequest<?> request,
                                              @NonNull MutableHttpResponse<?> response,
                                              @NonNull CorsOriginConfiguration config) {
-        HttpHeaders headers = request.getHeaders();
-        setOrigin(headers.getOrigin().orElse(null), response);
+        setOrigin(request.getOrigin().orElse(null), response);
         setVary(response);
         setExposeHeaders(config.getExposedHeaders(), response);
         setAllowCredentials(config, response);
     }
 
     @NonNull
-    private Publisher<MutableHttpResponse<?>> handlePreflightRequest(@NonNull HttpRequest<?> request,
-                                                                     @NonNull ServerFilterChain chain,
+    private MutableHttpResponse<?> handlePreflightRequest(@NonNull HttpRequest<?> request,
                                                                      @NonNull CorsOriginConfiguration corsOriginConfiguration) {
         Optional<HttpStatus> statusOptional = validatePreflightRequest(request, corsOriginConfiguration);
         if (statusOptional.isPresent()) {
             HttpStatus status = statusOptional.get();
             if (status.getCode() >= 400) {
-                return Publishers.just(HttpResponse.status(status));
+                return HttpResponse.status(status);
             }
             MutableHttpResponse<?> resp = HttpResponse.status(status);
             decorateResponseWithHeadersForPreflightRequest(request, resp, corsOriginConfiguration);
             decorateResponseWithHeaders(request, resp, corsOriginConfiguration);
-            return Publishers.just(resp);
+            return resp;
         }
-        return Publishers.then(chain.proceed(request), resp -> {
-            decorateResponseWithHeadersForPreflightRequest(request, resp, corsOriginConfiguration);
-            decorateResponseWithHeaders(request, resp, corsOriginConfiguration);
-        });
+        return null;
     }
 
     @NonNull

@@ -16,11 +16,10 @@
 package io.micronaut.inject.ast.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
-
-import java.util.function.Function;
+import io.micronaut.inject.ast.GenericElement;
 
 /**
  * Element's annotation metadata factory.
@@ -40,15 +39,31 @@ public interface ElementAnnotationMetadataFactory {
     ElementAnnotationMetadata build(@NonNull Element element);
 
     /**
-     * Build new element annotation metadata from the element with preloaded annotations.
-     * This method will avoid fetching default annotation metadata from cache.
+     * Build new class element type annotation metadata from the class element.
      *
-     * @param element            The element
+     * @param element The element
+     * @return the element's metadata
+     */
+    @NonNull
+    ElementAnnotationMetadata buildTypeAnnotations(@NonNull ClassElement element);
+
+    /**
+     * Build new generic element type annotation metadata from the class element.
+     *
+     * @param element The element
+     * @return the element's metadata
+     */
+    @NonNull
+    ElementAnnotationMetadata buildGenericTypeAnnotations(@NonNull GenericElement element);
+
+    /**
+     * Build new mutable element annotation metadata.
+     *
      * @param annotationMetadata The preloaded annotation
      * @return the element's metadata
      */
     @NonNull
-    ElementAnnotationMetadata build(@NonNull Element element, @NonNull AnnotationMetadata annotationMetadata);
+    ElementAnnotationMetadata buildMutable(@NonNull AnnotationMetadata annotationMetadata);
 
     /**
      * Makes this factory read-only. No modification to the annotation metadata should be persisted into the shared cache.
@@ -58,43 +73,4 @@ public interface ElementAnnotationMetadataFactory {
     @NonNull
     ElementAnnotationMetadataFactory readOnly();
 
-    /**
-     * Creates a factory wrapper that would override the annotation metadata value for the provided native type.
-     * @param nativeType The native type
-     * @param fn The function to build the annotation metadata
-     * @return a new factory
-     */
-    @Experimental
-    @NonNull
-    default ElementAnnotationMetadataFactory overrideForNativeType(Object nativeType,
-                                                                   Function<Element, ElementAnnotationMetadata> fn) {
-        ElementAnnotationMetadataFactory thisFactory = this;
-        return new ElementAnnotationMetadataFactory() {
-
-            private boolean fetched;
-
-            @Override
-            public ElementAnnotationMetadata build(Element element) {
-                if (!fetched && element.getNativeType().equals(nativeType)) {
-                    fetched = true;
-                    return fn.apply(element);
-                }
-                return thisFactory.build(element);
-            }
-
-            @Override
-            public ElementAnnotationMetadata build(Element element, AnnotationMetadata annotationMetadata) {
-                if (!fetched && element.getNativeType().equals(nativeType)) {
-                    fetched = true;
-                    return fn.apply(element);
-                }
-                return thisFactory.build(element, annotationMetadata);
-            }
-
-            @Override
-            public ElementAnnotationMetadataFactory readOnly() {
-                throw new IllegalStateException("Not supported!");
-            }
-        };
-    }
 }

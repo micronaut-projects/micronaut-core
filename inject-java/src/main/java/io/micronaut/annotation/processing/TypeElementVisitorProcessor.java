@@ -17,6 +17,7 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaClassElement;
 import io.micronaut.annotation.processing.visitor.JavaElementFactory;
+import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import io.micronaut.annotation.processing.visitor.LoadedVisitor;
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Requires;
@@ -60,6 +61,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -227,18 +229,21 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
             TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
             TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
+            Predicate<TypeElement> notGroovyObject = typeElement -> groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType);
 
             Set<TypeElement> elements = new LinkedHashSet<>();
 
             for (TypeElement annotation : annotations) {
-                final Set<? extends Element> annotatedElements = roundEnv.getElementsAnnotatedWith(annotation);
-                includeElements(elements, annotatedElements, groovyObjectType);
+                modelUtils.resolveTypeElements(
+                    roundEnv.getElementsAnnotatedWith(annotation)
+                ).filter(notGroovyObject).forEach(elements::add);
             }
 
             // This call to getRootElements() should be removed in Micronaut 4. It should not be possible
             // to process elements without at least one annotation present and this call breaks that assumption.
-            final Set<? extends Element> rootElements = roundEnv.getRootElements();
-            includeElements(elements, rootElements, groovyObjectType);
+            modelUtils.resolveTypeElements(
+                roundEnv.getRootElements()
+            ).filter(notGroovyObject).forEach(elements::add);
 
             if (!elements.isEmpty()) {
 
@@ -251,20 +256,25 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 // Micronaut Data use-case: EntityMapper with a higher priority needs to process entities first
                 // before RepositoryMapper is going to process repositories and read entities
 
+                List<JavaClassElement> javaClassElements = elements.stream()
+                    .map(typeElement -> elementFactory.newSourceClassElement(typeElement, elementAnnotationMetadataFactory))
+                    .toList();
+
                 for (LoadedVisitor loadedVisitor : loadedVisitors) {
-                    for (TypeElement typeElement : elements) {
+                    for (JavaClassElement javaClassElement : javaClassElements) {
                         try {
-                            JavaClassElement javaClassElement = elementFactory.newSourceClassElement(
-                                typeElement,
-                                elementAnnotationMetadataFactory
-                            );
                             if (!loadedVisitor.matchesClass(javaClassElement)) {
                                 continue;
                             }
+                            TypeElement typeElement = javaClassElement.getNativeType().element();
                             String className = typeElement.getQualifiedName().toString();
                             typeElement.accept(new ElementVisitor(javaClassElement, typeElement, Collections.singletonList(loadedVisitor)), className);
                         } catch (ProcessingException e) {
-                            error((Element) e.getOriginatingElement(), e.getMessage());
+                            JavaNativeElement originatingElement = (JavaNativeElement) e.getOriginatingElement();
+                            if (originatingElement == null) {
+                                originatingElement = javaClassElement.getNativeType();
+                            }
+                            error(originatingElement.element(), e.getMessage());
                         } catch (PostponeToNextRoundException e) {
                             // Ignore
                             continue;
@@ -298,18 +308,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             writeBeanDefinitionsToMetaInf();
         }
         return false;
-    }
-
-    private void includeElements(Set<TypeElement> target,
-                                 Set<? extends Element> annotatedElements, TypeMirror groovyObjectType) {
-        annotatedElements
-            .stream()
-            .filter(element -> JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element) || JavaModelUtils.isRecord(element))
-            .map(modelUtils::classElementFor)
-            .filter(Objects::nonNull)
-            .filter(element -> element.getAnnotation(Generated.class) == null)
-            .filter(typeElement -> groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType))
-            .forEach(target::add);
     }
 
     /**
@@ -392,7 +390,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         @Override
         public Object visitType(TypeElement classElement, Object o) {
-            if (!classElement.equals(javaClassElement.getNativeTypeElement())) {
+            if (!classElement.equals(javaClassElement.getNativeType().element())) {
                 javaClassElement = javaVisitorContext.getElementFactory().newSourceClassElement(
                     classElement,
                     javaVisitorContext.getElementAnnotationMetadataFactory()

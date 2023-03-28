@@ -9,14 +9,28 @@ dependencies {
     jmhAnnotationProcessor libs.bundles.asm
     jmhAnnotationProcessor libs.jmh.generator.annprocess
 
-    annotationProcessor project(":validation")
-    compileOnly project(":validation")
+    annotationProcessor platform(libs.test.boms.micronaut.validation)
+    annotationProcessor (libs.micronaut.validation.processor) {
+        exclude group: 'io.micronaut'
+    }
+
+    compileOnly platform(libs.test.boms.micronaut.validation)
+    compileOnly (libs.micronaut.validation) {
+        exclude group: 'io.micronaut'
+    }
+
     api project(":inject")
     api project(":inject-java-test")
-    api project(":validation")
     api project(":http-server")
+    api project(":http-server-netty")
+    api project(":jackson-databind")
     api project(":router")
     api project(":runtime")
+
+    api platform(libs.test.boms.micronaut.validation)
+    api (libs.micronaut.validation) {
+        exclude group: 'io.micronaut'
+    }
 
     jmh libs.jmh.core
 }

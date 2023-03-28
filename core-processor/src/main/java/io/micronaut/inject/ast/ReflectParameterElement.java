@@ -20,7 +20,6 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 
 import java.lang.annotation.Annotation;
@@ -36,7 +35,7 @@ import java.util.function.Consumer;
 class ReflectParameterElement implements ParameterElement {
     private final ClassElement classElement;
     private final String name;
-    private AnnotationMetadata annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
+    private MutableAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
 
     ReflectParameterElement(ClassElement classElement, String name) {
         this.classElement = classElement;
@@ -104,7 +103,7 @@ class ReflectParameterElement implements ParameterElement {
         } else {
             AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
             consumer.accept(builder);
-            this.annotationMetadata = DefaultAnnotationMetadata.mutateMember(annotationMetadata, annotationType, builder.build().getValues());
+            this.annotationMetadata = MutableAnnotationMetadata.mutateMember(annotationMetadata, annotationType, builder.build().getValues());
         }
         return this;
     }

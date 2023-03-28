@@ -21,13 +21,13 @@ import io.micronaut.aop.Introduction;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.aop.writer.AopProxyWriter;
 import io.micronaut.context.RequiresCondition;
+import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.value.OptionalValues;
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MemberElement;
@@ -90,7 +90,7 @@ abstract class AbstractBeanElementCreator implements BeanDefinitionCreator {
             annotation.stringValue(RequiresCondition.MEMBER_BEAN_PROPERTY)
                 .ifPresent(beanProperty -> {
                     annotation.stringValue(RequiresCondition.MEMBER_BEAN)
-                        .map(className -> visitorContext.getClassElement(className, visitorContext.getElementAnnotationMetadataFactory().readOnly()).get())
+                        .flatMap(className -> visitorContext.getClassElement(className, visitorContext.getElementAnnotationMetadataFactory().readOnly()))
                         .ifPresent(classElement -> {
                             String requiredValue = annotation.stringValue().orElse(null);
                             String notEqualsValue = annotation.stringValue(RequiresCondition.MEMBER_NOT_EQUALS).orElse(null);
@@ -100,14 +100,11 @@ abstract class AbstractBeanElementCreator implements BeanDefinitionCreator {
         }
     }
 
-    public static AnnotationMetadata getElementAnnotationMetadata(MemberElement methodElement) {
-        // NOTE: if annotation processor modified the method's annotation
-        // annotationUtils.getAnnotationMetadata(method) will return AnnotationMetadataHierarchy of both method+class metadata
-        AnnotationMetadata annotationMetadata = methodElement.getTargetAnnotationMetadata();
-        if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
-            return annotationMetadata.getDeclaredMetadata();
+    public static AnnotationMetadata getElementAnnotationMetadata(MemberElement memberElement) {
+        if (memberElement instanceof MethodElement methodElement) {
+            return methodElement.getMethodAnnotationMetadata();
         }
-        return annotationMetadata;
+        return memberElement.getAnnotationMetadata();
     }
 
     protected boolean visitIntrospectedMethod(BeanDefinitionVisitor visitor, ClassElement typeElement, MethodElement methodElement) {
@@ -121,6 +118,12 @@ abstract class AbstractBeanElementCreator implements BeanDefinitionCreator {
             || InterceptedMethodUtil.hasDeclaredAroundAdvice(methodElement.getAnnotationMetadata())) {
             addToIntroduction(aopProxyWriter, typeElement, methodElement, false);
             return true;
+        } else if (!methodElement.isAbstract() && methodElement.hasDeclaredStereotype(Executable.class)) {
+            aopProxyWriter.visitExecutableMethod(
+                typeElement,
+                methodElement,
+                visitorContext
+            );
         }
         return false;
     }

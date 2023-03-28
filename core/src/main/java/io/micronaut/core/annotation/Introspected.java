@@ -15,7 +15,12 @@
  */
 package io.micronaut.core.annotation;
 
-import java.lang.annotation.*;
+import java.lang.annotation.Annotation;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Inherited;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
@@ -69,6 +74,13 @@ public @interface Introspected {
      * @return The classes to generate introspections for
      */
     Class<?>[] classes() default {};
+
+    /**
+     * Alternative way to specify the value for `classes` when the class cannot be referenced.
+     *
+     * @return The class names to generate introspections for
+     */
+    String[] classNames() default {};
 
     /**
      * <p>The default access type is {@link AccessKind#METHOD} which treats only public JavaBean getters or Java record components as properties. By specifying {@link AccessKind#FIELD}, public or package-protected fields will be used instead. </p>
@@ -218,6 +230,13 @@ public @interface Introspected {
          * The default behaviour which in addition to public getters and setters will also include package protected fields if an {@link io.micronaut.core.annotation.Introspected.AccessKind} of {@link io.micronaut.core.annotation.Introspected.AccessKind#FIELD} is specified.
          *
          */
-        DEFAULT
+        DEFAULT,
+
+        /**
+         * All methods and/or fields are included.
+         *
+         * @since 4.0.0
+         */
+        ANY
     }
 }

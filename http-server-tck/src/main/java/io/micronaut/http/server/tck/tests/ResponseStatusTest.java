@@ -26,16 +26,16 @@ import io.micronaut.http.annotation.Delete;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Status;
-import io.micronaut.http.server.tck.AssertionUtils;
-import io.micronaut.http.server.tck.HttpResponseAssertion;
-import static io.micronaut.http.server.tck.TestScenario.asserts;
+import io.micronaut.http.tck.AssertionUtils;
+import io.micronaut.http.tck.HttpResponseAssertion;
 import org.junit.jupiter.api.Test;
 
-import javax.validation.ConstraintViolationException;
+import jakarta.validation.ConstraintViolationException;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Optional;
 
+import static io.micronaut.http.tck.TestScenario.asserts;
 
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only

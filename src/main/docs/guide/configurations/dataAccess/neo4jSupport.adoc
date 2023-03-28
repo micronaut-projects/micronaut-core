@@ -1,4 +1,4 @@
-Micronaut features dedicated support for automatically configuring the https://neo4j.com/docs/developer-manual/current/drivers/[Neo4j Bolt Driver] for the popular https://neo4j.com/[Neo4j] Graph Database.
+The Micronaut Framework features dedicated support for automatically configuring the https://neo4j.com/docs/developer-manual/current/drivers/[Neo4j Bolt Driver] for the popular https://neo4j.com/[Neo4j] Graph Database.
 
 [TIP]
 .Using the CLI

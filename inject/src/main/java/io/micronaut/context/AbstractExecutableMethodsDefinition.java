@@ -16,7 +16,11 @@
 package io.micronaut.context;
 
 import io.micronaut.context.env.Environment;
-import io.micronaut.core.annotation.*;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
@@ -25,9 +29,16 @@ import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ExecutableMethodsDefinition;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
 
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -39,13 +50,13 @@ import java.util.stream.Stream;
  * @since 3.0
  */
 @Internal
-public abstract class AbstractExecutableMethodsDefinition<T> implements ExecutableMethodsDefinition<T>, EnvironmentConfigurable {
+public abstract class AbstractExecutableMethodsDefinition<T> implements ExecutableMethodsDefinition<T>, EnvironmentConfigurable, ContextConfigurable {
 
     private final MethodReference[] methodsReferences;
     private final DispatchedExecutableMethod<T, ?>[] executableMethods;
     private Environment environment;
+    private BeanContext beanContext;
     private List<DispatchedExecutableMethod<T, ?>> executableMethodsList;
-    private Method[] reflectiveMethods;
 
     protected AbstractExecutableMethodsDefinition(MethodReference[] methodsReferences) {
         this.methodsReferences = methodsReferences;
@@ -58,6 +69,16 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         for (DispatchedExecutableMethod<T, ?> executableMethod : executableMethods) {
             if (executableMethod != null) {
                 executableMethod.configure(environment);
+            }
+        }
+    }
+
+    @Override
+    public void configure(BeanContext beanContext) {
+        this.beanContext = beanContext;
+        for (DispatchedExecutableMethod<T, ?> executableMethod : executableMethods) {
+            if (executableMethod != null) {
+                executableMethod.configure(beanContext);
             }
         }
     }
@@ -101,6 +122,9 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             executableMethod = new DispatchedExecutableMethod<>(this, index, methodsReference, methodsReference.annotationMetadata);
             if (environment != null) {
                 executableMethod.configure(environment);
+            }
+            if (beanContext != null) {
+                executableMethod.configure(beanContext);
             }
             executableMethods[index] = executableMethod;
         }
@@ -162,17 +186,11 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
     // this logic must allow reflection
     @SuppressWarnings("java:S3011")
     protected final Method getAccessibleTargetMethodByIndex(int index) {
-        if (reflectiveMethods == null) {
-            reflectiveMethods = new Method[methodsReferences.length];
+        Method method = getTargetMethodByIndex(index);
+        if (ClassUtils.REFLECTION_LOGGER.isDebugEnabled()) {
+            ClassUtils.REFLECTION_LOGGER.debug("Reflectively accessing method {} of type {}", method, method.getDeclaringClass());
         }
-        Method method = reflectiveMethods[index];
-        if (method == null) {
-            method = getTargetMethodByIndex(index);
-            if (ClassUtils.REFLECTION_LOGGER.isDebugEnabled()) {
-                ClassUtils.REFLECTION_LOGGER.debug("Reflectively accessing method {} of type {}", method, method.getDeclaringClass());
-            }
-            method.setAccessible(true);
-        }
+        method.setAccessible(true);
         return method;
     }
 
@@ -227,18 +245,22 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
 
     /**
      * Internal class representing method's metadata.
+     *
+     * @param declaringType      The declaring type
+     * @param annotationMetadata The metadata
+     * @param methodName         The method name
+     * @param returnArgument     The return argument
+     * @param arguments          The arguments
+     * @param isAbstract         Is abstract
+     * @param isSuspend          Is suspend
      */
-    @Internal
-    public static final class MethodReference {
-        final AnnotationMetadata annotationMetadata;
-        final Class<?> declaringType;
-        final String methodName;
-        @Nullable
-        final Argument<?> returnArgument;
-        final Argument<?>[] arguments;
-        final boolean isAbstract;
-        final boolean isSuspend;
-
+    public record MethodReference(Class<?> declaringType,
+                                  AnnotationMetadata annotationMetadata,
+                                  String methodName,
+                                  @Nullable Argument<?> returnArgument,
+                                  Argument<?>[] arguments,
+                                  boolean isAbstract,
+                                  boolean isSuspend) {
         /**
          * The constructor.
          *
@@ -250,7 +272,13 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
          * @param isAbstract         Is abstract
          * @param isSuspend          Is suspend
          */
-        public MethodReference(Class<?> declaringType, AnnotationMetadata annotationMetadata, String methodName, Argument<?> returnArgument, Argument<?>[] arguments, boolean isAbstract, boolean isSuspend) {
+        public MethodReference(Class<?> declaringType,
+                               AnnotationMetadata annotationMetadata,
+                               String methodName,
+                               Argument<?> returnArgument,
+                               Argument<?>[] arguments,
+                               boolean isAbstract,
+                               boolean isSuspend) {
             this.declaringType = declaringType;
             this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata;
             this.methodName = methodName;
@@ -258,6 +286,37 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             this.arguments = arguments == null ? Argument.ZERO_ARGUMENTS : arguments;
             this.isAbstract = isAbstract;
             this.isSuspend = isSuspend;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            MethodReference that = (MethodReference) o;
+            return isAbstract == that.isAbstract && isSuspend == that.isSuspend && Objects.equals(declaringType, that.declaringType) && Objects.equals(annotationMetadata, that.annotationMetadata) && Objects.equals(methodName, that.methodName) && Objects.equals(returnArgument, that.returnArgument) && Arrays.equals(arguments, that.arguments);
+        }
+
+        @Override
+        public int hashCode() {
+            return methodName.hashCode();
+        }
+
+        @Override
+        public String toString() {
+            final StringBuilder sb = new StringBuilder("MethodReference{");
+            sb.append("declaringType=").append(declaringType);
+            sb.append(", annotationMetadata=").append(annotationMetadata);
+            sb.append(", methodName='").append(methodName).append('\'');
+            sb.append(", returnArgument=").append(returnArgument);
+            sb.append(", arguments=").append(Arrays.toString(arguments));
+            sb.append(", isAbstract=").append(isAbstract);
+            sb.append(", isSuspend=").append(isSuspend);
+            sb.append('}');
+            return sb.toString();
         }
     }
 
@@ -267,15 +326,20 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
      * @param <T> The type
      * @param <R> The result type
      */
-    private static final class DispatchedExecutableMethod<T, R> implements ExecutableMethod<T, R>, ReturnType<R>, EnvironmentConfigurable {
+    private static final class DispatchedExecutableMethod<T, R> implements ExecutableMethod<T, R>,
+                                                                           EnvironmentConfigurable,
+                                                                           ContextConfigurable {
 
         private final AbstractExecutableMethodsDefinition dispatcher;
         private final int index;
         private final MethodReference methodReference;
         private AnnotationMetadata annotationMetadata;
+        private ReturnType<R> returnType;
 
-        private DispatchedExecutableMethod(AbstractExecutableMethodsDefinition dispatcher, int index,
-                                           MethodReference methodReference, AnnotationMetadata annotationMetadata) {
+        private DispatchedExecutableMethod(AbstractExecutableMethodsDefinition dispatcher,
+                                           int index,
+                                           MethodReference methodReference,
+                                           AnnotationMetadata annotationMetadata) {
             this.dispatcher = dispatcher;
             this.index = index;
             this.methodReference = methodReference;
@@ -290,8 +354,21 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         }
 
         @Override
+        public void configure(BeanContext beanContext) {
+            annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
+            if (annotationMetadata instanceof EvaluatedAnnotationMetadata eam) {
+                eam.configure(beanContext);
+            }
+        }
+
+        @Override
         public boolean hasPropertyExpressions() {
             return annotationMetadata.hasPropertyExpressions();
+        }
+
+        @Override
+        public boolean hasEvaluatedExpressions() {
+            return annotationMetadata.hasEvaluatedExpressions();
         }
 
         @Override
@@ -326,51 +403,37 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
 
         @Override
         public ReturnType<R> getReturnType() {
-            return this;
-        }
-
-        @Override
-        public Class<R> getType() {
-            if (methodReference.returnArgument == null) {
-                return (Class<R>) void.class;
+            if (returnType == null) {
+                // Return type also contains method annotations (Micronaut 3)
+                Argument<R> returnTypeArgument = methodReference.returnArgument == null ? (Argument<R>) Argument.VOID : (Argument<R>) methodReference.returnArgument;
+                AnnotationMetadata returnTypeAnnotationMetadata;
+                if (!returnTypeArgument.getAnnotationMetadata().isEmpty() && !annotationMetadata.isEmpty()) {
+                    returnTypeAnnotationMetadata = new AnnotationMetadataHierarchy(returnTypeArgument.getAnnotationMetadata(), annotationMetadata);
+                } else if (!returnTypeArgument.getAnnotationMetadata().isEmpty()) {
+                    returnTypeAnnotationMetadata = returnTypeArgument.getAnnotationMetadata();
+                } else {
+                    returnTypeAnnotationMetadata = annotationMetadata;
+                }
+                if (returnTypeArgument.getAnnotationMetadata() != returnTypeAnnotationMetadata) {
+                    returnTypeArgument = Argument.of(
+                            returnTypeArgument.getType(),
+                            returnTypeAnnotationMetadata,
+                            returnTypeArgument.getTypeParameters()
+                    );
+                }
+                returnType = new DefaultReturnType<>(
+                        returnTypeArgument,
+                        returnTypeAnnotationMetadata,
+                        methodReference.isSuspend
+                );
             }
-            return (Class<R>) methodReference.returnArgument.getType();
-        }
-
-        @Override
-        public boolean isSuspended() {
-            return methodReference.isSuspend;
+            return returnType;
         }
 
         @NonNull
         @Override
         public AnnotationMetadata getAnnotationMetadata() {
             return annotationMetadata;
-        }
-
-        @Override
-        public Argument[] getTypeParameters() {
-            if (methodReference.returnArgument != null) {
-                return methodReference.returnArgument.getTypeParameters();
-            }
-            return Argument.ZERO_ARGUMENTS;
-        }
-
-        @Override
-        public Map<String, Argument<?>> getTypeVariables() {
-            if (methodReference.returnArgument != null) {
-                return methodReference.returnArgument.getTypeVariables();
-            }
-            return Collections.emptyMap();
-        }
-
-        @Override
-        @NonNull
-        public Argument asArgument() {
-            Map<String, Argument<?>> typeVariables = getTypeVariables();
-            Collection<Argument<?>> values = typeVariables.values();
-            final AnnotationMetadata annotationMetadata = getAnnotationMetadata();
-            return Argument.of(getType(), annotationMetadata, values.toArray(Argument.ZERO_ARGUMENTS));
         }
 
         @Override
@@ -384,10 +447,9 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             if (this == o) {
                 return true;
             }
-            if (!(o instanceof AbstractExecutableMethodsDefinition.DispatchedExecutableMethod)) {
+            if (!(o instanceof AbstractExecutableMethodsDefinition.DispatchedExecutableMethod that)) {
                 return false;
             }
-            DispatchedExecutableMethod that = (DispatchedExecutableMethod) o;
             return Objects.equals(methodReference.declaringType, that.methodReference.declaringType) &&
                     Objects.equals(methodReference.methodName, that.methodReference.methodName) &&
                     Arrays.equals(methodReference.arguments, that.methodReference.arguments);
@@ -407,6 +469,51 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             String text = Argument.toString(getArguments());
             return getReturnType().getType().getSimpleName() + " " + getMethodName() + "(" + text + ")";
         }
+
+    }
+
+    /**
+     * The default return type implementation.
+     *
+     * @param returnArgument     The return argument
+     * @param annotationMetadata The annotation metadata
+     * @param isSuspend          Is suspended
+     * @param <R>                The return type
+     */
+    private record DefaultReturnType<R>(Argument<R> returnArgument,
+                                        AnnotationMetadata annotationMetadata,
+                                        boolean isSuspend) implements ReturnType<R> {
+
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return annotationMetadata;
+        }
+
+        @Override
+        public Class<R> getType() {
+            return returnArgument.getType();
+        }
+
+        @Override
+        public boolean isSuspended() {
+            return isSuspend;
+        }
+
+        @Override
+        public Argument<?>[] getTypeParameters() {
+            return returnArgument.getTypeParameters();
+        }
+
+        @Override
+        public Map<String, Argument<?>> getTypeVariables() {
+            return returnArgument.getTypeVariables();
+        }
+
+        @Override
+        @NonNull
+        public Argument<R> asArgument() {
+            return returnArgument;
+        }
     }
 
     private static final class MethodAnnotationMetadata extends AbstractEnvironmentAnnotationMetadata {
@@ -424,5 +531,4 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             return environment;
         }
     }
-
 }

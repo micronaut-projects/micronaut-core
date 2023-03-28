@@ -119,7 +119,7 @@ public interface AnnotationScanner {
     default @NonNull Stream<Class<?>> scan(@NonNull Class<? extends Annotation> annotation, @NonNull Collection<String> packages) {
         Objects.requireNonNull(annotation, "Annotation type cannot be null");
         Objects.requireNonNull(packages, "Packages to scan cannot be null");
-        return scan(annotation.getName(), packages.parallelStream());
+        return scan(annotation.getName(), packages.stream());
     }
 
     /**
@@ -134,7 +134,6 @@ public interface AnnotationScanner {
         Objects.requireNonNull(packages, "Packages to scan cannot be null");
 
         return packages
-            .parallel()
             .flatMap(pkg -> scan(annotation, pkg));
     }
 

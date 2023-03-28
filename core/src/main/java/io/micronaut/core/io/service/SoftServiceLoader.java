@@ -368,7 +368,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             return findAll(condition)
                     .map(ServiceDefinition::load)
                     .filter(s -> predicate == null || predicate.test(s))
-                    .collect(Collectors.toList());
+                    .toList();
         }
     }
 

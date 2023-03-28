@@ -17,8 +17,14 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.util.Toggleable;
+import io.micronaut.expressions.context.ExpressionWithContext;
 import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.ast.*;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.VisitorContext;
 import org.objectweb.asm.Type;
@@ -30,6 +36,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Interface for {@link BeanDefinitionVisitor} implementations such as {@link BeanDefinitionWriter}.
@@ -136,7 +143,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
 
     /**
      * Alter the super class of this bean definition. The passed class should be a subclass of
-     * {@link io.micronaut.context.AbstractBeanDefinition}.
+     * {@link io.micronaut.context.AbstractInitializableBeanDefinition}.
      *
      * @param name The super type
      */
@@ -163,7 +170,7 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
     Type getProvidedType();
 
     /**
-     * Make the bean definition as validated by javax.validation.
+     * Make the bean definition as validated by jakarta.validation.
      *
      * @param validated Whether the bean definition is validated
      */
@@ -332,6 +339,13 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * @return The annotation metadata
      */
     AnnotationMetadata getAnnotationMetadata();
+
+    /**
+     * @return The evaluated expressions metadata
+     * @since 4.0.0
+     */
+    @NonNull
+    Set<ExpressionWithContext> getEvaluatedExpressions();
 
     /**
      * Begin defining a configuration builder.

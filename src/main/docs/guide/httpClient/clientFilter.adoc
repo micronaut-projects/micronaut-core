@@ -1,6 +1,6 @@
 Often, you need to include the same HTTP headers or URL parameters in a set of requests against a third-party API or when calling another Microservice.
 
-To simplify this, you can define api:http.filter.HttpClientFilter[] classes that are applied to all matching HTTP client requests.
+To simplify this, you can define api:http.annotation.ClientFilter[] classes that are applied to all matching HTTP client requests. The details of how filters worked are described in the <<filters, server filter documentation>>. Here we will only show some client filters.
 
 As an example, say you want to build a client to communicate with the https://bintray.com/docs/api/[Bintray REST API]. It would be tedious to specify authentication for every single HTTP call.
 
@@ -22,11 +22,11 @@ snippet::io.micronaut.docs.client.ThirdPartyClientFilterSpec[tags="bintrayFilter
 
 Now when you invoke the `bintrayService.fetchRepositories()` method, the `Authorization` HTTP header is included in the request.
 
-=== Injecting Another Client into a HttpClientFilter
+=== Injecting Another Client into a ClientFilter
 
-To create an link:{micronautreactorapi}/io/micronaut/reactor/http/client/ReactorHttpClient.html[ReactorHttpClient], Micronaut needs to resolve all `HttpClientFilter` instances, which creates a circular dependency when injecting another link:{micronautreactorapi}/io/micronaut/reactor/http/client/ReactorHttpClient.html[ReactorHttpClient] or a `@Client` bean into an instance of a `HttpClientFilter`.
+To create an link:{micronautreactorapi}/io/micronaut/reactor/http/client/ReactorHttpClient.html[ReactorHttpClient], the Micronaut framework needs to resolve all `ClientFilter` beans, which creates a circular dependency when injecting another link:{micronautreactorapi}/io/micronaut/reactor/http/client/ReactorHttpClient.html[ReactorHttpClient] or a `@Client` bean into an instance of a `ClientFilter`.
 
-To resolve this issue, use the api:context.BeanProvider[] interface to inject another link:{micronautreactorapi}/io/micronaut/reactor/http/client/ReactorHttpClient.html[ReactorHttpClient] or a `@Client` bean into an instance of `HttpClientFilter`.
+To resolve this issue, use the api:context.BeanProvider[] interface to inject another link:{micronautreactorapi}/io/micronaut/reactor/http/client/ReactorHttpClient.html[ReactorHttpClient] or a `@Client` bean into an instance of `ClientFilter`.
 
 The following example which implements a filter allowing https://cloud.google.com/run/docs/authenticating/service-to-service[authentication between services on Google Cloud Run] demonstrates how to use api:context.BeanProvider[] to inject another client:
 

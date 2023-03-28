@@ -2,7 +2,7 @@ Support for Azure Function is implemented in the https://micronaut-projects.gith
 
 ==== Simple Functions with Azure Function
 
-You can implement Azure Functions with Micronaut that directly implement the https://docs.microsoft.com/en-us/azure/azure-functions/functions-reference-java?tabs=consumption[Azure Function Java SDK]. See the documentation on https://micronaut-projects.github.io/micronaut-azure/1.0.x/guide/index.html#azureFunction[Azure Functions] for more information.
+You can implement Azure Functions with the Micronaut framework that directly implement the https://docs.microsoft.com/en-us/azure/azure-functions/functions-reference-java?tabs=consumption[Azure Function Java SDK]. See the documentation on https://micronaut-projects.github.io/micronaut-azure/1.0.x/guide/index.html#azureFunction[Azure Functions] for more information.
 
 [TIP]
 .Using the CLI

@@ -17,9 +17,9 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.EnumElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -42,27 +42,32 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
     protected List<String> values;
 
     /**
-     * @param classElement              The {@link TypeElement}
+     * @param nativeElement              The native element
      * @param annotationMetadataFactory The annotation metadata factory
      * @param visitorContext            The visitor context
      */
-    JavaEnumElement(TypeElement classElement,
+    JavaEnumElement(JavaNativeElement.Class nativeElement,
                     ElementAnnotationMetadataFactory annotationMetadataFactory,
                     JavaVisitorContext visitorContext) {
-        this(classElement, annotationMetadataFactory, visitorContext, 0);
+        this(nativeElement, annotationMetadataFactory, visitorContext, 0);
     }
 
     /**
-     * @param classElement              The {@link TypeElement}
+     * @param nativeElement              The native element
      * @param annotationMetadataFactory The annotation metadata factory
      * @param visitorContext            The visitor context
      * @param arrayDimensions           The number of array dimensions
      */
-    JavaEnumElement(TypeElement classElement,
+    JavaEnumElement(JavaNativeElement.Class nativeElement,
                     ElementAnnotationMetadataFactory annotationMetadataFactory,
                     JavaVisitorContext visitorContext,
                     int arrayDimensions) {
-        super(classElement, annotationMetadataFactory, visitorContext, Collections.emptyList(), Collections.emptyMap(), arrayDimensions, false);
+        super(nativeElement, annotationMetadataFactory, visitorContext, Collections.emptyList(), Collections.emptyMap(), arrayDimensions, false);
+    }
+
+    @Override
+    protected JavaClassElement copyThis() {
+        return new JavaEnumElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, arrayDimensions);
     }
 
     @Override
@@ -86,14 +91,14 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
     private void initEnum() {
         values = new ArrayList<>();
         enumConstants = new ArrayList<>();
-        TypeElement nativeType = (TypeElement) getNativeType();
+        TypeElement nativeType = getNativeType().element();
         for (Element element : nativeType.getEnclosedElements()) {
             if (element.getKind() == ElementKind.ENUM_CONSTANT) {
                 values.add(element.getSimpleName().toString());
                 enumConstants.add(
                     new JavaEnumConstantElement(
                         this,
-                        (VariableElement) element,
+                        new JavaNativeElement.Variable((VariableElement) element),
                         elementAnnotationMetadataFactory,
                         visitorContext)
                 );
@@ -105,6 +110,7 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new JavaEnumElement(classElement, elementAnnotationMetadataFactory, visitorContext, arrayDimensions);
+        return new JavaEnumElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, arrayDimensions);
     }
+
 }

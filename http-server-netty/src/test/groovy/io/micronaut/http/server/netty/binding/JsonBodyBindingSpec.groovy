@@ -1,10 +1,9 @@
 package io.micronaut.http.server.netty.binding
 
-import io.micronaut.core.async.annotation.SingleResult
 import com.fasterxml.jackson.annotation.JsonCreator
-import com.fasterxml.jackson.core.JsonParseException
 import groovy.json.JsonSlurper
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -17,6 +16,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.http.hateoas.Link
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import io.micronaut.json.JsonSyntaxException
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.scheduler.Schedulers
@@ -72,8 +72,8 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
         then:
         HttpClientResponseException e = thrown()
-        e.message == """Invalid JSON: Unexpected character ('T' (code 84)): expected a valid value (JSON String, Number, Array, Object or token 'null', 'true' or 'false')
- at [Source: UNKNOWN; line: 1, column: 11]"""
+        e.message == """Invalid JSON: Unrecognized token 'The': was expecting (JSON String, Number, Array, Object or token 'null', 'true' or 'false')
+ at [Source: (io.netty.buffer.ByteBufInputStream); line: 1, column: 14]"""
         e.response.status == HttpStatus.BAD_REQUEST
 
         when:
@@ -405,10 +405,10 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
             return myReqBody.items*.name
         }
 
-        @Error(JsonParseException)
-        HttpResponse jsonError(HttpRequest request, JsonParseException jsonParseException) {
+        @Error(JsonSyntaxException)
+        HttpResponse jsonError(HttpRequest request, JsonSyntaxException jsonSyntaxException) {
             def response = HttpResponse.status(HttpStatus.BAD_REQUEST, "No!! Invalid JSON")
-            def error = new JsonError("Invalid JSON: ${jsonParseException.message}")
+            def error = new JsonError("Invalid JSON: ${jsonSyntaxException.message}")
             error.link(Link.SELF, Link.of(request.getUri()))
             response.body(error)
             return response

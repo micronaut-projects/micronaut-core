@@ -230,7 +230,12 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
                 currentlyStreamedMessage = inMsg;
                 // It has a body, stream it
-                HandlerPublisher<? extends HttpContent> publisher = new HandlerPublisher<HttpContent>(ctx.executor(), HttpContent.class) {
+                HandlerPublisher<? extends HttpContent> publisher = new HandlerPublisher<HttpContent>(ctx.executor()) {
+                    @Override
+                    protected boolean acceptInboundMessage(Object msg) {
+                        return msg instanceof HttpContent;
+                    }
+
                     @Override
                     protected void cancelled() {
                         if (ctx.executor().inEventLoop()) {
@@ -359,7 +364,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                         //if oncomplete gets called before the message is written the promise
                         //set to lastWriteFuture shouldn't complete until the first content is written
                         lastWriteFuture = messageWritePromise;
-                        ctx.writeAndFlush(message).addListener(f -> super.onNext(httpContent, messageWritePromise));
+                        ctx.writeAndFlush(message).addListener(f -> onNext(httpContent, messageWritePromise));
                     } else {
                         super.onNext(httpContent);
                     }

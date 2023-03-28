@@ -76,4 +76,4 @@ In the above example the management endpoints are exposed only over port 8085.
 
 === JMX
 
-Micronaut provides functionality to register endpoints with JMX. See the section on <<jmx, JMX>> to get started.
+The Micronaut framework provides functionality to register endpoints with JMX. See the section on <<jmx, JMX>> to get started.

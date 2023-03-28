@@ -132,6 +132,12 @@ public @interface BeanProperties {
         /**
          * The default behaviour which in addition to public getters and setters will also include package protected fields if an {@link BeanProperties.AccessKind} of {@link BeanProperties.AccessKind#FIELD} is specified.
          */
-        DEFAULT
+        DEFAULT,
+
+        /**
+         * All methods and/or fields are included.
+         *
+         */
+        ANY
     }
 }

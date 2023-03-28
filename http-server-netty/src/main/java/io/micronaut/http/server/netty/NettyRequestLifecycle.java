@@ -17,7 +17,7 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.execution.CompletableFutureExecutionFlow;
+import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
@@ -50,11 +50,9 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 
 @Internal
 final class NettyRequestLifecycle extends RequestLifecycle {
@@ -151,7 +149,7 @@ final class NettyRequestLifecycle extends RequestLifecycle {
         HttpContentProcessor processor = rib.httpContentProcessorResolver.resolve(nettyRequest, routeMatch);
         StreamingDataSubscriber pr = new StreamingDataSubscriber(completer, processor);
         ((StreamedHttpRequest) nettyRequest.getNativeRequest()).subscribe(pr);
-        return CompletableFutureExecutionFlow.just(pr.completion);
+        return pr.completion;
     }
 
     void handleException(Throwable cause) {
@@ -167,11 +165,11 @@ final class NettyRequestLifecycle extends RequestLifecycle {
             return false;
         }
         if (routeMatch instanceof MethodBasedRouteMatch<?, ?> methodBasedRouteMatch) {
-            if (Arrays.stream(methodBasedRouteMatch.getArguments()).anyMatch(argument -> MultipartBody.class.equals(argument.getType()))) {
+            if (hasArg(methodBasedRouteMatch, MultipartBody.class)) {
                 // MultipartBody will subscribe to the request body in MultipartBodyArgumentBinder
                 return false;
             }
-            if (Arrays.stream(methodBasedRouteMatch.getArguments()).anyMatch(argument -> HttpRequest.class.equals(argument.getType()))) {
+            if (hasArg(methodBasedRouteMatch, HttpRequest.class)) {
                 // HttpRequest argument in the method
                 return true;
             }
@@ -186,8 +184,18 @@ final class NettyRequestLifecycle extends RequestLifecycle {
         return !routeMatch.isExecutable();
     }
 
+    private static boolean hasArg(MethodBasedRouteMatch<?, ?> methodBasedRouteMatch, Class<?> type) {
+        for (Argument<?> argument : methodBasedRouteMatch.getArguments()) {
+            if (argument.getType() == type) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static class StreamingDataSubscriber implements Subscriber<ByteBufHolder> {
-        final CompletableFuture<RouteMatch<?>> completion = new CompletableFuture<>();
+        final DelayedExecutionFlow<RouteMatch<?>> completion = DelayedExecutionFlow.create();
+        private boolean completed = false;
 
         private final List<Object> bufferList = new ArrayList<>(1);
         private final HttpContentProcessor contentProcessor;
@@ -272,7 +280,10 @@ final class NettyRequestLifecycle extends RequestLifecycle {
             // this may drop the exception if the route has already been executed. However, that is
             // only the case if there are publisher parameters, and those will still receive the
             // failure. Hopefully.
-            completion.completeExceptionally(t);
+            if (!completed) {
+                completion.completeExceptionally(t);
+                completed = true;
+            }
             downstreamDone = true;
         }
 
@@ -298,6 +309,7 @@ final class NettyRequestLifecycle extends RequestLifecycle {
 
         private void executeRoute() {
             completion.complete(completer.routeMatch);
+            completed = true;
         }
     }
 }

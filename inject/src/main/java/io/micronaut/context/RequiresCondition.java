@@ -98,9 +98,16 @@ public class RequiresCondition implements Condition {
         }
         AnnotationMetadataProvider component = context.getComponent();
         boolean isBeanReference = component instanceof BeanDefinitionReference;
+
         // here we use AnnotationMetadata to avoid loading the classes referenced in the annotations directly
         if (isBeanReference) {
             for (AnnotationValue<Requires> requirement : requirements) {
+                // if annotation value has evaluated expressions, postpone
+                // decision until the bean is loaded
+                if (requirement.hasEvaluatedExpressions()) {
+                    continue;
+                }
+
                 processPreStartRequirements(context, requirement);
                 if (context.isFailing()) {
                     return false;
@@ -528,13 +535,12 @@ public class RequiresCondition implements Condition {
 
     private boolean matchesPresenceOfEntities(ConditionContext context, AnnotationValue<Requires> annotationValue) {
         if (annotationValue.contains(MEMBER_ENTITIES)) {
-            Optional<AnnotationClassValue[]> classNames = annotationValue.get(MEMBER_ENTITIES, AnnotationClassValue[].class);
-            if (classNames.isPresent()) {
+            AnnotationClassValue<?>[] classNames = annotationValue.annotationClassValues(MEMBER_ENTITIES);
+            if (ArrayUtils.isNotEmpty(classNames)) {
                 BeanContext beanContext = context.getBeanContext();
                 if (beanContext instanceof ApplicationContext) {
                     ApplicationContext applicationContext = (ApplicationContext) beanContext;
-                    final AnnotationClassValue<?>[] classValues = classNames.get();
-                    for (AnnotationClassValue<?> classValue : classValues) {
+                    for (AnnotationClassValue<?> classValue : classNames) {
                         final Optional<? extends Class<?>> entityType = classValue.getType();
                         if (entityType.isEmpty()) {
                             context.fail("Annotation type [" + classValue.getName() + "] not present on classpath");

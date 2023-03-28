@@ -12,7 +12,7 @@ The above example defines a ann:http.annotation.Header[] annotation on the `PetC
 
 Then set the following in your configuration file (e.g `application.yml`) to populate the value:
 
-.Configuring Headers in YAML
+.Configuring Headers
 [configuration]
 ----
 pet:

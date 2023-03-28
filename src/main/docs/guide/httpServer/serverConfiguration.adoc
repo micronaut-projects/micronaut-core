@@ -8,18 +8,18 @@ The following example shows how to tweak configuration options for the server vi
 micronaut:
   server:
     maxRequestSize: 1MB
-    host: localhost # <1>
+    host: localhost
     netty:
-      maxHeaderSize: 500KB # <2>
+      maxHeaderSize: 500KB
       worker:
-        threads: 8 # <3>
+        threads: 8
       childOptions:
-        autoRead: true # <4>
+        autoRead: true
 ----
-<1> By default Micronaut binds to all network interfaces. Use `localhost` to bind only to loopback network interface
-<2> Maximum size for headers
-<3> Number of Netty worker threads
-<4> Auto read request body
+- By default, Micronaut framework binds to all network interfaces. Use `localhost` to bind only to loopback network interface
+- `maxHeaderSize` sets the maximum size for headers
+- `worker.threads` specifies the number of Netty worker threads
+- `autoRead` enables request body auto read
 
 include::{includedir}configurationProperties/io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration.adoc[]
 

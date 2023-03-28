@@ -23,14 +23,15 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.CookieValue;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.cookie.Cookie;
-import io.micronaut.http.server.tck.AssertionUtils;
-import io.micronaut.http.server.tck.HttpResponseAssertion;
-import static io.micronaut.http.server.tck.TestScenario.asserts;
+import io.micronaut.http.tck.AssertionUtils;
+import io.micronaut.http.tck.HttpResponseAssertion;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+
+import static io.micronaut.http.tck.TestScenario.asserts;
 
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only

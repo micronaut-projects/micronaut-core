@@ -124,7 +124,7 @@ class Test {
 
     void "test write annotation metadata with primitive arrays"() {
         given:
-        AnnotationMetadata toWrite = new DefaultAnnotationMetadata(
+        AnnotationMetadata toWrite = new MutableAnnotationMetadata(
                 [
                         "io.micrometer.core.annotation.Timed": [
                                 percentiles: [1.1d] as double[]
@@ -135,7 +135,7 @@ class Test {
                         percentiles: [1.1d] as double[]
                 ]
 
-        ], null
+        ], null, false
         )
         when:
         def className = "test"
@@ -693,5 +693,102 @@ class Test {
         metadata.classValues(TypeHint)[1] == UUID.class
     }
 
+    void "test defaults"() {
+        given:
+            AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\
+package test;
+
+@io.micronaut.inject.annotation.MyAnnotation2(intArray3 = 1, stringArray4 = "X", boolArray4 = false, myEnumArray4 = io.micronaut.inject.annotation.MyEnum2.FOO)
+class Test {
+}
+
+''')
+        when:
+            AnnotationMetadata metadata = writeAndLoadMetadata("test", toWrite)
+            def defaults = metadata.getDefaultValues("io.micronaut.inject.annotation.MyAnnotation2")
+            def av = metadata.getAnnotation("io.micronaut.inject.annotation.MyAnnotation2")
+
+        then:
+            defaults["num"] == 10
+            defaults["bool"] == false
+            defaults["intArray1"] == new int[] {}
+            defaults["intArray2"] == new int[] {1, 2, 3}
+            defaults["intArray3"] == null
+            defaults["stringArray1"] == new String[] {}
+            defaults["stringArray2"] == new String[] {""}
+            defaults["stringArray3"] == new String[] {"A"}
+            defaults["stringArray4"] == null
+            defaults["boolArray1"] == new boolean[] {}
+            defaults["boolArray2"] == new boolean[] {true}
+            defaults["boolArray3"] == new boolean[] {false}
+            defaults["boolArray4"] == null
+            defaults["myEnumArray1"] == new String[] {}
+            defaults["myEnumArray2"] == new String[] {"ABC"}
+            defaults["myEnumArray3"] == new String[] {"FOO", "BAR"}
+            defaults["myEnumArray4"] == null
+            defaults["classesArray1"] == new AnnotationClassValue[0]
+            defaults["classesArray2"] == new AnnotationClassValue[] {new AnnotationClassValue(String)}
+            defaults["ann"] == AnnotationValue.builder(MyAnnotation3).value("foo").build()
+            defaults["annotationsArray1"] == new AnnotationValue[0]
+            defaults["annotationsArray2"] == new AnnotationValue[] { AnnotationValue.builder(MyAnnotation3).value("foo").build(), AnnotationValue.builder(MyAnnotation3).value("bar").build() }
+
+            av.getRequiredValue("num", Integer.class) == 10
+            av.getRequiredValue("bool", Boolean.class) == false
+            av.getRequiredValue("intArray1", int[].class) == new int[] {}
+            av.getRequiredValue("intArray2", int[].class) == new int[] {1, 2, 3}
+            av.getRequiredValue("stringArray1", String[].class) == new String[] {}
+            av.getRequiredValue("stringArray2", String[].class) == new String[] {""}
+            av.getRequiredValue("stringArray3", String[].class) == new String[] {"A"}
+            av.getRequiredValue("myEnumArray1", String[].class) == new String[] {}
+            av.getRequiredValue("myEnumArray2", String[].class) == new String[] {"ABC"}
+            av.getRequiredValue("myEnumArray3", String[].class) == new String[] {"FOO", "BAR"}
+    }
+
+    void "test aliases"() {
+        given:
+            AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\
+package test;
+
+@io.micronaut.inject.annotation.MyAnnotation2Aliases(
+        intArray1Alias = {},
+        intArray2Alias = {1, 2, 3},
+        stringArray1Alias = {},
+        stringArray2Alias = "",
+        stringArray3Alias = "A",
+        myEnumArray1Alias = {},
+        myEnumArray2Alias = io.micronaut.inject.annotation.MyEnum2.ABC,
+        myEnumArray3Alias = {io.micronaut.inject.annotation.MyEnum2.FOO, io.micronaut.inject.annotation.MyEnum2.BAR},
+        classesArray1Alias = {},
+        classesArray2Alias = {String.class},
+        annAlias = @io.micronaut.inject.annotation.MyAnnotation3("foo"),
+        annotationsArray1Alias = {},
+        annotationsArray2Alias = {
+                @io.micronaut.inject.annotation.MyAnnotation3("foo"),
+                @io.micronaut.inject.annotation.MyAnnotation3("bar")
+        }
+)class Test {
+}
+
+''')
+        when:
+            AnnotationMetadata metadata = writeAndLoadMetadata("test", toWrite)
+            def values = metadata.getValues("io.micronaut.inject.annotation.MyAnnotation2Aliases")
+            def av = metadata.getAnnotation("io.micronaut.inject.annotation.MyAnnotation2Aliases")
+
+        then:
+            values["intArray1"] == new int[] {}
+            values["intArray2"] == new int[] {1, 2, 3}
+            values["stringArray1"] == new String[] {}
+            values["stringArray2"] == new String[] {""}
+            values["stringArray3"] == new String[] {"A"}
+            values["myEnumArray1"] == new String[] {}
+            values["myEnumArray2"] == new String[] {"ABC"}
+            values["myEnumArray3"] == new String[] {"FOO", "BAR"}
+            values["classesArray1"] == new AnnotationClassValue[0]
+            values["classesArray2"] == new AnnotationClassValue[] {new AnnotationClassValue(String)}
+            values["ann"] == AnnotationValue.builder(MyAnnotation3).value("foo").build()
+            values["annotationsArray1"] == new AnnotationValue[0]
+            values["annotationsArray2"] == new AnnotationValue[] { AnnotationValue.builder(MyAnnotation3).value("foo").build(), AnnotationValue.builder(MyAnnotation3).value("bar").build() }
+    }
 
 }
