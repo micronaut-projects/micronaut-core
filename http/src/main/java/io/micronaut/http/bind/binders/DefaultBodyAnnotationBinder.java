@@ -141,7 +141,7 @@ public class DefaultBodyAnnotationBinder<T> implements BodyArgumentBinder<T> {
             }
             return decoded;
         } catch (CodecException e) {
-            if(e.getCause() instanceof RuntimeException r) {
+            if (e.getCause() instanceof RuntimeException r) {
                 throw r;
             } else {
                 throw e;

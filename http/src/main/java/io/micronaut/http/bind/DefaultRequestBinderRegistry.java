@@ -85,8 +85,9 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
     }
 
     /**
-     * @param conversionService The conversion service
-     * @param binders           The request argument binders
+     * @param mediaTypeCodecRegistry The codec registry
+     * @param conversionService      The conversion service
+     * @param binders                The request argument binders
      */
     public DefaultRequestBinderRegistry(MediaTypeCodecRegistry mediaTypeCodecRegistry, ConversionService conversionService, RequestArgumentBinder... binders) {
         this(null, conversionService, Arrays.asList(binders));
