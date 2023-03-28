@@ -32,12 +32,12 @@ import java.util.Optional;
 public class OutgoingHttpRequestProcessorImpl implements OutgoingHttpRequestProcessor {
 
     /**
-     * @param matcher A {@link OutgointRequestProcessorMatcher} implementation. Entity defining matching rules.
+     * @param matcher A {@link OutgoingRequestProcessorMatcher} implementation. Entity defining matching rules.
      * @param request The request
      * @return true if the request should be processed
      */
     @Override
-    public boolean shouldProcessRequest(OutgointRequestProcessorMatcher matcher, HttpRequest<?> request) {
+    public boolean shouldProcessRequest(OutgoingRequestProcessorMatcher matcher, HttpRequest<?> request) {
         Optional<String> serviceId = request.getAttribute(HttpAttributes.SERVICE_ID.toString(), String.class);
         String uri = request.getUri().toString();
         return shouldProcessRequest(matcher, serviceId.orElse(null), uri);
@@ -45,12 +45,12 @@ public class OutgoingHttpRequestProcessorImpl implements OutgoingHttpRequestProc
 
     /**
      *
-     * @param matcher A {@link OutgointRequestProcessorMatcher} implementation. Entity defining matching rules.
+     * @param matcher A {@link OutgoingRequestProcessorMatcher} implementation. Entity defining matching rules.
      * @param serviceId The service id
      * @param uri The URI of the request being processed
      * @return true if the request should be processed
      */
-    public boolean shouldProcessRequest(OutgointRequestProcessorMatcher matcher, String serviceId, String uri) {
+    public boolean shouldProcessRequest(OutgoingRequestProcessorMatcher matcher, String serviceId, String uri) {
         if (matcher.getServiceIdPattern() != null && serviceId != null && matcher.getServiceIdPattern().matcher(serviceId).matches()) {
             return true;
         }

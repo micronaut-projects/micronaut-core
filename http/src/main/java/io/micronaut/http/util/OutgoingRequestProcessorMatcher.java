@@ -23,10 +23,10 @@ import java.util.regex.Pattern;
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface OutgointRequestProcessorMatcher {
+public interface OutgoingRequestProcessorMatcher {
 
     /**
-     * @return a regular expresion to validate the service id against.
+     * @return a regular expression to validate the service id against.
      */
     Pattern getServiceIdPattern();
 
