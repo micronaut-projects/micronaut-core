@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.ReflectionConfig;
 import io.micronaut.core.annotation.TypeHint;
+import io.micronaut.core.util.CollectionUtils;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -62,8 +63,10 @@ public interface GraalReflectionConfigurer extends AnnotationMetadataProvider {
                     return;
                 }
                 context.register(t);
-                final Set<TypeHint.AccessType> accessType = Set.of(
-                    reflectConfig.enumValues("accessType", TypeHint.AccessType.class)
+                TypeHint.AccessType[] accessTypes = reflectConfig.enumValues("accessType", TypeHint.AccessType.class);
+                // DO NOT change to Set.of(..) which disallows duplicates
+                final Set<TypeHint.AccessType> accessType = CollectionUtils.setOf(
+                    accessTypes
                 );
                 if (accessType.contains(TypeHint.AccessType.ALL_PUBLIC_METHODS)) {
                     final Method[] methods = t.getMethods();

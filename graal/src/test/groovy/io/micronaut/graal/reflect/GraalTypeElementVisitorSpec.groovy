@@ -332,7 +332,7 @@ class Test {
         then:
         config
         config.stringValue("type").get() == 'test.Test'
-        config.enumValues("accessType", TypeHint.AccessType) == [TypeHint.AccessType.ALL_PUBLIC_METHODS, TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS, TypeHint.AccessType.ALL_DECLARED_FIELDS] as TypeHint.AccessType[]
+        config.enumValues("accessType", TypeHint.AccessType) as Set == [TypeHint.AccessType.ALL_PUBLIC_METHODS, TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS, TypeHint.AccessType.ALL_DECLARED_FIELDS] as Set
         config.getAnnotations("methods").first().stringValue("name").get() == '<init>'
     }
 
@@ -359,7 +359,7 @@ class Test {
         then:
         config
         config.stringValue("type").get() == 'test.Test'
-        config.enumValues("accessType", TypeHint.AccessType) == [TypeHint.AccessType.ALL_PUBLIC_METHODS, TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS, TypeHint.AccessType.ALL_DECLARED_FIELDS] as TypeHint.AccessType[]
+        config.enumValues("accessType", TypeHint.AccessType) as Set == [TypeHint.AccessType.ALL_PUBLIC_METHODS, TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS, TypeHint.AccessType.ALL_DECLARED_FIELDS] as Set
         config.getAnnotations("methods").size() == 1
         config.getAnnotations("methods").first().stringValue("name").get() == '<init>'
 
@@ -405,7 +405,7 @@ enum Test {
         then:
         config
         config.stringValue("type").get() == 'test.Test'
-        config.enumValues("accessType", TypeHint.AccessType) == [TypeHint.AccessType.ALL_PUBLIC_METHODS, TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS, TypeHint.AccessType.ALL_DECLARED_FIELDS] as TypeHint.AccessType[]
+        config.enumValues("accessType", TypeHint.AccessType) as Set == [TypeHint.AccessType.ALL_PUBLIC_METHODS, TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS, TypeHint.AccessType.ALL_DECLARED_FIELDS] as TypeHint.AccessType[] as Set
         config.getAnnotations("methods").size() == 2 // Two methods from Enum
 
     }
