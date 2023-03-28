@@ -33,6 +33,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageDecoder;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,6 +109,7 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
                 }
             }
             out.add(request);
+            ReferenceCountUtil.retain(msg); // retain the body if it's a FullHttpRequest
         } catch (IllegalArgumentException e) {
             // this configured the request in the channel as an attribute
             new NettyHttpRequest<>(

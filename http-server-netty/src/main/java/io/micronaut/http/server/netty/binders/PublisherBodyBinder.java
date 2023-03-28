@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.binders;
 
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
+import io.micronaut.core.bind.OneShotBindingResult;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
@@ -33,6 +34,7 @@ import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.EmptyByteBuf;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ReferenceCounted;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
@@ -86,7 +88,7 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
             Argument<?> targetType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             HttpContentProcessor processor = httpContentProcessorResolver.resolve(nettyHttpRequest, targetType).resultType(context.getArgument());
             if (nativeRequest instanceof StreamedHttpRequest) {
-                return () -> Optional.of(subscriber -> HttpContentProcessorAsReactiveProcessor.asPublisher(processor, nettyHttpRequest).subscribe(new CompletionAwareSubscriber<>() {
+                return new OneShotBindingResult<>(() -> Optional.of(subscriber -> HttpContentProcessorAsReactiveProcessor.asPublisher(processor, nettyHttpRequest).subscribe(new CompletionAwareSubscriber<>() {
 
                     Subscription s;
 
@@ -148,24 +150,33 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
                         subscriber.onComplete();
                     }
 
-                }));
-            } else if (nativeRequest instanceof FullHttpRequest fullHttpRequest) {
-                return () -> {
+                })));
+            } else if (nativeRequest instanceof FullHttpRequest fullHttpRequest && fullHttpRequest.content().isReadable()) {
+                // we will read the body, retain the request
+                fullHttpRequest.retain();
+                return new OneShotBindingResult<>(() -> {
                     List<Object> buffer = new ArrayList<>(1);
                     try {
                         processor.add(fullHttpRequest, buffer);
                         processor.complete(buffer);
-                        for (int i = 0; i < buffer.size(); i++) {
+                        List<Object> convertedBuffer = new ArrayList<>(buffer.size());
+                        for (Object object : buffer) {
+                            if (object instanceof ByteBufHolder holder) {
+                                object = holder.content();
+                                if (!holder.content().isReadable()) {
+                                    continue;
+                                }
+                            }
                             ArgumentConversionContext<?> conversionContext = context.with(targetType);
-                            Optional<?> converted = conversionService.convert(buffer.get(i), conversionContext);
+                            Optional<?> converted = conversionService.convert(object, conversionContext);
                             if (converted.isPresent()) {
-                                buffer.set(i, converted.get());
+                                convertedBuffer.add(converted.get());
                             } else {
                                 // handled below
-                                throw extractError(buffer.get(i), conversionContext);
+                                throw extractError(object, conversionContext);
                             }
                         }
-                        return Optional.of(Flux.fromIterable(buffer));
+                        return Optional.of(Flux.fromIterable(convertedBuffer));
                     } catch (Throwable t) {
                         try {
                             processor.cancel();
@@ -173,8 +184,12 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
                             t.addSuppressed(u);
                         }
                         return Optional.of(Mono.error(t));
+                    } finally {
+                        for (Object o : buffer) {
+                            ReferenceCountUtil.release(o);
+                        }
                     }
-                };
+                });
             }
         }
         return BindingResult.EMPTY;

@@ -57,6 +57,7 @@ public class DefaultBodyAnnotationBinder<T> implements BodyArgumentBinder<T> {
 
     /**
      * @param conversionService The conversion service
+     * @param mediaTypeCodecRegistry The media type codec registry
      */
     public DefaultBodyAnnotationBinder(ConversionService conversionService, MediaTypeCodecRegistry mediaTypeCodecRegistry) {
         this.conversionService = conversionService;

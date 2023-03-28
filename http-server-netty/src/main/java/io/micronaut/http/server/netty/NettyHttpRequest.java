@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.netty;
 
-import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -38,7 +37,6 @@ import io.micronaut.http.MutableHttpParameters;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.PushCapableHttpRequest;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
-import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
@@ -67,7 +65,6 @@ import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
-import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
@@ -158,7 +155,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         // we do copy the weight and dependency id
     }
 
-    private final boolean isFull;
     private final MediaTypeCodecRegistry codecRegistry;
 
     boolean destroyed = false;
@@ -214,15 +210,8 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         this.serverConfiguration = serverConfiguration;
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
-        if (nettyRequest instanceof FullHttpRequest fullHttpRequest) {
-            this.isFull = true;
-             // released by NettyHttpRequest.release()
-            fullHttpRequest.retain();
-        } else {
-            this.receivedContent = new ArrayList<>();
-            this.receivedData = new LinkedHashMap<>();
-            this.isFull = false;
-        }
+        this.receivedContent = new ArrayList<>();
+        this.receivedData = new LinkedHashMap<>();
         this.body = SupplierUtil.memoizedNonEmpty(() -> {
             T built = (T) buildBody();
             this.bodyUnwrapped = built;
@@ -350,10 +339,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      * @return A {@link CompositeByteBuf}
      */
     protected Object buildBody() {
-        if (this.isFull) {
-            FullHttpRequest fullHttpRequest = (FullHttpRequest) this.nettyRequest;
-            return NettyByteBufferFactory.DEFAULT.wrap(fullHttpRequest.content());
-        } else if (!receivedData.isEmpty()) {
+        if (!receivedData.isEmpty()) {
             Map body = new LinkedHashMap(receivedData.size());
 
             for (HttpData data: receivedData.values()) {
@@ -377,16 +363,20 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             return body;
         } else if (!receivedContent.isEmpty()) {
             int size = receivedContent.size();
-            CompositeByteBuf byteBufs = channelHandlerContext.alloc().compositeBuffer(size);
-            for (ByteBufHolder holder : receivedContent) {
-                ByteBuf content = holder.content();
-                if (content != null) {
-                    content.touch();
-                    // need to retain content, because for addComponent "ownership of buffer is transferred to this CompositeByteBuf."
-                    byteBufs.addComponent(true, content.retain());
+            if (size == 1) {
+                return receivedContent.get(0).content().retain();
+            } else {
+                CompositeByteBuf byteBufs = channelHandlerContext.alloc().compositeBuffer(size);
+                for (ByteBufHolder holder : receivedContent) {
+                    ByteBuf content = holder.content();
+                    if (content != null) {
+                        content.touch();
+                        // need to retain content, because for addComponent "ownership of buffer is transferred to this CompositeByteBuf."
+                        byteBufs.addComponent(true, content.retain());
+                    }
                 }
+                return byteBufs;
             }
-            return byteBufs;
         } else {
             return null;
         }
@@ -419,19 +409,15 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     @Internal
     public void release() {
         destroyed = true;
-        if (isFull) {
-            releaseIfNecessary(this.nettyRequest);
-        } else {
-            Consumer<Object> releaseIfNecessary = this::releaseIfNecessary;
-            receivedContent.forEach(releaseIfNecessary);
-            receivedData.values().forEach(releaseIfNecessary);
-            releaseIfNecessary(bodyUnwrapped);
-            if (attributes != null) {
-                attributes.values().forEach(releaseIfNecessary);
-            }
-            if (nettyRequest instanceof StreamedHttpRequest streamedHttpRequest) {
-                streamedHttpRequest.closeIfNoSubscriber();
-            }
+        Consumer<Object> releaseIfNecessary = this::releaseIfNecessary;
+        receivedContent.forEach(releaseIfNecessary);
+        receivedData.values().forEach(releaseIfNecessary);
+        releaseIfNecessary(bodyUnwrapped);
+        if (attributes != null) {
+            attributes.values().forEach(releaseIfNecessary);
+        }
+        if (nettyRequest instanceof StreamedHttpRequest streamedHttpRequest) {
+            streamedHttpRequest.closeIfNoSubscriber();
         }
     }
 
@@ -473,18 +459,16 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     public void addContent(ByteBufHolder httpContent) {
-        if (receivedData != null) {
-            httpContent.touch();
-            if (httpContent instanceof MicronautHttpData<?>) {
-                receivedData.computeIfAbsent(new IdentityWrapper(httpContent), key -> {
-                    // released in release()
-                    httpContent.retain();
-                    return (HttpData) httpContent;
-                });
-            } else {
+        httpContent.touch();
+        if (httpContent instanceof MicronautHttpData<?>) {
+            receivedData.computeIfAbsent(new IdentityWrapper(httpContent), key -> {
                 // released in release()
-                receivedContent.add(httpContent.retain());
-            }
+                httpContent.retain();
+                return (HttpData) httpContent;
+            });
+        } else {
+            // released in release()
+            receivedContent.add(httpContent.retain());
         }
     }
 

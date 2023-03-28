@@ -101,7 +101,12 @@ final class NettyRequestLifecycle extends RequestLifecycle {
             result = normalFlow();
         }
 
-        result.onComplete((response, throwable) -> rib.writeResponse(ctx, nettyRequest, response, throwable));
+        result.onComplete((response, throwable) -> {
+            if (nettyRequest.getNativeRequest() instanceof FullHttpRequest full) {
+                full.release();
+            }
+            rib.writeResponse(ctx, nettyRequest, response, throwable);
+        });
     }
 
     @Nullable
@@ -132,12 +137,7 @@ final class NettyRequestLifecycle extends RequestLifecycle {
         if (decoderResult.isFailure()) {
             return ExecutionFlow.error(decoderResult.cause());
         }
-        if (nettyRequest.getNativeRequest() instanceof FullHttpRequest) {
-            // will do the fulfillment later
-            return waitForBody(routeMatch);
-        } else {
-            return super.fulfillArguments(routeMatch).flatMap(this::waitForBody);
-        }
+        return super.fulfillArguments(routeMatch).flatMap(this::waitForBody);
     }
 
     /**
@@ -145,6 +145,7 @@ final class NettyRequestLifecycle extends RequestLifecycle {
      * This method also sometimes fulfills more controller parameters with form data.
      */
     private ExecutionFlow<RouteMatch<?>> waitForBody(RouteMatch<?> routeMatch) {
+        // note: shouldReadBody only works when fulfill has been called at least once
         if (!shouldReadBody(routeMatch)) {
             ctx.read();
             return ExecutionFlow.just(routeMatch);
@@ -155,9 +156,15 @@ final class NettyRequestLifecycle extends RequestLifecycle {
         HttpContentProcessor processor = rib.httpContentProcessorResolver.resolve(nettyRequest, routeMatch);
         io.netty.handler.codec.http.HttpRequest nativeRequest = nettyRequest.getNativeRequest();
         if (nativeRequest instanceof FullHttpRequest full) {
+            // we will read the body, retain the request
+            full.retain();
             List<Object> bufferList = new ArrayList<>(1);
             try {
-                processor.add(full.retain(), bufferList);
+                if (full.content().isReadable()) {
+                    processor.add(full, bufferList);
+                } else {
+                    full.release();
+                }
                 processor.complete(bufferList);
                 for (Object o : bufferList) {
                     completer.add(o);

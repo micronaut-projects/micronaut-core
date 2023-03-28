@@ -22,7 +22,6 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.netty.HttpContentProcessor;
@@ -34,6 +33,7 @@ import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Subscription;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -79,17 +79,53 @@ public class CompletableFutureBodyBinder
         if (source instanceof NettyHttpRequest) {
             NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) source;
             io.netty.handler.codec.http.HttpRequest nativeRequest = ((NettyHttpRequest) source).getNativeRequest();
-            CompletableFuture future = new CompletableFuture();
             Argument<?> targetType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-            if (nativeRequest instanceof FullHttpRequest) {
-                return () -> Optional.of(CompletableFuture.completedFuture(
-                    nettyHttpRequest.getBody(targetType).orElse(null)
-                ));
+            HttpContentProcessor processor = httpContentProcessorResolver.resolve(nettyHttpRequest, targetType);
+            if (nativeRequest instanceof FullHttpRequest fullHttpRequest && fullHttpRequest.content().isReadable()) {
+                // we will read the body, retain the request
+                fullHttpRequest.retain();
+                List<Object> buffer = new ArrayList<>(1);
+                try {
+                    processor.add(fullHttpRequest, buffer);
+                    processor.complete(buffer);
+                    for (Object object : buffer) {
+                        if (object instanceof ByteBufHolder holder) {
+                            nettyHttpRequest.addContent(holder);
+                        } else {
+                            nettyHttpRequest.setBody(object);
+                        }
+                        // upstream producer gave us control of the message. release it now, if we still need it,
+                        // nettyHttpRequest will have retained it
+                        ReferenceCountUtil.release(object);
+                    }
+                    Optional<Argument<?>> firstTypeParameter = context.getFirstTypeVariable();
+                    CompletableFuture future;
+                    if (firstTypeParameter.isPresent()) {
+                        Argument<?> arg = firstTypeParameter.get();
+                        Optional converted = nettyHttpRequest.getBody(arg);
+                        if (converted.isPresent()) {
+                            future = CompletableFuture.completedFuture(converted.get());
+                        } else {
+                            future = CompletableFuture.failedFuture(new IllegalArgumentException("Cannot bind body to argument type: " + arg.getType().getName()));
+                        }
+                    } else {
+                        future = CompletableFuture.completedFuture(nettyHttpRequest.getBody().orElse(null));
+                    }
+                    return () -> Optional.of(future);
+                } catch (Throwable t) {
+                    try {
+                        processor.cancel();
+                    } catch (Throwable u) {
+                        t.addSuppressed(u);
+                    }
+                    return () -> Optional.of(CompletableFuture.failedFuture(t));
+                } finally {
+                    for (Object o : buffer) {
+                        ReferenceCountUtil.release(o);
+                    }
+                }
             } else if (nativeRequest instanceof StreamedHttpRequest) {
-
-
-                HttpContentProcessor processor = httpContentProcessorResolver.resolve(nettyHttpRequest, targetType);
-
+                CompletableFuture future = new CompletableFuture();
                 HttpContentProcessorAsReactiveProcessor.asPublisher(processor, nettyHttpRequest).subscribe(new CompletionAwareSubscriber<Object>() {
                     @Override
                     protected void doOnSubscribe(Subscription subscription) {

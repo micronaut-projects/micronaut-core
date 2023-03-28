@@ -31,6 +31,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.EmptyByteBuf;
 import io.netty.handler.codec.http.FullHttpRequest;
 import org.reactivestreams.Subscription;
@@ -43,6 +44,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 
@@ -164,15 +167,32 @@ public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<Inpu
                 } catch (IOException e) {
                     context.reject(e);
                 }
-            } else if (nativeRequest instanceof FullHttpRequest fullHttpRequest) {
-                ByteBuf content = fullHttpRequest.content();
-                int i = content.readableBytes();
-                if (i == 0) {
-                    return BindingResult.EMPTY;
-                } else {
-                    @SuppressWarnings("S2095")
-                    ByteBufInputStream bufInputStream = new ByteBufInputStream(content.retain(), true);
+            } else if (nativeRequest instanceof FullHttpRequest fullHttpRequest && fullHttpRequest.content().isReadable()) {
+                // we will read the body, retain the request
+                fullHttpRequest.retain();
+                HttpContentProcessor processor = processorResolver.resolve(nettyHttpRequest, context.getArgument());
+                List<Object> buffer = new ArrayList<>(1);
+                try {
+                    processor.add(fullHttpRequest, buffer);
+                    processor.complete(buffer);
+
+                    ByteBuf buf;
+                    if (buffer.size() == 1) {
+                        buf = ((ByteBufHolder) buffer.get(0)).content();
+                    } else {
+                        CompositeByteBuf comp = nettyHttpRequest.getChannelHandlerContext().alloc().compositeBuffer();
+                        for (Object o : buffer) {
+                            comp.addComponent(true, ((ByteBufHolder) o).content());
+                        }
+                        buf = comp;
+                    }
+                    ByteBufInputStream bufInputStream = new ByteBufInputStream(buf, true);
                     return () -> Optional.of(bufInputStream);
+                } catch (Throwable t) {
+                    if (LOG.isTraceEnabled()) {
+                        LOG.trace("Server received error for argument [" + context.getArgument() + "]: " + t.getMessage(), t);
+                    }
+                    return BindingResult.EMPTY;
                 }
             }
         }
