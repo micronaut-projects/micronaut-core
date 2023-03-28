@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,8 +27,6 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.slf4j.LoggerFactory;
 
-import java.util.Optional;
-
 /**
  * An implementation of {@link LoggingSystem} that works with logback.
  *
@@ -45,23 +43,34 @@ public final class LogbackLoggingSystem implements LoggingSystem {
     private final String logbackXmlLocation;
 
     /**
-     * @deprecated Use {@link LogbackLoggingSystem#LogbackLoggingSystem(Optional, Optional)} instead
+     * @deprecated Use {@link LogbackLoggingSystem#LogbackLoggingSystem(String, String)} instead
      * @param logbackXmlLocation
      */
     @Deprecated
     public LogbackLoggingSystem(@Nullable @Property(name = "logger.config") String logbackXmlLocation) {
         this(
-            Optional.ofNullable(System.getProperty("logback.configurationFile")),
-            Optional.ofNullable(logbackXmlLocation)
+            System.getProperty("logback.configurationFile"),
+            logbackXmlLocation
         );
     }
 
+    /**
+     * @param logbackExternalConfigLocation The location of the logback configuration file set via logback properties
+     * @param logbackXmlLocation The location of the logback configuration file set via micronaut properties
+     * @since 3.8.8
+     */
     @Inject
     public LogbackLoggingSystem(
-        @Property(name = "logback.configurationFile") Optional<String> logbackExternalConfigLocation,
-        @Property(name = "logger.config") Optional<String> logbackXmlLocation
+        @Nullable @Property(name = "logback.configurationFile") String logbackExternalConfigLocation,
+        @Nullable @Property(name = "logger.config") String logbackXmlLocation
     ) {
-        this.logbackXmlLocation = logbackExternalConfigLocation.orElseGet(() -> logbackXmlLocation.orElse(DEFAULT_LOGBACK_LOCATION));
+        if (logbackExternalConfigLocation != null) {
+            this.logbackXmlLocation = logbackExternalConfigLocation;
+        } else if (logbackXmlLocation != null) {
+            this.logbackXmlLocation = logbackXmlLocation;
+        } else {
+            this.logbackXmlLocation = DEFAULT_LOGBACK_LOCATION;
+        }
     }
 
     @Override
