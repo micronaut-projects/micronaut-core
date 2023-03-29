@@ -137,7 +137,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor {
                     InterfaceHttpData currentPartialHttpData = postRequestDecoder.currentPartialHttpData();
                     if (currentPartialHttpData instanceof HttpData) {
                         // can't give away ownership of this data yet, so retain it
-                        out.add(currentPartialHttpData.retain());
+                        out.add(currentPartialHttpData);
                     }
 
                 } catch (HttpPostRequestDecoder.EndOfDataDecoderException e) {

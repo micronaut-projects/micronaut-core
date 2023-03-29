@@ -31,9 +31,9 @@ import java.nio.charset.Charset;
  * @since 2.5.5
  */
 @Internal
-class MicronautHttpPostMultipartRequestDecoder extends HttpPostMultipartRequestDecoder {
+public class MicronautHttpPostMultipartRequestDecoder extends HttpPostMultipartRequestDecoder {
 
-    MicronautHttpPostMultipartRequestDecoder(HttpDataFactory factory, HttpRequest request, Charset charset) {
+    public MicronautHttpPostMultipartRequestDecoder(HttpDataFactory factory, HttpRequest request, Charset charset) {
         super(factory, request, charset);
     }
 
