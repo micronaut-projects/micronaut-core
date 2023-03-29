@@ -3,23 +3,18 @@
 # https://github.com/micronaut-projects/micronaut-project-template/tree/master/.github/workflows
 #
 # and edit them there. Note that it will be sync'ed to all the Micronaut repos
-name: Java CI
+name: GraalVM Dev CI
 on:
-  push:
-    branches:
-      - master
-      - '[1-9]+.[0-9]+.x'
-  pull_request:
-    branches:
-      - master
-      - '[1-9]+.[0-9]+.x'
+  schedule:
+    - cron: "0 1 * * 1-5" # Mon-Fri at 1am UTC
+  workflow_dispatch:
 jobs:
   build:
     if: github.repository != 'micronaut-projects/micronaut-project-template'
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        graalvm: [ 'latest']
+        graalvm: [ 'dev']
         java: ['17']
     env:
       GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
@@ -29,7 +24,6 @@ jobs:
       GH_USERNAME: ${{ secrets.GH_USERNAME }}
       TESTCONTAINERS_RYUK_DISABLED: true
       PREDICTIVE_TEST_SELECTION: "${{ github.event_name == 'pull_request' && 'true' || 'false' }}"
-      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
        # https://github.com/actions/virtual-environments/issues/709
@@ -65,11 +59,6 @@ jobs:
         run: |
           ./gradlew check --no-daemon --continue
 
-      - name: "🔎 Run static analysis"
-        if: env.SONAR_TOKEN != ''
-        run: |
-          ./gradlew sonar
-
       - name: "📊 Publish Test Report"
         if: always()
         uses: mikepenz/action-junit-report@v3
@@ -85,26 +74,3 @@ jobs:
           name: binary-compatibility-reports
           path: "**/build/reports/binary-compatibility-*.html"
 
-      - name: "📦 Publish to Sonatype Snapshots"
-        if: success() && github.event_name == 'push' && matrix.java == '17'
-        env:
-          SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
-          SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
-        run: ./gradlew publishToSonatype docs --no-daemon
-
-      - name: "❓ Determine docs target repository"
-        uses: haya14busa/action-cond@v1
-        id: docs_target
-        with:
-          cond: ${{ github.repository == 'micronaut-projects/micronaut-core' }}
-          if_true: "micronaut-projects/micronaut-docs"
-          if_false: ${{ github.repository }}
-
-      - name: "📑 Publish to Github Pages"
-        if: success() && github.event_name == 'push' && matrix.java == '17'
-        uses: micronaut-projects/github-pages-deploy-action@master
-        env:
-          TARGET_REPOSITORY: ${{ steps.docs_target.outputs.value }}
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          BRANCH: gh-pages
-          FOLDER: build/docs
