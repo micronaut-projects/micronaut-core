@@ -39,6 +39,8 @@ import java.util.function.Supplier;
  */
 public final class LogbackUtils {
 
+    private static final String DEFAULT_LOGBACK_13_PROGRAMMATIC_CONFIGURATOR = "ch.qos.logback.classic.util.DefaultJoranConfigurator";
+
     private LogbackUtils() {
     }
 
@@ -88,7 +90,7 @@ public final class LogbackUtils {
         Supplier<URL> resourceSupplier
     ) {
         Configurator configurator = loadFromServiceLoader();
-        if (configurator != null) {
+        if (isSupportedConfigurator(context, configurator)) {
             context.getStatusManager().add(new InfoStatus("Using " + configurator.getClass().getName(), context));
             programmaticConfiguration(context, configurator);
         } else {
@@ -103,6 +105,17 @@ public final class LogbackUtils {
                 throw new LoggingSystemException("Resource " + logbackXmlLocation + " not found");
             }
         }
+    }
+
+    private static boolean isSupportedConfigurator(LoggerContext context, Configurator configurator) {
+        if (configurator == null) {
+            return false;
+        }
+        if (DEFAULT_LOGBACK_13_PROGRAMMATIC_CONFIGURATOR.equals(configurator.getClass().getName())) {
+            context.getStatusManager().add(new InfoStatus("Skipping " + configurator.getClass().getName() + " as it's assumed to be from an unsupported version of Logback", context));
+            return false;
+        }
+        return true;
     }
 
     /**
