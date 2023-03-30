@@ -2,7 +2,7 @@ package io.micronaut.inject.beanbuilder;
 
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.inject.annotation.TypedAnnotationTransformer;
+import io.micronaut.inject.annotation.processor.TypedAnnotationTransformer;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.util.Arrays;

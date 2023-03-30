@@ -21,7 +21,7 @@ import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.context.annotation.Context
 import io.micronaut.core.annotation.Generated
-import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
+import io.micronaut.inject.annotation.processor.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.processing.BeanDefinitionCreator
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
 import io.micronaut.inject.processing.ProcessingException

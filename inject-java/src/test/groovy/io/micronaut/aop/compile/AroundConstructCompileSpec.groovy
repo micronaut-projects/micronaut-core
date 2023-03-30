@@ -7,7 +7,7 @@ import io.micronaut.aop.InterceptorKind
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.core.annotation.AnnotationValue
-import io.micronaut.inject.annotation.NamedAnnotationTransformer
+import io.micronaut.inject.annotation.processor.NamedAnnotationTransformer
 import io.micronaut.inject.visitor.VisitorContext
 import spock.lang.Unroll
 

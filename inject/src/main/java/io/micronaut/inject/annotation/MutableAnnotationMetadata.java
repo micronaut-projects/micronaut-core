@@ -16,28 +16,14 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.*;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import org.jetbrains.annotations.Contract;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -51,13 +37,13 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
 
     private boolean hasPropertyExpressions = false;
     @Nullable
-    Map<String, Map<CharSequence, Object>> annotationDefaultValues;
+    private Map<String, Map<CharSequence, Object>> annotationDefaultValues;
     @Nullable
     private Set<String> sourceRetentionAnnotations;
     @Nullable
     private Map<String, Map<CharSequence, Object>> sourceAnnotationDefaultValues;
     @Nullable
-    Map<String, String> annotationRepeatableContainer;
+    private Map<String, String> annotationRepeatableContainer;
 
     /**
      * Default constructor.
@@ -66,17 +52,17 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     }
 
     private MutableAnnotationMetadata(@Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
-                                     @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes,
-                                     @Nullable Map<String, Map<CharSequence, Object>> allStereotypes,
-                                     @Nullable Map<String, Map<CharSequence, Object>> allAnnotations,
-                                     @Nullable Map<String, List<String>> annotationsByStereotype,
-                                     boolean hasPropertyExpressions) {
+                                      @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes,
+                                      @Nullable Map<String, Map<CharSequence, Object>> allStereotypes,
+                                      @Nullable Map<String, Map<CharSequence, Object>> allAnnotations,
+                                      @Nullable Map<String, List<String>> annotationsByStereotype,
+                                      boolean hasPropertyExpressions) {
         super(declaredAnnotations,
-              declaredStereotypes,
-              allStereotypes,
-              allAnnotations,
-              annotationsByStereotype,
-              hasPropertyExpressions);
+            declaredStereotypes,
+            allStereotypes,
+            allAnnotations,
+            annotationsByStereotype,
+            hasPropertyExpressions);
         this.hasPropertyExpressions = hasPropertyExpressions;
     }
 
@@ -86,9 +72,9 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         }
         annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
-            return  ((AnnotationMetadataHierarchy) annotationMetadata).merge();
+            return ((AnnotationMetadataHierarchy) annotationMetadata).merge();
         } else if (annotationMetadata instanceof MutableAnnotationMetadata) {
-            return  ((MutableAnnotationMetadata) annotationMetadata).clone();
+            return ((MutableAnnotationMetadata) annotationMetadata).clone();
         } else if (annotationMetadata instanceof DefaultAnnotationMetadata) {
             MutableAnnotationMetadata metadata = new MutableAnnotationMetadata();
             metadata.addAnnotationMetadata((DefaultAnnotationMetadata) annotationMetadata);
@@ -96,6 +82,149 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         } else {
             throw new IllegalStateException("Unknown annotation metadata: " + annotationMetadata);
         }
+    }
+
+    /**
+     * <p>Sets a member of the given {@link AnnotationMetadata} return a new annotation metadata instance without
+     * mutating the existing.</p>
+     *
+     * <p>WARNING: for internal use only be the framework</p>
+     *
+     * @param annotationMetadata The metadata
+     * @param annotationName     The annotation name
+     * @param member             The member
+     * @param value              The value
+     * @return The metadata
+     */
+    @Internal
+    public static MutableAnnotationMetadata mutateMember(MutableAnnotationMetadata annotationMetadata,
+                                                         String annotationName,
+                                                         String member,
+                                                         Object value) {
+
+        return mutateMember(annotationMetadata, annotationName, Collections.singletonMap(member, value));
+    }
+
+    /**
+     * Contributes defaults to the given target.
+     *
+     * <p>WARNING: for internal use only be the framework</p>
+     *
+     * @param target The target
+     * @param source The source
+     */
+    @Internal
+    public static void contributeDefaults(AnnotationMetadata target, AnnotationMetadata source) {
+        source = source.getTargetAnnotationMetadata();
+        if (source instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
+            contributeDefaults(target, annotationMetadataHierarchy);
+            return;
+        }
+        if (target instanceof MutableAnnotationMetadata damTarget && source instanceof MutableAnnotationMetadata damSource) {
+            final Map<String, Map<CharSequence, Object>> existingDefaults = damTarget.annotationDefaultValues;
+            final Map<String, Map<CharSequence, Object>> additionalDefaults = damSource.annotationDefaultValues;
+            if (existingDefaults != null) {
+                if (additionalDefaults != null) {
+                    existingDefaults.putAll(
+                        additionalDefaults
+                    );
+                }
+            } else {
+                if (additionalDefaults != null) {
+                    additionalDefaults.forEach(damTarget::addDefaultAnnotationValues);
+                }
+            }
+        }
+        // We don't need to contribute the default source annotation
+        contributeRepeatable(target, source);
+    }
+
+    /**
+     * Contributes defaults to the given target.
+     *
+     * <p>WARNING: for internal use only be the framework</p>
+     *
+     * @param target The target
+     * @param source The source
+     * @since 4.0.0
+     */
+    @Internal
+    public static void contributeDefaults(AnnotationMetadata target, AnnotationMetadataHierarchy source) {
+        for (AnnotationMetadata annotationMetadata : source) {
+            if (annotationMetadata instanceof AnnotationMetadataReference) {
+                continue;
+            }
+            contributeDefaults(target, annotationMetadata);
+        }
+    }
+
+    /**
+     * Contributes repeatable annotation metadata to the given target.
+     *
+     * <p>WARNING: for internal use only be the framework</p>
+     *
+     * @param target The target
+     * @param source The source
+     */
+    @Internal
+    public static void contributeRepeatable(AnnotationMetadata target, AnnotationMetadata source) {
+        source = source.getTargetAnnotationMetadata();
+        if (source instanceof AnnotationMetadataHierarchy) {
+            source = ((AnnotationMetadataHierarchy) source).merge();
+        }
+        if (target instanceof MutableAnnotationMetadata damTarget && source instanceof MutableAnnotationMetadata damSource) {
+            if (damSource.annotationRepeatableContainer != null && !damSource.annotationRepeatableContainer.isEmpty()) {
+                if (damTarget.annotationRepeatableContainer == null) {
+                    damTarget.annotationRepeatableContainer = new HashMap<>(damSource.annotationRepeatableContainer);
+                } else {
+                    damTarget.annotationRepeatableContainer.putAll(damSource.annotationRepeatableContainer);
+                }
+            }
+        }
+    }
+
+    /**
+     * <p>Sets a member of the given {@link AnnotationMetadata} return a new annotation metadata instance without
+     * mutating the existing.</p>
+     *
+     * <p>WARNING: for internal use only be the framework</p>
+     *
+     * @param annotationMetadata The metadata
+     * @param annotationName     The annotation name
+     * @param members            The key/value set of members and values
+     * @return The metadata
+     */
+    @Internal
+    public static MutableAnnotationMetadata mutateMember(MutableAnnotationMetadata annotationMetadata,
+                                                         String annotationName,
+                                                         Map<CharSequence, Object> members) {
+        if (StringUtils.isEmpty(annotationName)) {
+            throw new IllegalArgumentException("Argument [annotationName] cannot be blank");
+        }
+        if (!members.isEmpty()) {
+            for (Map.Entry<CharSequence, Object> entry : members.entrySet()) {
+                if (StringUtils.isEmpty(entry.getKey())) {
+                    throw new IllegalArgumentException("Argument [members] cannot have a blank key");
+                }
+                if (entry.getValue() == null) {
+                    throw new IllegalArgumentException("Argument [members] cannot have a null value. Key [" + entry.getKey() + "]");
+                }
+            }
+        }
+        annotationMetadata = annotationMetadata.clone();
+        annotationMetadata.addDeclaredAnnotation(annotationName, members);
+        return annotationMetadata;
+    }
+
+    /**
+     * @return unmodifiable map of annotation repeatable container
+     */
+    @Internal
+    public Map<String, String> getAnnotationRepeatableContainer() {
+        if (annotationRepeatableContainer == null) {
+            return null;
+        }
+        return Collections.unmodifiableMap(annotationRepeatableContainer);
     }
 
     @Override
@@ -106,12 +235,12 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     @Override
     public MutableAnnotationMetadata clone() {
         final MutableAnnotationMetadata cloned = new MutableAnnotationMetadata(
-                declaredAnnotations != null ? cloneMapOfMapValue(declaredAnnotations) : null,
-                declaredStereotypes != null ? cloneMapOfMapValue(declaredStereotypes) : null,
-                allStereotypes != null ? cloneMapOfMapValue(allStereotypes) : null,
-                allAnnotations != null ? cloneMapOfMapValue(allAnnotations) : null,
-                annotationsByStereotype != null ? cloneMapOfListValue(annotationsByStereotype) : null,
-                hasPropertyExpressions
+            declaredAnnotations != null ? cloneMapOfMapValue(declaredAnnotations) : null,
+            declaredStereotypes != null ? cloneMapOfMapValue(declaredStereotypes) : null,
+            allStereotypes != null ? cloneMapOfMapValue(allStereotypes) : null,
+            allAnnotations != null ? cloneMapOfMapValue(allAnnotations) : null,
+            annotationsByStereotype != null ? cloneMapOfListValue(annotationsByStereotype) : null,
+            hasPropertyExpressions
         );
         if (annotationDefaultValues != null) {
             cloned.annotationDefaultValues = new LinkedHashMap<>(annotationDefaultValues);
@@ -142,7 +271,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         final Map<CharSequence, Object> compileTimeDefaults = annotationDefaultValues.get(annotation);
         if (compileTimeDefaults != null && !compileTimeDefaults.isEmpty()) {
             return compileTimeDefaults.entrySet().stream()
-                    .collect(Collectors.toMap(e -> e.getKey().toString(), Map.Entry::getValue));
+                .collect(Collectors.toMap(e -> e.getKey().toString(), Map.Entry::getValue));
         }
         return values;
     }
@@ -175,10 +304,10 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     }
 
     /**
-     * @return The annotations that are source retention.
+     * @return The annotations that are source retention. <b>read only</b>
      */
     @Internal
-    Set<String> getSourceRetentionAnnotations() {
+    public Set<String> getSourceRetentionAnnotations() {
         if (sourceRetentionAnnotations != null) {
             return Collections.unmodifiableSet(sourceRetentionAnnotations);
         }
@@ -196,7 +325,6 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     public void addAnnotation(String annotation, Map<CharSequence, Object> values) {
         addAnnotation(annotation, values, RetentionPolicy.RUNTIME);
     }
-
 
     /**
      * Adds an annotation and its member values, if the annotation already exists the data will be merged with existing
@@ -372,7 +500,6 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         addStereotype(parentAnnotations, stereotype, values, RetentionPolicy.RUNTIME);
     }
 
-
     /**
      * Adds a stereotype and its member values, if the annotation already exists the data will be merged with existing
      * values replaced.
@@ -412,14 +539,26 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
 
             // add to stereotypes
             addAnnotation(
-                    stereotype,
-                    values,
-                    null,
-                    allStereotypes,
-                    false,
-                    retentionPolicy
+                stereotype,
+                values,
+                null,
+                allStereotypes,
+                false,
+                retentionPolicy
             );
         }
+    }
+
+    /**
+     * @return A read only map of the default values for the annotation
+     */
+    @Nullable
+    @Contract(pure = true)
+    public Map<String, Map<CharSequence, Object>> getAnnotationDefaultValues() {
+        if (annotationDefaultValues == null) {
+            return null;
+        }
+        return Collections.unmodifiableMap(annotationDefaultValues);
     }
 
     /**
@@ -474,12 +613,12 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
             }
 
             addAnnotation(
-                    stereotype,
-                    values,
-                    declaredStereotypes,
-                    allStereotypes,
-                    true,
-                    retentionPolicy
+                stereotype,
+                values,
+                declaredStereotypes,
+                allStereotypes,
+                true,
+                retentionPolicy
             );
         }
     }
@@ -588,7 +727,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     }
 
     @SuppressWarnings("MagicNumber")
-    private Map<String, Map<CharSequence, Object>> getAllStereotypes() {
+    public Map<String, Map<CharSequence, Object>> getAllStereotypes() {
         Map<String, Map<CharSequence, Object>> stereotypes = this.allStereotypes;
         if (stereotypes == null) {
             stereotypes = new HashMap<>(3);
@@ -608,7 +747,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     }
 
     @SuppressWarnings("MagicNumber")
-    private Map<String, Map<CharSequence, Object>> getAllAnnotations() {
+    public Map<String, Map<CharSequence, Object>> getAllAnnotations() {
         Map<String, Map<CharSequence, Object>> annotations = this.allAnnotations;
         if (annotations == null) {
             annotations = new HashMap<>(3);
@@ -671,27 +810,6 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
             newValues.add(annotationValue);
             values.put(AnnotationMetadata.VALUE_MEMBER, newValues);
         }
-    }
-
-    /**
-     * <p>Sets a member of the given {@link AnnotationMetadata} return a new annotation metadata instance without
-     * mutating the existing.</p>
-     *
-     * <p>WARNING: for internal use only be the framework</p>
-     *
-     * @param annotationMetadata The metadata
-     * @param annotationName     The annotation name
-     * @param member             The member
-     * @param value              The value
-     * @return The metadata
-     */
-    @Internal
-    public static MutableAnnotationMetadata mutateMember(MutableAnnotationMetadata annotationMetadata,
-                                                         String annotationName,
-                                                         String member,
-                                                         Object value) {
-
-        return mutateMember(annotationMetadata, annotationName, Collections.singletonMap(member, value));
     }
 
     @Override
@@ -809,117 +927,6 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                 annotationRepeatableContainer.putAll(annotationMetadata.annotationRepeatableContainer);
             }
         }
-    }
-
-    /**
-     * Contributes defaults to the given target.
-     *
-     * <p>WARNING: for internal use only be the framework</p>
-     *
-     * @param target The target
-     * @param source The source
-     */
-    @Internal
-    public static void contributeDefaults(AnnotationMetadata target, AnnotationMetadata source) {
-        source = source.getTargetAnnotationMetadata();
-        if (source instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
-            contributeDefaults(target, annotationMetadataHierarchy);
-            return;
-        }
-        if (target instanceof MutableAnnotationMetadata damTarget && source instanceof MutableAnnotationMetadata damSource) {
-            final Map<String, Map<CharSequence, Object>> existingDefaults = damTarget.annotationDefaultValues;
-            final Map<String, Map<CharSequence, Object>> additionalDefaults = damSource.annotationDefaultValues;
-            if (existingDefaults != null) {
-                if (additionalDefaults != null) {
-                    existingDefaults.putAll(
-                            additionalDefaults
-                    );
-                }
-            } else {
-                if (additionalDefaults != null) {
-                    additionalDefaults.forEach(damTarget::addDefaultAnnotationValues);
-                }
-            }
-        }
-        // We don't need to contribute the default source annotation
-        contributeRepeatable(target, source);
-    }
-
-    /**
-     * Contributes defaults to the given target.
-     *
-     * <p>WARNING: for internal use only be the framework</p>
-     *
-     * @param target The target
-     * @param source The source
-     * @since 4.0.0
-     */
-    @Internal
-    public static void contributeDefaults(AnnotationMetadata target, AnnotationMetadataHierarchy source) {
-        for (AnnotationMetadata annotationMetadata : source) {
-            if (annotationMetadata instanceof AnnotationMetadataReference) {
-                continue;
-            }
-            contributeDefaults(target, annotationMetadata);
-        }
-    }
-
-    /**
-     * Contributes repeatable annotation metadata to the given target.
-     *
-     * <p>WARNING: for internal use only be the framework</p>
-     *
-     * @param target The target
-     * @param source The source
-     */
-    @Internal
-    public static void contributeRepeatable(AnnotationMetadata target, AnnotationMetadata source) {
-        source = source.getTargetAnnotationMetadata();
-        if (source instanceof AnnotationMetadataHierarchy) {
-            source = ((AnnotationMetadataHierarchy) source).merge();
-        }
-        if (target instanceof MutableAnnotationMetadata damTarget && source instanceof MutableAnnotationMetadata damSource) {
-            if (damSource.annotationRepeatableContainer != null && !damSource.annotationRepeatableContainer.isEmpty()) {
-                if (damTarget.annotationRepeatableContainer == null) {
-                    damTarget.annotationRepeatableContainer = new HashMap<>(damSource.annotationRepeatableContainer);
-                } else {
-                    damTarget.annotationRepeatableContainer.putAll(damSource.annotationRepeatableContainer);
-                }
-            }
-        }
-    }
-
-    /**
-     * <p>Sets a member of the given {@link AnnotationMetadata} return a new annotation metadata instance without
-     * mutating the existing.</p>
-     *
-     * <p>WARNING: for internal use only be the framework</p>
-     *
-     * @param annotationMetadata The metadata
-     * @param annotationName     The annotation name
-     * @param members            The key/value set of members and values
-     * @return The metadata
-     */
-    @Internal
-    public static MutableAnnotationMetadata mutateMember(MutableAnnotationMetadata annotationMetadata,
-                                                         String annotationName,
-                                                         Map<CharSequence, Object> members) {
-        if (StringUtils.isEmpty(annotationName)) {
-            throw new IllegalArgumentException("Argument [annotationName] cannot be blank");
-        }
-        if (!members.isEmpty()) {
-            for (Map.Entry<CharSequence, Object> entry : members.entrySet()) {
-                if (StringUtils.isEmpty(entry.getKey())) {
-                    throw new IllegalArgumentException("Argument [members] cannot have a blank key");
-                }
-                if (entry.getValue() == null) {
-                    throw new IllegalArgumentException("Argument [members] cannot have a null value. Key [" + entry.getKey() + "]");
-                }
-            }
-        }
-        annotationMetadata = annotationMetadata.clone();
-        annotationMetadata.addDeclaredAnnotation(annotationName, members);
-        return annotationMetadata;
     }
 
     /**
@@ -1046,5 +1053,37 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
             }
         }
         return AnnotationMetadataSupport.getRepeatableAnnotation(annotation);
+    }
+
+    /**
+     * @return annotations directly declared on the element. <b>read only</b>
+     */
+    @Internal
+    public Map<String, Map<CharSequence, Object>> getDeclaredAnnotations() {
+        if (declaredAnnotations == null) {
+            return Collections.emptyMap();
+        }
+        return Collections.unmodifiableMap(declaredAnnotations);
+    }
+
+    /**
+     * @return all stereotypes of the element. <b>read only</b>
+     */
+    @Internal
+    public Map<String, Map<CharSequence, Object>> getDeclaredStereotypes() {
+        if (declaredStereotypes == null) {
+            return Collections.emptyMap();
+        }
+        return Collections.unmodifiableMap(declaredStereotypes);
+    }
+
+    /**
+     * @return all annotations of the element mapped to by respective stereotype <b>read only</b>
+     */
+    public Map<String, List<String>> getAnnotationsByStereotype() {
+        if (annotationsByStereotype == null) {
+            return Collections.emptyMap();
+        }
+        return Collections.unmodifiableMap(annotationsByStereotype);
     }
 }

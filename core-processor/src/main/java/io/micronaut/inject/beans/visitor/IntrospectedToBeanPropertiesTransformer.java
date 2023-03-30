@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.inject.annotation.TypedAnnotationTransformer;
+import io.micronaut.inject.annotation.processor.TypedAnnotationTransformer;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.lang.annotation.RetentionPolicy;

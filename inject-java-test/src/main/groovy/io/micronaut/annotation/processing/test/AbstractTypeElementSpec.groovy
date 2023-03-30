@@ -45,10 +45,10 @@ import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanConfiguration
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
-import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
-import io.micronaut.inject.annotation.AnnotationMapper
-import io.micronaut.inject.annotation.AnnotationMetadataWriter
-import io.micronaut.inject.annotation.AnnotationTransformer
+import io.micronaut.inject.annotation.processor.AbstractAnnotationMetadataBuilder
+import io.micronaut.inject.annotation.processor.AnnotationMapper
+import io.micronaut.inject.annotation.processor.AnnotationMetadataWriter
+import io.micronaut.inject.annotation.processor.AnnotationTransformer
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.WildcardElement

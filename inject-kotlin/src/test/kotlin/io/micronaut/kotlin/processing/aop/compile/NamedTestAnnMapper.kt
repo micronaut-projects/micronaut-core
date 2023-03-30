@@ -2,7 +2,7 @@ package io.micronaut.kotlin.processing.aop.compile
 
 import io.micronaut.aop.InterceptorBinding
 import io.micronaut.core.annotation.AnnotationValue
-import io.micronaut.inject.annotation.NamedAnnotationMapper
+import io.micronaut.inject.annotation.processor.NamedAnnotationMapper
 import io.micronaut.inject.visitor.VisitorContext
 
 class NamedTestAnnMapper: NamedAnnotationMapper {

@@ -2,7 +2,7 @@ package io.micronaut.annotation.mapping
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationValue
-import io.micronaut.inject.annotation.TypedAnnotationMapper
+import io.micronaut.inject.annotation.processor.TypedAnnotationMapper
 import io.micronaut.inject.visitor.VisitorContext
 
 class MappedValueHasDefaultSpec extends AbstractTypeElementSpec {

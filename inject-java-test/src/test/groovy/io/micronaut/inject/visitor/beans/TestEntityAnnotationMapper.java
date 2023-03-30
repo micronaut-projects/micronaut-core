@@ -18,7 +18,7 @@ package io.micronaut.inject.visitor.beans;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.inject.annotation.NamedAnnotationMapper;
+import io.micronaut.inject.annotation.processor.NamedAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import io.micronaut.core.annotation.NonNull;

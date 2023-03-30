@@ -29,7 +29,7 @@ import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.reflect.ReflectionUtils
 import io.micronaut.core.util.ArrayUtils
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap
-import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
+import io.micronaut.inject.annotation.processor.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.annotation.MutableAnnotationMetadata
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.kotlin.processing.getBinaryName

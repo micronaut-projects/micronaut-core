@@ -3,10 +3,11 @@ package io.micronaut.kotlin.processing.aop.compile
 import io.micronaut.aop.InterceptorBinding
 import io.micronaut.aop.InterceptorKind
 import io.micronaut.core.annotation.AnnotationValue
-import io.micronaut.inject.annotation.NamedAnnotationTransformer
+import io.micronaut.inject.annotation.processor.NamedAnnotationTransformer
 import io.micronaut.inject.visitor.VisitorContext
 
-class AroundConstructAnnTransformer: NamedAnnotationTransformer {
+class AroundConstructAnnTransformer:
+    NamedAnnotationTransformer {
 
     override fun transform(
         annotation: AnnotationValue<Annotation>,

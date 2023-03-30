@@ -18,7 +18,7 @@ package io.micronaut.kotlin.processing.elementapi
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.annotation.NonNull
-import io.micronaut.inject.annotation.NamedAnnotationMapper
+import io.micronaut.inject.annotation.processor.NamedAnnotationMapper
 import io.micronaut.inject.visitor.VisitorContext
 
 class EntityAnnotationMapper : NamedAnnotationMapper {

@@ -17,7 +17,7 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.AbstractJavaElement;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
-import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.annotation.processor.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.WildcardElement;

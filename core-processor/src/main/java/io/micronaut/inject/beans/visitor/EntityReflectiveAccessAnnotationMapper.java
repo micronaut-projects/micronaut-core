@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.ReflectiveAccess;
-import io.micronaut.inject.annotation.NamedAnnotationMapper;
+import io.micronaut.inject.annotation.processor.NamedAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.lang.annotation.Annotation;

@@ -18,7 +18,7 @@ package io.micronaut.inject.annotation.internal;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.inject.annotation.NamedAnnotationTransformer;
+import io.micronaut.inject.annotation.processor.NamedAnnotationTransformer;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.lang.annotation.Annotation;

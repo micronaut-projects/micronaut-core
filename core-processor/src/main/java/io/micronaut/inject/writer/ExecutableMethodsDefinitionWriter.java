@@ -22,7 +22,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
-import io.micronaut.inject.annotation.AnnotationMetadataWriter;
+import io.micronaut.inject.annotation.processor.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.annotation;
+package io.micronaut.inject.annotation.processor;
 
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Aliases;
@@ -33,6 +33,10 @@ import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.annotation.AnnotatedElementValidator;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.lang.annotation.Annotation;
@@ -1062,9 +1066,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private Stream<ProcessedAnnotation> transform(@NonNull ProcessingContext context,
                                                   @NonNull ProcessedAnnotation toTransform) {
         // Transform annotation using:
-        // - io.micronaut.inject.annotation.AnnotationMapper
-        // - io.micronaut.inject.annotation.AnnotationRemapper
-        // - io.micronaut.inject.annotation.AnnotationTransformer
+        // - io.micronaut.inject.annotation.processor.AnnotationMapper
+        // - io.micronaut.inject.annotation.processor.AnnotationRemapper
+        // - io.micronaut.inject.annotation.processor.AnnotationTransformer
         // Each result of the transformation will be also transformed
         return processAnnotationMappers(context, toTransform)
                 .flatMap(annotation -> processAnnotationRemappers(context, annotation))

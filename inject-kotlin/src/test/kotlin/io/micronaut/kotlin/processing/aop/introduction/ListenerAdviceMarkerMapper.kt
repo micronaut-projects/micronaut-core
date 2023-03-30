@@ -1,11 +1,12 @@
 package io.micronaut.kotlin.processing.aop.introduction
 
 import io.micronaut.core.annotation.AnnotationValue
-import io.micronaut.inject.annotation.TypedAnnotationMapper
+import io.micronaut.inject.annotation.processor.TypedAnnotationMapper
 import io.micronaut.inject.visitor.VisitorContext
 import java.util.ArrayList
 
-class ListenerAdviceMarkerMapper : TypedAnnotationMapper<ListenerAdviceMarker> {
+class ListenerAdviceMarkerMapper :
+    TypedAnnotationMapper<ListenerAdviceMarker> {
 
     override fun annotationType(): Class<ListenerAdviceMarker> {
         return ListenerAdviceMarker::class.java

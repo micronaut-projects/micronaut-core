@@ -17,7 +17,7 @@ package io.micronaut.aop.factory.mapped;
 
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.inject.annotation.TypedAnnotationMapper;
+import io.micronaut.inject.annotation.processor.TypedAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.util.ArrayList;

@@ -20,7 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
-import io.micronaut.inject.annotation.AnnotationMetadataWriter;
+import io.micronaut.inject.annotation.processor.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.Element;
 import org.objectweb.asm.ClassWriter;

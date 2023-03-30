@@ -5,8 +5,8 @@ import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.NonNull
-import io.micronaut.inject.annotation.AnnotationTransformer
-import io.micronaut.inject.annotation.NamedAnnotationTransformer
+import io.micronaut.inject.annotation.processor.AnnotationTransformer
+import io.micronaut.inject.annotation.processor.NamedAnnotationTransformer
 import io.micronaut.inject.visitor.VisitorContext
 
 import java.lang.annotation.Annotation

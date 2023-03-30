@@ -21,7 +21,7 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.inject.annotation.TypedAnnotationMapper;
+import io.micronaut.inject.annotation.processor.TypedAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.lang.annotation.Annotation;

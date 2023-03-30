@@ -11,8 +11,8 @@ import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.inject.AdvisedBeanType
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
-import io.micronaut.inject.annotation.NamedAnnotationMapper
-import io.micronaut.inject.annotation.NamedAnnotationTransformer
+import io.micronaut.inject.annotation.processor.NamedAnnotationMapper
+import io.micronaut.inject.annotation.processor.NamedAnnotationTransformer
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.BeanDefinitionWriter

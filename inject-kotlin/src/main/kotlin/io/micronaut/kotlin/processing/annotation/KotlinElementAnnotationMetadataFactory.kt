@@ -17,7 +17,7 @@ package io.micronaut.kotlin.processing.annotation
 
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSAnnotation
-import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata
+import io.micronaut.inject.annotation.processor.AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.FieldElement

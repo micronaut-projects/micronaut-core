@@ -31,7 +31,7 @@ import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.annotation.processor.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.annotation.AnnotatedElementValidator;
 import io.micronaut.inject.visitor.VisitorContext;
 import org.codehaus.groovy.ast.AnnotatedNode;

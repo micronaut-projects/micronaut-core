@@ -17,7 +17,7 @@ package io.micronaut.ast.groovy.utils;
 
 import groovy.lang.GroovyClassLoader;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.annotation.processor.AbstractAnnotationMetadataBuilder;
 import org.codehaus.groovy.control.CompilerConfiguration;
 
 import java.io.ByteArrayInputStream;

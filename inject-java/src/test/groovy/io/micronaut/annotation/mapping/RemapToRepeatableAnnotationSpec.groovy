@@ -2,7 +2,7 @@ package io.micronaut.annotation.mapping
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationValue
-import io.micronaut.inject.annotation.AnnotationRemapper
+import io.micronaut.inject.annotation.processor.AnnotationRemapper
 import io.micronaut.inject.visitor.VisitorContext
 
 class RemapToRepeatableAnnotationSpec extends AbstractTypeElementSpec {

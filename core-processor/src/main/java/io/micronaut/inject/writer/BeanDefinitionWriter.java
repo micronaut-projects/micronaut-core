@@ -74,7 +74,7 @@ import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
 import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
-import io.micronaut.inject.annotation.AnnotationMetadataWriter;
+import io.micronaut.inject.annotation.processor.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;

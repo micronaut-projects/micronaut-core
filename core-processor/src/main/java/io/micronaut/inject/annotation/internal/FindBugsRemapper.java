@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.inject.annotation.AnnotationRemapper;
+import io.micronaut.inject.annotation.processor.AnnotationRemapper;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import io.micronaut.core.annotation.NonNull;

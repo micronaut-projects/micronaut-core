@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.annotation;
+package io.micronaut.inject.annotation.processor;
 
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -24,6 +24,7 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.annotation.*;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.writer.AbstractAnnotationMetadataWriter;
 import io.micronaut.inject.writer.AbstractClassFileWriter;
@@ -364,7 +365,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
      */
     @Internal
     public static void writeAnnotationDefaults(MutableAnnotationMetadata annotationMetadata, ClassWriter classWriter, Type owningType, Map<String, Integer> defaultsStorage, Map<String, GeneratorAdapter> loadTypeMethods) {
-        final Map<String, Map<CharSequence, Object>> annotationDefaultValues = annotationMetadata.annotationDefaultValues;
+        final Map<String, Map<CharSequence, Object>> annotationDefaultValues = annotationMetadata.getAnnotationDefaultValues();
         if (CollectionUtils.isNotEmpty(annotationDefaultValues)) {
 
             MethodVisitor si = classWriter.visitMethod(ACC_STATIC, "<clinit>", "()V", null, null);
@@ -396,7 +397,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             MutableAnnotationMetadata annotationMetadata,
             Map<String, Integer> defaultsStorage,
             Map<String, GeneratorAdapter> loadTypeMethods) {
-            final Map<String, Map<CharSequence, Object>> annotationDefaultValues = annotationMetadata.annotationDefaultValues;
+            final var annotationDefaultValues = annotationMetadata.getAnnotationDefaultValues();
         if (CollectionUtils.isNotEmpty(annotationDefaultValues)) {
             for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationDefaultValues.entrySet()) {
                 final Map<CharSequence, Object> annotationValues = entry.getValue();
@@ -418,10 +419,11 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 }
             }
         }
-        if (annotationMetadata.annotationRepeatableContainer != null && !annotationMetadata.annotationRepeatableContainer.isEmpty()) {
-            AnnotationMetadataSupport.registerRepeatableAnnotations(annotationMetadata.annotationRepeatableContainer);
-            if (!annotationMetadata.annotationRepeatableContainer.isEmpty()) {
-                pushStringMapOf(staticInit, annotationMetadata.annotationRepeatableContainer, true, null, v -> pushValue(owningType, classWriter, staticInit, v, defaultsStorage, loadTypeMethods, true));
+        var repeatableContainer = annotationMetadata.getAnnotationRepeatableContainer();
+        if (!CollectionUtils.isEmpty(repeatableContainer)) {
+            AnnotationMetadataSupport.registerRepeatableAnnotations(repeatableContainer);
+            if (!repeatableContainer.isEmpty()) {
+                pushStringMapOf(staticInit, repeatableContainer, true, null, v -> pushValue(owningType, classWriter, staticInit, v, defaultsStorage, loadTypeMethods, true));
                 staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_REPEATABLE_ANNOTATIONS);
             }
         }
@@ -463,15 +465,15 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             generatorAdapter.loadThis();
         }
         // 1st argument: the declared annotations
-        pushCreateAnnotationData(owningType, declaringClassWriter, generatorAdapter, annotationMetadata.declaredAnnotations, defaultsStorage, loadTypeMethods, annotationMetadata.getSourceRetentionAnnotations());
+        pushCreateAnnotationData(owningType, declaringClassWriter, generatorAdapter, annotationMetadata.getDeclaredAnnotations(), defaultsStorage, loadTypeMethods, annotationMetadata.getSourceRetentionAnnotations());
         // 2nd argument: the declared stereotypes
-        pushCreateAnnotationData(owningType, declaringClassWriter, generatorAdapter, annotationMetadata.declaredStereotypes, defaultsStorage, loadTypeMethods, annotationMetadata.getSourceRetentionAnnotations());
+        pushCreateAnnotationData(owningType, declaringClassWriter, generatorAdapter, annotationMetadata.getDeclaredStereotypes(), defaultsStorage, loadTypeMethods, annotationMetadata.getSourceRetentionAnnotations());
         // 3rd argument: all stereotypes
-        pushCreateAnnotationData(owningType, declaringClassWriter, generatorAdapter, annotationMetadata.allStereotypes, defaultsStorage, loadTypeMethods, annotationMetadata.getSourceRetentionAnnotations());
+        pushCreateAnnotationData(owningType, declaringClassWriter, generatorAdapter, annotationMetadata.getAllStereotypes(), defaultsStorage, loadTypeMethods, annotationMetadata.getSourceRetentionAnnotations());
         // 4th argument: all annotations
-        pushCreateAnnotationData(owningType, declaringClassWriter, generatorAdapter, annotationMetadata.allAnnotations, defaultsStorage, loadTypeMethods, annotationMetadata.getSourceRetentionAnnotations());
+        pushCreateAnnotationData(owningType, declaringClassWriter, generatorAdapter, annotationMetadata.getAllAnnotations(), defaultsStorage, loadTypeMethods, annotationMetadata.getSourceRetentionAnnotations());
         // 5th argument: annotations by stereotype
-        Map<String, List<String>> annotationsByStereotype = annotationMetadata.annotationsByStereotype;
+        Map<String, List<String>> annotationsByStereotype = annotationMetadata.getAnnotationsByStereotype();
         if (annotationMetadata.getSourceRetentionAnnotations() != null && annotationsByStereotype != null) {
             annotationsByStereotype = new LinkedHashMap<>(annotationsByStereotype);
             for (String sourceRetentionAnnotation : annotationMetadata.getSourceRetentionAnnotations()) {

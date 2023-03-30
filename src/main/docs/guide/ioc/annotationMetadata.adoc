@@ -87,9 +87,9 @@ include::http-client-core/src/main/java/io/micronaut/http/client/annotation/Clie
 
 With these aliases in place, whether you define `@Client("foo")` or `@Client(id="foo")`, both the `value` and `id` members will be set, making it easier to parse and work with the annotation.
 
-If you do not have control over the annotation, another approach is to use an api:io.micronaut.inject.annotation.AnnotationMapper[]. To create an `AnnotationMapper`, do the following:
+If you do not have control over the annotation, another approach is to use an api:io.micronaut.inject.annotation.processor.AnnotationMapper[]. To create an `AnnotationMapper`, do the following:
 
-* Implement the api:io.micronaut.inject.annotation.AnnotationMapper[] interface
+* Implement the api:io.micronaut.inject.annotation.processor.AnnotationMapper[] interface
 * Define a `META-INF/services/io.micronaut.inject.annotation.AnnotationMapper` file referencing the implementation class
 * Add the JAR file containing the implementation to the `annotationProcessor` classpath (`kapt` for Kotlin)
 
@@ -106,4 +106,4 @@ include::core-processor/src/main/java/io/micronaut/inject/beans/visitor/EntityIn
 <1> The `map` method receives a api:io.micronaut.core.annotation.AnnotationValue[] with the values for the annotation.
 <2> One or more annotations can be returned, in this case `@Transient`.
 
-NOTE: The example above implements the api:io.micronaut.inject.annotation.NamedAnnotationMapper[] interface which allows for annotations to be mixed with runtime code. To operate against a concrete annotation type, use api:io.micronaut.inject.annotation.TypedAnnotationMapper[] instead, although note it requires the annotation class itself to be on the annotation processor classpath.
+NOTE: The example above implements the api:io.micronaut.inject.annotation.processor.NamedAnnotationMapper[] interface which allows for annotations to be mixed with runtime code. To operate against a concrete annotation type, use api:io.micronaut.inject.annotation.processor.TypedAnnotationMapper[] instead, although note it requires the annotation class itself to be on the annotation processor classpath.

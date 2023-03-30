@@ -66,6 +66,7 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @Internal
+@UsedByGeneratedCode
 public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implements AnnotationMetadata, Cloneable, EnvironmentAnnotationMetadata {
 
     @Nullable

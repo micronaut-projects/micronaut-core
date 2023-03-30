@@ -11,7 +11,7 @@ import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.inject.AdvisedBeanType
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
-import io.micronaut.inject.annotation.NamedAnnotationMapper
+import io.micronaut.inject.annotation.processor.NamedAnnotationMapper
 import io.micronaut.inject.visitor.VisitorContext
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import spock.lang.Issue

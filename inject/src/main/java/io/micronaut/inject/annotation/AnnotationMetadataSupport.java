@@ -216,12 +216,9 @@ public final class AnnotationMetadataSupport {
      * @param name The name of the annotation type
      * @return The annotation
      */
-    static Optional<Class<? extends Annotation>> getRegisteredAnnotationType(String name) {
+    public static Optional<Class<? extends Annotation>> getRegisteredAnnotationType(String name) {
         final Class<? extends Annotation> type = ANNOTATION_TYPES.get(name);
-        if (type != null) {
-            return Optional.of(type);
-        }
-        return Optional.empty();
+        return Optional.ofNullable(type);
     }
 
     /**
@@ -291,7 +288,7 @@ public final class AnnotationMetadataSupport {
      * @param repeatableAnnotations the repeatable annotations
      */
     @Internal
-    static void registerRepeatableAnnotations(Map<String, String> repeatableAnnotations) {
+    public static void registerRepeatableAnnotations(Map<String, String> repeatableAnnotations) {
         REPEATABLE_ANNOTATIONS_CONTAINERS.putAll(repeatableAnnotations);
     }
 

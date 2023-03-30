@@ -13,25 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.annotation;
+package io.micronaut.inject.annotation.processor;
+
+import io.micronaut.core.naming.Named;
 
 import java.lang.annotation.Annotation;
 
 /**
- * A typed {@link AnnotationTransformer} operates against a concrete annotation type. Mapper implementations
- * that implement this class require the annotations to exist on the annotation processor classpath. If this
- * is problematic consider {@link NamedAnnotationMapper}.
+ * A named {@link AnnotationMapper} operates against any named annotation, and does not require the
+ * annotation to be on the annotation processor classpath.
  *
- * @param <T> The annotation type.
- * @since 2.0
  * @author graemerocher
+ * @since 1.0
  */
-public interface TypedAnnotationTransformer<T extends Annotation> extends AnnotationTransformer<T> {
-
-    /**
-     * The annotation type to be mapped.
-     *
-     * @return The annotation type
-     */
-    Class<T> annotationType();
+@SuppressWarnings("WeakerAccess")
+public interface NamedAnnotationMapper extends AnnotationMapper<Annotation>, Named {
 }

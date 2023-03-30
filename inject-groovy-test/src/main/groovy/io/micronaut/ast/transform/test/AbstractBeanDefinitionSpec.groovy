@@ -31,8 +31,8 @@ import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
-import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
-import io.micronaut.inject.annotation.AnnotationMetadataWriter
+import io.micronaut.inject.annotation.processor.AbstractAnnotationMetadataBuilder
+import io.micronaut.inject.annotation.processor.AnnotationMetadataWriter
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.provider.BeanProviderDefinition
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter

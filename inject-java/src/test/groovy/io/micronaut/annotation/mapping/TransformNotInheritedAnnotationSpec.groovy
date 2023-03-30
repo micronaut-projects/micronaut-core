@@ -4,7 +4,7 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.HttpMethodMapping
-import io.micronaut.inject.annotation.TypedAnnotationTransformer
+import io.micronaut.inject.annotation.processor.TypedAnnotationTransformer
 import io.micronaut.inject.visitor.VisitorContext
 
 class TransformNotInheritedAnnotationSpec extends AbstractTypeElementSpec {

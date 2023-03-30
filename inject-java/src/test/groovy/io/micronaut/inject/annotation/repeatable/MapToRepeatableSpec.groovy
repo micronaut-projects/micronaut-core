@@ -5,8 +5,8 @@ import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.NonNull
-import io.micronaut.inject.annotation.AnnotationMapper
-import io.micronaut.inject.annotation.NamedAnnotationMapper
+import io.micronaut.inject.annotation.processor.AnnotationMapper
+import io.micronaut.inject.annotation.processor.NamedAnnotationMapper
 import io.micronaut.inject.visitor.VisitorContext
 
 import java.lang.annotation.Annotation

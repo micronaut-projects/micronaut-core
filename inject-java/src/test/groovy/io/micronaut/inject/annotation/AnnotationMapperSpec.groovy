@@ -11,6 +11,8 @@ import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.HttpMethodMapping
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.inject.annotation.processor.AnnotationMapper
+import io.micronaut.inject.annotation.processor.TypedAnnotationMapper
 import io.micronaut.inject.visitor.VisitorContext
 
 import java.lang.annotation.Annotation
