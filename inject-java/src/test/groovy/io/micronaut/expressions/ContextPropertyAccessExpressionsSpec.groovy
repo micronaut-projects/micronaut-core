@@ -142,6 +142,101 @@ class ContextPropertyAccessExpressionsSpec extends AbstractEvaluatedExpressionsS
         expr == null
     }
 
+    void "test multi-level context property access safe navigation - success"() {
+        given:
+        Object expr = evaluateAgainstContext("#{ foo?.bar?.name }",
+                """
+            @jakarta.inject.Singleton
+            class Context {
+                public Foo getFoo() {
+                    return new Foo();
+                }
+            }
+
+            class Foo {
+                private Bar bar = new Bar();
+                public Bar getBar() {
+                    return bar;
+                }
+            }
+
+            class Bar {
+                private String name = "test";
+                public String getName() {
+                    return name;
+                }
+            }
+        """)
+
+        expect:
+        expr == "test"
+    }
+
+    void "test multi-level context property access safe navigation with optionals"() {
+        given:
+        Object expr = evaluateAgainstContext("#{ foo?.bar?.name }",
+                """
+            import java.util.Optional;
+
+            @jakarta.inject.Singleton
+            class Context {
+                public Optional<Foo> getFoo() {
+                    return Optional.of(new Foo());
+                }
+            }
+
+            class Foo {
+                private Bar bar;
+                public Optional<Bar> getBar() {
+                    return Optional.ofNullable(bar);
+                }
+            }
+
+            class Bar {
+                private String name = "test";
+                public String getName() {
+                    return name;
+                }
+            }
+        """)
+
+        expect:
+        expr == null
+    }
+
+    void "test multi-level context property access safe navigation with optionals - success"() {
+        given:
+        Object expr = evaluateAgainstContext("#{ foo?.bar?.name }",
+                """
+            import java.util.Optional;
+
+            @jakarta.inject.Singleton
+            class Context {
+                public Optional<Foo> getFoo() {
+                    return Optional.of(new Foo());
+                }
+            }
+
+            class Foo {
+                private Bar bar = new Bar();
+                public Optional<Bar> getBar() {
+                    return Optional.ofNullable(bar);
+                }
+            }
+
+            class Bar {
+                private String name = "test";
+                public String getName() {
+                    return name;
+                }
+            }
+        """)
+
+        expect:
+        expr == "test"
+    }
+
+
     void "test multi-level context property access non-safe navigation"() {
         when:
         Object expr = evaluateAgainstContext("#{ foo.bar.name }",

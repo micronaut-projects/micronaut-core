@@ -23,12 +23,11 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
-import org.objectweb.asm.Type;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.getRequiredClassElement;
 import static java.util.Collections.emptyList;
 import static java.util.function.Predicate.not;
 
@@ -48,30 +47,36 @@ public final class PropertyAccess extends ElementMethodCall {
 
     @Override
     protected CandidateMethod resolveUsedMethod(ExpressionVisitorContext ctx) {
-        Type calleeType = callee.resolveType(ctx);
-        ClassElement classElement = getRequiredClassElement(calleeType, ctx.visitorContext());
+        ClassElement classElement = callee.resolveClassElement(ctx);
+
+        if (isNullSafe() && classElement.isAssignable(Optional.class)) {
+            // safe navigate optional
+            classElement = classElement.getFirstTypeArgument().orElse(classElement);
+        }
 
         List<PropertyElement> propertyElements =
             classElement.getBeanProperties(
                 PropertyElementQuery.of(classElement.getAnnotationMetadata())
+                    .allowStaticProperties(false)
                     .includes(Collections.singleton(name))).stream()
                 .filter(not(PropertyElement::isExcluded))
                 .toList();
 
-        if (propertyElements.size() == 0) {
+        if (propertyElements.isEmpty()) {
             throw new ExpressionCompilationException(
-                "Can not find property with name [" + name + "] in class " + calleeType);
+                "Can not find property with name [" + name + "] in class " + classElement.getName());
         } else if (propertyElements.size() > 1) {
             throw new ExpressionCompilationException(
                 "Ambiguous property access. Found " + propertyElements.size() +
-                    " matching properties with name [" + name + "] in class " + calleeType);
+                    " matching properties with name [" + name + "] in class " + classElement.getName());
         }
 
         PropertyElement property = propertyElements.iterator().next();
+        ClassElement finalClassElement = classElement;
         MethodElement methodElement =
             property.getReadMethod()
                 .orElseThrow(() -> new ExpressionCompilationException(
-                    "Can not resolve access method for property [" + name + "] in class " + calleeType));
+                    "Can not resolve access method for property [" + name + "] in class " + finalClassElement.getName()));
 
         return new CandidateMethod(methodElement);
     }
