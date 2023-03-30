@@ -30,7 +30,6 @@ import java.io.IOException;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
 
-
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
@@ -58,7 +57,7 @@ public class HeadersTest {
             HttpRequest.GET("/foo/bar").header("fOO",  "ok"),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
-                .body("{\"status\":\"ok\"}")
+                .body("{\"status\":\"okok\"}")
                 .build()));
     }
 
@@ -71,8 +70,8 @@ public class HeadersTest {
         }
 
         @Get(value = "/bar", produces = MediaType.APPLICATION_JSON)
-        String getFooAsJson(@Header("Foo") String foo) {
-            return "{\"status\":\"" + foo + "\"}";
+        String getFooAsJson(@Header("Foo") String foo, @Header("fOo") String foo2) {
+            return "{\"status\":\"" + foo + foo2 + "\"}";
         }
     }
 }
