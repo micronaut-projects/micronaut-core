@@ -1,0 +1,85 @@
+package io.micronaut.http
+
+import io.micronaut.core.convert.ConversionService
+import io.micronaut.core.type.Argument
+import spock.lang.Specification
+
+class CaseInsensitiveMutableHttpHeadersSpec extends Specification {
+
+    void "starts empty"() {
+        given:
+        CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED)
+
+        expect:
+        headers.isEmpty()
+    }
+
+    void "can be set up with a map"() {
+        given:
+        CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED, "Content-Type": "application/json", "Content-Length": "123")
+
+        expect:
+        headers.size() == 2
+        headers.get("content-type") == "application/json"
+        headers.get("content-length") == "123"
+    }
+
+    void "values can be converted"() {
+        given:
+        CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED, "Content-Type": "application/json", "Content-Length": "123")
+
+        expect:
+        headers.size() == 2
+        headers.get("content-type", Argument.of(MediaType)).get() == MediaType.APPLICATION_JSON_TYPE
+        headers.get("content-length", Argument.of(Integer)).get() == 123
+    }
+
+    void "values can be removed"() {
+        when:
+        CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED, "Content-Type": "application/json")
+
+        then:
+        headers.size() == 1
+        headers.get("content-type") == "application/json"
+
+        when:
+        headers.remove("content-TYPE")
+
+        then:
+        headers.empty
+    }
+
+    void "case insensitivity"() {
+        given:
+        CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED, "foo": "123")
+
+        expect:
+        ["foo", "FOO", "Foo", "fOo"].each {
+            assert headers.get(it) == "123"
+        }
+    }
+
+    void "cannot add invalid or insecure header names"() {
+        given:
+        CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED)
+
+        when:
+        headers.add("foo ", "bar")
+
+        then:
+        IllegalArgumentException ex = thrown()
+        ex.message == '''a header name can only contain "token" characters, but found invalid character 0x20 at index 3 of header 'foo '.'''
+    }
+
+    void "cannot add invalid or insecure header values"() {
+        given:
+        CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED)
+
+        when:
+        headers.add("foo", "bar\nOrigin: localhost")
+
+        then:
+        IllegalArgumentException ex = thrown()
+        ex.message == "The header value for 'foo' contains prohibited character 0xa at index 3."
+    }
+}
