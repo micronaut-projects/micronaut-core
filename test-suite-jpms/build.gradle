@@ -1,0 +1,16 @@
+plugins {
+    id 'io.micronaut.build.internal.functional-test'
+    id "io.micronaut.build.internal.convention-test-library"
+}
+
+dependencies {
+    testAnnotationProcessor project(":inject-java")
+    testImplementation project(":inject")
+    testImplementation project(":context")
+    testImplementation(libs.managed.jakarta.annotation.api)
+    testImplementation(testFixtures(project(":test-suite")))
+
+    api project(':runtime')
+}
+
+
