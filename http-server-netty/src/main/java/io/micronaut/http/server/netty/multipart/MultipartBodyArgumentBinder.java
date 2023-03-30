@@ -36,12 +36,15 @@ import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
+import io.netty.util.ReferenceCounted;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -94,6 +97,8 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
                 Subscription s;
                 final AtomicLong partsRequested = new AtomicLong(0);
 
+                final Set<ReferenceCounted> partial = new HashSet<>();
+
                 @Override
                 protected void doOnSubscribe(Subscription subscription) {
                     this.s = subscription;
@@ -118,18 +123,16 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
                     if (LOG.isTraceEnabled()) {
                         LOG.trace("Server received streaming message for argument [{}]: {}", context.getArgument(), message);
                     }
-                    // MicronautHttpData does not support .content()
-                    if (message.length() == 0) {
-                        return;
-                    }
-
-                    if (message.isCompleted()) {
+                    if (message.isCompleted() && message.length() != 0) {
+                        partial.remove(message);
                         partsRequested.decrementAndGet();
                         if (message instanceof FileUpload fu) {
-                            subscriber.onNext(new NettyCompletedFileUpload(fu, false));
+                            subscriber.onNext(new NettyCompletedFileUpload(fu, true));
                         } else if (message instanceof Attribute attr) {
-                            subscriber.onNext(new NettyCompletedAttribute(attr, false));
+                            subscriber.onNext(new NettyCompletedAttribute(attr, true));
                         }
+                    } else {
+                        partial.add(message);
                     }
 
                     if (partsRequested.get() > 0) {
@@ -142,6 +145,7 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
                     if (LOG.isTraceEnabled()) {
                         LOG.trace("Server received error for argument [" + context.getArgument() + "]: " + t.getMessage(), t);
                     }
+                    releasePartial();
                     try {
                         subscriber.onError(t);
                     } finally {
@@ -154,7 +158,15 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
                     if (LOG.isTraceEnabled()) {
                         LOG.trace("Done receiving messages for argument: {}", context.getArgument());
                     }
+                    releasePartial();
                     subscriber.onComplete();
+                }
+
+                private void releasePartial() {
+                    for (ReferenceCounted rc : partial) {
+                        rc.release();
+                    }
+                    partial.clear();
                 }
 
             }));

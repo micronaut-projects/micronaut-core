@@ -27,6 +27,7 @@ import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.handler.codec.http.multipart.HttpDataFactory;
+import io.netty.handler.codec.http.multipart.HttpPostMultipartRequestDecoder;
 import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
 import io.netty.handler.codec.http.multipart.HttpPostStandardRequestDecoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
@@ -75,7 +76,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor {
         HttpDataFactory factory = new MicronautHttpData.Factory(multipart, characterEncoding);
         final HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
         if (HttpPostRequestDecoder.isMultipart(nativeRequest)) {
-            this.decoder = new MicronautHttpPostMultipartRequestDecoder(factory, nativeRequest, characterEncoding);
+            this.decoder = new HttpPostMultipartRequestDecoder(factory, nativeRequest, characterEncoding);
         } else {
             this.decoder = new HttpPostStandardRequestDecoder(factory, nativeRequest, characterEncoding);
         }
@@ -136,8 +137,8 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor {
 
                     InterfaceHttpData currentPartialHttpData = postRequestDecoder.currentPartialHttpData();
                     if (currentPartialHttpData instanceof HttpData) {
-                        // can't give away ownership of this data yet, so retain it
                         out.add(currentPartialHttpData);
+                        postRequestDecoder.removeHttpDataFromClean(currentPartialHttpData);
                     }
 
                 } catch (HttpPostRequestDecoder.EndOfDataDecoderException e) {

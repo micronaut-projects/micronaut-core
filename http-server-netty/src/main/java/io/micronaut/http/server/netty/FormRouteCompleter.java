@@ -81,9 +81,8 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
         this.routeMatch = routeMatch;
     }
 
-    private <T> Flux<T> withFlowControl(Flux<T> flux, MicronautHttpData<?> data) {
+    private <T> Flux<T> withFlowControl(Flux<T> flux) {
         return flux
-            .doOnComplete(data::release)
             .doOnRequest(upstreamSubscription::request);
     }
 
@@ -186,7 +185,7 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
                 }
                 if (data.attachment.subject == null) {
                     Sinks.Many<PartData> childSubject = makeDownstreamUnicastProcessor();
-                    Flux<PartData> flowable = withFlowControl(childSubject.asFlux(), data);
+                    Flux<PartData> flowable = withFlowControl(childSubject.asFlux());
                     if (streamingFileUpload && data instanceof FileUpload fu) {
                         namedSubject.tryEmitNext(fileUploadFactory.create(fu, flowable));
                     } else {
@@ -222,7 +221,7 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
                 StreamingFileUpload.class.isAssignableFrom(argument.getType()) &&
                 data.attachment.upload == null) {
 
-                data.attachment.upload = fileUploadFactory.create(fu, withFlowControl(subject.asFlux(), data));
+                data.attachment.upload = fileUploadFactory.create(fu, withFlowControl(subject.asFlux()));
             }
 
             Optional<?> converted = conversionService.convert(part, typeVariable);
@@ -238,7 +237,7 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
                     return data.attachment.upload;
                 } else {
                     if (data.attachment.subject == null) {
-                        return withFlowControl(namedSubject.asFlux(), data);
+                        return withFlowControl(namedSubject.asFlux());
                     } else {
                         return namedSubject.asFlux();
                     }

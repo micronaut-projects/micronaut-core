@@ -3,6 +3,7 @@ package io.micronaut.http.server.netty
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.async.annotation.SingleResult
+import io.micronaut.core.io.buffer.ReferenceCounted
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
@@ -461,7 +462,10 @@ class MaxRequestSizeSpec extends Specification {
         @Post(uri = "/multipart-body", consumes = MediaType.MULTIPART_FORM_DATA)
         @SingleResult
         Publisher<String> multipart(@Body io.micronaut.http.server.multipart.MultipartBody body) {
-            return Flux.from(body).collectList().map({ list -> "OK" })
+            return Flux.from(body).map {
+                if (it instanceof ReferenceCounted) it.release()
+                return it
+            }.collectList().map({ list -> "OK" })
         }
     }
 }

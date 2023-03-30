@@ -26,7 +26,6 @@ import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.body.ImmediateSingleObjectBody;
-import io.netty.util.ReferenceCountUtil;
 
 import java.util.Arrays;
 import java.util.List;
@@ -91,9 +90,7 @@ public class CompletableFutureBodyBinder
                 CompletableFuture<Object> future = retFlow.map(immediateSingleObjectBody -> {
                     Object claimed = immediateSingleObjectBody.claimForExternal();
                     if (firstTypeParameter.isPresent()) {
-                        Optional<?> converted = conversionService.convert(claimed, targetType);
-                        ReferenceCountUtil.release(claimed);
-                        return converted.orElse(null);
+                        return PublisherBodyBinder.convertAndRelease(conversionService, context.with(targetType), claimed);
                     } else {
                         return claimed;
                     }

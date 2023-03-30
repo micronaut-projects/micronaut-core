@@ -1,17 +1,21 @@
 package io.micronaut.http.server.netty.body;
 
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.server.netty.FormRouteCompleter;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufHolder;
+import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import reactor.core.publisher.Flux;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -29,9 +33,9 @@ public class StreamingMultiObjectBody extends ManagedBody<Publisher<?>> implemen
 
     @Override
     public InputStream coerceToInputStream(ByteBufAllocator alloc) {
-        PublisherAsStream publisherAsStream = new PublisherAsStream();
-        claim().subscribe(publisherAsStream);
-        return publisherAsStream;
+        PublisherAsBlocking publisherAsBlocking = new PublisherAsBlocking();
+        claim().subscribe(publisherAsBlocking);
+        return new PublisherAsStream(publisherAsBlocking);
     }
 
     @Override
@@ -50,15 +54,156 @@ public class StreamingMultiObjectBody extends ManagedBody<Publisher<?>> implemen
         next(formRouteCompleter);
     }
 
-    private static final class PublisherAsStream extends InputStream implements Subscriber<Object> {
+    /**
+     * A subscriber that allows blocking reads from a publisher. Handles resource cleanup properly.
+     */
+    private static final class PublisherAsBlocking implements Subscriber<Object>, Closeable {
         private final Lock lock = new ReentrantLock();
         private final Condition newDataCondition = lock.newCondition();
-
+        /**
+         * Set when {@link #take()} is called before {@link #onSubscribe}. {@link #onSubscribe} will
+         * immediately request some input.
+         */
+        private boolean pendingDemand;
+        /**
+         * Pending object, this field is used to transfer from {@link #onNext} to {@link #take}.
+         */
+        private Object swap;
+        /**
+         * The upstream subscription.
+         */
         private Subscription subscription;
-        private volatile ByteBuf buffer;
-        private volatile boolean done = false;
-        private Throwable failure = null;
+        /**
+         * Set by {@link #onComplete} and {@link #onError}.
+         */
+        private boolean done;
+        /**
+         * Set by {@link #close}. Further objects will be discarded.
+         */
         private boolean closed;
+        /**
+         * Failure from {@link #onError}.
+         */
+        private Throwable failure;
+
+        @Override
+        public void onSubscribe(Subscription s) {
+            boolean pendingDemand;
+            lock.lock();
+            try {
+                this.subscription = s;
+                pendingDemand = this.pendingDemand;
+            } finally {
+                lock.unlock();
+            }
+            if (pendingDemand) {
+                s.request(1);
+            }
+        }
+
+        @Override
+        public void onNext(Object o) {
+            lock.lock();
+            try {
+                if (closed) {
+                    ReferenceCountUtil.release(o);
+                    return;
+                }
+                swap = o;
+                newDataCondition.signalAll();
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        @Override
+        public void onError(Throwable t) {
+            lock.lock();
+            try {
+                if (swap != null) {
+                    ReferenceCountUtil.release(swap);
+                    swap = null;
+                }
+                failure = t;
+                done = true;
+                newDataCondition.signalAll();
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        @Override
+        public void onComplete() {
+            lock.lock();
+            try {
+                done = true;
+                newDataCondition.signalAll();
+            } finally {
+                lock.unlock();
+            }
+        }
+
+        /**
+         * Get the next object.
+         *
+         * @return The next object, or {@code null} if the stream is done
+         */
+        @Nullable
+        public Object take() throws InterruptedException {
+            boolean demanded = false;
+            while (true) {
+                Subscription subscription;
+                lock.lock();
+                try {
+                    Object swap = this.swap;
+                    if (swap != null) {
+                        this.swap = null;
+                        return swap;
+                    }
+                    if (done) {
+                        return null;
+                    }
+                    if (demanded) {
+                        newDataCondition.await();
+                    }
+                    subscription = this.subscription;
+                    if (subscription == null) {
+                        pendingDemand = true;
+                    }
+                } finally {
+                    lock.unlock();
+                }
+                if (!demanded) {
+                    demanded = true;
+                    if (subscription != null) {
+                        subscription.request(1);
+                    }
+                }
+            }
+        }
+
+        @Override
+        public void close() {
+            lock.lock();
+            try {
+                closed = true;
+                if (swap != null) {
+                    ReferenceCountUtil.release(swap);
+                    swap = null;
+                }
+            } finally {
+                lock.unlock();
+            }
+        }
+    }
+
+    private static final class PublisherAsStream extends InputStream {
+        private final PublisherAsBlocking publisherAsBlocking;
+        private ByteBuf buffer;
+
+        private PublisherAsStream(PublisherAsBlocking publisherAsBlocking) {
+            this.publisherAsBlocking = publisherAsBlocking;
+        }
 
         @Override
         public int read() throws IOException {
@@ -69,31 +214,23 @@ public class StreamingMultiObjectBody extends ManagedBody<Publisher<?>> implemen
 
         @Override
         public int read(@NonNull byte[] b, int off, int len) throws IOException {
-            boolean requested = false;
             while (buffer == null) {
-                if (done) {
-                    if (failure == null) {
-                        return -1;
-                    } else {
-                        throw new IOException(failure);
-                    }
-                }
-                if (closed) {
-                    throw new IOException("Channel closed");
-                }
-
-                if (!requested) {
-                    subscription.request(1);
-                    requested = true;
-                }
-
-                lock.lock();
                 try {
-                    if (buffer == null && !done) {
-                        newDataCondition.awaitUninterruptibly();
+                    Object o = publisherAsBlocking.take();
+                    if (o == null) {
+                        if (publisherAsBlocking.failure == null) {
+                            return -1;
+                        } else {
+                            throw new IOException(publisherAsBlocking.failure);
+                        }
                     }
-                } finally {
-                    lock.unlock();
+                    ByteBuf buf = o instanceof ByteBufHolder holder ? holder.content() : (ByteBuf) o;
+                    if (!buf.isReadable()) {
+                        continue;
+                    }
+                    buffer = buf;
+                } catch (InterruptedException e) {
+                    throw new InterruptedIOException();
                 }
             }
 
@@ -107,71 +244,12 @@ public class StreamingMultiObjectBody extends ManagedBody<Publisher<?>> implemen
         }
 
         @Override
-        public void onSubscribe(Subscription s) {
-            this.subscription = s;
-        }
-
-        private void signalAll() {
-            lock.lock();
-            try {
-                if (closed) {
-                    if (buffer != null) {
-                        buffer.release();
-                        buffer = null;
-                    }
-                }
-                newDataCondition.signalAll();
-            } finally {
-                lock.unlock();
-            }
-        }
-
-        @Override
-        public void onNext(Object data) {
-            if (data instanceof ByteBufHolder bbh) {
-                data = bbh.content();
-            }
-            ByteBuf b = (ByteBuf) data;
-            if (b.isReadable()) {
-                if (this.buffer != null) {
-                    throw new IllegalStateException("Double onNext?");
-                }
-                buffer = b;
-                signalAll();
-            } else {
-                b.release();
-                subscription.request(1);
-            }
-        }
-
-        @Override
-        public void onError(Throwable t) {
-            failure = t;
-            done = true;
-            signalAll();
-        }
-
-        @Override
-        public void onComplete() {
-            done = true;
-            signalAll();
-        }
-
-        @Override
         public void close() throws IOException {
-            if (subscription != null) {
-                subscription.cancel();
+            if (buffer != null) {
+                buffer.release();
+                buffer = null;
             }
-            lock.lock();
-            try {
-                closed = true;
-                if (buffer != null) {
-                    buffer.release();
-                    buffer = null;
-                }
-            } finally {
-                lock.unlock();
-            }
+            publisherAsBlocking.close();
         }
     }
 }

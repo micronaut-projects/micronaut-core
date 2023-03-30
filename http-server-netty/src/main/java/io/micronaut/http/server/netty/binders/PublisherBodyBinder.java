@@ -19,6 +19,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
@@ -80,24 +81,8 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
                 Publisher<?> publisher = nhr.rootBody()
                     .processMulti(httpContentProcessorResolver.resolve(nhr, targetType).resultType(context.getArgument()))
                     .mapNotNull(o -> {
-                        try {
-                            if (o instanceof ByteBufHolder holder) {
-                                o = holder.content();
-                                if (!((ByteBuf) o).isReadable()) {
-                                    return null;
-                                }
-                            }
-
-                            ArgumentConversionContext<?> conversionContext = context.with(targetType);
-                            Optional<?> converted = conversionService.convert(o, conversionContext);
-                            if (converted.isPresent()) {
-                                return converted.get();
-                            } else {
-                                throw extractError(o, conversionContext);
-                            }
-                        } finally {
-                            ReferenceCountUtil.release(o);
-                        }
+                        ArgumentConversionContext<?> conversionContext = context.with(targetType);
+                        return convertAndRelease(conversionService, conversionContext, o);
                     })
                     .asPublisher();
                 return () -> Optional.of(publisher);
@@ -123,6 +108,42 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
                 LOG.debug(MSG_CONVERT_DEBUG, conversionContext.getArgument(), message);
             }
             return UnsatisfiedRouteException.create(conversionContext.getArgument());
+        }
+    }
+
+    /**
+     * This method converts a potentially
+     * {@link io.netty.util.ReferenceCounted netty reference counted} and transfers release
+     * ownership to the new object.
+     *
+     * @param conversionService The conversion service
+     * @param conversionContext The context to convert to
+     * @param o The object to convert
+     * @return The converted object
+     */
+    static Object convertAndRelease(ConversionService conversionService, ArgumentConversionContext<?> conversionContext, Object o) {
+        try {
+            if (o instanceof ByteBufHolder holder) {
+                o = holder.content();
+                if (!((ByteBuf) o).isReadable()) {
+                    return null;
+                }
+            }
+
+            Optional<?> converted = conversionService.convert(o, conversionContext);
+            if (converted.isPresent()) {
+                Object conv = converted.get();
+                if (conv instanceof ReferenceCounted rc) {
+                    rc.retain();
+                } else if (conv instanceof io.netty.util.ReferenceCounted rc) {
+                    rc.retain();
+                }
+                return conv;
+            } else {
+                throw extractError(o, conversionContext);
+            }
+        } finally {
+            ReferenceCountUtil.release(o);
         }
     }
 }

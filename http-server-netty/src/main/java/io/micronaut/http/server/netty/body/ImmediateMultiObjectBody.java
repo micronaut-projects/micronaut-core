@@ -96,7 +96,7 @@ public final class ImmediateMultiObjectBody extends ManagedBody<List<?>> impleme
         List<?> objects = claim();
         ByteBuf buf = switch (objects.size()) {
             case 0 -> Unpooled.EMPTY_BUFFER;
-            case 1 -> (ByteBuf) objects.get(0);
+            case 1 -> ((ByteBufHolder) objects.get(0)).content();
             default -> coerceToComposite(objects, alloc);
         };
         return new ByteBufInputStream(buf, true);
