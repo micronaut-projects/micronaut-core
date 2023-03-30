@@ -11,6 +11,7 @@ extraJavaModuleInfo {
         exports("javax.inject")
     }
     automaticModule("org.jetbrains.kotlin:kotlin-stdlib-common","kotlin.stdlib.common")
+    failOnMissingModuleInfo.set(false) //because tests are not modularized
 }
 micronautBuild {
     core {
