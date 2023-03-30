@@ -24,7 +24,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
-import io.micronaut.http.multipart.FileUpload;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.server.netty.MicronautHttpData;
@@ -35,7 +34,6 @@ import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
@@ -57,11 +55,6 @@ final class PublisherPartUploadBinder implements TypedRequestArgumentBinder<Publ
     public PublisherPartUploadBinder(ConversionService conversionService, NettyStreamingFileUpload.Factory fileUploadFactory) {
         this.conversionService = conversionService;
         this.fileUploadFactory = fileUploadFactory;
-    }
-
-    @Override
-    public List<Class<?>> superTypes() {
-        return List.of(FileUpload.class);
     }
 
     @Override
