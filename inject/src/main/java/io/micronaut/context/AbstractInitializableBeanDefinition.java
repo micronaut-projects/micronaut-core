@@ -2140,7 +2140,19 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         if (!(context instanceof PropertyResolver)) {
             throw new DependencyInjectionException(resolutionContext, "@Value requires a BeanContext that implements PropertyResolver");
         }
-        String valueAnnVal = argument.getAnnotationMetadata().stringValue(Value.class).orElse(null);
+        AnnotationMetadata argumentAnnotationMetadata = argument.getAnnotationMetadata();
+        if (argumentAnnotationMetadata.hasEvaluatedExpressions()) {
+            boolean isOptional = argument.isOptional();
+            if (isOptional) {
+                Argument<?> t = isOptional ? argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT) : argument;
+                Object v = argumentAnnotationMetadata.getValue(Value.class, t).orElse(null);
+                return Optional.ofNullable(v);
+            } else {
+                return argumentAnnotationMetadata.getValue(Value.class, argument).orElse(null);
+            }
+        }
+
+        String valueAnnVal = argumentAnnotationMetadata.stringValue(Value.class).orElse(null);
         Argument<?> argumentType;
         boolean isCollection = false;
         final boolean wrapperType = argument.isWrapperType();
@@ -2162,7 +2174,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                 return resolutionContext.getBean(argumentType, qualifier);
             }
         } else {
-            String valString = resolvePropertyValueName(resolutionContext, parentAnnotationMetadata, argument.getAnnotationMetadata(), valueAnnVal);
+            String valString = resolvePropertyValueName(resolutionContext, parentAnnotationMetadata, argumentAnnotationMetadata, valueAnnVal);
             ArgumentConversionContext conversionContext = wrapperType ? ConversionContext.of(argumentType) : ConversionContext.of(argument);
             Optional value = resolveValue((ApplicationContext) context, conversionContext, valueAnnVal != null, valString);
             if (argument.isOptional()) {
@@ -2193,7 +2205,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                     if (argument.isDeclaredNullable()) {
                         return null;
                     }
-                    return argument.getAnnotationMetadata().getValue(Bindable.class, "defaultValue", argument)
+                    return argumentAnnotationMetadata.getValue(Bindable.class, "defaultValue", argument)
                             .orElseThrow(() -> DependencyInjectionException.missingProperty(resolutionContext, conversionContext, valString));
                 }
             }
