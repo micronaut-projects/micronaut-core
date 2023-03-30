@@ -9,6 +9,10 @@ module micronaut.context {
     requires micronaut.core.processor;
     requires micronaut.core.reactive;
     requires org.reactivestreams;
+    requires micronaut.aop;
+    requires jakarta.validation;
+    requires ch.qos.logback.classic;
+    requires ch.qos.logback.core;
     exports io.micronaut.logging;
     exports io.micronaut.logging.impl;
 
