@@ -16,6 +16,7 @@
 package io.micronaut.expressions.parser.ast.access;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.ast.types.TypeIdentifier;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
@@ -23,15 +24,15 @@ import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.inject.processing.JavaModelUtils;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
 import java.util.List;
+import java.util.Optional;
 
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.getRequiredClassElement;
 import static org.objectweb.asm.Opcodes.ACONST_NULL;
 import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 
@@ -46,6 +47,8 @@ import static org.objectweb.asm.Opcodes.INVOKESTATIC;
 @Internal
 public sealed class ElementMethodCall extends AbstractMethodCall permits PropertyAccess {
 
+    private static final Type TYPE_OPTIONAL = Type.getType(Optional.class);
+    private static final Method METHOD_OR_ELSE = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(Optional.class, "orElse", Object.class));
     protected final ExpressionNode callee;
     private final boolean nullSafe;
 
@@ -58,14 +61,19 @@ public sealed class ElementMethodCall extends AbstractMethodCall permits Propert
         this.nullSafe = nullSafe;
     }
 
+    /**
+     * @return Is the method call null safe
+     */
+    protected boolean isNullSafe() {
+        return nullSafe;
+    }
+
     @Override
     protected void generateBytecode(ExpressionVisitorContext ctx) {
         GeneratorAdapter mv = ctx.methodVisitor();
-        VisitorContext visitorContext = ctx.visitorContext();
-        Type calleeType = callee.resolveType(ctx);
+        ClassElement calleeClass = callee.resolveClassElement(ctx);
         Method method = usedMethod.toAsmMethod();
-
-        ClassElement calleeClass = getRequiredClassElement(calleeType, visitorContext);
+        Type calleeType = JavaModelUtils.getTypeReference(calleeClass);
 
         if (callee instanceof TypeIdentifier) {
             compileArguments(ctx);
@@ -78,16 +86,25 @@ public sealed class ElementMethodCall extends AbstractMethodCall permits Propert
         } else {
             callee.compile(ctx);
             if (nullSafe) {
+                if (calleeClass.isAssignable(Optional.class)) {
+                    mv.checkCast(TYPE_OPTIONAL);
+                    // safe navigate optional
+                    mv.visitInsn(ACONST_NULL);
+                    mv.invokeVirtual(TYPE_OPTIONAL, METHOD_OR_ELSE);
+                    // recompute new return type
+                    calleeClass = calleeClass.getFirstTypeArgument().orElse(ClassElement.of(Object.class));
+                    calleeType = JavaModelUtils.getTypeReference(calleeClass);
+                    mv.checkCast(calleeType);
+                }
                 // null safe operator is used so we need to check the result is null
-                Type returnType = method.getReturnType();
-                mv.storeLocal(2, returnType);
-                mv.loadLocal(2, returnType);
+                mv.storeLocal(2, calleeType);
+                mv.loadLocal(2, calleeType);
                 Label proceed = new Label();
                 mv.ifNonNull(proceed);
                 mv.visitInsn(ACONST_NULL);
                 mv.returnValue();
                 mv.visitLabel(proceed);
-                mv.loadLocal(2, returnType);
+                mv.loadLocal(2, calleeType);
             }
             compileArguments(ctx);
             if (calleeClass.isInterface()) {

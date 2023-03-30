@@ -210,6 +210,8 @@ You can also use the safe dereference operator `?.` to navigate paths in a null 
 #{ foo?.bar?.name == "Fred" }
 ----
 
+TIP: When used, the safe dereference operator will also automatically unwrap Java's `Optional` type.
+
 === Type References
 
 A predefined syntax construct `T(...)` can be used to reference a class. The value inside brackets should be fully
