@@ -31,7 +31,6 @@ import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.lang.reflect.Method;
@@ -96,14 +95,6 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     public MethodInterceptorChain(Interceptor<T, R>[] interceptors, T target, ExecutableMethod<T, R> executionHandle, Object... originalParameters) {
         super(interceptors, target, executionHandle, originalParameters);
         this.kind = null;
-    }
-
-    @Override
-    public AnnotationMetadata getAnnotationMetadata() {
-        if (executionHandle.getAnnotationMetadata() instanceof EvaluatedAnnotationMetadata eam) {
-            return eam.withArguments(originalParameters);
-        }
-        return executionHandle.getAnnotationMetadata();
     }
 
     @Override

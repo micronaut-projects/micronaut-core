@@ -124,7 +124,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                     ExecutableBeanContextBinder binder = new DefaultExecutableBeanContextBinder();
                     BoundExecutable<?, ?> boundExecutable = binder.bind(method, beanContext);
                     Object bean = beanContext.getBean(beanType, declaredQualifier);
-                     AnnotationValue<Scheduled> finalAnnotationValue = scheduledAnnotation;
+                    AnnotationValue<Scheduled> finalAnnotationValue = scheduledAnnotation;
                     if (finalAnnotationValue instanceof EvaluatedAnnotationValue<Scheduled> evaluated) {
                         finalAnnotationValue = evaluated.withArguments(boundExecutable.getBoundArguments());
                     }

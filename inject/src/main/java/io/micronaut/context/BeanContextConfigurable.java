@@ -21,7 +21,7 @@ package io.micronaut.context;
  * @author Sergey Gavirlov
  * @since 4.0
  */
-public interface ContextConfigurable {
+public interface BeanContextConfigurable {
     /**
      * Configure the component for the given bean context.
      *

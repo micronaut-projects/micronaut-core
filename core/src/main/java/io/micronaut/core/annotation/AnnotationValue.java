@@ -178,7 +178,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         this.convertibleValues = convertibleValues;
         this.valueMapper = valueMapper;
         this.retentionPolicy = RetentionPolicy.RUNTIME;
-        this.stereotypes = null;
+        this.stereotypes = target.stereotypes;
     }
 
     /**

@@ -183,7 +183,7 @@ public abstract class AbstractInitializableBeanDefinitionReference<T> extends Ab
         } else if (context instanceof ApplicationContext applicationContext && definition instanceof EnvironmentConfigurable environmentConfigurable) {
             environmentConfigurable.configure(applicationContext.getEnvironment());
         }
-        if (definition instanceof ContextConfigurable ctxConfigurable) {
+        if (definition instanceof BeanContextConfigurable ctxConfigurable) {
             ctxConfigurable.configure(context);
         }
         return definition;

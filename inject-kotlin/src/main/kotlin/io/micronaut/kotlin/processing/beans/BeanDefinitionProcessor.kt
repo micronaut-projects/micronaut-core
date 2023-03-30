@@ -21,7 +21,6 @@ import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.context.annotation.Context
 import io.micronaut.core.annotation.Generated
-import io.micronaut.expressions.EvaluatedExpressionWriter
 import io.micronaut.inject.processing.BeanDefinitionCreator
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory
 import io.micronaut.inject.processing.ProcessingException
@@ -143,7 +142,6 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
             beanDefinitionWriter.visitBeanDefinitionEnd()
             if (beanDefinitionWriter.isEnabled) {
                 beanDefinitionWriter.accept(outputVisitor)
-                processEvaluatedExpressions(beanDefinitionWriter, visitorContext, outputVisitor)
                 val beanDefinitionReferenceWriter = BeanDefinitionReferenceWriter(beanDefinitionWriter)
                 beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing())
                 val className = beanDefinitionReferenceWriter.beanDefinitionQualifiedClassName
@@ -157,21 +155,6 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
             // raise a compile error
             val message = e.message
             error("Unexpected error ${e.javaClass.simpleName}:" + (message ?: e.javaClass.simpleName))
-        }
-    }
-
-    private fun processEvaluatedExpressions(
-        beanDefinitionWriter: BeanDefinitionVisitor,
-        visitorContext: KotlinVisitorContext,
-        outputVisitor: KotlinOutputVisitor
-    ) {
-        for (expressionMetadata in beanDefinitionWriter.evaluatedExpressions) {
-            val expressionWriter = EvaluatedExpressionWriter(
-                expressionMetadata,
-                visitorContext,
-                beanDefinitionWriter.originatingElement
-            )
-            expressionWriter.accept(outputVisitor)
         }
     }
 

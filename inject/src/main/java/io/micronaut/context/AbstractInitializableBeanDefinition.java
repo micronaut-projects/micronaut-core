@@ -105,7 +105,7 @@ import java.util.stream.Stream;
  */
 @Internal
 public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextConditional
-    implements InstantiatableBeanDefinition<T>, InjectableBeanDefinition<T>, EnvironmentConfigurable, ContextConfigurable {
+    implements InstantiatableBeanDefinition<T>, InjectableBeanDefinition<T>, EnvironmentConfigurable, BeanContextConfigurable {
     private static final Logger LOG = LoggerFactory.getLogger(AbstractInitializableBeanDefinition.class);
 
     private final Class<T> type;
@@ -275,7 +275,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
 
     @Override
     public boolean hasEvaluatedExpressions() {
-        return getAnnotationMetadata().hasEvaluatedExpressions();
+        return precalculatedInfo.hasEvaluatedExpressions();
     }
 
     @Override
@@ -650,7 +650,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
 
     @Override
     public void configure(BeanContext beanContext) {
-        if (beanContext == null) {
+        if (beanContext == null || !hasEvaluatedExpressions()) {
             return;
         }
 
@@ -734,7 +734,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             }
         }
 
-        if (executableMethodsDefinition instanceof ContextConfigurable ctxConfigurable) {
+        if (executableMethodsDefinition instanceof BeanContextConfigurable ctxConfigurable) {
             ctxConfigurable.configure(beanContext);
         }
     }
@@ -2137,17 +2137,6 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     private Object resolveValue(BeanResolutionContext resolutionContext, BeanContext context, AnnotationMetadata parentAnnotationMetadata, Argument<?> argument, Qualifier qualifier) {
-        AnnotationMetadata argumentAnnotationMetadata = argument.getAnnotationMetadata();
-        if (argumentAnnotationMetadata instanceof EvaluatedAnnotationMetadata eam) {
-            eam.configure(context);
-            eam.setBeanDefinition(this);
-            AnnotationValue<Value> annotation = eam.getAnnotation(Value.class);
-            if (annotation.hasEvaluatedExpressions()) {
-                Optional<?> value = annotation.getValue(argument);
-                return value.orElse(null);
-            }
-        }
-
         if (!(context instanceof PropertyResolver)) {
             throw new DependencyInjectionException(resolutionContext, "@Value requires a BeanContext that implements PropertyResolver");
         }
@@ -2473,12 +2462,6 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     private <K> Argument<K> resolveArgument(BeanContext context, Argument<K> argument) {
-        if (argument instanceof DefaultArgument) {
-            if (argument.getAnnotationMetadata().hasPropertyExpressions()) {
-                argument = new EnvironmentAwareArgument<>((DefaultArgument<K>) argument);
-                instrumentAnnotationMetadata(context, argument);
-            }
-        }
         return ExpressionsAwareArgument.wrapIfNecessary(argument, context, this);
     }
 
@@ -2537,33 +2520,12 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         }
     }
 
-    private void instrumentAnnotationMetadata(BeanContext context, Object object) {
-        if (object instanceof final EnvironmentConfigurable ec && context instanceof ApplicationContext ac) {
-            if (ec.hasPropertyExpressions()) {
-                ec.configure(ac.getEnvironment());
-            }
-        }
-    }
-
     private Object getExpressionValueForArgument(Argument<?> argument) {
+        Argument<?> t = argument.isOptional() ? argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT) : argument;
         Optional<?> expressionValue =
             argument.getAnnotationMetadata()
-                .getValue(Value.class, argument.getType());
-
-        if (argument.isOptional()) {
-            if (expressionValue.isEmpty()) {
-                return expressionValue;
-            } else {
-                Object convertedOptional = expressionValue.get();
-                if (convertedOptional instanceof Optional) {
-                    return convertedOptional;
-                } else {
-                    return expressionValue;
-                }
-            }
-        } else {
-            return expressionValue.orElse(null);
-        }
+                .getValue(Value.class, t);
+        return expressionValue.orElse(null);
     }
 
     @Internal
@@ -2576,9 +2538,12 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         boolean isPrimary,
         boolean isConfigurationProperties,
         boolean isContainerType,
-        boolean requiresMethodProcessing
+        boolean requiresMethodProcessing,
+        boolean hasEvaluatedExpressions
     ) {
-
+        public PrecalculatedInfo(Optional<String> scope, boolean isAbstract, boolean isIterable, boolean isSingleton, boolean isPrimary, boolean isConfigurationProperties, boolean isContainerType, boolean requiresMethodProcessing) {
+            this(scope, isAbstract, isIterable, isSingleton, isPrimary, isConfigurationProperties, isContainerType, requiresMethodProcessing, false);
+        }
     }
 
     /**
