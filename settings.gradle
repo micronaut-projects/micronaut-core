@@ -79,6 +79,7 @@ include "test-suite-kotlin-ksp"
 include "test-suite-groovy"
 include "test-suite-groovy"
 include "test-suite-logback"
+include "test-suite-logback-external-configuration"
 include "test-utils"
 
 // benchmarks
