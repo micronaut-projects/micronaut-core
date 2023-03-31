@@ -29,7 +29,7 @@ import io.micronaut.inject.BeanDefinition;
  * @author Sergey Gavrilov
  */
 @Internal
-public interface ConfigurableExpressionEvaluationContext extends ExpressionEvaluationContext {
+public sealed interface ConfigurableExpressionEvaluationContext extends ExpressionEvaluationContext permits DefaultExpressionEvaluationContext {
 
     /**
      * Set arguments passed to invoked method.

@@ -267,14 +267,13 @@ The available methods can be extended by extended the evaluation context. There 
 
 NOTE: The api:TypeElementVisitor[] has to be on the annotation processor classpath, therefore needs to be defined in a separate module that can be included on this classpath.
 
-Once a class is registered within evaluation context the methods and properties of the class are available for referencing in evaluated expressions. Any context reference
-needs to be prefixed with `#` sign.
+Once a class is registered within evaluation context the methods and properties of the class are available for referencing in evaluated expressions.
 
 Consider the following example:
 
 snippet::io.micronaut.docs.expressions.CustomEvaluationContext[title="User-defined evaluated expression context"]
 
-NOTE: The class should be resolvable as a bean can use `jakarta.inject` annotations to inject other types if necessary.
+NOTE: The class should be resolvable as a bean can use `jakarta.inject` annotations to inject other types if necessary. In addition, for performance reasons all evaluation context classes are effectively singleton regardless of the defined scope.
 
 Registering this class can be achieved with a custom implementation of api:expressions.context.ExpressionEvaluationContextRegistrar[] that is registered via service loader as a api:inject.visitor.TypeElementVisitor[] (create a new `META-INF/services/io.micronaut.inject.visitor.TypeElementVisitor` file referencing the new class) and placed on the annotation processor classpath:
 

@@ -16,6 +16,7 @@
 package io.micronaut.context.expressions;
 
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.DefaultBeanResolutionContext;
@@ -24,6 +25,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.BeanIdentifier;
 
 /**
  * Default implementation of {@link ConfigurableExpressionEvaluationContext}.
@@ -34,7 +36,7 @@ import io.micronaut.inject.BeanDefinition;
  * @author Sergey Gavrilov
  */
 @Internal
-public class DefaultExpressionEvaluationContext implements ConfigurableExpressionEvaluationContext {
+public final class DefaultExpressionEvaluationContext implements ConfigurableExpressionEvaluationContext {
 
     private final Object[] args;
     private final BeanContext beanContext;
@@ -56,22 +58,28 @@ public class DefaultExpressionEvaluationContext implements ConfigurableExpressio
 
     @Override
     public ConfigurableExpressionEvaluationContext setArguments(Object[] args) {
-        return new DefaultExpressionEvaluationContext(args, this.beanContext, this.owningBean);
+        DefaultExpressionEvaluationContext evaluationContext = new DefaultExpressionEvaluationContext(args, this.beanContext, this.owningBean);
+        evaluationContext.resolutionContext = resolutionContext;
+        return evaluationContext;
     }
 
     @Override
     public ConfigurableExpressionEvaluationContext setOwningBean(BeanDefinition<?> beanDefinition) {
-        return new DefaultExpressionEvaluationContext(this.args, this.beanContext, beanDefinition);
+        DefaultExpressionEvaluationContext evaluationContext = new DefaultExpressionEvaluationContext(this.args, this.beanContext, beanDefinition);
+        evaluationContext.resolutionContext = resolutionContext;
+        return evaluationContext;
     }
 
     @Override
     public ConfigurableExpressionEvaluationContext setBeanContext(BeanContext beanContext) {
-        return new DefaultExpressionEvaluationContext(this.args, beanContext, this.owningBean);
+        DefaultExpressionEvaluationContext evaluationContext = new DefaultExpressionEvaluationContext(this.args, beanContext, this.owningBean);
+        evaluationContext.resolutionContext = resolutionContext;
+        return evaluationContext;
     }
 
     @Override
     public Object getArgument(int index) {
-        if (args == null || args.length == 0) {
+        if (args == null || args.length == 0 || args.length < index) {
             throw new ExpressionEvaluationException(
                 "Can not obtain argument at index [" + index + "] since arguments are not provided");
         }
@@ -89,11 +97,19 @@ public class DefaultExpressionEvaluationContext implements ConfigurableExpressio
             if (resolutionContext == null && owningBean != null) {
                 resolutionContext = new DefaultBeanResolutionContext(defaultBeanContext, owningBean);
             }
-
             if (resolutionContext != null) {
-                try (BeanResolutionContext.Path ignored =
-                         resolutionContext.getPath().pushAnnotationResolve(owningBean, Argument.of(type))) {
-                    return defaultBeanContext.getBean(resolutionContext, type);
+                BeanIdentifier identifier = BeanIdentifier.of(type.getName());
+                BeanRegistration<Object> existing = resolutionContext.getInFlightBean(identifier);
+                if (existing != null) {
+                    return (T) existing.getBean();
+                } else {
+                    Argument<T> t = Argument.of(type);
+                    try (BeanResolutionContext.Path ignored =
+                             resolutionContext.getPath().pushAnnotationResolve(owningBean, t)) {
+                        BeanRegistration<T> beanRegistration = defaultBeanContext.getBeanRegistration(resolutionContext, t, null);
+                        resolutionContext.addInFlightBean(identifier, beanRegistration);
+                        return beanRegistration.getBean();
+                    }
                 }
             }
         }
@@ -103,6 +119,9 @@ public class DefaultExpressionEvaluationContext implements ConfigurableExpressio
 
     @Override
     public void close() throws Exception {
-        resolutionContext = null;
+        if (resolutionContext != null) {
+            resolutionContext.close();
+            resolutionContext = null;
+        }
     }
 }

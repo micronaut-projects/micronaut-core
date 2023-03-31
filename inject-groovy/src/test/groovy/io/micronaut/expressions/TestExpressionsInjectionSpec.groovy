@@ -130,14 +130,16 @@ class TestExpressionsInjectionSpec extends AbstractBeanDefinitionSpec {
             }
 
             class Expr {
-                private final Integer wrapper
-                private final int primitive
-                private final String contextValue
+                public final Integer wrapper
+                public final int primitive
+                public final String contextValue
+                public final String contextValue2
 
-                Expr(Integer wrapper, int primitive, String contextValue) {
+                Expr(Integer wrapper, int primitive, String contextValue, String contextValue2) {
                     this.wrapper = wrapper
                     this.primitive = primitive
                     this.contextValue = contextValue
+                    this.contextValue2 = contextValue2;
                 }
             }
 
@@ -146,8 +148,9 @@ class TestExpressionsInjectionSpec extends AbstractBeanDefinitionSpec {
                 @Bean
                 Expr factoryBean(@Value('#{ 25 }') Integer wrapper,
                                  @Value('#{ 23 }') int primitive,
-                                 @Value('#{ #contextValue }') String contextValue) {
-                    return new Expr(wrapper, primitive, contextValue)
+                                 @Value('#{ #contextValue }') String contextValue,
+                                 @Value("#{ contextValue + ' ' + contextValue }") String contextValue2) {
+                    return new Expr(wrapper, primitive, contextValue, contextValue2)
                 }
             }
         """)
@@ -159,6 +162,7 @@ class TestExpressionsInjectionSpec extends AbstractBeanDefinitionSpec {
         bean.wrapper == 25
         bean.primitive == 23
         bean.contextValue == "context value"
+        bean.contextValue2 == "context value context value"
 
         cleanup:
         ctx.close()
