@@ -26,10 +26,6 @@ import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.multipart.MultipartBodyArgumentBinder;
-import io.micronaut.scheduling.TaskExecutors;
-import jakarta.inject.Named;
-
-import java.util.concurrent.ExecutorService;
 
 /**
  * A binder registrar that requests Netty related binders.
@@ -45,7 +41,6 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
     private final HttpContentProcessorResolver httpContentProcessorResolver;
     private final BeanLocator beanLocator;
     private final BeanProvider<HttpServerConfiguration> httpServerConfiguration;
-    private final BeanProvider<ExecutorService> executorService;
 
     /**
      * Default constructor.
@@ -54,18 +49,15 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
      * @param httpContentProcessorResolver The processor resolver
      * @param beanLocator                  The bean locator
      * @param httpServerConfiguration      The server config
-     * @param executorService              The executor to offload blocking operations
      */
     NettyBinderRegistrar(ConversionService conversionService,
                          HttpContentProcessorResolver httpContentProcessorResolver,
                          BeanLocator beanLocator,
-                         BeanProvider<HttpServerConfiguration> httpServerConfiguration,
-                         @Named(TaskExecutors.BLOCKING) BeanProvider<ExecutorService> executorService) {
+                         BeanProvider<HttpServerConfiguration> httpServerConfiguration) {
         this.conversionService = conversionService;
         this.httpContentProcessorResolver = httpContentProcessorResolver;
         this.beanLocator = beanLocator;
         this.httpServerConfiguration = httpServerConfiguration;
-        this.executorService = executorService;
     }
 
     @Override
@@ -73,15 +65,15 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
         RequestBinderRegistry registry = event.getBean();
         registry.addRequestArgumentBinder(new CompletableFutureBodyBinder(
                 httpContentProcessorResolver,
-                conversionService
+                conversionService,
+                httpServerConfiguration
         ));
         registry.addRequestArgumentBinder(new MultipartBodyArgumentBinder(
                 beanLocator,
                 httpServerConfiguration
         ));
         registry.addRequestArgumentBinder(new InputStreamBodyBinder(
-                httpContentProcessorResolver,
-                executorService.get()
+                httpContentProcessorResolver
         ));
         return registry;
     }

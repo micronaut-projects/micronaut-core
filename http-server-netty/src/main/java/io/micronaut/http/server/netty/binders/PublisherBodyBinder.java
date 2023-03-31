@@ -15,37 +15,28 @@
  */
 package io.micronaut.http.server.netty.binders;
 
-import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
-import io.micronaut.core.bind.OneShotBindingResult;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
-import io.micronaut.http.netty.stream.StreamedHttpRequest;
-import io.micronaut.http.server.netty.HttpContentProcessor;
-import io.micronaut.http.server.netty.HttpContentProcessorAsReactiveProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
+import io.micronaut.http.server.netty.body.ImmediateByteBody;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
-import io.netty.buffer.EmptyByteBuf;
-import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.util.ReferenceCountUtil;
-import io.netty.util.ReferenceCounted;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -57,9 +48,9 @@ import java.util.Optional;
 @Singleton
 public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publisher> {
 
+    public static final String MSG_CONVERT_DEBUG = "Cannot convert message for argument [{}] and value: {}";
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
     private static final Argument<Publisher> TYPE = Argument.of(Publisher.class);
-    public static final String MSG_CONVERT_DEBUG = "Cannot convert message for argument [{}] and value: {}";
 
     private final HttpContentProcessorResolver httpContentProcessorResolver;
     private final ConversionService conversionService;
@@ -81,121 +72,31 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
 
     @Override
     public BindingResult<Publisher> bind(ArgumentConversionContext<Publisher> context, HttpRequest<?> source) {
-        if (source instanceof NettyHttpRequest) {
-            NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) source;
-            io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
-
+        if (source instanceof NettyHttpRequest nhr) {
+            if (nhr.rootBody() instanceof ImmediateByteBody imm && imm.empty()) {
+                return BindingResult.EMPTY;
+            }
             Argument<?> targetType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-            HttpContentProcessor processor = httpContentProcessorResolver.resolve(nettyHttpRequest, targetType).resultType(context.getArgument());
-            if (nativeRequest instanceof StreamedHttpRequest) {
-                return new OneShotBindingResult<>(() -> Optional.of(subscriber -> HttpContentProcessorAsReactiveProcessor.asPublisher(processor, nettyHttpRequest).subscribe(new CompletionAwareSubscriber<>() {
-
-                    Subscription s;
-
-                    @Override
-                    protected void doOnSubscribe(Subscription subscription) {
-                        this.s = subscription;
-                        subscriber.onSubscribe(subscription);
-                    }
-
-                    @Override
-                    protected void doOnNext(Object message) {
-                        if (LOG.isTraceEnabled()) {
-                            LOG.trace("Server received streaming message for argument [{}]: {}", context.getArgument(), message);
-                        }
-                        if (message instanceof ByteBufHolder) {
-                            message = ((ByteBufHolder) message).content();
-                            if (message instanceof EmptyByteBuf) {
-                                s.request(1);
-                                return;
-                            }
-                        }
-
+            try {
+                Publisher<?> publisher = nhr.rootBody()
+                    .processMulti(httpContentProcessorResolver.resolve(nhr, targetType).resultType(context.getArgument()))
+                    .mapNotNull(o -> {
                         ArgumentConversionContext<?> conversionContext = context.with(targetType);
-                        Optional<?> converted = conversionService.convert(message, conversionContext);
-
-                        if (converted.isPresent()) {
-                            subscriber.onNext(converted.get());
-                        } else {
-
-                            try {
-                                subscriber.onError(extractError(message, conversionContext));
-                            } finally {
-                                s.cancel();
-                            }
-                        }
-
-                        if (message instanceof ReferenceCounted) {
-                            ((ReferenceCounted) message).release();
-                        }
-                    }
-
-                    @Override
-                    protected void doOnError(Throwable t) {
-                        if (LOG.isTraceEnabled()) {
-                            LOG.trace("Server received error for argument [" + context.getArgument() + "]: " + t.getMessage(), t);
-                        }
-                        try {
-                            subscriber.onError(t);
-                        } finally {
-                            s.cancel();
-                        }
-                    }
-
-                    @Override
-                    protected void doOnComplete() {
-                        if (LOG.isTraceEnabled()) {
-                            LOG.trace("Done receiving messages for argument: {}", context.getArgument());
-                        }
-                        subscriber.onComplete();
-                    }
-
-                })));
-            } else if (nativeRequest instanceof FullHttpRequest fullHttpRequest && fullHttpRequest.content().isReadable()) {
-                // we will read the body, retain the request
-                fullHttpRequest.retain();
-                return new OneShotBindingResult<>(() -> {
-                    List<Object> buffer = new ArrayList<>(1);
-                    try {
-                        processor.add(fullHttpRequest, buffer);
-                        processor.complete(buffer);
-                        List<Object> convertedBuffer = new ArrayList<>(buffer.size());
-                        for (Object object : buffer) {
-                            if (object instanceof ByteBufHolder holder) {
-                                object = holder.content();
-                                if (!holder.content().isReadable()) {
-                                    continue;
-                                }
-                            }
-                            ArgumentConversionContext<?> conversionContext = context.with(targetType);
-                            Optional<?> converted = conversionService.convert(object, conversionContext);
-                            if (converted.isPresent()) {
-                                convertedBuffer.add(converted.get());
-                            } else {
-                                // handled below
-                                throw extractError(object, conversionContext);
-                            }
-                        }
-                        return Optional.of(Flux.fromIterable(convertedBuffer));
-                    } catch (Throwable t) {
-                        try {
-                            processor.cancel();
-                        } catch (Throwable u) {
-                            t.addSuppressed(u);
-                        }
-                        return Optional.of(Mono.error(t));
-                    } finally {
-                        for (Object o : buffer) {
-                            ReferenceCountUtil.release(o);
-                        }
-                    }
-                });
+                        return convertAndRelease(conversionService, conversionContext, o);
+                    })
+                    .asPublisher();
+                return () -> Optional.of(publisher);
+            } catch (Throwable t) {
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("Server received error for argument [" + context.getArgument() + "]: " + t.getMessage(), t);
+                }
+                return () -> Optional.of(Mono.error(t));
             }
         }
         return BindingResult.EMPTY;
     }
 
-    private static Exception extractError(Object message, ArgumentConversionContext<?> conversionContext) {
+    private static RuntimeException extractError(Object message, ArgumentConversionContext<?> conversionContext) {
         Optional<ConversionError> lastError = conversionContext.getLastError();
         if (lastError.isPresent()) {
             if (LOG.isDebugEnabled()) {
@@ -207,6 +108,42 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
                 LOG.debug(MSG_CONVERT_DEBUG, conversionContext.getArgument(), message);
             }
             return UnsatisfiedRouteException.create(conversionContext.getArgument());
+        }
+    }
+
+    /**
+     * This method converts a potentially
+     * {@link io.netty.util.ReferenceCounted netty reference counted} and transfers release
+     * ownership to the new object.
+     *
+     * @param conversionService The conversion service
+     * @param conversionContext The context to convert to
+     * @param o The object to convert
+     * @return The converted object
+     */
+    static Object convertAndRelease(ConversionService conversionService, ArgumentConversionContext<?> conversionContext, Object o) {
+        try {
+            if (o instanceof ByteBufHolder holder) {
+                o = holder.content();
+                if (!((ByteBuf) o).isReadable()) {
+                    return null;
+                }
+            }
+
+            Optional<?> converted = conversionService.convert(o, conversionContext);
+            if (converted.isPresent()) {
+                Object conv = converted.get();
+                if (conv instanceof ReferenceCounted rc) {
+                    rc.retain();
+                } else if (conv instanceof io.netty.util.ReferenceCounted rc) {
+                    rc.retain();
+                }
+                return conv;
+            } else {
+                throw extractError(o, conversionContext);
+            }
+        } finally {
+            ReferenceCountUtil.release(o);
         }
     }
 }

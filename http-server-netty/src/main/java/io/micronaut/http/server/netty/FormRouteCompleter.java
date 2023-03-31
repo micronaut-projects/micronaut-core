@@ -16,104 +16,126 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.execution.DelayedExecutionFlow;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
+import io.micronaut.http.server.netty.body.HttpBody;
+import io.micronaut.http.server.netty.body.ImmediateMultiObjectBody;
+import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
 import io.micronaut.http.server.netty.multipart.NettyStreamingFileUpload;
 import io.micronaut.web.router.RouteMatch;
-import io.netty.buffer.ByteBufHolder;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
-import io.netty.handler.codec.http.multipart.HttpData;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.Set;
 import java.util.function.Supplier;
 
 /**
- * Extension of {@link BaseRouteCompleter} that handles incoming multipart data and binds
- * parameters (e.g. {@link io.micronaut.http.annotation.Part}).
+ * Special {@link HttpBody} that "demultiplexes" form data. Basically, this class receives a stream
+ * of {@link MicronautHttpData} and splits it into individual streams for each form field, and they
+ * can all be subscribed to and bound independently.
  *
  * @since 4.0.0
  * @author Jonas Konrad
  */
 @Internal
-final class FormRouteCompleter extends BaseRouteCompleter {
+public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
     static final Argument<PartData> ARGUMENT_PART_DATA = Argument.of(PartData.class);
     private static final Logger LOG = LoggerFactory.getLogger(FormRouteCompleter.class);
 
+    final DelayedExecutionFlow<RouteMatch<?>> execute = DelayedExecutionFlow.create();
+    private final NettyHttpRequest<?> request;
+    private boolean executed;
     private final NettyStreamingFileUpload.Factory fileUploadFactory;
     private final ConversionService conversionService;
-    private final boolean alwaysAddContent = request.isFormData();
-    private final AtomicLong pressureRequested = new AtomicLong();
+    private RouteMatch<?> routeMatch;
     private final Map<String, Sinks.Many<Object>> subjectsByDataName = new HashMap<>();
     private final Collection<Sinks.Many<?>> downstreamSubscribers = new ArrayList<>();
+    private Subscription upstreamSubscription;
+    private final Set<MicronautHttpData<?>> allData = new LinkedHashSet<>();
 
     FormRouteCompleter(NettyStreamingFileUpload.Factory fileUploadFactory, ConversionService conversionService, NettyHttpRequest<?> request, RouteMatch<?> routeMatch) {
-        super(request, routeMatch);
+        this.request = request;
         this.fileUploadFactory = fileUploadFactory;
         this.conversionService = conversionService;
+        this.routeMatch = routeMatch;
     }
 
-    private void request(long n) {
-        pressureRequested.getAndUpdate(old -> {
-            if ((old + n) < old) {
-                return Long.MAX_VALUE;
-            } else {
-                return old + n;
-            }
-        });
-        needsInput = true;
-        Runnable checkDemand = this.checkDemand;
-        if (checkDemand != null) {
-            checkDemand.run();
-        }
-    }
-
-    private <T> Flux<T> withFlowControl(Flux<T> flux, MicronautHttpData<?> data) {
+    private <T> Flux<T> withFlowControl(Flux<T> flux) {
         return flux
-            .doOnComplete(data::release)
-            .doOnRequest(this::request);
+            .doOnRequest(upstreamSubscription::request);
     }
 
     @Override
-    protected void addHolder(ByteBufHolder holder) {
-        if (holder instanceof HttpData data) {
-            needsInput = pressureRequested.decrementAndGet() > 0;
-            addData((MicronautHttpData<?>) data);
-        } else {
-            super.addHolder(holder);
+    public void onSubscribe(Subscription s) {
+        upstreamSubscription = s;
+        s.request(1);
+    }
+
+    @Override
+    public void onNext(Object o) {
+        try {
+            addData((MicronautHttpData<?>) o);
+        } catch (Exception e) {
+            upstreamSubscription.cancel();
+            onError(e);
         }
     }
 
     @Override
-    void completeSuccess() {
+    public void onComplete() {
         for (Sinks.Many<?> subject : downstreamSubscribers) {
             // subjects will ignore the onComplete if they're already done
             subject.tryEmitComplete();
         }
-        super.completeSuccess();
+        if (!executed) {
+            executed = true;
+            execute.complete(routeMatch);
+        }
     }
 
     @Override
-    void completeFailure(Throwable failure) {
-        super.completeFailure(failure);
+    public void onError(Throwable failure) {
         for (Sinks.Many<?> subject : downstreamSubscribers) {
             subject.tryEmitError(failure);
+        }
+        for (Object toDiscard : routeMatch.getVariableValues().values()) {
+            if (toDiscard instanceof ReferenceCounted rc) {
+                rc.release();
+            }
+            if (toDiscard instanceof io.netty.util.ReferenceCounted rc) {
+                rc.release();
+            }
+            if (toDiscard instanceof NettyCompletedFileUpload fu) {
+                fu.discard();
+            }
+        }
+        executed = true;
+        try {
+            execute.completeExceptionally(failure);
+        } catch (IllegalStateException ignored) {
         }
     }
 
@@ -121,13 +143,13 @@ final class FormRouteCompleter extends BaseRouteCompleter {
         if (LOG.isTraceEnabled()) {
             LOG.trace("Received HTTP Data for request [{}]: {}", request, data);
         }
+        allData.add(data);
 
         String name = data.getName();
         Optional<Argument<?>> requiredInput = routeMatch.getRequiredInput(name);
 
         if (requiredInput.isEmpty()) {
-            request.addContent(data);
-            request(1);
+            upstreamSubscription.request(1);
             return;
         }
 
@@ -139,8 +161,6 @@ final class FormRouteCompleter extends BaseRouteCompleter {
         if (isPublisher) {
             if (data.attachment == null) {
                 data.attachment = new HttpDataAttachment();
-                // retain exactly once
-                data.retain();
             }
 
             Argument typeVariable;
@@ -167,7 +187,7 @@ final class FormRouteCompleter extends BaseRouteCompleter {
                 }
                 if (data.attachment.subject == null) {
                     Sinks.Many<PartData> childSubject = makeDownstreamUnicastProcessor();
-                    Flux<PartData> flowable = withFlowControl(childSubject.asFlux(), data);
+                    Flux<PartData> flowable = withFlowControl(childSubject.asFlux());
                     if (streamingFileUpload && data instanceof FileUpload fu) {
                         namedSubject.tryEmitNext(fileUploadFactory.create(fu, flowable));
                     } else {
@@ -203,7 +223,7 @@ final class FormRouteCompleter extends BaseRouteCompleter {
                 StreamingFileUpload.class.isAssignableFrom(argument.getType()) &&
                 data.attachment.upload == null) {
 
-                data.attachment.upload = fileUploadFactory.create(fu, withFlowControl(subject.asFlux(), data));
+                data.attachment.upload = fileUploadFactory.create(fu, withFlowControl(subject.asFlux()));
             }
 
             Optional<?> converted = conversionService.convert(part, typeVariable);
@@ -219,7 +239,7 @@ final class FormRouteCompleter extends BaseRouteCompleter {
                     return data.attachment.upload;
                 } else {
                     if (data.attachment.subject == null) {
-                        return withFlowControl(namedSubject.asFlux(), data);
+                        return withFlowControl(namedSubject.asFlux());
                     } else {
                         return namedSubject.asFlux();
                     }
@@ -228,8 +248,7 @@ final class FormRouteCompleter extends BaseRouteCompleter {
 
         } else {
             if (data instanceof Attribute && !data.isCompleted()) {
-                request.addContent(data);
-                request(1);
+                upstreamSubscription.request(1);
                 return;
             } else {
                 value = () -> {
@@ -242,33 +261,24 @@ final class FormRouteCompleter extends BaseRouteCompleter {
             }
         }
 
-        if (!execute) {
+        if (!executed) {
             String argumentName = argument.getName();
             if (!routeMatch.isSatisfied(argumentName)) {
                 Object fulfillParamter = value.get();
                 routeMatch = routeMatch.fulfill(Collections.singletonMap(argumentName, fulfillParamter));
-                // we need to release the data here. However, if the route argument is a
-                // ByteBuffer, we need to retain the data until the route is executed. Adding
-                // the data to the request ensures it is cleaned up after the route completes.
-                if (!alwaysAddContent && fulfillParamter instanceof ByteBufHolder holder) {
-                    request.addContent(holder);
-                }
             }
             if (isPublisher && chunkedProcessing) {
                 //accounting for the previous request
-                request(1);
+                upstreamSubscription.request(1);
             }
             if (routeMatch.isExecutable()) {
-                execute = true;
+                executed = true;
+                execute.complete(routeMatch);
             }
         }
 
-        if (alwaysAddContent && !request.destroyed) {
-            request.addContent(data);
-        }
-
-        if (!execute || !chunkedProcessing) {
-            request(1);
+        if (!executed || !chunkedProcessing) {
+            upstreamSubscription.request(1);
         }
     }
 
@@ -276,6 +286,23 @@ final class FormRouteCompleter extends BaseRouteCompleter {
         Sinks.Many<T> processor = Sinks.many().unicast().onBackpressureBuffer();
         downstreamSubscribers.add(processor);
         return processor;
+    }
+
+    @Override
+    public void release() {
+        for (MicronautHttpData<?> data : allData) {
+            data.release();
+        }
+    }
+
+    @Nullable
+    @Override
+    public HttpBody next() {
+        return null;
+    }
+
+    public Map<String, Object> asMap(Charset defaultCharset) {
+        return ImmediateMultiObjectBody.toMap(defaultCharset, allData);
     }
 
     static class HttpDataAttachment {

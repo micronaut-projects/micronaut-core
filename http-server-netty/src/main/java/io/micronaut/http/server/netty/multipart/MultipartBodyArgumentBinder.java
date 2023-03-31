@@ -24,24 +24,27 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
-import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.DefaultHttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessor;
-import io.micronaut.http.server.netty.HttpContentProcessorAsReactiveProcessor;
 import io.micronaut.http.server.netty.HttpContentSubscriberFactory;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
+import io.micronaut.http.server.netty.body.MultiObjectBody;
 import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
+import io.netty.util.ReferenceCounted;
+import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -76,88 +79,97 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
 
     @Override
     public BindingResult<MultipartBody> bind(ArgumentConversionContext<MultipartBody> context, HttpRequest<?> source) {
-        if (source instanceof NettyHttpRequest) {
-            NettyHttpRequest nettyHttpRequest = (NettyHttpRequest) source;
-            io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
-            if (nativeRequest instanceof StreamedHttpRequest) {
-                HttpContentProcessor processor = beanLocator.findBean(HttpContentSubscriberFactory.class,
-                        new ConsumesMediaTypeQualifier<>(MediaType.MULTIPART_FORM_DATA_TYPE))
-                        .map(factory -> factory.build(nettyHttpRequest))
-                        .orElse(new DefaultHttpContentProcessor(nettyHttpRequest, httpServerConfiguration.get()));
-
-                //noinspection unchecked
-                return () -> Optional.of(subscriber -> HttpContentProcessorAsReactiveProcessor.<HttpData>asPublisher(processor.resultType(context.getArgument()), nettyHttpRequest).subscribe(new CompletionAwareSubscriber<>() {
-
-                    Subscription s;
-                    AtomicLong partsRequested = new AtomicLong(0);
-
-                    @Override
-                    protected void doOnSubscribe(Subscription subscription) {
-                        this.s = subscription;
-                        subscriber.onSubscribe(new Subscription() {
-
-                            @Override
-                            public void request(long n) {
-                                if (partsRequested.getAndUpdate(prev -> prev + n) == 0) {
-                                    s.request(n);
-                                }
-                            }
-
-                            @Override
-                            public void cancel() {
-                                subscription.cancel();
-                            }
-                        });
-                    }
-
-                    @Override
-                    protected void doOnNext(HttpData message) {
-                        if (LOG.isTraceEnabled()) {
-                            LOG.trace("Server received streaming message for argument [{}]: {}", context.getArgument(), message);
-                        }
-                        // MicronautHttpData does not support .content()
-                        if (message.length() == 0) {
-                            return;
-                        }
-
-                        if (message.isCompleted()) {
-                            partsRequested.decrementAndGet();
-                            if (message instanceof FileUpload fu) {
-                                subscriber.onNext(new NettyCompletedFileUpload(fu, false));
-                            } else if (message instanceof Attribute attr) {
-                                subscriber.onNext(new NettyCompletedAttribute(attr, false));
-                            }
-                        }
-
-                        message.release();
-
-                        if (partsRequested.get() > 0) {
-                            s.request(1);
-                        }
-                    }
-
-                    @Override
-                    protected void doOnError(Throwable t) {
-                        if (LOG.isTraceEnabled()) {
-                            LOG.trace("Server received error for argument [" + context.getArgument() + "]: " + t.getMessage(), t);
-                        }
-                        try {
-                            subscriber.onError(t);
-                        } finally {
-                            s.cancel();
-                        }
-                    }
-
-                    @Override
-                    protected void doOnComplete() {
-                        if (LOG.isTraceEnabled()) {
-                            LOG.trace("Done receiving messages for argument: {}", context.getArgument());
-                        }
-                        subscriber.onComplete();
-                    }
-
-                }));
+        if (source instanceof NettyHttpRequest<?> nhr) {
+            HttpContentProcessor processor = beanLocator.findBean(HttpContentSubscriberFactory.class,
+                    new ConsumesMediaTypeQualifier<>(MediaType.MULTIPART_FORM_DATA_TYPE))
+                .map(factory -> factory.build(nhr))
+                .orElse(new DefaultHttpContentProcessor(nhr, httpServerConfiguration.get()));
+            MultiObjectBody multiObjectBody;
+            try {
+                multiObjectBody = nhr.rootBody()
+                    .processMulti(processor);
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
             }
+            //noinspection RedundantCast,unchecked
+            return () -> Optional.of(subscriber -> ((Publisher<HttpData>) multiObjectBody.asPublisher()).subscribe(new CompletionAwareSubscriber<>() {
+
+                Subscription s;
+                final AtomicLong partsRequested = new AtomicLong(0);
+
+                final Set<ReferenceCounted> partial = new HashSet<>();
+
+                @Override
+                protected void doOnSubscribe(Subscription subscription) {
+                    this.s = subscription;
+                    subscriber.onSubscribe(new Subscription() {
+
+                        @Override
+                        public void request(long n) {
+                            if (partsRequested.getAndUpdate(prev -> prev + n) == 0) {
+                                s.request(n);
+                            }
+                        }
+
+                        @Override
+                        public void cancel() {
+                            subscription.cancel();
+                        }
+                    });
+                }
+
+                @Override
+                protected void doOnNext(HttpData message) {
+                    if (LOG.isTraceEnabled()) {
+                        LOG.trace("Server received streaming message for argument [{}]: {}", context.getArgument(), message);
+                    }
+                    if (message.isCompleted() && message.length() != 0) {
+                        partial.remove(message);
+                        partsRequested.decrementAndGet();
+                        if (message instanceof FileUpload fu) {
+                            subscriber.onNext(new NettyCompletedFileUpload(fu, true));
+                        } else if (message instanceof Attribute attr) {
+                            subscriber.onNext(new NettyCompletedAttribute(attr, true));
+                        }
+                    } else {
+                        partial.add(message);
+                    }
+
+                    if (partsRequested.get() > 0) {
+                        s.request(1);
+                    }
+                }
+
+                @Override
+                protected void doOnError(Throwable t) {
+                    if (LOG.isTraceEnabled()) {
+                        LOG.trace("Server received error for argument [" + context.getArgument() + "]: " + t.getMessage(), t);
+                    }
+                    releasePartial();
+                    try {
+                        subscriber.onError(t);
+                    } finally {
+                        s.cancel();
+                    }
+                }
+
+                @Override
+                protected void doOnComplete() {
+                    if (LOG.isTraceEnabled()) {
+                        LOG.trace("Done receiving messages for argument: {}", context.getArgument());
+                    }
+                    releasePartial();
+                    subscriber.onComplete();
+                }
+
+                private void releasePartial() {
+                    for (ReferenceCounted rc : partial) {
+                        rc.release();
+                    }
+                    partial.clear();
+                }
+
+            }));
         }
         return BindingResult.EMPTY;
     }

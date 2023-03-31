@@ -28,10 +28,11 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.runtime.server.EmbeddedServer;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageDecoder;
-import io.netty.handler.codec.http.DefaultHttpRequest;
+import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
@@ -113,7 +114,7 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
         } catch (IllegalArgumentException e) {
             // this configured the request in the channel as an attribute
             new NettyHttpRequest<>(
-                    new DefaultHttpRequest(msg.protocolVersion(), msg.method(), "/"),
+                    new DefaultFullHttpRequest(msg.protocolVersion(), msg.method(), "/", Unpooled.EMPTY_BUFFER),
                     ctx,
                     conversionService,
                     configuration,
