@@ -42,7 +42,6 @@ import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.bind.binders.RequestAttributeAnnotationBinder;
 import io.micronaut.http.bind.binders.RequestBeanAnnotationBinder;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import jakarta.inject.Inject;
@@ -74,34 +73,22 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
     private final ConversionService conversionService;
     private final Map<TypeAndAnnotation, Optional<RequestArgumentBinder>> argumentBinderCache =
         new ConcurrentLinkedHashMap.Builder<TypeAndAnnotation, Optional<RequestArgumentBinder>>().maximumWeightedCapacity(CACHE_MAX_SIZE).build();
-    private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
 
     /**
      * @param conversionService The conversion service
      * @param binders           The request argument binders
      */
     public DefaultRequestBinderRegistry(ConversionService conversionService, RequestArgumentBinder... binders) {
-        this(null, conversionService, Arrays.asList(binders));
+        this(conversionService, Arrays.asList(binders));
     }
 
     /**
-     * @param mediaTypeCodecRegistry The codec registry
-     * @param conversionService      The conversion service
-     * @param binders                The request argument binders
-     */
-    public DefaultRequestBinderRegistry(MediaTypeCodecRegistry mediaTypeCodecRegistry, ConversionService conversionService, RequestArgumentBinder... binders) {
-        this(null, conversionService, Arrays.asList(binders));
-    }
-
-    /**
-     * @param mediaTypeCodecRegistry the media type codec registry
      * @param conversionService      The conversion service
      * @param binders                The request argument binders
      */
     @Inject
-    public DefaultRequestBinderRegistry(MediaTypeCodecRegistry mediaTypeCodecRegistry, ConversionService conversionService, List<RequestArgumentBinder> binders) {
+    public DefaultRequestBinderRegistry(ConversionService conversionService, List<RequestArgumentBinder> binders) {
         this.conversionService = conversionService;
-        this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         if (CollectionUtils.isNotEmpty(binders)) {
             for (RequestArgumentBinder binder : binders) {
                 addRequestArgumentBinder(binder);
