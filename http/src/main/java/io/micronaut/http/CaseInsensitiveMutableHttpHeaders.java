@@ -38,7 +38,7 @@ import java.util.TreeMap;
  * @since 4.0.0
  */
 @Internal
-public class CaseInsensitiveMutableHttpHeaders implements MutableHttpHeaders {
+public final class CaseInsensitiveMutableHttpHeaders implements MutableHttpHeaders {
 
     private final boolean validate;
     private final TreeMap<String, List<String>> backing;
