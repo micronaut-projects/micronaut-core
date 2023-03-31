@@ -49,14 +49,12 @@ import io.micronaut.http.netty.cookies.NettyCookies;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
-import io.micronaut.http.server.exceptions.InternalServerException;
 import io.micronaut.http.server.netty.body.ByteBody;
 import io.micronaut.http.server.netty.body.HttpBody;
 import io.micronaut.http.server.netty.body.ImmediateMultiObjectBody;
 import io.micronaut.http.server.netty.body.ImmediateSingleObjectBody;
 import io.micronaut.json.convert.LazyJsonNode;
 import io.micronaut.web.router.RouteMatch;
-import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -69,7 +67,6 @@ import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
-import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.handler.codec.http2.DefaultHttp2PushPromiseFrame;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
 import io.netty.handler.codec.http2.Http2FrameCodec;
@@ -83,7 +80,6 @@ import io.netty.util.concurrent.GenericFutureListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -151,11 +147,9 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
     private final MediaTypeCodecRegistry codecRegistry;
 
-    boolean destroyed = false;
-
     private final NettyHttpHeaders headers;
     private final ChannelHandlerContext channelHandlerContext;
-    public final HttpServerConfiguration serverConfiguration; // todo: private
+    private final HttpServerConfiguration serverConfiguration;
     private MutableConvertibleValues<Object> attributes;
     private NettyCookies nettyCookies;
     private final ByteBody body;
@@ -207,11 +201,11 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         this.origin = headers.getOrigin().orElse(null);
     }
 
-    public ByteBody rootBody() {
+    public final ByteBody rootBody() {
         return body;
     }
 
-    public HttpBody lastBody() {
+    private HttpBody lastBody() {
         HttpBody body = rootBody();
         while (true) {
             HttpBody next = body.next();
@@ -342,70 +336,10 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             return (Optional<T>) Optional.ofNullable(single.valueUnclaimed());
         } else if (lastBody instanceof FormRouteCompleter frc) {
             //noinspection unchecked
-            return (Optional<T>) Optional.of(frc.asMap());
+            return (Optional<T>) Optional.of(frc.asMap(serverConfiguration.getDefaultCharset()));
         } else {
-            //throw new IllegalStateException("Body has not arrived yet, or has not been processed yet, or has already been consumed");
             return Optional.empty();
         }
-    }
-
-    /**
-     * @return A {@link CompositeByteBuf}
-     */
-    /*
-    protected Object buildBody() {
-        if (!receivedData.isEmpty()) {
-            Map body = new LinkedHashMap(receivedData.size());
-
-            for (HttpData data: receivedData.values()) {
-                String newValue = getContent(data);
-                //noinspection unchecked
-                body.compute(data.getName(), (key, oldValue) -> {
-                    if (oldValue == null) {
-                        return newValue;
-                    } else if (oldValue instanceof Collection) {
-                        //noinspection unchecked
-                        ((Collection) oldValue).add(newValue);
-                        return oldValue;
-                    } else {
-                        ArrayList<Object> values = new ArrayList<>(2);
-                        values.add(oldValue);
-                        values.add(newValue);
-                        return values;
-                    }
-                });
-            }
-            return body;
-        } else if (!receivedContent.isEmpty()) {
-            int size = receivedContent.size();
-            if (size == 1) {
-                return receivedContent.get(0).content().retain();
-            } else {
-                CompositeByteBuf byteBufs = channelHandlerContext.alloc().compositeBuffer(size);
-                for (ByteBufHolder holder : receivedContent) {
-                    ByteBuf content = holder.content();
-                    if (content != null) {
-                        content.touch();
-                        // need to retain content, because for addComponent "ownership of buffer is transferred to this CompositeByteBuf."
-                        byteBufs.addComponent(true, content.retain());
-                    }
-                }
-                return byteBufs;
-            }
-        } else {
-            return null;
-        }
-    }
-     */
-
-    private String getContent(HttpData data) {
-        String newValue;
-        try {
-            newValue = data.getString(serverConfiguration.getDefaultCharset());
-        } catch (IOException e) {
-            throw new InternalServerException("Error retrieving or decoding the value for: " + data.getName());
-        }
-        return newValue;
     }
 
     @Override
@@ -424,7 +358,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     public void release() {
-        destroyed = true;
         body.release();
         if (attributes != null) {
             attributes.values().forEach(this::releaseIfNecessary);

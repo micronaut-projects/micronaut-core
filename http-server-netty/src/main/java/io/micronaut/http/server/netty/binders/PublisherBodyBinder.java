@@ -48,9 +48,9 @@ import java.util.Optional;
 @Singleton
 public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publisher> {
 
+    public static final String MSG_CONVERT_DEBUG = "Cannot convert message for argument [{}] and value: {}";
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
     private static final Argument<Publisher> TYPE = Argument.of(Publisher.class);
-    public static final String MSG_CONVERT_DEBUG = "Cannot convert message for argument [{}] and value: {}";
 
     private final HttpContentProcessorResolver httpContentProcessorResolver;
     private final ConversionService conversionService;

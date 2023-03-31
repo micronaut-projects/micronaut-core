@@ -3,7 +3,6 @@ package io.micronaut.http.server.netty
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.async.annotation.SingleResult
-import io.micronaut.core.io.buffer.ReferenceCounted
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
@@ -13,6 +12,7 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.multipart.CompletedFileUpload
+import io.micronaut.http.multipart.FileUpload
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.bootstrap.Bootstrap
 import io.netty.buffer.Unpooled
@@ -463,7 +463,7 @@ class MaxRequestSizeSpec extends Specification {
         @SingleResult
         Publisher<String> multipart(@Body io.micronaut.http.server.multipart.MultipartBody body) {
             return Flux.from(body).map {
-                if (it instanceof ReferenceCounted) it.release()
+                if (it instanceof FileUpload) it.discard()
                 return it
             }.collectList().map({ list -> "OK" })
         }

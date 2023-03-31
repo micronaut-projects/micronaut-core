@@ -41,6 +41,7 @@ import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -64,8 +65,8 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
     static final Argument<PartData> ARGUMENT_PART_DATA = Argument.of(PartData.class);
     private static final Logger LOG = LoggerFactory.getLogger(FormRouteCompleter.class);
 
-    private final NettyHttpRequest<?> request;
     final DelayedExecutionFlow<RouteMatch<?>> execute = DelayedExecutionFlow.create();
+    private final NettyHttpRequest<?> request;
     private boolean executed;
     private final NettyStreamingFileUpload.Factory fileUploadFactory;
     private final ConversionService conversionService;
@@ -300,8 +301,8 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
         return null;
     }
 
-    public Map<String, Object> asMap() {
-        return ImmediateMultiObjectBody.toMap(request.serverConfiguration.getDefaultCharset(), allData);
+    public Map<String, Object> asMap(Charset defaultCharset) {
+        return ImmediateMultiObjectBody.toMap(defaultCharset, allData);
     }
 
     static class HttpDataAttachment {

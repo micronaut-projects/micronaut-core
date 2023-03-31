@@ -25,7 +25,6 @@ import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
-import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.handler.codec.http.multipart.HttpDataFactory;
 import io.netty.handler.codec.http.multipart.HttpPostMultipartRequestDecoder;
 import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
@@ -136,7 +135,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor {
                     }
 
                     InterfaceHttpData currentPartialHttpData = postRequestDecoder.currentPartialHttpData();
-                    if (currentPartialHttpData instanceof HttpData) {
+                    if (currentPartialHttpData != null) {
                         out.add(currentPartialHttpData);
                         postRequestDecoder.removeHttpDataFromClean(currentPartialHttpData);
                     }

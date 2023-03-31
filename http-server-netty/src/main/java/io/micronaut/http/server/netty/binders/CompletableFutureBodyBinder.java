@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.binders;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -23,8 +24,11 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.http.server.netty.body.ByteBody;
+import io.micronaut.http.server.netty.body.ImmediateByteBody;
 import io.micronaut.http.server.netty.body.ImmediateSingleObjectBody;
 
 import java.util.Arrays;
@@ -48,14 +52,17 @@ public class CompletableFutureBodyBinder
 
     private final HttpContentProcessorResolver httpContentProcessorResolver;
     private final ConversionService conversionService;
+    private final BeanProvider<HttpServerConfiguration> httpServerConfiguration;
 
     /**
      * @param httpContentProcessorResolver The http content processor resolver
      * @param conversionService            The conversion service
+     * @param httpServerConfiguration      The server configuration
      */
-    public CompletableFutureBodyBinder(HttpContentProcessorResolver httpContentProcessorResolver, ConversionService conversionService) {
+    public CompletableFutureBodyBinder(HttpContentProcessorResolver httpContentProcessorResolver, ConversionService conversionService, BeanProvider<HttpServerConfiguration> httpServerConfiguration) {
         this.httpContentProcessorResolver = httpContentProcessorResolver;
         this.conversionService = conversionService;
+        this.httpServerConfiguration = httpServerConfiguration;
     }
 
     @NonNull
@@ -72,15 +79,20 @@ public class CompletableFutureBodyBinder
     @Override
     public BindingResult<CompletableFuture> bind(ArgumentConversionContext<CompletableFuture> context, HttpRequest<?> source) {
         if (source instanceof NettyHttpRequest nhr) {
+            ByteBody rootBody = nhr.rootBody();
+            if (rootBody instanceof ImmediateByteBody immediate && immediate.empty()) {
+                return BindingResult.EMPTY;
+            }
+
             Optional<Argument<?>> firstTypeParameter = context.getFirstTypeVariable();
             Argument<?> targetType = firstTypeParameter.orElse(Argument.OBJECT_ARGUMENT);
             try {
-                ExecutionFlow<ImmediateSingleObjectBody> retFlow = nhr.rootBody()
+                ExecutionFlow<ImmediateSingleObjectBody> retFlow = rootBody
                     .buffer(nhr.getChannelHandlerContext().alloc())
                     .map(bytes -> {
                         try {
                             return bytes.processMulti(httpContentProcessorResolver.resolve(nhr, targetType))
-                                .single(nhr.serverConfiguration.getDefaultCharset(), nhr.getChannelHandlerContext().alloc());
+                                .single(httpServerConfiguration.get().getDefaultCharset(), nhr.getChannelHandlerContext().alloc());
                         } catch (RuntimeException e) {
                             throw e;
                         } catch (Throwable e) {
@@ -99,7 +111,6 @@ public class CompletableFutureBodyBinder
             } catch (Throwable e) {
                 return () -> Optional.of(CompletableFuture.failedFuture(e));
             }
-            // todo: empty binding result on empty body
         } else {
             return BindingResult.EMPTY;
         }

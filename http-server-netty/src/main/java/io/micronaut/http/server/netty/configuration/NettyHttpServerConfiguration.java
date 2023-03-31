@@ -212,6 +212,18 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
+     * @param applicationConfiguration The application configuration
+     * @param pipelineCustomizers A list of pipeline customizers
+     */
+    @Inject
+    public NettyHttpServerConfiguration(
+            ApplicationConfiguration applicationConfiguration,
+            List<ChannelPipelineListener> pipelineCustomizers) {
+        super(applicationConfiguration);
+        this.pipelineCustomizers = pipelineCustomizers;
+    }
+
+    /**
      * @return Sets the server type.
      * @see HttpServerType
      */
@@ -244,22 +256,15 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         this.closeOnExpectationFailed = closeOnExpectationFailed;
     }
 
+    /**
+     * Set the server type.
+     *
+     * @param serverType The server type
+     */
     public void setServerType(@Nullable HttpServerType serverType) {
         if (serverType != null) {
             this.serverType = serverType;
         }
-    }
-
-    /**
-     * @param applicationConfiguration The application configuration
-     * @param pipelineCustomizers A list of pipeline customizers
-     */
-    @Inject
-    public NettyHttpServerConfiguration(
-            ApplicationConfiguration applicationConfiguration,
-            List<ChannelPipelineListener> pipelineCustomizers) {
-        super(applicationConfiguration);
-        this.pipelineCustomizers = pipelineCustomizers;
     }
 
     /**
