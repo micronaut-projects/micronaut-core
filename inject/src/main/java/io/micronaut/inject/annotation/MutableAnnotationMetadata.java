@@ -19,7 +19,6 @@ import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
 import io.micronaut.core.annotation.*;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import org.jetbrains.annotations.Contract;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
@@ -553,7 +552,6 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
      * @return A read only map of the default values for the annotation
      */
     @Nullable
-    @Contract(pure = true)
     public Map<String, Map<CharSequence, Object>> getAnnotationDefaultValues() {
         if (annotationDefaultValues == null) {
             return null;

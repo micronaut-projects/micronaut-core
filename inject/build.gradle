@@ -25,12 +25,14 @@ dependencies {
     api libs.jakarta.inject.api
     api libs.managed.jakarta.annotation.api
     api project(':core')
-    api libs.jetbrains.annotations
 
     compileOnly libs.javax.inject
     compileOnly libs.managed.snakeyaml
     compileOnly libs.managed.groovy
     compileOnly libs.kotlin.stdlib.jdk8
+    //this is needed since jetbrains annotations are not transitive on module level
+    //it doesn't actually adds a new dependency, it just explicitly expresses it as module
+    compileOnly libs.jetbrains.annotations;
 
     testImplementation project(":context")
     testImplementation project(":inject-groovy")
