@@ -24,7 +24,6 @@ import io.micronaut.core.util.CollectionUtils;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -50,7 +49,7 @@ public final class CaseInsensitiveMutableHttpHeaders implements MutableHttpHeade
      * @param conversionService The conversion service
      */
     public CaseInsensitiveMutableHttpHeaders(ConversionService<?> conversionService) {
-        this(true, new HashMap<>(), conversionService);
+        this(true, Collections.emptyMap(), conversionService);
     }
 
     /**
@@ -60,7 +59,7 @@ public final class CaseInsensitiveMutableHttpHeaders implements MutableHttpHeade
      * @param conversionService The conversion service
      */
     public CaseInsensitiveMutableHttpHeaders(boolean validate, ConversionService<?> conversionService) {
-        this(validate, new HashMap<>(), conversionService);
+        this(validate, Collections.emptyMap(), conversionService);
     }
 
     /**
