@@ -26,6 +26,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static io.micronaut.expressions.parser.token.TokenType.AND;
+import static io.micronaut.expressions.parser.token.TokenType.BEAN_CONTEXT;
 import static io.micronaut.expressions.parser.token.TokenType.BOOL;
 import static io.micronaut.expressions.parser.token.TokenType.COLON;
 import static io.micronaut.expressions.parser.token.TokenType.COMMA;
@@ -94,6 +95,7 @@ public final class Tokenizer {
         "^instanceof\\b", INSTANCEOF,
         "^matches\\b", MATCHES,
         "^empty\\b", EMPTY,
+        "^ctx\\b", BEAN_CONTEXT,
 
         // LITERALS
         "^null\\b", NULL,          // NULL

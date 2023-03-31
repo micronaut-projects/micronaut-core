@@ -27,6 +27,7 @@ import io.micronaut.core.annotation.Internal;
 public enum TokenType {
     WHITESPACE,
     IDENTIFIER,
+    BEAN_CONTEXT,
     TYPE_IDENTIFIER,
     EXPRESSION_CONTEXT_REF,
     DOT,
