@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.body;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.server.exceptions.InternalServerException;
 import io.micronaut.http.server.netty.FormRouteCompleter;
 import io.micronaut.http.server.netty.MicronautHttpData;
@@ -33,6 +34,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -83,8 +85,8 @@ public final class ImmediateMultiObjectBody extends ManagedBody<List<?>> impleme
         return composite;
     }
 
-    public static Map<String, Object> toMap(Charset charset, Iterable<? extends MicronautHttpData<?>> dataList) {
-        Map<String, Object> singleMap = new LinkedHashMap<>();
+    public static Map<String, Object> toMap(Charset charset, Collection<? extends MicronautHttpData<?>> dataList) {
+        Map<String, Object> singleMap = CollectionUtils.newLinkedHashMap(dataList.size());
         Map<String, List<Object>> multiMap = new LinkedHashMap<>();
         for (MicronautHttpData<?> data : dataList) {
             String key = data.getName();
