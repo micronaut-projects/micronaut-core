@@ -131,7 +131,7 @@ public final class CaseInsensitiveMutableHttpHeaders implements MutableHttpHeade
     @Override
     public MutableHttpHeaders add(CharSequence header, CharSequence value) {
         validate(header, value);
-        backing.computeIfAbsent(header.toString(), s -> new ArrayList<>()).add(value.toString());
+        backing.computeIfAbsent(header.toString(), s -> new ArrayList<>(2)).add(value.toString());
         return this;
     }
 
