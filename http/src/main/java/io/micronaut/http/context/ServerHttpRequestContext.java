@@ -25,7 +25,7 @@ import io.micronaut.http.HttpRequest;
  * Http request propagation.
  *
  * @author Denis Stepanov
- * @since 3.6.0
+ * @since 4.0.0
  */
 @Experimental
 public final class ServerHttpRequestContext implements ThreadPropagatedContextElement<HttpRequest<?>> {

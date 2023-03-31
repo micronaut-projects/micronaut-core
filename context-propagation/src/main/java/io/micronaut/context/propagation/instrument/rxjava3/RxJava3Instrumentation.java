@@ -22,14 +22,14 @@ import io.micronaut.core.propagation.PropagatedContext;
 import io.reactivex.rxjava3.functions.Function;
 import io.reactivex.rxjava3.plugins.RxJavaPlugins;
 
-import javax.annotation.PostConstruct;
-import javax.annotation.PreDestroy;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 
 /**
  * On scheduler hook for the thread to be aware of {@link PropagatedContext}.
  *
  * @author Denis Stepanov
- * @since 3.6.0
+ * @since 4.0.0
  */
 @Requires(classes = {RxJavaPlugins.class})
 @Context

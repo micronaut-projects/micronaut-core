@@ -34,7 +34,7 @@ import java.util.Optional;
  * - Support thread-aware context elements which can restore thread-local state
  *
  * @author Denis Stepanov
- * @since 3.6.0
+ * @since 4.0.0
  */
 @Internal
 final class PropagatedContextImpl implements PropagatedContext {
@@ -81,7 +81,7 @@ final class PropagatedContextImpl implements PropagatedContext {
     public static PropagatedContextImpl get() {
         PropagatedContextImpl propagatedContext = THREAD_CONTEXT.get();
         if (propagatedContext == null) {
-            throw new IllegalStateException("No active context!");
+            throw new IllegalStateException("No active propagation context!");
         }
         return propagatedContext;
     }

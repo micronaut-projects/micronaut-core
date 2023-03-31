@@ -2,6 +2,7 @@ package io.micronaut.context.propagation.mdc
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.context.propagation.reactive.ReactivePropagation
 import io.micronaut.core.propagation.PropagatedContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.order.Ordered
@@ -17,7 +18,6 @@ import io.micronaut.http.filter.HttpClientFilter
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.http.uri.UriBuilder
-import io.micronaut.reactive.ReactivePropagation
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Singleton
 import kotlinx.coroutines.Dispatchers

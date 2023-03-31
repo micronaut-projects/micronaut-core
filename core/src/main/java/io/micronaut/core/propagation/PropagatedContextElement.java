@@ -23,7 +23,7 @@ import io.micronaut.core.annotation.Experimental;
  * Simple implementation intended for the propagation in the context as a data carrier.
  *
  * @author Denis Stepanov
- * @since 3.6.0
+ * @since 4.0.0
  */
 @Experimental
 public interface PropagatedContextElement {

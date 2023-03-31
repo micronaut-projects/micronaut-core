@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.reactive;
+package io.micronaut.context.propagation.reactive;
 
 import io.micronaut.core.propagation.PropagatedContext;
 import org.reactivestreams.Publisher;
@@ -27,7 +27,7 @@ import reactor.util.context.Context;
  * Reactive propagation of {@link PropagatedContext}.
  *
  * @author Denis Stepanov
- * @since 3.6.0
+ * @since 4.0.0
  */
 public class ReactivePropagation {
 
@@ -52,6 +52,10 @@ public class ReactivePropagation {
 
                 @Override
                 public void subscribe(Subscriber<? super T> subscriber) {
+                    if (subscriber instanceof CoreSubscriber<? super T> coreSubscriber) {
+                        subscribe(coreSubscriber);
+                        return;
+                    }
                     try (PropagatedContext.InContext ignore = propagatedContext.propagate()) {
                         actual.subscribe(propagate(propagatedContext, subscriber));
                     }

@@ -27,7 +27,7 @@ import java.util.concurrent.Callable;
  * for use-cases when thread-local values needs to be updated.
  *
  * @author Denis Stepanov
- * @since 3.6.0
+ * @since 4.0.0
  */
 @Experimental
 public interface PropagatedContext {
@@ -144,6 +144,23 @@ public interface PropagatedContext {
      */
     @NonNull
     default <V> Callable<V> propagate(@NonNull Callable<V> callable) {
+        PropagatedContext propagatedContext = this;
+        return () -> {
+            try (InContext ignore = propagatedContext.propagate()) {
+                return callable.call();
+            }
+        };
+    }
+
+    /**
+     * Wrap callable for this context to be propagated in.
+     *
+     * @param callable The callable
+     * @param <V>      The callable return type
+     * @return new callable
+     */
+    @NonNull
+    default <V> Callable<V> call(@NonNull Callable<V> callable) {
         PropagatedContext propagatedContext = this;
         return () -> {
             try (InContext ignore = propagatedContext.propagate()) {

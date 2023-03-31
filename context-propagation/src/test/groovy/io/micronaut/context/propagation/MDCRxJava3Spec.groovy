@@ -23,7 +23,7 @@ import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
-import io.micronaut.reactive.ReactivePropagation
+import io.micronaut.context.propagation.reactive.ReactivePropagation
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.annotation.ExecuteOn
 import io.reactivex.rxjava3.core.Flowable

@@ -31,7 +31,7 @@ import java.util.concurrent.ScheduledExecutorService;
  * Wraps {@link ExecutorService} to instrument {@link Callable} and {@link Runnable} to be aware of {@link PropagatedContext}.
  *
  * @author Denis Stepanov
- * @since 3.6.0
+ * @since 4.0.0
  */
 @Prototype
 @Internal

@@ -43,6 +43,9 @@ micronaut-test = "4.0.0-M1"
 micronaut-serde = "2.0.0-M1"
 micronaut-tracing = "5.0.0-SNAPSHOT"
 micronaut-validation = "4.0.0-M3"
+micronaut-rxjava2 = "2.0.0-SNAPSHOT"
+micronaut-rxjava3 = "3.0.0-SNAPSHOT"
+micronaut-reactor = "3.0.0-SNAPSHOT"
 micrometer = "1.10.2"
 neo4j-java-driver = "1.4.5"
 selenium = "4.7.2"
@@ -83,6 +86,9 @@ test-boms-micronaut-aws = { module = "io.micronaut.aws:micronaut-aws-bom", versi
 test-boms-micronaut-sql = { module = "io.micronaut.sql:micronaut-sql-bom", version.ref = "micronaut-sql" }
 test-boms-micronaut-tracing = { module = "io.micronaut.tracing:micronaut-tracing-bom", version.ref = "micronaut-tracing" }
 test-boms-micronaut-validation = { module = "io.micronaut.validation:micronaut-validation-bom", version.ref = "micronaut-validation" }
+test-boms-micronaut-rxjava2 = { module = "io.micronaut.rxjava2:micronaut-rxjava2-bom", version.ref = "micronaut-rxjava2" }
+test-boms-micronaut-rxjava3 = { module = "io.micronaut.rxjava3:micronaut-rxjava3-bom", version.ref = "micronaut-rxjava3" }
+test-boms-micronaut-reactor = { module = "io.micronaut.reactor:micronaut-reactor-bom", version.ref = "micronaut-reactor" }
 
 boms-groovy = { module = "org.apache.groovy:groovy-bom", version.ref = "managed-groovy" }
 boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "managed-kotlin" }

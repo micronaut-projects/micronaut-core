@@ -23,7 +23,6 @@ import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
-import io.micronaut.reactive.ReactivePropagation
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.annotation.ExecuteOn
 import jakarta.inject.Inject
@@ -165,15 +164,23 @@ class MDCReactorSpec extends Specification {
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request,
                                                    ServerFilterChain chain) {
+            return chain.proceed(request)
+        }
+    }
+
+    @Filter(MATCH_ALL_PATTERN)
+    @Requires(property = 'mdc.reactortestx.enabled')
+    static class TracingHttpServerFilter2 implements HttpServerFilter {
+
+        @Override
+        Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request,
+                                                   ServerFilterChain chain) {
             try {
                 String trackingId = request.headers.get("X-TrackingId")
                 MDC.put("trackingId", trackingId)
-                return Mono.from(
-                        ReactivePropagation.propagate(
-                                PropagatedContext.get() + new MdcPropagationContext(),
-                                chain.proceed(request)
-                        )
-                ).contextWrite(ctx -> ctx.put("xyz", "abc"))
+                return PropagatedContext.get().plus(new MdcPropagationContext()).call {
+                    return Mono.from(chain.proceed(request)).contextWrite(ctx -> ctx.put("xyz", "abc"))
+                }.call()
             } finally {
                 MDC.clear()
             }

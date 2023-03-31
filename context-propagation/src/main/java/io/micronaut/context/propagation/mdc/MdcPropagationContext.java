@@ -25,7 +25,7 @@ import java.util.Map;
  * MDC propagation.
  *
  * @author Denis Stepanov
- * @since 3.6.0
+ * @since 4.0.0
  */
 @Experimental
 public final class MdcPropagationContext implements ThreadPropagatedContextElement<Map<String, String>> {

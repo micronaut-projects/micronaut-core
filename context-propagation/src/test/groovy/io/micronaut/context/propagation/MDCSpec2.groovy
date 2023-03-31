@@ -13,7 +13,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
-import io.micronaut.reactive.ReactivePropagation
+import io.micronaut.context.propagation.reactive.ReactivePropagation
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
 import org.slf4j.Logger

@@ -24,7 +24,7 @@ import io.micronaut.core.annotation.Nullable;
  *
  * @param <S> The restore state type
  * @author Denis Stepanov
- * @since 3.6.0
+ * @since 4.0.0
  */
 @Experimental
 public interface ThreadPropagatedContextElement<S> extends PropagatedContextElement {

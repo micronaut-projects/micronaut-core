@@ -149,7 +149,7 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
                     .plus(new MicronautPropagatedContext(PropagatedContext.get()))
             );
         }
-        return KotlinInterceptedMethodHelper.handleResult(completionStageResult, isUnitValueType, continuation);
+        return KotlinInterceptedMethodHelper.handleResult(completionStageResult, isUnitValueType, (Continuation<? super Object>) continuation);
     }
 
     @Override
