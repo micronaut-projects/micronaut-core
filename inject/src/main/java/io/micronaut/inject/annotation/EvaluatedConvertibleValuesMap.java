@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
  * @author Sergey Gavrilov
  */
 @Internal
-public class EvaluatedConvertibleValuesMap<V> implements ConvertibleValues<V> {
+final class EvaluatedConvertibleValuesMap<V> implements ConvertibleValues<V> {
 
     private final ExpressionEvaluationContext evaluationContext;
     private final ConvertibleValues<V> delegateValues;

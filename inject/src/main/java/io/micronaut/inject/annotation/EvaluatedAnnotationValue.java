@@ -17,6 +17,7 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.context.expressions.ConfigurableExpressionEvaluationContext;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.expressions.EvaluatedExpression;
 
 import java.lang.annotation.Annotation;
@@ -27,11 +28,12 @@ import java.lang.annotation.Annotation;
  * @param <A> The annotation
  * @since 4.0.0
  */
-public class EvaluatedAnnotationValue<A extends Annotation> extends AnnotationValue<A> {
+@Experimental
+public final class EvaluatedAnnotationValue<A extends Annotation> extends AnnotationValue<A> {
     private final ConfigurableExpressionEvaluationContext evaluationContext;
     private final AnnotationValue<A> annotationValue;
 
-    public EvaluatedAnnotationValue(AnnotationValue<A> annotationValue, ConfigurableExpressionEvaluationContext evaluationContext) {
+    EvaluatedAnnotationValue(AnnotationValue<A> annotationValue, ConfigurableExpressionEvaluationContext evaluationContext) {
         super(
             annotationValue,
             annotationValue.getDefaultValues(),

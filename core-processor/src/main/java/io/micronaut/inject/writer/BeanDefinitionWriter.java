@@ -64,6 +64,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
+import io.micronaut.expressions.EvaluatedExpressionWriter;
 import io.micronaut.expressions.context.ExpressionCompilationContext;
 import io.micronaut.expressions.context.ExpressionWithContext;
 import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory;
@@ -439,7 +440,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     boolean.class, // isPrimary
                     boolean.class, // isConfigurationProperties
                     boolean.class, // isContainerType
-                    boolean.class  // requiresMethodProcessing
+                    boolean.class,  // requiresMethodProcessing,
+                    boolean.class // hasEvaluatedExpressions
             ));
 
     private static final String FIELD_CONSTRUCTOR = "$CONSTRUCTOR";
@@ -1418,7 +1420,19 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     throw e;
                 }
             }
+            writeEvaluatedExpressions(visitor);
             out.write(toByteArray());
+        }
+    }
+
+    private void writeEvaluatedExpressions(ClassWriterOutputVisitor visitor) throws IOException {
+        for (ExpressionWithContext expressionMetadata: getEvaluatedExpressions()) {
+            EvaluatedExpressionWriter expressionWriter = new EvaluatedExpressionWriter(
+                expressionMetadata,
+                visitorContext,
+                getOriginatingElement());
+
+            expressionWriter.accept(visitor);
         }
     }
 
@@ -4192,6 +4206,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         protectedConstructor.push(isContainerType());
         // 8: requiresMethodProcessing
         protectedConstructor.push(preprocessMethods);
+
+        // 9: hasEvaluatedExpressions
+        protectedConstructor.push(!getEvaluatedExpressions().isEmpty());
 
         protectedConstructor.invokeConstructor(PRECALCULATED_INFO, PRECALCULATED_INFO_CONSTRUCTOR);
     }

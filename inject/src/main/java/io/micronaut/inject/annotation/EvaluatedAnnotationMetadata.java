@@ -17,12 +17,12 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanDefinitionAware;
-import io.micronaut.context.ContextConfigurable;
+import io.micronaut.context.BeanContextConfigurable;
 import io.micronaut.context.expressions.ConfigurableExpressionEvaluationContext;
 import io.micronaut.context.expressions.DefaultExpressionEvaluationContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.BeanDefinition;
 
 import java.lang.annotation.Annotation;
@@ -34,8 +34,8 @@ import java.lang.annotation.Annotation;
  * @author Sergey Gavrilov
  * @since 4.0
  */
-@Internal
-public final class EvaluatedAnnotationMetadata extends MappingAnnotationMetadataDelegate implements ContextConfigurable, BeanDefinitionAware {
+@Experimental
+public final class EvaluatedAnnotationMetadata extends MappingAnnotationMetadataDelegate implements BeanContextConfigurable, BeanDefinitionAware {
 
     private final AnnotationMetadata delegateAnnotationMetadata;
 
@@ -56,7 +56,8 @@ public final class EvaluatedAnnotationMetadata extends MappingAnnotationMetadata
     public EvaluatedAnnotationMetadata withArguments(Object[] args) {
         return new EvaluatedAnnotationMetadata(
             delegateAnnotationMetadata,
-            evaluationContext.setArguments(args));
+            evaluationContext.setArguments(args)
+        );
     }
 
     @Override

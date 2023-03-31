@@ -50,7 +50,7 @@ import java.util.stream.Stream;
  * @since 3.0
  */
 @Internal
-public abstract class AbstractExecutableMethodsDefinition<T> implements ExecutableMethodsDefinition<T>, EnvironmentConfigurable, ContextConfigurable {
+public abstract class AbstractExecutableMethodsDefinition<T> implements ExecutableMethodsDefinition<T>, EnvironmentConfigurable, BeanContextConfigurable {
 
     private final MethodReference[] methodsReferences;
     private final DispatchedExecutableMethod<T, ?>[] executableMethods;
@@ -328,7 +328,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
      */
     private static final class DispatchedExecutableMethod<T, R> implements ExecutableMethod<T, R>,
                                                                            EnvironmentConfigurable,
-                                                                           ContextConfigurable {
+            BeanContextConfigurable {
 
         private final AbstractExecutableMethodsDefinition dispatcher;
         private final int index;

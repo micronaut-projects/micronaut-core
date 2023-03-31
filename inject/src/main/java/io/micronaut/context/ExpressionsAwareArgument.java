@@ -33,7 +33,7 @@ import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
  * @since 4.0
  */
 @Internal
-final class ExpressionsAwareArgument<T> extends DefaultArgument<T> implements ContextConfigurable,
+final class ExpressionsAwareArgument<T> extends DefaultArgument<T> implements BeanContextConfigurable,
                                                                         BeanDefinitionAware {
 
     private final EvaluatedAnnotationMetadata annotationMetadata;
@@ -52,22 +52,33 @@ final class ExpressionsAwareArgument<T> extends DefaultArgument<T> implements Co
     public static <T> Argument<T> wrapIfNecessary(Argument<T> argument,
                                                   @Nullable BeanContext beanContext,
                                                   @Nullable BeanDefinition<?> owningBean) {
-        if (argument == null) {
+        if (!(argument instanceof DefaultArgument<T>)) {
             return null;
         }
 
-        AnnotationMetadata annotationMetadata =
-            EvaluatedAnnotationMetadata.wrapIfNecessary(argument.getAnnotationMetadata());
-        if (annotationMetadata instanceof EvaluatedAnnotationMetadata evaluatedAnnotationMetadata) {
-            if (beanContext != null) {
-                evaluatedAnnotationMetadata.configure(beanContext);
+        AnnotationMetadata argumentAnnotationMetadata = argument.getAnnotationMetadata();
+        if (argumentAnnotationMetadata.hasPropertyExpressions()) {
+            if (!(argument instanceof EnvironmentAwareArgument<T>) && beanContext instanceof ApplicationContext ac) {
+                EnvironmentAwareArgument<T> environmentAwareArgument = new EnvironmentAwareArgument<>((DefaultArgument<T>) argument);
+                environmentAwareArgument.configure(ac.getEnvironment());
+                return environmentAwareArgument;
+            } else {
+                return argument;
             }
+        } else if (argumentAnnotationMetadata.hasEvaluatedExpressions()) {
+            AnnotationMetadata annotationMetadata =
+                EvaluatedAnnotationMetadata.wrapIfNecessary(argumentAnnotationMetadata);
+            if (annotationMetadata instanceof EvaluatedAnnotationMetadata evaluatedAnnotationMetadata) {
+                if (beanContext != null) {
+                    evaluatedAnnotationMetadata.configure(beanContext);
+                }
 
-            if (owningBean != null) {
-                evaluatedAnnotationMetadata.setBeanDefinition(owningBean);
+                if (owningBean != null) {
+                    evaluatedAnnotationMetadata.setBeanDefinition(owningBean);
+                }
+
+                return new ExpressionsAwareArgument<>(argument, evaluatedAnnotationMetadata);
             }
-
-            return new ExpressionsAwareArgument<>(argument, evaluatedAnnotationMetadata);
         }
         return argument;
     }
