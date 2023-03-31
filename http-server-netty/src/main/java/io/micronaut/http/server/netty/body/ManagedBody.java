@@ -23,6 +23,8 @@ import io.micronaut.core.annotation.Nullable;
  * once.
  *
  * @param <T> The value type
+ * @since 4.0.0
+ * @author Jonas Konrad
  */
 @Internal
 abstract class ManagedBody<T> implements HttpBody {

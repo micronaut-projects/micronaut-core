@@ -42,6 +42,9 @@ import java.util.function.Function;
 
 /**
  * Immediate {@link MultiObjectBody}, all operations are eager.
+ *
+ * @since 4.0.0
+ * @author Jonas Konrad
  */
 @Internal
 public final class ImmediateMultiObjectBody extends ManagedBody<List<?>> implements MultiObjectBody {

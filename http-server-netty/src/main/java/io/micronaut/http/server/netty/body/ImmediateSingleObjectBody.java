@@ -22,6 +22,9 @@ import io.netty.util.ReferenceCountUtil;
 /**
  * {@link HttpBody} that contains a single object. This is used to implement
  * {@link NettyHttpRequest#getBody()} and {@link java.util.concurrent.CompletableFuture} binding.
+ *
+ * @since 4.0.0
+ * @author Jonas Konrad
  */
 @Internal
 public final class ImmediateSingleObjectBody extends ManagedBody<Object> implements HttpBody {

@@ -23,6 +23,9 @@ import io.micronaut.core.annotation.Nullable;
  * <p>Exactly one HttpBody holds control over a request body at a time. When a transformation of
  * the body is performed, e.g. multipart processing, the new HttpBody takes control and the old one
  * becomes invalid. The new body will be available via {@link #next()}.</p>
+ *
+ * @since 4.0.0
+ * @author Jonas Konrad
  */
 @Internal
 public interface HttpBody {

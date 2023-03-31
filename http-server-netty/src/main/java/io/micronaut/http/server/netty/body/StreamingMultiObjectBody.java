@@ -37,6 +37,12 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 
+/**
+ * {@link MultiObjectBody} derived from a {@link StreamingByteBody}. Operations are lazy.
+ *
+ * @since 4.0.0
+ * @author Jonas Konrad
+ */
 @Internal
 public final class StreamingMultiObjectBody extends ManagedBody<Publisher<?>> implements MultiObjectBody {
     StreamingMultiObjectBody(Publisher<?> publisher) {

@@ -25,6 +25,9 @@ import io.netty.handler.codec.http.HttpRequest;
 
 /**
  * Base class for a raw {@link HttpBody} with just bytes.
+ *
+ * @since 4.0.0
+ * @author Jonas Konrad
  */
 @Internal
 public sealed interface ByteBody extends HttpBody permits ImmediateByteBody, StreamingByteBody {

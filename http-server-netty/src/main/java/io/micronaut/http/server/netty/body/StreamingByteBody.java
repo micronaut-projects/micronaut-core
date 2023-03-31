@@ -32,6 +32,13 @@ import org.reactivestreams.Subscription;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+/**
+ * {@link ByteBody} implementation that wraps a
+ * {@link io.micronaut.http.netty.stream.StreamedHttpRequest}.
+ *
+ * @since 4.0.0
+ * @author Jonas Konrad
+ */
 @Internal
 public final class StreamingByteBody extends ManagedBody<Publisher<HttpContent>> implements ByteBody {
     StreamingByteBody(Publisher<HttpContent> publisher) {

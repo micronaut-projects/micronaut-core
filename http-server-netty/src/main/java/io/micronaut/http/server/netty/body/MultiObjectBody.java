@@ -28,6 +28,9 @@ import java.util.function.Function;
  * {@link Publisher}{@code <?>}. This class is so generic for compatibility reasons, it's the
  * result of processing a {@link ByteBody} using a
  * {@link io.micronaut.http.server.netty.HttpContentProcessor}.
+ *
+ * @since 4.0.0
+ * @author Jonas Konrad
  */
 @Internal
 public sealed interface MultiObjectBody extends HttpBody permits ImmediateMultiObjectBody, StreamingMultiObjectBody {

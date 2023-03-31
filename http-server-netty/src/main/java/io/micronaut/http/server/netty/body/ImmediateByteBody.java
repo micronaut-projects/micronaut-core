@@ -27,6 +27,9 @@ import java.util.List;
 
 /**
  * Fully buffered {@link ByteBody}, all operations are eager.
+ *
+ * @since 4.0.0
+ * @author Jonas Konrad
  */
 @Internal
 public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements ByteBody {
