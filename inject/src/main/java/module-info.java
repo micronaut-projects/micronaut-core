@@ -1,6 +1,5 @@
 module micronaut.inject {
     requires transitive jakarta.inject;//api
-    requires transitive org.jetbrains.annotations;
     requires transitive micronaut.core;
     requires transitive jakarta.annotation;
 
@@ -8,6 +7,7 @@ module micronaut.inject {
     requires static javax.inject;
     requires static org.yaml.snakeyaml;
     requires static org.apache.groovy;
+    requires static org.jetbrains.annotations;
     requires org.slf4j;
 
     exports io.micronaut.context;

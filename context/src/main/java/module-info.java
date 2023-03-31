@@ -1,15 +1,13 @@
 module micronaut.context {
+    requires static org.apache.logging.log4j.core;
+    requires static org.apache.logging.log4j;
+    requires static micronaut.core.processor;
+    requires static micronaut.core.reactive;
+    requires transitive micronaut.inject;
+    requires transitive micronaut.aop;
     requires jakarta.inject;
-    requires org.apache.logging.log4j.core;
-    requires micronaut.core;
-    requires micronaut.inject;
-    requires org.apache.logging.log4j;
     requires jakarta.annotation;
-    requires org.slf4j;
-    requires micronaut.core.processor;
-    requires micronaut.core.reactive;
     requires org.reactivestreams;
-    requires micronaut.aop;
     requires jakarta.validation;
     requires ch.qos.logback.classic;
     requires ch.qos.logback.core;
