@@ -99,7 +99,7 @@ public final class CaseInsensitiveMutableHttpHeaders implements MutableHttpHeade
         if (CollectionUtils.isEmpty(values)) {
             return Collections.emptyList();
         }
-        return values;
+        return Collections.unmodifiableList(values);
     }
 
     @Nullable

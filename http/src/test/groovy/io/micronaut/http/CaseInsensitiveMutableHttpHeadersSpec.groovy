@@ -60,6 +60,29 @@ class CaseInsensitiveMutableHttpHeadersSpec extends Specification {
         }
     }
 
+    void "getAll returns an unmodifiable collection"() {
+        given:
+        CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED, "foo": ["123"])
+
+        when:
+        headers.getAll("foo").add("456")
+
+        then:
+        thrown(UnsupportedOperationException)
+
+        when:
+        headers.getAll("missing").add("456")
+
+        then:
+        thrown(UnsupportedOperationException)
+
+        when:
+        headers.getAll(null).add("456")
+
+        then:
+        thrown(UnsupportedOperationException)
+    }
+
     void "calling get with a null name returns null"() {
         expect:
         new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED).get(null) == null
