@@ -84,14 +84,21 @@ class CaseInsensitiveMutableHttpHeadersSpec extends Specification {
 
         then:
         IllegalArgumentException ex = thrown()
-        ex.message == '''a header name can only contain "token" characters, but found invalid character 0x20 at index 3 of header 'foo '.'''
+        ex.message == '''A header name can only contain "token" characters, but found invalid character 0x20 at index 3 of header 'foo '.'''
 
         when:
         new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED, "foo\nha": ["bar"])
 
         then:
         IllegalArgumentException cex = thrown()
-        cex.message == '''a header name can only contain "token" characters, but found invalid character 0xa at index 3 of header 'foo\nha'.'''
+        cex.message == '''A header name can only contain "token" characters, but found invalid character 0xa at index 3 of header 'foo\nha'.'''
+
+        when:
+        headers.add(null, "null isn't allowed")
+
+        then:
+        IllegalArgumentException nex = thrown()
+        nex.message == "Header name cannot be null"
     }
 
     void "cannot add invalid or insecure header values"() {
@@ -111,5 +118,24 @@ class CaseInsensitiveMutableHttpHeadersSpec extends Specification {
         then:
         IllegalArgumentException cex = thrown()
         cex.message == "The header value for 'foo' contains prohibited character 0xa at index 3."
+    }
+
+    void "can switch off validation"() {
+        given:
+        CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(false, ConversionService.SHARED)
+
+        when:
+        headers.add("foo ", "bar")
+        headers.add("foo", "bar\nOrigin: localhost")
+
+        then:
+        noExceptionThrown()
+
+        when:
+        headers.add(null, "null isn't allowed")
+
+        then:
+        IllegalArgumentException ex = thrown()
+        ex.message == "Header name cannot be null"
     }
 }

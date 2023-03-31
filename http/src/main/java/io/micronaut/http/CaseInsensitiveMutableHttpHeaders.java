@@ -40,6 +40,7 @@ import java.util.TreeMap;
 @Internal
 public class CaseInsensitiveMutableHttpHeaders implements MutableHttpHeaders {
 
+    private final boolean validate;
     private final TreeMap<String, List<String>> backing;
     private final ConversionService<?> conversionService;
 
@@ -49,7 +50,17 @@ public class CaseInsensitiveMutableHttpHeaders implements MutableHttpHeaders {
      * @param conversionService The conversion service
      */
     public CaseInsensitiveMutableHttpHeaders(ConversionService<?> conversionService) {
-        this(new HashMap<>(), conversionService);
+        this(true, new HashMap<>(), conversionService);
+    }
+
+    /**
+     * Create an empty CaseInsensitiveMutableHttpHeaders.
+     *
+     * @param validate Whether to validate the headers
+     * @param conversionService The conversion service
+     */
+    public CaseInsensitiveMutableHttpHeaders(boolean validate, ConversionService<?> conversionService) {
+        this(validate, new HashMap<>(), conversionService);
     }
 
     /**
@@ -59,6 +70,21 @@ public class CaseInsensitiveMutableHttpHeaders implements MutableHttpHeaders {
      * @param conversionService The conversion service
      */
     public CaseInsensitiveMutableHttpHeaders(Map<String, List<String>> defaults, ConversionService<?> conversionService) {
+        this(true, defaults, conversionService);
+    }
+
+    /**
+     * Create a CaseInsensitiveMutableHttpHeaders populated by the entries in the provided {@literal Map<String,String>}.
+     * <p>
+     * <b>Warning!</b> Setting {@code validate} to {@code false} will not validate header names and values, and can leave your server implementation vulnerable to
+     * <a href="https://cwe.mitre.org/data/definitions/113.html">CWE-113: Improper Neutralization of CRLF Sequences in HTTP Headers ('HTTP Response Splitting')</a>.
+     *
+     * @param validate Whether to validate the headers
+     * @param defaults The defaults
+     * @param conversionService The conversion service
+     */
+    public CaseInsensitiveMutableHttpHeaders(boolean validate, Map<String, List<String>> defaults, ConversionService<?> conversionService) {
+        this.validate = validate;
         this.conversionService = conversionService;
         this.backing = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         defaults.forEach((key, value) -> value.forEach(v -> this.add(key, v)));
@@ -120,13 +146,18 @@ public class CaseInsensitiveMutableHttpHeaders implements MutableHttpHeaders {
      ******************************************************************************************************************/
 
     private void validate(CharSequence header, CharSequence value) {
-        int index = validateCharSequenceToken(header);
-        if (index != -1) {
-            throw new IllegalArgumentException("a header name can only contain \"token\" characters, but found invalid character 0x" + Integer.toHexString(header.charAt(index)) + " at index " + index + " of header '" + header + "'.");
+        if (header == null) {
+            throw new IllegalArgumentException("Header name cannot be null");
         }
-        index = verifyValidHeaderValueCharSequence(value);
-        if (index != -1) {
-            throw new IllegalArgumentException("The header value for '" + header + "' contains prohibited character 0x" + Integer.toHexString(value.charAt(index)) + " at index " + index + '.');
+        if (validate) {
+            int index = validateCharSequenceToken(header);
+            if (index != -1) {
+                throw new IllegalArgumentException("A header name can only contain \"token\" characters, but found invalid character 0x" + Integer.toHexString(header.charAt(index)) + " at index " + index + " of header '" + header + "'.");
+            }
+            index = verifyValidHeaderValueCharSequence(value);
+            if (index != -1) {
+                throw new IllegalArgumentException("The header value for '" + header + "' contains prohibited character 0x" + Integer.toHexString(value.charAt(index)) + " at index " + index + '.');
+            }
         }
     }
 
