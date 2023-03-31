@@ -137,7 +137,9 @@ public final class CaseInsensitiveMutableHttpHeaders implements MutableHttpHeade
 
     @Override
     public MutableHttpHeaders remove(CharSequence header) {
-        backing.remove(header.toString());
+        if (header != null) {
+            backing.remove(header.toString());
+        }
         return this;
     }
 
