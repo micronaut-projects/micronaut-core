@@ -32,6 +32,7 @@ class CaseInsensitiveMutableHttpHeadersSpec extends Specification {
         headers.size() == 2
         headers.get("content-type", Argument.of(MediaType)).get() == MediaType.APPLICATION_JSON_TYPE
         headers.get("content-length", Argument.of(Integer)).get() == 123
+        headers.get("content-type", Argument.of(String)).get() == MediaType.APPLICATION_JSON
     }
 
     void "values can be removed"() {

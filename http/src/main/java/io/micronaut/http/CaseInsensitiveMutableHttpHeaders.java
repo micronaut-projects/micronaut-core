@@ -126,10 +126,15 @@ public final class CaseInsensitiveMutableHttpHeaders implements MutableHttpHeade
     }
 
     @Override
+    @SuppressWarnings("unchecked")
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         String value = get(name);
         if (value != null) {
-            return conversionService.convert(value, conversionContext);
+            if (conversionContext.getArgument().getType().isInstance(value)) {
+                return Optional.of((T) value);
+            } else {
+                return conversionService.convert(value, conversionContext);
+            }
         }
         return Optional.empty();
     }
