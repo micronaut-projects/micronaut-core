@@ -243,7 +243,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
      * @param byAnnotation The request argument binder
      */
     protected void registerDefaultAnnotationBinders(Map<Class<? extends Annotation>, RequestArgumentBinder> byAnnotation) {
-        DefaultBodyAnnotationBinder bodyBinder = new DefaultBodyAnnotationBinder(conversionService, mediaTypeCodecRegistry);
+        DefaultBodyAnnotationBinder bodyBinder = new DefaultBodyAnnotationBinder(conversionService);
         byAnnotation.put(Body.class, bodyBinder);
 
         CookieAnnotationBinder<Object> cookieAnnotationBinder = new CookieAnnotationBinder<>(conversionService);

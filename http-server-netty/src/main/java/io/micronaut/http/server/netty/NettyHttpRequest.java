@@ -21,10 +21,8 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
@@ -35,7 +33,6 @@ import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpParameters;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.PushCapableHttpRequest;
-import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
@@ -53,7 +50,6 @@ import io.micronaut.http.server.netty.body.ByteBody;
 import io.micronaut.http.server.netty.body.HttpBody;
 import io.micronaut.http.server.netty.body.ImmediateMultiObjectBody;
 import io.micronaut.http.server.netty.body.ImmediateSingleObjectBody;
-import io.micronaut.json.convert.LazyJsonNode;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
@@ -585,30 +581,8 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
                 if (value == null) {
                     return Optional.empty();
                 }
-                Argument argument = conversionContext.getArgument();
-                if (argument.isInstance(value)) {
+                if (Argument.OBJECT_ARGUMENT.equalsType(conversionContext.getArgument())) {
                     return Optional.of(value);
-                } else if (value instanceof ByteBuffer<?> byteBuffer) {
-                    if (argument.isAssignableFrom(ConvertibleValues.class)) {
-                        LazyJsonNode lazyJsonNode = new LazyJsonNode(byteBuffer);
-                        return convertFromNext(conversionService, conversionContext, lazyJsonNode);
-                    } else {
-                        Object decoded;
-                        try {
-                            decoded = DefaultBodyAnnotationBinder.decodeBody(
-                                NettyHttpRequest.this,
-                                byteBuffer,
-                                argument,
-                                codecRegistry
-                            );
-                        } catch (Exception e) {
-                            conversionContext.reject(e);
-                            return Optional.empty();
-                        }
-                        if (decoded != null) {
-                            return Optional.of(decoded);
-                        }
-                    }
                 }
                 return convertFromNext(conversionService, conversionContext, value);
             }
