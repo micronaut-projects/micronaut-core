@@ -52,8 +52,9 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 /**
- * Extension of {@link BaseRouteCompleter} that handles incoming multipart data and binds
- * parameters (e.g. {@link io.micronaut.http.annotation.Part}).
+ * Special {@link HttpBody} that "demultiplexes" form data. Basically, this class receives a stream
+ * of {@link MicronautHttpData} and splits it into individual streams for each form field, and they
+ * can all be subscribed to and bound independently.
  *
  * @since 4.0.0
  * @author Jonas Konrad

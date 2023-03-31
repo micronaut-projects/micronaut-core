@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty.body;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.netty.buffer.ByteBuf;
@@ -9,10 +10,14 @@ import io.netty.handler.codec.http.DefaultHttpContent;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Fully buffered {@link ByteBody}, all operations are eager.
+ */
+@Internal
 public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements ByteBody {
     private final boolean empty;
 
-    public ImmediateByteBody(ByteBuf buf) {
+    ImmediateByteBody(ByteBuf buf) {
         super(buf);
         this.empty = !buf.isReadable();
     }

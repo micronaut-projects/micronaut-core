@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty.body;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.server.exceptions.InternalServerException;
 import io.micronaut.http.server.netty.FormRouteCompleter;
 import io.micronaut.http.server.netty.MicronautHttpData;
@@ -22,8 +23,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
+/**
+ * Immediate {@link MultiObjectBody}, all operations are eager.
+ */
+@Internal
 public final class ImmediateMultiObjectBody extends ManagedBody<List<?>> implements MultiObjectBody {
-    public ImmediateMultiObjectBody(List<?> objects) {
+    ImmediateMultiObjectBody(List<?> objects) {
         super(objects);
     }
 

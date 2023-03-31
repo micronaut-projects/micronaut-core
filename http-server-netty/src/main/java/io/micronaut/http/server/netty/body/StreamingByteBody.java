@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty.body;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -16,8 +17,9 @@ import org.reactivestreams.Subscription;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+@Internal
 public final class StreamingByteBody extends ManagedBody<Publisher<HttpContent>> implements ByteBody {
-    public StreamingByteBody(Publisher<HttpContent> publisher) {
+    StreamingByteBody(Publisher<HttpContent> publisher) {
         super(publisher);
     }
 

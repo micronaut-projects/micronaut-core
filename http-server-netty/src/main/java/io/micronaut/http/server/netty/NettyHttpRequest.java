@@ -52,10 +52,8 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.exceptions.InternalServerException;
 import io.micronaut.http.server.netty.body.ByteBody;
 import io.micronaut.http.server.netty.body.HttpBody;
-import io.micronaut.http.server.netty.body.ImmediateByteBody;
 import io.micronaut.http.server.netty.body.ImmediateMultiObjectBody;
 import io.micronaut.http.server.netty.body.ImmediateSingleObjectBody;
-import io.micronaut.http.server.netty.body.StreamingByteBody;
 import io.micronaut.json.convert.LazyJsonNode;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.buffer.CompositeByteBuf;
@@ -68,7 +66,6 @@ import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
-import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
@@ -204,11 +201,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         this.serverConfiguration = serverConfiguration;
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
-        if (nettyRequest instanceof FullHttpRequest full) {
-            this.body = new ImmediateByteBody(full.content());
-        } else {
-            this.body = new StreamingByteBody((StreamedHttpRequest) nettyRequest);
-        }
+        this.body = ByteBody.of(nettyRequest);
         this.contentLength = headers.contentLength().orElse(-1);
         this.contentType = headers.contentType().orElse(null);
         this.origin = headers.getOrigin().orElse(null);

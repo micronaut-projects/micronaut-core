@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty.body;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.server.netty.FormRouteCompleter;
@@ -21,8 +22,9 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 
-public class StreamingMultiObjectBody extends ManagedBody<Publisher<?>> implements MultiObjectBody {
-    public StreamingMultiObjectBody(Publisher<?> publisher) {
+@Internal
+public final class StreamingMultiObjectBody extends ManagedBody<Publisher<?>> implements MultiObjectBody {
+    StreamingMultiObjectBody(Publisher<?> publisher) {
         super(publisher);
     }
 

@@ -29,7 +29,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
 import java.util.Optional;
-import java.util.concurrent.ExecutorService;
 
 /**
  * Responsible for binding to a {@link InputStream} argument from the body of the request.
@@ -44,16 +43,12 @@ public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<Inpu
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
 
     private final HttpContentProcessorResolver processorResolver;
-    private final ExecutorService executorService;
 
     /**
      * @param processorResolver The http content processor resolver
-     * @param executorService  The executor service to use
      */
-    public InputStreamBodyBinder(HttpContentProcessorResolver processorResolver,
-                                 ExecutorService executorService) {
+    public InputStreamBodyBinder(HttpContentProcessorResolver processorResolver) {
         this.processorResolver = processorResolver;
-        this.executorService = executorService;
     }
 
     @Override
