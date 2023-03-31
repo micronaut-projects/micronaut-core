@@ -35,7 +35,7 @@ class UpgradeSpec extends Specification {
                 nettyRequest,
                 new DetachedMockFactory().Mock(ChannelHandlerContext.class),
                 ConversionService.SHARED,
-                new HttpServerConfiguration(), null
+                new HttpServerConfiguration()
         )
 
         then:

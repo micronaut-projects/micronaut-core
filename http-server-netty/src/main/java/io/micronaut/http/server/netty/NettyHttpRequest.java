@@ -33,7 +33,6 @@ import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpParameters;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.PushCapableHttpRequest;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
@@ -141,8 +140,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         // we do copy the weight and dependency id
     }
 
-    private final MediaTypeCodecRegistry codecRegistry;
-
     private final NettyHttpHeaders headers;
     private final ChannelHandlerContext channelHandlerContext;
     private final HttpServerConfiguration serverConfiguration;
@@ -171,14 +168,12 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      * @param ctx                    The {@link ChannelHandlerContext}
      * @param environment            The Environment
      * @param serverConfiguration    The {@link HttpServerConfiguration}
-     * @param mediaTypeCodecRegistry the codec registry
      */
     @SuppressWarnings("MagicNumber")
     public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest,
                             ChannelHandlerContext ctx,
                             ConversionService environment,
-                            HttpServerConfiguration serverConfiguration,
-                            MediaTypeCodecRegistry mediaTypeCodecRegistry) {
+                            HttpServerConfiguration serverConfiguration) {
         super(nettyRequest, environment);
         Objects.requireNonNull(nettyRequest, "Netty request cannot be null");
         Objects.requireNonNull(ctx, "ChannelHandlerContext cannot be null");
@@ -187,7 +182,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         if (channel != null) {
             channel.attr(ServerAttributeKeys.REQUEST_KEY).set(this);
         }
-        this.codecRegistry = mediaTypeCodecRegistry;
         this.serverConfiguration = serverConfiguration;
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);

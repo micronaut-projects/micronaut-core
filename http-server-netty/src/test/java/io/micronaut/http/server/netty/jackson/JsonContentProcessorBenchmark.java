@@ -111,8 +111,8 @@ public class JsonContentProcessorBenchmark {
                 new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"),
                 ch.pipeline().firstContext(),
                 ConversionService.SHARED,
-                configuration,
-                null);
+                configuration
+            );
         }
 
         @TearDown

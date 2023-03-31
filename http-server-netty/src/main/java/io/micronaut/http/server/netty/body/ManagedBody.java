@@ -32,7 +32,7 @@ abstract class ManagedBody<T> implements HttpBody {
     private boolean claimed;
     private HttpBody next;
 
-    public ManagedBody(T value) {
+    ManagedBody(T value) {
         this.value = value;
     }
 

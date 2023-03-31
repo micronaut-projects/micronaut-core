@@ -15,13 +15,10 @@
  */
 package io.micronaut.http.server.netty.decoders;
 
-import io.micronaut.context.BeanProvider;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.order.Ordered;
-import io.micronaut.core.type.GenericArgument;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
@@ -62,7 +59,6 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
     private final ConversionService conversionService;
     private final HttpServerConfiguration configuration;
     private final ApplicationEventPublisher<HttpRequestReceivedEvent> httpRequestReceivedEventPublisher;
-    private final BeanProvider<MediaTypeCodecRegistry> mediaCodecRegistry;
 
     /**
      * @param embeddedServer    The embedded service
@@ -79,10 +75,6 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
         this.conversionService = conversionService;
         this.configuration = configuration;
         this.httpRequestReceivedEventPublisher = httpRequestReceivedEventPublisher;
-        //noinspection Convert2Diamond
-        this.mediaCodecRegistry = embeddedServer.getApplicationContext()
-            .getBean(new GenericArgument<BeanProvider<MediaTypeCodecRegistry>>() {
-            });
     }
 
     @Override
@@ -91,7 +83,7 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
             LOG.trace("Server {}:{} Received Request: {} {}", embeddedServer.getHost(), embeddedServer.getPort(), msg.method(), msg.uri());
         }
         try {
-            NettyHttpRequest<Object> request = new NettyHttpRequest<>(msg, ctx, conversionService, configuration, mediaCodecRegistry.orElse(null));
+            NettyHttpRequest<Object> request = new NettyHttpRequest<>(msg, ctx, conversionService, configuration);
             if (httpRequestReceivedEventPublisher != ApplicationEventPublisher.NO_OP) {
                 try {
                     ctx.executor().execute(() -> {
@@ -117,8 +109,7 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
                     new DefaultFullHttpRequest(msg.protocolVersion(), msg.method(), "/", Unpooled.EMPTY_BUFFER),
                     ctx,
                     conversionService,
-                    configuration,
-                    mediaCodecRegistry.orElse(null)
+                    configuration
             );
             final Throwable cause = e.getCause();
             ctx.fireExceptionCaught(cause != null ? cause : e);
