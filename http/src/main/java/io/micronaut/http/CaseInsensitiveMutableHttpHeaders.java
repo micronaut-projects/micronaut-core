@@ -92,6 +92,9 @@ public final class CaseInsensitiveMutableHttpHeaders implements MutableHttpHeade
 
     @Override
     public List<String> getAll(CharSequence name) {
+        if (name == null) {
+            return Collections.emptyList();
+        }
         List<String> values = backing.get(name.toString());
         if (CollectionUtils.isEmpty(values)) {
             return Collections.emptyList();

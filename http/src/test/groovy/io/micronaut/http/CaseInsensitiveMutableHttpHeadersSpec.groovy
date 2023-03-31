@@ -59,9 +59,14 @@ class CaseInsensitiveMutableHttpHeadersSpec extends Specification {
         }
     }
 
-    void "calling get with a null name doesn't throw an exception"() {
+    void "calling get with a null name returns null"() {
         expect:
         new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED).get(null) == null
+    }
+
+    void "calling getAll with a null name returns an empty list"() {
+        expect:
+        new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED).getAll(null) == []
     }
 
     void "calling remove with a null name doesn't throw an exception"() {
