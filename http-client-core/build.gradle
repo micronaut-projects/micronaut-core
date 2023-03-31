@@ -8,6 +8,7 @@ dependencies {
     implementation libs.managed.reactor
 
     api project(":runtime")
+    api project(":management")
 
     compileOnly libs.kotlin.stdlib
 }
