@@ -102,6 +102,9 @@ public final class CaseInsensitiveMutableHttpHeaders implements MutableHttpHeade
     @Nullable
     @Override
     public String get(CharSequence name) {
+        if (name == null) {
+            return null;
+        }
         List<String> strings = backing.get(name.toString());
         if (CollectionUtils.isEmpty(strings)) {
             return null;
