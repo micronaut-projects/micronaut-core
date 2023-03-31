@@ -64,6 +64,14 @@ class CaseInsensitiveMutableHttpHeadersSpec extends Specification {
         new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED).get(null) == null
     }
 
+    void "calling remove with a null name doesn't throw an exception"() {
+        when:
+        new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED).remove(null)
+
+        then:
+        noExceptionThrown()
+    }
+
     void "getAll on a missing key results in an empty collection"() {
         given:
         CaseInsensitiveMutableHttpHeaders headers = new CaseInsensitiveMutableHttpHeaders(ConversionService.SHARED)
