@@ -17,6 +17,7 @@ package io.micronaut.expressions.parser;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
+import io.micronaut.expressions.parser.ast.access.BeanContextAccess;
 import io.micronaut.expressions.parser.ast.access.ContextElementAccess;
 import io.micronaut.expressions.parser.ast.access.ContextMethodCall;
 import io.micronaut.expressions.parser.ast.access.ElementMethodCall;
@@ -60,8 +61,11 @@ import io.micronaut.expressions.parser.token.Tokenizer;
 import java.util.ArrayList;
 import java.util.List;
 
+import static io.micronaut.expressions.parser.token.TokenType.AND;
+import static io.micronaut.expressions.parser.token.TokenType.BEAN_CONTEXT;
 import static io.micronaut.expressions.parser.token.TokenType.BOOL;
 import static io.micronaut.expressions.parser.token.TokenType.COLON;
+import static io.micronaut.expressions.parser.token.TokenType.COMMA;
 import static io.micronaut.expressions.parser.token.TokenType.DECREMENT;
 import static io.micronaut.expressions.parser.token.TokenType.DIV;
 import static io.micronaut.expressions.parser.token.TokenType.DOT;
@@ -73,6 +77,7 @@ import static io.micronaut.expressions.parser.token.TokenType.EXPRESSION_CONTEXT
 import static io.micronaut.expressions.parser.token.TokenType.FLOAT;
 import static io.micronaut.expressions.parser.token.TokenType.GT;
 import static io.micronaut.expressions.parser.token.TokenType.GTE;
+import static io.micronaut.expressions.parser.token.TokenType.IDENTIFIER;
 import static io.micronaut.expressions.parser.token.TokenType.R_SQUARE;
 import static io.micronaut.expressions.parser.token.TokenType.TYPE_IDENTIFIER;
 import static io.micronaut.expressions.parser.token.TokenType.INCREMENT;
@@ -183,8 +188,8 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
     //   ;
     private ExpressionNode andExpression() {
         ExpressionNode leftNode = equalityExpression();
-        while (lookahead != null && lookahead.type() == TokenType.AND) {
-            eat(TokenType.AND);
+        while (lookahead != null && lookahead.type() == AND) {
+            eat(AND);
             leftNode = new AndOperator(leftNode, equalityExpression());
         }
         return leftNode;
@@ -226,7 +231,7 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
                 case LT -> new LtOperator(leftNode, additiveExpression());
                 case GTE -> new GteOperator(leftNode, additiveExpression());
                 case LTE -> new LteOperator(leftNode, additiveExpression());
-                case INSTANCEOF -> new InstanceofOperator(leftNode, typeIdentifier());
+                case INSTANCEOF -> new InstanceofOperator(leftNode, typeIdentifier(true));
                 case MATCHES -> new MatchesOperator(leftNode, stringLiteral());
                 default -> leftNode;
             };
@@ -323,6 +328,7 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
     //  : PrimaryExpression
     //  | PostfixExpression '.'  MethodOrPropertyAccess
     //  | PostfixExpression '?.'  MethodOrPropertyAccess with safe navigation
+    //  | PostfixExpression SubscriptOperator
     //  | PostfixExpression '++'
     //  | PostfixExpression '--'
     //  ;
@@ -344,7 +350,6 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
                 eat(SAFE_NAV);
                 leftNode = methodOrPropertyAccess(leftNode, true);
             } else if (tokenType == L_SQUARE) {
-                eat(L_SQUARE);
                 leftNode = subscriptOperator(leftNode);
             } else {
                 throw new ExpressionParsingException("Unexpected token: " + lookahead.value());
@@ -354,33 +359,36 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
     }
 
     // PrimaryExpression
-    //  : ContextAccess
+    //  : EvaluationContextAccess
+    //  | BeanContextAccess
     //  | TypeIdentifier
     //  | ParenthesizedExpression
     //  | Literal
     //  ;
     private ExpressionNode primaryExpression() {
         return switch (lookahead.type()) {
-            case EXPRESSION_CONTEXT_REF -> contextAccess();
-            case IDENTIFIER -> identifier();
-            case TYPE_IDENTIFIER -> typeIdentifier();
+            case EXPRESSION_CONTEXT_REF -> evaluationContextAccess(true);
+            case IDENTIFIER -> evaluationContextAccess(false);
+            case BEAN_CONTEXT -> beanContextAccess();
+            case TYPE_IDENTIFIER -> typeIdentifier(true);
             case L_PAREN -> parenthesizedExpression();
             case STRING, INT, LONG, DOUBLE, FLOAT, BOOL, NULL -> literal();
             default -> throw new ExpressionParsingException("Unexpected token: " + lookahead.value());
         };
     }
 
-    // ContextAccess
+    // EvaluationContextAccess
     //  : '#' Identifier
     //  | '#' Identifier MethodArguments
+    //  | Identifier
+    //  | Identifier MethodArguments
     //  ;
-    private ExpressionNode contextAccess() {
-        eat(EXPRESSION_CONTEXT_REF);
-        return primaryExpression();
-    }
+    private ExpressionNode evaluationContextAccess(boolean prefixed) {
+        if (prefixed) {
+            eat(EXPRESSION_CONTEXT_REF);
+        }
 
-    private ExpressionNode identifier() {
-        String identifier = eat(TokenType.IDENTIFIER).value();
+        String identifier = eat(IDENTIFIER).value();
         if (lookahead != null && lookahead.type() == L_PAREN) {
             List<ExpressionNode> methodArguments = methodArguments();
             return new ContextMethodCall(identifier, methodArguments);
@@ -388,12 +396,31 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
         return new ContextElementAccess(identifier);
     }
 
+    // BeanContextAccess
+    //  : 'ctx' '[' TypeIdentifier ']'
+    //  ;
+    private ExpressionNode beanContextAccess() {
+        eat(BEAN_CONTEXT);
+        eat(L_SQUARE);
+        TypeIdentifier typeIdentifier;
+        if (lookahead != null) {
+            typeIdentifier = lookahead.type() == TYPE_IDENTIFIER
+                                 ? typeIdentifier(true)
+                                 : typeIdentifier(false);
+        } else {
+            throw new ExpressionParsingException("Bean context access must be followed by type reference");
+        }
+
+        eat(R_SQUARE);
+        return new BeanContextAccess(typeIdentifier);
+    }
+
     // MethodOrFieldAccess
     //  : SimpleIdentifier
     //  | SimpleIdentifier MethodArguments
     //  ;
     private ExpressionNode methodOrPropertyAccess(ExpressionNode callee, boolean nullSafe) {
-        String identifier = eat(TokenType.IDENTIFIER).value();
+        String identifier = eat(IDENTIFIER).value();
         if (lookahead != null && lookahead.type() == L_PAREN) {
             List<ExpressionNode> methodArguments = methodArguments();
             return new ElementMethodCall(callee, identifier, methodArguments, nullSafe);
@@ -402,21 +429,16 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
     }
 
     // SubscriptOperator
-    //  : SimpleIdentifier
-    //  | SimpleIdentifier [index]
-    //  ;
+    //  '[' Expression ']'
     private ExpressionNode subscriptOperator(ExpressionNode callee) {
-        if (lookahead != null) {
-            ExpressionNode indexExpression = expression();
-            SubscriptOperator subscriptOperator = new SubscriptOperator(
-                callee,
-                indexExpression
-            );
-            eat(R_SQUARE);
-            return subscriptOperator;
-        } else {
-            throw new ExpressionParsingException("Unclosed subscript operator");
-        }
+        eat(L_SQUARE);
+        ExpressionNode indexExpression = expression();
+        SubscriptOperator subscriptOperator = new SubscriptOperator(
+            callee,
+            indexExpression
+        );
+        eat(R_SQUARE);
+        return subscriptOperator;
     }
 
     // MethodArguments:
@@ -443,7 +465,7 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
             arguments.add(firstArgument);
 
             while (lookahead.type() != R_PAREN) {
-                eat(TokenType.COMMA);
+                eat(COMMA);
                 arguments.add(expression());
             }
         }
@@ -453,15 +475,21 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
     // TypeReference
     //   : 'T(' ChainedIdentifier')'
     //   ;
-    private TypeIdentifier  typeIdentifier() {
-        eat(TYPE_IDENTIFIER);
+    private TypeIdentifier typeIdentifier(boolean wrapped) {
+        if (wrapped) {
+            eat(TYPE_IDENTIFIER);
+        }
+
         List<String> parts = new ArrayList<>();
-        parts.add(eat(TokenType.IDENTIFIER).value());
+        parts.add(eat(IDENTIFIER).value());
         while (lookahead != null && lookahead.type() == DOT) {
             eat(DOT);
-            parts.add(eat(TokenType.IDENTIFIER).value());
+            parts.add(eat(IDENTIFIER).value());
         }
-        eat(R_PAREN);
+
+        if (wrapped) {
+            eat(R_PAREN);
+        }
         return new TypeIdentifier(String.join(".", parts));
     }
 

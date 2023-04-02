@@ -62,6 +62,7 @@ The Evaluated Expressions syntax supports the following functionality:
 * Type References
 * Method Invocation
 * Property Access
+* Retrieving Beans from Bean Context
 
 === Literal Values
 
@@ -193,7 +194,7 @@ limited.
 
 === Dot and Safe Navigation Operator
 
-The dot operator can be use to access methods and properties of a value within an expression. For example:
+The dot operator can be used to access methods and properties of a value within an expression. For example:
 
 .Dot operator usage
 [source]
@@ -406,4 +407,17 @@ class ContextConsumer {
     public String value;
 
 }
+----
+
+==== Retrieving Beans from Bean Context
+
+A predefined syntax construct `ctx[...]` can be used to retrieve beans from bean
+context. The argument inside square brackets has to be a fully qualified class name (note that `T(...)` wrapper is
+optional and can be omitted for simplicity).
+
+.Retrieving beans from bean context
+[source]
+----
+#{ ctx[T(io.micronaut.example.ContextBean)] }
+#{ ctx[io.micronaut.example.ContextBean] }
 ----
