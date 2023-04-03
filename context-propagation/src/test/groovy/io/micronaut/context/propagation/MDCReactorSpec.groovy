@@ -164,17 +164,6 @@ class MDCReactorSpec extends Specification {
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request,
                                                    ServerFilterChain chain) {
-            return chain.proceed(request)
-        }
-    }
-
-    @Filter(MATCH_ALL_PATTERN)
-    @Requires(property = 'mdc.reactortestx.enabled')
-    static class TracingHttpServerFilter2 implements HttpServerFilter {
-
-        @Override
-        Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request,
-                                                   ServerFilterChain chain) {
             try {
                 String trackingId = request.headers.get("X-TrackingId")
                 MDC.put("trackingId", trackingId)

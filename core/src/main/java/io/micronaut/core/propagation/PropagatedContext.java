@@ -173,7 +173,7 @@ public interface PropagatedContext {
      * Context propagation {@link AutoCloseable} to be used in try-resource block.
      *
      * @author Denis Stepanov
-     * @since 3.6.0
+     * @since 4.0.0
      */
     interface InContext extends AutoCloseable {
         @Override
