@@ -47,7 +47,7 @@ micrometer = "1.10.2"
 neo4j-java-driver = "1.4.5"
 selenium = "4.7.2"
 smallrye = "5.5.0"
-spock = "2.2-groovy-4.0"
+spock = "2.3-groovy-4.0"
 spotbugs = "4.7.1"
 systemlambda = "1.2.1"
 testcontainers = "1.17.5"
@@ -58,7 +58,7 @@ wiremock = "2.33.2"
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
-managed-groovy = "4.0.10"
+managed-groovy = "4.0.11"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "2.14.2"
 managed-jackson-databind = "2.14.1"
