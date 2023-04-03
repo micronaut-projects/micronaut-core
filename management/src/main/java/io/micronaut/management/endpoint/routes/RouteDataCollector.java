@@ -15,7 +15,8 @@
  */
 package io.micronaut.management.endpoint.routes;
 
-import io.micronaut.web.router.UriRoute;
+import io.micronaut.web.router.UriRouteInfo;
+
 import java.util.stream.Stream;
 
 /**
@@ -28,9 +29,9 @@ import java.util.stream.Stream;
 public interface RouteDataCollector<T> {
 
     /**
-     * @param routes A java stream of uri routes
+     * @param routes A java stream of uri route infos
      * @return A publisher that returns data representing all of
      * the given routes.
      */
-    T getData(Stream<UriRoute> routes);
+    T getData(Stream<UriRouteInfo<?, ?>> routes);
 }

@@ -34,17 +34,12 @@ public enum HttpAttributes implements CharSequence {
     ERROR(Constants.PREFIX + ".error"),
 
     /**
-     * Attribute used to store the object that represents the Route.
-     */
-    ROUTE(Constants.PREFIX + ".route"),
-
-    /**
      * Attribute used to store the object that represents the Route match.
      */
     ROUTE_MATCH(Constants.PREFIX + ".route.match"),
 
     /**
-     * Attribute used to store the object that represents the Route metadata.
+     * Attribute used to store the object that represents the Route.
      */
     ROUTE_INFO(Constants.PREFIX + ".route.info"),
 

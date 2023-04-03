@@ -133,7 +133,11 @@ final class NettyRequestLifecycle extends RequestLifecycle {
      */
     private ExecutionFlow<RouteMatch<?>> waitForBody(RouteMatch<?> routeMatch) {
         // note: shouldReadBody only works when fulfill has been called at least once
-        if (!shouldReadBody(routeMatch)) {
+        if (nettyRequest.isUsingHttpContentProcessor()) {
+            ctx.read();
+            return ExecutionFlow.just(routeMatch);
+        }
+        if (!needsBody(routeMatch)) {
             ctx.read();
             return ExecutionFlow.just(routeMatch);
         }
@@ -147,7 +151,7 @@ final class NettyRequestLifecycle extends RequestLifecycle {
                 return ExecutionFlow.error(e);
             }
             return frc.execute;
-        } else {
+        } else if (needsBody(routeMatch)) {
             return rootBody.buffer(nettyRequest.getChannelHandlerContext().alloc())
                 .map(ibb -> {
                     try {
@@ -159,6 +163,9 @@ final class NettyRequestLifecycle extends RequestLifecycle {
                     }
                     return routeMatch;
                 });
+        } else {
+            ctx.read();
+            return ExecutionFlow.just(routeMatch);
         }
     }
 
@@ -166,28 +173,22 @@ final class NettyRequestLifecycle extends RequestLifecycle {
         onError(cause).onComplete((response, throwable) -> rib.writeResponse(ctx, nettyRequest, response, throwable));
     }
 
-    private boolean shouldReadBody(RouteMatch<?> routeMatch) {
-        if (!HttpMethod.permitsRequestBody(request().getMethod())) {
+    private boolean needsBody(RouteMatch<?> routeMatch) {
+        if (!routeMatch.getRouteInfo().isPermitsRequestBody()) {
             return false;
         }
         if (routeMatch instanceof MethodBasedRouteMatch<?, ?> methodBasedRouteMatch) {
-            if (hasArg(methodBasedRouteMatch, MultipartBody.class)) {
-                // MultipartBody will subscribe to the request body in MultipartBodyArgumentBinder
-                return false;
-            }
             if (hasArg(methodBasedRouteMatch, HttpRequest.class)) {
                 // HttpRequest argument in the method
                 return true;
             }
         }
-        Optional<Argument<?>> bodyArgument = routeMatch.getBodyArgument()
-            .filter(argument -> argument.getAnnotationMetadata().hasAnnotation(Body.class));
-        if (bodyArgument.isPresent() && !routeMatch.isSatisfied(bodyArgument.get().getName())) {
+        if (routeMatch.getRouteInfo().getBodyArgument().isPresent()) {
             // Body argument in the method
             return true;
         }
-        // Might be some body parts
-        return !routeMatch.isExecutable();
+        // Not annotated body argument
+        return !routeMatch.isFulfilled();
     }
 
     private static boolean hasArg(MethodBasedRouteMatch<?, ?> methodBasedRouteMatch, Class<?> type) {

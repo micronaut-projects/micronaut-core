@@ -30,7 +30,7 @@ import java.lang.annotation.Annotation;
  * @param <T> A type
  * @author Graeme Rocher
  * @see CookieAnnotationBinder
- * @see ParameterAnnotationBinder
+ * @see DefaultUnmatchedRequestArgumentBinder
  * @see HeaderAnnotationBinder
  * @see RequestAttributeAnnotationBinder
  * @since 1.0

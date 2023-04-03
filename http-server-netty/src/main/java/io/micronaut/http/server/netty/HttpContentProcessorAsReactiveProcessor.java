@@ -52,13 +52,13 @@ public final class HttpContentProcessorAsReactiveProcessor {
      */
     @SuppressWarnings("unchecked")
     public static <T> Publisher<T> asPublisher(HttpContentProcessor processor, NettyHttpRequest<?> request) {
-        StreamedHttpMessage streamed = (StreamedHttpMessage) request.getNativeRequest();
+        Flux<HttpContent> start = request.getNativeRequest() instanceof StreamedHttpMessage s ? Flux.from(s) : Flux.empty();
         return asPublisher(processor, streamed);
     }
 
     @NonNull
     public static <T> Flux<T> asPublisher(HttpContentProcessor processor, Publisher<HttpContent> streamed) {
-        return Flux.concat(Flux.from(streamed)
+        return Flux.concat(start
             .doOnError(e -> {
                 try {
                     processor.cancel();

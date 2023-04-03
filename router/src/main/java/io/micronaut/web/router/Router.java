@@ -46,7 +46,20 @@ public interface Router {
      * @param <R>     The return type
      * @return A stream of route matches
      */
-    @NonNull <T, R> Stream<UriRouteMatch<T, R>> findAny(@NonNull CharSequence uri, @Nullable HttpRequest<?> context);
+    @NonNull
+    <T, R> Stream<UriRouteMatch<T, R>> findAny(@NonNull CharSequence uri, @Nullable HttpRequest<?> context);
+
+    /**
+     * Find any {@link RouteMatch} regardless of HTTP method.
+     *
+     * @param request The request
+     * @param <T>     The target type
+     * @param <R>     The return type
+     * @return A stream of route matches
+     * @since 4.0.0
+     */
+    @NonNull
+    <T, R> List<UriRouteMatch<T, R>> findAny(@NonNull HttpRequest<?> request);
 
     /**
      * @return The exposed ports.
@@ -83,8 +96,8 @@ public interface Router {
      * @param <R>        The URI route match
      * @return A {@link Stream} of possible {@link Route} instances.
      */
-    default @NonNull
-    <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull URI uri, @Nullable HttpRequest<?> context) {
+    @NonNull
+    default <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull URI uri, @Nullable HttpRequest<?> context) {
         return find(httpMethod, uri.toString(), context);
     }
 
@@ -96,8 +109,8 @@ public interface Router {
      * @param <R>     The URI route match
      * @return A {@link Stream} of possible {@link Route} instances.
      */
-    default @NonNull
-    <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest<?> request) {
+    @NonNull
+    default <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest<?> request) {
         return find(request, request.getPath());
     }
 
@@ -110,7 +123,8 @@ public interface Router {
      * @param <R>     The type of what
      * @return A {@link Stream} of possible {@link Route} instances.
      */
-    default @NonNull  <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest<?> request, @NonNull CharSequence uri) {
+    @NonNull
+    default  <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest<?> request, @NonNull CharSequence uri) {
         return find(HttpMethod.valueOf(request.getMethodName()), uri, request);
     }
 
@@ -123,14 +137,16 @@ public interface Router {
      * @return A {@link List} of possible {@link Route} instances.
      * @since 1.2.1
      */
-    @NonNull <T, R> List<UriRouteMatch<T, R>> findAllClosest(@NonNull HttpRequest<?> request);
+    @NonNull
+    <T, R> List<UriRouteMatch<T, R>> findAllClosest(@NonNull HttpRequest<?> request);
 
     /**
      * Returns all UriRoutes.
      *
      * @return A {@link Stream} of all registered {@link UriRoute} instances.
      */
-    @NonNull Stream<UriRoute> uriRoutes();
+    @NonNull
+    Stream<UriRouteInfo<?, ?>> uriRoutes();
 
     /**
      * Finds the first possible route for the given HTTP method and URI.

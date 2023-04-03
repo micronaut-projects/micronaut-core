@@ -651,8 +651,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
             @NonNull
             @Override
-            public ExecutableMethod<?, Object> getExecutableMethod() {
-                return (ExecutableMethod<?, Object>) method;
+            public ExecutableMethod<Object, Object> getExecutableMethod() {
+                return (ExecutableMethod<Object, Object>) method;
             }
         };
     }
@@ -3785,7 +3785,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
         @NonNull
         @Override
-        public ExecutableMethod<?, R> getExecutableMethod() {
+        public ExecutableMethod<T, R> getExecutableMethod() {
             return method;
         }
 

@@ -75,7 +75,7 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
     @Override
     @NonNull
     public HttpContentProcessor resolve(@NonNull NettyHttpRequest<?> request, @NonNull RouteMatch<?> route) {
-        Argument<?> bodyType = route.getBodyArgument()
+        Argument<?> bodyType = route.getRouteInfo().getBodyArgument()
                 /*
                 The getBodyArgument() method returns arguments for functions where it is
                 not possible to dictate whether the argument is supposed to bind the entire
@@ -85,14 +85,14 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
                 .filter(argument -> {
                     AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
                     if (annotationMetadata.hasAnnotation(Body.class)) {
-                        return !annotationMetadata.stringValue(Body.class).isPresent();
+                        return annotationMetadata.stringValue(Body.class).isEmpty();
                     } else {
                         return false;
                     }
                 })
                 .orElseGet(() -> {
-                    if (route instanceof ExecutionHandle) {
-                        for (Argument<?> argument: ((ExecutionHandle) route).getArguments()) {
+                    if (route instanceof ExecutionHandle executionHandle) {
+                        for (Argument<?> argument: executionHandle.getArguments()) {
                             if (argument.getType() == HttpRequest.class) {
                                 return argument;
                             }

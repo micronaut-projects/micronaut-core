@@ -50,7 +50,7 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
 
     public static final String MSG_CONVERT_DEBUG = "Cannot convert message for argument [{}] and value: {}";
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
-    private static final Argument<Publisher> TYPE = Argument.of(Publisher.class);
+    private static final Argument<Publisher<?>> TYPE = (Argument) Argument.of(Publisher.class);
 
     private final HttpContentProcessorResolver httpContentProcessorResolver;
     private final ConversionService conversionService;
@@ -66,7 +66,7 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
     }
 
     @Override
-    public Argument<Publisher> argumentType() {
+    public Argument<Publisher<?>> argumentType() {
         return TYPE;
     }
 

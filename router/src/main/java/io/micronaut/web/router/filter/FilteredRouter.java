@@ -23,7 +23,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
-import io.micronaut.web.router.UriRoute;
+import io.micronaut.web.router.UriRouteInfo;
 import io.micronaut.web.router.UriRouteMatch;
 
 import java.util.List;
@@ -73,6 +73,11 @@ public class FilteredRouter implements Router {
     }
 
     @Override
+    public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request) {
+        return router.<T, R>findAny(request).stream().filter(routeFilter.filter(request)).toList();
+    }
+
+    @Override
     public Set<Integer> getExposedPorts() {
         return router.getExposedPorts();
     }
@@ -108,7 +113,7 @@ public class FilteredRouter implements Router {
 
     @NonNull
     @Override
-    public Stream<UriRoute> uriRoutes() {
+    public Stream<UriRouteInfo<?, ?>> uriRoutes() {
         return router.uriRoutes();
     }
 

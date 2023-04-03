@@ -18,12 +18,12 @@ package io.micronaut.http.server.netty.multipart;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
+import io.micronaut.http.multipart.CompletedPart;
+import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.DefaultHttpContentProcessor;
@@ -41,6 +41,7 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
 
 import java.util.HashSet;
 import java.util.Optional;
@@ -54,7 +55,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * @since 1.3.0
  */
 @Internal
-public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinder<MultipartBody> {
+public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinder<MultipartBody>, StreamedNettyRequestArgumentBinder<MultipartBody> {
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
 
@@ -64,7 +65,7 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
     /**
      * Default constructor.
      *
-     * @param beanLocator The bean locator
+     * @param beanLocator             The bean locator
      * @param httpServerConfiguration The server configuration
      */
     public MultipartBodyArgumentBinder(BeanLocator beanLocator, BeanProvider<HttpServerConfiguration> httpServerConfiguration) {
@@ -92,83 +93,22 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
                 throw new RuntimeException(e);
             }
             //noinspection RedundantCast,unchecked
-            return () -> Optional.of(subscriber -> ((Publisher<HttpData>) multiObjectBody.asPublisher()).subscribe(new CompletionAwareSubscriber<>() {
-
-                Subscription s;
-                final AtomicLong partsRequested = new AtomicLong(0);
-
-                final Set<ReferenceCounted> partial = new HashSet<>();
-
-                @Override
-                protected void doOnSubscribe(Subscription subscription) {
-                    this.s = subscription;
-                    subscriber.onSubscribe(new Subscription() {
-
-                        @Override
-                        public void request(long n) {
-                            if (partsRequested.getAndUpdate(prev -> prev + n) == 0) {
-                                s.request(n);
-                            }
-                        }
-
-                        @Override
-                        public void cancel() {
-                            subscription.cancel();
-                        }
-                    });
+            return () -> Optional.of(subscriber -> Flux.from(((Publisher<HttpData>) multiObjectBody.asPublisher())).flatMap(message -> {
+                // MicronautHttpData does not support .content()
+                if (message.length() == 0) {
+                    return Flux.empty();
                 }
-
-                @Override
-                protected void doOnNext(HttpData message) {
-                    if (LOG.isTraceEnabled()) {
-                        LOG.trace("Server received streaming message for argument [{}]: {}", context.getArgument(), message);
-                    }
-                    if (message.isCompleted() && message.length() != 0) {
-                        partial.remove(message);
-                        partsRequested.decrementAndGet();
-                        if (message instanceof FileUpload fu) {
-                            subscriber.onNext(new NettyCompletedFileUpload(fu, true));
-                        } else if (message instanceof Attribute attr) {
-                            subscriber.onNext(new NettyCompletedAttribute(attr, true));
-                        }
-                    } else {
-                        partial.add(message);
-                    }
-
-                    if (partsRequested.get() > 0) {
-                        s.request(1);
+                if (message.isCompleted()) {
+                    if (message instanceof FileUpload fu) {
+                        return Flux.just(new NettyCompletedFileUpload(fu, false))
+                            .doOnComplete(message::release);
+                    } else if (message instanceof Attribute attr) {
+                        return Flux.just(new NettyCompletedAttribute(attr, false))
+                            .doOnComplete(message::release);
                     }
                 }
-
-                @Override
-                protected void doOnError(Throwable t) {
-                    if (LOG.isTraceEnabled()) {
-                        LOG.trace("Server received error for argument [" + context.getArgument() + "]: " + t.getMessage(), t);
-                    }
-                    releasePartial();
-                    try {
-                        subscriber.onError(t);
-                    } finally {
-                        s.cancel();
-                    }
-                }
-
-                @Override
-                protected void doOnComplete() {
-                    if (LOG.isTraceEnabled()) {
-                        LOG.trace("Done receiving messages for argument: {}", context.getArgument());
-                    }
-                    releasePartial();
-                    subscriber.onComplete();
-                }
-
-                private void releasePartial() {
-                    for (ReferenceCounted rc : partial) {
-                        rc.release();
-                    }
-                    partial.clear();
-                }
-
+                message.release();
+                return Flux.empty();
             }));
         }
         return BindingResult.EMPTY;

@@ -25,6 +25,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.server.HttpServerConfiguration;
+import io.micronaut.http.netty.stream.StreamedHttpRequest;
+import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.body.ByteBody;
@@ -46,9 +48,9 @@ import java.util.concurrent.Future;
  */
 @Internal
 public class CompletableFutureBodyBinder
-    implements NonBlockingBodyArgumentBinder<CompletableFuture> {
+    implements NonBlockingBodyArgumentBinder<CompletableFuture<?>> {
 
-    private static final Argument<CompletableFuture> TYPE = Argument.of(CompletableFuture.class);
+    private static final Argument<CompletableFuture<?>> TYPE = (Argument) Argument.of(CompletableFuture.class);
 
     private final HttpContentProcessorResolver httpContentProcessorResolver;
     private final ConversionService conversionService;
@@ -72,7 +74,7 @@ public class CompletableFutureBodyBinder
     }
 
     @Override
-    public Argument<CompletableFuture> argumentType() {
+    public Argument<CompletableFuture<?>> argumentType() {
         return TYPE;
     }
 
