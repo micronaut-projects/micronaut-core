@@ -28,6 +28,7 @@ public enum TokenType {
     WHITESPACE,
     IDENTIFIER,
     BEAN_CONTEXT,
+    ENVIRONMENT,
     TYPE_IDENTIFIER,
     EXPRESSION_CONTEXT_REF,
     DOT,

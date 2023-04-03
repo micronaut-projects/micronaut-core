@@ -36,6 +36,7 @@ import static io.micronaut.expressions.parser.token.TokenType.DOT;
 import static io.micronaut.expressions.parser.token.TokenType.DOUBLE;
 import static io.micronaut.expressions.parser.token.TokenType.ELVIS;
 import static io.micronaut.expressions.parser.token.TokenType.EMPTY;
+import static io.micronaut.expressions.parser.token.TokenType.ENVIRONMENT;
 import static io.micronaut.expressions.parser.token.TokenType.EQ;
 import static io.micronaut.expressions.parser.token.TokenType.EXPRESSION_CONTEXT_REF;
 import static io.micronaut.expressions.parser.token.TokenType.IDENTIFIER;
@@ -96,6 +97,7 @@ public final class Tokenizer {
         "^matches\\b", MATCHES,
         "^empty\\b", EMPTY,
         "^ctx\\b", BEAN_CONTEXT,
+        "^env\\b", ENVIRONMENT,
 
         // LITERALS
         "^null\\b", NULL,          // NULL
