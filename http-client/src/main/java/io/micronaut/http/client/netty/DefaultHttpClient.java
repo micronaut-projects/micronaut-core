@@ -170,7 +170,6 @@ import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
-import reactor.util.context.Context;
 
 import java.io.Closeable;
 import java.io.File;
@@ -1261,11 +1260,8 @@ public class DefaultHttpClient implements
         FilterRunner.sortReverse(filters);
         filters.add(new GenericHttpFilter.TerminalReactive(responsePublisher));
 
-        FilterRunner runner = new FilterRunner(conversionService, filters);
-        Mono<R> responseMono = Mono.deferContextual(ctx -> {
-            runner.reactorContext(Context.of(ctx));
-            return Mono.from(ReactiveExecutionFlow.fromFlow((ExecutionFlow<R>) runner.run(request)).toPublisher());
-        });
+        FilterRunner runner = new FilterRunner(filters);
+        Mono<R> responseMono = Mono.from(ReactiveExecutionFlow.fromFlow((ExecutionFlow<R>) runner.run(request)).toPublisher());
         if (parentRequest != null) {
             responseMono = responseMono.contextWrite(c -> {
                 // existing entry takes precedence. The parentRequest is derived from a thread

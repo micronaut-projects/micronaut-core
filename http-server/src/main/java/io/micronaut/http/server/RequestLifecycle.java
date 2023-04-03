@@ -45,7 +45,6 @@ import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.UriRouteMatch;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.util.context.Context;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -72,7 +71,6 @@ public class RequestLifecycle {
     private final RouteExecutor routeExecutor;
     private final RequestArgumentSatisfier requestArgumentSatisfier;
     private HttpRequest<?> request;
-    private Context context = Context.empty();
     private boolean multipartEnabled = true;
 
     /**
@@ -145,7 +143,7 @@ public class RequestLifecycle {
 
         return runWithFilters(() ->
             fulfillArguments(routeMatch)
-                .flatMap(rm -> routeExecutor.callRoute(context, rm, request).flatMap(res -> handleStatusException(res, rm)))
+                .flatMap(rm -> routeExecutor.callRoute(rm, request).flatMap(res -> handleStatusException(res, rm)))
                 .onErrorResume(this::onErrorNoFilter));
     }
 
@@ -181,7 +179,7 @@ public class RequestLifecycle {
             }
             try {
                 return ExecutionFlow.just(errorRoute)
-                    .flatMap(routeMatch -> routeExecutor.callRoute(context, routeMatch, request).flatMap(res -> handleStatusException(res, routeMatch)))
+                    .flatMap(routeMatch -> routeExecutor.callRoute(routeMatch, request).flatMap(res -> handleStatusException(res, routeMatch)))
                     .onErrorResume(u -> createDefaultErrorResponseFlow(request, u))
                     .<MutableHttpResponse<?>>map(response -> {
                         response.setAttribute(HttpAttributes.EXCEPTION, cause);
@@ -256,12 +254,11 @@ public class RequestLifecycle {
 
         List<GenericHttpFilter> filters = new ArrayList<>(httpFilters.size() + 1);
         filters.addAll(httpFilters);
-        filters.add((GenericHttpFilter.TerminalWithReactorContext) (request, context) -> {
+        filters.add((GenericHttpFilter.Terminal) (request) -> {
             this.request = request;
-            this.context = context;
             return downstream.get();
         });
-        FilterRunner filterRunner = new FilterRunner(routeExecutor.beanContext.getConversionService(), filters) {
+        FilterRunner filterRunner = new FilterRunner(filters) {
             @Override
             protected ExecutionFlow<? extends HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response) {
                 RequestLifecycle.this.request = request;
@@ -289,7 +286,7 @@ public class RequestLifecycle {
             RouteMatch<Object> statusRoute = routeExecutor.findStatusRoute(request, response.status(), routeInfo);
             if (statusRoute != null) {
                 return fulfillArguments(statusRoute)
-                    .flatMap(rm -> routeExecutor.callRoute(Context.empty(), rm, request).flatMap(res -> handleStatusException(res, rm)))
+                    .flatMap(rm -> routeExecutor.callRoute(rm, request).flatMap(res -> handleStatusException(res, rm)))
                     .onErrorResume(this::onErrorNoFilter);
             }
         }
@@ -372,7 +369,7 @@ public class RequestLifecycle {
         Optional<RouteMatch<Object>> statusRoute = routeExecutor.router.findStatusRoute(defaultResponse.status(), request);
         if (statusRoute.isPresent()) {
             return runWithFilters(() -> fulfillArguments(statusRoute.get())
-                .flatMap(routeMatch -> routeExecutor.callRoute(context, routeMatch, request).flatMap(res -> handleStatusException(res, routeMatch)))
+                .flatMap(routeMatch -> routeExecutor.callRoute(routeMatch, request).flatMap(res -> handleStatusException(res, routeMatch)))
                 .onErrorResume(this::onErrorNoFilter));
         }
         if (request.getMethod() != HttpMethod.HEAD) {

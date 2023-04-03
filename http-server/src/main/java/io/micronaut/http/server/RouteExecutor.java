@@ -64,7 +64,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
-import reactor.util.context.ContextView;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -418,7 +417,7 @@ public final class RouteExecutor {
         return ExecutionFlow.just(forStatus(routeInfo, null).body(body));
     }
 
-    ExecutionFlow<MutableHttpResponse<?>> callRoute(ContextView contextFromFilter, RouteMatch<?> routeMatch, HttpRequest<?> request) {
+    ExecutionFlow<MutableHttpResponse<?>> callRoute(RouteMatch<?> routeMatch, HttpRequest<?> request) {
         RouteInfo<?> routeInfo = routeMatch.getRouteInfo();
         ExecutorService executorService = routeInfo.getExecutor(serverConfiguration.getThreadSelection());
         ExecutionFlow<MutableHttpResponse<?>> executeMethodResponseFlow;
@@ -426,10 +425,11 @@ public final class RouteExecutor {
             if (routeInfo.isSuspended()) {
                 executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
                         coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(request, contextView));
+                        ExecutionFlow<MutableHttpResponse<?>> flow = flowSupplier.get();
                         return Mono.from(
                             ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(routeMatch, request)).toPublisher()
                         );
-                    }).contextWrite(contextFromFilter))
+                    }))
                     .putInContext(ServerRequestContext.KEY, request);
             } else if (routeInfo.isReactive()) {
                 executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(routeMatch, request))
@@ -441,10 +441,11 @@ public final class RouteExecutor {
             if (routeInfo.isSuspended()) {
                 executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
                         coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(request, contextView));
+                        ExecutionFlow<MutableHttpResponse<?>> flow = flowSupplier.get();
                         return Mono.from(
                             ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(routeMatch, request)).toPublisher()
                         );
-                    }).contextWrite(contextFromFilter))
+                    }))
                     .putInContext(ServerRequestContext.KEY, request);
             } else if (routeInfo.isReactive()) {
                 executeMethodResponseFlow = ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(routeMatch, request))

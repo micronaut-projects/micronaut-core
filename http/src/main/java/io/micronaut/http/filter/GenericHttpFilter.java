@@ -21,8 +21,8 @@ import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import org.reactivestreams.Publisher;
-import reactor.util.context.Context;
 
 import java.util.concurrent.Executor;
 
@@ -40,9 +40,7 @@ public sealed interface GenericHttpFilter
     FilterRunner.FilterMethod,
     GenericHttpFilter.AroundLegacy,
     GenericHttpFilter.Async,
-    GenericHttpFilter.Terminal,
-    GenericHttpFilter.TerminalReactive,
-    GenericHttpFilter.TerminalWithReactorContext {
+    GenericHttpFilter.Terminal {
 
     /**
      * When the filter is using the continuation it needs to be suspended and wait for the response.
@@ -126,19 +124,23 @@ public sealed interface GenericHttpFilter
      * Terminal filter that accepts a reactive type. Used as a temporary solution for the http
      * client, until that is un-reactified.
      *
-     * @param responsePublisher The response publisher
      */
     @Internal
-    record TerminalReactive(Publisher<? extends HttpResponse<?>> responsePublisher) implements GenericHttpFilter {
-    }
+    final class TerminalReactive implements Terminal {
 
-    /**
-     * Like {@link Terminal}, with an additional parameter for the reactive context.
-     */
-    @Internal
-    @FunctionalInterface
-    non-sealed interface TerminalWithReactorContext extends GenericHttpFilter {
-        ExecutionFlow<? extends HttpResponse<?>> execute(HttpRequest<?> request, Context context) throws Exception;
+        private final Publisher<? extends HttpResponse<?>> responsePublisher;
+
+        /**
+         * @param responsePublisher The response publisher
+         */
+        public TerminalReactive(Publisher<? extends HttpResponse<?>> responsePublisher) {
+            this.responsePublisher = responsePublisher;
+        }
+
+        @Override
+        public ExecutionFlow<? extends HttpResponse<?>> execute(HttpRequest<?> request) throws Exception {
+            return ReactiveExecutionFlow.fromPublisher(responsePublisher);
+        }
     }
 
     /**
