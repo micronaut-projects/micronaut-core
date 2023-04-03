@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.binders;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.NettyHttpRequest;
@@ -55,12 +56,11 @@ public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<Inpu
         return TYPE;
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public BindingResult<InputStream> bind(ArgumentConversionContext<InputStream> context, HttpRequest<?> source) {
         if (source instanceof NettyHttpRequest<?> nhr) {
             if (nhr.rootBody() instanceof ImmediateByteBody imm && imm.empty()) {
-                return BindingResult.EMPTY;
+                return BindingResult.empty();
             }
             try {
                 InputStream s = nhr.rootBody().processMulti(processorResolver.resolve(nhr, context.getArgument())).coerceToInputStream(nhr.getChannelHandlerContext().alloc());
@@ -69,9 +69,9 @@ public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<Inpu
                 if (LOG.isTraceEnabled()) {
                     LOG.trace("Server received error for argument [" + context.getArgument() + "]: " + t.getMessage(), t);
                 }
-                return BindingResult.EMPTY;
+                return BindingResult.empty();
             }
         }
-        return BindingResult.EMPTY;
+        return BindingResult.empty();
     }
 }

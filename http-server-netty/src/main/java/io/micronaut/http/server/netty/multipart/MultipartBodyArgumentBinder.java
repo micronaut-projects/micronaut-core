@@ -20,10 +20,9 @@ import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
-import io.micronaut.http.multipart.CompletedPart;
-import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.DefaultHttpContentProcessor;
@@ -36,17 +35,12 @@ import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
-import io.netty.util.ReferenceCounted;
 import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
-import java.util.HashSet;
 import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * A {@link io.micronaut.http.annotation.Body} argument binder for a {@link MultipartBody} argument.
@@ -55,7 +49,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * @since 1.3.0
  */
 @Internal
-public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinder<MultipartBody>, StreamedNettyRequestArgumentBinder<MultipartBody> {
+public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinder<MultipartBody> {
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
 
@@ -92,7 +86,7 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
             } catch (Throwable e) {
                 throw new RuntimeException(e);
             }
-            //noinspection RedundantCast,unchecked
+            //noinspection unchecked
             return () -> Optional.of(subscriber -> Flux.from(((Publisher<HttpData>) multiObjectBody.asPublisher())).flatMap(message -> {
                 // MicronautHttpData does not support .content()
                 if (message.length() == 0) {
@@ -111,6 +105,6 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
                 return Flux.empty();
             }));
         }
-        return BindingResult.EMPTY;
+        return BindingResult.empty();
     }
 }

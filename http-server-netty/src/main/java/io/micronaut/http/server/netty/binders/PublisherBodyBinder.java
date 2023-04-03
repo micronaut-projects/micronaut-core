@@ -46,7 +46,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
-public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publisher> {
+public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publisher<?>> {
 
     public static final String MSG_CONVERT_DEBUG = "Cannot convert message for argument [{}] and value: {}";
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
@@ -71,10 +71,10 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
     }
 
     @Override
-    public BindingResult<Publisher> bind(ArgumentConversionContext<Publisher> context, HttpRequest<?> source) {
-        if (source instanceof NettyHttpRequest nhr) {
+    public BindingResult<Publisher<?>> bind(ArgumentConversionContext<Publisher<?>> context, HttpRequest<?> source) {
+        if (source instanceof NettyHttpRequest<?> nhr) {
             if (nhr.rootBody() instanceof ImmediateByteBody imm && imm.empty()) {
-                return BindingResult.EMPTY;
+                return BindingResult.empty();
             }
             Argument<?> targetType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             try {
@@ -93,7 +93,7 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
                 return () -> Optional.of(Mono.error(t));
             }
         }
-        return BindingResult.EMPTY;
+        return BindingResult.empty();
     }
 
     private static RuntimeException extractError(Object message, ArgumentConversionContext<?> conversionContext) {

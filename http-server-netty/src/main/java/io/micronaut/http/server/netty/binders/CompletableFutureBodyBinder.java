@@ -25,8 +25,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.server.HttpServerConfiguration;
-import io.micronaut.http.netty.stream.StreamedHttpRequest;
-import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.body.ByteBody;
@@ -79,7 +77,7 @@ public class CompletableFutureBodyBinder
     }
 
     @Override
-    public BindingResult<CompletableFuture> bind(ArgumentConversionContext<CompletableFuture> context, HttpRequest<?> source) {
+    public BindingResult<CompletableFuture<?>> bind(ArgumentConversionContext<CompletableFuture<?>> context, HttpRequest<?> source) {
         if (source instanceof NettyHttpRequest nhr) {
             ByteBody rootBody = nhr.rootBody();
             if (rootBody instanceof ImmediateByteBody immediate && immediate.empty()) {

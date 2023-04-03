@@ -23,12 +23,8 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.core.execution.DelayedExecutionFlow;
-import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.core.util.SupplierUtil;
-import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
@@ -79,12 +75,8 @@ import io.netty.handler.ssl.SslHandler;
 import io.netty.util.ReferenceCounted;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
-import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.CoreSubscriber;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Sinks;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -364,9 +356,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     @SuppressWarnings("unchecked")
     @Override
     public <T1> Optional<T1> getBody(ArgumentConversionContext<T1> conversionContext) {
-        if (!bodyFullyRead) {
-            return Optional.empty();
-        }
         return getBody().flatMap(t -> bodyConvertor.convert(conversionContext, t));
     }
 
@@ -609,20 +598,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         } else {
             return contentLength;
         }
-    }
-
-    /**
-     * Register to use custom http content processor.
-     */
-    public void setUsesHttpContentProcessor() {
-        usesHttpContentProcessor = true;
-    }
-
-    /**
-     * @return Is registered to use custom http content processor.
-     */
-    public boolean isUsingHttpContentProcessor() {
-        return usesHttpContentProcessor;
     }
 
     /**
