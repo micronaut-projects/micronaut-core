@@ -20,10 +20,6 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.handler.codec.http.DefaultHttpContent;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Fully buffered {@link ByteBody}, all operations are eager.
@@ -47,15 +43,7 @@ public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements Byt
 
     @Override
     public ImmediateMultiObjectBody processMulti(HttpContentProcessor processor) throws Throwable {
-        List<Object> out = new ArrayList<>(1);
-        ByteBuf data = prepareClaim();
-        if (data.isReadable()) {
-            processor.add(new DefaultHttpContent(data), out);
-        } else {
-            data.release();
-        }
-        processor.complete(out);
-        return next(new ImmediateMultiObjectBody(out));
+        return next(new ImmediateMultiObjectBody(processor.processSingle(prepareClaim())));
     }
 
     @Override
