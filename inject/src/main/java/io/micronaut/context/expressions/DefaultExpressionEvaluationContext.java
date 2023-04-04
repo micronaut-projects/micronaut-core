@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.expressions;
 
+import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
@@ -85,6 +86,17 @@ public final class DefaultExpressionEvaluationContext implements ConfigurableExp
         }
 
         return args[index];
+    }
+
+    @Override
+    public String getProperty(String name) {
+        if (beanContext == null || !(beanContext instanceof ApplicationContext applicationContext)) {
+            throw new ExpressionEvaluationException("Can not obtain environment property [" + name + "] " +
+                                                        "since application context is not set");
+        }
+
+        return applicationContext.getProperty(name, String.class)
+                   .orElse(null);
     }
 
     @Override

@@ -16,6 +16,7 @@
 package io.micronaut.core.expressions;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 
 /**
  * Context that can be used by evaluated expression to obtain objects required
@@ -43,4 +44,12 @@ public interface ExpressionEvaluationContext extends AutoCloseable {
      * @return bean instance
      */
     <T> T getBean(Class<T> type);
+
+    /**
+     * Provides property by name.
+     * @param name property name
+     * @return property value or null
+     */
+    @Nullable
+    String getProperty(String name);
 }

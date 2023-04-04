@@ -63,6 +63,7 @@ The Evaluated Expressions syntax supports the following functionality:
 * Method Invocation
 * Property Access
 * Retrieving Beans from Bean Context
+* Retrieving Environment Properties
 
 === Literal Values
 
@@ -420,4 +421,16 @@ optional and can be omitted for simplicity).
 ----
 #{ ctx[T(io.micronaut.example.ContextBean)] }
 #{ ctx[io.micronaut.example.ContextBean] }
+----
+
+==== Retrieving Environment Properties
+
+A syntax construct `env[...]` can be used to retrieve environment properties by name.
+The expression inside square brackets has to resolve to string value, otherwise compilation will fail. If property
+value will be absent at runtime, the expression will return `null`
+
+.Retrieving Environment Properties
+[source]
+----
+#{ env['test.property'] }
 ----

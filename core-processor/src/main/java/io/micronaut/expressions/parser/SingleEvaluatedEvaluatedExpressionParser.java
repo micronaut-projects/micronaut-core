@@ -21,6 +21,7 @@ import io.micronaut.expressions.parser.ast.access.BeanContextAccess;
 import io.micronaut.expressions.parser.ast.access.ContextElementAccess;
 import io.micronaut.expressions.parser.ast.access.ContextMethodCall;
 import io.micronaut.expressions.parser.ast.access.ElementMethodCall;
+import io.micronaut.expressions.parser.ast.access.EnvironmentAccess;
 import io.micronaut.expressions.parser.ast.access.SubscriptOperator;
 import io.micronaut.expressions.parser.ast.access.PropertyAccess;
 import io.micronaut.expressions.parser.ast.conditional.ElvisOperator;
@@ -72,6 +73,7 @@ import static io.micronaut.expressions.parser.token.TokenType.DOT;
 import static io.micronaut.expressions.parser.token.TokenType.DOUBLE;
 import static io.micronaut.expressions.parser.token.TokenType.ELVIS;
 import static io.micronaut.expressions.parser.token.TokenType.EMPTY;
+import static io.micronaut.expressions.parser.token.TokenType.ENVIRONMENT;
 import static io.micronaut.expressions.parser.token.TokenType.EQ;
 import static io.micronaut.expressions.parser.token.TokenType.EXPRESSION_CONTEXT_REF;
 import static io.micronaut.expressions.parser.token.TokenType.FLOAT;
@@ -361,6 +363,7 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
     // PrimaryExpression
     //  : EvaluationContextAccess
     //  | BeanContextAccess
+    //  | EnvironmentAccess
     //  | TypeIdentifier
     //  | ParenthesizedExpression
     //  | Literal
@@ -370,6 +373,7 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
             case EXPRESSION_CONTEXT_REF -> evaluationContextAccess(true);
             case IDENTIFIER -> evaluationContextAccess(false);
             case BEAN_CONTEXT -> beanContextAccess();
+            case ENVIRONMENT -> environmentAccess();
             case TYPE_IDENTIFIER -> typeIdentifier(true);
             case L_PAREN -> parenthesizedExpression();
             case STRING, INT, LONG, DOUBLE, FLOAT, BOOL, NULL -> literal();
@@ -413,6 +417,17 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
 
         eat(R_SQUARE);
         return new BeanContextAccess(typeIdentifier);
+    }
+
+    // EnvironmentAccess
+    //  : 'env' '[' Expression ']'
+    //  ;
+    private ExpressionNode environmentAccess() {
+        eat(ENVIRONMENT);
+        eat(L_SQUARE);
+        ExpressionNode propertyName = expression();
+        eat(R_SQUARE);
+        return new EnvironmentAccess(propertyName);
     }
 
     // MethodOrFieldAccess
