@@ -45,8 +45,8 @@ public class ServiceHttpClientHealthIndicatorFactory implements HealthIndicator 
 
     private HealthResult determineServiceHealth() {
         Map<String, Object> details = new LinkedHashMap<>(2);
-        details.put("allUrls", originalUrls);
-        details.put("availableUrls", loadBalancerUrls);
+        details.put("all_urls", originalUrls);
+        details.put("available_urls", loadBalancerUrls);
 
         if (loadBalancerUrls.isEmpty()) {
             return serviceHealthBuilder.status(HealthStatus.DOWN).details(details).build();
