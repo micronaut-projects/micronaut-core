@@ -81,7 +81,7 @@ See <<filtermethods, Filter Methods>>
 
 === Other Dependency Upgrades
 
-- Kotlin 1.8.10
+- Kotlin 1.8.20
 
 <<breaks, Breaking changes in Micronaut framework 4.0>>
 
