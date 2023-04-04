@@ -27,9 +27,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.server.RequestLifecycle;
-import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.body.ByteBody;
-import io.micronaut.http.server.netty.multipart.NettyStreamingFileUpload;
 import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType;
 import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
@@ -133,18 +131,14 @@ final class NettyRequestLifecycle extends RequestLifecycle {
      */
     private ExecutionFlow<RouteMatch<?>> waitForBody(RouteMatch<?> routeMatch) {
         // note: shouldReadBody only works when fulfill has been called at least once
-        if (nettyRequest.isUsingHttpContentProcessor()) {
-            ctx.read();
-            return ExecutionFlow.just(routeMatch);
-        }
-        if (!needsBody(routeMatch)) {
+        if (nettyRequest.rootBody().next() != null) {
             ctx.read();
             return ExecutionFlow.just(routeMatch);
         }
         HttpContentProcessor processor = rib.httpContentProcessorResolver.resolve(nettyRequest, routeMatch);
         ByteBody rootBody = nettyRequest.rootBody();
         if (nettyRequest.isFormOrMultipartData() && processor instanceof FormDataHttpContentProcessor) {
-            FormRouteCompleter frc = new FormRouteCompleter(new NettyStreamingFileUpload.Factory(rib.serverConfiguration.getMultipart(), rib.getIoExecutor()), rib.conversionService, nettyRequest, routeMatch);
+            FormRouteCompleter frc = nettyRequest.formRouteCompleter();
             try {
                 rootBody.processMulti(processor).handleForm(frc);
             } catch (Throwable e) {

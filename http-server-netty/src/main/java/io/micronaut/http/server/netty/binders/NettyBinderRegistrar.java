@@ -27,6 +27,10 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.multipart.MultipartBodyArgumentBinder;
 import io.micronaut.http.server.netty.multipart.NettyStreamingFileUpload;
+import io.micronaut.scheduling.TaskExecutors;
+import jakarta.inject.Named;
+
+import java.util.concurrent.ExecutorService;
 
 /**
  * A binder registrar that requests Netty related binders.
@@ -42,6 +46,7 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
     private final HttpContentProcessorResolver httpContentProcessorResolver;
     private final BeanLocator beanLocator;
     private final BeanProvider<HttpServerConfiguration> httpServerConfiguration;
+    private final BeanProvider<ExecutorService> executorService;
 
     /**
      * Default constructor.
@@ -49,15 +54,19 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
      * @param httpContentProcessorResolver The processor resolver
      * @param beanLocator                  The bean locator
      * @param httpServerConfiguration      The server config
+     * @param executorService
      */
     NettyBinderRegistrar(ConversionService conversionService,
                          HttpContentProcessorResolver httpContentProcessorResolver,
                          BeanLocator beanLocator,
-                         BeanProvider<HttpServerConfiguration> httpServerConfiguration) {
+                         BeanProvider<HttpServerConfiguration> httpServerConfiguration,
+                         @Named(TaskExecutors.BLOCKING)
+                         BeanProvider<ExecutorService> executorService) {
         this.conversionService = conversionService;
         this.httpContentProcessorResolver = httpContentProcessorResolver;
         this.beanLocator = beanLocator;
         this.httpServerConfiguration = httpServerConfiguration;
+        this.executorService = executorService;
     }
 
     @Override

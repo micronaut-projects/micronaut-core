@@ -25,6 +25,7 @@ import io.micronaut.http.bind.binders.AnnotatedRequestArgumentBinder;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpRequest;
+import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Optional;
@@ -65,22 +66,12 @@ public class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgumentBi
             return publisherPartUploadBinder.bind((ArgumentConversionContext) context, request);
         }
 
-        CompletableFuture<T> completableFuture = new CompletableFuture<>();
-
         Argument<T> argument = context.getArgument();
         String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(argument.getName());
 
-        request.observeFileUpload()
-            .filter(data -> data.getName().equals(inputName) && data.isCompleted())
-            .take(1)
-            .doOnNext(data -> {
-                if (data.refCnt() > 0) {
-                    completableFuture.complete(conversionService.convert(data, argument.getType(), context).orElse(null));
-                } else {
-                    completableFuture.complete(null);
-                }
-            })
-            .subscribe();
+        CompletableFuture<T> completableFuture = Mono.from(request.formRouteCompleter().claimFieldsComplete(inputName))
+            .map(d -> conversionService.convert(d, argument.getType(), context).orElse(null))
+            .toFuture();
 
         return new PendingRequestBindingResult<>() {
 

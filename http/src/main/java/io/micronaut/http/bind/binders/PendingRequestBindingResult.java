@@ -48,5 +48,4 @@ public interface PendingRequestBindingResult<T> extends ArgumentBinder.BindingRe
         return !isPending() && ArgumentBinder.BindingResult.super.isPresentAndSatisfied();
     }
 
-
 }

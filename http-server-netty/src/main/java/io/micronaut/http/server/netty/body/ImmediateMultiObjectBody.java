@@ -27,6 +27,7 @@ import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.util.ReferenceCountUtil;
+import io.netty.util.ReferenceCounted;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
@@ -129,7 +130,7 @@ public final class ImmediateMultiObjectBody extends ManagedBody<List<?>> impleme
 
     @Override
     public Publisher<?> asPublisher() {
-        return Flux.fromIterable(claim());
+        return Flux.fromIterable(claim()).doOnDiscard(ReferenceCounted.class, ReferenceCounted::release);
     }
 
     @Override

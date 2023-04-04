@@ -24,6 +24,7 @@ import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import io.micronaut.http.multipart.FileUpload;
 import io.micronaut.http.server.netty.NettyHttpRequest;
+import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Optional;
@@ -57,18 +58,12 @@ public non-sealed class CompletedFileUploadBinder implements TypedRequestArgumen
             return BindingResult.unsatisfied();
         }
 
-        CompletableFuture<CompletedFileUpload> completableFuture = new CompletableFuture<>();
-
         Argument<CompletedFileUpload> argument = context.getArgument();
         String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(argument.getName());
 
-        request.observeFileUpload()
-            .filter(data -> data.getName().equals(inputName) && data instanceof io.netty.handler.codec.http.multipart.FileUpload && data.isCompleted())
-            .take(1)
-            .doOnNext(data -> completableFuture.complete(
-                conversionService.convertRequired(data, CompletedFileUpload.class)
-            ))
-            .subscribe();
+        CompletableFuture<CompletedFileUpload> completableFuture = Mono.from(request.formRouteCompleter().claimFieldsComplete(inputName))
+            .map(d -> conversionService.convertRequired(d, CompletedFileUpload.class))
+            .toFuture();
 
         return new PendingRequestBindingResult<>() {
 

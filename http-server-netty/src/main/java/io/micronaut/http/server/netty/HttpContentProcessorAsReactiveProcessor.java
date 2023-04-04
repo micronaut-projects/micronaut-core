@@ -46,15 +46,10 @@ public final class HttpContentProcessorAsReactiveProcessor {
      * {@link org.reactivestreams.Processor}.
      *
      * @param processor The content processor to use
-     * @param request The request to subscribe to
+     * @param streamed The request to subscribe to
      * @return The publisher producing output data
      * @param <T> The output element type
      */
-    public static <T> Publisher<T> asPublisher(HttpContentProcessor processor, NettyHttpRequest<?> request) {
-        StreamedHttpMessage streamed = (StreamedHttpMessage) request.getNativeRequest();
-        return asPublisher(processor, streamed);
-    }
-
     @NonNull
     public static <T> Flux<T> asPublisher(HttpContentProcessor processor, Publisher<HttpContent> streamed) {
         return Flux.concat(Flux.from(streamed)

@@ -27,7 +27,6 @@ import reactor.core.publisher.Mono;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -86,7 +85,7 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
         value.subscribe(new Subscriber<>() {
 
             Subscription subscription;
-            final AtomicReference<Object> value = new AtomicReference<>();
+            Object value;
 
             @Override
             public void onSubscribe(Subscription s) {
@@ -96,8 +95,8 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
 
             @Override
             public void onNext(Object v) {
+                value = v;
                 subscription.request(1); // ???
-                value.set(v);
             }
 
             @Override
@@ -107,7 +106,7 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
 
             @Override
             public void onComplete() {
-                fn.accept(value.get(), null);
+                fn.accept(value, null);
             }
         });
     }

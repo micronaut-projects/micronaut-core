@@ -20,17 +20,12 @@ import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
-import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
-import io.micronaut.http.server.netty.MicronautHttpData;
 import io.micronaut.http.server.netty.NettyHttpRequest;
-import io.micronaut.http.server.netty.multipart.NettyPartData;
 import io.micronaut.http.server.netty.multipart.NettyStreamingFileUpload;
 import io.netty.handler.codec.http.multipart.FileUpload;
-import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.Optional;
@@ -59,41 +54,11 @@ final class StreamingFileUploadBinder implements TypedRequestArgumentBinder<Stre
     public BindingResult<StreamingFileUpload> bindForNettyRequest(ArgumentConversionContext<StreamingFileUpload> context,
                                                                   NettyHttpRequest<?> request) {
 
-        CompletableFuture<StreamingFileUpload> completableFuture = new CompletableFuture<>();
-
         Argument<StreamingFileUpload> argument = context.getArgument();
         String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(argument.getName());
 
-        Flux<PartData> parts = request.observeFileUploadWithBackPressure().filter(data -> data.getName().equals(inputName))
-            .replay(1)
-            .autoConnect()
-            .flatMap(thisData -> {
-                MicronautHttpData<?>.Chunk chunk = thisData.pollChunk();
-                if (chunk != null) {
-                    NettyPartData part = new NettyPartData(() -> {
-                        if (thisData instanceof FileUpload fu) {
-                            return Optional.of(MediaType.of(fu.getContentType()));
-                        } else {
-                            return Optional.empty();
-                        }
-                    }, chunk::claim);
-                    Optional<PartData> convert = conversionService.convert(part, PartData.class);
-                    if (convert.isPresent()) {
-                        return Mono.just(convert.get());
-                    }
-                }
-                return Mono.empty();
-            });
-
-        request.observeFileUpload()
-            .filter(data -> data.getName().equals(inputName))
-            .take(1)
-            .doOnNext(data -> {
-                data.retain();
-                completableFuture.complete(
-                    fileUploadFactory.create((FileUpload) data, parts)
-                );
-            }).subscribe();
+        CompletableFuture<? extends StreamingFileUpload> completableFuture = Mono.from(
+            request.formRouteCompleter().claimFields(inputName, (data, publisher) -> fileUploadFactory.create((FileUpload) data, publisher))).toFuture();
 
         return new PendingRequestBindingResult<>() {
 

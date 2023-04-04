@@ -22,7 +22,6 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
@@ -30,12 +29,11 @@ import io.micronaut.http.server.netty.MicronautHttpData;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
 import io.micronaut.http.server.netty.multipart.NettyStreamingFileUpload;
+import io.netty.handler.codec.http.multipart.FileUpload;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
 
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Bind publisher annotated {@link io.micronaut.http.annotation.Part}.
@@ -64,8 +62,6 @@ final class PublisherPartUploadBinder implements TypedRequestArgumentBinder<Publ
             return BindingResult.unsatisfied();
         }
 
-        CompletableFuture<Publisher<?>> completableFuture = new CompletableFuture<>();
-
         Argument<Publisher<?>> argument = context.getArgument();
         String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(argument.getName());
 
@@ -73,87 +69,38 @@ final class PublisherPartUploadBinder implements TypedRequestArgumentBinder<Publ
         Class<?> contentTypeClass = contentArgument.getType();
 
         Flux<?> publisher;
-        Flux<MicronautHttpData<?>> cachedStream = request.observeFileUploadWithBackPressure().filter(data -> data.getName().equals(inputName))
-            .replay(1)
-            .autoConnect();
-        if (contentTypeClass.equals(StreamingFileUpload.class)) {
-            publisher = cachedStream
-                .filter(data -> data instanceof io.netty.handler.codec.http.multipart.FileUpload)
-                .distinct()
-                .map(data -> {
-                    data.retain();
-                    return fileUploadFactory.create(
-                        (io.netty.handler.codec.http.multipart.FileUpload) data,
-                        chunkedProcessing(
-                            PART_DATA_ARGUMENT,
-                            cachedStream.filter(d -> d == data).doOnComplete(data::release)
-                        )
-                    );
-                });
-        } else if (contentTypeClass.equals(Publisher.class)) {
-            publisher = cachedStream
-                .filter(data -> data instanceof io.netty.handler.codec.http.multipart.FileUpload)
-                .map(data -> {
-                    data.retain();
-                    return chunkedProcessing(
-                        contentArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT),
-                        cachedStream.filter(d -> d == data).doOnComplete(data::release)
-                    );
-                });
-        } else if (PartData.class.equals(contentTypeClass) || ClassUtils.isJavaLangType(contentTypeClass)) {
-            publisher = chunkedProcessing(contentArgument, cachedStream);
+        if (contentTypeClass == StreamingFileUpload.class) {
+            publisher = request.formRouteCompleter().claimFields(inputName, (data, flux) -> fileUploadFactory.create((FileUpload) data, flux));
+        } else if (contentTypeClass == Publisher.class) {
+            Argument<?> nestedType = contentArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            publisher = request.formRouteCompleter()
+                .claimFields(inputName, (data, flux) -> flux.mapNotNull(partData -> conversionService.convert(partData, nestedType).orElse(null)));
         } else {
-            publisher = cachedStream
-                .flatMap(data -> {
-                    Optional<?> convert = conversionService.convert(data, contentArgument);
-                    if (convert.isPresent()) {
-                        data.retain();
-                        return Flux.just(convert.get()).doOnComplete(data::release);
-                    }
-                    return Flux.empty();
-                });
+            Flux<? extends MicronautHttpData<?>> raw = request.formRouteCompleter().claimFieldsRaw(inputName);
+            Flux<?> mnTypeIfNecessary;
+            if (contentTypeClass == PartData.class || ClassUtils.isJavaLangType(contentTypeClass)) {
+                mnTypeIfNecessary = raw
+                    .mapNotNull(data -> {
+                        MicronautHttpData<?>.Chunk chunk = data.pollChunk();
+                        if (chunk != null) {
+                            return new NettyPartData(() -> {
+                                if (data instanceof FileUpload fileUpload) {
+                                    return Optional.of(MediaType.of(fileUpload.getContentType()));
+                                } else {
+                                    return Optional.empty();
+                                }
+                            }, chunk::claim);
+                        } else {
+                            return null;
+                        }
+                    });
+            } else {
+                mnTypeIfNecessary = raw;
+            }
+            publisher = mnTypeIfNecessary.mapNotNull(it -> conversionService.convert(it, contentArgument).orElse(null));
         }
 
-        // TODO: We should consider setting the publisher directly without waiting for the first data
-
-        request.observeFileUpload()
-            .filter(data -> data.getName().equals(inputName))
-            .take(1)
-            .doOnNext(data -> completableFuture.complete(publisher)).subscribe();
-
-        return new PendingRequestBindingResult<>() {
-
-            @Override
-            public boolean isPending() {
-                return !completableFuture.isDone();
-            }
-
-            @Override
-            public Optional<Publisher<?>> getValue() {
-                return Optional.ofNullable(completableFuture.getNow(null));
-            }
-        };
-    }
-
-    private <T> Flux<T> chunkedProcessing(Argument<T> contentArgument, Flux<MicronautHttpData<?>> cachedStream) {
-        return cachedStream
-            .flatMap(thisData -> {
-                MicronautHttpData<?>.Chunk chunk = thisData.pollChunk();
-                if (chunk != null) {
-                    NettyPartData part = new NettyPartData(() -> {
-                        if (thisData instanceof io.netty.handler.codec.http.multipart.FileUpload fu) {
-                            return Optional.of(MediaType.of(fu.getContentType()));
-                        } else {
-                            return Optional.empty();
-                        }
-                    }, chunk::claim);
-                    Optional<T> convert = conversionService.convert(part, contentArgument);
-                    if (convert.isPresent()) {
-                        return Mono.just(convert.get());
-                    }
-                }
-                return Mono.empty();
-            });
+        return () -> Optional.of(publisher);
     }
 
     @Override

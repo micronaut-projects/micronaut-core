@@ -149,9 +149,8 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private MutableConvertibleValues<Object> attributes;
     private NettyCookies nettyCookies;
     private final ByteBody body;
-
-    private RouteMatch<?> matchedRoute;
-    private boolean bodyRequired;
+    @Nullable
+    private FormRouteCompleter formRouteCompleter;
 
     /**
      * Set to {@code true} when the {@link #headers} may have been mutated. If this is not the case,
@@ -208,6 +207,13 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             body = next;
         }
         return body;
+    }
+
+    public final FormRouteCompleter formRouteCompleter() {
+        if (formRouteCompleter == null) {
+            formRouteCompleter = new FormRouteCompleter(this, (RouteMatch<?>) getAttribute(HttpAttributes.ROUTE_MATCH).get());
+        }
+        return formRouteCompleter;
     }
 
     @Override

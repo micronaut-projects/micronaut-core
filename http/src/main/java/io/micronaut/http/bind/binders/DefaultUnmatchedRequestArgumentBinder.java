@@ -66,15 +66,23 @@ public final class DefaultUnmatchedRequestArgumentBinder<T> implements Postponed
     public BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> request) {
         List<PendingRequestBindingResult<?>> pending = new ArrayList<>();
         List<ConversionError> errors = new ArrayList<>();
+        boolean allUnsatisfied = true;
         for (RequestArgumentBinder<Object> binder : stream().filter(binder -> !(binder instanceof PostponedRequestArgumentBinder)).toList()) {
             BindingResult<?> result = binder.bind((ArgumentConversionContext<Object>) context, request);
             if (result.isPresentAndSatisfied()) {
                 return (BindingResult<T>) result;
             } else if (result instanceof PendingRequestBindingResult<?> pendingRequestBindingResult) {
                 pending.add(pendingRequestBindingResult);
+                allUnsatisfied = false;
             } else {
-                errors.addAll(result.getConversionErrors());
+                if (result != BindingResult.UNSATISFIED) {
+                    errors.addAll(result.getConversionErrors());
+                    allUnsatisfied = false;
+                }
             }
+        }
+        if (allUnsatisfied) {
+            return BindingResult.unsatisfied();
         }
         return new PendingRequestBindingResult<>() {
 

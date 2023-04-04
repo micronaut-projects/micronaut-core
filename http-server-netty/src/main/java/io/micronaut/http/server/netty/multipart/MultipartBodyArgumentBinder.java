@@ -23,6 +23,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
+import io.micronaut.http.multipart.CompletedPart;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.DefaultHttpContentProcessor;
@@ -35,12 +36,15 @@ import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
+import io.netty.util.ReferenceCounted;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * A {@link io.micronaut.http.annotation.Body} argument binder for a {@link MultipartBody} argument.
@@ -86,24 +90,22 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
             } catch (Throwable e) {
                 throw new RuntimeException(e);
             }
+            Set<ReferenceCounted> partial = new HashSet<>();
             //noinspection unchecked
-            return () -> Optional.of(subscriber -> Flux.from(((Publisher<HttpData>) multiObjectBody.asPublisher())).flatMap(message -> {
-                // MicronautHttpData does not support .content()
-                if (message.length() == 0) {
-                    return Flux.empty();
-                }
-                if (message.isCompleted()) {
+            Flux<CompletedPart> completed = Flux.from(((Publisher<HttpData>) multiObjectBody.asPublisher())).mapNotNull(message -> {
+                if (message.isCompleted() && message.length() != 0) {
+                    partial.remove(message);
                     if (message instanceof FileUpload fu) {
-                        return Flux.just(new NettyCompletedFileUpload(fu, false))
-                            .doOnComplete(message::release);
-                    } else if (message instanceof Attribute attr) {
-                        return Flux.just(new NettyCompletedAttribute(attr, false))
-                            .doOnComplete(message::release);
+                        return new NettyCompletedFileUpload(fu, true);
+                    } else {
+                        return new NettyCompletedAttribute((Attribute) message, true);
                     }
+                } else {
+                    partial.add(message);
+                    return null;
                 }
-                message.release();
-                return Flux.empty();
-            }));
+            }).doOnTerminate(() -> partial.forEach(ReferenceCounted::release));
+            return () -> Optional.of(completed::subscribe);
         }
         return BindingResult.empty();
     }
