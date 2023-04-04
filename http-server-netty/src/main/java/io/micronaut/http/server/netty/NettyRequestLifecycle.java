@@ -137,7 +137,7 @@ final class NettyRequestLifecycle extends RequestLifecycle {
         }
         HttpContentProcessor processor = rib.httpContentProcessorResolver.resolve(nettyRequest, routeMatch);
         ByteBody rootBody = nettyRequest.rootBody();
-        if (nettyRequest.isFormOrMultipartData() && processor instanceof FormDataHttpContentProcessor) {
+        if (processor instanceof FormDataHttpContentProcessor && nettyRequest.isFormOrMultipartData()) {
             FormRouteCompleter frc = nettyRequest.formRouteCompleter();
             try {
                 rootBody.processMulti(processor).handleForm(frc);
