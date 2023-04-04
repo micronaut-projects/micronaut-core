@@ -426,7 +426,7 @@ public class Publishers {
         if (Publisher.class.isAssignableFrom(type)) {
             return true;
         } else {
-            if (type.isPrimitive() || packageOf(type).startsWith("java.")) {
+            if (type.isPrimitive() || type.getName().startsWith("java.")) {
                 return false;
             }
             for (Class<?> reactiveType : REACTIVE_TYPES) {
