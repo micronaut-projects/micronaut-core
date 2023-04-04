@@ -37,7 +37,7 @@ import java.util.Map;
  * Returns {@link HealthStatus#DOWN} if there are no available URLs in the load balancer.</p>
  *
  * @author Alexander Simpson
- * @since 3.8
+ * @since 3.8.9
  */
 @Factory
 @EachBean(ServiceHttpClientConfiguration.class)
@@ -49,6 +49,10 @@ public class ServiceHttpClientHealthIndicatorFactory implements HealthIndicator 
     private final Collection<URI> originalUrls;
     private final HealthResult.Builder serviceHealthBuilder;
 
+    /**
+     * @param configuration Configuration for the individual service http client.
+     * @param instanceList Instance List for the individual service http client. Used to obtain available load balancer URLs.
+     */
     public ServiceHttpClientHealthIndicatorFactory(@Parameter ServiceHttpClientConfiguration configuration, @Parameter StaticServiceInstanceList instanceList) {
         this.configuration = configuration;
         this.loadBalancerUrls = instanceList.getLoadBalancedURIs();
