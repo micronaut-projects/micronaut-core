@@ -51,6 +51,7 @@ public class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
     private final Map<String, Argument<?>> requiredInputs;
     private final boolean isVoid;
     private final Optional<Argument<?>> optionalBodyArgument;
+    private final Optional<Argument<?>> optionalFullBodyArgument;
 
     private RequestArgumentBinder<Object>[] argumentBinders;
 
@@ -94,6 +95,7 @@ public class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
         } else {
             optionalBodyArgument = Optional.empty();
         }
+        optionalFullBodyArgument = super.getFullBodyArgument();
     }
 
     @Override
@@ -147,6 +149,11 @@ public class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
     @Override
     public Optional<Argument<?>> getBodyArgument() {
         return optionalBodyArgument;
+    }
+
+    @Override
+    public Optional<Argument<?>> getFullBodyArgument() {
+        return optionalFullBodyArgument;
     }
 
     @Override

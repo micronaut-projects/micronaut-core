@@ -15,13 +15,16 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Body;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -56,6 +59,32 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
      * @return The argument that represents the body
      */
     Optional<Argument<?>> getBodyArgument();
+
+    /**
+     * Like {@link #getBodyArgument()}, but excludes body arguments that may match only a part of
+     * the body (i.e. that have no {@code @Body} annotation, or where the {@code @Body} has a value
+     * set).
+     *
+     * @return The argument that represents the body
+     */
+    @Internal
+    default Optional<Argument<?>> getFullBodyArgument() {
+        return getBodyArgument()
+            /*
+            The getBodyArgument() method returns arguments for functions where it is
+            not possible to dictate whether the argument is supposed to bind the entire
+            body or just a part of the body. We check to ensure the argument has the body
+            annotation to exclude that use case
+            */
+            .filter(argument -> {
+                AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+                if (annotationMetadata.hasAnnotation(Body.class)) {
+                    return annotationMetadata.stringValue(Body.class).isEmpty();
+                } else {
+                    return false;
+                }
+            });
+    }
 
     /**
      * @return The declaring type of the route.
