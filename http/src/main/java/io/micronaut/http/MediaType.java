@@ -401,6 +401,8 @@ public class MediaType implements CharSequence {
 
     private BigDecimal qualityNumberField = BigDecimal.ONE;
 
+    private boolean valid;
+
     static {
         textTypePatterns.add(Pattern.compile("^text/.*$"));
         textTypePatterns.add(Pattern.compile("^.*\\+json$"));
@@ -696,6 +698,21 @@ public class MediaType implements CharSequence {
             return of(contentType).isTextBased();
         } catch (IllegalArgumentException e) {
             return false;
+        }
+    }
+
+    /**
+     * Validate this media type for sending as an HTTP header. This is an optimization to only run
+     * the validation once if possible. If the validation function does not throw, future calls to
+     * this method will not call the validation function again.
+     *
+     * @param r Validation function
+     */
+    @Internal
+    public void validate(Runnable r) {
+        if (!valid) {
+            r.run();
+            valid = true;
         }
     }
 

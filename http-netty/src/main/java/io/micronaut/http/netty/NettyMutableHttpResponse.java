@@ -115,7 +115,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
      * @param conversionService The conversion service
      */
     public NettyMutableHttpResponse(HttpVersion httpVersion, HttpResponseStatus httpResponseStatus, Object body, ConversionService conversionService) {
-        this(httpVersion, httpResponseStatus, new DefaultHttpHeaders(), body, conversionService);
+        this(httpVersion, httpResponseStatus, null, body, conversionService);
     }
 
     /**
@@ -150,7 +150,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
 
         boolean hasHeaders = nettyHeaders != null;
         if (!hasHeaders) {
-            nettyHeaders = new DefaultHttpHeaders();
+            nettyHeaders = new DefaultHttpHeaders(false);
         }
         this.nettyHeaders = nettyHeaders;
         this.headers = new NettyHttpHeaders(nettyHeaders, conversionService);
@@ -299,6 +299,18 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
             bodyConvertor.cleanup();
         }
         return (MutableHttpResponse<T>) this;
+    }
+
+    @Override
+    public MutableHttpResponse<B> contentType(MediaType mediaType) {
+        if (mediaType == null) {
+            headers.remove(HttpHeaderNames.CONTENT_TYPE);
+        } else {
+            // optimization for content type validation
+            mediaType.validate(() -> NettyHttpHeaders.validateHeader(HttpHeaderNames.CONTENT_TYPE, mediaType));
+            headers.setUnsafe(HttpHeaderNames.CONTENT_TYPE, mediaType);
+        }
+        return this;
     }
 
     /**
