@@ -406,14 +406,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         }
     }
 
-    /**
-     * @return Obtains the matched route
-     */
-    @Internal
-    public RouteMatch<?> getMatchedRoute() {
-        return matchedRoute;
-    }
-
     @Nullable
     private ChannelHandlerContext findConnectionHandler() {
         ChannelHandlerContext current = channelHandlerContext.pipeline().context(Http2ConnectionHandler.class);
