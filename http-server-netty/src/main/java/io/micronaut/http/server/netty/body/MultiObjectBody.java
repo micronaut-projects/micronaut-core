@@ -33,7 +33,7 @@ import java.util.function.Function;
  * @author Jonas Konrad
  */
 @Internal
-public sealed interface MultiObjectBody extends HttpBody permits ImmediateMultiObjectBody, StreamingMultiObjectBody {
+public sealed interface MultiObjectBody extends HttpBody permits ImmediateMultiObjectBody, ImmediateSingleObjectBody, StreamingMultiObjectBody {
     /**
      * Coerce this value to an {@link InputStream}. This implements
      * {@link io.micronaut.http.server.netty.binders.InputStreamBodyBinder}. Requires the objects

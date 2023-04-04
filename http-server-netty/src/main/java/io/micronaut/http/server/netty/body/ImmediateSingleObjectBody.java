@@ -16,8 +16,19 @@
 package io.micronaut.http.server.netty.body;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.server.netty.FormRouteCompleter;
 import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.ByteBufHolder;
+import io.netty.buffer.ByteBufInputStream;
 import io.netty.util.ReferenceCountUtil;
+import io.netty.util.ReferenceCounted;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
+
+import java.io.InputStream;
+import java.util.List;
+import java.util.function.Function;
 
 /**
  * {@link HttpBody} that contains a single object. This is used to implement
@@ -27,7 +38,7 @@ import io.netty.util.ReferenceCountUtil;
  * @author Jonas Konrad
  */
 @Internal
-public final class ImmediateSingleObjectBody extends ManagedBody<Object> implements HttpBody {
+public final class ImmediateSingleObjectBody extends ManagedBody<Object> implements HttpBody, MultiObjectBody {
     ImmediateSingleObjectBody(Object value) {
         super(value);
     }
@@ -55,5 +66,27 @@ public final class ImmediateSingleObjectBody extends ManagedBody<Object> impleme
      */
     public Object valueUnclaimed() {
         return value();
+    }
+
+    @Override
+    public InputStream coerceToInputStream(ByteBufAllocator alloc) {
+        return new ByteBufInputStream(((ByteBufHolder) claim()).content(), true);
+    }
+
+    @Override
+    public Publisher<?> asPublisher() {
+        return Flux.just(claim()).doOnDiscard(ReferenceCounted.class, ReferenceCounted::release);
+    }
+
+    @Override
+    public MultiObjectBody mapNotNull(Function<Object, Object> transform) {
+        Object result = transform.apply(prepareClaim());
+        return next(result == null ? new ImmediateMultiObjectBody(List.of()) : new ImmediateSingleObjectBody(result));
+    }
+
+    @Override
+    public void handleForm(FormRouteCompleter formRouteCompleter) {
+        Flux.just(prepareClaim()).subscribe(formRouteCompleter);
+        next(formRouteCompleter);
     }
 }

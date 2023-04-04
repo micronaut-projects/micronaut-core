@@ -91,8 +91,11 @@ public class CompletableFutureBodyBinder
                     .buffer(nhr.getChannelHandlerContext().alloc())
                     .map(bytes -> {
                         try {
-                            return bytes.processMulti(httpContentProcessorResolver.resolve(nhr, targetType))
-                                .single(httpServerConfiguration.get().getDefaultCharset(), nhr.getChannelHandlerContext().alloc());
+                            return bytes.processSingle(
+                                httpContentProcessorResolver.resolve(nhr, targetType),
+                                httpServerConfiguration.get().getDefaultCharset(),
+                                nhr.getChannelHandlerContext().alloc()
+                            );
                         } catch (RuntimeException e) {
                             throw e;
                         } catch (Throwable e) {

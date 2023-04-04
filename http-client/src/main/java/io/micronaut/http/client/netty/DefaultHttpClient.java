@@ -879,6 +879,7 @@ public class DefaultHttpClient implements
             customHeaders = ((NettyHttpHeaders) headers).getNettyHeaders();
         }
         if (StringUtils.isNotEmpty(subprotocol)) {
+            NettyHttpHeaders.validateHeader("Sec-WebSocket-Protocol", subprotocol);
             customHeaders.add("Sec-WebSocket-Protocol", subprotocol);
         }
 

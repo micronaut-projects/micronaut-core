@@ -25,6 +25,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaderValidationUtil;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -51,8 +52,8 @@ import java.util.stream.Collectors;
 @Internal
 public class NettyHttpHeaders implements MutableHttpHeaders {
 
-    io.netty.handler.codec.http.HttpHeaders nettyHeaders;
-    ConversionService conversionService;
+    private final io.netty.handler.codec.http.HttpHeaders nettyHeaders;
+    private ConversionService conversionService;
 
     /**
      * @param nettyHeaders      The Netty Http headers
@@ -67,11 +68,13 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
      * Default constructor.
      */
     public NettyHttpHeaders() {
-        this.nettyHeaders = new DefaultHttpHeaders();
+        this.nettyHeaders = new DefaultHttpHeaders(false);
         this.conversionService = ConversionService.SHARED;
     }
 
     /**
+     * Note: Caller must take care to validate headers inserted into this object!
+     *
      * @return The underlying Netty headers.
      */
     public io.netty.handler.codec.http.HttpHeaders getNettyHeaders() {
@@ -81,15 +84,6 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     @Override
     public final boolean contains(String name) {
         return nettyHeaders.contains(name);
-    }
-
-    /**
-     * Sets the underlying netty headers.
-     *
-     * @param headers The Netty http headers
-     */
-    void setNettyHeaders(io.netty.handler.codec.http.HttpHeaders headers) {
-        this.nettyHeaders = headers;
     }
 
     @Override
@@ -142,14 +136,31 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
 
     @Override
     public MutableHttpHeaders add(CharSequence header, CharSequence value) {
+        validateHeader(header, value);
         nettyHeaders.add(header, value);
         return this;
     }
 
     @Override
     public MutableHeaders set(CharSequence header, CharSequence value) {
+        validateHeader(header, value);
         nettyHeaders.set(header, value);
         return this;
+    }
+
+    @Override
+    public MutableHttpHeaders setUnsafe(CharSequence header, CharSequence value) {
+        nettyHeaders.set(header, value);
+        return this;
+    }
+
+    public static void validateHeader(CharSequence name, CharSequence value) {
+        if (name == null || name.isEmpty() || HttpHeaderValidationUtil.validateToken(name) != -1) {
+            throw new IllegalArgumentException("Invalid header name");
+        }
+        if (HttpHeaderValidationUtil.validateValidHeaderValue(value) != -1) {
+            throw new IllegalArgumentException("Invalid header value");
+        }
     }
 
     @Override

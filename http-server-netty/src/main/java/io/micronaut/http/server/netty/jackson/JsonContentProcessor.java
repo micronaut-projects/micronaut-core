@@ -31,6 +31,7 @@ import io.micronaut.json.tree.JsonNode;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.CompositeByteBuf;
+import io.netty.handler.codec.http.DefaultHttpContent;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -44,10 +45,11 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-public class JsonContentProcessor extends AbstractHttpContentProcessor {
+public final class JsonContentProcessor extends AbstractHttpContentProcessor {
 
     private final JsonMapper jsonMapper;
     private final JsonCounter counter = new JsonCounter();
+    private final boolean tokenize;
     private ByteBuf singleBuffer;
     private CompositeByteBuf compositeBuffer;
 
@@ -62,9 +64,8 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
             JsonMapper jsonMapper) {
         super(nettyHttpRequest, configuration);
         this.jsonMapper = jsonMapper;
-
-        if (hasContentType(MediaType.APPLICATION_JSON_TYPE)) {
-
+        this.tokenize = !hasContentType(MediaType.APPLICATION_JSON_TYPE);
+        if (!tokenize) {
             // if the content type is application/json, we can only have one root-level value
             counter.noTokenization();
         }
@@ -86,6 +87,31 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
             }
         }
         return this;
+    }
+
+    @Override
+    public Object processSingle(ByteBuf data) throws Throwable {
+        // if data is empty, we return no json nodes, so can't use this method
+        if (tokenize || !data.isReadable()) {
+            return null;
+        }
+
+        if (data.readableBytes() > requestMaxSize) {
+            fireExceedsLength(data.readableBytes(), requestMaxSize, new DefaultHttpContent(data));
+        }
+        int start = data.readerIndex();
+        counter.feed(data);
+        data.readerIndex(start);
+        ByteBuffer<ByteBuf> wrapped = NettyByteBufferFactory.DEFAULT.wrap(data);
+        if (((NettyHttpServerConfiguration) configuration).isEagerParsing()) {
+            try {
+                return jsonMapper.readValue(wrapped, Argument.of(JsonNode.class));
+            } finally {
+                data.release();
+            }
+        } else {
+            return new LazyJsonNode(wrapped);
+        }
     }
 
     private boolean hasContentType(MediaType expected) {
