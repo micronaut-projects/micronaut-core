@@ -105,12 +105,16 @@ public final class DefaultUnmatchedRequestArgumentBinder<T> implements Postponed
 
     @Override
     public BindingResult<T> bindPostponed(ArgumentConversionContext<T> context, HttpRequest<?> request) {
+        BindingResult<T> lastWithError = null;
         for (RequestArgumentBinder<Object> binder : stream().filter(binder -> (binder instanceof PostponedRequestArgumentBinder)).toList()) {
             BindingResult<?> result = binder.bind((ArgumentConversionContext<Object>) context, request);
-            if (result.isPresentAndSatisfied()) {
+            if (result.getValue().isPresent()) {
                 return (BindingResult<T>) result;
             }
+            if (!result.getConversionErrors().isEmpty()) {
+                lastWithError = (BindingResult<T>) result;
+            }
         }
-        return BindingResult.unsatisfied();
+        return lastWithError == null ? BindingResult.unsatisfied() : lastWithError;
     }
 }

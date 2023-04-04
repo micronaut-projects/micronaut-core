@@ -59,9 +59,10 @@ public class DefaultBodyAnnotationBinder<T> extends AbstractArgumentBinder<T> im
         if (body.isEmpty()) {
             return BindingResult.empty();
         }
-
-        String bodyComponent = context.getAnnotationMetadata().stringValue(Body.class).orElseGet(() -> {
-            if (context.getAnnotationMetadata().hasAnnotation(Body.class)) {
+        boolean annotatedAsBody = context.getAnnotationMetadata().hasAnnotation(Body.class);
+        Optional<String> optionalBodyComponent = context.getAnnotationMetadata().stringValue(Body.class);
+        String bodyComponent = optionalBodyComponent.orElseGet(() -> {
+            if (annotatedAsBody) {
                 return null;
             }
             return context.getArgument().getName();
@@ -70,13 +71,16 @@ public class DefaultBodyAnnotationBinder<T> extends AbstractArgumentBinder<T> im
             Optional<ConvertibleValues> convertibleValuesBody = source.getBody(ConvertibleValues.class);
             if (convertibleValuesBody.isPresent()) {
                 BindingResult<T> convertibleValuesBindingResult = doBind(context, convertibleValuesBody.get(), bodyComponent);
-                if (convertibleValuesBindingResult.getValue().isPresent()) {
+                if (convertibleValuesBindingResult.getValue().isPresent() || !convertibleValuesBindingResult.getConversionErrors().isEmpty()) {
                     return convertibleValuesBindingResult;
                 }
             }
         }
-
-        return doConvert(body.get(), context);
+        BindingResult<T> bindingResult = doConvert(body.get(), context);
+        if (!annotatedAsBody && bindingResult.getValue().isEmpty()) {
+            return BindingResult.empty();
+        }
+        return bindingResult;
     }
 
 }

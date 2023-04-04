@@ -148,6 +148,20 @@ public abstract class AbstractArgumentBinder<T> {
      */
     protected BindingResult<T> doConvert(Object value, ArgumentConversionContext<T> context, BindingResult<T> defaultResult) {
         if (value == null) {
+            Optional<ConversionError> lastError = context.getLastError();
+            if (lastError.isPresent()) {
+                return new BindingResult<>() {
+                    @Override
+                    public Optional<T> getValue() {
+                        return Optional.empty();
+                    }
+
+                    @Override
+                    public List<ConversionError> getConversionErrors() {
+                        return lastError.map(List::of).orElseGet(List::of);
+                    }
+                };
+            }
             return defaultResult;
         } else {
             Optional<T> result = conversionService.convert(value, context);
