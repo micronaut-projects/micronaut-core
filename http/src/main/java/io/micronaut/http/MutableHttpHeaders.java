@@ -15,7 +15,6 @@
  */
 package io.micronaut.http;
 
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionServiceAware;
 import io.micronaut.core.type.MutableHeaders;
 
@@ -60,18 +59,6 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders, Convers
     @Override
     default MutableHeaders set(CharSequence header, CharSequence value) {
         return MutableHeaders.super.set(header, value);
-    }
-
-    /**
-     * Like {@link #set(CharSequence, CharSequence)} but without header validation.
-     *
-     * @param header The header name
-     * @param value  The header value
-     * @return This object
-     */
-    @Internal
-    default MutableHttpHeaders setUnsafe(CharSequence header, CharSequence value) {
-        return (MutableHttpHeaders) set(header, value);
     }
 
     /**

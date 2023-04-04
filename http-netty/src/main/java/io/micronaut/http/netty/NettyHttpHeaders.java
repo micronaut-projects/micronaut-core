@@ -148,10 +148,14 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
         return this;
     }
 
-    @Override
-    public MutableHttpHeaders setUnsafe(CharSequence header, CharSequence value) {
+    /**
+     * Like {@link #set(CharSequence, CharSequence)} but without header validation.
+     *
+     * @param header The header name
+     * @param value  The header value
+     */
+    public void setUnsafe(CharSequence header, CharSequence value) {
         nettyHeaders.set(header, value);
-        return this;
     }
 
     public static void validateHeader(CharSequence name, CharSequence value) {
