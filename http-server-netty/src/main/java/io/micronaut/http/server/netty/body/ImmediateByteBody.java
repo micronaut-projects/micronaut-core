@@ -20,6 +20,12 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import io.netty.handler.codec.http.DefaultHttpContent;
+import org.jetbrains.annotations.NotNull;
+
+import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Fully buffered {@link ByteBody}, all operations are eager.
@@ -42,8 +48,40 @@ public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements Byt
     }
 
     @Override
-    public ImmediateMultiObjectBody processMulti(HttpContentProcessor processor) throws Throwable {
-        return next(new ImmediateMultiObjectBody(processor.processSingle(prepareClaim())));
+    public MultiObjectBody processMulti(HttpContentProcessor processor) throws Throwable {
+        ByteBuf data = prepareClaim();
+        Object item = processor.processSingle(data);
+        if (item != null) {
+            return next(new ImmediateSingleObjectBody(item));
+        }
+
+        return next(processMultiImpl(processor, data));
+    }
+
+    @NotNull
+    private ImmediateMultiObjectBody processMultiImpl(HttpContentProcessor processor, ByteBuf data) throws Throwable {
+        List<Object> out = new ArrayList<>(1);
+        if (data.isReadable()) {
+            processor.add(new DefaultHttpContent(data), out);
+        } else {
+            data.release();
+        }
+        processor.complete(out);
+        return new ImmediateMultiObjectBody(out);
+    }
+
+    /**
+     * Process this body and then transform it into a single object using
+     * {@link ImmediateMultiObjectBody#single}.
+     *
+     * @param processor The processor
+     * @param defaultCharset The default charset (see {@link ImmediateMultiObjectBody#single})
+     * @param alloc The buffer allocator (see {@link ImmediateMultiObjectBody#single})
+     * @return The processed object
+     * @throws Throwable Any failure
+     */
+    public ImmediateSingleObjectBody processSingle(HttpContentProcessor processor, Charset defaultCharset, ByteBufAllocator alloc) throws Throwable {
+        return next(processMultiImpl(processor, prepareClaim()).single(defaultCharset, alloc));
     }
 
     @Override

@@ -15,15 +15,13 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.Toggleable;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
-import io.netty.handler.codec.http.DefaultHttpContent;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 
 /**
  * This class represents the first step of the HTTP body parsing pipeline. It transforms
@@ -74,20 +72,14 @@ public interface HttpContentProcessor extends Toggleable {
     }
 
     /**
-     * Process a single {@link ByteBuf}.
+     * Process a single {@link ByteBuf} into a single item, if possible.
      *
      * @param data The input data
-     * @return The output values
+     * @return The output value, or {@code null} if this is unsupported.
      * @throws Throwable Any failure
      */
-    default List<Object> processSingle(ByteBuf data) throws Throwable {
-        List<Object> out = new ArrayList<>(1);
-        if (data.isReadable()) {
-            add(new DefaultHttpContent(data), out);
-        } else {
-            data.release();
-        }
-        complete(out);
-        return out;
+    @Nullable
+    default Object processSingle(ByteBuf data) throws Throwable {
+        return null;
     }
 }

@@ -35,7 +35,6 @@ import io.netty.handler.codec.http.DefaultHttpContent;
 
 import java.io.IOException;
 import java.util.Collection;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -91,9 +90,10 @@ public final class JsonContentProcessor extends AbstractHttpContentProcessor {
     }
 
     @Override
-    public List<Object> processSingle(ByteBuf data) throws Throwable {
-        if (tokenize) {
-            return super.processSingle(data);
+    public Object processSingle(ByteBuf data) throws Throwable {
+        // if data is empty, we return no json nodes, so can't use this method
+        if (tokenize || !data.isReadable()) {
+            return null;
         }
 
         if (data.readableBytes() > requestMaxSize) {
@@ -105,12 +105,12 @@ public final class JsonContentProcessor extends AbstractHttpContentProcessor {
         ByteBuffer<ByteBuf> wrapped = NettyByteBufferFactory.DEFAULT.wrap(data);
         if (((NettyHttpServerConfiguration) configuration).isEagerParsing()) {
             try {
-                return List.of(jsonMapper.readValue(wrapped, Argument.of(JsonNode.class)));
+                return jsonMapper.readValue(wrapped, Argument.of(JsonNode.class));
             } finally {
                 data.release();
             }
         } else {
-            return List.of(new LazyJsonNode(wrapped));
+            return new LazyJsonNode(wrapped);
         }
     }
 
