@@ -52,7 +52,6 @@ public interface UriRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, RequestM
      */
     @Override
     default Optional<UriRouteMatch<T, R>> match(URI uri) {
-
         return match(uri.toString());
     }
 
