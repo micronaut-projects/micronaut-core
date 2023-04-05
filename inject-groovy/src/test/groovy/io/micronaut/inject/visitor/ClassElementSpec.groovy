@@ -932,9 +932,13 @@ class SuccessfulTest extends AbstractExample {
             def allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
         then:
             props.size() == 3
-            props[0].name == "ctx"
-            props[1].name.contains "dummy"
-            props[2].name.contains "sharedCtx"
+            props[0].name == '$spock_sharedField_sharedCtx'
+            props[1].name == "ctx"
+            props[2].name.contains "dummy"
+            allFields.size() == 3
+            allFields[0].name == '$spock_sharedField_sharedCtx'
+            allFields[1].name == "ctx"
+            allFields[2].name.contains "dummy"
     }
 
     void "test fields selection"() {
