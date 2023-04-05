@@ -247,6 +247,11 @@ public final class ApplicationEventPublisherFactory<T>
                 });
                 return future;
             }
+
+            @Override
+            public boolean empty() {
+                return lazyListeners.get().isEmpty();
+            }
         };
     }
 
