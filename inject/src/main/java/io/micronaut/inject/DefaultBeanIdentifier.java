@@ -26,7 +26,7 @@ import java.util.Objects;
  * @since 1.0
  */
 @Internal
-class DefaultBeanIdentifier implements BeanIdentifier {
+final class DefaultBeanIdentifier implements BeanIdentifier {
 
     private final String id;
 

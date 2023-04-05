@@ -34,6 +34,7 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.context.BeanContextConfigurable;
 import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -238,6 +239,9 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
     }
 
     private static void instrumentAnnotationMetadata(BeanContext beanContext, Object method) {
+        if (method instanceof BeanContextConfigurable ctxConfigurable) {
+            ctxConfigurable.configure(beanContext);
+        }
         if (beanContext instanceof ApplicationContext applicationContext && method instanceof EnvironmentConfigurable environmentConfigurable) {
             // ensure metadata is environment aware
             if (environmentConfigurable.hasPropertyExpressions()) {

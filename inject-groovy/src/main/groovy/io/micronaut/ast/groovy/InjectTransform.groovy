@@ -73,6 +73,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         } else {
             outputVisitor = new DirectoryClassWriterOutputVisitor(classesDir)
         }
+
         List<ClassNode> classes = moduleNode.getClasses()
         if (classes.size() == 1) {
             ClassNode classNode = classes[0]

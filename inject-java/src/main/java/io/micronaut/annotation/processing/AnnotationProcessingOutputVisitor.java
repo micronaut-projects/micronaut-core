@@ -87,8 +87,8 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
                 // gradle filer only support single originating element for isolating processors
                 final io.micronaut.inject.ast.Element e = originatingElements[0];
                 final Object nativeType = e.getNativeType();
-                if (nativeType instanceof Element) {
-                    nativeOriginatingElements = new Element[] { (Element) nativeType };
+                if (nativeType instanceof JavaNativeElement javaNativeElement) {
+                    nativeOriginatingElements = new Element[] { javaNativeElement.element() };
                 } else {
                     nativeOriginatingElements = new Element[0];
                 }

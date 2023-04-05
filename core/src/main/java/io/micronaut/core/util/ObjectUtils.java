@@ -18,6 +18,10 @@ package io.micronaut.core.util;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 
+import java.util.Collection;
+import java.util.Map;
+import java.util.Optional;
+
 /**
  * <p>Utility methods for working with objects</p>.
  *
@@ -60,4 +64,39 @@ public final class ObjectUtils {
         return result;
     }
 
+    /**
+     * Coerce the given object to boolean. The following cases are handled:
+     *
+     * <ol>
+     *     <li>{@code null} results in {@code false}</li>
+     *     <li>empty strings result in {@code false}</li>
+     *     <li>positive numbers are {@code true}</li>
+     *     <li>empty collections, arrays, optionals and maps are {@code false}</li>
+     * </ol>
+     * @param object The object
+     * @return The boolean
+     * @since 4.0.0
+     */
+    @SuppressWarnings("unused") // used by expressions
+    public static boolean coerceToBoolean(@Nullable Object object) {
+        if (object == null) {
+            return false;
+        } else if (object instanceof Boolean b) {
+            return b;
+        } else if (object instanceof CharSequence charSequence) {
+            return charSequence.length() > 0;
+        } else if (object instanceof Number n) {
+            return n.doubleValue() != 0;
+        } else if (object instanceof Collection<?> col) {
+            return !col.isEmpty();
+        } else if (object instanceof Map<?, ?> col) {
+            return !col.isEmpty();
+        } else if (object instanceof Object[] array) {
+            return array.length > 0;
+        } else if (object instanceof Optional<?> opt) {
+            return opt.isPresent();
+        }
+        return true;
+
+    }
 }

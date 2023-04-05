@@ -25,6 +25,7 @@ import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.core.order.OrderUtil
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder
+import io.micronaut.inject.writer.BeanDefinitionWriter
 import io.micronaut.inject.writer.ClassWriterOutputVisitor
 import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
 import org.codehaus.groovy.ast.ASTNode
@@ -98,7 +99,7 @@ class TypeElementVisitorEnd implements ASTTransformation, CompilationUnitAware {
 
         TypeElementVisitorTransform.loadedVisitors.remove()
         TypeElementVisitorTransform.beanDefinitionBuilders.remove()
-        AbstractAnnotationMetadataBuilder.clearMutated()
+        BeanDefinitionWriter.finish()
     }
 
     @Override

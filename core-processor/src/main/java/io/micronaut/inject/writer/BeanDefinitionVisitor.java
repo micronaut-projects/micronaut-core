@@ -17,6 +17,7 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.util.Toggleable;
+import io.micronaut.expressions.context.ExpressionWithContext;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
@@ -35,6 +36,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Interface for {@link BeanDefinitionVisitor} implementations such as {@link BeanDefinitionWriter}.
@@ -337,6 +339,13 @@ public interface BeanDefinitionVisitor extends OriginatingElements, Toggleable {
      * @return The annotation metadata
      */
     AnnotationMetadata getAnnotationMetadata();
+
+    /**
+     * @return The evaluated expressions metadata
+     * @since 4.0.0
+     */
+    @NonNull
+    Set<ExpressionWithContext> getEvaluatedExpressions();
 
     /**
      * Begin defining a configuration builder.

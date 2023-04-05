@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,27 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.util;
+package io.micronaut.expressions.parser.token;
 
-import java.util.regex.Pattern;
+import io.micronaut.core.annotation.Internal;
 
 /**
- * Defines regular expressions to match requests.
+ * Parsed token with value and type.
  *
- * @author Sergio del Amo
- * @since 1.0
+ * @param type token type
+ * @param value token string value
+ *
+ * @author Sergey Gavrilov
+ * @since 4.0.0
  */
-public interface OutgointRequestProcessorMatcher {
-
-    /**
-     * @return a regular expresion to validate the service id against.
-     */
-    Pattern getServiceIdPattern();
-
-    /**
-     *
-     * @return a regular expression to validate the target request uri against.
-     */
-    Pattern getUriPattern();
-
-}
+@Internal
+public record Token(TokenType type, String value) { }

@@ -47,6 +47,7 @@ config:
   environments: The Environment
   propertySource: Externalized Configuration with PropertySources
   valueAnnotation: Configuration Injection
+  evaluatedExpressions: Expression Language
   configurationProperties: Configuration Properties
   customTypeConverter: Custom Type Converters
   eachProperty: Using @EachProperty to Drive Configuration

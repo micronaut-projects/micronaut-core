@@ -24,6 +24,7 @@ import io.micronaut.ast.groovy.utils.ExtendedParameter;
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ConversionService;
@@ -145,6 +146,20 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             }
         }
         return null;
+    }
+
+    @Override
+    protected String getOriginatingClassName(AnnotatedNode originatingElement)
+    {
+        if (originatingElement instanceof ClassNode classNode) {
+            return classNode.getName();
+        } else if (originatingElement instanceof ExtendedParameter extendedParameter) {
+            return extendedParameter.getMethodNode().getDeclaringClass().getName();
+        } else if (originatingElement instanceof MethodNode methodNode) {
+            return methodNode.getDeclaringClass().getName();
+        }
+
+        return originatingElement.getDeclaringClass().getName();
     }
 
     @Override
@@ -351,7 +366,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             Object annotationValue,
             Map<CharSequence, Object> annotationValues) {
         if (!annotationValues.containsKey(memberName)) {
-            final Object v = readAnnotationValue(originatingElement, member, memberName, annotationValue);
+            Object v = readAnnotationValue(originatingElement, member, annotationName, memberName, annotationValue);
             if (v != null) {
                 validateAnnotationValue(originatingElement, annotationName, member, memberName, v);
                 annotationValues.put(memberName, v);
@@ -386,9 +401,9 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
-    protected Object readAnnotationValue(AnnotatedNode originatingElement, AnnotatedNode member, String memberName, Object annotationValue) {
+    protected Object readAnnotationValue(AnnotatedNode originatingElement, AnnotatedNode member, String annotationName, String memberName, Object annotationValue) {
         if (annotationValue instanceof ConstantExpression constantExpression) {
-            return readConstantExpression(originatingElement, member, constantExpression);
+            return readConstantExpression(originatingElement, annotationName, member, constantExpression);
         } else if (annotationValue instanceof PropertyExpression pe) {
             if (pe.getObjectExpression() instanceof ClassExpression classExpression) {
                 ClassNode propertyType = classExpression.getType();
@@ -417,15 +432,21 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
                     Expression valueExpression = propertyExpression.getProperty();
                     Expression objectExpression = propertyExpression.getObjectExpression();
                     if (valueExpression instanceof ConstantExpression constantExpression && objectExpression instanceof ClassExpression) {
-                        Object value = readConstantExpression(originatingElement, member, constantExpression);
+                        Object value = readConstantExpression(originatingElement, annotationName, member, constantExpression);
                         if (value != null) {
                             converted.add(value);
                         }
                     }
                 }
                 if (exp instanceof ConstantExpression constantExpression) {
-                    Object value = readConstantExpression(originatingElement, member, constantExpression);
+                    Object value = readConstantExpression(originatingElement, annotationName, member, constantExpression);
                     if (value != null) {
+                        // if value is an expression reference, since we're iterating through a list,
+                        //  we extract initial annotation value to wrap it into a single expression reference
+                        //  after the iteration is complete
+                        if (value instanceof EvaluatedExpressionReference expressionReference) {
+                            value = expressionReference.annotationValue();
+                        }
                         converted.add(value);
                     }
                 } else if (exp instanceof ClassExpression classExpression) {
@@ -438,11 +459,15 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
                     converted.add(new AnnotationClassValue<>(typeName));
                 }
             }
-            return toArray(member, converted);
+            Object array = toArray(member, converted);
+            if (isEvaluatedExpression(array)) {
+                return buildEvaluatedExpressionReference(originatingElement, annotationName, memberName, array);
+            }
+            return array;
         } else if (annotationValue instanceof VariableExpression variableExpression) {
             Variable variable = variableExpression.getAccessedVariable();
             if (variable != null && variable.hasInitialExpression()) {
-                return readAnnotationValue(originatingElement, member, memberName, variable.getInitialExpression());
+                return readAnnotationValue(originatingElement, member, annotationName, memberName, variable.getInitialExpression());
             }
         } else if (annotationValue != null) {
             if (ClassUtils.isJavaLangType(annotationValue.getClass())) {
@@ -477,6 +502,8 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
                     arrayType = AnnotationValue.class;
                 } else if (Class.class.isAssignableFrom(arrayType)) {
                     arrayType = AnnotationClassValue.class;
+                } else if (EvaluatedExpressionReference.class.isAssignableFrom(arrayType)) {
+                    arrayType = EvaluatedExpressionReference.class;
                 }
             }
         }
@@ -487,6 +514,8 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             arrayType = AnnotationClassValue.class;
         } else if (collection.stream().allMatch(val -> val instanceof AnnotationValue)) {
             arrayType = AnnotationValue.class;
+        } else if (collection.stream().anyMatch(val -> val instanceof EvaluatedExpressionReference)) {
+            arrayType = Object.class;
         }
         if (arrayType.isPrimitive()) {
             Class<?> wrapperType = ReflectionUtils.getWrapperType(arrayType);
@@ -500,7 +529,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
                 .orElse(null);
     }
 
-    private Object readConstantExpression(AnnotatedNode originatingElement, AnnotatedNode member, ConstantExpression constantExpression) {
+    private Object readConstantExpression(AnnotatedNode originatingElement, String annotationName, AnnotatedNode member, ConstantExpression constantExpression) {
         if (constantExpression instanceof AnnotationConstantExpression ann) {
             AnnotationNode value = (AnnotationNode) ann.getValue();
             return readNestedAnnotationValue(originatingElement, value);
@@ -509,9 +538,17 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             if (value == null) {
                 return null;
             }
+            if (isEvaluatedExpression(value)) {
+                String memberName = getAnnotationMemberName(member);
+                return buildEvaluatedExpressionReference(originatingElement, annotationName, memberName, value);
+            }
             if (value instanceof Collection<?> collection) {
                 collection = collection.stream().map(this::convertConstantValue).toList();
-                return toArray(member, collection);
+                Object array = toArray(member, collection);
+                if (isEvaluatedExpression(array)) {
+                    return buildEvaluatedExpressionReference(originatingElement, annotationName, getAnnotationMemberName(member), array);
+                }
+                return array;
             }
             return convertConstantValue(value);
         }

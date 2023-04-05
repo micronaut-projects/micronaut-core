@@ -24,8 +24,8 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * <p>Allows configuration injection from the environment on a per property, field, method/constructor parameter
- * basis.</p>
+ * <p>Allows configuration injection from the environment or bean context on a per property, field,
+ * method/constructor parameter basis.</p>
  *
  * @author Graeme Rocher
  * @see ConfigurationProperties
@@ -38,7 +38,8 @@ import java.lang.annotation.Target;
 public @interface Value {
 
     /**
-     * A string containing a value, which my optionally contain property placeholder expressions.
+     * A string containing a value, which my optionally contain property placeholder expressions or
+     * evaluated expressions.
      *
      * @return The value to inject.
      */
