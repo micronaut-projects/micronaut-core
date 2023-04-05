@@ -67,7 +67,7 @@ public class DefaultExecutorSelector implements ExecutorSelector {
 
     @Override
     public Optional<ExecutorService> select(MethodReference<?, ?> method, ThreadSelection threadSelection) {
-        final String name = method.stringValue(EXECUTE_ON).orElse(null);
+        final String name = method.executeOn();
         if (name != null) {
             final ExecutorService executorService;
             try {
