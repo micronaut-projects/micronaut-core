@@ -25,11 +25,13 @@ import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
+import io.micronaut.scheduling.executor.ThreadSelection;
 
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Common information shared between route and route match.
@@ -225,4 +227,11 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
      */
     boolean isPermitsRequestBody();
 
+    /**
+     * @param threadSelection The thread selection
+     * @return The route executor
+     * @since 4.0.0
+     */
+    @Nullable
+    ExecutorService getExecutor(@Nullable ThreadSelection threadSelection);
 }

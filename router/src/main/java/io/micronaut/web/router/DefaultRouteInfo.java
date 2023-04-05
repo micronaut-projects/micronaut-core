@@ -29,10 +29,12 @@ import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.sse.Event;
+import io.micronaut.scheduling.executor.ThreadSelection;
 
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
 
 /**
  * The default route info implementation.
@@ -282,6 +284,11 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     @Override
     public boolean isPermitsRequestBody() {
         return isPermitsBody;
+    }
+
+    @Override
+    public ExecutorService getExecutor(ThreadSelection threadSelection) {
+        return null;
     }
 
     @Override
