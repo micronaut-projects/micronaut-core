@@ -21,6 +21,7 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.filter.GenericHttpFilter;
+import io.micronaut.web.router.exceptions.DuplicateRouteException;
 
 import java.net.URI;
 import java.util.List;
@@ -139,6 +140,26 @@ public interface Router {
      */
     @NonNull
     <T, R> List<UriRouteMatch<T, R>> findAllClosest(@NonNull HttpRequest<?> request);
+
+    /**
+     * Finds the closest match for the given request or null if none is found.
+     *
+     * @param request The request
+     * @param <T>     The target type
+     * @param <R>     The type
+     * @return A match or null, throws {@link DuplicateRouteException} on multiple routes.
+     * @since 4.0.0
+     */
+    @NonNull
+    default <T, R> UriRouteMatch<T, R> findClosest(@NonNull HttpRequest<?> request) throws DuplicateRouteException {
+        List<UriRouteMatch<T, R>> uriRoutes = findAllClosest(request);
+        if (uriRoutes.size() > 1) {
+            throw new DuplicateRouteException(request.getPath(), (List) uriRoutes);
+        } else if (uriRoutes.size() == 1) {
+            return uriRoutes.get(0);
+        }
+        return null;
+    }
 
     /**
      * Returns all UriRoutes.

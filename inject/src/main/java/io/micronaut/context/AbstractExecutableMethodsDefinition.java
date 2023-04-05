@@ -24,6 +24,7 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.core.type.UnsafeExecutable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.ExecutableMethod;
@@ -327,8 +328,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
      * @param <R> The result type
      */
     private static final class DispatchedExecutableMethod<T, R> implements ExecutableMethod<T, R>,
-                                                                           EnvironmentConfigurable,
-            BeanContextConfigurable {
+        EnvironmentConfigurable, BeanContextConfigurable, UnsafeExecutable<T, R> {
 
         private final AbstractExecutableMethodsDefinition dispatcher;
         private final int index;
@@ -439,6 +439,11 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         @Override
         public R invoke(T instance, Object... arguments) {
             ArgumentUtils.validateArguments(this, methodReference.arguments, arguments);
+            return (R) dispatcher.dispatch(index, instance, arguments);
+        }
+
+        @Override
+        public R invokeUnsafe(T instance, Object... arguments) {
             return (R) dispatcher.dispatch(index, instance, arguments);
         }
 

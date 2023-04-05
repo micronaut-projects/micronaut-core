@@ -301,7 +301,7 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
                         Writable writable = (Writable) body;
                         writable.writeTo(outputStream, nettyRequest.getCharacterEncoding());
                         response.body(byteBuf);
-                        if (!response.getContentType().isPresent()) {
+                        if (response.getContentType().isEmpty()) {
                             response.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).ifPresent((routeInfo) ->
                                 response.contentType(routeExecutor.resolveDefaultResponseContentType(nettyRequest, routeInfo)));
                         }

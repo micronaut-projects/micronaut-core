@@ -234,4 +234,10 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
      */
     @Nullable
     ExecutorService getExecutor(@Nullable ThreadSelection threadSelection);
+
+    /**
+     * @return true if the route needs request body to be read
+     * @since 4.0.0
+     */
+    boolean needsRequestBody();
 }

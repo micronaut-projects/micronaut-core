@@ -53,7 +53,6 @@ import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
-import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
@@ -168,14 +167,7 @@ public final class RouteExecutor {
 
     @Nullable
     UriRouteMatch<Object, Object> findRouteMatch(HttpRequest<?> httpRequest) {
-        UriRouteMatch<Object, Object> routeMatch = null;
-
-        List<UriRouteMatch<Object, Object>> uriRoutes = router.findAllClosest(httpRequest);
-        if (uriRoutes.size() > 1) {
-            throw new DuplicateRouteException(httpRequest.getPath(), uriRoutes);
-        } else if (uriRoutes.size() == 1) {
-            routeMatch = uriRoutes.get(0);
-        }
+        UriRouteMatch<Object, Object> routeMatch = router.findClosest(httpRequest);
 
         if (routeMatch == null && httpRequest.getMethod().equals(HttpMethod.OPTIONS)) {
             List<UriRouteMatch<Object, Object>> anyUriRoutes = router.findAny(httpRequest);
@@ -386,26 +378,9 @@ public final class RouteExecutor {
             (finalRoute.isAsync() || finalRoute.isSuspended() || Publishers.isSingle(bodyClass)));
     }
 
-    private MutableHttpResponse<?> toMutableResponse(HttpResponse<?> message) {
-        MutableHttpResponse<?> mutableHttpResponse;
-        if (message instanceof MutableHttpResponse) {
-            mutableHttpResponse = (MutableHttpResponse<?>) message;
-        } else {
-            mutableHttpResponse = HttpResponse.status(message.code(), message.reason());
-            mutableHttpResponse.body(message.body());
-            message.getHeaders().forEach((name, value) -> {
-                for (String val : value) {
-                    mutableHttpResponse.header(name, val);
-                }
-            });
-            mutableHttpResponse.getAttributes().putAll(message.getAttributes());
-        }
-        return mutableHttpResponse;
-    }
-
     private ExecutionFlow<MutableHttpResponse<?>> fromImperativeExecute(HttpRequest<?> request, RouteInfo<?> routeInfo, Object body) {
-        if (body instanceof HttpResponse) {
-            MutableHttpResponse<?> outgoingResponse = toMutableResponse((HttpResponse<?>) body);
+        if (body instanceof HttpResponse<?> httpResponse) {
+            MutableHttpResponse<?> outgoingResponse = httpResponse.toMutableResponse();
             final Argument<?> bodyArgument = routeInfo.getReturnType().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             if (bodyArgument.isAsyncOrReactive()) {
                 return fromPublisher(
@@ -531,8 +506,8 @@ public final class RouteExecutor {
                 Mono.fromCompletionStage(supplier)
                     .flatMap(obj -> {
                         MutableHttpResponse<?> response;
-                        if (obj instanceof HttpResponse) {
-                            response = toMutableResponse((HttpResponse<?>) obj);
+                        if (obj instanceof HttpResponse<?> httpResponse) {
+                            response = httpResponse.toMutableResponse();
                             final Argument<?> bodyArgument = routeInfo.getReturnType().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
                             if (bodyArgument.isAsyncOrReactive()) {
                                 return processPublisherBody(request, response, routeInfo);
@@ -585,8 +560,8 @@ public final class RouteExecutor {
                             return Flux.just(emptyResponse.get());
                         }
                     }
-                    if (o instanceof HttpResponse) {
-                        singleResponse = toMutableResponse((HttpResponse<?>) o);
+                    if (o instanceof HttpResponse<?> httpResponse) {
+                        singleResponse = httpResponse.toMutableResponse();
                         final Argument<?> bodyArgument = routeInfo.getReturnType() //Mono
                             .getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT) //HttpResponse
                             .getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT); //Mono
@@ -609,7 +584,7 @@ public final class RouteExecutor {
             // a response stream
             Publisher<HttpResponse<?>> bodyPublisher = Publishers.convertPublisher(conversionService, body, Publisher.class);
             Flux<MutableHttpResponse<?>> response = Flux.from(bodyPublisher)
-                .map(this::toMutableResponse);
+                .map(HttpResponse::toMutableResponse);
             Argument<?> bodyArgument = typeArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             if (bodyArgument.isAsyncOrReactive()) {
                 return response.flatMap((resp) ->

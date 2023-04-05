@@ -54,6 +54,7 @@ public class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
     private final Optional<Argument<?>> optionalFullBodyArgument;
 
     private RequestArgumentBinder<Object>[] argumentBinders;
+    private boolean needsBody;
 
     public DefaultMethodBasedRouteInfo(MethodExecutionHandle<T, R> targetMethod,
                                        @Nullable
@@ -96,6 +97,16 @@ public class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
             optionalBodyArgument = Optional.empty();
         }
         optionalFullBodyArgument = super.getFullBodyArgument();
+        needsBody = optionalBodyArgument.isPresent() || hasArg(arguments, HttpRequest.class);
+    }
+
+    private static boolean hasArg(Argument<?>[] arguments, Class<?> type) {
+        for (Argument<?> argument : arguments) {
+            if (argument.getType() == type) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -159,5 +170,10 @@ public class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
     @Override
     public String[] getArgumentNames() {
         return argumentNames;
+    }
+
+    @Override
+    public boolean needsRequestBody() {
+        return needsBody || super.needsRequestBody();
     }
 }

@@ -18,9 +18,7 @@ package io.micronaut.http.server.netty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
-import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
@@ -31,7 +29,6 @@ import io.micronaut.http.server.netty.body.ByteBody;
 import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType;
 import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
-import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.DecoderResult;
@@ -168,29 +165,8 @@ final class NettyRequestLifecycle extends RequestLifecycle {
     }
 
     private boolean needsBody(RouteMatch<?> routeMatch) {
-        if (!routeMatch.getRouteInfo().isPermitsRequestBody()) {
-            return false;
-        }
-        if (routeMatch instanceof MethodBasedRouteMatch<?, ?> methodBasedRouteMatch) {
-            if (hasArg(methodBasedRouteMatch, HttpRequest.class)) {
-                // HttpRequest argument in the method
-                return true;
-            }
-        }
-        if (routeMatch.getRouteInfo().getBodyArgument().isPresent()) {
-            // Body argument in the method
-            return true;
-        }
         // Not annotated body argument
-        return !routeMatch.isFulfilled();
+        return routeMatch.getRouteInfo().needsRequestBody() || !routeMatch.isFulfilled();
     }
 
-    private static boolean hasArg(MethodBasedRouteMatch<?, ?> methodBasedRouteMatch, Class<?> type) {
-        for (Argument<?> argument : methodBasedRouteMatch.getArguments()) {
-            if (argument.getType() == type) {
-                return true;
-            }
-        }
-        return false;
-    }
 }

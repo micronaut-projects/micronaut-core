@@ -295,4 +295,9 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
     }
+
+    @Override
+    public boolean needsRequestBody() {
+        return isPermitsBody;
+    }
 }
