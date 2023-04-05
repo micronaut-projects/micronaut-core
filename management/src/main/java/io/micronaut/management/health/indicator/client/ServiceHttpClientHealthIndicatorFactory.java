@@ -44,6 +44,7 @@ import java.util.Map;
 @Factory
 @EachBean(ServiceHttpClientConfiguration.class)
 @Requires(beans = HealthEndpoint.class)
+@Requires(classes = ServiceHttpClientConfiguration.class)
 @Requires(property = HealthEndpoint.PREFIX + ".service-http-client.enabled", defaultValue = StringUtils.FALSE, notEquals = StringUtils.FALSE)
 public class ServiceHttpClientHealthIndicatorFactory implements HealthIndicator {
 
