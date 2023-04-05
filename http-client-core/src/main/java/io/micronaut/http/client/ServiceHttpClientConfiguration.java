@@ -66,19 +66,12 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
     @SuppressWarnings("WeakerAccess")
     public static final long DEFAULT_HEALTHCHECKINTERVAL_SECONDS = 30;
 
-    /**
-     * The default health indicator value.
-     */
-    @SuppressWarnings("WeakerAccess")
-    public static final boolean DEFAULT_HEALTH_INDICATOR = false;
-
     private final String serviceId;
     private final ServiceConnectionPoolConfiguration connectionPoolConfiguration;
     private List<URI> urls = Collections.emptyList();
     private String healthCheckUri = DEFAULT_HEALTHCHECKURI;
     private boolean healthCheck = DEFAULT_HEALTHCHECK;
     private Duration healthCheckInterval = Duration.ofSeconds(DEFAULT_HEALTHCHECKINTERVAL_SECONDS);
-    private boolean healthIndicator = DEFAULT_HEALTH_INDICATOR;
     private String path;
 
     /**
@@ -248,23 +241,6 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration impl
         if (healthCheckInterval != null) {
             this.healthCheckInterval = healthCheckInterval;
         }
-    }
-
-    /**
-     * Whether service health indicator should be created.
-     *
-     * @return True if a health indicator should be created
-     */
-    public boolean isHealthIndicator() {
-        return healthIndicator;
-    }
-
-    /**
-     * Sets whether a service health indicator should be created. Default value ({@value #DEFAULT_HEALTH_INDICATOR}).
-     * @param healthIndicator True if health indicator should be created
-     */
-    public void setHealthIndicator(boolean healthIndicator) {
-        this.healthIndicator = healthIndicator;
     }
 
     @Override

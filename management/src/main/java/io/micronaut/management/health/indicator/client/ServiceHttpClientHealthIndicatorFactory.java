@@ -13,15 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.client;
+package io.micronaut.management.health.indicator.client;
 
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.StaticServiceInstanceList;
 import io.micronaut.health.HealthStatus;
+import io.micronaut.http.client.ServiceHttpClientConfiguration;
 import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
@@ -42,6 +44,7 @@ import java.util.Map;
 @Factory
 @EachBean(ServiceHttpClientConfiguration.class)
 @Requires(beans = HealthEndpoint.class)
+@Requires(property = HealthEndpoint.PREFIX + ".service-http-client.enabled", defaultValue = StringUtils.FALSE, notEquals = StringUtils.FALSE)
 public class ServiceHttpClientHealthIndicatorFactory implements HealthIndicator {
 
     private final ServiceHttpClientConfiguration configuration;
@@ -62,7 +65,7 @@ public class ServiceHttpClientHealthIndicatorFactory implements HealthIndicator 
 
     @Override
     public Publisher<HealthResult> getResult() {
-        if (!configuration.isHealthIndicator() || !configuration.isHealthCheck()) {
+        if (!configuration.isHealthCheck()) {
             return Publishers.empty();
         }
 

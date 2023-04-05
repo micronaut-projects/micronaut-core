@@ -12,6 +12,7 @@ dependencies {
         exclude module:'micronaut-inject'
         exclude module:'micronaut-bom'
     }
+    implementation project(":http-client-core")
 
     implementation libs.managed.reactor
 

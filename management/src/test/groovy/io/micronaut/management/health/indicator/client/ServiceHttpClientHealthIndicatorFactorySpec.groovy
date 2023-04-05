@@ -1,7 +1,8 @@
-package io.micronaut.http.client
+package io.micronaut.management.health.indicator.client
 
 import io.micronaut.discovery.StaticServiceInstanceList
 import io.micronaut.health.HealthStatus
+import io.micronaut.http.client.ServiceHttpClientConfiguration
 import io.micronaut.runtime.ApplicationConfiguration
 import reactor.core.publisher.Mono
 import spock.lang.Specification
@@ -17,7 +18,6 @@ class ServiceHttpClientHealthIndicatorFactorySpec extends Specification {
     def "Health Indicator is set to true and is healthy"() {
         given:
         serviceHttpConfiguration.setHealthCheck(true)
-        serviceHttpConfiguration.setHealthIndicator(true)
         def healthIndicator = new ServiceHttpClientHealthIndicatorFactory(serviceHttpConfiguration, instanceList)
 
         when:
@@ -32,7 +32,6 @@ class ServiceHttpClientHealthIndicatorFactorySpec extends Specification {
     def "Health Indicator and check are true, instance list is updated - #scenario"() {
         given:
         serviceHttpConfiguration.setHealthCheck(true)
-        serviceHttpConfiguration.setHealthIndicator(true)
         def healthIndicator = new ServiceHttpClientHealthIndicatorFactory(serviceHttpConfiguration, instanceList)
 
         when: "uri is removed from list"
@@ -51,10 +50,9 @@ class ServiceHttpClientHealthIndicatorFactorySpec extends Specification {
         "both uris are removed" | [uri1, uri2] || HealthStatus.DOWN
     }
 
-    def "Calling getResult but #scenario, so result is null"() {
+    def "Calling getResult but health-check is false, so result is null"() {
         given:
-        serviceHttpConfiguration.setHealthCheck(healthCheck)
-        serviceHttpConfiguration.setHealthIndicator(indicator)
+        serviceHttpConfiguration.setHealthCheck(false)
         def healthIndicator = new ServiceHttpClientHealthIndicatorFactory(serviceHttpConfiguration, instanceList)
 
         when:
@@ -64,11 +62,5 @@ class ServiceHttpClientHealthIndicatorFactorySpec extends Specification {
         null == result
 
         0 * _
-
-        where:
-        scenario                                           | healthCheck | indicator
-        "health check is set to false"                     | false       | true
-        "health indicator is set to false"                 | true        | false
-        "both indicator and health check are set to false" | false       | false
     }
 }

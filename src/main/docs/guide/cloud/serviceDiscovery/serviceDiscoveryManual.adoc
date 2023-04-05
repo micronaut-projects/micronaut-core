@@ -32,13 +32,10 @@ micronaut:
         health-check: true
         health-check-interval: 15s
         health-check-uri: /health
-        health-indicator: true
 ----
 
 - `health-check` indicates whether to health check the service
 - `health-check-interval` is the interval between checks
 - `health-check-uri` specifies the endpoint URI of the health check request
-- `health-indicator` indicates whether to create a health indicator for the given service. Requires `health-check` to also be true
 
-The Micronaut framework starts a background thread to check the health status of the service and if any of the configured services respond with an error code, they are removed from the list of available services.
-If indicators are created, they will return a `DOWN` status when the list of available services is empty.
+Micronaut starts a background thread to check the health status of the service and if any of the configured services respond with an error code, they are removed from the list of available services.
