@@ -288,6 +288,13 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     private <T, R> List<UriRouteMatch<T, R>> toMatches(String path, List<UriRouteInfo<Object, Object>> routes) {
+        if (routes.size() == 1) {
+            UriRouteMatch match = routes.iterator().next().tryMatch(path);
+            if (match != null) {
+                return List.of(match);
+            }
+            return List.of();
+        }
         List<UriRouteMatch<T, R>> uriRoutes = new ArrayList<>(routes.size());
         for (UriRouteInfo<Object, Object> route : routes) {
             UriRouteMatch match = route.tryMatch(path);
@@ -299,6 +306,13 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     private <T, R> List<UriRouteMatch<T, R>> toMatches(String path, UriRouteInfo<Object, Object>[] routes) {
+        if (routes.length == 1) {
+            UriRouteMatch match = routes[0].tryMatch(path);
+            if (match != null) {
+                return List.of(match);
+            }
+            return List.of();
+        }
         List<UriRouteMatch<T, R>> uriRoutes = new ArrayList<>(routes.length);
         for (UriRouteInfo<Object, Object> route : routes) {
             UriRouteMatch match = route.tryMatch(path);
