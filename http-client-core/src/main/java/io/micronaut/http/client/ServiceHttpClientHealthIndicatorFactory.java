@@ -37,7 +37,7 @@ import java.util.Map;
  * Returns {@link HealthStatus#DOWN} if there are no available URLs in the load balancer.</p>
  *
  * @author Alexander Simpson
- * @since 3.8.9
+ * @since 3.9
  */
 @Factory
 @EachBean(ServiceHttpClientConfiguration.class)
