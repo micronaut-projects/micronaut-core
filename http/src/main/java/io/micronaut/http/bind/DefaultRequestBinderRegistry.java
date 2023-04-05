@@ -25,7 +25,6 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.http.FullHttpRequest;
 import io.micronaut.http.HttpHeaders;
-import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpParameters;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.PushCapableHttpRequest;

@@ -23,7 +23,6 @@ import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpAttributes;
-import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.uri.UriMatchInfo;

@@ -106,7 +106,6 @@ public enum HttpMethod implements CharSequence {
         return requiresRequestBody;
     }
 
-
     /**
      * Whether the given method allows a request body.
      *
