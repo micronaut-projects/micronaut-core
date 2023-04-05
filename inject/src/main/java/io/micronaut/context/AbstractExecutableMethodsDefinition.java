@@ -335,7 +335,6 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         private final MethodReference methodReference;
         private AnnotationMetadata annotationMetadata;
         private ReturnType<R> returnType;
-        private String executeOn;
 
         private DispatchedExecutableMethod(AbstractExecutableMethodsDefinition dispatcher,
                                            int index,
@@ -441,15 +440,6 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         public R invoke(T instance, Object... arguments) {
             ArgumentUtils.validateArguments(this, methodReference.arguments, arguments);
             return (R) dispatcher.dispatch(index, instance, arguments);
-        }
-
-        @Override
-        public String executeOn() {
-            String executeOn = this.executeOn;
-            if (executeOn == null) {
-                this.executeOn = executeOn = ExecutableMethod.super.executeOn();
-            }
-            return executeOn;
         }
 
         @Override

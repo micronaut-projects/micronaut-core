@@ -17,12 +17,10 @@ package io.micronaut.inject;
 
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 
+import io.micronaut.core.annotation.NonNull;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 
@@ -85,11 +83,5 @@ public interface MethodReference<T, R> extends AnnotationMetadataDelegate, Annot
     @Override
     default String getName() {
         return getMethodName();
-    }
-
-    @Nullable
-    @Internal
-    default String executeOn() {
-        return stringValue("io.micronaut.scheduling.annotation.ExecuteOn").orElse(null);
     }
 }
