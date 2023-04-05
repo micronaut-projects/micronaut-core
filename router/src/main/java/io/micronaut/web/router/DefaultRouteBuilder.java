@@ -748,7 +748,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         final UriMatchTemplate uriMatchTemplate;
         final List<DefaultUriRoute> nestedRoutes = new ArrayList<>(2);
         private Integer port;
-        private final DefaultUrlRouteInfo<Object, Object> routeInfo;
+        private final RouteExecutorSelector executorSelector;
 
         /**
          * @param httpMethod The HTTP method
@@ -871,7 +871,12 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             this.httpMethod = httpMethod;
             this.uriMatchTemplate = uriTemplate;
             this.httpMethodName = httpMethodName;
-            this.routeInfo = new DefaultUrlRouteInfo<>(
+            this.executorSelector = new RouteExecutorSelector();
+        }
+
+        @Override
+        public UriRouteInfo<Object, Object> toRouteInfo() {
+            return new DefaultUrlRouteInfo<>(
                 httpMethod,
                 uriMatchTemplate,
                 defaultCharset,
@@ -883,13 +888,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 conditions,
                 port,
                 conversionService,
-                new RouteExecutorSelector()
+                executorSelector
             );
-        }
-
-        @Override
-        public UriRouteInfo<Object, Object> toRouteInfo() {
-            return routeInfo;
         }
 
         @Override
@@ -979,8 +979,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         private final class RouteExecutorSelector implements ExecutorSelector {
             @Override
             public Optional<ExecutorService> select(MethodReference<?, ?> method, ThreadSelection threadSelection) {
-                if (executorSelector != null) {
-                    return executorSelector.select(targetMethod.getExecutableMethod(), threadSelection);
+                if (DefaultRouteBuilder.this.executorSelector != null) {
+                    return DefaultRouteBuilder.this.executorSelector.select(targetMethod.getExecutableMethod(), threadSelection);
                 } else {
                     return Optional.empty();
                 }
@@ -988,8 +988,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
             @Override
             public Optional<ExecutorService> select(String name) {
-                if (executorSelector != null) {
-                    return executorSelector.select(name);
+                if (DefaultRouteBuilder.this.executorSelector != null) {
+                    return DefaultRouteBuilder.this.executorSelector.select(name);
                 } else {
                     return Optional.empty();
                 }
