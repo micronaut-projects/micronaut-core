@@ -38,6 +38,7 @@ import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.stream.JsonSubscriber;
@@ -53,14 +54,17 @@ import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufOutputStream;
+import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
@@ -317,12 +321,50 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
                 });
             } else if (body instanceof Publisher) {
                 response.body(null);
-                DelegateStreamedHttpResponse streamedResponse = new DelegateStreamedHttpResponse(
-                    toNettyResponse(response),
-                    mapToHttpContent(nettyRequest, response, body, context)
-                );
-                context.writeAndFlush(streamedResponse);
-                context.read();
+                if (serverConfiguration.getServerType() == NettyHttpServerConfiguration.HttpServerType.FULL_CONTENT) {
+                    // HttpStreamsHandler is not present, so we can't write a StreamedHttpResponse.
+                    Flux.from(mapToHttpContent(nettyRequest, response, body, context)).collectList().subscribe(contents -> {
+                        if (contents.size() == 0) {
+                            setResponseBody(response, Unpooled.EMPTY_BUFFER);
+                        } else if (contents.size() == 1) {
+                            setResponseBody(response, contents.get(0).content().retain());
+                        } else {
+                            CompositeByteBuf composite = context.alloc().compositeBuffer();
+                            for (HttpContent c : contents) {
+                                composite.addComponent(true, c.content().retain());
+                            }
+                            setResponseBody(response, composite);
+                        }
+                        for (HttpContent content : contents) {
+                            content.release();
+                        }
+
+                        writeFinalNettyResponse(
+                            response,
+                            nettyRequest,
+                            context
+                        );
+                    }, error -> {
+                        if (LOG.isErrorEnabled()) {
+                            LOG.error("Error occurred writing publisher response: " + error.getMessage(), error);
+                        }
+                        HttpResponseStatus responseStatus;
+                        if (error instanceof HttpStatusException) {
+                            responseStatus = HttpResponseStatus.valueOf(((HttpStatusException) error).getStatus().getCode(), error.getMessage());
+                        } else {
+                            responseStatus = HttpResponseStatus.INTERNAL_SERVER_ERROR;
+                        }
+                        context.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, responseStatus))
+                            .addListener(ChannelFutureListener.CLOSE);
+                    });
+                } else {
+                    DelegateStreamedHttpResponse streamedResponse = new DelegateStreamedHttpResponse(
+                        toNettyResponse(response),
+                        mapToHttpContent(nettyRequest, response, body, context)
+                    );
+                    context.writeAndFlush(streamedResponse);
+                    context.read();
+                }
             } else {
                 encodeResponseBody(
                     context,
@@ -562,8 +604,7 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
 
             io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
 
-            if (nativeRequest instanceof StreamedHttpRequest && !((StreamedHttpRequest) nativeRequest).isConsumed()) {
-                StreamedHttpRequest streamedHttpRequest = (StreamedHttpRequest) nativeRequest;
+            if (nativeRequest instanceof StreamedHttpRequest streamedHttpRequest && !streamedHttpRequest.isConsumed()) {
                 // We have to clear the buffer of FlowControlHandler before writing the response
                 // If this is a streamed request and there is still content to consume then subscribe
                 // and write the buffer is empty.

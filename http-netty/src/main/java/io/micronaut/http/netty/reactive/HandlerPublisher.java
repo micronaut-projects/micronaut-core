@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.EventExecutor;
 import org.reactivestreams.Subscriber;
@@ -98,6 +99,7 @@ public abstract class HandlerPublisher<T> extends ChannelDuplexHandler implement
     private ChannelHandlerContext ctx;
     private volatile long outstandingDemand = 0;
     private Throwable noSubscriberError;
+    private boolean seenLast;
 
     /**
      * Create a handler publisher.
@@ -164,7 +166,10 @@ public abstract class HandlerPublisher<T> extends ChannelDuplexHandler implement
             LOG.trace("Demand received for next message (state = " + state + "). Calling context.read()");
         }
 
-        ctx.read();
+        // prevent requesting demand beyond LastHttpContent
+        if (!seenLast) {
+            ctx.read();
+        }
     }
 
     /**
@@ -321,6 +326,9 @@ public abstract class HandlerPublisher<T> extends ChannelDuplexHandler implement
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object message) {
+        if (message instanceof LastHttpContent) {
+            seenLast = true;
+        }
         if (acceptInboundMessage(message)) {
             publishMessageLater(message);
         } else {

@@ -15,18 +15,22 @@
  */
 package io.micronaut.web.router;
 
-import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.http.HttpRequest;
 
 /**
- * Represents a {@link Route} that is backed by a method.
+ * Route with a request predicate.
  *
- * @author James Kleeh
- * @since 1.0
+ * @author Denis Stepanov
+ * @since 4.0.0
  */
-public interface MethodBasedRoute extends Route {
+public interface RequestMatcher {
 
     /**
-     * @return The {@link MethodExecutionHandle}
+     * Match the given request.
+     *
+     * @param httpRequest The request
+     * @return true if route matches this request
      */
-    MethodExecutionHandle getTargetMethod();
+    boolean matching(HttpRequest<?> httpRequest);
+
 }

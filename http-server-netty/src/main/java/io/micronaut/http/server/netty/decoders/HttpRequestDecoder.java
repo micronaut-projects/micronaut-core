@@ -25,11 +25,13 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.runtime.server.EmbeddedServer;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageDecoder;
-import io.netty.handler.codec.http.DefaultHttpRequest;
+import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,7 +66,11 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
      * @param configuration     The Http server configuration
      * @param httpRequestReceivedEventPublisher The publisher of {@link HttpRequestReceivedEvent}
      */
-    public HttpRequestDecoder(EmbeddedServer embeddedServer, ConversionService conversionService, HttpServerConfiguration configuration, ApplicationEventPublisher<HttpRequestReceivedEvent> httpRequestReceivedEventPublisher) {
+    public HttpRequestDecoder(
+        EmbeddedServer embeddedServer,
+        ConversionService conversionService,
+        HttpServerConfiguration configuration,
+        ApplicationEventPublisher<HttpRequestReceivedEvent> httpRequestReceivedEventPublisher) {
         this.embeddedServer = embeddedServer;
         this.conversionService = conversionService;
         this.configuration = configuration;
@@ -96,19 +102,20 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
                 }
             }
             out.add(request);
+            ReferenceCountUtil.retain(msg); // retain the body if it's a FullHttpRequest
         } catch (IllegalArgumentException e) {
             // this configured the request in the channel as an attribute
             new NettyHttpRequest<>(
-                    new DefaultHttpRequest(msg.protocolVersion(), msg.method(), "/"),
+                    new DefaultFullHttpRequest(msg.protocolVersion(), msg.method(), "/", Unpooled.EMPTY_BUFFER),
                     ctx,
                     conversionService,
                     configuration
             );
             final Throwable cause = e.getCause();
             ctx.fireExceptionCaught(cause != null ? cause : e);
-            if (msg instanceof StreamedHttpRequest) {
+            if (msg instanceof StreamedHttpRequest streamedHttpRequest) {
                 // discard any data that may come in
-                ((StreamedHttpRequest) msg).closeIfNoSubscriber();
+                streamedHttpRequest.closeIfNoSubscriber();
             }
         }
     }

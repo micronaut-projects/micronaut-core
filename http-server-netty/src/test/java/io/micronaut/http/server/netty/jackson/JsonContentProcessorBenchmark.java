@@ -9,7 +9,6 @@ import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.JsonSyntaxException;
 import io.micronaut.json.convert.LazyJsonNode;
-import io.micronaut.json.tree.JsonNode;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.DefaultByteBufHolder;
 import io.netty.buffer.PooledByteBufAllocator;

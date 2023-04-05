@@ -2,6 +2,7 @@ package io.micronaut.http.server.stack;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.server.netty.NettyHttpServer;
+import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
@@ -164,6 +165,7 @@ public class FullHttpStackBenchmark {
             Stack openChannel() {
                 ApplicationContext ctx = ApplicationContext.run(Map.of(
                     "spec.name", "FullHttpStackBenchmark",
+                    "micronaut.server.netty.server-type", NettyHttpServerConfiguration.HttpServerType.FULL_CONTENT,
                     "micronaut.server.date-header", false // disabling this makes the response identical each time
                 ));
                 EmbeddedServer server = ctx.getBean(EmbeddedServer.class);

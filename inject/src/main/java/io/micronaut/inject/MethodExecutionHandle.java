@@ -32,5 +32,5 @@ public interface MethodExecutionHandle<T, R> extends ExecutionHandle<T, R>, Meth
      * @return The underlying method reference.
      */
     @NonNull
-    ExecutableMethod<?, R> getExecutableMethod();
+    ExecutableMethod<T, R> getExecutableMethod();
 }

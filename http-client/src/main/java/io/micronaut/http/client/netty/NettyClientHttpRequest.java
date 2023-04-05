@@ -282,7 +282,8 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
                 req = new DefaultFullHttpRequest(
                         HttpVersion.HTTP_1_1,
                         method,
-                        uriStr
+                        uriStr,
+                        false
                 );
                 req.headers().setAll(headers.getNettyHeaders());
             }
@@ -306,7 +307,7 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
             String uriStr = resolveUriPath();
             io.netty.handler.codec.http.HttpMethod method = getMethod(httpMethodName);
             DefaultStreamedHttpRequest req = new DefaultStreamedHttpRequest(
-                    HttpVersion.HTTP_1_1, method, uriStr, (Publisher<HttpContent>) body);
+                                HttpVersion.HTTP_1_1, method, uriStr, false, (Publisher<HttpContent>) body);
             req.headers().setAll(headers.getNettyHeaders());
             return req;
         } else {

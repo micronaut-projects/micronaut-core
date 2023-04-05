@@ -17,7 +17,6 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanProvider;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -26,7 +25,6 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.CopyOnWriteMap;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Body;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.inject.ExecutionHandle;
 import io.micronaut.web.router.RouteMatch;
@@ -75,24 +73,10 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
     @Override
     @NonNull
     public HttpContentProcessor resolve(@NonNull NettyHttpRequest<?> request, @NonNull RouteMatch<?> route) {
-        Argument<?> bodyType = route.getBodyArgument()
-                /*
-                The getBodyArgument() method returns arguments for functions where it is
-                not possible to dictate whether the argument is supposed to bind the entire
-                body or just a part of the body. We check to ensure the argument has the body
-                annotation to exclude that use case
-                */
-                .filter(argument -> {
-                    AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
-                    if (annotationMetadata.hasAnnotation(Body.class)) {
-                        return !annotationMetadata.stringValue(Body.class).isPresent();
-                    } else {
-                        return false;
-                    }
-                })
+        Argument<?> bodyType = route.getRouteInfo().getFullBodyArgument()
                 .orElseGet(() -> {
-                    if (route instanceof ExecutionHandle) {
-                        for (Argument<?> argument: ((ExecutionHandle) route).getArguments()) {
+                    if (route instanceof ExecutionHandle executionHandle) {
+                        for (Argument<?> argument: executionHandle.getArguments()) {
                             if (argument.getType() == HttpRequest.class) {
                                 return argument;
                             }

@@ -15,20 +15,29 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.bind.binders.RequestArgumentBinder;
+import io.micronaut.inject.MethodExecutionHandle;
+
 /**
- * Represents an argument with a null value.
+ * Represents a route that is backed by a method.
  *
+ * @param <T> The target
+ * @param <R> The result
  * @author James Kleeh
- * @since 1.3.1
+ * @since 1.0
  */
-public final class NullArgument {
+public interface MethodBasedRouteInfo<T, R> extends RouteInfo<R> {
 
     /**
-     * The NullArgument instance.
+     * @return The {@link MethodExecutionHandle}
      */
-    public static final NullArgument INSTANCE = new NullArgument();
+    MethodExecutionHandle<T, R> getTargetMethod();
 
-    private NullArgument() {
+    @NonNull
+    String[] getArgumentNames();
 
-    }
+    RequestArgumentBinder<Object>[] resolveArgumentBinders(RequestBinderRegistry requestBinderRegistry);
+
 }

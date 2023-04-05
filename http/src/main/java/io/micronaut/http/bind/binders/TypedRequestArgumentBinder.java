@@ -39,4 +39,21 @@ public interface TypedRequestArgumentBinder<T> extends RequestArgumentBinder<T>,
     default @NonNull List<Class<?>> superTypes() {
         return Collections.emptyList();
     }
+
+    /**
+     * Check if this typed argument binder matches the provided class.
+     * @param aClass The class to match
+     * @return true if matches
+     */
+    default boolean matches(Class<?> aClass) {
+        if (aClass.equals(argumentType().getType())) {
+            return true;
+        }
+        for (Class<?> superType : superTypes()) {
+            if (aClass.equals(superType)) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

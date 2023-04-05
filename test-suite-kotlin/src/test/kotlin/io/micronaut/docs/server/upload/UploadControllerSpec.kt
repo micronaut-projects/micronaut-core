@@ -1,8 +1,8 @@
 package io.micronaut.docs.server.upload
 
-import io.kotest.matchers.shouldBe
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.shouldBe
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
@@ -109,7 +109,7 @@ class UploadControllerSpec: StringSpec() {
             val embedded: Map<*, *> = response.getBody(Map::class.java).get().get("_embedded") as Map<*, *>
             val message = ((embedded.get("errors") as java.util.List<*>).get(0) as Map<*, *>).get("message")
 
-            message shouldBe "Required argument [CompletedFileUpload file] not specified"
+            message shouldBe "Cannot convert type [class io.micronaut.http.server.netty.MicronautHttpData\$AttributeImpl] to target type: interface io.micronaut.http.multipart.CompletedFileUpload. Considering defining a TypeConverter bean to handle this case."
         }
 
         "test completed file upload with no filename and no bytes"() {
@@ -129,7 +129,7 @@ class UploadControllerSpec: StringSpec() {
             val embedded: Map<*, *> = response.getBody(Map::class.java).get().get("_embedded") as Map<*, *>
             val message = ((embedded.get("errors") as java.util.List<*>).get(0) as Map<*, *>).get("message")
 
-            message shouldBe "Required argument [CompletedFileUpload file] not specified"
+            message shouldBe "Cannot convert type [class io.micronaut.http.server.netty.MicronautHttpData\$AttributeImpl] to target type: interface io.micronaut.http.multipart.CompletedFileUpload. Considering defining a TypeConverter bean to handle this case."
         }
 
         "test completed file upload with no part"() {

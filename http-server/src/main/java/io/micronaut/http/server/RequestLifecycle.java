@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -30,6 +31,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.http.filter.GenericHttpFilter;
+import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
@@ -37,6 +39,7 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.json.JsonSyntaxException;
+import io.micronaut.web.router.DefaultRouteInfo;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.UriRouteMatch;
@@ -67,6 +70,7 @@ public class RequestLifecycle {
     private static final Logger LOG = LoggerFactory.getLogger(RequestLifecycle.class);
 
     private final RouteExecutor routeExecutor;
+    private final RequestArgumentSatisfier requestArgumentSatisfier;
     private HttpRequest<?> request;
     private Context context = Context.empty();
     private boolean multipartEnabled = true;
@@ -78,6 +82,7 @@ public class RequestLifecycle {
     protected RequestLifecycle(RouteExecutor routeExecutor, HttpRequest<?> request) {
         this.routeExecutor = Objects.requireNonNull(routeExecutor, "routeExecutor");
         this.request = Objects.requireNonNull(request, "request");
+        this.requestArgumentSatisfier = routeExecutor.getRequestArgumentSatisfier();
     }
 
     /**
@@ -131,7 +136,7 @@ public class RequestLifecycle {
             LOG.trace("Matched route {} - {} to controller {}", request.getMethodName(), request.getUri().getPath(), routeMatch.getDeclaringType());
         }
         // all ok proceed to try and execute the route
-        if (routeMatch.isWebSocketRoute()) {
+        if (routeMatch.getRouteInfo().isWebSocketRoute()) {
             return onStatusError(
                 HttpResponse.status(HttpStatus.BAD_REQUEST),
                 "Not a WebSocket request");
@@ -194,31 +199,17 @@ public class RequestLifecycle {
                 final Optional<ExecutableMethod<ExceptionHandler, Object>> optionalMethod = handlerDefinition.findPossibleMethods("handle").findFirst();
                 RouteInfo<Object> routeInfo;
                 if (optionalMethod.isPresent()) {
-                    routeInfo = new ExecutableRouteInfo(optionalMethod.get(), true);
+                    routeInfo = new ExecutableRouteInfo<>(optionalMethod.get(), true);
                 } else {
-                    routeInfo = new RouteInfo<>() {
-                        @Override
-                        public ReturnType<?> getReturnType() {
-                            return ReturnType.of(Object.class);
-                        }
-
-                        @Override
-                        public Class<?> getDeclaringType() {
-                            return handlerDefinition.getBeanType();
-                        }
-
-                        @Override
-                        public boolean isErrorRoute() {
-                            return true;
-                        }
-
-                        @Override
-                        public List<MediaType> getProduces() {
-                            return MediaType.fromType(getDeclaringType())
-                                .map(Collections::singletonList)
-                                .orElse(Collections.emptyList());
-                        }
-                    };
+                    routeInfo = new DefaultRouteInfo<>(
+                            AnnotationMetadata.EMPTY_METADATA,
+                            ReturnType.of(Object.class),
+                            List.of(),
+                            MediaType.fromType(handlerDefinition.getBeanType()).map(Collections::singletonList).orElse(Collections.emptyList()),
+                            handlerDefinition.getBeanType(),
+                            true,
+                            false
+                    );
                 }
                 Supplier<ExecutionFlow<MutableHttpResponse<?>>> responseSupplier = () -> {
                     ExceptionHandler<Throwable, ?> handler = routeExecutor.beanContext.getBean(handlerDefinition);
@@ -227,7 +218,7 @@ public class RequestLifecycle {
                             routeExecutor.logException(cause);
                         }
                         Object result = handler.handle(request, cause);
-                        return routeExecutor.createResponseForBody(request, result, routeInfo);
+                        return routeExecutor.createResponseForBody(request, result, routeInfo, null);
                     } catch (Throwable e) {
                         return createDefaultErrorResponseFlow(request, e);
                     }
@@ -293,7 +284,7 @@ public class RequestLifecycle {
         if (response.code() >= 400 && routeInfo != null && !routeInfo.isErrorRoute()) {
             RouteMatch<Object> statusRoute = routeExecutor.findStatusRoute(request, response.status(), routeInfo);
             if (statusRoute != null) {
-                return ExecutionFlow.just(statusRoute)
+                return fulfillArguments(statusRoute)
                     .flatMap(routeMatch -> routeExecutor.callRoute(Context.empty(), routeMatch, request))
                     .flatMap(this::handleStatusException)
                     .onErrorResume(this::onErrorNoFilter);
@@ -316,8 +307,7 @@ public class RequestLifecycle {
         }
 
         // if there is no route present try to locate a route that matches a different HTTP method
-        final List<UriRouteMatch<Object, Object>> anyMatchingRoutes = routeExecutor.router
-            .findAny(httpRequest.getPath(), httpRequest).toList();
+        final List<UriRouteMatch<Object, Object>> anyMatchingRoutes = routeExecutor.router.findAny(httpRequest);
         final Collection<MediaType> acceptedTypes = httpRequest.accept();
         final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(acceptedTypes);
 
@@ -325,15 +315,15 @@ public class RequestLifecycle {
         Set<String> allowedMethods = new HashSet<>(5);
         Set<MediaType> produceableContentTypes = hasAcceptHeader ? new HashSet<>(5) : null;
         for (UriRouteMatch<?, ?> anyRoute : anyMatchingRoutes) {
-            final String routeMethod = anyRoute.getRoute().getHttpMethodName();
+            final String routeMethod = anyRoute.getRouteInfo().getHttpMethodName();
             if (!requestMethodName.equals(routeMethod)) {
                 allowedMethods.add(routeMethod);
             }
-            if (contentType != null && !anyRoute.doesConsume(contentType)) {
-                acceptableContentTypes.addAll(anyRoute.getRoute().getConsumes());
+            if (contentType != null && !anyRoute.getRouteInfo().doesConsume(contentType)) {
+                acceptableContentTypes.addAll(anyRoute.getRouteInfo().getConsumes());
             }
-            if (hasAcceptHeader && !anyRoute.doesProduce(acceptedTypes)) {
-                produceableContentTypes.addAll(anyRoute.getRoute().getProduces());
+            if (hasAcceptHeader && !anyRoute.getRouteInfo().doesProduce(acceptedTypes)) {
+                produceableContentTypes.addAll(anyRoute.getRouteInfo().getProduces());
             }
         }
 
@@ -417,6 +407,7 @@ public class RequestLifecycle {
      */
     protected ExecutionFlow<RouteMatch<?>> fulfillArguments(RouteMatch<?> routeMatch) {
         // try to fulfill the argument requirements of the route
-        return ExecutionFlow.just(routeExecutor.requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, request(), false));
+        routeExecutor.requestArgumentSatisfier.fulfillArgumentRequirementsBeforeFilters(routeMatch, request());
+        return ExecutionFlow.just(routeMatch);
     }
 }

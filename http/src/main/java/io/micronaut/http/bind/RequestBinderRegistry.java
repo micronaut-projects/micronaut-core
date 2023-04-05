@@ -17,6 +17,7 @@ package io.micronaut.http.bind;
 
 import io.micronaut.core.bind.ArgumentBinderRegistry;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.bind.binders.RequestArgumentBinder;
 
 /**
  * A {@link ArgumentBinderRegistry} where the source of binding is a {@link HttpRequest}.
@@ -26,5 +27,13 @@ import io.micronaut.http.HttpRequest;
  */
 public interface RequestBinderRegistry extends ArgumentBinderRegistry<HttpRequest<?>> {
 
+    /**
+     * Adds a request argument binder that will be used to match the argument that wasn't matched by a type or an annotation.
+     * @param binder The binder
+     * @since 4.0.0
+     */
+    default void addUnmatchedRequestArgumentBinder(RequestArgumentBinder<Object> binder) {
+        throw new UnsupportedOperationException("Binder registry is not mutable");
+    }
 
 }

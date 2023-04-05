@@ -1505,6 +1505,18 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
+     * Faster version of {@link #hasStereotype(Class)} that does not support repeatable
+     * annotations.
+     *
+     * @param annotation The annotation type
+     * @return Whether this metadata has the given stereotype
+     */
+    @Internal
+    default boolean hasStereotypeNonRepeating(@NonNull Class<? extends Annotation> annotation) {
+        return hasStereotype(annotation.getName());
+    }
+
+    /**
      * Check whether any of the given stereotypes is present.
      *
      * @param annotations The annotations

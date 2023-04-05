@@ -170,7 +170,6 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         this.nettyEmbeddedServices = nettyEmbeddedServices;
         this.coroutineHelper = coroutineHelper;
         request.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
-        request.setAttribute(HttpAttributes.ROUTE, routeMatch.getRoute());
 
         Flux.from(callOpenMethod(ctx)).subscribe(v -> { }, t -> {
             forwardErrorToUser(ctx, e -> {

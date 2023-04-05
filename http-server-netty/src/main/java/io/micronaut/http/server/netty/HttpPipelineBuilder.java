@@ -41,6 +41,7 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http.HttpMessage;
+import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpServerKeepAliveHandler;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler;
@@ -554,7 +555,16 @@ final class HttpPipelineBuilder {
             if (webSocketUpgradeHandler.isPresent()) {
                 pipeline.addLast(NettyServerWebSocketUpgradeHandler.COMPRESSION_HANDLER, new WebSocketServerCompressionHandler());
             }
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, new HttpStreamsServerHandler());
+            if (server.getServerConfiguration().getServerType() == NettyHttpServerConfiguration.HttpServerType.STREAMED) {
+                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, new HttpStreamsServerHandler());
+            } else {
+                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR,
+                    new HttpObjectAggregator(
+                        (int) server.getServerConfiguration().getMaxRequestSize(),
+                        server.getServerConfiguration().isCloseOnExpectationFailed()
+                    )
+                );
+            }
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK, new ChunkedWriteHandler());
             pipeline.addLast(HttpRequestDecoder.ID, requestDecoder);
             if (server.getServerConfiguration().isDualProtocol() && server.getServerConfiguration().isHttpToHttpsRedirect() && !https) {
@@ -580,7 +590,9 @@ final class HttpPipelineBuilder {
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER, accessLogHandler);
             }
             registerMicronautChannelHandlers();
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_FLOW_CONTROL, new FlowControlHandler());
+            if (server.getServerConfiguration().getServerType() == NettyHttpServerConfiguration.HttpServerType.STREAMED) {
+                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_FLOW_CONTROL, new FlowControlHandler());
+            }
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_KEEP_ALIVE, new HttpServerKeepAliveHandler());
 
             insertMicronautHandlers(sslHandler == null && !https);

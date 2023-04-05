@@ -16,7 +16,7 @@
 package io.micronaut.http.bind.binders;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.bind.annotation.AbstractAnnotatedArgumentBinder;
+import io.micronaut.core.bind.annotation.AbstractArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
@@ -34,7 +34,7 @@ import io.micronaut.http.annotation.Header;
  * @see io.micronaut.http.HttpHeaders
  * @since 1.0
  */
-public class HeaderAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<Header, T, HttpRequest<?>> implements AnnotatedRequestArgumentBinder<Header, T> {
+public class HeaderAnnotationBinder<T> extends AbstractArgumentBinder<T> implements AnnotatedRequestArgumentBinder<Header, T> {
 
     /**
      * @param conversionService The conversion service
@@ -57,7 +57,7 @@ public class HeaderAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<H
     }
 
     @Override
-    protected String getFallbackFormat(Argument argument) {
+    protected String getFallbackFormat(Argument<?> argument) {
         return NameUtils.hyphenate(NameUtils.capitalize(argument.getName()), false);
     }
 }

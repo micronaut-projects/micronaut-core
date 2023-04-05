@@ -49,8 +49,6 @@ import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_MAX_AGE
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD
-import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS
 import static io.micronaut.http.HttpHeaders.VARY
 
 class CorsFilterSpec extends Specification {
@@ -206,16 +204,14 @@ class CorsFilterSpec extends Specification {
         String origin = 'http://www.foo.com'
         HttpHeaders headers = Stub(HttpHeaders) {
             getOrigin() >> Optional.of(origin)
-            getFirst(ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.GET)
-            get(ACCESS_CONTROL_REQUEST_HEADERS, _) >> Optional.of(['foo', 'bar'])
-            contains(ACCESS_CONTROL_REQUEST_METHOD) >> true
+            getFirst(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.GET)
+            get(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, _) >> Optional.of(['foo', 'bar'])
+            contains(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD) >> true
         }
         HttpRequest request = createRequest(headers)
         request.getMethod() >> HttpMethod.OPTIONS
         request.getUri() >> new URIBuilder( '/example' ).build()
-        List<UriRouteMatch<?,?>> routes = embeddedServer.getApplicationContext().getBean(Router).
-                findAny(request.getUri().toString(), request)
-                .collect(Collectors.toList())
+        List<UriRouteMatch<?,?>> routes = embeddedServer.getApplicationContext().getBean(Router).findAny(request.getUri().toString(), request).collect(Collectors.toList())
 
         request.getAttribute(HttpAttributes.AVAILABLE_HTTP_METHODS, _) >> Optional.of(routes.stream().map(route->route.getHttpMethod()).collect(Collectors.toList()))
 
@@ -247,16 +243,15 @@ class CorsFilterSpec extends Specification {
 
         HttpHeaders headers = Stub(HttpHeaders) {
             getOrigin() >> Optional.of(origin)
-            getFirst(ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.GET)
-            get(ACCESS_CONTROL_REQUEST_HEADERS, _) >> Optional.of(['foo'])
-            contains(ACCESS_CONTROL_REQUEST_METHOD) >> true
+            getFirst(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.GET)
+            get(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, _) >> Optional.of(['foo'])
+            contains(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD) >> true
         }
         HttpRequest request = createRequest(headers)
         request.getMethod() >> HttpMethod.OPTIONS
         request.getUri() >> new URIBuilder( '/example' ).build()
         List<UriRouteMatch<?,?>> routes = embeddedServer.getApplicationContext().getBean(Router).
-                findAny(request.getUri().toString(), request)
-                .collect(Collectors.toList())
+                findAny(request)
         request.getAttribute(HttpAttributes.AVAILABLE_HTTP_METHODS, _) >> Optional.of(routes.stream().map(route->route.getHttpMethod()).collect(Collectors.toList()))
 
         CorsOriginConfiguration originConfig = new CorsOriginConfiguration()
@@ -336,7 +331,7 @@ class CorsFilterSpec extends Specification {
         String origin = 'http://www.foo.com'
         HttpHeaders headers = Stub(HttpHeaders) {
             getOrigin() >> Optional.of(origin)
-            contains(ACCESS_CONTROL_REQUEST_METHOD) >> true
+            contains(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD) >> true
         }
         HttpRequest request = createRequest(headers)
 
@@ -368,9 +363,9 @@ class CorsFilterSpec extends Specification {
     void "test handleResponse for preflight request"() {
         given:
         HttpHeaders headers = Stub(HttpHeaders) {
-            contains(ACCESS_CONTROL_REQUEST_METHOD) >> true
-            get(ACCESS_CONTROL_REQUEST_HEADERS, _) >> Optional.of(['X-Header', 'Y-Header'])
-            getFirst(ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.GET)
+            contains(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD) >> true
+            get(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, _) >> Optional.of(['X-Header', 'Y-Header'])
+            getFirst(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.GET)
             getOrigin() >> Optional.of('http://www.foo.com')
         }
         URI uri = new URIBuilder('/example').build()
@@ -424,9 +419,9 @@ class CorsFilterSpec extends Specification {
 
         HttpHeaders headers = Stub(HttpHeaders) {
             getOrigin() >> Optional.of('http://www.foo.com')
-            contains(ACCESS_CONTROL_REQUEST_METHOD) >> true
-            get(ACCESS_CONTROL_REQUEST_HEADERS, _) >> Optional.of(['X-Header', 'Y-Header'])
-            getFirst(ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.GET)
+            contains(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD) >> true
+            get(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, _) >> Optional.of(['X-Header', 'Y-Header'])
+            getFirst(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.GET)
         }
         URI uri = new URIBuilder( '/example' ).build()
         HttpRequest request = Stub(HttpRequest) {
@@ -436,8 +431,7 @@ class CorsFilterSpec extends Specification {
             getOrigin() >> headers.getOrigin()
         }
         List<UriRouteMatch<?,?>> routes = embeddedServer.getApplicationContext().getBean(Router).
-                findAny(request.getUri().toString(), request)
-                .collect(Collectors.toList())
+                findAny(request)
         request.getAttribute(HttpAttributes.AVAILABLE_HTTP_METHODS, _) >> Optional.of(routes.stream().map(route->route.getHttpMethod()).collect(Collectors.toList()))
 
         when:
@@ -466,9 +460,9 @@ class CorsFilterSpec extends Specification {
         given:
         String origin = 'http://www.foo.com'
         HttpHeaders headers = Stub(HttpHeaders) {
-            getFirst(ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.GET)
+            getFirst(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.GET)
             getOrigin() >> Optional.of(origin)
-            contains(ACCESS_CONTROL_REQUEST_METHOD) >> true
+            contains(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD) >> true
         }
         URI uri = new URIBuilder( '/doesnt-exists-route' ).build()
         HttpRequest request = Stub(HttpRequest) {
@@ -516,8 +510,8 @@ class CorsFilterSpec extends Specification {
         String origin = 'http://www.foo.com'
         HttpHeaders headers = Stub(HttpHeaders) {
             getOrigin() >> Optional.of(origin)
-            getFirst(ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.POST)
-            contains(ACCESS_CONTROL_REQUEST_METHOD) >> true
+            getFirst(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, _) >> Optional.of(HttpMethod.POST)
+            contains(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD) >> true
         }
         URI uri = new URIBuilder( '/example' ).build()
         HttpRequest request = Stub(HttpRequest) {
@@ -527,8 +521,7 @@ class CorsFilterSpec extends Specification {
         }
 
         List<UriRouteMatch<?,?>> routes = embeddedServer.getApplicationContext().getBean(Router).
-                findAny(request.getUri().toString(), request)
-                .collect(Collectors.toList())
+                findAny(request)
         request.getAttribute(HttpAttributes.AVAILABLE_HTTP_METHODS, _) >> Optional.of(routes.stream().map(route->route.getHttpMethod()).collect(Collectors.toList()))
 
         when:

@@ -24,7 +24,8 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.SupplierUtil;
+import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -46,11 +47,12 @@ import io.micronaut.http.netty.cookies.NettyCookies;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
-import io.micronaut.http.server.exceptions.InternalServerException;
+import io.micronaut.http.server.netty.body.ByteBody;
+import io.micronaut.http.server.netty.body.HttpBody;
+import io.micronaut.http.server.netty.body.ImmediateMultiObjectBody;
+import io.micronaut.http.server.netty.body.ImmediateSingleObjectBody;
+import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.web.router.RouteMatch;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufHolder;
-import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -63,7 +65,6 @@ import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
-import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.handler.codec.http2.DefaultHttp2PushPromiseFrame;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
 import io.netty.handler.codec.http2.Http2FrameCodec;
@@ -71,29 +72,21 @@ import io.netty.handler.codec.http2.Http2StreamChannel;
 import io.netty.handler.codec.http2.Http2StreamChannelBootstrap;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.handler.ssl.SslHandler;
-import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ReferenceCounted;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 /**
  * Delegates to the Netty {@link io.netty.handler.codec.http.HttpRequest} instance.
@@ -150,20 +143,14 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         // we do copy the weight and dependency id
     }
 
-    boolean destroyed = false;
-
     private final NettyHttpHeaders headers;
     private final ChannelHandlerContext channelHandlerContext;
     private final HttpServerConfiguration serverConfiguration;
     private MutableConvertibleValues<Object> attributes;
     private NettyCookies nettyCookies;
-    private final List<ByteBufHolder> receivedContent = new ArrayList<>();
-    private final Map<IdentityWrapper, HttpData> receivedData = new LinkedHashMap<>();
-
-    private T bodyUnwrapped;
-    private Supplier<Optional<T>> body;
-    private RouteMatch<?> matchedRoute;
-    private boolean bodyRequired;
+    private final ByteBody body;
+    @Nullable
+    private FormRouteCompleter formRouteCompleter;
 
     /**
      * Set to {@code true} when the {@link #headers} may have been mutated. If this is not the case,
@@ -179,10 +166,10 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private final BodyConvertor bodyConvertor = newBodyConvertor();
 
     /**
-     * @param nettyRequest        The {@link io.netty.handler.codec.http.HttpRequest}
-     * @param ctx                 The {@link ChannelHandlerContext}
-     * @param environment         The Environment
-     * @param serverConfiguration The {@link HttpServerConfiguration}
+     * @param nettyRequest           The {@link io.netty.handler.codec.http.HttpRequest}
+     * @param ctx                    The {@link ChannelHandlerContext}
+     * @param environment            The Environment
+     * @param serverConfiguration    The {@link HttpServerConfiguration}
      */
     @SuppressWarnings("MagicNumber")
     public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest,
@@ -200,14 +187,33 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         this.serverConfiguration = serverConfiguration;
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
-        this.body = SupplierUtil.memoizedNonEmpty(() -> {
-            T built = (T) buildBody();
-            this.bodyUnwrapped = built;
-            return Optional.ofNullable(built);
-        });
+        this.body = ByteBody.of(nettyRequest);
         this.contentLength = headers.contentLength().orElse(-1);
         this.contentType = headers.contentType().orElse(null);
         this.origin = headers.getOrigin().orElse(null);
+    }
+
+    public final ByteBody rootBody() {
+        return body;
+    }
+
+    private HttpBody lastBody() {
+        HttpBody body = rootBody();
+        while (true) {
+            HttpBody next = body.next();
+            if (next == null) {
+                break;
+            }
+            body = next;
+        }
+        return body;
+    }
+
+    public final FormRouteCompleter formRouteCompleter() {
+        if (formRouteCompleter == null) {
+            formRouteCompleter = new FormRouteCompleter(this, (RouteMatch<?>) getAttribute(HttpAttributes.ROUTE_MATCH).get());
+        }
+        return formRouteCompleter;
     }
 
     @Override
@@ -319,61 +325,33 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     }
 
     @Override
+    public HttpRequest<T> setAttribute(CharSequence name, Object value) {
+        // This is the copy from the super method to avoid the type pollution
+        if (StringUtils.isNotEmpty(name)) {
+            if (value == null) {
+                getAttributes().remove(name.toString());
+            } else {
+                getAttributes().put(name.toString(), value);
+            }
+        }
+        return this;
+    }
+
+    @Override
     public Optional<T> getBody() {
-        return this.body.get();
-    }
-
-    /**
-     * @return A {@link CompositeByteBuf}
-     */
-    protected Object buildBody() {
-        if (!receivedData.isEmpty()) {
-            Map body = new LinkedHashMap(receivedData.size());
-
-            for (HttpData data: receivedData.values()) {
-                String newValue = getContent(data);
-                //noinspection unchecked
-                body.compute(data.getName(), (key, oldValue) -> {
-                    if (oldValue == null) {
-                        return newValue;
-                    } else if (oldValue instanceof Collection) {
-                        //noinspection unchecked
-                        ((Collection) oldValue).add(newValue);
-                        return oldValue;
-                    } else {
-                        ArrayList<Object> values = new ArrayList<>(2);
-                        values.add(oldValue);
-                        values.add(newValue);
-                        return values;
-                    }
-                });
-            }
-            return body;
-        } else if (!receivedContent.isEmpty()) {
-            int size = receivedContent.size();
-            CompositeByteBuf byteBufs = channelHandlerContext.alloc().compositeBuffer(size);
-            for (ByteBufHolder holder : receivedContent) {
-                ByteBuf content = holder.content();
-                if (content != null) {
-                    content.touch();
-                    // need to retain content, because for addComponent "ownership of buffer is transferred to this CompositeByteBuf."
-                    byteBufs.addComponent(true, content.retain());
-                }
-            }
-            return byteBufs;
+        HttpBody lastBody = lastBody();
+        if (lastBody instanceof ImmediateMultiObjectBody multi) {
+            lastBody = multi.single(serverConfiguration.getDefaultCharset(), channelHandlerContext.alloc());
+        }
+        if (lastBody instanceof ImmediateSingleObjectBody single) {
+            //noinspection unchecked
+            return (Optional<T>) Optional.ofNullable(single.valueUnclaimed());
+        } else if (lastBody instanceof FormRouteCompleter frc) {
+            //noinspection unchecked
+            return (Optional<T>) Optional.of(frc.asMap(serverConfiguration.getDefaultCharset()));
         } else {
-            return null;
+            return Optional.empty();
         }
-    }
-
-    private String getContent(HttpData data) {
-        String newValue;
-        try {
-            newValue = data.getString(serverConfiguration.getDefaultCharset());
-        } catch (IOException e) {
-            throw new InternalServerException("Error retrieving or decoding the value for: " + data.getName());
-        }
-        return newValue;
     }
 
     @Override
@@ -392,16 +370,27 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     public void release() {
-        destroyed = true;
-        Consumer<Object> releaseIfNecessary = this::releaseIfNecessary;
-        receivedContent.forEach(releaseIfNecessary);
-        receivedData.values().forEach(releaseIfNecessary);
-        releaseIfNecessary(bodyUnwrapped);
-        if (attributes != null) {
-            attributes.values().forEach(releaseIfNecessary);
+        RouteMatch<?> routeMatch = (RouteMatch<?>) getAttribute(HttpAttributes.ROUTE_MATCH).orElse(null);
+        if (routeMatch != null) {
+            // discard parameters that have already been bound
+            for (Object toDiscard : routeMatch.getVariableValues().values()) {
+                if (toDiscard instanceof io.micronaut.core.io.buffer.ReferenceCounted rc) {
+                    rc.release();
+                }
+                if (toDiscard instanceof io.netty.util.ReferenceCounted rc) {
+                    rc.release();
+                }
+                if (toDiscard instanceof NettyCompletedFileUpload fu) {
+                    fu.discard();
+                }
+            }
         }
-        if (nettyRequest instanceof StreamedHttpRequest) {
-            ((StreamedHttpRequest) nettyRequest).closeIfNoSubscriber();
+        body.release();
+        if (attributes != null) {
+            attributes.values().forEach(this::releaseIfNecessary);
+        }
+        if (nettyRequest instanceof StreamedHttpRequest streamedHttpRequest) {
+            streamedHttpRequest.closeIfNoSubscriber();
         }
     }
 
@@ -409,76 +398,12 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      * @param value An object with a value
      */
     protected void releaseIfNecessary(Object value) {
-        if (value instanceof ReferenceCounted) {
-            ReferenceCounted referenceCounted = (ReferenceCounted) value;
+        if (value instanceof ReferenceCounted referenceCounted) {
             int i = referenceCounted.refCnt();
             if (i != 0) {
                 referenceCounted.release();
             }
         }
-    }
-
-    /**
-     * Sets the body.
-     *
-     * @param body The body to set
-     */
-    @Internal
-    public void setBody(T body) {
-        ReferenceCountUtil.retain(body);
-        this.bodyUnwrapped = body;
-        this.body = () -> Optional.ofNullable(body);
-        bodyConvertor.cleanup();
-    }
-
-    /**
-     * @return Obtains the matched route
-     */
-    @Internal
-    public RouteMatch<?> getMatchedRoute() {
-        return matchedRoute;
-    }
-
-    /**
-     * @param httpContent The HttpContent as {@link ByteBufHolder}
-     */
-    @Internal
-    public void addContent(ByteBufHolder httpContent) {
-        httpContent.touch();
-        if (httpContent instanceof MicronautHttpData<?>) {
-            receivedData.computeIfAbsent(new IdentityWrapper(httpContent), key -> {
-                // released in release()
-                httpContent.retain();
-                return (HttpData) httpContent;
-            });
-        } else {
-            // released in release()
-            receivedContent.add(httpContent.retain());
-        }
-    }
-
-    /**
-     * @param matchedRoute The matched route
-     */
-    @Internal
-    void setMatchedRoute(RouteMatch<?> matchedRoute) {
-        this.matchedRoute = matchedRoute;
-    }
-
-    /**
-     * @param bodyRequired Sets the body as required
-     */
-    @Internal
-    void setBodyRequired(boolean bodyRequired) {
-        this.bodyRequired = bodyRequired;
-    }
-
-    /**
-     * @return Whether the body is required
-     */
-    @Internal
-    boolean isBodyRequired() {
-        return bodyRequired || HttpMethod.requiresRequestBody(getMethod());
     }
 
     @Nullable
@@ -550,51 +475,51 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
             // request used to compute the headers for the PUSH_PROMISE frame
             io.netty.handler.codec.http.HttpRequest outboundRequest = new DefaultHttpRequest(
-                    inboundRequest.protocolVersion(),
-                    inboundRequest.method(),
-                    fixedUri.toString(),
-                    inboundRequest.headers()
+                inboundRequest.protocolVersion(),
+                inboundRequest.method(),
+                fixedUri.toString(),
+                inboundRequest.headers()
             );
 
             int ourStream = ((Http2StreamChannel) channelHandlerContext.channel()).stream().id();
             HttpPipelineBuilder.StreamPipeline originalStreamPipeline = channelHandlerContext.channel().attr(HttpPipelineBuilder.STREAM_PIPELINE_ATTRIBUTE.get()).get();
 
             new Http2StreamChannelBootstrap(channelHandlerContext.channel().parent())
-                    .handler(new ChannelInitializer<Http2StreamChannel>() {
-                        @Override
-                        protected void initChannel(@NonNull Http2StreamChannel ch) throws Exception {
-                            int newStream = ch.stream().id();
+                .handler(new ChannelInitializer<Http2StreamChannel>() {
+                    @Override
+                    protected void initChannel(@NonNull Http2StreamChannel ch) throws Exception {
+                        int newStream = ch.stream().id();
 
-                            channelHandlerContext.write(new DefaultHttp2PushPromiseFrame(HttpConversionUtil.toHttp2Headers(outboundRequest, false))
-                                    .stream(((Http2StreamChannel) channelHandlerContext.channel()).stream())
-                                    .pushStream(ch.stream()));
+                        channelHandlerContext.write(new DefaultHttp2PushPromiseFrame(HttpConversionUtil.toHttp2Headers(outboundRequest, false))
+                            .stream(((Http2StreamChannel) channelHandlerContext.channel()).stream())
+                            .pushStream(ch.stream()));
 
-                            originalStreamPipeline.initializeChildPipelineForPushPromise(ch);
+                        originalStreamPipeline.initializeChildPipelineForPushPromise(ch);
 
-                            inboundRequest.headers().setInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), newStream);
-                            inboundRequest.headers().setInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_PROMISE_ID.text(), ourStream);
+                        inboundRequest.headers().setInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), newStream);
+                        inboundRequest.headers().setInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_PROMISE_ID.text(), ourStream);
 
-                            // delay until our handling is complete
-                            connectionHandlerContext.executor().execute(() -> {
-                                try {
-                                    ch.pipeline().context(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER).fireChannelRead(inboundRequest);
-                                } catch (Exception e) {
-                                    LOG.warn("Failed to complete push promise", e);
-                                }
-                            });
-                        }
-                    })
-                    .open()
-                    .addListener((GenericFutureListener<Future<Http2StreamChannel>>) future -> {
-                        try {
-                            future.sync();
-                        } catch (Exception e) {
-                            if (e instanceof InterruptedException) {
-                                Thread.currentThread().interrupt();
+                        // delay until our handling is complete
+                        connectionHandlerContext.executor().execute(() -> {
+                            try {
+                                ch.pipeline().context(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER).fireChannelRead(inboundRequest);
+                            } catch (Exception e) {
+                                LOG.warn("Failed to complete push promise", e);
                             }
-                            LOG.warn("Failed to complete push promise", e);
+                        });
+                    }
+                })
+                .open()
+                .addListener((GenericFutureListener<Future<Http2StreamChannel>>) future -> {
+                    try {
+                        future.sync();
+                    } catch (Exception e) {
+                        if (e instanceof InterruptedException) {
+                            Thread.currentThread().interrupt();
                         }
-                    });
+                        LOG.warn("Failed to complete push promise", e);
+                    }
+                });
             return this;
         } else {
             throw new UnsupportedOperationException("Server push not supported by this client: Not a HTTP2 client");
@@ -610,7 +535,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      * @return Return true if the request is form data.
      */
     @Internal
-    final boolean isFormOrMultipartData() {
+    public final boolean isFormOrMultipartData() {
         MediaType ct = getContentType().orElse(null);
         return ct != null && (ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) || ct.equals(MediaType.MULTIPART_FORM_DATA_TYPE));
     }
@@ -619,7 +544,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      * @return Return true if the request is form data.
      */
     @Internal
-    final boolean isFormData() {
+    public final boolean isFormData() {
         MediaType ct = getContentType().orElse(null);
         return ct != null && (ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE));
     }
@@ -783,12 +708,12 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
                 return (io.netty.handler.codec.http.FullHttpRequest) NettyHttpRequest.this.nettyRequest;
             } else {
                 return new DefaultFullHttpRequest(
-                        nr.protocolVersion(),
-                        nr.method(),
-                        nr.uri(),
-                        Unpooled.EMPTY_BUFFER,
-                        nr.headers(),
-                        EmptyHttpHeaders.INSTANCE
+                    nr.protocolVersion(),
+                    nr.method(),
+                    nr.uri(),
+                    Unpooled.EMPTY_BUFFER,
+                    nr.headers(),
+                    EmptyHttpHeaders.INSTANCE
                 );
             }
         }
@@ -801,11 +726,11 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             } else {
                 io.netty.handler.codec.http.FullHttpRequest fullHttpRequest = toFullHttpRequest();
                 DefaultStreamedHttpRequest request = new DefaultStreamedHttpRequest(
-                        fullHttpRequest.protocolVersion(),
-                        fullHttpRequest.method(),
-                        fullHttpRequest.uri(),
-                        true,
-                        Publishers.just(new DefaultLastHttpContent(fullHttpRequest.content()))
+                    fullHttpRequest.protocolVersion(),
+                    fullHttpRequest.method(),
+                    fullHttpRequest.uri(),
+                    true,
+                    Publishers.just(new DefaultLastHttpContent(fullHttpRequest.content()))
                 );
                 request.headers().setAll(fullHttpRequest.headers());
                 return request;

@@ -26,6 +26,7 @@ import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
@@ -114,7 +115,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
      * @param conversionService The conversion service
      */
     public NettyMutableHttpResponse(HttpVersion httpVersion, HttpResponseStatus httpResponseStatus, Object body, ConversionService conversionService) {
-        this(httpVersion, httpResponseStatus, new DefaultHttpHeaders(), body, conversionService);
+        this(httpVersion, httpResponseStatus, null, body, conversionService);
     }
 
     /**
@@ -149,7 +150,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
 
         boolean hasHeaders = nettyHeaders != null;
         if (!hasHeaders) {
-            nettyHeaders = new DefaultHttpHeaders();
+            nettyHeaders = new DefaultHttpHeaders(false);
         }
         this.nettyHeaders = nettyHeaders;
         this.headers = new NettyHttpHeaders(nettyHeaders, conversionService);
@@ -219,6 +220,19 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
     }
 
     @Override
+    public io.micronaut.http.HttpResponse<B> setAttribute(CharSequence name, Object value) {
+        // This is the copy from the super method to avoid the type pollution
+        if (StringUtils.isNotEmpty(name)) {
+            if (value == null) {
+                getAttributes().remove(name.toString());
+            } else {
+                getAttributes().put(name.toString(), value);
+            }
+        }
+        return this;
+    }
+
+    @Override
     public int code() {
         return httpResponseStatus.code();
     }
@@ -285,6 +299,18 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
             bodyConvertor.cleanup();
         }
         return (MutableHttpResponse<T>) this;
+    }
+
+    @Override
+    public MutableHttpResponse<B> contentType(MediaType mediaType) {
+        if (mediaType == null) {
+            headers.remove(HttpHeaderNames.CONTENT_TYPE);
+        } else {
+            // optimization for content type validation
+            mediaType.validate(() -> NettyHttpHeaders.validateHeader(HttpHeaderNames.CONTENT_TYPE, mediaType));
+            headers.setUnsafe(HttpHeaderNames.CONTENT_TYPE, mediaType);
+        }
+        return this;
     }
 
     /**

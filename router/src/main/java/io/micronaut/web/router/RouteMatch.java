@@ -15,16 +15,16 @@
  */
 package io.micronaut.web.router;
 
-import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MediaType;
+import io.micronaut.http.bind.RequestBinderRegistry;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.Callable;
-import java.util.function.Function;
-import java.util.function.Predicate;
 
 /**
  * A {@link Route} that is executable.
@@ -33,7 +33,12 @@ import java.util.function.Predicate;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, RouteInfo<R> {
+public interface RouteMatch<R> extends Callable<R>, AnnotationMetadataProvider {
+
+    /**
+     * @return The route info
+     */
+    RouteInfo<R> getRouteInfo();
 
     /**
      * @return The variable values following a successful match.
@@ -41,30 +46,36 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Rout
     Map<String, Object> getVariableValues();
 
     /**
-     * Execute the route with the given values. The passed map should contain values for every argument returned by
-     * {@link #getRequiredArguments()}.
+     * Fulfill argument values.
      *
      * @param argumentValues The argument values
-     * @return The result
      */
-    R execute(Map<String, Object> argumentValues);
+    void fulfill(Map<String, Object> argumentValues);
 
     /**
-     * Returns a new {@link RouteMatch} fulfilling arguments required by this route to execute. The new route will not
-     * return the given arguments from the {@link #getRequiredArguments()} method.
+     * Attempt to satisfy the arguments of the given route with the data from the given request.
      *
-     * @param argumentValues The argument values
-     * @return The fulfilled route
+     * @param requestBinderRegistry The request binder registry
+     * @param request               The request
+     * @since 4.0.0
      */
-    RouteMatch<R> fulfill(Map<String, Object> argumentValues);
+    void fulfillBeforeFilters(RequestBinderRegistry requestBinderRegistry, HttpRequest<?> request);
 
     /**
-     * Decorates the execution of the route with the given executor.
+     * Attempt to satisfy the arguments of the given route with the data from the given request.
      *
-     * @param executor The executor
-     * @return A new route match
+     * @param requestBinderRegistry The request binder registry
+     * @param request               The request
+     * @since 4.0.0
      */
-    RouteMatch<R> decorate(Function<RouteMatch<R>, R> executor);
+    void fulfillAfterFilters(RequestBinderRegistry requestBinderRegistry, HttpRequest<?> request);
+
+    /**
+     * @return Whether the route match can be executed without passing any additional arguments ie. via
+     * {@link #execute()}
+     * @since 4.0.0
+     */
+    boolean isFulfilled();
 
     /**
      * Return whether the given named input is required by this route.
@@ -73,18 +84,6 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Rout
      * @return True if it is
      */
     Optional<Argument<?>> getRequiredInput(String name);
-
-    /**
-     * @return The argument that represents the body
-     */
-    Optional<Argument<?>> getBodyArgument();
-
-    /**
-     * The media types able to produced by this route.
-     *
-     * @return A list of {@link MediaType} that this route can produce
-     */
-    List<MediaType> getProduces();
 
     /**
      * <p>Returns the required arguments for this RouteMatch.</p>
@@ -96,20 +95,12 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Rout
     }
 
     /**
-     * @return The return type
-     */
-    @Override
-    ReturnType<? extends R> getReturnType();
-
-    /**
      * Execute the route with the given values. Note if there are required arguments returned from
      * {@link #getRequiredArguments()} this method will throw an {@link IllegalArgumentException}.
      *
      * @return The result
      */
-    default R execute() {
-        return execute(Collections.emptyMap());
-    }
+    R execute();
 
     /**
      * Same as {@link #execute()}.
@@ -123,77 +114,11 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Rout
     }
 
     /**
-     * @return Whether the route match can be executed without passing any additional arguments ie. via
-     * {@link #execute()}
-     */
-    default boolean isExecutable() {
-        return getRequiredArguments().isEmpty();
-    }
-
-    /**
-     * Return whether the given named input is required by this route.
-     *
-     * @param name The name of the input
-     * @return True if it is
-     */
-    default boolean isRequiredInput(String name) {
-        return getRequiredInput(name).isPresent();
-    }
-
-    /**
-     * Whether the specified content type is an accepted type.
-     *
-     * @param contentType The content type
-     * @return True if it is
-     */
-    boolean doesConsume(@Nullable MediaType contentType);
-
-    /**
-     * Whether the route does produce any of the given types.
-     *
-     * @param acceptableTypes The acceptable types
-     * @return True if it is
-     */
-    boolean doesProduce(@Nullable Collection<MediaType> acceptableTypes);
-
-    /**
-     * Whether the route does produce any of the given types.
-     *
-     * @param acceptableType The acceptable type
-     * @return True if it is
-     */
-    boolean doesProduce(@Nullable MediaType acceptableType);
-
-    /**
-     * Whether the specified content type is explicitly an accepted type.
-     *
-     * @param contentType The content type
-     * @return True if it is
-     */
-    default boolean explicitlyConsumes(@Nullable MediaType contentType) {
-        return false;
-    }
-
-    /**
-     * Whether the specified content type is explicitly a producing type.
-     *
-     * @param contentType The content type
-     * @return True if it is
-     * @since 2.5.0
-     */
-    default boolean explicitlyProduces(@Nullable MediaType contentType) {
-        return false;
-    }
-
-    /**
      * Is the given input satisfied.
      *
      * @param name The name of the input
      * @return True if it is
      */
-    default boolean isSatisfied(String name) {
-        Object val = getVariableValues().get(name);
-        return val != null && !(val instanceof UnresolvedArgument);
-    }
+    boolean isSatisfied(String name);
 
 }

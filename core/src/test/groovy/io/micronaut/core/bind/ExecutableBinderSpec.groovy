@@ -60,7 +60,7 @@ class ExecutableBinderSpec extends Specification {
             return { Optional.of(args[1].get(args[0].argument.name)) } as ArgumentBinder.BindingResult
         } )
 
-        registry.findArgumentBinder(_,_) >> Optional.of( argumentBinder)
+        registry.findArgumentBinder(_) >> Optional.of( argumentBinder)
 
         when:
         def bound = binder.bind(executable, registry, [foo:"bar"])
@@ -103,7 +103,7 @@ class ExecutableBinderSpec extends Specification {
             return ArgumentBinder.BindingResult.UNSATISFIED
         } )
 
-        registry.findArgumentBinder(_,_) >> Optional.of( argumentBinder)
+        registry.findArgumentBinder(_) >> Optional.of( argumentBinder)
 
         when:
         def bound = binder.bind(executable, registry, [foo:"bar"])
@@ -141,7 +141,7 @@ class ExecutableBinderSpec extends Specification {
             return ArgumentBinder.BindingResult.UNSATISFIED
         } )
 
-        registry.findArgumentBinder(_,_) >> Optional.of( argumentBinder)
+        registry.findArgumentBinder(_) >> Optional.of( argumentBinder)
 
         when:
         def bound = binder.bind(executable, registry, [not:"there"])
