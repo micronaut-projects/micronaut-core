@@ -51,7 +51,7 @@ public class DefaultBodyAnnotationBinder<T> extends AbstractArgumentBinder<T> im
 
     @Override
     public BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {
-        if (!HttpMethod.permitsRequestBody(source.getMethod())) {
+        if (!source.getMethod().permitsRequestBody()) {
             return BindingResult.unsatisfied();
         }
 

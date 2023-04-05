@@ -103,7 +103,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
 
         byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (RequestArgumentBinder<HttpHeaders>) (argument, source) -> () -> Optional.of(source.getHeaders()));
         byType.put(Argument.of(HttpRequest.class).typeHashCode(), (RequestArgumentBinder<HttpRequest<?>>) (argument, source) -> {
-            if (HttpMethod.permitsRequestBody(source.getMethod())) {
+            if (source.getMethod().permitsRequestBody()) {
                 Optional<Argument<?>> typeVariable = argument.getFirstTypeVariable()
                     .filter(arg -> arg.getType() != Object.class)
                     .filter(arg -> arg.getType() != Void.class);
@@ -118,7 +118,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                 Optional<Argument<?>> typeVariable = argument.getFirstTypeVariable()
                     .filter(arg -> arg.getType() != Object.class)
                     .filter(arg -> arg.getType() != Void.class);
-                if (typeVariable.isPresent() && HttpMethod.permitsRequestBody(source.getMethod())) {
+                if (typeVariable.isPresent() && source.getMethod().permitsRequestBody()) {
                     if (source.getBody().isPresent()) {
                         return () -> Optional.of(new PushCapableFullHttpRequest((PushCapableHttpRequest) source, typeVariable.get()));
                     } else {

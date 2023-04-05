@@ -226,7 +226,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 uriRoutes = mostSpecific;
             }
         }
-        boolean permitsBody = HttpMethod.permitsRequestBody(request.getMethod());
+        boolean permitsBody = request.getMethod().permitsRequestBody();
         int routeCount = uriRoutes.size();
         if (routeCount > 1 && permitsBody) {
             final MediaType contentType = request.getContentType().orElse(MediaType.ALL_TYPE);
@@ -533,7 +533,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     private List<UriRouteInfo<Object, Object>> findInternal(HttpRequest<?> request) {
         String httpMethodName = request.getMethodName();
-        boolean permitsBody = HttpMethod.permitsRequestBody(request.getMethod());
+        boolean permitsBody = request.getMethod().permitsRequestBody();
         final Collection<MediaType> acceptedProducedTypes = request.accept();
         List<UriRouteInfo<Object, Object>> routes = routesByMethod.getOrDefault(httpMethodName, Collections.emptyList());
         if (CollectionUtils.isEmpty(routes)) {

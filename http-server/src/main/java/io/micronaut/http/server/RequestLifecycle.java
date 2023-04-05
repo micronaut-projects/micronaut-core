@@ -106,18 +106,19 @@ public class RequestLifecycle {
     protected final ExecutionFlow<MutableHttpResponse<?>> normalFlow() {
         ServerRequestContext.set(request);
 
-        MediaType contentType = request.getContentType().orElse(null);
-        if (!multipartEnabled &&
-            contentType != null &&
+        if (!multipartEnabled) {
+            MediaType contentType = request.getContentType().orElse(null);
+            if (contentType != null &&
             contentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE)) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Multipart uploads have been disabled via configuration. Rejected request for URI {}, method {}, and content type {}", request.getUri(),
-                    request.getMethodName(), contentType);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Multipart uploads have been disabled via configuration. Rejected request for URI {}, method {}, and content type {}", request.getUri(),
+                        request.getMethodName(), contentType);
+                }
+                return onStatusError(
+                    HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
+                    "Content Type [" + contentType + "] not allowed"
+                );
             }
-            return onStatusError(
-                HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
-                "Content Type [" + contentType + "] not allowed"
-            );
         }
 
         UriRouteMatch<Object, Object> routeMatch = routeExecutor.findRouteMatch(request);

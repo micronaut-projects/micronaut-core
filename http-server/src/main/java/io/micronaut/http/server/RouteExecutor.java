@@ -420,38 +420,37 @@ public final class RouteExecutor {
 
     ExecutionFlow<MutableHttpResponse<?>> callRoute(ContextView contextFromFilter, RouteMatch<?> routeMatch, HttpRequest<?> request) {
         RouteInfo<?> routeInfo = routeMatch.getRouteInfo();
-        ExecutorService executorService = findExecutor(routeInfo);
-        Supplier<ExecutionFlow<MutableHttpResponse<?>>> flowSupplier = () -> executeRouteAndConvertBody(routeMatch, request);
+        ExecutorService executorService = routeInfo.getExecutor(serverConfiguration.getThreadSelection());
         ExecutionFlow<MutableHttpResponse<?>> executeMethodResponseFlow;
         if (executorService != null) {
             if (routeInfo.isSuspended()) {
                 executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
                         coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(request, contextView));
                         return Mono.from(
-                            ReactiveExecutionFlow.fromFlow(flowSupplier.get()).toPublisher()
+                            ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(routeMatch, request)).toPublisher()
                         );
                     }).contextWrite(contextFromFilter))
                     .putInContext(ServerRequestContext.KEY, request);
             } else if (routeInfo.isReactive()) {
-                executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, flowSupplier)
+                executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(routeMatch, request))
                     .putInContext(ServerRequestContext.KEY, request);
             } else {
-                executeMethodResponseFlow = ExecutionFlow.async(executorService, flowSupplier);
+                executeMethodResponseFlow = ExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(routeMatch, request));
             }
         } else {
             if (routeInfo.isSuspended()) {
                 executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
                         coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(request, contextView));
                         return Mono.from(
-                            ReactiveExecutionFlow.fromFlow(flowSupplier.get()).toPublisher()
+                            ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(routeMatch, request)).toPublisher()
                         );
                     }).contextWrite(contextFromFilter))
                     .putInContext(ServerRequestContext.KEY, request);
             } else if (routeInfo.isReactive()) {
-                executeMethodResponseFlow = ReactiveExecutionFlow.fromFlow(flowSupplier.get())
+                executeMethodResponseFlow = ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(routeMatch, request))
                     .putInContext(ServerRequestContext.KEY, request);
             } else {
-                executeMethodResponseFlow = flowSupplier.get();
+                executeMethodResponseFlow = executeRouteAndConvertBody(routeMatch, request);
             }
         }
         return executeMethodResponseFlow;
@@ -479,7 +478,7 @@ public final class RouteExecutor {
         if (body == null) {
             if (routeInfo.isVoid()) {
                 MutableHttpResponse<Object> data = forStatus(routeInfo);
-                if (HttpMethod.permitsRequestBody(request.getMethod())) {
+                if (request.getMethod().permitsRequestBody()) {
                     data.header(HttpHeaders.CONTENT_LENGTH, "0");
                 }
                 outgoingResponse = ExecutionFlow.just(data);

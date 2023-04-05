@@ -25,10 +25,13 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.scheduling.executor.ExecutorSelector;
+import io.micronaut.scheduling.executor.ThreadSelection;
 
 import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Predicate;
 
 /**
@@ -47,6 +50,9 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     private final Charset defaultCharset;
     private final Integer port;
     private final ConversionService conversionService;
+    private final ExecutorSelector executorSelector;
+    private boolean noExecutor;
+    private ExecutorService executor;
 
     public DefaultUrlRouteInfo(HttpMethod httpMethod,
                                UriMatchTemplate uriMatchTemplate,
@@ -58,13 +64,15 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
                                List<MediaType> producesMediaTypes,
                                List<Predicate<HttpRequest<?>>> predicates,
                                Integer port,
-                               ConversionService conversionService) {
-        super(targetMethod, bodyArgument, bodyArgumentName, consumesMediaTypes, producesMediaTypes, HttpMethod.permitsRequestBody(httpMethod), false, predicates);
+                               ConversionService conversionService,
+                               ExecutorSelector executorSelector) {
+        super(targetMethod, bodyArgument, bodyArgumentName, consumesMediaTypes, producesMediaTypes, httpMethod.permitsRequestBody(), false, predicates);
         this.httpMethod = httpMethod;
         this.uriMatchTemplate = uriMatchTemplate;
         this.defaultCharset = defaultCharset;
         this.port = port;
         this.conversionService = conversionService;
+        this.executorSelector = executorSelector;
     }
 
     @Override
@@ -105,5 +113,20 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
                 .append(String.join(",", consumesMediaTypes))
                 .append(")")
                 .toString();
+    }
+
+    @Override
+    public ExecutorService getExecutor(ThreadSelection threadSelection) {
+        if (executorSelector == null || noExecutor) {
+            return null;
+        } else {
+            this.executor =
+                executorSelector.select(getTargetMethod(), threadSelection)
+                .orElse(null);
+            if (executor == null) {
+                noExecutor = true;
+            }
+            return executor;
+        }
     }
 }

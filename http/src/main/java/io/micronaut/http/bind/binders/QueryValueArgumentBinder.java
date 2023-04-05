@@ -73,7 +73,7 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
         Argument<T> argument = context.getArgument();
         AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
 
-        if (HttpMethod.permitsRequestBody(source.getMethod()) && !annotationMetadata.hasAnnotation(QueryValue.class)) {
+        if (source.getMethod().permitsRequestBody() && !annotationMetadata.hasAnnotation(QueryValue.class)) {
             // During the unmatched check avoid requests that don't allow bodies
             return BindingResult.unsatisfied();
         }

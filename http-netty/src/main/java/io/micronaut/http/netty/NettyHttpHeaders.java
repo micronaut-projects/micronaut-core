@@ -104,7 +104,8 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     }
 
     @Override
-    public List<String> getAll(CharSequence name) {
+    public List<String>
+    getAll(CharSequence name) {
         return nettyHeaders.getAll(name);
     }
 

@@ -36,6 +36,9 @@ import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.inject.MethodReference;
+import io.micronaut.scheduling.executor.ExecutorSelector;
+import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.web.router.exceptions.RoutingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,6 +55,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -75,6 +79,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     protected final UriNamingStrategy uriNamingStrategy;
     protected final ConversionService conversionService;
     protected final Charset defaultCharset;
+    private final ExecutorSelector executorSelector;
 
     private DefaultUriRoute currentParentRoute;
     private final List<UriRoute> uriRoutes = new ArrayList<>();
@@ -110,8 +115,10 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         if (executionHandleLocator instanceof ApplicationContext applicationContext) {
             Environment environment = applicationContext.getEnvironment();
             defaultCharset = environment.get("micronaut.application.default-charset", Charset.class, StandardCharsets.UTF_8);
+            this.executorSelector = applicationContext.findBean(ExecutorSelector.class).orElse(null);
         } else {
             defaultCharset = StandardCharsets.UTF_8;
+            this.executorSelector = null;
         }
     }
 
@@ -735,12 +742,13 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     /**
      * The default route impl.
      */
-    class DefaultUriRoute extends AbstractRoute implements UriRoute {
+    final class DefaultUriRoute extends AbstractRoute implements UriRoute {
         final String httpMethodName;
         final HttpMethod httpMethod;
         final UriMatchTemplate uriMatchTemplate;
         final List<DefaultUriRoute> nestedRoutes = new ArrayList<>(2);
         private Integer port;
+        private final DefaultUrlRouteInfo<Object, Object> routeInfo;
 
         /**
          * @param httpMethod The HTTP method
@@ -863,22 +871,25 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             this.httpMethod = httpMethod;
             this.uriMatchTemplate = uriTemplate;
             this.httpMethodName = httpMethodName;
+            this.routeInfo = new DefaultUrlRouteInfo<>(
+                httpMethod,
+                uriMatchTemplate,
+                defaultCharset,
+                targetMethod,
+                bodyArgumentName,
+                bodyArgument,
+                consumesMediaTypes,
+                producesMediaTypes,
+                conditions,
+                port,
+                conversionService,
+                new RouteExecutorSelector()
+            );
         }
 
         @Override
         public UriRouteInfo<Object, Object> toRouteInfo() {
-            return new DefaultUrlRouteInfo<>(
-                    httpMethod,
-                    uriMatchTemplate,
-                    defaultCharset,
-                    targetMethod,
-                    bodyArgumentName,
-                    bodyArgument,
-                    consumesMediaTypes,
-                    producesMediaTypes,
-                    conditions,
-                    port,
-                    conversionService);
+            return routeInfo;
         }
 
         @Override
@@ -964,12 +975,32 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         public int compareTo(UriRoute o) {
             return uriMatchTemplate.compareTo(o.getUriMatchTemplate());
         }
+
+        private final class RouteExecutorSelector implements ExecutorSelector {
+            @Override
+            public Optional<ExecutorService> select(MethodReference<?, ?> method, ThreadSelection threadSelection) {
+                if (executorSelector != null) {
+                    return executorSelector.select(targetMethod.getExecutableMethod(), threadSelection);
+                } else {
+                    return Optional.empty();
+                }
+            }
+
+            @Override
+            public Optional<ExecutorService> select(String name) {
+                if (executorSelector != null) {
+                    return executorSelector.select(name);
+                } else {
+                    return Optional.empty();
+                }
+            }
+        }
     }
 
     /**
      * Define a single route.
      */
-    class DefaultSingleRoute extends DefaultResourceRoute {
+    final class DefaultSingleRoute extends DefaultResourceRoute {
 
         /**
          * @param resourceRoutes The resource routes
