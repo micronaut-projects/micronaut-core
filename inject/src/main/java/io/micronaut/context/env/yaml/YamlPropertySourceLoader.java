@@ -61,7 +61,7 @@ public class YamlPropertySourceLoader extends AbstractPropertySourceLoader {
                 Object object = i.next();
                 if (object instanceof Map) {
                     Map map = (Map) object;
-                    if (LOG.isTraceEnabled()) {
+                    if (logEnabled) {
                         LOG.trace("Processing YAML: {}", map);
                     }
                     String prefix = "";
@@ -69,7 +69,7 @@ public class YamlPropertySourceLoader extends AbstractPropertySourceLoader {
                 }
             }
         } else {
-            if (LOG.isTraceEnabled()) {
+            if (logEnabled) {
                 LOG.trace("PropertySource [{}] produced no YAML content", name);
             }
         }
