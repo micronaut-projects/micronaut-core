@@ -63,7 +63,7 @@ public interface UriRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, RequestM
      * @return A null or a {@link RouteMatch}
      */
     @Nullable
-    default UriRouteMatch<T, R> tryMatch(@NonNull  URI uri) {
+    default UriRouteMatch<T, R> tryMatch(@NonNull URI uri) {
         return tryMatch(uri.toString());
     }
 
