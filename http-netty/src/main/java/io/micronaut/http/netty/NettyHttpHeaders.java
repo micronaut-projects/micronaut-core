@@ -20,14 +20,16 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpHeaderValues;
-import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.util.HttpHeadersUtil;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValidationUtil;
+import jakarta.annotation.Nullable;
 
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -38,6 +40,7 @@ import java.util.Base64;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.Set;
@@ -269,7 +272,7 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     @Override
     public Optional<MediaType> contentType() {
         // optimization to avoid ConversionService
-        String str = get(HttpHeaders.CONTENT_TYPE);
+        String str = get(HttpHeaderNames.CONTENT_TYPE);
         if (str != null) {
             try {
                 return Optional.of(MediaType.of(str));
@@ -293,7 +296,47 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     }
 
     @Override
+    public List<MediaType> accept() {
+        // use HttpHeaderNames instead of HttpHeaders
+        return MediaType.orderedOf(getAll(HttpHeaderNames.ACCEPT));
+    }
+
+    @Nullable
+    @Override
+    public Charset acceptCharset() {
+        String text = get(HttpHeaderNames.ACCEPT_CHARSET);
+        if (text == null) {
+            return null;
+        }
+        text = HttpHeadersUtil.splitAcceptHeader(text);
+        if (text != null) {
+            try {
+                return Charset.forName(text);
+            } catch (Exception ignored) {
+            }
+        }
+        // default to UTF-8
+        return StandardCharsets.UTF_8;
+    }
+
+    @Nullable
+    @Override
+    public Locale acceptLanguage() {
+        String text = get(HttpHeaderNames.ACCEPT_LANGUAGE);
+        if (text == null) {
+            return null;
+        }
+        String part = HttpHeadersUtil.splitAcceptHeader(text);
+        return part == null ? Locale.getDefault() : Locale.forLanguageTag(part);
+    }
+
+    @Override
     public Optional<String> getOrigin() {
         return findFirst(HttpHeaderNames.ORIGIN);
+    }
+
+    @Override
+    public boolean containsServer() {
+        return nettyHeaders.contains(HttpHeaderNames.SERVER);
     }
 }
