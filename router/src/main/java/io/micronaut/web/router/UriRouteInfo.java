@@ -83,7 +83,7 @@ public interface UriRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, RequestM
      * @return A null or a {@link RouteMatch}
      */
     @Nullable
-    UriRouteMatch<T, R> tryMatch(@NonNull  String uri);
+    UriRouteMatch<T, R> tryMatch(@NonNull String uri);
 
     /**
      * @return The port the route listens to, or null if the default port
