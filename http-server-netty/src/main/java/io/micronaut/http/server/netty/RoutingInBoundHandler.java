@@ -647,7 +647,7 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
         io.netty.handler.codec.http.HttpResponse nettyResponse,
         GenericFutureListener<Future<? super Void>> requestCompletor
     ) {
-        context.writeAndFlush(nettyResponse).addListener(requestCompletor);
+        context.write(nettyResponse).addListener(requestCompletor);
 
         if (LOG.isDebugEnabled()) {
             LOG.debug("Response {} - {} {}",
@@ -655,6 +655,11 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
                 request.getMethodName(),
                 request.getUri());
         }
+    }
+
+    @Override
+    public void channelReadComplete(ChannelHandlerContext ctx) {
+        ctx.flush();
     }
 
     @NonNull
