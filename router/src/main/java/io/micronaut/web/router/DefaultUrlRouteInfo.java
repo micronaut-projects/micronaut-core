@@ -79,8 +79,16 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
 
     @Override
     public Optional<UriRouteMatch<T, R>> match(String uri) {
-        Optional<UriMatchInfo> matchInfo = uriMatchTemplate.match(uri);
-        return matchInfo.map(info -> new DefaultUriRouteMatch<>(info, this, defaultCharset, conversionService));
+        return uriMatchTemplate.match(uri).map(info -> new DefaultUriRouteMatch<>(info, this, defaultCharset, conversionService));
+    }
+
+    @Override
+    public UriRouteMatch<T, R> tryMatch(String uri) {
+        UriMatchInfo matchInfo = uriMatchTemplate.tryMatch(uri);
+        if (matchInfo != null) {
+            return new DefaultUriRouteMatch<>(matchInfo, this, defaultCharset, conversionService);
+        }
+        return null;
     }
 
     @Override

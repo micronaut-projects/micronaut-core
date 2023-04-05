@@ -43,8 +43,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -62,9 +62,11 @@ import java.util.stream.Stream;
 @Singleton
 public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatch<?>> {
 
-    private final Map<String, List<UriRouteInfo<Object, Object>>> routesByMethod = new HashMap<>();
-    private final List<StatusRouteInfo<Object, Object>> statusRoutes = new ArrayList<>();
-    private final List<ErrorRouteInfo<Object, Object>> errorRoutes = new ArrayList<>();
+    private static final UriRouteInfo<Object, Object>[] EMPTY = new UriRouteInfo[0];
+
+    private final Map<String, UriRouteInfo<Object, Object>[]> routesByMethod;
+    private final StatusRouteInfo<Object, Object>[] statusRoutes;
+    private final ErrorRouteInfo<Object, Object>[] errorRoutes;
     private final Set<Integer> exposedPorts;
     @Nullable
     private Set<Integer> ports;
@@ -100,6 +102,9 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     public DefaultRouter(Collection<RouteBuilder> builders) {
         Set<Integer> exposedPorts = new HashSet<>(5);
         List<FilterRoute> filterRoutes = new ArrayList<>();
+        Map<String, List<UriRouteInfo<Object, Object>>> routesByMethod = CollectionUtils.newHashMap(HttpMethod.values().length);
+        Set<StatusRouteInfo<Object, Object>> statusRoutes = new LinkedHashSet<>();
+        Set<ErrorRouteInfo<Object, Object>> errorRoutes = new LinkedHashSet<>();
         for (RouteBuilder builder : builders) {
             List<UriRoute> constructedRoutes = builder.getUriRoutes();
             for (UriRoute route : constructedRoutes) {
@@ -114,7 +119,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                     final StatusRouteInfo<Object, Object> existing = statusRoutes.stream().filter(r -> r.equals(routeInfo)).findFirst().orElse(null);
                     throw new RoutingException("Attempted to register multiple local routes for http status [" + statusRoute.status() + "]. New route: " + statusRoute + ". Existing: " + existing);
                 }
-                this.statusRoutes.add(routeInfo);
+                statusRoutes.add(routeInfo);
             }
             for (ErrorRoute errorRoute : builder.getErrorRoutes()) {
                 ErrorRouteInfo<Object, Object> routeInfo = errorRoute.toRouteInfo();
@@ -122,7 +127,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                     final ErrorRouteInfo<Object, Object> existing = errorRoutes.stream().filter(r -> r.equals(routeInfo)).findFirst().orElse(null);
                     throw new RoutingException("Attempted to register multiple local routes for error [" + errorRoute.exceptionType().getSimpleName() + "]. New route: " + errorRoute + ". Existing: " + existing);
                 }
-                this.errorRoutes.add(routeInfo);
+                errorRoutes.add(routeInfo);
             }
             filterRoutes.addAll(builder.getFilterRoutes());
             exposedPorts.addAll(builder.getExposedPorts());
@@ -142,6 +147,13 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 preconditionFilterRoutes.add(filterRoute);
             }
         }
+        Map<String, UriRouteInfo<Object, Object>[]> map = CollectionUtils.newHashMap(routesByMethod.size());
+        for (Map.Entry<String, List<UriRouteInfo<Object, Object>>> e : routesByMethod.entrySet()) {
+            map.put(e.getKey(), finalizeRoutes(e.getValue()));
+        }
+        this.routesByMethod = map;
+        this.statusRoutes = statusRoutes.toArray(StatusRouteInfo[]::new);
+        this.errorRoutes = errorRoutes.toArray(ErrorRouteInfo[]::new);
     }
 
     private boolean isMatchesAll(FilterRoute filterRoute) {
@@ -188,14 +200,14 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri, @Nullable HttpRequest<?> context) {
         return this.<T, R>toMatches(
                 uri.toString(),
-                routesByMethod.getOrDefault(httpMethod.name(), Collections.emptyList())
+                routesByMethod.getOrDefault(httpMethod.name(), EMPTY)
         ).stream();
     }
 
     @NonNull
     @Override
     public Stream<UriRouteInfo<?, ?>> uriRoutes() {
-        return routesByMethod.values().stream().flatMap(List::stream);
+        return routesByMethod.values().stream().flatMap(Arrays::stream);
     }
 
     @NonNull
@@ -278,9 +290,20 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     private <T, R> List<UriRouteMatch<T, R>> toMatches(String path, List<UriRouteInfo<Object, Object>> routes) {
         List<UriRouteMatch<T, R>> uriRoutes = new ArrayList<>(routes.size());
         for (UriRouteInfo<Object, Object> route : routes) {
-            Optional<UriRouteMatch<Object, Object>> match = route.match(path);
-            if (match.isPresent()) {
-                uriRoutes.add((UriRouteMatch<T, R>) match.get());
+            UriRouteMatch match = route.tryMatch(path);
+            if (match != null) {
+                uriRoutes.add(match);
+            }
+        }
+        return uriRoutes;
+    }
+
+    private <T, R> List<UriRouteMatch<T, R>> toMatches(String path, UriRouteInfo<Object, Object>[] routes) {
+        List<UriRouteMatch<T, R>> uriRoutes = new ArrayList<>(routes.length);
+        for (UriRouteInfo<Object, Object> route : routes) {
+            UriRouteMatch match = route.tryMatch(path);
+            if (match != null) {
+                uriRoutes.add(match);
             }
         }
         return uriRoutes;
@@ -289,8 +312,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     @NonNull
     @Override
     public <T, R> Optional<UriRouteMatch<T, R>> route(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri) {
-        List<UriRouteInfo<Object, Object>> routes = routesByMethod.getOrDefault(httpMethod.name(), Collections.emptyList());
-        for (UriRouteInfo<Object, Object> uriRouteInfo : routes) {
+        for (UriRouteInfo<Object, Object> uriRouteInfo : routesByMethod.getOrDefault(httpMethod.name(), EMPTY)) {
             Optional<UriRouteMatch<Object, Object>> match = uriRouteInfo.match(uri.toString());
             if (match.isPresent()) {
                 return (Optional) match;
@@ -365,8 +387,8 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             }
             return findRouteMatch(matchedRoutes, error);
         } else {
-            List<RouteMatch<R>> producesAllMatchedRoutes = new ArrayList<>(errorRoutes.size());
-            List<RouteMatch<R>> producesSpecificMatchedRoutes = new ArrayList<>(errorRoutes.size());
+            List<RouteMatch<R>> producesAllMatchedRoutes = new ArrayList<>(errorRoutes.length);
+            List<RouteMatch<R>> producesSpecificMatchedRoutes = new ArrayList<>(errorRoutes.length);
             for (ErrorRouteInfo<Object, Object> errorRouteInfo : errorRoutes) {
                 if (!errorRouteInfo.matching(request)) {
                     continue;
@@ -490,7 +512,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     public <T, R> Stream<UriRouteMatch<T, R>> findAny(@NonNull CharSequence uri, @Nullable HttpRequest<?> request) {
         List matchedRoutes = new ArrayList<>(5);
         final String uriStr = uri.toString();
-        for (List<UriRouteInfo<Object, Object>> routes : routesByMethod.values()) {
+        for (UriRouteInfo<Object, Object>[] routes : routesByMethod.values()) {
             for (UriRouteInfo<Object, Object> route : routes) {
                 if (request != null) {
                     if (shouldSkipForPort(request, route)) {
@@ -500,8 +522,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                         continue;
                     }
                 }
-
-                final UriRouteMatch<Object, Object> match = route.match(uriStr).orElse(null);
+                UriRouteMatch match = route.tryMatch(uriStr);
                 if (match != null) {
                     matchedRoutes.add(match);
                 }
@@ -514,7 +535,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request) {
         String path = request.getPath();
         List matchedRoutes = new ArrayList<>(5);
-        for (List<UriRouteInfo<Object, Object>> routes : routesByMethod.values()) {
+        for (UriRouteInfo<Object, Object>[] routes : routesByMethod.values()) {
             for (UriRouteInfo<Object, Object> route : routes) {
                 if (shouldSkipForPort(request, route)) {
                     continue;
@@ -522,7 +543,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 if (!route.matching(request)) {
                     continue;
                 }
-                final UriRouteMatch<Object, Object> match = route.match(path).orElse(null);
+                UriRouteMatch match = route.tryMatch(path);
                 if (match != null) {
                     matchedRoutes.add(match);
                 }
@@ -535,11 +556,11 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         String httpMethodName = request.getMethodName();
         boolean permitsBody = HttpMethod.permitsRequestBody(request.getMethod());
         final Collection<MediaType> acceptedProducedTypes = request.accept();
-        List<UriRouteInfo<Object, Object>> routes = routesByMethod.getOrDefault(httpMethodName, Collections.emptyList());
-        if (CollectionUtils.isEmpty(routes)) {
+        UriRouteInfo<Object, Object>[] routes = routesByMethod.getOrDefault(httpMethodName, EMPTY);
+        if (routes.length == 0) {
             return Collections.emptyList();
         }
-        List<UriRouteInfo<Object, Object>> result = new ArrayList<>(routes.size());
+        List<UriRouteInfo<Object, Object>> result = new ArrayList<>(routes.length);
         for (UriRouteInfo<Object, Object> route : routes) {
             if (shouldSkipForPort(request, route)) {
                 continue;
@@ -573,7 +594,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         return false;
     }
 
-    private UriRouteInfo[] finalizeRoutes(List<UriRouteInfo<Object, Object>> routes) {
+    private UriRouteInfo<Object, Object>[] finalizeRoutes(List<UriRouteInfo<Object, Object>> routes) {
         Collections.sort(routes);
         return routes.toArray(new UriRouteInfo[0]);
     }
