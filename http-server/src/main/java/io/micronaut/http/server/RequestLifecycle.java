@@ -144,8 +144,7 @@ public class RequestLifecycle {
 
         return runWithFilters(() ->
             fulfillArguments(routeMatch)
-                .flatMap(rm -> routeExecutor.callRoute(context, rm, request))
-                .flatMap(this::handleStatusException)
+                .flatMap(rm -> routeExecutor.callRoute(context, rm, request).flatMap(res -> handleStatusException(res, rm)))
                 .onErrorResume(this::onErrorNoFilter));
     }
 
@@ -181,8 +180,7 @@ public class RequestLifecycle {
             }
             try {
                 return ExecutionFlow.just(errorRoute)
-                    .flatMap(routeMatch -> routeExecutor.callRoute(context, routeMatch, request))
-                    .flatMap(this::handleStatusException)
+                    .flatMap(routeMatch -> routeExecutor.callRoute(context, routeMatch, request).flatMap(res -> handleStatusException(res, routeMatch)))
                     .onErrorResume(u -> createDefaultErrorResponseFlow(request, u))
                     .<MutableHttpResponse<?>>map(response -> {
                         response.setAttribute(HttpAttributes.EXCEPTION, cause);
@@ -266,7 +264,8 @@ public class RequestLifecycle {
             @Override
             protected ExecutionFlow<? extends HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response) {
                 RequestLifecycle.this.request = request;
-                return handleStatusException((MutableHttpResponse<?>) response)
+                RouteInfo<?> routeInfo = response.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).orElse(null);
+                return handleStatusException((MutableHttpResponse<?>) response, routeInfo)
                     .onErrorResume(throwable -> onErrorNoFilter(throwable));
             }
 
@@ -279,14 +278,17 @@ public class RequestLifecycle {
         return filterRunner.run(request);
     }
 
-    private ExecutionFlow<MutableHttpResponse<?>> handleStatusException(MutableHttpResponse<?> response) {
-        RouteInfo<?> routeInfo = response.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).orElse(null);
+    private ExecutionFlow<MutableHttpResponse<?>> handleStatusException(MutableHttpResponse<?> response, RouteMatch<?> routeMatch) {
+        RouteInfo<?> routeInfo = routeMatch == null ? null : routeMatch.getRouteInfo();
+        return handleStatusException(response, routeInfo);
+    }
+
+    private ExecutionFlow<MutableHttpResponse<?>> handleStatusException(MutableHttpResponse<?> response, RouteInfo<?> routeInfo) {
         if (response.code() >= 400 && routeInfo != null && !routeInfo.isErrorRoute()) {
             RouteMatch<Object> statusRoute = routeExecutor.findStatusRoute(request, response.status(), routeInfo);
             if (statusRoute != null) {
                 return fulfillArguments(statusRoute)
-                    .flatMap(routeMatch -> routeExecutor.callRoute(Context.empty(), routeMatch, request))
-                    .flatMap(this::handleStatusException)
+                    .flatMap(rm -> routeExecutor.callRoute(Context.empty(), rm, request).flatMap(res -> handleStatusException(res, rm)))
                     .onErrorResume(this::onErrorNoFilter);
             }
         }
@@ -369,8 +371,7 @@ public class RequestLifecycle {
         Optional<RouteMatch<Object>> statusRoute = routeExecutor.router.findStatusRoute(defaultResponse.status(), request);
         if (statusRoute.isPresent()) {
             return runWithFilters(() -> fulfillArguments(statusRoute.get())
-                .flatMap(routeMatch -> routeExecutor.callRoute(context, routeMatch, request))
-                .flatMap(this::handleStatusException)
+                .flatMap(routeMatch -> routeExecutor.callRoute(context, routeMatch, request).flatMap(res -> handleStatusException(res, routeMatch)))
                 .onErrorResume(this::onErrorNoFilter));
         }
         if (request.getMethod() != HttpMethod.HEAD) {

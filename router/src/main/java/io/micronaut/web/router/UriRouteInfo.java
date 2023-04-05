@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.uri.UriMatchTemplate;
@@ -57,11 +58,31 @@ public interface UriRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, RequestM
     /**
      * Match this route within the given URI and produce a {@link RouteMatch} if a match is found.
      *
+     * @param uri The URI The URI
+     * @return A null or a {@link RouteMatch}
+     */
+    @Nullable
+    default UriRouteMatch<T, R> tryMatch(@NonNull URI uri) {
+        return tryMatch(uri.toString());
+    }
+
+    /**
+     * Match this route within the given URI and produce a {@link RouteMatch} if a match is found.
+     *
      * @param uri The URI
      * @return An {@link Optional} of {@link RouteMatch}
      */
     @Override
     Optional<UriRouteMatch<T, R>> match(String uri);
+
+    /**
+     * Match this route within the given URI and produce a {@link RouteMatch} if a match is found.
+     *
+     * @param uri The URI
+     * @return A null or a {@link RouteMatch}
+     */
+    @Nullable
+    UriRouteMatch<T, R> tryMatch(@NonNull String uri);
 
     /**
      * @return The port the route listens to, or null if the default port

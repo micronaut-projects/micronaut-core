@@ -60,6 +60,7 @@ class ExecutableRouteInfo<T, R> extends DefaultRouteInfo<R> implements MethodRef
     public String getMethodName() {
         return method.getMethodName();
     }
+
     @Override
     @NonNull
     public AnnotationMetadata getAnnotationMetadata() {
