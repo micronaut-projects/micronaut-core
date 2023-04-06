@@ -1893,6 +1893,33 @@ class Test {
             isAssignable
     }
 
+    void "test type isAssignable between nullable and not nullable"() {
+        when:
+            boolean isAssignable = buildClassElementMapped('test.Cart', '''
+package test
+
+data class CartItem(
+        val id: Long?,
+        val name: String,
+        val cart: Cart?
+) {
+    constructor(name: String) : this(null, name, null)
+}
+
+data class Cart(
+        val id: Long?,
+        val items: List<CartItem>?
+) {
+
+    constructor(items: List<CartItem>) : this(null, items)
+
+    fun cartItemsNotNullable() : List<CartItem> = listOf()
+}
+
+''', cl -> cl.getPrimaryConstructor().get().parameters[1].getType().isAssignable(cl.findMethod("cartItemsNotNullable").get().getReturnType()))
+        then:
+            isAssignable
+    }
 
     private void assertListGenericArgument(ClassElement type, Closure cl) {
         def arg1 = type.getAllTypeArguments().get(List.class.name).get("E")

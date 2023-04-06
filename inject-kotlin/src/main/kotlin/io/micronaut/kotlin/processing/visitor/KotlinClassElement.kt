@@ -504,7 +504,7 @@ internal open class KotlinClassElement(
 
     override fun isAssignable(type: ClassElement): Boolean {
         if (type is KotlinClassElement) {
-            return type.kotlinType.isAssignableFrom(kotlinType)
+            return type.kotlinType.makeNullable().isAssignableFrom(kotlinType.makeNullable())
         }
         return super.isAssignable(type)
     }
