@@ -15,7 +15,6 @@
  */
 package io.micronaut.http;
 
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.type.Headers;
 import io.micronaut.http.util.HttpHeadersUtil;
@@ -766,16 +765,5 @@ public interface HttpHeaders extends Headers {
      */
     default Optional<String> getContentType() {
         return findFirst(CONTENT_TYPE);
-    }
-
-    /**
-     * Equivalent to {@code contains(SERVER)}, optimized for internal use only.
-     *
-     * @return {@code contains(SERVER)}
-     * @since 4.0.0
-     */
-    @Internal
-    default boolean containsServer() {
-        return contains(SERVER);
     }
 }

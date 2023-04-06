@@ -334,9 +334,4 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     public Optional<String> getOrigin() {
         return findFirst(HttpHeaderNames.ORIGIN);
     }
-
-    @Override
-    public boolean containsServer() {
-        return nettyHeaders.contains(HttpHeaderNames.SERVER);
-    }
 }
