@@ -649,7 +649,7 @@ public final class RouteExecutor {
         if (serverConfiguration.isDateHeader() && !headers.contains(HttpHeaders.DATE)) {
             headers.date(LocalDateTime.now());
         }
-        if (!headers.contains(HttpHeaders.SERVER)) {
+        if (headers.get(HttpHeaders.SERVER) == null) {
             serverConfiguration.getServerHeader()
                 .ifPresent(header -> headers.add(HttpHeaders.SERVER, header));
         }

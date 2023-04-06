@@ -177,7 +177,7 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
         try {
             request.release();
         } finally {
-            if (terminateEventPublisher != ApplicationEventPublisher.NO_OP) {
+            if (!terminateEventPublisher.isEmpty()) {
                 ctx.executor().execute(() -> {
                     try {
                         terminateEventPublisher.publishEvent(new HttpRequestTerminatedEvent(request));

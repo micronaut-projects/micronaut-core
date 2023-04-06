@@ -17,7 +17,11 @@ package io.micronaut.http;
 
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.type.Headers;
+import io.micronaut.http.util.HttpHeadersUtil;
+import jakarta.annotation.Nullable;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -26,6 +30,7 @@ import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.OptionalLong;
 
@@ -692,6 +697,45 @@ public interface HttpHeaders extends Headers {
      */
     default List<MediaType> accept() {
         return MediaType.orderedOf(getAll(HttpHeaders.ACCEPT));
+    }
+
+    /**
+     * The {@code Accept-Charset} header, or {@code null} if unset.
+     *
+     * @return The {@code Accept-Charset} header
+     * @since 4.0.0
+     */
+    @Nullable
+    default Charset acceptCharset() {
+        return findFirst(HttpHeaders.ACCEPT_CHARSET)
+            .map(text -> {
+                text = HttpHeadersUtil.splitAcceptHeader(text);
+                if (text != null) {
+                    try {
+                        return Charset.forName(text);
+                    } catch (Exception ignored) {
+                    }
+                }
+                // default to UTF-8
+                return StandardCharsets.UTF_8;
+            })
+            .orElse(null);
+    }
+
+    /**
+     * The {@code Accept-Language} header, or {@code null} if unset.
+     *
+     * @return The {@code Accept-Language} header
+     * @since 4.0.0
+     */
+    @Nullable
+    default Locale acceptLanguage() {
+        return findFirst(HttpHeaders.ACCEPT_LANGUAGE)
+            .map(text -> {
+                String part = HttpHeadersUtil.splitAcceptHeader(text);
+                return part == null ? Locale.getDefault() : Locale.forLanguageTag(part);
+            })
+            .orElse(null);
     }
 
     /**

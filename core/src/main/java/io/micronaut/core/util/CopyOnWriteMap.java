@@ -139,22 +139,34 @@ public final class CopyOnWriteMap<K, V> extends AbstractMap<K, V> implements Con
         R ret = updater.apply(next);
         int newSize = next.size();
         if (newSize >= maxSizeWithEvictionMargin) {
-            // select some indices in the map to remove at random
-            BitSet toRemove = new BitSet(newSize);
-            for (int i = 0; i < EVICTION_BATCH; i++) {
-                setUnset(toRemove, ThreadLocalRandom.current().nextInt(newSize - i));
-            }
-            // iterate over the map and remove those indices
-            Iterator<?> iterator = next.entrySet().iterator();
-            for (int i = 0; i < newSize; i++) {
-                iterator.next();
-                if (toRemove.get(i)) {
-                    iterator.remove();
-                }
-            }
+            evict(next, EVICTION_BATCH);
         }
         actual = next;
         return ret;
+    }
+
+    /**
+     * Evict {@code numToEvict} items from the given {@code map} at random. This is not an atomic
+     * operation.
+     *
+     * @param map        The map to modify
+     * @param numToEvict The number of items to remove
+     */
+    public static void evict(Map<?, ?> map, int numToEvict) {
+        int size = map.size();
+        // select some indices in the map to remove at random
+        BitSet toRemove = new BitSet(size);
+        for (int i = 0; i < numToEvict; i++) {
+            setUnset(toRemove, ThreadLocalRandom.current().nextInt(size - i));
+        }
+        // iterate over the map and remove those indices
+        Iterator<?> iterator = map.entrySet().iterator();
+        for (int i = 0; i < size; i++) {
+            iterator.next();
+            if (toRemove.get(i)) {
+                iterator.remove();
+            }
+        }
     }
 
     /**

@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.util;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.SupplierUtil;
@@ -91,5 +92,29 @@ public final class HttpHeadersUtil {
             return null;
         }
         return "*MASKED*";
+    }
+
+    /**
+     * Split an accept-x header and get the first component. If the header is {@code *}, return
+     * null.
+     *
+     * @param text The input header
+     * @return The first part of the header, or {@code null} if the header is {@code *}
+     * @since 4.0.0
+     */
+    @Internal
+    @Nullable
+    public static String splitAcceptHeader(@NonNull String text) {
+        int len = text.length();
+        if (len == 0 || (len == 1 && text.charAt(0) == '*')) {
+            return null;
+        }
+        if (text.indexOf(';') > -1) {
+            text = text.split(";")[0];
+        }
+        if (text.indexOf(',') > -1) {
+            text = text.split(",")[0];
+        }
+        return text;
     }
 }
