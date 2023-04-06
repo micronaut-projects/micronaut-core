@@ -456,6 +456,15 @@ public class DefaultHttpClient implements
         return log;
     }
 
+    /**
+     * Access to the connection manager, for micronaut-oracle-cloud.
+     *
+     * @return The connection manager of this client
+     */
+    public ConnectionManager connectionManager() {
+        return connectionManager;
+    }
+
     @Override
     public HttpClient start() {
         if (!isRunning()) {
@@ -1859,7 +1868,7 @@ public class DefaultHttpClient implements
     /**
      * Key used for connection pooling and determining host/port.
      */
-    static final class RequestKey {
+    public static final class RequestKey {
         private final String host;
         private final int port;
         private final boolean secure;
