@@ -1872,19 +1872,54 @@ class Test {
     fun method2() : java.util.List<String>? {
         return null
     }
+
+    @Executable
+    fun method3() : kotlin.collections.List<String>? {
+        return listOf()
+    }
+
 }
 
 ''', ce -> {
             return ce.findMethod("method1").get().getReturnType().isAssignable(Iterable.class)
                     && ce.findMethod("method2").get().getReturnType().isAssignable(Iterable.class)
+                    && ce.findMethod("method3").get().getReturnType().isAssignable(Iterable.class)
                     && ((KotlinClassElement) ce.findMethod("method1").get().getReturnType()).isAssignable2(Iterable.class.name)
                     && ((KotlinClassElement) ce.findMethod("method2").get().getReturnType()).isAssignable2(Iterable.class.name)
+                    && ((KotlinClassElement) ce.findMethod("method3").get().getReturnType()).isAssignable2(Iterable.class.name)
         })
 
         expect:
             isAssignable
     }
 
+    void "test type isAssignable between nullable and not nullable"() {
+        when:
+            boolean isAssignable = buildClassElementMapped('test.Cart', '''
+package test
+
+data class CartItem(
+        val id: Long?,
+        val name: String,
+        val cart: Cart?
+) {
+    constructor(name: String) : this(null, name, null)
+}
+
+data class Cart(
+        val id: Long?,
+        val items: List<CartItem>?
+) {
+
+    constructor(items: List<CartItem>) : this(null, items)
+
+    fun cartItemsNotNullable() : List<CartItem> = listOf()
+}
+
+''', cl -> cl.getPrimaryConstructor().get().parameters[1].getType().isAssignable(cl.findMethod("cartItemsNotNullable").get().getReturnType()))
+        then:
+            isAssignable
+    }
 
     private void assertListGenericArgument(ClassElement type, Closure cl) {
         def arg1 = type.getAllTypeArguments().get(List.class.name).get("E")
