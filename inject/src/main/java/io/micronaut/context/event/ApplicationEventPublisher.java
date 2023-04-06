@@ -71,7 +71,7 @@ public interface ApplicationEventPublisher<T> {
      * @return {@code true} iff there are no subscribers
      * @since 4.0.0
      */
-    default boolean empty() {
+    default boolean isEmpty() {
         return false;
     }
 }

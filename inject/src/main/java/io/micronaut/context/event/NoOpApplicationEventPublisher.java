@@ -36,7 +36,7 @@ final class NoOpApplicationEventPublisher implements ApplicationEventPublisher<O
     }
 
     @Override
-    public boolean empty() {
+    public boolean isEmpty() {
         return true;
     }
 }

@@ -249,7 +249,7 @@ public final class ApplicationEventPublisherFactory<T>
             }
 
             @Override
-            public boolean empty() {
+            public boolean isEmpty() {
                 return lazyListeners.get().isEmpty();
             }
         };
