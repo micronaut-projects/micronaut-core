@@ -2166,4 +2166,36 @@ class Holder<A : Animal>(
             animal instanceof GenericPlaceholder
             animal.isTypeVariable()
     }
+
+    void "test list property"() {
+        given:
+            BeanIntrospection introspection = buildBeanIntrospection('test.Cart', '''
+package test
+import io.micronaut.core.annotation.Introspected
+
+@io.micronaut.core.annotation.Introspected
+data class CartItem(
+        val id: Long?,
+        val name: String,
+        val cart: Cart?
+) {
+    constructor(name: String) : this(null, name, null)
+}
+
+@io.micronaut.core.annotation.Introspected
+data class Cart(
+        val id: Long?,
+        val items: List<CartItem>?
+) {
+
+    constructor(items: List<CartItem>) : this(null, items)
+
+    fun cartItemsNotNullable() : List<CartItem> = listOf()
+}
+        ''')
+            def bean = introspection.instantiate(1L, new ArrayList())
+            bean = introspection.getProperty("items").get().withValue(bean, new ArrayList())
+        expect:
+            bean
+    }
 }
