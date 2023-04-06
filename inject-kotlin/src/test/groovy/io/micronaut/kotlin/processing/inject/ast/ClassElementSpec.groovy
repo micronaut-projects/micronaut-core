@@ -1872,13 +1872,21 @@ class Test {
     fun method2() : java.util.List<String>? {
         return null
     }
+
+    @Executable
+    fun method3() : kotlin.collections.List<String>? {
+        return listOf()
+    }
+
 }
 
 ''', ce -> {
             return ce.findMethod("method1").get().getReturnType().isAssignable(Iterable.class)
                     && ce.findMethod("method2").get().getReturnType().isAssignable(Iterable.class)
+                    && ce.findMethod("method3").get().getReturnType().isAssignable(Iterable.class)
                     && ((KotlinClassElement) ce.findMethod("method1").get().getReturnType()).isAssignable2(Iterable.class.name)
                     && ((KotlinClassElement) ce.findMethod("method2").get().getReturnType()).isAssignable2(Iterable.class.name)
+                    && ((KotlinClassElement) ce.findMethod("method3").get().getReturnType()).isAssignable2(Iterable.class.name)
         })
 
         expect:

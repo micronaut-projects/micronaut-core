@@ -463,7 +463,6 @@ internal open class KotlinClassElement(
 
     override fun isTypeVariable() = typeVariable
 
-    @OptIn(KspExperimental::class)
     override fun isAssignable(type: String): Boolean {
         val otherDeclaration = visitorContext.resolver.getClassDeclarationByName(type)
         if (otherDeclaration != null) {
@@ -481,11 +480,12 @@ internal open class KotlinClassElement(
             if (thisFullName == otherFullName) {
                 return true
             }
-            val otherKotlinType = otherDeclaration.asStarProjectedType()
-            if (otherKotlinType == kotlinType) {
+            val otherKotlinType = otherDeclaration.asStarProjectedType().makeNullable()
+            val kotlinTypeNullable = kotlinType.makeNullable()
+            if (otherKotlinType == kotlinTypeNullable) {
                 return true
             }
-            if (otherKotlinType.isAssignableFrom(kotlinType)) {
+            if (otherKotlinType.isAssignableFrom(kotlinTypeNullable)) {
                 return true
             }
         }
@@ -499,7 +499,7 @@ internal open class KotlinClassElement(
             visitorContext.resolver.getKSNameFromString(type)
         ) ?: return false
         val kotlinClassByName = visitorContext.resolver.getKotlinClassByName(kotlinName) ?: return false
-        return kotlinClassByName.asStarProjectedType().isAssignableFrom(kotlinType.starProjection())
+        return kotlinClassByName.asStarProjectedType().makeNullable().isAssignableFrom(kotlinType.starProjection().makeNullable())
     }
 
     override fun isAssignable(type: ClassElement): Boolean {
