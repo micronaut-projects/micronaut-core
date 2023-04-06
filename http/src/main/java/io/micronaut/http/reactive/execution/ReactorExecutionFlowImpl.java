@@ -20,10 +20,14 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
 import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import reactor.core.CoreSubscriber;
 import reactor.core.Fuseable;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
+import reactor.util.context.Context;
+import reactor.util.context.ContextView;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -43,7 +47,7 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
     private Mono<Object> value;
 
     <K> ReactorExecutionFlowImpl(Publisher<K> value) {
-        this(Mono.from(value));
+        this(value instanceof Flux<K> flux ? flux.next() : Mono.from(value));
     }
 
     <K> ReactorExecutionFlowImpl(Mono<K> value) {
@@ -82,10 +86,18 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
 
     @Override
     public void onComplete(BiConsumer<? super Object, Throwable> fn) {
-        value.subscribe(new Subscriber<>() {
+        value.subscribe(new CoreSubscriber<>() {
 
             Subscription subscription;
             Object value;
+
+            @Override
+            public Context currentContext() {
+                if (fn instanceof ReactiveConsumer reactiveConsumer) {
+                    return Context.of(reactiveConsumer.contextView);
+                }
+                return CoreSubscriber.super.currentContext();
+            }
 
             @Override
             public void onSubscribe(Subscription s) {
@@ -147,7 +159,22 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
             }
             return m;
         } else {
-            return Mono.fromCompletionStage(next.toCompletableFuture());
+            return Mono.deferContextual(contextView -> {
+                Sinks.One<Object> sink = Sinks.one();
+                ReactiveConsumer reactiveConsumer = new ReactiveConsumer(contextView) {
+
+                    @Override
+                    public void accept(Object o, Throwable throwable) {
+                        if (throwable != null) {
+                            sink.tryEmitError(throwable);
+                        } else {
+                            sink.tryEmitValue(o);
+                        }
+                    }
+                };
+                next.onComplete(reactiveConsumer);
+                return sink.asMono();
+            });
         }
     }
 
@@ -163,5 +190,14 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
     @Override
     public CompletableFuture<Object> toCompletableFuture() {
         return value.toFuture();
+    }
+
+    private abstract static class ReactiveConsumer implements BiConsumer<Object, Throwable> {
+
+        private final ContextView contextView;
+
+        private ReactiveConsumer(ContextView contextView) {
+            this.contextView = contextView;
+        }
     }
 }

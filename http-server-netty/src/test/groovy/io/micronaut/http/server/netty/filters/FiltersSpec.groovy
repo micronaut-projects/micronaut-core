@@ -113,19 +113,19 @@ class FiltersSpec extends Specification {
             filter3.mapExecutedOn.startsWith "io-executor"
             filter3.filterOrder == 3
 
-            filter4.doFilterExecutedOn.startsWith "io-executor"
+            filter4.doFilterExecutedOn.startsWith "default-nioEventLoopGroup"
             filter4.mapExecutedOn.startsWith "io-executor"
             filter4.filterOrder == 4
 
-            filter5.doFilterExecutedOn.startsWith "io-executor"
+            filter5.doFilterExecutedOn.startsWith "default-nioEventLoopGroup"
             filter5.mapExecutedOn.startsWith "io-executor"
             filter5.filterOrder == 5
 
-            filter6.doFilterExecutedOn.startsWith "io-executor"
+            filter6.doFilterExecutedOn.startsWith "default-nioEventLoopGroup"
             filter6.mapExecutedOn.startsWith "io-executor"
             filter6.filterOrder == 6
 
-            filter7.doFilterExecutedOn.startsWith "io-executor"
+            filter7.doFilterExecutedOn.startsWith "default-nioEventLoopGroup"
             filter7.mapExecutedOn.startsWith "io-executor"
             filter7.filterOrder == 7
 
