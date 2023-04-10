@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,16 +30,23 @@ import java.time.LocalDate
 // tag::class[]
 @Prototype
 class MapToLocalDateConverter implements TypeConverter<Map, LocalDate> { // <1>
+
+    final ConversionService  conversionService
+
+    MapToLocalDateConverter(ConversionService conversionService) { // <2>
+        this.conversionService = conversionService;
+    }
+
     @Override
     Optional<LocalDate> convert(Map propertyMap, Class<LocalDate> targetType, ConversionContext context) {
-        Optional<Integer> day = ConversionService.SHARED.convert(propertyMap.day, Integer)
-        Optional<Integer> month = ConversionService.SHARED.convert(propertyMap.month, Integer)
-        Optional<Integer> year = ConversionService.SHARED.convert(propertyMap.year, Integer)
+        Optional<Integer> day = conversionService.convert(propertyMap.day, Integer)
+        Optional<Integer> month = conversionService.convert(propertyMap.month, Integer)
+        Optional<Integer> year = conversionService.convert(propertyMap.year, Integer)
         if (day.present && month.present && year.present) {
             try {
-                return Optional.of(LocalDate.of(year.get(), month.get(), day.get())) // <2>
+                return Optional.of(LocalDate.of(year.get(), month.get(), day.get())) // <3>
             } catch (DateTimeException e) {
-                context.reject(propertyMap, e) // <3>
+                context.reject(propertyMap, e) // <4>
                 return Optional.empty()
             }
         }
