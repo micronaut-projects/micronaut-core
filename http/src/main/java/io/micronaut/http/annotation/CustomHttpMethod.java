@@ -22,14 +22,16 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.context.annotation.AnnotationExpressionContext;
 import io.micronaut.core.async.annotation.SingleResult;
+import io.micronaut.http.expression.RequestConditionContext;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * This annotation is designed for non-standard http methods, that you
  * can provide by specifying the required {@link #method()} property.
- * 
+ *
  * @author spirit-1984
  * @since 1.3.0
  */
@@ -61,6 +63,17 @@ public @interface CustomHttpMethod {
     @AliasFor(annotation = HttpMethodMapping.class, member = "uris")
     @AliasFor(annotation = UriMapping.class, member = "uris")
     String[] uris() default {UriMapping.DEFAULT_URI};
+
+    /**
+     * Allows defining a condition for this route to match using an expression.
+     *
+     * @return An expression that evaluates to true or false.
+     * @see io.micronaut.http.expression.RequestConditionContext
+     * @since 4.0.0
+     */
+    @AnnotationExpressionContext(RequestConditionContext.class)
+    @AliasFor(annotation = UriMapping.class, member = "condition")
+    String condition() default "";
 
     /**
      * @return The name of the non-standard http method.

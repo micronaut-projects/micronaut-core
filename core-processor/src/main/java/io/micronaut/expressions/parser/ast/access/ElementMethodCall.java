@@ -118,25 +118,27 @@ public sealed class ElementMethodCall extends AbstractMethodCall permits Propert
     @Override
     protected CandidateMethod resolveUsedMethod(ExpressionVisitorContext ctx) {
         List<Type> argumentTypes = resolveArgumentTypes(ctx);
-        Type calleeType = callee.resolveType(ctx);
+        ClassElement classElement = callee.resolveClassElement(ctx);
+
+        if (isNullSafe() && classElement.isAssignable(Optional.class)) {
+            // safe navigate optional
+            classElement = classElement.getFirstTypeArgument().orElse(classElement);
+        }
+
 
         ElementQuery<MethodElement> methodQuery = buildMethodQuery();
-        List<CandidateMethod> candidateMethods =
-            ctx.visitorContext()
-                .getClassElement(calleeType.getClassName())
-                .stream()
-                .flatMap(element -> element.getEnclosedElements(methodQuery).stream())
+        List<CandidateMethod> candidateMethods = classElement.getEnclosedElements(methodQuery).stream()
                 .map(method -> toCandidateMethod(ctx, method, argumentTypes))
                 .filter(method -> method.isMatching(ctx.visitorContext()))
                 .toList();
 
         if (candidateMethods.isEmpty()) {
             throw new ExpressionCompilationException(
-                "No method [ " + name + stringifyArguments(ctx) + " ] available in class " + calleeType);
+                "No method [ " + name + stringifyArguments(ctx) + " ] available in class " + classElement.getName());
         } else if (candidateMethods.size() > 1) {
             throw new ExpressionCompilationException(
                 "Ambiguous method call. Found " + candidateMethods.size() +
-                    " matching methods: " + candidateMethods + " in class " + calleeType);
+                    " matching methods: " + candidateMethods + " in class " + classElement.getName());
         }
 
         return candidateMethods.iterator().next();

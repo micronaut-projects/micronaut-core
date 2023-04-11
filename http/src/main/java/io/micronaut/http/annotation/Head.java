@@ -18,6 +18,8 @@ package io.micronaut.http.annotation;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.context.annotation.AnnotationExpressionContext;
+import io.micronaut.http.expression.RequestConditionContext;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -60,4 +62,15 @@ public @interface Head {
     @AliasFor(annotation = HttpMethodMapping.class, member = "uris")
     @AliasFor(annotation = UriMapping.class, member = "uris")
     String[] uris() default {UriMapping.DEFAULT_URI};
+
+    /**
+     * Allows defining a condition for this route to match using an expression.
+     *
+     * @return An expression that evaluates to true or false.
+     * @see io.micronaut.http.expression.RequestConditionContext
+     * @since 4.0.0
+     */
+    @AnnotationExpressionContext(RequestConditionContext.class)
+    @AliasFor(annotation = UriMapping.class, member = "condition")
+    String condition() default "";
 }
