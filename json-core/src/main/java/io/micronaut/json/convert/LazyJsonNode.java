@@ -186,7 +186,7 @@ public final class LazyJsonNode implements ReferenceCounted {
      * Try to release this node if it hasn't been released already.
      */
     @Internal
-    void tryRelease() {
+    public void tryRelease() {
         // this is a bit yikes but it's necessary so we can attempt conversion twice.
         // it seems to work fine because the first conversion is to JsonNode, which we store
         // locally.

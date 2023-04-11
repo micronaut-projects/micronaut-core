@@ -26,7 +26,6 @@ import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ReferenceCounted;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
@@ -55,7 +54,7 @@ public final class ImmediateMultiObjectBody extends ManagedBody<List<?>> impleme
 
     @Override
     void release(List<?> value) {
-        value.forEach(ReferenceCountUtil::release);
+        value.forEach(ImmediateSingleObjectBody::release0);
     }
 
     public ImmediateSingleObjectBody single(Charset defaultCharset, ByteBufAllocator alloc) {
