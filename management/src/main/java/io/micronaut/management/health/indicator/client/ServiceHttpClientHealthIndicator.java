@@ -16,7 +16,6 @@
 package io.micronaut.management.health.indicator.client;
 
 import io.micronaut.context.annotation.EachBean;
-import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.publisher.Publishers;
@@ -41,12 +40,11 @@ import java.util.Map;
  * @author Alexander Simpson
  * @since 3.9
  */
-@Factory
 @EachBean(ServiceHttpClientConfiguration.class)
 @Requires(beans = HealthEndpoint.class)
 @Requires(classes = ServiceHttpClientConfiguration.class)
 @Requires(property = HealthEndpoint.PREFIX + ".service-http-client.enabled", defaultValue = StringUtils.FALSE, notEquals = StringUtils.FALSE)
-public class ServiceHttpClientHealthIndicatorFactory implements HealthIndicator {
+public class ServiceHttpClientHealthIndicator implements HealthIndicator {
 
     private final ServiceHttpClientConfiguration configuration;
     private final Collection<URI> loadBalancerUrls;
@@ -57,7 +55,7 @@ public class ServiceHttpClientHealthIndicatorFactory implements HealthIndicator 
      * @param configuration Configuration for the individual service http client.
      * @param instanceList Instance List for the individual service http client. Used to obtain available load balancer URLs.
      */
-    public ServiceHttpClientHealthIndicatorFactory(@Parameter ServiceHttpClientConfiguration configuration, @Parameter StaticServiceInstanceList instanceList) {
+    public ServiceHttpClientHealthIndicator(@Parameter ServiceHttpClientConfiguration configuration, @Parameter StaticServiceInstanceList instanceList) {
         this.configuration = configuration;
         this.loadBalancerUrls = instanceList.getLoadBalancedURIs();
         this.originalUrls = configuration.getUrls();

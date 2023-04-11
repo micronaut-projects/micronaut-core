@@ -7,7 +7,7 @@ import io.micronaut.runtime.ApplicationConfiguration
 import reactor.core.publisher.Mono
 import spock.lang.Specification
 
-class ServiceHttpClientHealthIndicatorFactorySpec extends Specification {
+class ServiceHttpClientHealthIndicatorSpec extends Specification {
 
     def static uri1 = new URI("http://localhost:8080")
     def static uri2 = new URI("http://localhost:8081")
@@ -18,7 +18,7 @@ class ServiceHttpClientHealthIndicatorFactorySpec extends Specification {
     def "Health Indicator is set to true and is healthy"() {
         given:
         serviceHttpConfiguration.setHealthCheck(true)
-        def healthIndicator = new ServiceHttpClientHealthIndicatorFactory(serviceHttpConfiguration, instanceList)
+        def healthIndicator = new ServiceHttpClientHealthIndicator(serviceHttpConfiguration, instanceList)
 
         when:
         def result = Mono.from(healthIndicator.getResult()).block()
@@ -32,7 +32,7 @@ class ServiceHttpClientHealthIndicatorFactorySpec extends Specification {
     def "Health Indicator and check are true, instance list is updated - #scenario"() {
         given:
         serviceHttpConfiguration.setHealthCheck(true)
-        def healthIndicator = new ServiceHttpClientHealthIndicatorFactory(serviceHttpConfiguration, instanceList)
+        def healthIndicator = new ServiceHttpClientHealthIndicator(serviceHttpConfiguration, instanceList)
 
         when: "uri is removed from list"
         instanceList.getLoadBalancedURIs().removeAll(urisToRemove)
@@ -53,7 +53,7 @@ class ServiceHttpClientHealthIndicatorFactorySpec extends Specification {
     def "Calling getResult but health-check is false, so result is null"() {
         given:
         serviceHttpConfiguration.setHealthCheck(false)
-        def healthIndicator = new ServiceHttpClientHealthIndicatorFactory(serviceHttpConfiguration, instanceList)
+        def healthIndicator = new ServiceHttpClientHealthIndicator(serviceHttpConfiguration, instanceList)
 
         when:
         def result = Mono.from(healthIndicator.getResult()).block()
