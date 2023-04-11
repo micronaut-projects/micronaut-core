@@ -50,7 +50,7 @@ public final class StringLiteral extends ExpressionNode {
 
     @Override
     protected ClassElement doResolveClassElement(ExpressionVisitorContext ctx) {
-        return STRING_ELEMENT;
+        return ctx.visitorContext().getClassElement(String.class).orElse(STRING_ELEMENT);
     }
 
     @Override
