@@ -21,7 +21,8 @@ import io.micronaut.http.context.ServerRequestContext;
 import jakarta.inject.Singleton;
 
 /**
- * An expression evaluation context for use with HTTP annotations and the {@code condition} member
+ * An expression evaluation context for use with HTTP annotations and the {@code condition} member.
+ *
  * @since 4.0.0
  */
 @Singleton
