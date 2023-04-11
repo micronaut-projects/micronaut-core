@@ -67,6 +67,7 @@ managed-kotlin-coroutines = "1.6.4"
 managed-maven-native-plugin = "0.9.13"
 managed-methvin-directory-watcher = "0.16.1"
 managed-netty = "4.1.91.Final"
+managed-netty-iouring = "0.0.19.Final"
 managed-netty-http3 = "0.0.16.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
@@ -138,6 +139,7 @@ managed-netty-handler = { module = "io.netty:netty-handler", version.ref = "mana
 managed-netty-handler-proxy = { module = "io.netty:netty-handler-proxy", version.ref = "managed-netty" }
 managed-netty-transport-native-epoll = { module = "io.netty:netty-transport-native-epoll", version.ref = "managed-netty" }
 managed-netty-transport-native-kqueue = { module = "io.netty:netty-transport-native-kqueue", version.ref = "managed-netty" }
+managed-netty-transport-native-iouring = { module = "io.netty.incubator:netty-incubator-transport-native-io_uring", version.ref = "managed-netty-iouring" }
 managed-netty-transport-native-unix-common = { module = "io.netty:netty-transport-native-unix-common", version.ref = "managed-netty" }
 
 managed-reactive-streams = { module = "org.reactivestreams:reactive-streams", version.ref = "managed-reactive-streams" }
