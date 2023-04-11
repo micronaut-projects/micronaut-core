@@ -188,4 +188,9 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
     default MutableHttpResponse<B> attribute(CharSequence name, Object value) {
         return (MutableHttpResponse<B>) setAttribute(name, value);
     }
+
+    @Override
+    default MutableHttpResponse<?> toMutableResponse() {
+        return this;
+    }
 }

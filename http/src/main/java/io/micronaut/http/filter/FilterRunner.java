@@ -27,6 +27,7 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
+import io.micronaut.core.type.UnsafeExecutable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
@@ -551,7 +552,12 @@ public class FilterRunner {
                     return ExecutionFlow.just(filterContext);
                 }
                 Object[] args = bindArgs(methodContext);
-                Object returnValue = method.invoke(bean, args);
+                Object returnValue;
+                if (method instanceof UnsafeExecutable<T, ?> unsafeExecutable) {
+                    returnValue = unsafeExecutable.invokeUnsafe(bean, args);
+                } else {
+                    returnValue = method.invoke(bean, args);
+                }
                 return returnHandler.handle(filterContext, returnValue, methodContext.continuation);
             } catch (Throwable e) {
                 return ExecutionFlow.error(e);

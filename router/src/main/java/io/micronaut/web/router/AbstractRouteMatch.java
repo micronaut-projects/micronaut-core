@@ -33,6 +33,7 @@ import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.bind.binders.UnmatchedRequestArgumentBinder;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.inject.UnsafeExecutionHandle;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 
 import java.lang.reflect.Method;
@@ -222,6 +223,10 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             return methodExecutionHandle.invoke();
         }
         if (fulfilled) {
+            if (methodExecutionHandle instanceof UnsafeExecutionHandle<?, ?>) {
+                UnsafeExecutionHandle<T, R> unsafeExecutionHandle = (UnsafeExecutionHandle<T, R>) methodExecutionHandle;
+                return unsafeExecutionHandle.invokeUnsafe(argumentValues);
+            }
             return methodExecutionHandle.invoke(argumentValues);
         }
         if (!beforeBindersApplied) {
@@ -252,6 +257,10 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             if (!argument.isNullable()) {
                 throw UnsatisfiedRouteException.create(argument);
             }
+        }
+        if (methodExecutionHandle instanceof UnsafeExecutionHandle) {
+            UnsafeExecutionHandle<T, R> unsafeExecutionHandle = (UnsafeExecutionHandle<T, R>) methodExecutionHandle;
+            return unsafeExecutionHandle.invokeUnsafe(argumentValues);
         }
         return methodExecutionHandle.invoke(argumentValues);
     }

@@ -82,6 +82,7 @@ import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.core.type.UnsafeExecutable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -108,6 +109,7 @@ import io.micronaut.inject.ParametrizedBeanFactory;
 import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
 import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.QualifiedBeanType;
+import io.micronaut.inject.UnsafeExecutionHandle;
 import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.provider.AbstractProviderDefinition;
 import io.micronaut.inject.proxy.InterceptedBeanProxy;
@@ -593,68 +595,11 @@ public class DefaultBeanContext implements InitializableBeanContext {
     }
 
     @Override
-    public MethodExecutionHandle<?, Object> createExecutionHandle(BeanDefinition<? extends Object> beanDefinition, ExecutableMethod<Object, ?> method) {
-        return new MethodExecutionHandle<>() {
-
-            private Object target;
-
-            @NonNull
-            @Override
-            public AnnotationMetadata getAnnotationMetadata() {
-                return method.getAnnotationMetadata();
-            }
-
-            @Override
-            public Object getTarget() {
-                Object target = this.target;
-                if (target == null) {
-                    synchronized (this) { // double check
-                        target = this.target;
-                        if (target == null) {
-                            target = getBean(beanDefinition);
-                            this.target = target;
-                        }
-                    }
-                }
-                return target;
-            }
-
-            @Override
-            public Class getDeclaringType() {
-                return beanDefinition.getBeanType();
-            }
-
-            @Override
-            public String getMethodName() {
-                return method.getMethodName();
-            }
-
-            @Override
-            public Argument[] getArguments() {
-                return method.getArguments();
-            }
-
-            @Override
-            public Method getTargetMethod() {
-                return method.getTargetMethod();
-            }
-
-            @Override
-            public ReturnType getReturnType() {
-                return method.getReturnType();
-            }
-
-            @Override
-            public Object invoke(Object... arguments) {
-                return method.invoke(getTarget(), arguments);
-            }
-
-            @NonNull
-            @Override
-            public ExecutableMethod<Object, Object> getExecutableMethod() {
-                return (ExecutableMethod<Object, Object>) method;
-            }
-        };
+    public MethodExecutionHandle<?, Object> createExecutionHandle(BeanDefinition<?> beanDefinition, ExecutableMethod<Object, ?> method) {
+        if (method instanceof UnsafeExecutable<?,?>) {
+            return new BeanContextUnsafeExecutionHandle(method, beanDefinition, (UnsafeExecutable<Object, Object>) method);
+        }
+        return new BeanContextExecutionHandle(method, beanDefinition);
     }
 
     @SuppressWarnings("unchecked")
@@ -3819,8 +3764,10 @@ public class DefaultBeanContext implements InitializableBeanContext {
      * @param <T> The targe type
      * @param <R> The return type
      */
-    private static final class ObjectExecutionHandle<T, R> extends AbstractExecutionHandle<T, R> {
+    private static final class ObjectExecutionHandle<T, R> extends AbstractExecutionHandle<T, R> implements UnsafeExecutionHandle<T, R> {
 
+        @Nullable
+        private final UnsafeExecutable<T, R> unsafeExecutable;
         private final T target;
 
         /**
@@ -3830,6 +3777,11 @@ public class DefaultBeanContext implements InitializableBeanContext {
         ObjectExecutionHandle(T target, ExecutableMethod<T, R> method) {
             super(method);
             this.target = target;
+            if (method instanceof UnsafeExecutable unsafeExecutable) {
+                this.unsafeExecutable = unsafeExecutable;
+            } else {
+                this.unsafeExecutable = null;
+            }
         }
 
         @Override
@@ -3840,6 +3792,14 @@ public class DefaultBeanContext implements InitializableBeanContext {
         @Override
         public R invoke(Object... arguments) {
             return method.invoke(target, arguments);
+        }
+
+        @Override
+        public R invokeUnsafe(Object... arguments) {
+            if (unsafeExecutable == null) {
+                return invoke(arguments);
+            }
+            return unsafeExecutable.invokeUnsafe(target, arguments);
         }
 
         @Override
@@ -4226,6 +4186,90 @@ public class DefaultBeanContext implements InitializableBeanContext {
             if (ref != null && ref.equals(reference)) {
                 this.reference = null;
             }
+        }
+    }
+
+    private class BeanContextUnsafeExecutionHandle extends BeanContextExecutionHandle implements UnsafeExecutionHandle<Object, Object> {
+
+        private final UnsafeExecutable<Object, Object> unsafeExecutionHandle;
+
+        public BeanContextUnsafeExecutionHandle(ExecutableMethod<Object, ?> method, BeanDefinition<?> beanDefinition, UnsafeExecutable<Object, Object> unsafeExecutionHandle) {
+            super(method, beanDefinition);
+            this.unsafeExecutionHandle = unsafeExecutionHandle;
+        }
+
+        @Override
+        public Object invokeUnsafe(Object... arguments) {
+            return unsafeExecutionHandle.invokeUnsafe(getTarget(), arguments);
+        }
+    }
+
+    private class BeanContextExecutionHandle implements MethodExecutionHandle<Object, Object> {
+
+        private final ExecutableMethod<Object, ?> method;
+        private final BeanDefinition<?> beanDefinition;
+        private Object target;
+
+        public BeanContextExecutionHandle(ExecutableMethod<Object, ?> method, BeanDefinition<? extends Object> beanDefinition) {
+            this.method = method;
+            this.beanDefinition = beanDefinition;
+        }
+
+        @NonNull
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return method.getAnnotationMetadata();
+        }
+
+        @Override
+        public Object getTarget() {
+            Object target = this.target;
+            if (target == null) {
+                synchronized (this) { // double check
+                    target = this.target;
+                    if (target == null) {
+                        target = getBean(beanDefinition);
+                        this.target = target;
+                    }
+                }
+            }
+            return target;
+        }
+
+        @Override
+        public Class getDeclaringType() {
+            return beanDefinition.getBeanType();
+        }
+
+        @Override
+        public String getMethodName() {
+            return method.getMethodName();
+        }
+
+        @Override
+        public Argument[] getArguments() {
+            return method.getArguments();
+        }
+
+        @Override
+        public Method getTargetMethod() {
+            return method.getTargetMethod();
+        }
+
+        @Override
+        public ReturnType getReturnType() {
+            return method.getReturnType();
+        }
+
+        @Override
+        public Object invoke(Object... arguments) {
+            return method.invoke(getTarget(), arguments);
+        }
+
+        @NonNull
+        @Override
+        public ExecutableMethod<Object, Object> getExecutableMethod() {
+            return (ExecutableMethod<Object, Object>) method;
         }
     }
 }
