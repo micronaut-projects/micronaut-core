@@ -54,7 +54,7 @@ public class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
     private final Optional<Argument<?>> optionalFullBodyArgument;
 
     private RequestArgumentBinder<Object>[] argumentBinders;
-    private boolean needsBody;
+    private final boolean needsBody;
 
     public DefaultMethodBasedRouteInfo(MethodExecutionHandle<T, R> targetMethod,
                                        @Nullable
