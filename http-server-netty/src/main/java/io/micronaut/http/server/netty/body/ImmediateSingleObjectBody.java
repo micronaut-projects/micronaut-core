@@ -18,10 +18,10 @@ package io.micronaut.http.server.netty.body;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.server.netty.FormRouteCompleter;
 import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.json.convert.LazyJsonNode;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.ByteBufInputStream;
-import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ReferenceCounted;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
@@ -45,7 +45,17 @@ public final class ImmediateSingleObjectBody extends ManagedBody<Object> impleme
 
     @Override
     void release(Object value) {
-        ReferenceCountUtil.release(value);
+        release0(value);
+    }
+
+    static void release0(Object value) {
+        if (value instanceof LazyJsonNode rc) {
+            // need to release LazyJsonNode in case it hasn't been converted yet. But conversion
+            // can also happen multiple times, so tryRelease is the best we can do, unfortunately.
+            rc.tryRelease();
+        } else if (value instanceof ReferenceCounted rc) {
+            rc.release();
+        }
     }
 
     /**
