@@ -23,6 +23,10 @@ import jakarta.inject.Singleton;
 /**
  * An expression evaluation context for use with HTTP annotations and the {@code condition} member.
  *
+ * <p>This context allows access to the current request via a {@code request} object which is an instance of {@link HttpRequest}.</p>
+ *
+ * @see HttpRequest
+ * @author graemerocher
  * @since 4.0.0
  */
 @Singleton
