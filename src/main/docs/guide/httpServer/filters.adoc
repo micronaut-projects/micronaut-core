@@ -76,6 +76,7 @@ The api:http.annotation.Filter[] can use different styles of pattern for path ma
 
 |`customer/**/*.html`
 |customer/index.html, customer/adam/profile.html, customer/adam/job/description.html
+|===
 
 The other option is regular expression based matching. To use regular expressions, set `patternStyle = FilterPatternStyle.REGEX`. The `pattern` attribute is expected to contain a regular expression which will be expected to match the provided URLs exactly (using link:{jdkapi}/java/util/regex/Matcher.html#matches--[Matcher#matches]).
 

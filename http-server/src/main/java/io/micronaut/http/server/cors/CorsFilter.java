@@ -97,7 +97,7 @@ public class CorsFilter implements HttpServerFilter {
             LOG.trace("Http Header " + HttpHeaders.ORIGIN + " not present. Proceeding with the request.");
             return chain.proceed(request);
         }
-        CorsOriginConfiguration corsOriginConfiguration = getConfiguration(origin).orElse(null);
+        CorsOriginConfiguration corsOriginConfiguration = getConfiguration(request).orElse(null);
         if (corsOriginConfiguration != null) {
             if (CorsUtil.isPreflightRequest(request)) {
                 return handlePreflightRequest(request, chain, corsOriginConfiguration);
@@ -126,6 +126,9 @@ public class CorsFilter implements HttpServerFilter {
      */
     protected boolean shouldDenyToPreventDriveByLocalhostAttack(@NonNull CorsOriginConfiguration corsOriginConfiguration,
                                                                 @NonNull HttpRequest<?> request) {
+        if (corsConfiguration.isLocalhostPassThrough()) {
+            return false;
+        }
         if (httpHostResolver == null) {
             return false;
         }
@@ -148,6 +151,9 @@ public class CorsFilter implements HttpServerFilter {
      */
     protected boolean shouldDenyToPreventDriveByLocalhostAttack(@NonNull String origin,
                                                                 @NonNull HttpRequest<?> request) {
+        if (corsConfiguration.isLocalhostPassThrough()) {
+            return false;
+        }
         if (httpHostResolver == null) {
             return false;
         }
@@ -311,31 +317,45 @@ public class CorsFilter implements HttpServerFilter {
     }
 
     @NonNull
-    private Optional<CorsOriginConfiguration> getConfiguration(@NonNull String requestOrigin) {
+    private Optional<CorsOriginConfiguration> getConfiguration(@NonNull HttpRequest<?> request) {
+        String requestOrigin = request.getHeaders().getOrigin().orElse(null);
+        if (requestOrigin == null) {
+            return Optional.empty();
+        }
+        Optional<CorsOriginConfiguration> originConfiguration = CrossOriginUtil.getCorsOriginConfigurationForRequest(request);
+        if (originConfiguration.isPresent() && matchesOrigin(originConfiguration.get(), requestOrigin)) {
+            return originConfiguration;
+        }
         if (!corsConfiguration.isEnabled()) {
             return Optional.empty();
         }
         return corsConfiguration.getConfigurations().values().stream()
-            .filter(config -> {
-                List<String> allowedOrigins = config.getAllowedOrigins();
-                return !allowedOrigins.isEmpty() && (isAny(allowedOrigins) || allowedOrigins.stream().anyMatch(origin -> matchesOrigin(origin, requestOrigin)));
-            }).findFirst();
+            .filter(config -> matchesOrigin(config, requestOrigin))
+            .findFirst();
     }
 
-    private boolean matchesOrigin(@NonNull String origin, @NonNull String requestOrigin) {
-        if (origin.equals(requestOrigin)) {
+    private static boolean matchesOrigin(@NonNull CorsOriginConfiguration config, String requestOrigin) {
+        if (config.getAllowedOriginsRegex().map(regex -> matchesOrigin(regex, requestOrigin)).orElse(false)) {
             return true;
         }
-        Pattern p = Pattern.compile(origin);
+        List<String> allowedOrigins = config.getAllowedOrigins();
+        return !allowedOrigins.isEmpty() && (
+            (!config.getAllowedOriginsRegex().isPresent() && isAny(allowedOrigins)) ||
+                allowedOrigins.stream().anyMatch(origin -> origin.equals(requestOrigin))
+        );
+    }
+
+    private static boolean matchesOrigin(@NonNull String originRegex, @NonNull String requestOrigin) {
+        Pattern p = Pattern.compile(originRegex);
         Matcher m = p.matcher(requestOrigin);
         return m.matches();
     }
 
-    private boolean isAny(List<String> values) {
+    private static boolean isAny(List<String> values) {
         return values == CorsOriginConfiguration.ANY;
     }
 
-    private boolean isAnyMethod(List<HttpMethod> allowedMethods) {
+    private static boolean isAnyMethod(List<HttpMethod> allowedMethods) {
         return allowedMethods == CorsOriginConfiguration.ANY_METHOD;
     }
 

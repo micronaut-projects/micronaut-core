@@ -153,11 +153,10 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         HttpHeaders headers = response.headers
 
         then: // The content length header was replaced, not appended
-        !headers.names().contains("content-type")
-        !headers.names().contains("Content-Length")
-        headers.contains("content-length")
         response.header("Content-Type") == "text/plain"
         response.header("Content-Length") == "3"
+        response.header("content-type") == "text/plain"
+        response.header("content-length") == "3"
     }
 
     void "test server header"() {

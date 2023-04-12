@@ -32,7 +32,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-import com.oracle.svm.core.annotate.AutomaticFeature;
 import com.oracle.svm.core.annotate.Substitute;
 import com.oracle.svm.core.annotate.TargetClass;
 import io.micronaut.core.annotation.Internal;
@@ -51,7 +50,6 @@ import org.graalvm.nativeimage.hosted.RuntimeReflection;
  * @since 3.5.0
  */
 @SuppressWarnings("unused")
-@AutomaticFeature
 final class ServiceLoaderFeature implements Feature {
 
     @Override

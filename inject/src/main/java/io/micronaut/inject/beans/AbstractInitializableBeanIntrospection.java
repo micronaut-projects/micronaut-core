@@ -120,6 +120,35 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
     }
 
     /**
+     * Find {@link Method} representation at the method by index. Used by {@link ExecutableMethod#getTargetMethod()}.
+     *
+     * @param index The index
+     * @return The method
+     */
+    @UsedByGeneratedCode
+    @Internal
+    protected abstract Method getTargetMethodByIndex(int index);
+
+    /**
+     * Find {@link Method} representation at the method by index. Used by {@link ExecutableMethod#getTargetMethod()}.
+     *
+     * @param index The index
+     * @return The method
+     * @since 3.8.5
+     */
+    @UsedByGeneratedCode
+    // this logic must allow reflection
+    @SuppressWarnings("java:S3011")
+    protected final Method getAccessibleTargetMethodByIndex(int index) {
+        Method method = getTargetMethodByIndex(index);
+        if (ClassUtils.REFLECTION_LOGGER.isDebugEnabled()) {
+            ClassUtils.REFLECTION_LOGGER.debug("Reflectively accessing method {} of type {}", method, method.getDeclaringClass());
+        }
+        method.setAccessible(true);
+        return method;
+    }
+
+    /**
      * Triggers the invocation of the method at index.
      *
      * @param index  The method index
@@ -577,7 +606,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
             if (ClassUtils.REFLECTION_LOGGER.isWarnEnabled()) {
                 ClassUtils.REFLECTION_LOGGER.warn("Using getTargetMethod for method {} on type {} requires the use of reflection. GraalVM configuration necessary", getName(), getDeclaringType());
             }
-            return ReflectionUtils.getRequiredMethod(getDeclaringType(), getMethodName(), getArgumentTypes());
+            return getTargetMethodByIndex(ref.methodIndex);
         }
 
         @Override

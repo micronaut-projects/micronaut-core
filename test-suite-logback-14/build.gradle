@@ -1,0 +1,26 @@
+plugins {
+    id("io.micronaut.build.internal.convention-test-library")
+}
+
+description = "logback tests with a new version of logback than we support, just to check it runs.  Can be removed when we upgrade as part of 4.0.0"
+
+// Logback 1.4.x is Java 11+ compatible
+def logbackVersion = JavaVersion.current().isJava11Compatible() ? "1.4.6" : "1.3.6"
+
+dependencies {
+    testAnnotationProcessor(projects.injectJava)
+
+    testImplementation(libs.managed.micronaut.test.spock) {
+        exclude(group: "io.micronaut", module: "micronaut-aop")
+    }
+    testImplementation(projects.context)
+    testImplementation(projects.injectGroovy)
+
+    // Use a newer version of logback than we support
+    testImplementation("ch.qos.logback:logback-classic:${logbackVersion}")
+
+    testImplementation(projects.management)
+    testImplementation(projects.httpClient)
+
+    testRuntimeOnly(projects.httpServerNetty)
+}

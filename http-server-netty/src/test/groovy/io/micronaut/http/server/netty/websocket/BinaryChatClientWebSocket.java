@@ -46,7 +46,7 @@ public abstract class BinaryChatClientWebSocket implements AutoCloseable{
         this.topic = topic;
         this.username = username;
         this.session = session;
-        System.out.println("Client session opened for username = " + username);
+        System.out.println("Client session " + session.getId() + " opened for username = " + username);
     }
 
     public String getTopic() {
@@ -72,7 +72,7 @@ public abstract class BinaryChatClientWebSocket implements AutoCloseable{
     @OnMessage
     public void onMessage(
             byte[] message) {
-        System.out.println("Client received message = " + new String(message));
+        System.out.println("Client " + username + " received message = " + new String(message));
         replies.add(new String(message));
     }
 

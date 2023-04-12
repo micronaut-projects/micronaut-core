@@ -14,11 +14,9 @@ import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.context.exceptions.ConfigurationException
 import org.slf4j.LoggerFactory
 import spock.lang.Specification
-import spock.lang.Unroll
 
 class LogbackLogLevelConfigurerSpec extends Specification {
 
-    @Unroll
     void 'test that log levels on logger "#loggerName" can be configured via properties'() {
         given:
             def loggerLevels = [
