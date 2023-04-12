@@ -1,11 +1,11 @@
 package io.micronaut.expressions
 
 import io.micronaut.ast.transform.test.AbstractEvaluatedExpressionsSpec
-import spock.lang.PendingFeature
+import spock.lang.Ignore
 
 class ContextMethodCallsExpressionsSpec extends AbstractEvaluatedExpressionsSpec{
 
-    @PendingFeature(reason = "Already tested in Java and fails intermittently due to a Groovy classloading bug")
+    @Ignore("Already tested in Java and fails intermittently due to a Groovy classloading bug")
     void "test context method calls"() {
         given:
         Object expr1 = evaluateAgainstContext("#{ #getIntValue() }",
