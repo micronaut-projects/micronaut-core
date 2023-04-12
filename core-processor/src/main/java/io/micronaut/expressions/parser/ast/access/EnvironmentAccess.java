@@ -60,7 +60,7 @@ public final class EnvironmentAccess extends ExpressionNode {
     @Override
     protected ClassElement doResolveClassElement(ExpressionVisitorContext ctx) {
         resolveType(ctx);
-        return STRING_ELEMENT;
+        return ctx.visitorContext().getClassElement(String.class).orElse(STRING_ELEMENT);
     }
 
     @Override
