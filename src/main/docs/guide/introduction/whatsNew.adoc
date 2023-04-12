@@ -1,4 +1,11 @@
 //Micronaut {version} includes the following changes:
+==
+
+== 3.9.0
+
+=== Deprecations
+`ConversionService.SHARED` is deprecated,  and it will be removed in a future version of the Micronaut Framework. Use an injected api:core.convert.ConversionService[] bean instead, and register new type converters by declaring beans of type api:core.convert.TypeConverter[].
+
 == 3.8.0
 
 Key features:
