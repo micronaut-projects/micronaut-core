@@ -75,6 +75,11 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         loadApplicationContextCustomizer(resolveClassLoader()).configure(this);
     }
 
+    DefaultApplicationContextBuilder(ClassLoader classLoader) {
+        loadApplicationContextCustomizer(classLoader).configure(this);
+        this.classLoader = classLoader;
+    }
+
     private ClassLoader resolveClassLoader() {
         final ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
         if (contextClassLoader != null) {
@@ -89,7 +94,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
-    @NonNull 
+    @NonNull
     public ApplicationContextBuilder enableDefaultPropertySources(boolean areEnabled) {
         this.enableDefaultPropertySources = areEnabled;
         return this;
