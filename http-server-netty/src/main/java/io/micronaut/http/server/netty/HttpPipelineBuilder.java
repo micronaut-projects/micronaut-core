@@ -586,9 +586,6 @@ final class HttpPipelineBuilder {
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER, accessLogHandler);
             }
             registerMicronautChannelHandlers();
-            if (server.getServerConfiguration().getServerType() == NettyHttpServerConfiguration.HttpServerType.STREAMED) {
-                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_FLOW_CONTROL, new FlowControlHandler());
-            }
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_KEEP_ALIVE, new HttpServerKeepAliveHandler());
 
             insertMicronautHandlers(sslHandler == null && !https);
