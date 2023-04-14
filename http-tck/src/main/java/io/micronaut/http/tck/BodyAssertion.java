@@ -22,6 +22,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.function.BiPredicate;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -80,7 +82,7 @@ public final class BodyAssertion<T, E> {
         return errorType;
     }
 
-    private static enum EvaluatorType {
+    private enum EvaluatorType {
         EQUAL,
         CONTAIN,
     }
@@ -108,8 +110,12 @@ public final class BodyAssertion<T, E> {
 
         EvaluatorType type();
 
+        default String render(T value) {
+            return String.valueOf(value);
+        }
+
         default String message(T expected, T actual) {
-            return "Expected received body of '" + actual + "' to " + type().name().toLowerCase() + " '" + expected + "'";
+            return "Expected received body of '" + render(actual) + "' to " + type().name().toLowerCase() + " '" + render(expected) + "'";
         }
     }
 
@@ -199,6 +205,19 @@ public final class BodyAssertion<T, E> {
     }
 
     private record ByteArrayEvaluator(EvaluatorType type) implements BodyEvaluator<byte[]> {
+
+        @Override
+        public String render(byte[] value) {
+            if (value == null) {
+                return "null";
+            }
+            String firstTen = IntStream.range(0, value.length)
+                .map(i -> value[i] & 0xff)
+                .mapToObj(i -> String.format("%02x", i))
+                .limit(10)
+                .collect(Collectors.joining(", ", "", "..."));
+            return "ByteArray(length=" + value.length + ", [" + firstTen + "])";
+        }
 
         @Override
         public boolean test(byte[] expected, byte[] received) {
