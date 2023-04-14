@@ -17,6 +17,8 @@ import java.lang.annotation.Target;
  * <p>When added to a method the condition will be evaluated during route matching and if the condition
  * does not evaluate to {@code true} the route will not be matched resulting in a {@link io.micronaut.http.HttpStatus#NOT_FOUND} response.  </p>
  *
+ * <p>Note that this annotation only applies to the server and is ignored when placed on declarative HTTP client routes.</p>
+ *
  * @see io.micronaut.http.expression.RequestConditionContext
  * @since 4.0.0
  */
