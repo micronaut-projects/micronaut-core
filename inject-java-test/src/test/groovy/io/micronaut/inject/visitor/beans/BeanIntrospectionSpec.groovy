@@ -82,6 +82,41 @@ class Test extends Auditable {
         bean.updatedAt != null
     }
 
+    void "test introspection can written to different package"() {
+        when:
+        def classLoader = buildClassLoader("test.Test", '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(introspectionPackage = "test.introspections")
+public class Test {
+    private String name;
+    public Test(String name) {
+        this.name = name;
+    }
+    public String getName() {
+        return name;
+    }
+}
+
+''')
+        def introspectionName = 'test.introspections.$Test$Introspection'
+        def introspection = classLoader.loadClass(introspectionName).newInstance() as BeanIntrospection
+
+        then:
+        introspection != null
+        introspection.getProperty("name").isPresent()
+
+        when:
+        def introspectionRefName = 'test.introspections.$Test$IntrospectionRef'
+        def introspectionRef = classLoader.loadClass(introspectionRefName).newInstance() as BeanIntrospectionReference
+
+        then:
+        introspectionRef != null
+        introspectionRef.load() != null
+    }
+
     void "test generics in arrays don't stack overflow"() {
         given:
         def introspection = buildBeanIntrospection('arraygenerics.Test', '''
@@ -902,6 +937,37 @@ class Test {}
 
         cleanup:
         applicationContext.close()
+    }
+
+    void "test create bean introspection for external class with custom package"() {
+        given:
+        def classLoader = buildClassLoader('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.inject.visitor.beans.OuterBean;
+
+@Introspected(classes=OuterBean.InnerBean.class, introspectionPackage="test.micronaut.intro")
+class Test {}
+''')
+
+        when:"the reference is loaded"
+        def reference = classLoader.loadClass('test.micronaut.intro.$Test$IntrospectionRef0').newInstance() as BeanIntrospectionReference
+
+        then:"the reference is valid"
+        notThrown(ClassNotFoundException)
+        reference.getBeanType() == OuterBean.InnerBean.class
+        reference.load() != null
+
+        print(classLoader)
+
+        when:"the introspection is loaded"
+        def introspectionName = 'test.micronaut.intro.$io_micronaut_inject_visitor_beans_OuterBean$InnerBean$Introspection'
+        def introspection = classLoader.loadClass(introspectionName).newInstance() as BeanIntrospection
+
+        then:"the introspection is valid"
+        notThrown(ClassNotFoundException)
+        introspection.getProperty("name").isPresent()
     }
 
     void "test create bean introspection for interface"() {

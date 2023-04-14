@@ -180,6 +180,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         Introspected.AccessKind[] accessKinds = introspected.enumValues("accessKind", Introspected.AccessKind.class);
         Introspected.Visibility[] visibilities =
                 introspected.enumValues("visibility", Introspected.Visibility.class);
+        final String introspectionPackage = introspected.stringValue("introspectionPackage").orElse(element.getPackageName());
+
         if (ArrayUtils.isEmpty(accessKinds)) {
             accessKinds = DEFAULT_ACCESS_KIND;
         }
@@ -217,6 +219,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                                 ? element.getAnnotationMetadata()
                                 : new AnnotationMetadataHierarchy(element.getAnnotationMetadata(), typeMetadata);
                         final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
+                                introspectionPackage,
                                 element.getName(),
                                 index.getAndIncrement(),
                                 element,
@@ -251,6 +254,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                             continue;
                         }
                         final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
+                                introspectionPackage,
                                 element.getName(),
                                 j++,
                                 element,
@@ -275,6 +279,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         } else {
 
             final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
+                    introspectionPackage,
                     element,
                     metadata ? element.getAnnotationMetadata() : null
             );
