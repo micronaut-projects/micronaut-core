@@ -31,7 +31,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.UriMapping;
+import io.micronaut.http.annotation.RouteCondition;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.uri.UriMatchTemplate;
@@ -875,10 +875,10 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             this.uriMatchTemplate = uriTemplate;
             this.httpMethodName = httpMethodName;
             this.executorSelector = new RouteExecutorSelector();
-            if (targetMethod.isPresent(UriMapping.class, "condition")) {
-                AnnotationValue<UriMapping> annotation = targetMethod.getAnnotation(UriMapping.class);
-                if (annotation instanceof EvaluatedAnnotationValue<UriMapping>) {
-                    where(request -> annotation.booleanValue("condition").orElse(false));
+            if (targetMethod.isPresent(RouteCondition.class, AnnotationMetadata.VALUE_MEMBER)) {
+                AnnotationValue<RouteCondition> annotation = targetMethod.getAnnotation(RouteCondition.class);
+                if (annotation instanceof EvaluatedAnnotationValue<RouteCondition>) {
+                    where(request -> annotation.booleanValue().orElse(false));
                 }
             }
         }

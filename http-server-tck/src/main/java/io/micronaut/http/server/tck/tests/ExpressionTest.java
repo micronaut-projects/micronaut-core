@@ -22,6 +22,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.RouteCondition;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import org.junit.jupiter.api.Test;
@@ -60,7 +61,8 @@ public class ExpressionTest {
     @Controller("/expr")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class ExpressionController {
-        @Get(value = "/test", condition = "#{request.headers.getFirst('Authorization')?.contains('foo')}")
+        @Get(value = "/test")
+        @RouteCondition("#{request.headers.getFirst('Authorization')?.contains('foo')}")
         String testGet() {
             return "ok";
         }
