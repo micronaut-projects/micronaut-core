@@ -21,6 +21,7 @@ import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -30,6 +31,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.RouteCondition;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.uri.UriMatchTemplate;
@@ -37,6 +39,7 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.MethodReference;
+import io.micronaut.inject.annotation.EvaluatedAnnotationValue;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.web.router.exceptions.RoutingException;
@@ -872,6 +875,12 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             this.uriMatchTemplate = uriTemplate;
             this.httpMethodName = httpMethodName;
             this.executorSelector = new RouteExecutorSelector();
+            if (targetMethod.isPresent(RouteCondition.class, AnnotationMetadata.VALUE_MEMBER)) {
+                AnnotationValue<RouteCondition> annotation = targetMethod.getAnnotation(RouteCondition.class);
+                if (annotation instanceof EvaluatedAnnotationValue<RouteCondition>) {
+                    where(request -> annotation.booleanValue().orElse(false));
+                }
+            }
         }
 
         @Override

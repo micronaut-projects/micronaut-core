@@ -787,8 +787,8 @@ public class FilterRunner {
     private static sealed class ReactiveContinuationImpl implements FilterContinuation<Publisher<HttpResponse<?>>>,
         InternalFilterContinuation<Publisher<HttpResponse<?>>> {
 
-        private final Function<FilterContext, ExecutionFlow<FilterContext>> downstream;
         protected FilterContext filterContext;
+        private final Function<FilterContext, ExecutionFlow<FilterContext>> downstream;
 
         private ReactiveContinuationImpl(Function<FilterContext, ExecutionFlow<FilterContext>> downstream,
                                          FilterContext filterContext) {

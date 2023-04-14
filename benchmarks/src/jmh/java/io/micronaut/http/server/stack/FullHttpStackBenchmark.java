@@ -68,7 +68,6 @@ public class FullHttpStackBenchmark {
             .measurementIterations(30)
             .mode(Mode.AverageTime)
             .timeUnit(TimeUnit.NANOSECONDS)
-            .addProfiler(AsyncProfiler.class, "libPath=/home/yawkat/bin/async-profiler-2.9-linux-x64/build/libasyncProfiler.so;output=flamegraph")
             .forks(1)
             .jvmArgsAppend("-Djmh.executor=CUSTOM", "-Djmh.executor.class=" + JmhFastThreadLocalExecutor.class.getName())
             .build();

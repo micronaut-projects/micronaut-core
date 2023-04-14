@@ -236,6 +236,38 @@ class ContextPropertyAccessExpressionsSpec extends AbstractEvaluatedExpressionsS
         expr == "test"
     }
 
+    void "test multi-level context property access safe navigation with optionals - method call"() {
+        given:
+        Object expr = evaluateAgainstContext("#{ foo?.bar?.getName() }",
+                """
+            import java.util.Optional;
+
+            @jakarta.inject.Singleton
+            class Context {
+                public Optional<Foo> getFoo() {
+                    return Optional.of(new Foo());
+                }
+            }
+
+            class Foo {
+                private Bar bar = new Bar();
+                public Optional<Bar> getBar() {
+                    return Optional.ofNullable(bar);
+                }
+            }
+
+            class Bar {
+                private String name = "test";
+                public String getName() {
+                    return name;
+                }
+            }
+        """)
+
+        expect:
+        expr == "test"
+    }
+
 
     void "test multi-level context property access non-safe navigation"() {
         when:

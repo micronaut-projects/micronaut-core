@@ -41,7 +41,7 @@ set of available features. Even though the complexity of expression is only limi
 constructs, it is in general not recommended to place complex logic inside an expression as there are usually better
 ways to achieve the same result.
 
-== Example Use Case
+== Using Expressions in Micronaut framework
 
 Expressions can be used anywhere throughout the Micronaut framework and associated modules, but as an example, you can use them to implement simple scheduled job control, for example:
 
@@ -49,6 +49,8 @@ snippet::io.micronaut.docs.expressions.ExampleJob[title="Job Control with Expres
 
 <1> Here the `condition` member of the ann:scheduling.annotation.Scheduled[] annotation is used to only execute the job if a pre-condition is met.
 <2> The `condition` invokes a method of a parameter which is another bean called `ExampleJobControl` which can be used to pause and resume execution of the job as desired.
+
+TIP: You can also use expressions to perform conditional routing using the ann:http.annotation.RouteCondition[] annotation.
 
 == Evaluated Expression Language Reference
 
