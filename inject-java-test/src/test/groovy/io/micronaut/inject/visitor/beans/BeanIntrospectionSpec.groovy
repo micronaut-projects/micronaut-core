@@ -89,7 +89,7 @@ package test;
 
 import io.micronaut.core.annotation.Introspected;
 
-@Introspected(introspectionPackage = "test.introspections")
+@Introspected(targetPackage = "test.introspections")
 public class Test {
     private String name;
     public Test(String name) {
@@ -947,7 +947,7 @@ package test;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.inject.visitor.beans.OuterBean;
 
-@Introspected(classes=OuterBean.InnerBean.class, introspectionPackage="test.micronaut.intro")
+@Introspected(classes=OuterBean.InnerBean.class, targetPackage="test.micronaut.intro")
 class Test {}
 ''')
 

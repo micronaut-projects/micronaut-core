@@ -67,6 +67,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     private static final Introspected.AccessKind[] DEFAULT_ACCESS_KIND = { Introspected.AccessKind.METHOD };
     private static final Introspected.Visibility[] DEFAULT_VISIBILITY = { Introspected.Visibility.DEFAULT };
 
+    private static final Introspected.Visibility[] PUBLIC_VISIBILITY = { Introspected.Visibility.PUBLIC };
+
     private Map<String, BeanIntrospectionWriter> writers = new LinkedHashMap<>(10);
     private List<AbstractIntrospection> abstractIntrospections = new ArrayList<>();
     private AbstractIntrospection currentAbstractIntrospection;
@@ -165,6 +167,17 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         }
     }
 
+    private static Introspected.Visibility[] getVisibilities(Introspected.Visibility[] current, String targetPackage, ClassElement classElement) {
+        if (ArrayUtils.isEmpty(current)) {
+            if (classElement.getPackageName().equals(targetPackage)) {
+                return DEFAULT_VISIBILITY;
+            } else {
+                return PUBLIC_VISIBILITY;
+            }
+        }
+        return current;
+    }
+
     private void processIntrospected(ClassElement element, VisitorContext context, AnnotationValue<Introspected> introspected) {
         final String[] packages = introspected.stringValues("packages");
         final AnnotationClassValue[] classes = introspected.get("classes", AnnotationClassValue[].class, new AnnotationClassValue[0]);
@@ -180,16 +193,16 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         Introspected.AccessKind[] accessKinds = introspected.enumValues("accessKind", Introspected.AccessKind.class);
         Introspected.Visibility[] visibilities =
                 introspected.enumValues("visibility", Introspected.Visibility.class);
-        final String introspectionPackage = introspected.stringValue("introspectionPackage").orElse(element.getPackageName());
+        final String targetPackage = introspected.stringValue("targetPackage").orElse(element.getPackageName());
 
         if (ArrayUtils.isEmpty(accessKinds)) {
             accessKinds = DEFAULT_ACCESS_KIND;
         }
-        if (ArrayUtils.isEmpty(visibilities)) {
-            visibilities = DEFAULT_VISIBILITY;
-        }
+//        if (ArrayUtils.isEmpty(visibilities)) {
+//            visibilities = DEFAULT_VISIBILITY;
+//        }
         Introspected.AccessKind[] finalAccessKinds = accessKinds;
-        Introspected.Visibility[] finalVisibilities = visibilities;
+//        Introspected.Visibility[] finalVisibilities = visibilities;
 
         if (CollectionUtils.isEmpty(toIndex)) {
             indexedAnnotations = CollectionUtils.setOf(
@@ -211,7 +224,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             for (AnnotationClassValue aClass : classes) {
                 final Optional<ClassElement> classElement = context.getClassElement(aClass.getName());
 
-
                 classElement.ifPresent(ce -> {
                     if (ce.isPublic() && !isIntrospected(context, ce)) {
                         final AnnotationMetadata typeMetadata = ce.getAnnotationMetadata();
@@ -219,7 +231,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                                 ? element.getAnnotationMetadata()
                                 : new AnnotationMetadataHierarchy(element.getAnnotationMetadata(), typeMetadata);
                         final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
-                                introspectionPackage,
+                                targetPackage,
                                 element.getName(),
                                 index.getAndIncrement(),
                                 element,
@@ -235,7 +247,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                                 indexedAnnotations,
                                 ce,
                                 writer,
-                                finalVisibilities,
+                                getVisibilities(visibilities, targetPackage, ce),
                                 finalAccessKinds
                         );
                     }
@@ -254,7 +266,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                             continue;
                         }
                         final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
-                                introspectionPackage,
+                                targetPackage,
                                 element.getName(),
                                 j++,
                                 element,
@@ -270,7 +282,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                                 indexedAnnotations,
                                 classElement,
                                 writer,
-                                finalVisibilities,
+                                getVisibilities(visibilities, targetPackage, classElement),
                                 finalAccessKinds
                         );
                     }
@@ -279,7 +291,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         } else {
 
             final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
-                    introspectionPackage,
+                    targetPackage,
                     element,
                     metadata ? element.getAnnotationMetadata() : null
             );
@@ -292,7 +304,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     indexedAnnotations,
                     element,
                     writer,
-                    finalVisibilities,
+                    getVisibilities(visibilities, targetPackage, element),
                     finalAccessKinds
             );
         }

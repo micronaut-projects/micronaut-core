@@ -125,15 +125,16 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     /**
      * Default constructor.
      *
+     * @param targetPackage          The package to write introspection to
      * @param classElement           The class element
      * @param beanAnnotationMetadata The bean annotation metadata
      */
-    BeanIntrospectionWriter(String introspectionPackage, ClassElement classElement, AnnotationMetadata beanAnnotationMetadata) {
-        super(computeReferenceName(introspectionPackage, classElement.getName()), classElement, beanAnnotationMetadata, true);
+    BeanIntrospectionWriter(String targetPackage, ClassElement classElement, AnnotationMetadata beanAnnotationMetadata) {
+        super(computeReferenceName(targetPackage, classElement.getName()), classElement, beanAnnotationMetadata, true);
         final String name = classElement.getName();
         this.classElement = classElement;
         this.referenceWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-        this.introspectionName = computeShortIntrospectionName(introspectionPackage, name);
+        this.introspectionName = computeShortIntrospectionName(targetPackage, name);
         this.introspectionType = getTypeReferenceForName(introspectionName);
         this.beanType = getTypeReferenceForName(name);
         this.dispatchWriter = new DispatchWriter(introspectionType, Type.getType(AbstractInitializableBeanIntrospection.class));
@@ -142,6 +143,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     /**
      * Constructor used to generate a reference for already compiled classes.
      *
+     * @param targetPackage          The package to write introspection to
      * @param generatingType         The originating type
      * @param index                  A unique index
      * @param originatingElement     The originating element
@@ -149,17 +151,17 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      * @param beanAnnotationMetadata The bean annotation metadata
      */
     BeanIntrospectionWriter(
-            String introspectionPackage,
+            String targetPackage,
             String generatingType,
             int index,
             ClassElement originatingElement,
             ClassElement classElement,
             AnnotationMetadata beanAnnotationMetadata) {
-        super(computeReferenceName(introspectionPackage, generatingType) + index, originatingElement, beanAnnotationMetadata, true);
+        super(computeReferenceName(targetPackage, generatingType) + index, originatingElement, beanAnnotationMetadata, true);
         final String className = classElement.getName();
         this.classElement = classElement;
         this.referenceWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-        this.introspectionName = computeIntrospectionName(introspectionPackage, className);
+        this.introspectionName = computeIntrospectionName(targetPackage, className);
         this.introspectionType = getTypeReferenceForName(introspectionName);
         this.beanType = getTypeReferenceForName(className);
         this.dispatchWriter = new DispatchWriter(introspectionType);

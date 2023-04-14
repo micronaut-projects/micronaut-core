@@ -161,7 +161,7 @@ public @interface Introspected {
      * @since 3.9.0
      */
     @Experimental
-    String introspectionPackage() default "";
+    String targetPackage() default "";
 
     /**
      * Allow pre-computed indexes for property lookups based on an annotation and a member.
