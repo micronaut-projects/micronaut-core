@@ -43,10 +43,14 @@ import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.stream.JsonSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
+import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.InternalServerException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
+import io.micronaut.http.server.netty.handler.RequestHandler;
+import io.micronaut.http.server.netty.types.NettyCustomizableResponseType;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
 import io.micronaut.runtime.http.codec.TextPlainCodec;
@@ -56,29 +60,20 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufOutputStream;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
-import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.codec.http2.Http2Error;
-import io.netty.handler.codec.http2.Http2Exception;
-import io.netty.handler.timeout.IdleState;
-import io.netty.handler.timeout.IdleStateEvent;
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
 import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -102,7 +97,7 @@ import java.util.regex.Pattern;
 @Internal
 @Sharable
 @SuppressWarnings("FileLength")
-final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.http.HttpRequest<?>> {
+public final class RoutingInBoundHandler implements RequestHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(RoutingInBoundHandler.class);
     /*
@@ -154,59 +149,31 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
         this.conversionService = conversionService;
     }
 
-    @Override
-    public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-        super.handlerRemoved(ctx);
-        cleanupIfNecessary(ctx);
-    }
-
-    @Override
-    public void channelInactive(@NonNull ChannelHandlerContext ctx) throws Exception {
-        super.channelInactive(ctx);
-        if (ctx.channel().isWritable()) {
-            ctx.flush();
-        }
-        cleanupIfNecessary(ctx);
-    }
-
-    private void cleanupIfNecessary(ChannelHandlerContext ctx) {
-        NettyHttpRequest.remove(ctx);
-    }
-
-    private void cleanupRequest(ChannelHandlerContext ctx, NettyHttpRequest<?> request) {
+    private void cleanupRequest(NettyHttpRequest<?> request) {
         try {
             request.release();
         } finally {
             if (!terminateEventPublisher.isEmpty()) {
-                ctx.executor().execute(() -> {
-                    try {
-                        terminateEventPublisher.publishEvent(new HttpRequestTerminatedEvent(request));
-                    } catch (Exception e) {
-                        if (LOG.isErrorEnabled()) {
-                            LOG.error("Error publishing request terminated event: " + e.getMessage(), e);
-                        }
+                try {
+                    terminateEventPublisher.publishEvent(new HttpRequestTerminatedEvent(request));
+                } catch (Exception e) {
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("Error publishing request terminated event: " + e.getMessage(), e);
                     }
-                });
-            }
-        }
-    }
-
-    @Override
-    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-        try {
-            if (evt instanceof IdleStateEvent idleStateEvent) {
-                IdleState state = idleStateEvent.state();
-                if (state == IdleState.ALL_IDLE) {
-                    ctx.close();
                 }
             }
-        } finally {
-            super.userEventTriggered(ctx, evt);
         }
     }
 
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+    public void responseWritten(Object attachment) {
+        if (attachment != null) {
+            cleanupRequest((NettyHttpRequest<?>) attachment);
+        }
+    }
+
+    @Override
+    public void handleUnboundError(Throwable cause) {
         // short-circuit ignorable exceptions: This is also handled by RouteExecutor, but handling this early avoids
         // running any filters
         if (isIgnorable(cause)) {
@@ -216,42 +183,51 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
             return;
         }
 
-        NettyHttpRequest<?> nettyHttpRequest = NettyHttpRequest.remove(ctx);
-        if (nettyHttpRequest == null) {
-            if (cause instanceof SSLException || cause.getCause() instanceof SSLException) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Micronaut Server Error - No request state present. Cause: " + cause.getMessage(), cause);
-                }
-            } else {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Micronaut Server Error - No request state present. Cause: " + cause.getMessage(), cause);
-                }
+        if (cause instanceof SSLException || cause.getCause() instanceof SSLException) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Micronaut Server Error - No request state present. Cause: " + cause.getMessage(), cause);
             }
-
-            ctx.writeAndFlush(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR));
-            return;
+        } else {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("Micronaut Server Error - No request state present. Cause: " + cause.getMessage(), cause);
+            }
         }
-        new NettyRequestLifecycle(this, ctx, nettyHttpRequest).handleException(cause);
     }
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, io.micronaut.http.HttpRequest<?> httpRequest) {
-        new NettyRequestLifecycle(this, ctx, (NettyHttpRequest<?>) httpRequest).handleNormal();
+    public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
+        NettyHttpRequest<Object> mnRequest;
+        try {
+            mnRequest = new NettyHttpRequest<>(request, ctx, conversionService, serverConfiguration);
+        } catch (IllegalArgumentException e) {
+            NettyHttpRequest<Object> errorRequest = new NettyHttpRequest<>(
+                new DefaultFullHttpRequest(request.protocolVersion(), request.method(), "/", Unpooled.EMPTY_BUFFER),
+                ctx,
+                conversionService,
+                serverConfiguration
+            );
+            new NettyRequestLifecycle(this, outboundAccess, errorRequest).handleException(e.getCause() == null ? e : e.getCause());
+            if (request instanceof StreamedHttpRequest streamed) {
+                streamed.closeIfNoSubscriber();
+            } else {
+                ((FullHttpRequest) request).release();
+            }
+            return;
+        }
+        new NettyRequestLifecycle(this, outboundAccess, mnRequest).handleNormal();
     }
 
-    void writeResponse(ChannelHandlerContext ctx,
-                               NettyHttpRequest<?> nettyHttpRequest,
-                               MutableHttpResponse<?> response,
-                               Throwable throwable) {
+    public void writeResponse(PipeliningServerHandler.OutboundAccess outboundAccess,
+                       NettyHttpRequest<?> nettyHttpRequest,
+                       MutableHttpResponse<?> response,
+                       Throwable throwable) {
         if (throwable != null) {
             response = routeExecutor.createDefaultErrorResponse(nettyHttpRequest, throwable);
         }
-        if (response == null) {
-            ctx.read();
-        } else {
+        if (response != null) {
             try {
                 encodeHttpResponse(
-                    ctx,
+                    outboundAccess,
                     nettyHttpRequest,
                     response,
                     null,
@@ -260,7 +236,7 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
             } catch (Throwable e) {
                 response = routeExecutor.createDefaultErrorResponse(nettyHttpRequest, e);
                 encodeHttpResponse(
-                    ctx,
+                    outboundAccess,
                     nettyHttpRequest,
                     response,
                     null,
@@ -285,7 +261,7 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
     }
 
     private void encodeHttpResponse(
-        ChannelHandlerContext context,
+        PipeliningServerHandler.OutboundAccess outboundAccess,
         NettyHttpRequest<?> nettyRequest,
         MutableHttpResponse<?> response,
         @Nullable Argument<Object> bodyType,
@@ -295,7 +271,7 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
         if (isNotHead) {
             if (body instanceof Writable) {
                 getIoExecutor().execute(() -> {
-                    ByteBuf byteBuf = context.alloc().ioBuffer(128);
+                    ByteBuf byteBuf = nettyRequest.getChannelHandlerContext().alloc().ioBuffer(128);
                     ByteBufOutputStream outputStream = new ByteBufOutputStream(byteBuf);
                     try {
                         Writable writable = (Writable) body;
@@ -308,14 +284,14 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
                         writeFinalNettyResponse(
                             response,
                             nettyRequest,
-                            context
+                            outboundAccess
                         );
                     } catch (IOException e) {
                         final MutableHttpResponse<?> errorResponse = routeExecutor.createDefaultErrorResponse(nettyRequest, e);
                         writeFinalNettyResponse(
                             errorResponse,
                             nettyRequest,
-                            context
+                            outboundAccess
                         );
                     }
                 });
@@ -323,13 +299,13 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
                 response.body(null);
                 if (serverConfiguration.getServerType() == NettyHttpServerConfiguration.HttpServerType.FULL_CONTENT) {
                     // HttpStreamsHandler is not present, so we can't write a StreamedHttpResponse.
-                    Flux.from(mapToHttpContent(nettyRequest, response, body, context)).collectList().subscribe(contents -> {
+                    Flux.from(mapToHttpContent(nettyRequest, response, body)).collectList().subscribe(contents -> {
                         if (contents.size() == 0) {
                             setResponseBody(response, Unpooled.EMPTY_BUFFER);
                         } else if (contents.size() == 1) {
                             setResponseBody(response, contents.get(0).content().retain());
                         } else {
-                            CompositeByteBuf composite = context.alloc().compositeBuffer();
+                            CompositeByteBuf composite = nettyRequest.getChannelHandlerContext().alloc().compositeBuffer();
                             for (HttpContent c : contents) {
                                 composite.addComponent(true, c.content().retain());
                             }
@@ -342,7 +318,7 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
                         writeFinalNettyResponse(
                             response,
                             nettyRequest,
-                            context
+                            outboundAccess
                         );
                     }, error -> {
                         if (LOG.isErrorEnabled()) {
@@ -354,20 +330,20 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
                         } else {
                             responseStatus = HttpResponseStatus.INTERNAL_SERVER_ERROR;
                         }
-                        context.writeAndFlush(new DefaultHttpResponse(HttpVersion.HTTP_1_1, responseStatus))
-                            .addListener(ChannelFutureListener.CLOSE);
+                        outboundAccess.closeAfterWrite();
+                        outboundAccess.writeFull(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, responseStatus));
                     });
                 } else {
                     DelegateStreamedHttpResponse streamedResponse = new DelegateStreamedHttpResponse(
                         toNettyResponse(response),
-                        mapToHttpContent(nettyRequest, response, body, context)
+                        mapToHttpContent(nettyRequest, response, body)
                     );
-                    context.writeAndFlush(streamedResponse);
-                    context.read();
+                    outboundAccess.attachment(nettyRequest);
+                    outboundAccess.writeStreamed(streamedResponse);
                 }
             } else {
                 encodeResponseBody(
-                    context,
+                    nettyRequest.getChannelHandlerContext(),
                     nettyRequest,
                     response,
                     bodyType,
@@ -377,7 +353,7 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
                 writeFinalNettyResponse(
                     response,
                     nettyRequest,
-                    context
+                    outboundAccess
                 );
             }
         } else {
@@ -385,15 +361,14 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
             writeFinalNettyResponse(
                 response,
                 nettyRequest,
-                context
+                outboundAccess
             );
         }
     }
 
     private Flux<HttpContent> mapToHttpContent(NettyHttpRequest<?> request,
                                                MutableHttpResponse<?> response,
-                                               Object body,
-                                               ChannelHandlerContext context) {
+                                               Object body) {
         final RouteInfo<?> routeInfo = response.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).orElse(null);
         final boolean hasRouteInfo = routeInfo != null;
         MediaType mediaType = response.getContentType().orElse(null);
@@ -402,7 +377,7 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
         }
         boolean isJson = mediaType != null && mediaType.getExtension().equals(MediaType.EXTENSION_JSON) &&
             isJsonFormattable(hasRouteInfo ? routeInfo.getBodyType() : null);
-        NettyByteBufferFactory byteBufferFactory = new NettyByteBufferFactory(context.alloc());
+        NettyByteBufferFactory byteBufferFactory = new NettyByteBufferFactory(request.getChannelHandlerContext().alloc());
 
         Flux<Object> bodyPublisher = Flux.from(Publishers.convertPublisher(conversionService, body, Publisher.class));
 
@@ -455,11 +430,7 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
         }
 
         httpContentPublisher = httpContentPublisher
-            .contextWrite(reactorContext -> reactorContext.put(ServerRequestContext.KEY, request))
-            .doOnNext(httpContent ->
-                // once an http content is written, read the next item if it is available
-                context.read())
-            .doAfterTerminate(() -> cleanupRequest(context, request));
+            .contextWrite(reactorContext -> reactorContext.put(ServerRequestContext.KEY, request));
 
         return httpContentPublisher;
     }
@@ -531,7 +502,7 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
 
     }
 
-    private void writeFinalNettyResponse(MutableHttpResponse<?> message, HttpRequest<?> request, ChannelHandlerContext context) {
+    private void writeFinalNettyResponse(MutableHttpResponse<?> message, HttpRequest<?> request, PipeliningServerHandler.OutboundAccess outboundAccess) {
         int httpStatus = message.code();
 
         final io.micronaut.http.HttpVersion httpVersion = request.getHttpVersion();
@@ -539,30 +510,6 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
 
         boolean decodeError = request instanceof NettyHttpRequest &&
             ((NettyHttpRequest<?>) request).getNativeRequest().decoderResult().isFailure();
-
-        GenericFutureListener<Future<? super Void>> requestCompletor = future -> {
-            try {
-                if (!future.isSuccess()) {
-                    final Throwable throwable = future.cause();
-                    if (!isIgnorable(throwable)) {
-                        if (throwable instanceof Http2Exception.StreamException se) {
-                            if (se.error() == Http2Error.STREAM_CLOSED) {
-                                // ignore
-                                return;
-                            }
-                        }
-                        if (LOG.isErrorEnabled()) {
-                            LOG.error("Error writing final response: " + throwable.getMessage(), throwable);
-                        }
-                    }
-                }
-            } finally {
-                if (request instanceof NettyHttpRequest) {
-                    cleanupRequest(context, (NettyHttpRequest<?>) request);
-                }
-                context.read();
-            }
-        };
 
         final Object body = message.body();
         if (body instanceof NettyCustomizableResponseTypeHandlerInvoker) {
@@ -578,7 +525,8 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
             }
             NettyCustomizableResponseTypeHandlerInvoker handler = (NettyCustomizableResponseTypeHandlerInvoker) body;
             message.body(null);
-            handler.invoke(request, message, context).addListener(requestCompletor);
+            outboundAccess.attachment(request instanceof NettyHttpRequest<?> ? request : null);
+            outboundAccess.writeStreamed(handler.invoke(request, message));
         } else {
             io.netty.handler.codec.http.HttpResponse nettyResponse = NettyHttpResponseBuilder.toHttpResponse(message);
             io.netty.handler.codec.http.HttpHeaders nettyHeaders = nettyResponse.headers();
@@ -601,53 +549,29 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
             }
             // close handled by HttpServerKeepAliveHandler
             final NettyHttpRequest<?> nettyHttpRequest = (NettyHttpRequest<?>) request;
-
-            io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
-
-            if (nativeRequest instanceof StreamedHttpRequest streamedHttpRequest && !streamedHttpRequest.isConsumed()) {
-                // We have to clear the buffer of FlowControlHandler before writing the response
-                // If this is a streamed request and there is still content to consume then subscribe
-                // and write the buffer is empty.
-
-                //noinspection ReactiveStreamsSubscriberImplementation
-                streamedHttpRequest.subscribe(new Subscriber<HttpContent>() {
-                    private Subscription streamSub;
-
-                    @Override
-                    public void onSubscribe(Subscription s) {
-                        streamSub = s;
-                        s.request(1);
-                    }
-
-                    @Override
-                    public void onNext(HttpContent httpContent) {
-                        httpContent.release();
-                        streamSub.request(1);
-                    }
-
-                    @Override
-                    public void onError(Throwable t) {
-                        syncWriteAndFlushNettyResponse(context, request, nettyResponse, requestCompletor);
-                    }
-
-                    @Override
-                    public void onComplete() {
-                        syncWriteAndFlushNettyResponse(context, request, nettyResponse, requestCompletor);
-                    }
-                });
-            } else {
-                syncWriteAndFlushNettyResponse(context, request, nettyResponse, requestCompletor);
+            if (nettyHttpRequest.getNativeRequest() instanceof StreamedHttpRequest streamed && !streamed.isConsumed()) {
+                // consume incoming data
+                Flux.from(streamed).subscribe(HttpContent::release);
             }
+            syncWriteAndFlushNettyResponse(outboundAccess, request, nettyResponse);
         }
     }
 
     private void syncWriteAndFlushNettyResponse(
-        ChannelHandlerContext context,
+        PipeliningServerHandler.OutboundAccess outboundAccess,
         HttpRequest<?> request,
-        io.netty.handler.codec.http.HttpResponse nettyResponse,
-        GenericFutureListener<Future<? super Void>> requestCompletor
+        io.netty.handler.codec.http.HttpResponse nettyResponse
     ) {
-        context.writeAndFlush(nettyResponse).addListener(requestCompletor);
+        if (nettyResponse instanceof StreamedHttpResponse streamed) {
+            outboundAccess.attachment(request instanceof NettyHttpRequest<?> ? request : null);
+            outboundAccess.writeStreamed(streamed);
+        } else {
+            if (request instanceof NettyHttpRequest<?> nettyRequest) {
+                // no need to wait, can release immediately
+                cleanupRequest(nettyRequest);
+            }
+            outboundAccess.writeFull((FullHttpResponse) nettyResponse);
+        }
 
         if (LOG.isDebugEnabled()) {
             LOG.debug("Response {} - {} {}",
@@ -788,8 +712,8 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
         }
 
         @SuppressWarnings("unchecked")
-        ChannelFuture invoke(HttpRequest<?> request, MutableHttpResponse response, ChannelHandlerContext channelHandlerContext) {
-            return this.handler.handle(body, request, response, channelHandlerContext);
+        NettyCustomizableResponseType.CustomResponse invoke(HttpRequest<?> request, MutableHttpResponse response) {
+            return this.handler.handle(body, request, response);
         }
     }
 }

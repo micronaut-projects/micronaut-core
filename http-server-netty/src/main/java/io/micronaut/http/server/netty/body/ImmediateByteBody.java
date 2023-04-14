@@ -16,12 +16,12 @@
 package io.micronaut.http.server.netty.body;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.handler.codec.http.DefaultHttpContent;
-import org.jetbrains.annotations.NotNull;
 
 import java.nio.charset.Charset;
 import java.util.ArrayList;
@@ -58,7 +58,7 @@ public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements Byt
         return next(processMultiImpl(processor, data));
     }
 
-    @NotNull
+    @NonNull
     private ImmediateMultiObjectBody processMultiImpl(HttpContentProcessor processor, ByteBuf data) throws Throwable {
         List<Object> out = new ArrayList<>(1);
         if (data.isReadable()) {

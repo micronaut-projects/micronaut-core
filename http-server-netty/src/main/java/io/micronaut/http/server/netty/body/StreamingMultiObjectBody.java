@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.body;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.netty.reactive.HotObservable;
 import io.micronaut.http.server.netty.FormRouteCompleter;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -51,7 +52,9 @@ public final class StreamingMultiObjectBody extends ManagedBody<Publisher<?>> im
 
     @Override
     void release(Publisher<?> value) {
-        // not subscribed, don't need to do anything
+        if (value instanceof HotObservable<?> hot) {
+            hot.closeIfNoSubscriber();
+        }
     }
 
     @Override

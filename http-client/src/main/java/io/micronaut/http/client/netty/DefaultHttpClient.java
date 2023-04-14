@@ -179,6 +179,7 @@ import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.channels.ClosedChannelException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -2054,6 +2055,13 @@ public class DefaultHttpClient implements
         }
 
         @Override
+        public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+            // connection became inactive before this handler was removed (i.e. before channelRead)
+            responsePromise.tryFailure(new ClosedChannelException());
+            ctx.fireChannelInactive();
+        }
+
+        @Override
         protected void channelReadInstrumented(ChannelHandlerContext ctx, R msg) throws Exception {
             if (responsePromise.isDone()) {
                 return;
@@ -2080,15 +2088,15 @@ public class DefaultHttpClient implements
                 Flux.from(resolveRedirectURI(parentRequest, redirectRequest))
                         .flatMap(makeRedirectHandler(parentRequest, redirectRequest))
                         .subscribe(new NettyPromiseSubscriber<>(responsePromise));
-                return;
+            } else {
+                HttpHeaders headers = msg.headers();
+                if (log.isTraceEnabled()) {
+                    log.trace("HTTP Client Response Received ({}) for Request: {} {}", msg.status(), finalRequest.getMethodName(), finalRequest.getUri());
+                    HttpHeadersUtil.trace(log, headers.names(), headers::getAll);
+                }
+                buildResponse(responsePromise, msg);
             }
 
-            HttpHeaders headers = msg.headers();
-            if (log.isTraceEnabled()) {
-                log.trace("HTTP Client Response Received ({}) for Request: {} {}", msg.status(), finalRequest.getMethodName(), finalRequest.getUri());
-                HttpHeadersUtil.trace(log, headers.names(), headers::getAll);
-            }
-            buildResponse(responsePromise, msg);
             removeHandler(ctx);
         }
 

@@ -20,8 +20,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerContext;
 
 /**
  * Represents a class that is designed to handle specific types that are returned from routes in a netty specific way.
@@ -40,10 +38,9 @@ public interface NettyCustomizableResponseTypeHandler<T> extends Ordered {
      * @param object   The object to be handled
      * @param request  The native Netty request
      * @param response The mutable Micronaut response
-     * @param context  The channel context
-     * @return The channel future that completes when the response is fully written.
+     * @return The netty response
      */
-    ChannelFuture handle(T object, HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context);
+    NettyCustomizableResponseType.CustomResponse handle(T object, HttpRequest<?> request, MutableHttpResponse<?> response);
 
     /**
      * @param type The type to check

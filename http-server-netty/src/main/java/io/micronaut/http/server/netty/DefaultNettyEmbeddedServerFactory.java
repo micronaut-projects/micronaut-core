@@ -43,6 +43,7 @@ import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.netty.types.DefaultCustomizableResponseTypeHandlerRegistry;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
 import io.micronaut.http.server.netty.types.files.FileTypeHandler;
+import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
 import io.micronaut.http.server.netty.websocket.WebSocketUpgradeHandlerFactory;
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.scheduling.executor.ExecutorSelector;
@@ -51,7 +52,6 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.ServerChannel;
-import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.socket.ServerSocketChannel;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
@@ -269,7 +269,7 @@ public class DefaultNettyEmbeddedServerFactory
     }
 
     @Override
-    public Optional<SimpleChannelInboundHandler<NettyHttpRequest<?>>> getWebSocketUpgradeHandler(NettyEmbeddedServer server) {
+    public Optional<NettyServerWebSocketUpgradeHandler> getWebSocketUpgradeHandler(NettyEmbeddedServer server) {
         return Optional.ofNullable(webSocketUpgradeHandlerFactory)
                         .map(factory -> factory.create(server, this));
     }

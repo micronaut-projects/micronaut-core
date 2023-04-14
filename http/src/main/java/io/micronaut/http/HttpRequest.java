@@ -177,6 +177,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      *
      * @return A certificate used for authentication, if applicable.
      */
+    @SuppressWarnings("deprecation")
     default Optional<Certificate> getCertificate() {
         return this.getAttribute(HttpAttributes.X509_CERTIFICATE, Certificate.class);
     }

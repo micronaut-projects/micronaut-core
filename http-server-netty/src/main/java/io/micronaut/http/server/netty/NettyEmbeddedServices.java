@@ -28,6 +28,7 @@ import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
+import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.resource.StaticResourceResolver;
@@ -35,7 +36,6 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.ServerChannel;
-import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.socket.ServerSocketChannel;
 
 import java.util.List;
@@ -124,7 +124,7 @@ public interface NettyEmbeddedServices {
      * @return The websocket upgrade handler if present
      */
     @SuppressWarnings("java:S1452")
-    Optional<SimpleChannelInboundHandler<NettyHttpRequest<?>>> getWebSocketUpgradeHandler(NettyEmbeddedServer embeddedServer);
+    Optional<NettyServerWebSocketUpgradeHandler> getWebSocketUpgradeHandler(NettyEmbeddedServer embeddedServer);
 
     /**
      * @return The event loop group registry.

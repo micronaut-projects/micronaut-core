@@ -20,14 +20,11 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpVersion;
-import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
-import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
-import io.micronaut.http.server.netty.decoders.HttpRequestDecoder;
-import io.micronaut.http.server.netty.encoders.HttpResponseEncoder;
+import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
+import io.micronaut.http.server.netty.handler.RequestHandler;
 import io.micronaut.http.server.netty.handler.accesslog.HttpAccessLogHandler;
-import io.micronaut.http.server.netty.ssl.HttpRequestCertificateHandler;
 import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
 import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
 import io.micronaut.http.server.util.HttpHostResolver;
@@ -77,11 +74,13 @@ import io.netty.util.ReferenceCountUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.net.ssl.SSLPeerUnverifiedException;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.channels.ClosedChannelException;
+import java.security.cert.Certificate;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
@@ -100,6 +99,8 @@ import java.util.function.Supplier;
 final class HttpPipelineBuilder {
     static final Supplier<AttributeKey<StreamPipeline>> STREAM_PIPELINE_ATTRIBUTE =
         SupplierUtil.memoized(() -> AttributeKey.newInstance("stream-pipeline"));
+    static final Supplier<AttributeKey<Supplier<Certificate>>> CERTIFICATE_SUPPLIER_ATTRIBUTE =
+        SupplierUtil.memoized(() -> AttributeKey.newInstance("certificate-supplier"));
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpPipelineBuilder.class);
 
@@ -113,8 +114,6 @@ final class HttpPipelineBuilder {
     private final SslContext sslContext;
     private final QuicSslContext quicSslContext;
     private final HttpAccessLogHandler accessLogHandler;
-    private final HttpRequestDecoder requestDecoder;
-    private final HttpResponseEncoder responseEncoder;
 
     private final NettyServerCustomizer serverCustomizer;
 
@@ -140,15 +139,6 @@ final class HttpPipelineBuilder {
         } else {
             accessLogHandler = null;
         }
-
-        requestDecoder = new HttpRequestDecoder(server,
-            server.getEnvironment(),
-            server.getServerConfiguration(),
-            embeddedServices.getEventPublisher(HttpRequestReceivedEvent.class));
-        responseEncoder = new HttpResponseEncoder(
-                embeddedServices.getMediaTypeCodecRegistry(),
-                server.getServerConfiguration(),
-                embeddedServices.getApplicationContext().getConversionService());
     }
 
     boolean supportsSsl() {
@@ -543,6 +533,15 @@ final class HttpPipelineBuilder {
          */
         private void insertMicronautHandlers(boolean zeroCopySupported) {
             channel.attr(STREAM_PIPELINE_ATTRIBUTE.get()).set(this);
+            if (sslHandler != null) {
+                channel.attr(CERTIFICATE_SUPPLIER_ATTRIBUTE.get()).set(SupplierUtil.memoized(() -> {
+                    try {
+                        return sslHandler.engine().getSession().getPeerCertificates()[0];
+                    } catch (SSLPeerUnverifiedException ex) {
+                        return null;
+                    }
+                }));
+            }
 
             SmartHttpContentCompressor contentCompressor = new SmartHttpContentCompressor(embeddedServices.getHttpCompressionStrategy());
             if (zeroCopySupported) {
@@ -551,13 +550,11 @@ final class HttpPipelineBuilder {
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_COMPRESSOR, contentCompressor);
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
 
-            Optional<SimpleChannelInboundHandler<NettyHttpRequest<?>>> webSocketUpgradeHandler = embeddedServices.getWebSocketUpgradeHandler(server);
+            Optional<NettyServerWebSocketUpgradeHandler> webSocketUpgradeHandler = embeddedServices.getWebSocketUpgradeHandler(server);
             if (webSocketUpgradeHandler.isPresent()) {
                 pipeline.addLast(NettyServerWebSocketUpgradeHandler.COMPRESSION_HANDLER, new WebSocketServerCompressionHandler());
             }
-            if (server.getServerConfiguration().getServerType() == NettyHttpServerConfiguration.HttpServerType.STREAMED) {
-                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, new HttpStreamsServerHandler());
-            } else {
+            if (server.getServerConfiguration().getServerType() != NettyHttpServerConfiguration.HttpServerType.STREAMED) {
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR,
                     new HttpObjectAggregator(
                         (int) server.getServerConfiguration().getMaxRequestSize(),
@@ -565,18 +562,17 @@ final class HttpPipelineBuilder {
                     )
                 );
             }
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK, new ChunkedWriteHandler());
-            pipeline.addLast(HttpRequestDecoder.ID, requestDecoder);
-            if (server.getServerConfiguration().isDualProtocol() && server.getServerConfiguration().isHttpToHttpsRedirect() && !https) {
-                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_TO_HTTPS_REDIRECT, new HttpToHttpsRedirectHandler(sslConfiguration, hostResolver));
-            }
-            if (sslHandler != null) {
-                pipeline.addLast("request-certificate-handler", new HttpRequestCertificateHandler(sslHandler));
-            }
-            pipeline.addLast(HttpResponseEncoder.ID, responseEncoder);
-            webSocketUpgradeHandler.ifPresent(h -> pipeline.addLast(ChannelPipelineCustomizer.HANDLER_WEBSOCKET_UPGRADE, h));
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_CHUNK, new ChunkedWriteHandler()); // todo: move to PipeliningServerHandler
 
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, routingInBoundHandler);
+            RequestHandler requestHandler = routingInBoundHandler;
+            if (webSocketUpgradeHandler.isPresent()) {
+                webSocketUpgradeHandler.get().next = routingInBoundHandler;
+                requestHandler = webSocketUpgradeHandler.get();
+            }
+            if (server.getServerConfiguration().isDualProtocol() && server.getServerConfiguration().isHttpToHttpsRedirect() && !https) {
+                requestHandler = new HttpToHttpsRedirectHandler(routingInBoundHandler.conversionService, server.getServerConfiguration(), sslConfiguration, hostResolver);
+            }
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, new PipeliningServerHandler(requestHandler));
         }
 
         /**

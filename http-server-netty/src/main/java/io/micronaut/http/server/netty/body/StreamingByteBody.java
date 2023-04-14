@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.http.netty.reactive.HotObservable;
 import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessorAsReactiveProcessor;
 import io.netty.buffer.ByteBuf;
@@ -60,7 +61,9 @@ public final class StreamingByteBody extends ManagedBody<Publisher<HttpContent>>
 
     @Override
     void release(Publisher<HttpContent> value) {
-        // not subscribed, don't need to do anything
+        if (value instanceof HotObservable<?> hot) {
+            hot.closeIfNoSubscriber();
+        }
     }
 
     /**
