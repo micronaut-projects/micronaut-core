@@ -97,7 +97,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         StreamingHttpClientRegistry<StreamingHttpClient>,
         WebSocketClientRegistry<WebSocketClient>,
         ProxyHttpClientRegistry<ProxyHttpClient>,
-        ChannelPipelineCustomizer {
+        ChannelPipelineCustomizer,
+        NettyClientCustomizer.Registry {
     private static final Logger LOG = LoggerFactory.getLogger(DefaultNettyHttpClientRegistry.class);
     private final Map<ClientKey, DefaultHttpClient> clients = new ConcurrentHashMap<>(10);
     private final LoadBalancerResolver loadBalancerResolver;
@@ -110,7 +111,9 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     private final List<InvocationInstrumenterFactory> invocationInstrumenterFactories;
     private final EventLoopGroupFactory eventLoopGroupFactory;
     private final HttpClientFilterResolver<ClientFilterResolutionContext> clientFilterResolver;
+    private final JsonMapper jsonMapper;
     private final Collection<ChannelPipelineListener> pipelineListeners = new CopyOnWriteArrayList<>();
+    private final CompositeNettyClientCustomizer clientCustomizer = new CompositeNettyClientCustomizer();
 
     /**
      * Default constructor.
@@ -125,6 +128,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
      * @param eventLoopGroupFactory           The event loop group factory
      * @param beanContext                     The bean context
      * @param invocationInstrumenterFactories The invocation instrumenter factories
+     * @param jsonMapper                      JSON Mapper
      */
     public DefaultNettyHttpClientRegistry(
             HttpClientConfiguration defaultHttpClientConfiguration,
@@ -136,8 +140,8 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             EventLoopGroupRegistry eventLoopGroupRegistry,
             EventLoopGroupFactory eventLoopGroupFactory,
             BeanContext beanContext,
-            List<InvocationInstrumenterFactory> invocationInstrumenterFactories
-    ) {
+            List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
+            JsonMapper jsonMapper) {
         this.clientFilterResolver = httpClientFilterResolver;
         this.defaultHttpClientConfiguration = defaultHttpClientConfiguration;
         this.loadBalancerResolver = loadBalancerResolver;
@@ -148,6 +152,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         this.eventLoopGroupFactory = eventLoopGroupFactory;
         this.eventLoopGroupRegistry = eventLoopGroupRegistry;
         this.invocationInstrumenterFactories = invocationInstrumenterFactories;
+        this.jsonMapper = jsonMapper;
     }
 
     @NonNull
@@ -296,6 +301,12 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         pipelineListeners.add(listener);
     }
 
+    @Override
+    public void register(@NonNull NettyClientCustomizer customizer) {
+        Objects.requireNonNull(customizer, "customizer");
+        clientCustomizer.add(customizer);
+    }
+
     private DefaultHttpClient getClient(ClientKey key, BeanContext beanContext, AnnotationMetadata annotationMetadata) {
         return clients.computeIfAbsent(key, clientKey -> {
             DefaultHttpClient clientBean = null;
@@ -318,7 +329,6 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             }
 
             LoadBalancer loadBalancer = null;
-            List<String> clientIdentifiers = null;
             final HttpClientConfiguration configuration;
             if (configurationClass != null) {
                 configuration = (HttpClientConfiguration) this.beanContext.getBean(configurationClass);
@@ -336,7 +346,6 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 loadBalancer = loadBalancerResolver.resolve(clientId)
                         .orElseThrow(() ->
                                 new HttpClientException("Invalid service reference [" + clientId + "] specified to @Client"));
-                clientIdentifiers = Collections.singletonList(clientId);
             }
 
             String contextPath = null;
@@ -355,7 +364,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                     loadBalancer,
                     clientKey.httpVersion,
                     configuration,
-                    clientIdentifiers,
+                    clientId,
                     contextPath,
                     beanContext,
                     annotationMetadata
@@ -384,7 +393,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             LoadBalancer loadBalancer,
             HttpVersion httpVersion,
             HttpClientConfiguration configuration,
-            List<String> clientIdentifiers,
+            String clientId,
             String contextPath,
             BeanContext beanContext,
             AnnotationMetadata annotationMetadata) {
@@ -397,7 +406,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 contextPath,
                 clientFilterResolver,
                 clientFilterResolver.resolveFilterEntries(new ClientFilterResolutionContext(
-                        clientIdentifiers,
+                        clientId == null ? null : Collections.singletonList(clientId),
                         annotationMetadata
                 )),
                 threadFactory,
@@ -410,7 +419,9 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 eventLoopGroup,
                 resolveSocketChannelFactory(configuration, beanContext),
                 pipelineListeners,
-                invocationInstrumenterFactories
+                clientCustomizer,
+                invocationInstrumenterFactories,
+                clientId
         );
     }
 
@@ -473,7 +484,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 .getAnnotationNamesByStereotype(FilterMatcher.class);
         final Class configurationClass =
                 metadata.classValue(Client.class, "configuration").orElse(null);
-        JsonFeatures jsonFeatures = beanContext.getBean(JsonMapper.class).detectFeatures(metadata).orElse(null);
+        JsonFeatures jsonFeatures = jsonMapper.detectFeatures(metadata).orElse(null);
 
         return new ClientKey(httpVersion, clientId, filterAnnotation, path, configurationClass, jsonFeatures);
     }

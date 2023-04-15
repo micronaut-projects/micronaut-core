@@ -49,10 +49,10 @@ class MessageUtils {
         String ls = CachedEnvironment.getProperty("line.separator");
         StringBuilder builder = new StringBuilder("Error instantiating bean of type  [");
         builder
-            .append(declaringType.getName())
-            .append("]")
-            .append(ls)
-            .append(ls);
+                .append(declaringType.getName())
+                .append("]")
+                .append(ls)
+                .append(ls);
 
         if (message != null) {
             builder.append("Message: ").append(message).append(ls);
@@ -75,6 +75,9 @@ class MessageUtils {
         if (currentSegment instanceof AbstractBeanResolutionContext.FieldSegment) {
             return buildMessageForField(resolutionContext, currentSegment.getDeclaringType(), currentSegment.getName(), message, circular);
         }
+        if (currentSegment instanceof AbstractBeanResolutionContext.AnnotationSegment) {
+            return buildMessage(resolutionContext, currentSegment.getArgument(), message, circular);
+        }
         throw new IllegalStateException("Unknown segment: " + currentSegment);
     }
 
@@ -93,12 +96,12 @@ class MessageUtils {
         StringBuilder builder = new StringBuilder("Failed to inject value for parameter [");
         String ls = CachedEnvironment.getProperty("line.separator");
         builder
-            .append(argument.getName()).append("] of method [")
-            .append(methodName)
-            .append("] of class: ")
-            .append(declaringType.getName())
-            .append(ls)
-            .append(ls);
+                .append(argument.getName()).append("] of method [")
+                .append(methodName)
+                .append("] of class: ")
+                .append(declaringType.getName())
+                .append(ls)
+                .append(ls);
 
         if (message != null) {
             builder.append("Message: ").append(message).append(ls);
@@ -121,10 +124,10 @@ class MessageUtils {
         StringBuilder builder = new StringBuilder("Failed to inject value for field [");
         String ls = CachedEnvironment.getProperty("line.separator");
         builder
-            .append(fieldName).append("] of class: ")
-            .append(declaringType.getName())
-            .append(ls)
-            .append(ls);
+                .append(fieldName).append("] of class: ")
+                .append(declaringType.getName())
+                .append(ls)
+                .append(ls);
 
         if (message != null) {
             builder.append("Message: ").append(message).append(ls);
@@ -147,10 +150,10 @@ class MessageUtils {
         String ls = CachedEnvironment.getProperty("line.separator");
         BeanResolutionContext.Path path = resolutionContext.getPath();
         builder
-            .append(argument.getName()).append("] of class: ")
-            .append(path.peek().getDeclaringType().getName())
-            .append(ls)
-            .append(ls);
+                .append(argument.getName()).append("] of class: ")
+                .append(path.peek().getDeclaringType().getName())
+                .append(ls)
+                .append(ls);
         if (message != null) {
             builder.append("Message: ").append(message).append(ls);
         }

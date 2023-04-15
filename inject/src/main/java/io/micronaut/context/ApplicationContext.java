@@ -33,10 +33,10 @@ import java.util.function.Consumer;
 /**
  * <p>An application context extends a {@link BeanContext} and adds the concepts of configuration, environments and
  *   runtimes.</p>
- * <p>
+ *
  * <p>The {@link ApplicationContext} is the main entry point for starting and running Micronaut applications. It
  * can be thought of as a container object for all dependency injected objects.</p>
- * <p>
+ *
  * <p>The {@link ApplicationContext} can be started via the {@link #run()} method. For example:</p>
  *
  * <pre class="code">
@@ -256,7 +256,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      */
     static @NonNull ApplicationContextBuilder builder(@NonNull String... environments) {
         ArgumentUtils.requireNonNull("environments", environments);
-        return new DefaultApplicationContextBuilder()
+        return builder()
                 .environments(environments);
     }
 
@@ -270,7 +270,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
     static @NonNull ApplicationContextBuilder builder(@NonNull Map<String, Object> properties, @NonNull String... environments) {
         ArgumentUtils.requireNonNull("environments", environments);
         ArgumentUtils.requireNonNull("properties", properties);
-        return new DefaultApplicationContextBuilder()
+        return builder()
                 .properties(properties)
                 .environments(environments);
     }
@@ -282,6 +282,14 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      */
     static @NonNull ApplicationContextBuilder builder() {
         return new DefaultApplicationContextBuilder();
+    }
+
+    /**
+     * @param classLoader The class loader to use
+     * @return The application context builder
+     */
+    static @NonNull ApplicationContextBuilder builder(ClassLoader classLoader) {
+        return new DefaultApplicationContextBuilder(classLoader);
     }
 
     /**
@@ -308,8 +316,8 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
         ArgumentUtils.requireNonNull("environments", environments);
         ArgumentUtils.requireNonNull("classLoader", classLoader);
 
-        return builder(environments)
-                .classLoader(classLoader);
+        return builder(classLoader)
+            .environments(environments);
     }
 
     /**

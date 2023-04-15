@@ -23,7 +23,7 @@ import java.io.OutputStream;
 /**
  * <p>Represents a part of a {@link io.micronaut.http.MediaType#MULTIPART_FORM_DATA} request.</p>
  *
- * <p>The <tt>StreamingFileUpload</tt> may be incomplete when first received, in which case the consumer can subscribe
+ * <p>The {@code StreamingFileUpload} may be incomplete when first received, in which case the consumer can subscribe
  * to the file upload to process the data a chunk at a time.</p>
  *
  * <p>The {@link #transferTo(String)} method can be used whether the upload is complete or not. If it is not complete
@@ -44,9 +44,11 @@ public interface StreamingFileUpload extends FileUpload, Publisher<PartData> {
      * <p>This method will return a no-op {@link Publisher} if called multiple times for the same location</p>
      *
      * @param location the name of the file to which the stream will be written. The file is created relative to
-     *                 the location as specified in the <tt>MultipartConfiguration</tt>
+     *                 the location as specified in the {@code MultipartConfiguration}
      * @return A {@link Publisher} that outputs whether the transfer was successful
+     * @deprecated Use {@link #transferTo(File)} or {@link #transferTo(OutputStream)} instead.
      */
+    @Deprecated
     Publisher<Boolean> transferTo(String location);
 
     /**

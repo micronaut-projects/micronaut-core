@@ -34,6 +34,8 @@ import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
 import jakarta.inject.Singleton;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
@@ -52,6 +54,7 @@ import java.util.Optional;
 @Internal
 @BootstrapContextCompatible
 public class NettyClientSslBuilder extends SslBuilder<SslContext> {
+    private static final Logger LOG = LoggerFactory.getLogger(NettyClientSslBuilder.class);
 
     /**
      * @param resourceResolver The resource resolver
@@ -131,6 +134,9 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> {
                 return super.getTrustManagerFactory(ssl);
             } else {
                 if (ssl instanceof AbstractClientSslConfiguration && ((AbstractClientSslConfiguration) ssl).isInsecureTrustAllCertificates()) {
+                    if (LOG.isWarnEnabled()) {
+                        LOG.warn("HTTP Client is configured to trust all certificates ('insecure-trust-all-certificates' is set to true). Trusting all certificates is not secure and should not be used in production.");
+                    }
                     return InsecureTrustManagerFactory.INSTANCE;
                 } else {
                     // netty will use the JDK trust store

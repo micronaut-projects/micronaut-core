@@ -202,7 +202,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * <p>For example consider the following annotation definition:</p>
      *
      * <pre class="code">
-     * &#064;PropertySource({ @Property(name="one",value="1"), @Property(name="two", value="2")})
+     * &#064;PropertySource({ @Property(name = "one", value = "1"), @Property(name = "two", value = "2")})
      * public class MyBean {
      *        ...
      * }</pre>
@@ -1092,7 +1092,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The result
      * @throws IllegalStateException If no member is available that conforms to the given name and type
      */
-    public final @NonNull
+    public @NonNull
     <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member, Class<T> type) {
         ArgumentUtils.requireNonNull("type", type);
         String typeName = type.getName();
@@ -1131,7 +1131,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @throws IllegalStateException If no member is available that conforms to the given name and type
      */
     @SuppressWarnings("unchecked")
-    public final @NonNull
+    public @NonNull
     <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member) {
         ArgumentUtils.requireNonNull("member", member);
         Object v = values.get(member);
@@ -1161,7 +1161,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @throws IllegalStateException If no member is available that conforms to the given name and type
      */
     public @NonNull
-    final <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(String member, Class<T> type) {
+    <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(String member, Class<T> type) {
         ArgumentUtils.requireNonNull("type", type);
         String typeName = type.getName();
 
@@ -1169,7 +1169,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         Object v = values.get(member);
         if (v instanceof AnnotationValue) {
             final AnnotationValue<T> av = (AnnotationValue<T>) v;
-            if (av.getAnnotationName().equals(type)) {
+            if (av.getAnnotationName().equals(typeName)) {
                 return Optional.of(av);
             }
             return Optional.empty();
@@ -1196,7 +1196,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @since 3.3.0
      */
     public @NonNull
-    final <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(@NonNull String member) {
+    <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(@NonNull String member) {
         ArgumentUtils.requireNonNull("member", member);
         Object v = values.get(member);
         if (v instanceof AnnotationValue) {

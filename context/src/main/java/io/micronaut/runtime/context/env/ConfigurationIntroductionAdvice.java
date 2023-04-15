@@ -30,6 +30,7 @@ import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.value.PropertyNotFoundException;
+import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.Optional;
 
@@ -71,8 +72,10 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
         final ReturnType<Object> rt = context.getReturnType();
         final Class<Object> returnType = rt.getType();
         if (context.isTrue(ConfigurationAdvice.class, MEMBER_BEAN)) {
+            final Qualifier<Object> qualifier = name != null ? Qualifiers.byName(name) : null;
+
             if (context.isNullable()) {
-                final Object v = beanContext.findBean(returnType).orElse(null);
+                final Object v = beanContext.findBean(returnType, qualifier).orElse(null);
                 if (v != null) {
                     return environment.convertRequired(v, returnType);
                 } else {
@@ -80,7 +83,7 @@ public class ConfigurationIntroductionAdvice implements MethodInterceptor<Object
                 }
             } else {
                 return environment.convertRequired(
-                        beanContext.getBean(returnType),
+                        beanContext.getBean(returnType, qualifier),
                         returnType
                 );
             }

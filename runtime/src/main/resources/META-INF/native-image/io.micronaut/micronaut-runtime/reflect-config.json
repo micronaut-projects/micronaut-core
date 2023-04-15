@@ -1,0 +1,180 @@
+[
+    {
+        "name":  "org.slf4j.impl.StaticLoggerBinder",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.pattern.DateConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.pattern.MessageConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.pattern.ThrowableProxyConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.pattern.NopThrowableInformationConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.pattern.ContextNameConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.core.pattern.color.BoldYellowCompositeConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.pattern.LoggerConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.core.pattern.ReplacingCompositeConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.core.pattern.color.BoldBlueCompositeConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.core.pattern.color.CyanCompositeConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.core.pattern.color.RedCompositeConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.core.pattern.color.WhiteCompositeConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.pattern.PropertyConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.pattern.ExtendedThrowableProxyConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.pattern.RootCauseFirstThrowableProxyConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.pattern.MethodOfCallerConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.pattern.LevelConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.core.pattern.IdentityCompositeConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.core.pattern.color.BoldWhiteCompositeConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.pattern.MarkerConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.core.pattern.color.BoldCyanCompositeConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.core.pattern.color.BoldMagentaCompositeConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.pattern.RelativeTimeConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.core.pattern.color.MagentaCompositeConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.pattern.ClassOfCallerConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.pattern.LineOfCallerConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.pattern.FileOfCallerConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.core.pattern.color.BoldGreenCompositeConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.pattern.LocalSequenceNumberConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.core.pattern.color.YellowCompositeConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.pattern.ExtendedThrowableProxyConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.pattern.color.HighlightingCompositeConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.core.pattern.color.GrayCompositeConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.pattern.MDCConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.pattern.ClassOfCallerConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.core.pattern.color.BoldRedCompositeConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.core.pattern.color.GreenCompositeConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.core.pattern.color.BlackCompositeConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.pattern.ThreadConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.pattern.LineSeparatorConverter",
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.classic.encoder.PatternLayoutEncoder",
+        "allPublicMethods":true,
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "ch.qos.logback.core.ConsoleAppender",
+        "allPublicMethods":true,
+        "allDeclaredConstructors": true
+    },
+    {
+        "name": "com.sun.org.apache.xerces.internal.jaxp.SAXParserFactoryImpl",
+        "allDeclaredConstructors": true
+    }
+]

@@ -17,6 +17,7 @@ package io.micronaut.http.server.exceptions.response;
 
 import io.micronaut.context.annotation.Secondary;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.http.HttpMethod;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.hateoas.JsonError;
@@ -49,8 +50,11 @@ public class HateoasErrorResponseProcessor implements ErrorResponseProcessor<Jso
      * Constructor for binary compatibility. Equivalent to
      * {@link HateoasErrorResponseProcessor#HateoasErrorResponseProcessor(JsonConfiguration)}
      *
+     * @deprecated Use {@link HateoasErrorResponseProcessor#HateoasErrorResponseProcessor(JsonConfiguration)} instead.
      * @param jacksonConfiguration the configuration to use for processing.
+     * @deprecated Use {@link HateoasErrorResponseProcessor(JsonConfiguration)}
      */
+    @Deprecated
     public HateoasErrorResponseProcessor(JacksonConfiguration jacksonConfiguration) {
         this((JsonConfiguration) jacksonConfiguration);
     }
@@ -58,6 +62,14 @@ public class HateoasErrorResponseProcessor implements ErrorResponseProcessor<Jso
     @Override
     @NonNull
     public MutableHttpResponse<JsonError> processResponse(@NonNull ErrorContext errorContext, @NonNull MutableHttpResponse<?> response) {
+        return getJsonErrorMutableHttpResponse(alwaysSerializeErrorsAsList, errorContext, response);
+    }
+
+    @NonNull
+    static MutableHttpResponse<JsonError> getJsonErrorMutableHttpResponse(boolean alwaysSerializeErrorsAsList, ErrorContext errorContext, MutableHttpResponse<?> response) {
+        if (errorContext.getRequest().getMethod() == HttpMethod.HEAD) {
+            return (MutableHttpResponse<JsonError>) response;
+        }
         JsonError error;
         if (!errorContext.hasErrors()) {
             error = new JsonError(response.getStatus().getReason());

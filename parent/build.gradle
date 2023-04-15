@@ -1,3 +1,27 @@
+import io.micronaut.build.internal.WriteMicronautVersionInfoTask
+
+apply plugin:'base'
+
+configurations {
+    bomVersions
+}
+
+repositories {
+    mavenCentral()
+}
+
+// Include any of our boms that hava required properties
+dependencies {
+    bomVersions(libs.boms.micronaut.grpc)
+    bomVersions(libs.boms.micronaut.picocli)
+}
+
+def micronautVersionInfo = tasks.register("micronautVersionInfo", WriteMicronautVersionInfoTask) {
+    version = projectVersion
+    dependencies.set(configurations.bomVersions.getAllDependencies().collect { "$it.group:$it.name:$it.version" })
+    outputDirectory = layout.buildDirectory.dir("version-info")
+}
+
 group projectGroupId
 version projectVersion
 
@@ -24,14 +48,25 @@ ext.extraPomInfo = {
 
         'azure-functions-maven-plugin.version'('1.5.0')
         'exec-maven-plugin.version'('1.6.0')
-        'function-maven-plugin.version'('0.9.4')
-        'jib-maven-plugin.version'('3.1.4')
-        'maven-compiler-plugin.version'('3.8.1') // Override actual Maven compiler version (3.1) because some bugs cause annotation processors doesn't work well
+        'function-maven-plugin.version'('0.9.8')
+        'jib-maven-plugin.version'('3.3.1')
+        'maven-compiler-plugin.version'('3.10.1') // Override actual Maven compiler version (3.1) because some bugs cause annotation processors doesn't work well
+        'maven-deploy-plugin.version'('3.0.0')
         'maven-failsafe-plugin.version'('2.22.2') // Override actual Maven surefire and failsafe version (2.12) to get native support for executing tests on the JUnit Platform (JUnit 5)
+        'maven-install-plugin.version'('3.1.0')
+        'maven-jar-plugin.version'('3.2.2')
         'maven-resources-plugin.version'('3.2.0')
         'maven-shade-plugin.version'('3.2.4')
         'maven-surefire-plugin.version'('2.22.2') // Override actual Maven surefire and failsafe version (2.12) to get native support for executing tests on the JUnit Platform (JUnit 5)
         'protoc-jar-maven-plugin.version'('3.11.4')
+        // inject the properties from the required boms
+        micronautVersionInfo.flatMap { it.outputDirectory.file(WriteMicronautVersionInfoTask.MICRONAUT_VERSIONS_PROPERTIES_FILE_NAME) }
+                .get()
+                .asFile
+                .text
+                .readLines()*.split('=', 2).each {
+            "${it[0]}"(it[1])
+        }
     }
     delegate.profiles {
         delegate.profile {
@@ -148,6 +183,21 @@ ext.extraPomInfo = {
 
                 delegate.plugin {
                     groupId "org.apache.maven.plugins"
+                    artifactId "maven-deploy-plugin"
+                    delegate.version '${maven-deploy-plugin.version}'
+                }
+                delegate.plugin {
+                    groupId "org.apache.maven.plugins"
+                    artifactId "maven-install-plugin"
+                    delegate.version '${maven-install-plugin.version}'
+                }
+                delegate.plugin {
+                    groupId "org.apache.maven.plugins"
+                    artifactId "maven-jar-plugin"
+                    delegate.version '${maven-jar-plugin.version}'
+                }
+                delegate.plugin {
+                    groupId "org.apache.maven.plugins"
                     artifactId "maven-resources-plugin"
                     delegate.version '${maven-resources-plugin.version}'
                 }
@@ -203,6 +253,17 @@ ext.extraPomInfo = {
                                     }
                                     transformer(implementation:'org.apache.maven.plugins.shade.resource.ServicesResourceTransformer')
                                 }
+                                filters{
+                                    filter {
+                                        artifact '*.*'
+                                        excludes {
+                                            exclude "META-INF/*.SF"
+                                            exclude "META-INF/*.DSA"
+                                            exclude "META-INF/*.RSA"
+                                            exclude "module-info.class"
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -217,7 +278,9 @@ ext.extraPomInfo = {
                         mainClass '${exec.mainClass}'
                         buildArgs {
                             buildArg '--no-fallback'
-                            buildArg '-cp ${project.build.directory}/${project.artifactId}-${project.version}.jar'
+                        }
+                        environment {
+                            USE_NATIVE_IMAGE_JAVA_PLATFORM_MODULE_SYSTEM(false)
                         }
                     }
                 }
@@ -249,3 +312,9 @@ ext.extraPomInfo = {
 }
 
 apply plugin: "io.micronaut.build.internal.publishing"
+
+afterEvaluate {
+    tasks.named("generatePomFileForMavenPublication", GenerateMavenPom).configure {
+        dependsOn micronautVersionInfo
+    }
+}

@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty;
 import java.util.Collections;
 import java.util.Set;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.runtime.context.scope.refresh.RefreshEventListener;
@@ -34,7 +35,8 @@ public interface NettyEmbeddedServer
         extends EmbeddedServer,
                 WebSocketSessionRepository,
                 ChannelPipelineCustomizer,
-                RefreshEventListener {
+                RefreshEventListener,
+                NettyServerCustomizer.Registry {
     /**
      * Gets the set of all ports this Netty server is bound to.
      * @return An immutable set of bound ports if the server has been started with {@link #start()} an empty set otherwise.
@@ -44,12 +46,29 @@ public interface NettyEmbeddedServer
     }
 
     @Override
+    @NonNull
     default NettyEmbeddedServer start() {
         return (NettyEmbeddedServer) EmbeddedServer.super.start();
     }
 
     @Override
+    @NonNull
     default NettyEmbeddedServer stop() {
         return (NettyEmbeddedServer) EmbeddedServer.super.stop();
+    }
+
+    /**
+     * Stops the Netty instance, but keeps the ApplicationContext running.
+     * This for CRaC checkpointing purposes.
+     *
+     * @return The stopped NettyEmbeddedServer
+     */
+    @SuppressWarnings("unused") // Used by CRaC
+    @NonNull
+    NettyEmbeddedServer stopServerOnly();
+
+    @Override
+    default void register(@NonNull NettyServerCustomizer customizer) {
+        throw new UnsupportedOperationException();
     }
 }

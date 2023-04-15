@@ -4,7 +4,7 @@ introduction:
   upgrading: Upgrading to Micronaut 3.x
 quickStart:
   title: Quick Start
-  buildCLI: Build/Install the CLI
+  buildCLI: Install the CLI
   creatingServer: Creating a Server Application
   ideSetup:
     title: Setting up an IDE
@@ -39,6 +39,7 @@ ioc:
   beanValidation: Bean Validation
   annotationMetadata: Bean Annotation Metadata
   beanImport: Importing Beans from Libraries
+  nullabilityAnnotations: Nullability Annotations
   springBeans: Micronaut Beans And Spring
   android: Android Support
 config:
@@ -90,7 +91,9 @@ httpServer:
     bodyAnnotation: Using the @Body Annotation
     reactiveResponses: Reactive Responses
   jsonBinding: JSON Binding with Jackson
-  datavalidation: Data Validation
+  datavalidation:
+    title: Data Validation
+    validationGroups: Validation Groups
   staticResources: Serving Static Resources
   errorHandling:
     title: Error Handling
@@ -118,9 +121,24 @@ httpServer:
   serverEvents: Server Events
   serverConfiguration:
     title: Configuring the HTTP Server
-    threadPools: Configuring Server Thread Pools
-    nettyPipeline: Configuring the Netty Pipeline
-    cors: Configuring CORS
+    threadPools:
+      title: Configuring Server Thread Pools
+      blockingOperations: Blocking Operations
+      atBlocking: '@Blocking'
+    nettyClientPipeline: Configuring the Netty Client Pipeline
+    nettyServerPipeline: Configuring the Netty Server Pipeline
+    listener: Advanced Listener Configuration
+    cors:
+      title: Configuring CORS
+      annotationBasedCors: Annotation-based CORS Configuration
+      corsConfiguration: CORS via Configuration
+      corsAllowedOrigins: Allowed Origins
+      corsAllowedMethods: Allowed Methods
+      corsAllowedHeaders: Allowed Headers
+      corsExposedHeaders: Exposed Headers
+      corsAllowCredentials: Allow Credentials
+      corsMaxAge: Max Age
+      corsMultipleHeaderValues: Multiple Header Values
     https: Securing the Server with HTTPS
     dualProtocol: Enabling HTTP and HTTPS
     accessLogger: Enabling Access Logger
@@ -282,8 +300,18 @@ cli:
 i18n:
   title: Internationalization
   bundle: Resource Bundles
+  localizedMessageSource: Localized Message Source
 appendix:
   title: Appendices
+  architecture:
+    title: Micronaut Architecture
+    compilerArch: Compiler
+    annotationArch: Annotation Metadata
+    introspectionArch: Bean Introspections
+    iocArch: Bean Definitions
+    aopArch: AOP Proxies
+    containerArch: Application Context
+    httpServerArch: HTTP Server
   faq: Frequently Asked Questions (FAQ)
   usingsnapshots: Using Snapshots
   problems: Common Problems

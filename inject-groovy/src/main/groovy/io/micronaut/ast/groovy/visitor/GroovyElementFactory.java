@@ -194,6 +194,20 @@ public class GroovyElementFactory implements ElementFactory<AnnotatedNode, Class
         );
     }
 
+    @Override
+    public EnumConstantElement newEnumConstantElement(ClassElement declaringClass, FieldNode enumConstant, AnnotationMetadata annotationMetadata) {
+        if (!(declaringClass instanceof GroovyClassElement)) {
+            throw new IllegalArgumentException("Declaring class must be a GroovyEnumElement");
+        }
+        return new GroovyEnumConstantElement(
+                (GroovyClassElement) declaringClass,
+                visitorContext,
+                enumConstant,
+                enumConstant,
+                annotationMetadata
+        );
+    }
+
     @NonNull
     @Override
     public FieldElement newFieldElement(ClassElement declaringClass, @NonNull FieldNode field, @NonNull AnnotationMetadata annotationMetadata) {

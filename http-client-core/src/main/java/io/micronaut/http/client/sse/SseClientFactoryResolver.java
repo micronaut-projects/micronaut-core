@@ -29,7 +29,7 @@ import java.util.ServiceLoader;
 @Internal
 final class SseClientFactoryResolver {
 
-    private static SseClientFactory factory;
+    private static volatile SseClientFactory factory;
 
     static SseClientFactory getFactory() {
         if (factory == null) {

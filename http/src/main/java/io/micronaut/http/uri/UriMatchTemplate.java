@@ -417,6 +417,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
                         .append(String.valueOf(operator))
                         .append(operatorQuantifier);
                     operatorAppended = true;
+                    // fall through
                 case '+':
                 case '0': // no active operator
                     if (!operatorAppended) {

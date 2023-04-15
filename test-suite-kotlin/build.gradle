@@ -1,6 +1,15 @@
 plugins {
+    id "io.micronaut.build.internal.convention-test-library"
     id "org.jetbrains.kotlin.jvm"
     id "org.jetbrains.kotlin.kapt"
+}
+
+micronautBuild {
+    core {
+        usesMicronautTestJunit()
+        usesMicronautTestSpock()
+        usesMicronautTestKotest()
+    }
 }
 
 dependencies {
@@ -19,6 +28,7 @@ dependencies {
     testImplementation libs.kotlinx.coroutines.rx2
     testImplementation libs.kotlinx.coroutines.slf4j
     testImplementation libs.kotlinx.coroutines.reactor
+    testImplementation libs.kotlinx.coroutines.reactive
 
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation libs.junit.jupiter.api
@@ -32,14 +42,7 @@ dependencies {
     testImplementation project(":http-client")
     testImplementation project(":session")
     testImplementation libs.managed.groovy.templates
-    testImplementation(libs.managed.micronaut.test.junit5) {
-        exclude module:'micronaut-runtime'
-        exclude module:'micronaut-inject'
-    }
-    testImplementation(libs.managed.micronaut.test.kotest) {
-        exclude module:'micronaut-runtime'
-        exclude module:'micronaut-inject'
-    }
+
     testImplementation project(":function-client")
     testImplementation project(":function-web")
     testImplementation libs.kotlin.kotest.junit5
@@ -47,7 +50,8 @@ dependencies {
     kaptTest project(':inject-java')
     kaptTest project(':validation')
     testImplementation libs.javax.inject
-    testImplementation(libs.managed.micronaut.tracing.zipkin) {
+    testImplementation(platform(libs.boms.micronaut.tracing))
+    testImplementation(libs.micronaut.tracing.zipkin) {
         exclude module: 'micronaut-bom'
         exclude module: 'micronaut-http-client'
         exclude module: 'micronaut-inject'
@@ -55,6 +59,7 @@ dependencies {
     }
 
     testRuntimeOnly libs.junit.jupiter.engine
+    testRuntimeOnly(platform(libs.boms.micronaut.aws))
     testRuntimeOnly libs.aws.java.sdk.lambda
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
         testImplementation libs.bcpkix
@@ -63,10 +68,27 @@ dependencies {
     testImplementation libs.managed.reactor
 }
 
+configurations.testRuntimeClasspath {
+    resolutionStrategy.eachDependency {
+        if (it.requested.group == 'org.jetbrains.kotlin') {
+            it.useVersion(libs.versions.managed.kotlin.asProvider().get())
+        }
+    }
+}
+
 tasks.named("compileTestKotlin") {
     kotlinOptions.jvmTarget = "1.8"
 }
 
 tasks.named("test") {
     useJUnitPlatform()
+}
+
+tasks.withType(Test).configureEach {
+    distribution {
+        enabled = false
+    }
+    predictiveSelection {
+        enabled = false
+    }
 }

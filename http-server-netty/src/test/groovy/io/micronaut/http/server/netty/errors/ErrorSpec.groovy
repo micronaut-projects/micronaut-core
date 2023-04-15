@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.errors
 
 import groovy.json.JsonSlurper
 import io.micronaut.context.annotation.Property
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.*
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
@@ -28,12 +29,31 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.hateoas.JsonError
 import io.micronaut.http.server.exceptions.ExceptionHandler
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import io.netty.bootstrap.Bootstrap
+import io.netty.buffer.ByteBuf
+import io.netty.buffer.CompositeByteBuf
+import io.netty.buffer.Unpooled
+import io.netty.channel.Channel
+import io.netty.channel.ChannelHandlerContext
+import io.netty.channel.ChannelInboundHandlerAdapter
+import io.netty.channel.ChannelInitializer
+import io.netty.channel.nio.NioEventLoopGroup
+import io.netty.channel.socket.nio.NioSocketChannel
+import io.netty.handler.codec.http.FullHttpResponse
+import io.netty.handler.codec.http.HttpClientCodec
+import io.netty.handler.codec.http.HttpObjectAggregator
+import io.netty.handler.codec.http.HttpResponseDecoder
 import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import io.micronaut.core.async.annotation.SingleResult
 import spock.lang.Issue
+import spock.lang.PendingFeature
+import spock.lang.Timeout
+
+import java.nio.charset.StandardCharsets
+import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Tests for different kinds of errors and the expected responses
@@ -177,6 +197,59 @@ class ErrorSpec extends AbstractMicronautSpec {
         response.getBody(String).get() == '<div>Error</div>'
     }
 
+    void "test encoding error"() {
+        given:
+        HttpResponse response = Flux.from(rxClient.exchange(
+                HttpRequest.GET('/errors/encoding-error')
+        )).onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
+
+        expect:
+        response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
+        response.getBody(Map).get()._embedded.errors[0].message.contains('foo')
+    }
+
+    @PendingFeature
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/7786')
+    void "test encoding error with handler"() {
+        given:
+        HttpResponse response = Flux.from(rxClient.exchange(
+                HttpRequest.GET('/errors/encoding-error/handled')
+        )).onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
+
+        expect:
+        response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
+        response.getBody(Map).get()._embedded.errors[0].message.contains('Server error')
+    }
+
+    void "test encoding error with handler loop"() {
+        given:
+        HttpResponse response = Flux.from(rxClient.exchange(
+                HttpRequest.GET('/errors/encoding-error/handled')
+        )).onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
+
+        expect:
+        response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
+        response.getBody(Map).get()._embedded.errors[0].message.contains('foo')
+    }
+
     void "test calling a controller that fails to inject with a local error handler"() {
         given:
         HttpResponse response = Flux.from(rxClient.exchange(
@@ -200,6 +273,52 @@ class ErrorSpec extends AbstractMicronautSpec {
         then:
         def e = thrown HttpClientResponseException
         e.status == HttpStatus.BAD_REQUEST
+    }
+
+    @Timeout(5)
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6925')
+    void "test error for invalid headers with body"() {
+        given:
+        def eventLoopGroup = new NioEventLoopGroup(1)
+        FullHttpResponse response = null
+        Bootstrap bootstrap = new Bootstrap()
+                .group(eventLoopGroup)
+                .channel(NioSocketChannel)
+                .handler(new ChannelInitializer<Channel>() {
+                    @Override
+                    protected void initChannel(@NonNull Channel ch) throws Exception {
+                        ch.pipeline()
+                                .addLast(new HttpResponseDecoder())
+                                .addLast(new HttpObjectAggregator(8192))
+                                .addLast(new ChannelInboundHandlerAdapter() {
+                                    @Override
+                                    void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
+                                        response = msg
+                                    }
+                                })
+                    }
+                })
+                .remoteAddress(embeddedServer.host, embeddedServer.port)
+        def longString = 'a' * 9000
+
+        when:
+        def channel = bootstrap.connect().sync().channel()
+        channel.writeAndFlush(Unpooled.wrappedBuffer("""POST /test HTTP/1.0\r
+Host: localhost\r
+Connection: close\r
+Content-Length: 26\r
+Accept: */*\r
+X-Long-Header: $longString\r
+\r
+{"message":"Hello World!"}""".getBytes(StandardCharsets.UTF_8)))
+        channel.read()
+        channel.closeFuture().await()
+
+        then:
+        response.status().code() == 413
+
+        cleanup:
+        response.release()
     }
 
     @Controller('/errors')
@@ -226,6 +345,11 @@ class ErrorSpec extends AbstractMicronautSpec {
         @Post(value = "/feedBirds", processes = MediaType.APPLICATION_JSON)
         void feedBirds(Flock flock) {
         }
+
+        @Get('/encoding-error')
+        ErrorThrowingBean encodingError() {
+            return new ErrorThrowingBean()
+        }
     }
 
     static class Flock {
@@ -242,6 +366,12 @@ class ErrorSpec extends AbstractMicronautSpec {
         public String getName() { return name; }
 
         public void setName(String name) { this.name = name; }
+    }
+
+    static class ErrorThrowingBean {
+        public String getName() {
+            throw new RuntimeException("foo")
+        }
     }
 
     @Controller('/errors/loop')
@@ -280,6 +410,32 @@ class ErrorSpec extends AbstractMicronautSpec {
         @Error
         HttpResponse<String> error(HttpRequest<?> request, Throwable e) {
             HttpResponse.serverError("Server error")
+        }
+    }
+
+    @Controller('/errors/encoding-error/handled')
+    static class ErrorEncodingHandlerController {
+        @Get
+        ErrorThrowingBean ok() {
+            return new ErrorThrowingBean()
+        }
+
+        @Error
+        HttpResponse<String> error(HttpRequest<?> request, Throwable e) {
+            HttpResponse.serverError("Server error")
+        }
+    }
+
+    @Controller('/errors/encoding-error/handled/loop')
+    static class ErrorEncodingHandlerLoopController {
+        @Get
+        ErrorThrowingBean ok() {
+            return new ErrorThrowingBean()
+        }
+
+        @Error
+        ErrorThrowingBean error(HttpRequest<?> request, Throwable e) {
+            return new ErrorThrowingBean()
         }
     }
 

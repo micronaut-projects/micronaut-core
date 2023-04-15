@@ -18,6 +18,7 @@ package io.micronaut.http.server.codec;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
@@ -53,6 +54,7 @@ import java.util.List;
 @Singleton
 @Internal
 @BootstrapContextCompatible
+@Requires(bean = ByteBufferFactory.class)
 public class TextStreamCodec implements MediaTypeCodec {
 
     public static final String CONFIGURATION_QUALIFIER = "text-stream";
@@ -149,15 +151,15 @@ public class TextStreamCodec implements MediaTypeCodec {
             event = Event.of(object);
         }
         Object data = event.getData();
-        ByteBuffer body;
+        byte[] body;
         if (data instanceof CharSequence) {
-            body = allocator.copiedBuffer(data.toString().getBytes(defaultCharset));
+            body = data.toString().getBytes(defaultCharset);
         } else {
             MediaTypeCodec jsonCodec = resolveMediaTypeCodecRegistry().findCodec(MediaType.APPLICATION_JSON_TYPE)
                 .orElseThrow(() -> new CodecException("No possible JSON encoders found!"));
-            body = jsonCodec.encode(data, allocator);
+            body = jsonCodec.encode(data);
         }
-        ByteBuffer eventData = allocator.buffer(body.readableBytes() + 10);
+        ByteBuffer eventData = allocator.buffer(body.length + 10);
         writeAttribute(eventData, COMMENT_PREFIX, event.getComment());
         writeAttribute(eventData, ID_PREFIX, event.getId());
         writeAttribute(eventData, EVENT_PREFIX, event.getName());
@@ -167,24 +169,28 @@ public class TextStreamCodec implements MediaTypeCodec {
         }
 
         // Write the data
-        int idx = body.indexOf((byte) '\n');
-        while (idx > -1) {
-            int length = idx + 1;
-            byte[] line = new byte[length];
-            body.read(line, 0, length);
-            eventData.write(DATA_PREFIX).write(line);
-            idx = body.indexOf((byte) '\n');
-        }
-        if (body.readableBytes() > 0) {
-            int length = body.readableBytes();
-            byte[] line = new byte[length];
-            body.read(line, 0, length);
-            eventData.write(DATA_PREFIX).write(line);
+        int start = 0;
+        while (start < body.length) {
+            int end = indexOf(body, (byte) '\n', start);
+            if (end == -1) {
+                end = body.length - 1;
+            }
+            eventData.write(DATA_PREFIX).write(body, start, end - start + 1);
+            start = end + 1;
         }
 
         // Write new lines for event separation
         eventData.write(NEWLINE).write(NEWLINE);
         return eventData;
+    }
+
+    private static int indexOf(byte[] haystack, @SuppressWarnings("SameParameterValue") byte needle, int start) {
+        for (int i = start; i < haystack.length; i++) {
+            if (haystack[i] == needle) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private MediaTypeCodecRegistry resolveMediaTypeCodecRegistry() {

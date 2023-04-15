@@ -1,0 +1,283 @@
+[
+
+  {
+    "type": "io.micronaut.ast.groovy.visitor.AbstractGroovyElement",
+    "member": "Class io.micronaut.ast.groovy.visitor.AbstractGroovyElement",
+    "reason": "Add support getDocumentation (groovydoc) for groovy"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.visitor.AbstractGroovyElement",
+    "member": "Constructor io.micronaut.ast.groovy.visitor.AbstractGroovyElement(io.micronaut.ast.groovy.visitor.GroovyVisitorContext,org.codehaus.groovy.ast.AnnotatedNode,io.micronaut.core.annotation.AnnotationMetadata)",
+    "reason": "Add support getDocumentation (groovydoc) for groovy"
+  },
+  {
+    "type": "io.micronaut.scheduling.TaskScheduler",
+    "member": "Class io.micronaut.scheduling.TaskScheduler",
+    "reason": "Added default methods"
+  },
+  {
+      "type": "io.micronaut.inject.ast.EnumElement",
+      "member": "Class io.micronaut.inject.ast.EnumElement",
+      "reason": "Added EnumConstantElement. Added EnumElement.elements() method to collect enum constant elements"
+  },
+  {
+      "type": "io.micronaut.inject.ast.EnumElement",
+      "member": "Method io.micronaut.inject.ast.EnumElement.elements()",
+      "reason": "Added EnumConstantElement. Added EnumElement.elements() method to collect enum constant elements"
+  },
+  {
+      "type": "io.micronaut.inject.visitor.TypeElementVisitor",
+      "member": "Class io.micronaut.inject.visitor.TypeElementVisitor",
+      "reason": "Added EnumConstantElement. Added EnumElement.elements() method to collect enum constant elements"
+  },
+  {
+      "type": "io.micronaut.inject.visitor.TypeElementVisitor",
+      "member": "Method io.micronaut.inject.visitor.TypeElementVisitor.visitEnumConstant(io.micronaut.inject.ast.EnumConstantElement,io.micronaut.inject.visitor.VisitorContext)",
+      "reason": "Added EnumConstantElement. Added EnumElement.elements() method to collect enum constant elements"
+  },  
+  {
+    "type": "io.micronaut.scheduling.TaskScheduler",
+    "member": "Method io.micronaut.scheduling.TaskScheduler.schedule(java.lang.String,java.lang.String,java.lang.Runnable)",
+    "reason": "Added default methods"
+  },
+  {
+    "type": "io.micronaut.scheduling.TaskScheduler",
+    "member": "Method io.micronaut.scheduling.TaskScheduler.schedule(java.lang.String,java.lang.String,java.util.concurrent.Callable)",
+    "reason": "Added default methods"
+  },
+  {
+    "type": "io.micronaut.core.annotation.AnnotationMetadata",
+    "member": "Method io.micronaut.core.annotation.AnnotationMetadata.getStereotypeAnnotationNames()",
+    "reason": "AnnotationMetadata is an internally implemented data structure and not designed to be implemented by consumers of the framework."
+  },
+  {
+    "type": "io.micronaut.core.annotation.AnnotationMetadata",
+    "member": "Method io.micronaut.core.annotation.AnnotationMetadata.getDeclaredStereotypeAnnotationNames()",
+    "reason": "AnnotationMetadata is an internally implemented data structure and not designed to be implemented by consumers of the framework."
+  },
+  {
+    "type": "io.micronaut.core.annotation.AnnotationMetadata",
+    "member": "Class io.micronaut.core.annotation.AnnotationMetadata",
+    "reason": "AnnotationMetadata is an internally implemented data structure and not designed to be implemented by consumers of the framework."
+  },
+  {
+    "type": "io.micronaut.inject.writer.ClassWriterOutputVisitor",
+    "member": "Class io.micronaut.inject.writer.ClassWriterOutputVisitor",
+    "reason": "Classes in the io.micronaut.inject.writer package are considered non-public implementation detail"
+  },
+  {
+    "type": "io.micronaut.inject.writer.ClassWriterOutputVisitor",
+    "member": "Method io.micronaut.inject.writer.ClassWriterOutputVisitor.visitServiceDescriptor(java.lang.Class,java.lang.String,io.micronaut.inject.ast.Element)",
+    "reason": "Classes in the io.micronaut.inject.writer package are considered non-public implementation detail"
+  },
+  {
+    "type": "io.micronaut.graal.reflect.GraalTypeElementVisitor",
+    "member": "Class io.micronaut.graal.reflect.GraalTypeElementVisitor",
+    "reason": "The Graal visitor is internal to the compiler and implementation detail not part of the public API"
+  },
+  {
+    "type": "io.micronaut.graal.reflect.GraalTypeElementVisitor",
+    "member": "Field originatingElements",
+    "reason": "The Graal visitor is internal to the compiler and implementation detail not part of the public API"
+  },
+  {
+    "type": "io.micronaut.graal.reflect.GraalTypeElementVisitor",
+    "member": "Field classes",
+    "reason": "The Graal visitor is internal to the compiler and implementation detail not part of the public API"
+  },
+  {
+    "type": "io.micronaut.graal.reflect.GraalTypeElementVisitor",
+    "member": "Field packages",
+    "reason": "The Graal visitor is internal to the compiler and implementation detail not part of the public API"
+  },
+  {
+    "type": "io.micronaut.graal.reflect.GraalTypeElementVisitor",
+    "member": "Field arrays",
+    "reason": "The Graal visitor is internal to the compiler and implementation detail not part of the public API"
+  },
+  {
+    "type": "io.micronaut.graal.reflect.GraalTypeElementVisitor",
+    "member": "Method io.micronaut.graal.reflect.GraalTypeElementVisitor.visitConstructor(io.micronaut.inject.ast.ConstructorElement,io.micronaut.inject.visitor.VisitorContext)",
+    "reason": "The Graal visitor is internal to the compiler and implementation detail not part of the public API"
+  },
+  {
+    "type": "io.micronaut.graal.reflect.GraalTypeElementVisitor",
+    "member": "Method io.micronaut.graal.reflect.GraalTypeElementVisitor.visitField(io.micronaut.inject.ast.FieldElement,io.micronaut.inject.visitor.VisitorContext)",
+    "reason": "The Graal visitor is internal to the compiler and implementation detail not part of the public API"
+  },
+  {
+    "type": "io.micronaut.graal.reflect.GraalTypeElementVisitor",
+    "member": "Method io.micronaut.graal.reflect.GraalTypeElementVisitor.visitMethod(io.micronaut.inject.ast.MethodElement,io.micronaut.inject.visitor.VisitorContext)",
+    "reason": "The Graal visitor is internal to the compiler and implementation detail not part of the public API"
+  },
+  {
+    "type": "io.micronaut.http.netty.channel.EventLoopGroupFactory",
+    "member": "Class io.micronaut.http.netty.channel.EventLoopGroupFactory",
+    "reason": "Added default methods"
+  },
+  {
+    "type": "io.micronaut.http.netty.channel.EventLoopGroupFactory",
+    "member": "Method io.micronaut.http.netty.channel.EventLoopGroupFactory.domainServerSocketChannelClass()",
+    "reason": "Added default methods"
+  },
+  {
+    "type": "io.micronaut.http.netty.channel.EventLoopGroupFactory",
+    "member": "Method io.micronaut.http.netty.channel.EventLoopGroupFactory.domainServerSocketChannelClass(io.micronaut.http.netty.channel.EventLoopGroupConfiguration)",
+    "reason": "Added default methods"
+  },
+  {
+    "type": "io.micronaut.http.netty.channel.EventLoopGroupFactory",
+    "member": "Method io.micronaut.http.netty.channel.EventLoopGroupFactory.domainServerSocketChannelInstance(io.micronaut.http.netty.channel.EventLoopGroupConfiguration)",
+    "reason": "Added default methods"
+  },
+  {
+    "type": "io.micronaut.aop.InterceptedProxy",
+    "member": "Class io.micronaut.aop.InterceptedProxy",
+    "reason": "Class now extends similar interface from the Inject module allowing to detect intercepted proxies"
+  },
+  {
+    "type": "io.micronaut.aop.InterceptedProxy",
+    "member": "Method io.micronaut.aop.InterceptedProxy.hasCachedInterceptedTarget()",
+    "reason": "New default method introduced to detect cached target, the interface is only implemented by the class generation"
+  },
+  {
+    "type": "io.micronaut.context.BeanDefinitionRegistry",
+    "member": "Class io.micronaut.context.BeanDefinitionRegistry",
+    "reason": "Added a new method"
+  },
+  {
+    "type": "io.micronaut.context.BeanDefinitionRegistry",
+    "member": "Method io.micronaut.context.BeanDefinitionRegistry.findProxyTargetBeanDefinition(io.micronaut.inject.BeanDefinition)",
+    "reason": "New method introduced"
+  },
+  {
+    "type": "io.micronaut.context.scope.CustomScope",
+    "member": "Class io.micronaut.context.scope.CustomScope",
+    "reason": "Added a new method"
+  },
+  {
+    "type": "io.micronaut.context.scope.CustomScope",
+    "member": "Method io.micronaut.context.scope.CustomScope.findBeanRegistration(io.micronaut.inject.BeanDefinition)",
+    "reason": "New method added with a default implementation"
+  },
+  {
+    "type": "io.micronaut.http.client.ProxyHttpClient",
+    "member": "Class io.micronaut.http.client.ProxyHttpClient",
+    "reason": "New method added with a default implementation"
+  },
+  {
+    "type": "io.micronaut.http.client.ProxyHttpClient",
+    "member": "Method io.micronaut.http.client.ProxyHttpClient.proxy(io.micronaut.http.HttpRequest,io.micronaut.http.client.ProxyRequestOptions)",
+    "reason": "New method added with a default implementation"
+  },
+  {
+    "type": "io.micronaut.context.annotation.Replaces",
+    "member": "Class io.micronaut.context.annotation.Replaces",
+    "reason": "Improvement of the API"
+  },
+  {
+    "type": "io.micronaut.context.annotation.Replaces",
+    "member": "Method io.micronaut.context.annotation.Replaces.qualifier()",
+    "reason": "Improvement of the API"
+  },
+  {
+    "type": "io.micronaut.inject.ast.ElementQuery",
+    "member": "Method io.micronaut.inject.ast.ElementQuery.named(java.lang.String)",
+    "reason": "New internally implemented default method"
+  },
+  {
+    "type": "io.micronaut.inject.ast.ElementQuery",
+    "member": "Class io.micronaut.inject.ast.ElementQuery",
+    "reason": "New internally implemented default method"
+  },
+  {
+    "type": "io.micronaut.inject.ast.beans.BeanMethodElement",
+    "member": "Class io.micronaut.inject.ast.beans.BeanMethodElement",
+    "reason": "New New internal default method default method"
+  },
+  {
+    "type": "io.micronaut.inject.ast.beans.BeanMethodElement",
+    "member": "Method io.micronaut.inject.ast.beans.BeanMethodElement.intercept(io.micronaut.core.annotation.AnnotationValue[])",
+    "reason": "New New internal default method default method"
+  },
+  {
+    "type": "io.micronaut.inject.ast.beans.BeanElementBuilder",
+    "member": "Class io.micronaut.inject.ast.beans.BeanElementBuilder",
+    "reason": "New New internal default method default method"
+  },
+  {
+    "type": "io.micronaut.inject.ast.beans.BeanElementBuilder",
+    "member": "Method io.micronaut.inject.ast.beans.BeanElementBuilder.intercept(io.micronaut.core.annotation.AnnotationValue[])",
+    "reason": "New New internal default method default method"
+  },
+  {
+    "type": "io.micronaut.core.type.TypeInformation",
+    "member": "Class io.micronaut.core.type.TypeInformation",
+    "reason": "Added a default method"
+  },
+  {
+    "type": "io.micronaut.core.type.TypeInformation",
+    "member": "Method io.micronaut.core.type.TypeInformation.asType()",
+    "reason": "Added a default method"
+  },
+  {
+    "type": "io.micronaut.core.annotation.AnnotationMetadata",
+    "member": "Method io.micronaut.core.annotation.AnnotationMetadata.getAnnotationValuesByStereotype(java.lang.String)",
+    "reason": "New default method"
+  },
+  {
+    "type": "io.micronaut.core.io.service.SoftServiceLoader$ServiceCollector",
+    "member": "Class io.micronaut.core.io.service.SoftServiceLoader$ServiceCollector",
+    "reason": "New default method"
+  },
+  {
+    "type": "io.micronaut.core.io.service.SoftServiceLoader$ServiceCollector",
+    "member": "Method io.micronaut.core.io.service.SoftServiceLoader$ServiceCollector.collect(java.util.Collection,boolean)",
+    "reason": "New default method"
+  },
+  {
+    "type": "io.micronaut.context.BeanDefinitionRegistry",
+    "member": "Method io.micronaut.context.BeanDefinitionRegistry.registerBeanDefinition(io.micronaut.context.RuntimeBeanDefinition)",
+    "reason": "new internal default method"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.NettyEmbeddedServer",
+    "member": "Class io.micronaut.http.server.netty.NettyEmbeddedServer",
+    "reason": "New default method"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.NettyEmbeddedServer",
+    "member": "Method io.micronaut.http.server.netty.NettyEmbeddedServer.register(io.micronaut.http.server.netty.NettyServerCustomizer)",
+    "reason": "New default method"
+  },
+  {
+    "type": "io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
+    "member": "Class io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
+    "reason": "Not a bean anymore"
+  },
+  {
+    "type": "io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
+    "member": "Field $ANNOTATION_METADATA",
+    "reason": "Not a bean anymore"
+  },
+  {
+    "type": "io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
+    "member": "Method io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference.getBeanDefinitionType()",
+    "reason": "Not a bean anymore"
+  },
+  {
+    "type": "io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
+    "member": "Method io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference.getBeanType()",
+    "reason": "Not a bean anymore"
+  },
+  {
+    "type": "io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
+    "member": "Method io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference.load()",
+    "reason": "Not a bean anymore"
+  },
+  {
+    "type": "io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
+    "member": "Constructor io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference()",
+    "reason": "Not a bean anymore"
+  }
+]

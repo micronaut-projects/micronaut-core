@@ -21,7 +21,7 @@ import java.lang.annotation.Annotation;
 
 /**
  * <p>An annotation processor is an object that processes the presence if a given annotation.</p>
- * <p>
+ *
  * <p>The {@link #process(BeanDefinition, Object)} method returns void since a processor is not able to mutate the
  * object itself or return an alternative instance, instead the design of a processor is to react to the rep</p>
  *

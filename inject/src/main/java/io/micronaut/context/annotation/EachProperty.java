@@ -27,17 +27,17 @@ import java.lang.annotation.Target;
 /**
  * <p>This annotation allows driving the production of {@link Bean} definitions from either configuration or the
  * presence of another bean definition</p>
- * <p>
+ *
  * <p>For example:</p>
  * <pre><code>
  *  {@literal @}EachProperty("foo.bar")
  *   public class ExampleConfiguration {
  *   }
  * </code></pre>
- * <p>
+ *
  * <p>In the above example a new {@code ExampleConfiguration} bean will be created for each item under the
  * {@code foo.bar} key in application configuration</p>
- * <p>
+ *
  * <p>A reference to the configuration entry name can be obtained with the {@link Parameter} annotation applied to a
  * constructor argument:</p>
  * <pre><code>
@@ -48,18 +48,18 @@ import java.lang.annotation.Target;
  *      }
  *   }
  * </code></pre>
- * <p>
+ *
  * <p>In the above example for a configuration property of {@code foo.bar.test}, the value of the {@code name} argument
  * will be {@code "test"}</p>
- * <p>
+ *
  * <p>The bean is created as a singleton with a Named qualifier matching the configuration entry
  * name, thus allowing retrieval with:</p>
- * <pre><code>
+ * <pre>{@code
  *  ExampleConfiguration exampleConfiguration = applicationContext.getBean(ExampleConfiguration.class, Qualifiers.byName("test"));
- * </code></pre>
- * <p>
+ * }</pre>
+ *
  * <p>Or alternatively dependency injection via the Named qualifier.</p>
- * <p>
+ *
  * <p>This annotation is typically used in conjunction with {@link EachBean}. For example, one can drive the
  * configuration of other beans with the {@link EachBean} annotation:</p>
  * <pre><code>

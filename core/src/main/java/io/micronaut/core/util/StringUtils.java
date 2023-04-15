@@ -262,7 +262,7 @@ public final class StringUtils {
                 return str.substring(i);
             }
         }
-        return str;
+        return "";
     }
 
     /**
@@ -271,8 +271,8 @@ public final class StringUtils {
      * <p>The given delimiters string is supposed to consist of any number of
      * delimiter characters. Each of those characters can be used to separate
      * tokens. A delimiter is always a single character; for multi-character
-     * delimiters, consider using <code>delimitedListToStringArray</code>
-     * <p/>
+     * delimiters, consider using {@code delimitedListToStringArray}
+     *
      * <p>Copied from the Spring Framework while retaining all license, copyright and author information.
      *
      * @param str        the String to tokenize
@@ -291,19 +291,19 @@ public final class StringUtils {
      * <p>The given delimiters string is supposed to consist of any number of
      * delimiter characters. Each of those characters can be used to separate
      * tokens. A delimiter is always a single character; for multi-character
-     * delimiters, consider using <code>delimitedListToStringArray</code>
-     * <p/>
+     * delimiters, consider using {@code delimitedListToStringArray}
+     *
      * <p>Copied from the Spring Framework while retaining all license, copyright and author information.
      *
      * @param str               the String to tokenize
      * @param delimiters        the delimiter characters, assembled as String
      *                          (each of those characters is individually considered as delimiter)
-     * @param trimTokens        trim the tokens via String's <code>trim</code>
+     * @param trimTokens        trim the tokens via String's {@code trim}
      * @param ignoreEmptyTokens omit empty tokens from the result array
      *                          (only applies to tokens that are empty after trimming; StringTokenizer
      *                          will not consider subsequent delimiters as token in the first place).
-     * @return an array of the tokens (<code>null</code> if the input String
-     * was <code>null</code>)
+     * @return an array of the tokens ({@code null} if the input String
+     * was {@code null})
      * @see java.util.StringTokenizer
      * @see java.lang.String#trim()
      */
@@ -375,9 +375,9 @@ public final class StringUtils {
         }
         uri = baseUri + uri;
         if (uri.startsWith("/")) {
-            return uri.replaceAll("[//]{2,}", "/");
+            return uri.replaceAll("/{2,}", "/");
         } else {
-            return uri.replaceAll("(?<=[^:])[//]{2,}", "/");
+            return uri.replaceAll("(?<=[^:])/{2,}", "/");
         }
     }
 

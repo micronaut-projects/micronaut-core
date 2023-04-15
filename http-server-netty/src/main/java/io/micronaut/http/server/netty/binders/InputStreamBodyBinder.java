@@ -85,7 +85,7 @@ public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<Inpu
                     PipedInputStream inputStream = new PipedInputStream(outputStream) {
                         private volatile HttpContentProcessor<ByteBufHolder> processor;
 
-                        private void init() {
+                        private synchronized void init() {
                             if (processor == null) {
                                 processor = (HttpContentProcessor<ByteBufHolder>) processorResolver.resolve(nettyHttpRequest, context.getArgument());
                                 Flux.from(processor)

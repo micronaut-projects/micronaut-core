@@ -37,6 +37,7 @@ import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.core.value.ValueException;
 import org.slf4j.Logger;
 
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -49,7 +50,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
-import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
@@ -64,7 +64,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class PropertySourcePropertyResolver implements PropertyResolver {
+public class PropertySourcePropertyResolver implements PropertyResolver, AutoCloseable {
 
     private static final Logger LOG = ClassUtils.getLogger(PropertySourcePropertyResolver.class);
 
@@ -86,10 +86,15 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     protected final Map<String, Object>[] catalog = new Map[58];
     protected final Map<String, Object>[] rawCatalog = new Map[58];
     protected final Map<String, Object>[] nonGenerated = new Map[58];
-    private final Random random = new Random();
+    private final SecureRandom random = new SecureRandom();
     private final Map<String, Boolean> containsCache = new ConcurrentHashMap<>(20);
     private final Map<String, Object> resolvedValueCache = new ConcurrentHashMap<>(20);
     private final EnvironmentProperties environmentProperties = EnvironmentProperties.fork(CURRENT_ENV);
+
+    /**
+     * If you don't need to initialize SLF4J, set 'false'.
+     */
+    protected boolean logEnabled = true;
 
     /**
      * Creates a new, initially empty, {@link PropertySourcePropertyResolver} for the given {@link ConversionService}.
@@ -324,7 +329,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                             converted = conversionService.convert(value, conversionContext);
                         }
 
-                        if (LOG.isTraceEnabled()) {
+                        if (logEnabled && LOG.isTraceEnabled()) {
                             if (converted.isPresent()) {
                                 LOG.trace("Resolved value [{}] for property: {}", converted.get(), name);
                             } else {
@@ -357,7 +362,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             }
 
         }
-        if (LOG.isTraceEnabled()) {
+        if (logEnabled) {
             LOG.trace("No value found for property: {}", name);
         }
 
@@ -385,9 +390,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     public Map<String, Object> getAllProperties(StringConvention keyConvention, MapFormat.MapTransformation transformation) {
         Map<String, Object> map = new HashMap<>();
         boolean isNested = transformation == MapFormat.MapTransformation.NESTED;
-
         Arrays
-            .stream(catalog)
+            .stream(getCatalog(keyConvention == StringConvention.RAW ? PropertyCatalog.RAW : PropertyCatalog.GENERATED))
             .filter(Objects::nonNull)
             .map(Map::entrySet)
             .flatMap(Collection::stream)
@@ -528,7 +532,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         synchronized (catalog) {
             for (String property : properties) {
 
-                if (LOG.isTraceEnabled()) {
+                if (logEnabled) {
                     LOG.trace("Processing property key {}", property);
                 }
 
@@ -895,6 +899,35 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         } catch (NumberFormatException ex) {
             throw new ValueException("Invalid range: `" + range + "` found for type Float while parsing property: " + property, ex);
         }
+    }
+
+    @Override
+    public void close() throws Exception {
+        if (propertyPlaceholderResolver instanceof AutoCloseable) {
+            ((AutoCloseable) propertyPlaceholderResolver).close();
+        }
+    }
+
+    /**
+     * Return logEnabled value.
+     *
+     * @return is log enabled
+     *
+     * @since 3.9.0
+     */
+    public boolean isLogEnabled() {
+        return logEnabled;
+    }
+
+    /**
+     * Setter for logEnabled.
+     *
+     * @param logEnabled is log enabled
+     *
+     * @since 3.9.0
+     */
+    public void setLogEnabled(boolean logEnabled) {
+        this.logEnabled = logEnabled;
     }
 
     /**

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,13 @@ package io.micronaut.logging.impl;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.LoggerContext;
+import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.logging.LogLevel;
 import io.micronaut.logging.LoggingSystem;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.slf4j.LoggerFactory;
 
@@ -35,9 +38,51 @@ import org.slf4j.LoggerFactory;
 @Internal
 public final class LogbackLoggingSystem implements LoggingSystem {
 
+    private static final String DEFAULT_LOGBACK_LOCATION = "logback.xml";
+
+    private final String logbackXmlLocation;
+
+    /**
+     * @deprecated Use {@link LogbackLoggingSystem#LogbackLoggingSystem(String, String)} instead
+     * @param logbackXmlLocation
+     */
+    @Deprecated
+    public LogbackLoggingSystem(@Nullable @Property(name = "logger.config") String logbackXmlLocation) {
+        this(
+            System.getProperty("logback.configurationFile"),
+            logbackXmlLocation
+        );
+    }
+
+    /**
+     * @param logbackExternalConfigLocation The location of the logback configuration file set via logback properties
+     * @param logbackXmlLocation The location of the logback configuration file set via micronaut properties
+     * @since 3.8.8
+     */
+    @Inject
+    public LogbackLoggingSystem(
+        @Nullable @Property(name = "logback.configurationFile") String logbackExternalConfigLocation,
+        @Nullable @Property(name = "logger.config") String logbackXmlLocation
+    ) {
+        if (logbackExternalConfigLocation != null) {
+            this.logbackXmlLocation = logbackExternalConfigLocation;
+        } else if (logbackXmlLocation != null) {
+            this.logbackXmlLocation = logbackXmlLocation;
+        } else {
+            this.logbackXmlLocation = DEFAULT_LOGBACK_LOCATION;
+        }
+    }
+
     @Override
     public void setLogLevel(String name, LogLevel level) {
         getLoggerContext().getLogger(name).setLevel(toLevel(level));
+    }
+
+    @Override
+    public void refresh() {
+        LoggerContext context = getLoggerContext();
+        context.reset();
+        LogbackUtils.configure(getClass().getClassLoader(), context, logbackXmlLocation);
     }
 
     /**

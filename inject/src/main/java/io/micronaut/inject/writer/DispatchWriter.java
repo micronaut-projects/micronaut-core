@@ -17,6 +17,7 @@ package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -45,13 +46,16 @@ import java.util.List;
  * @author Denis Stepanov
  * @since 3.1
  */
-public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
+@Internal
+public final class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
 
     private static final Method DISPATCH_METHOD = new Method("dispatch", getMethodDescriptor(Object.class, Arrays.asList(int.class, Object.class, Object[].class)));
 
     private static final Method DISPATCH_ONE_METHOD = new Method("dispatchOne", getMethodDescriptor(Object.class, Arrays.asList(int.class, Object.class, Object.class)));
 
     private static final Method GET_TARGET_METHOD = new Method("getTargetMethodByIndex", getMethodDescriptor(java.lang.reflect.Method.class, Collections.singletonList(int.class)));
+
+    private static final Method GET_ACCESSIBLE_TARGET_METHOD = new Method("getAccessibleTargetMethodByIndex", getMethodDescriptor(java.lang.reflect.Method.class, Collections.singletonList(int.class)));
 
     private static final Method UNKNOWN_DISPATCH_AT_INDEX = new Method("unknownDispatchAtIndexException", getMethodDescriptor(RuntimeException.class, Collections.singletonList(int.class)));
 
@@ -62,13 +66,24 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
     private static final org.objectweb.asm.commons.Method METHOD_GET_REQUIRED_METHOD = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "getRequiredMethod", Class.class, String.class, Class[].class));
 
+    private static final org.objectweb.asm.commons.Method METHOD_INVOKE_METHOD = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "invokeMethod", Object.class, java.lang.reflect.Method.class, Object[].class));
+
     private final List<DispatchTarget> dispatchTargets = new ArrayList<>();
     private final Type thisType;
+
+    private final Type dispatchSuperType;
+
     private boolean hasInterceptedMethod;
 
     public DispatchWriter(Type thisType) {
+        this(thisType, ExecutableMethodsDefinitionWriter.SUPER_TYPE);
+    }
+
+    public DispatchWriter(Type thisType, Type dispatchSuperType) {
         super();
         this.thisType = thisType;
+        this.dispatchSuperType = dispatchSuperType;
     }
 
     /**
@@ -111,7 +126,7 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
      * @return the target index
      */
     public int addMethod(TypedElement declaringType, MethodElement methodElement, boolean useOneDispatch) {
-        return addDispatchTarget(new MethodDispatchTarget(declaringType, methodElement, useOneDispatch, !useOneDispatch));
+        return addDispatchTarget(new MethodDispatchTarget(dispatchSuperType, declaringType, methodElement, useOneDispatch, !useOneDispatch));
     }
 
     /**
@@ -128,7 +143,14 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
                                     String interceptedProxyClassName,
                                     String interceptedProxyBridgeMethodName) {
         hasInterceptedMethod = true;
-        return addDispatchTarget(new InterceptableMethodDispatchTarget(declaringType, methodElement, interceptedProxyClassName, interceptedProxyBridgeMethodName, thisType));
+        return addDispatchTarget(new InterceptableMethodDispatchTarget(
+                dispatchSuperType,
+                declaringType,
+                methodElement,
+                interceptedProxyClassName,
+                interceptedProxyBridgeMethodName,
+                thisType)
+        );
     }
 
     /**
@@ -170,7 +192,7 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
             @Override
             public void generateCase(int key, Label end) {
                 DispatchTarget method = dispatchTargets.get(key);
-                method.writeDispatchMulti(dispatchMethod);
+                method.writeDispatchMulti(dispatchMethod, key);
                 dispatchMethod.returnValue();
             }
 
@@ -248,36 +270,17 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
         );
         getTargetMethodByIndex.loadArg(0);
         int[] cases = dispatchTargets.stream()
-                .filter(dispatchTarget -> dispatchTarget instanceof MethodDispatchTarget)
+                .filter(MethodDispatchTarget.class::isInstance)
                 .mapToInt(dispatchTargets::indexOf)
                 .toArray();
         getTargetMethodByIndex.tableSwitch(cases, new TableSwitchGenerator() {
             @Override
             public void generateCase(int key, Label end) {
                 MethodDispatchTarget method = (MethodDispatchTarget) dispatchTargets.get(key);
-                Type declaringTypeObject = JavaModelUtils.getTypeReference(method.declaringType);
-                List<ParameterElement> argumentTypes = Arrays.asList(method.methodElement.getSuspendParameters());
-
-                getTargetMethodByIndex.push(declaringTypeObject);
-                getTargetMethodByIndex.push(method.methodElement.getName());
-                if (!argumentTypes.isEmpty()) {
-                    int len = argumentTypes.size();
-                    Iterator<ParameterElement> iter = argumentTypes.iterator();
-                    pushNewArray(getTargetMethodByIndex, Class.class, len);
-                    for (int i = 0; i < len; i++) {
-                        ParameterElement type = iter.next();
-                        pushStoreInArray(
-                                getTargetMethodByIndex,
-                                i,
-                                len,
-                                () -> getTargetMethodByIndex.push(JavaModelUtils.getTypeReference(type))
-                        );
-
-                    }
-                } else {
-                    getTargetMethodByIndex.getStatic(TYPE_REFLECTION_UTILS, "EMPTY_CLASS_ARRAY", Type.getType(Class[].class));
-                }
-                getTargetMethodByIndex.invokeStatic(TYPE_REFLECTION_UTILS, METHOD_GET_REQUIRED_METHOD);
+                TypedElement declaringType = method.declaringType;
+                Type declaringTypeObject = JavaModelUtils.getTypeReference(declaringType);
+                MethodElement methodElement = method.methodElement;
+                pushTypeUtilsGetRequiredMethod(getTargetMethodByIndex, declaringTypeObject, methodElement);
                 getTargetMethodByIndex.returnValue();
             }
 
@@ -291,6 +294,31 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
         }, true);
         getTargetMethodByIndex.visitMaxs(DEFAULT_MAX_STACK, 1);
         getTargetMethodByIndex.visitEnd();
+    }
+
+    public static void pushTypeUtilsGetRequiredMethod(GeneratorAdapter builder, Type declaringTypeObject, MethodElement methodElement) {
+        List<ParameterElement> argumentTypes = Arrays.asList(methodElement.getSuspendParameters());
+
+        builder.push(declaringTypeObject);
+        builder.push(methodElement.getName());
+        if (!argumentTypes.isEmpty()) {
+            int len = argumentTypes.size();
+            Iterator<ParameterElement> iter = argumentTypes.iterator();
+            pushNewArray(builder, Class.class, len);
+            for (int i = 0; i < len; i++) {
+                ParameterElement type = iter.next();
+                pushStoreInArray(
+                    builder,
+                        i,
+                        len,
+                        () -> builder.push(JavaModelUtils.getTypeReference(type))
+                );
+
+            }
+        } else {
+            builder.getStatic(TYPE_REFLECTION_UTILS, "EMPTY_CLASS_ARRAY", Type.getType(Class[].class));
+        }
+        builder.invokeStatic(TYPE_REFLECTION_UTILS, METHOD_GET_REQUIRED_METHOD);
     }
 
     @Override
@@ -315,6 +343,7 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
     /**
      * Dispatch target implementation writer.
      */
+    @Internal
     public interface DispatchTarget {
 
         /**
@@ -325,7 +354,8 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
         }
 
         /**
-         * Generete dispatch one.
+         * Generate dispatch one.
+         *
          * @param writer The writer
          */
         default void writeDispatchOne(GeneratorAdapter writer) {
@@ -340,10 +370,12 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
         }
 
         /**
-         * Generete dispatch multi.
+         * Generate dispatch multi.
+         *
          * @param writer The writer
+         * @param methodIndex The method index
          */
-        default void writeDispatchMulti(GeneratorAdapter writer) {
+        default void writeDispatchMulti(GeneratorAdapter writer, int methodIndex) {
             throw new IllegalStateException("Not supported");
         }
 
@@ -443,15 +475,17 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
     @Internal
     @SuppressWarnings("FinalClass")
     public static class MethodDispatchTarget implements DispatchTarget {
+        final Type dispatchSuperType;
         final TypedElement declaringType;
         final MethodElement methodElement;
         final boolean oneDispatch;
         final boolean multiDispatch;
 
-        private MethodDispatchTarget(TypedElement declaringType,
+        private MethodDispatchTarget(Type dispatchSuperType, TypedElement declaringType,
                                      MethodElement methodElement,
                                      boolean oneDispatch,
                                      boolean multiDispatch) {
+            this.dispatchSuperType = dispatchSuperType;
             this.declaringType = declaringType;
             this.methodElement = methodElement;
             this.oneDispatch = oneDispatch;
@@ -473,44 +507,64 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
         }
 
         @Override
-        public void writeDispatchMulti(GeneratorAdapter writer) {
+        public void writeDispatchMulti(GeneratorAdapter writer, int methodIndex) {
             String methodName = methodElement.getName();
 
             List<ParameterElement> argumentTypes = Arrays.asList(methodElement.getSuspendParameters());
             Type declaringTypeObject = JavaModelUtils.getTypeReference(declaringType);
 
+            final boolean reflectionRequired = methodElement.isReflectionRequired();
             ClassElement returnType = methodElement.isSuspend() ? ClassElement.of(Object.class) : methodElement.getReturnType();
             boolean isInterface = declaringType.getType().isInterface();
             Type returnTypeObject = JavaModelUtils.getTypeReference(returnType);
+            boolean hasArgs = !argumentTypes.isEmpty();
 
             // load this
-            writer.loadArg(1);
-            // duplicate target
-            writer.dup();
+            if (!methodElement.isStatic()) {
+                writer.loadArg(1);
+            }
 
-            String methodDescriptor = getMethodDescriptor(returnType, argumentTypes);
-
-            pushCastToType(writer, declaringTypeObject);
-            boolean hasArgs = !argumentTypes.isEmpty();
-            if (hasArgs) {
-                int argCount = argumentTypes.size();
-                Iterator<ParameterElement> argIterator = argumentTypes.iterator();
-                for (int i = 0; i < argCount; i++) {
+            if (reflectionRequired) {
+                if (methodElement.isStatic()) {
+                    writer.push((String) null);
+                }
+                writer.loadThis();
+                writer.push(methodIndex);
+                writer.invokeVirtual(dispatchSuperType, GET_ACCESSIBLE_TARGET_METHOD);
+                if (hasArgs) {
                     writer.loadArg(2);
-                    writer.push(i);
-                    writer.visitInsn(AALOAD);
-                    // cast the return value to the correct type
-                    pushCastToType(writer, argIterator.next());
+                } else {
+                    writer.getStatic(Type.getType(ArrayUtils.class), "EMPTY_OBJECT_ARRAY", Type.getType(Object[].class));
+                }
+                writer.invokeStatic(TYPE_REFLECTION_UTILS, METHOD_INVOKE_METHOD);
+            } else {
+                if (!methodElement.isStatic()) {
+                    pushCastToType(writer, declaringTypeObject);
+                }
+                if (hasArgs) {
+                    int argCount = argumentTypes.size();
+                    Iterator<ParameterElement> argIterator = argumentTypes.iterator();
+                    for (int i = 0; i < argCount; i++) {
+                        writer.loadArg(2);
+                        writer.push(i);
+                        writer.visitInsn(AALOAD);
+                        // cast the return value to the correct type
+                        pushCastToType(writer, argIterator.next());
+                    }
+                }
+                String methodDescriptor = getMethodDescriptor(returnType, argumentTypes);
+                if (methodElement.isStatic()) {
+                    writer.invokeStatic(declaringTypeObject, new Method(methodName, methodDescriptor));
+                } else {
+                    writer.visitMethodInsn(isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL,
+                        declaringTypeObject.getInternalName(), methodName,
+                        methodDescriptor, isInterface);
                 }
             }
 
-            writer.visitMethodInsn(isInterface ? INVOKEINTERFACE : INVOKEVIRTUAL,
-                    declaringTypeObject.getInternalName(), methodName,
-                    methodDescriptor, isInterface);
-
             if (returnTypeObject.equals(Type.VOID_TYPE)) {
-                writer.visitInsn(ACONST_NULL);
-            } else {
+                writer.push((String) null);
+            } else if (!reflectionRequired) {
                 pushBoxPrimitiveIfNecessary(returnType, writer);
             }
         }
@@ -555,18 +609,20 @@ public class DispatchWriter extends AbstractClassFileWriter implements Opcodes {
         final String interceptedProxyBridgeMethodName;
         final Type thisType;
 
-        private InterceptableMethodDispatchTarget(TypedElement declaringType,
+        private InterceptableMethodDispatchTarget(Type dispatchSuperType,
+                                                  TypedElement declaringType,
                                                   MethodElement methodElement,
                                                   String interceptedProxyClassName,
                                                   String interceptedProxyBridgeMethodName,
                                                   Type thisType) {
-            super(declaringType, methodElement, false, true);
+            super(dispatchSuperType, declaringType, methodElement, false, true);
             this.interceptedProxyClassName = interceptedProxyClassName;
             this.interceptedProxyBridgeMethodName = interceptedProxyBridgeMethodName;
             this.thisType = thisType;
         }
 
-        public void writeDispatchMulti(GeneratorAdapter writer) {
+        @Override
+        public void writeDispatchMulti(GeneratorAdapter writer, int methodIndex) {
             String methodName = methodElement.getName();
 
             List<ParameterElement> argumentTypes = Arrays.asList(methodElement.getSuspendParameters());

@@ -52,8 +52,6 @@ import java.util.function.Consumer
  */
 @MicronautTest
 @Property(name = 'spec.name', value = 'HttpGetSpec')
-@Property(name = "micronaut.server.netty.log-level", value = 'trace')
-@Property(name = "micronaut.http.client.log-level", value = 'trace')
 class HttpGetSpec extends Specification {
 
     @Inject
@@ -574,7 +572,7 @@ class HttpGetSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == "Failed to decode the body for the given content type [does/notexist]"
+        ex.message == "Client '/get': Failed to decode the body for the given content type [does/notexist]"
     }
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/5223")
@@ -594,7 +592,7 @@ class HttpGetSpec extends Specification {
 
         then:
         HttpClientResponseException ex = thrown()
-        ex.message == "Failed to decode the body for the given content type [does/notexist]"
+        ex.message == "Client '/get': Failed to decode the body for the given content type [does/notexist]"
     }
 
     void "test deserializing map wrapped by Reactive type"() {

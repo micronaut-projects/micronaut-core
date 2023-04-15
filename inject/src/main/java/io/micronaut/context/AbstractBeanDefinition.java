@@ -51,10 +51,10 @@ import java.util.stream.Stream;
  * code.
  * Instead a build time tool does analysis of source code and dynamically produces subclasses of this class containing
  * information about the available injection points for a given class.</p>
- * <p>
+ *
  * <p>For technical reasons the class has to be marked as public, but is regarded as internal and should be used by
  * compiler tools and plugins (such as AST transformation frameworks)</p>
- * <p>
+ *
  * <p>The {@link io.micronaut.inject.writer.BeanDefinitionWriter} class can be used to produce bean definitions at
  * compile or runtime</p>
  *
@@ -680,13 +680,13 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             // this is to ensure that if the post construct method does anything funky to
             // cause recreation of this bean then we don't have a circular problem
             key = new DefaultBeanContext.BeanKey(this, resolutionContext.getCurrentQualifier());
-            resolutionContext.addInFlightBean(key, bean);
+            resolutionContext.addInFlightBean(key, new BeanRegistration(key, this, bean));
         }
 
-        final Set<Map.Entry<Class, List<BeanInitializedEventListener>>> beanInitializedEventListeners
+        final Set<Map.Entry<Class<?>, List<BeanInitializedEventListener>>> beanInitializedEventListeners
                 = ((DefaultBeanContext) context).beanInitializedEventListeners;
         if (CollectionUtils.isNotEmpty(beanInitializedEventListeners)) {
-            for (Map.Entry<Class, List<BeanInitializedEventListener>> entry : beanInitializedEventListeners) {
+            for (Map.Entry<Class<?>, List<BeanInitializedEventListener>> entry : beanInitializedEventListeners) {
                 if (entry.getKey().isAssignableFrom(getBeanType())) {
                     for (BeanInitializedEventListener listener : entry.getValue()) {
                         bean = listener.onInitialized(new BeanInitializingEvent(context, this, bean));
@@ -1153,7 +1153,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
     /**
      * Obtains all bean definitions for a constructor argument at the given index.
-     * <p>
+     *
      * @param resolutionContext         The resolution context
      * @param context                   The context
      * @param constructorInjectionPoint The constructor injection point
@@ -1176,7 +1176,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
     /**
      * Obtains all bean definitions for a constructor argument at the given index.
-     * <p>
+     *
      * @param resolutionContext         The resolution context
      * @param context                   The context
      * @param argumentIndex             The argument index
@@ -1200,7 +1200,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
     /**
      * Obtains all bean definitions for a constructor argument at the given index.
-     * <p>
+     *
      * @param resolutionContext         The resolution context
      * @param context                   The context
      * @param methodIndex               The method index
@@ -1225,7 +1225,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
     /**
      * Obtains all bean definitions for the field at the given index.
-     * <p>
+     *
      * @param resolutionContext         The resolution context
      * @param context                   The context
      * @param fieldIndex                The field index
@@ -2149,10 +2149,18 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         final Collection<BeanRegistration<Object>> beanRegistrations = resolveBeanRegistrationsWithGenericsFromArgument(resolutionContext, argument, path,
                 (beanType, qualifier) -> context.getBeanRegistrations(resolutionContext, beanType, qualifier)
         );
-        if (argument.isArray()) {
-            return beanRegistrations.toArray(new BeanRegistration[beanRegistrations.size()]);
+        if (CollectionUtils.isNotEmpty(beanRegistrations)) {
+            if (argument.isArray()) {
+                return beanRegistrations.toArray(new BeanRegistration[beanRegistrations.size()]);
+            } else {
+                return coerceCollectionToCorrectType(argument.getType(), beanRegistrations);
+            }
         } else {
-            return coerceCollectionToCorrectType(argument.getType(), beanRegistrations);
+            if (argument.isArray()) {
+                return Array.newInstance(argument.getType(), 0);
+            } else {
+                return coerceCollectionToCorrectType(argument.getType(), Collections.emptySet());
+            }
         }
     }
 

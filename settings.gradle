@@ -14,16 +14,15 @@ pluginManagement {
 }
 
 plugins {
-    id 'io.micronaut.build.shared.settings' version '5.1.2'
+    id 'io.micronaut.build.shared.settings' version '5.4.8'
 }
+enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
-enableFeaturePreview("VERSION_CATALOGS")
 
 rootProject.name = 'micronaut'
 
 include "aop"
 include "bom"
-include "bom-check"
 include "parent"
 include "buffer-netty"
 include "core"
@@ -38,6 +37,7 @@ include "http-client-core"
 include "http-client"
 include "http-netty"
 include "http-server"
+include "http-server-tck"
 include "http-server-netty"
 include "http-validation"
 include "inject"
@@ -64,15 +64,15 @@ include "test-suite"
 include "test-suite-helper"
 include "test-suite-javax-inject"
 include "test-suite-jakarta-inject-bean-import"
+include "test-suite-http-server-tck-netty"
 include "test-suite-kotlin"
+include "test-suite-graal"
 include "test-suite-groovy"
+include "test-suite-groovy"
+include "test-suite-logback"
+include "test-suite-logback-14"
+include "test-suite-logback-external-configuration"
 include "test-utils"
 
 // benchmarks
 include "benchmarks"
-
-gradle.beforeProject { p ->
-    p.pluginManager.withPlugin('java-library') {
-        p.plugins.apply('io.micronaut.build.internal.sanity-checks')
-    }
-}

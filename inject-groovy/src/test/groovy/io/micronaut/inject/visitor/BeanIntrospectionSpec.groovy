@@ -1,8 +1,8 @@
 package io.micronaut.inject.visitor
 
 import com.blazebit.persistence.impl.function.entity.ValuesEntity
-import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.TypeElementVisitorStart
+import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
@@ -10,6 +10,7 @@ import io.micronaut.core.beans.BeanIntrospectionReference
 import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.core.beans.BeanMethod
 import io.micronaut.core.beans.BeanProperty
+import io.micronaut.core.beans.UnsafeBeanProperty
 import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.introspections.Person
@@ -57,6 +58,12 @@ class Test {
         then:'the new value is reflected'
         one.get(instance) == 'test'
         instance.invoked
+
+        when:
+        instance.invoked = false
+        then:'unsafe access is working'
+        (one as UnsafeBeanProperty).getUnsafe(instance) == 'test'
+        instance.invoked
     }
 
     void 'test favor method access with custom getter'() {
@@ -92,6 +99,12 @@ class Test {
         then:'the new value is reflected'
         one.get(instance) == 'test'
         instance.invoked
+
+        when:
+        instance.invoked = false
+        then:'unsafe access is working'
+        (one as UnsafeBeanProperty).getUnsafe(instance) == 'test'
+        instance.invoked
     }
 
     void 'test favor field access'() {
@@ -125,6 +138,16 @@ class Test {
 
         then:'the new value is reflected'
         one.get(instance) == 'test'
+        !instance.invoked
+
+        and:'unsafe access is working'
+        (one as UnsafeBeanProperty).getUnsafe(instance) == 'test'
+        !instance.invoked
+
+        when:
+        (one as UnsafeBeanProperty).setUnsafe(instance, "test2")
+        then:
+        (one as UnsafeBeanProperty).getUnsafe(instance) == 'test2'
         !instance.invoked
     }
 
@@ -265,6 +288,13 @@ class CopyMe {
         then:"it is correct"
         result.url == anotherUrl
         result.enabled == true
+
+        when:'unsafe withValue is used'
+        def anotherUrl2 = new URL("http://another123.com")
+        then:'unsafe access is working'
+        def newBean = (urlProperty as UnsafeBeanProperty).withValueUnsafe(result, anotherUrl2)
+        result.url == anotherUrl2
+        newBean.url == anotherUrl2
     }
 
     // @PackageScope is commented out because type element visitors are run before it
@@ -453,7 +483,14 @@ interface Test extends io.micronaut.core.naming.Named {
 
         then:
         property.get(named) == 'test'
+        (property as UnsafeBeanProperty).getUnsafe(named) == 'test'
         setNameValue == 'test'
+
+        when:
+        (property as UnsafeBeanProperty).setUnsafe(named, "test2")
+
+        then:
+        setNameValue == 'test2'
     }
 
     void "test generate bean introspection for interface with custom setter"() {
@@ -489,6 +526,7 @@ interface Test extends io.micronaut.core.naming.Named {
 
         then:
         property.get(named) == 'test'
+        (property as UnsafeBeanProperty).getUnsafe(named) == 'test'
         setNameValue == 'test'
     }
 
@@ -736,7 +774,7 @@ class Test {
 
         then:
         prop.get(test) == 'Foo'
-
+        (prop as UnsafeBeanProperty).getUnsafe(test) == 'Foo'
     }
 
     void "test write bean introspection with inner classes"() {
@@ -1067,6 +1105,12 @@ class ParentBean {
         ageProp.get(instance) == 10
         stringArrayProp.get(instance) == ['foo'] as String[]
         primitiveArrayProp.get(instance) == [10] as int[]
+
+        when:
+        (nameProp as UnsafeBeanProperty).setUnsafe(instance, 'bar')
+        then:
+        nameProp.get(instance) == 'bar'
+        (nameProp as UnsafeBeanProperty).getUnsafe(instance) == 'bar'
 
         when:
         introspection.instantiate("blah") // illegal argument
@@ -2124,6 +2168,24 @@ class AImpl implements A {
 
         then:
         property.isReadWrite()
+    }
+
+    def "property name with a number is not duplicated"() {
+        when:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+class Test {
+    UUID id
+    String s3Name
+}
+''')
+
+        then:
+            introspection.beanProperties.size() == 2
     }
 
 }

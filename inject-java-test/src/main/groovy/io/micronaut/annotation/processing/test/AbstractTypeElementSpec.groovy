@@ -17,11 +17,20 @@ package io.micronaut.annotation.processing.test
 
 import com.sun.source.util.JavacTask
 import groovy.transform.CompileStatic
-import io.micronaut.annotation.processing.*
+import io.micronaut.annotation.processing.AggregatingTypeElementVisitorProcessor
+import io.micronaut.annotation.processing.AnnotationUtils
+import io.micronaut.annotation.processing.GenericUtils
+import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
+import io.micronaut.annotation.processing.ModelUtils
+import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.visitor.JavaElementFactory
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext
 import io.micronaut.aop.internal.InterceptorRegistryBean
-import io.micronaut.context.*
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.ApplicationContextBuilder
+import io.micronaut.context.ApplicationContextConfiguration
+import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.context.Qualifier
 import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Experimental
@@ -29,6 +38,7 @@ import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
+import io.micronaut.core.graal.GraalReflectionConfigurer
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanConfiguration
 import io.micronaut.inject.BeanDefinition
@@ -58,6 +68,7 @@ import javax.tools.JavaFileObject
 import java.lang.annotation.Annotation
 import java.util.stream.Collectors
 import java.util.stream.StreamSupport
+
 /**
  * Base class to extend from to allow compilation of Java sources
  * at runtime to allow testing of compile time behavior.
@@ -149,6 +160,20 @@ abstract class AbstractTypeElementSpec extends Specification {
     }
 
     /**
+     * Build and return a {@link GraalReflectionConfigurer} for the given class name and class data.
+     *
+     * @return the GraalReflectionConfigurer if it is correct
+     **/
+    protected GraalReflectionConfigurer buildReflectionConfigurer(String className, @Language("java") String cls) {
+        String beanDefName = (className.startsWith('$') ? '' : '$') + NameUtils.getSimpleName(className) + GraalReflectionConfigurer.CLASS_SUFFIX
+        String packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        ClassLoader classLoader = buildClassLoader(className, cls)
+        return (GraalReflectionConfigurer)classLoader.loadClass(beanFullName).newInstance()
+    }
+
+    /**
      * @param annotationExpression the annotation expression
      * @param packages the packages to import
      * @return The metadata
@@ -190,6 +215,17 @@ class Test {
      */
     Object getBean(ApplicationContext context, String className, Qualifier qualifier = null) {
         context.getBean(context.classLoader.loadClass(className), qualifier)
+    }
+
+
+    /**
+     * Gets a bean definition from the context for the given class name
+     * @param context The context
+     * @param className The class name
+     * @return The bean instance
+     */
+    BeanDefinition<?> getBeanDefinition(ApplicationContext context, String className, Qualifier qualifier = null) {
+        context.getBeanDefinition(context.classLoader.loadClass(className), qualifier)
     }
 
     /**
@@ -312,7 +348,7 @@ class Test {
         return metadata
     }
 
-    protected TypeElement buildTypeElement(String cls) {
+    protected TypeElement buildTypeElement(@Language('java') String cls) {
         List<Element> elements = []
 
         newJavaParser().parseLines("",
@@ -464,7 +500,7 @@ class Test {
         return metadata
     }
 
-    private JavaAnnotationMetadataBuilder newJavaAnnotationBuilder() {
+    protected JavaAnnotationMetadataBuilder newJavaAnnotationBuilder() {
         JavaParser parser = newJavaParser()
         JavacTask javacTask = parser.getJavacTask()
         def elements = javacTask.elements

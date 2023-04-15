@@ -55,8 +55,8 @@ import io.micronaut.http.annotation.HttpMethodMapping;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
-import io.micronaut.http.client.ReactiveClientResultTransformer;
 import io.micronaut.http.client.HttpClientRegistry;
+import io.micronaut.http.client.ReactiveClientResultTransformer;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.bind.ClientArgumentRequestBinder;
@@ -88,7 +88,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -220,7 +219,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             // Apply all the argument binders
             Argument[] arguments = context.getArguments();
             if (arguments.length > 0) {
-                Map<String, Object> paramMap = context.getParameterValueMap();
                 for (Argument argument : arguments) {
                     Object definedValue = getValue(argument, context, parameters);
 
@@ -300,11 +298,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             request.setAttribute(HttpAttributes.INVOCATION_CONTEXT, context);
             // Set the URI template used to make the request for tracing purposes
             request.setAttribute(HttpAttributes.URI_TEMPLATE, resolveTemplate(annotationMetadata, uriTemplate.toString()));
-            String serviceId = getClientId(annotationMetadata);
             Argument<?> errorType = annotationMetadata.classValue(Client.class, "errorType")
                     .map((Function<Class, Argument>) Argument::of).orElse(HttpClient.DEFAULT_ERROR_TYPE);
-            request.setAttribute(HttpAttributes.SERVICE_ID, serviceId);
-
 
             final MediaType[] acceptTypes;
             Collection<MediaType> accept = request.accept();
@@ -347,18 +342,23 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                         Publisher<?> csPublisher = httpClientResponsePublisher(httpClient, request, returnType, errorType, valueType);
                         CompletableFuture<Object> future = new CompletableFuture<>();
                         csPublisher.subscribe(new CompletionAwareSubscriber<Object>() {
-                            AtomicReference<Object> reference = new AtomicReference<>();
+                            Object message;
+                            Subscription subscription;
 
                             @Override
                             protected void doOnSubscribe(Subscription subscription) {
-                                subscription.request(1);
+                                this.subscription = subscription;
+                                subscription.request(Long.MAX_VALUE);
                             }
 
                             @Override
                             protected void doOnNext(Object message) {
                                 if (Void.class != reactiveValueType) {
-                                    reference.set(message);
+                                    this.message = message;
                                 }
+                                // we only want the first item
+                                subscription.cancel();
+                                doOnComplete();
                             }
 
                             @Override
@@ -384,7 +384,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
                             @Override
                             protected void doOnComplete() {
-                                future.complete(reference.get());
+                                // can be called twice
+                                future.complete(message);
                             }
                         });
                         return interceptedMethod.handleResult(future);
@@ -427,7 +428,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         Class<?> argumentType = reactiveValueArgument.getType();
         if (Void.class == argumentType || returnType.isVoid()) {
             request.getHeaders().remove(HttpHeaders.ACCEPT);
-            return httpClient.exchange(request, Argument.VOID, errorType);
+            return httpClient.retrieve(request, Argument.VOID, errorType);
         } else {
             if (HttpResponse.class.isAssignableFrom(argumentType)) {
                 return httpClient.exchange(request, reactiveValueArgument, errorType);

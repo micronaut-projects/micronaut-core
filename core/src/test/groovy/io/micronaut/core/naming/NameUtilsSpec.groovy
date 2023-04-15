@@ -143,6 +143,8 @@ class NameUtilsSpec extends Specification {
         "ABC"   | "ABC"
         "AB"    | "AB"
         "ABc"   | "aBc"
+        "S3abc" | "s3abc"
+        "S3a"   | "s3a"
     }
 
     void "test decapitalize returns same ref"() {
@@ -242,6 +244,8 @@ class NameUtilsSpec extends Specification {
         "getFoo" | true
         "getfoo" | false
         "a"      | false
+        "get_foo" | true
+        'get$foo' | true
     }
 
     @Unroll

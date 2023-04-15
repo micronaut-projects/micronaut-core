@@ -15,7 +15,6 @@
  */
 package io.micronaut.buffer.netty;
 
-import com.oracle.svm.core.annotate.AutomaticFeature;
 import com.oracle.svm.core.jdk.SystemPropertiesSupport;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.graal.AutomaticFeatureUtils;
@@ -36,7 +35,6 @@ import java.util.Arrays;
  * @since 3.3.0
  */
 @Internal
-@AutomaticFeature
 final class NettyFeature implements Feature {
     @Override
     public void beforeAnalysis(BeforeAnalysisAccess access) {

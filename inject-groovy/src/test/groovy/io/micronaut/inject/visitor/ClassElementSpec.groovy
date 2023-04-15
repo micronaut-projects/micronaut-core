@@ -22,14 +22,19 @@ import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.EnumElement
+import io.micronaut.inject.ast.FieldElement
+import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PackageElement
+import io.micronaut.inject.ast.PropertyElement
+import io.micronaut.inject.ast.TypedElement
 import spock.lang.Issue
 import spock.lang.Unroll
 import spock.util.environment.RestoreSystemProperties
 
 import java.sql.SQLException
 import java.util.function.Supplier
+import java.util.stream.Collectors
 
 @RestoreSystemProperties
 class ClassElementSpec extends AbstractBeanDefinitionSpec {
@@ -40,6 +45,104 @@ class ClassElementSpec extends AbstractBeanDefinitionSpec {
 
     def cleanup() {
         AllElementsVisitor.clearVisited()
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-openapi/issues/670")
+    void "test correct properties decaliring class with inheritance"() {
+        given:
+        def controller = buildBeanDefinition('test.TestController', '''
+package test
+
+import groovy.transform.CompileStatic
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+
+import javax.validation.constraints.NotNull
+
+@Controller
+class TestController {
+
+    @Get
+    PessoaFisicaDto test() {
+        return null
+    }
+}
+
+@Introspected
+@CompileStatic
+abstract class EntidadeDto {
+
+    @NotNull
+    UUID id
+    Long tenantId
+    Integer version
+    @NotNull
+    Date criadoEm
+    @NotNull
+    Date atualizadoEm
+}
+
+@Introspected
+@CompileStatic
+class PessoaFisicaDto extends EntidadeDto {
+
+    String nome
+    String nomeMae
+    String nomePai
+    String CPF
+}
+
+''')
+        expect:
+        controller
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS
+        when:
+        def method = AllElementsVisitor.VISITED_METHOD_ELEMENTS[0]
+        def type = method.genericReturnType;
+        List<PropertyElement> beanProperties = type.getBeanProperties().stream().filter(p -> !"groovy.lang.MetaClass".equals(p.getType().getName())).collect(Collectors.toList());
+
+        List<TypedElement> childFieldsOwned = new ArrayList<>();
+        List<TypedElement> childClassFields = new ArrayList<>();
+        for (TypedElement publicField : beanProperties) {
+            if (publicField instanceof MemberElement) {
+
+                MemberElement memberEl = (MemberElement) publicField;
+                if (memberEl.getDeclaringType().getType().getName() == type.getName()) {
+                    childClassFields.add(publicField)
+                }
+                if (memberEl.getOwningType().getType().getName() == type.getName()) {
+                    childFieldsOwned.add(publicField)
+                }
+            }
+        }
+
+        then:
+        childClassFields
+        childClassFields.size() == 4
+        childFieldsOwned
+        childFieldsOwned.size() == 9
+    }
+
+    void "test interface bean properties"() {
+        given:
+        def element = buildClassElement("""
+package test
+
+interface HealthResult {
+
+    String getName();
+
+    Object getStatus();
+
+    Object getDetails();
+}
+""")
+
+        List<PropertyElement> properties = element.getBeanProperties()
+        expect:
+        properties
+        properties.size() == 3
     }
 
     @Unroll
@@ -131,6 +234,24 @@ class PckElementTest {
 
         expect:
         pe.name == 'pkgeltest'
+        pe.simpleName == 'pkgeltest'
+        pe.getClass().name.contains("GroovyPackageElement")
+    }
+
+    void "test get full package element"() {
+        given:
+        def element = buildClassElement('''
+package abc.my.pkgeltest;
+
+class PckElementTest {
+
+}
+''')
+        PackageElement pe = element.getPackage()
+
+        expect:
+        pe.name == 'abc.my.pkgeltest'
+        pe.simpleName == 'pkgeltest'
         pe.getClass().name.contains("GroovyPackageElement")
     }
 
@@ -143,24 +264,24 @@ abstract class Test extends SuperType implements AnotherInterface, SomeInt {
 
     protected boolean t1;
     private boolean t2;
-    
+
     private boolean privateMethod() {
         return true;
     }
-    
+
     boolean packagePrivateMethod() {
         return true;
     }
-    
+
     @java.lang.Override
     public boolean publicMethod() {
         return true;
     }
-    
+
     static boolean staticMethod() {
         return true;
     }
-    
+
     abstract boolean unimplementedMethod();
 }
 
@@ -170,15 +291,15 @@ abstract class SuperType {
     private boolean privateMethod() {
         return true;
     }
-    
+
     public boolean publicMethod() {
         return true;
     }
-    
+
     public boolean otherSuper() {
         return true;
     }
-    
+
     abstract boolean unimplementedSuperMethod();
 }
 
@@ -186,13 +307,13 @@ interface SomeInt {
     default boolean itfeMethod() {
         return true;
     }
-    
+
     boolean publicMethod();
 }
 
 interface AnotherInterface {
     boolean publicMethod();
-    
+
     boolean unimplementedItfeMethod();
 }
 ''')
@@ -225,19 +346,19 @@ class Test extends SuperType implements AnotherInterface, SomeInt {
 
     protected boolean t1;
     private boolean t2;
-    
+
     private boolean privateMethod() {
         return true;
     }
-    
+
     boolean packagePrivateMethod() {
         return true;
     }
-    
+
     public boolean publicMethod() {
         return true;
     }
-    
+
     static boolean staticMethod() {
         return true;
     }
@@ -249,11 +370,11 @@ class SuperType {
     private boolean privateMethod() {
         return true;
     }
-    
+
     public boolean publicMethod() {
         return true;
     }
-    
+
     public boolean otherSuper() {
         return true;
     }
@@ -263,7 +384,7 @@ interface SomeInt {
     default boolean itfeMethod() {
         return true;
     }
-    
+
     boolean publicMethod();
 }
 
@@ -325,12 +446,12 @@ import javax.inject.Inject;
 
 @Controller("/test")
 public class TestController implements java.util.function.Supplier<String> {
-    
+
     @Get("/getMethod")
     public String get() {
         return null;
     }
-    
+
 
 }
 
@@ -350,12 +471,12 @@ import javax.inject.Inject;
 
 @Controller("/test")
 public class TestController {
-    
+
     @Get("/getMethod")
     public String[] getMethod(int[] argument) {
         return null;
     }
-    
+
 
 }
 ''')
@@ -378,12 +499,12 @@ import javax.inject.Inject;
 
 @Controller("/test")
 public class TestController {
-    
+
     @Get("/getMethod")
     public HttpMethod getMethod(HttpMethod argument) {
         return null;
     }
-    
+
 
 }
 ''')
@@ -406,12 +527,12 @@ import javax.inject.Inject;
 
 @Controller("/test")
 public class TestController {
-    
+
     @Get("/getMethod")
     public int getMethod(long argument) {
         return 0;
     }
-    
+
 
 }
 ''')
@@ -432,12 +553,12 @@ import javax.inject.Inject;
 
 @Controller("/test")
 public class TestController<T extends Foo> {
-    
+
     @Get("/getMethod")
     public T getMethod(T argument) {
         return null;
     }
-    
+
 
 }
 
@@ -460,12 +581,12 @@ import javax.inject.Inject;
 
 @Controller("/test")
 public class TestController<T extends Foo> {
-    
+
     @Get("/getMethod")
     public T[] getMethod(T[] argument) {
         return null;
     }
-    
+
 
 }
 
@@ -490,12 +611,12 @@ import javax.inject.Inject;
 
 @Controller("/test")
 public class TestController {
-    
+
     @Get("/getMethod")
     public <T extends Foo> T getMethod(T argument) {
         return null;
     }
-    
+
 
 }
 
@@ -518,12 +639,12 @@ import javax.inject.Inject;
 
 @Controller("/test")
 public class TestController<T extends Foo> {
-    
+
     @Get("/getMethod")
     public java.util.List<T> getMethod(java.util.Set<T> argument) {
         return null;
     }
-    
+
 
 }
 
@@ -558,5 +679,79 @@ class InvoicePO extends TransactionPO {
 
         expect:
         classElement.getBeanProperties().find { it.name == "discount" }.getType().hasAnnotation(SomeAnn)
+    }
+
+    void "test find enum fields using ElementQuery"() {
+        given:
+            ClassElement classElement = buildClassElement('''
+package elementquery;
+
+enum Test {
+
+    A, B, C;
+
+    public static final String publicStaticFinalField = "";
+    public static String publicStaticField;
+    public final String publicFinalField = "";
+    public String publicField;
+
+    protected static final String protectedStaticFinalField = "";
+    protected static String protectedStaticField;
+    protected final String protectedFinalField = "";
+    protected String protectedField;
+
+    static final String packagePrivateStaticFinalField = "";
+    static String packagePrivateStaticField;
+    final String packagePrivateFinalField = "";
+    String packagePrivateField;
+
+    private static final String privateStaticFinalField = "";
+    private static String privateStaticField;
+    private final String privateFinalField = "";
+    private String privateField;
+}
+''')
+        when:
+        List<FieldElement> allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
+        List<String> expected = [
+                'A',
+                'B',
+                'C',
+                'publicStaticFinalField',
+                'publicStaticField',
+                'publicFinalField',
+                'publicField',
+                'protectedStaticFinalField',
+                'protectedStaticField',
+                'protectedFinalField',
+                'protectedField',
+                'packagePrivateStaticFinalField',
+                'packagePrivateStaticField',
+                'packagePrivateFinalField',
+                'packagePrivateField',
+                'privateStaticFinalField',
+                'privateStaticField',
+                'privateFinalField',
+                'privateField',
+                'MIN_VALUE',
+                'MAX_VALUE',
+                'name',
+                'ordinal',
+        ]
+
+        then:
+        for (String name : allFields*.name) {
+            assert expected.contains(name)
+        }
+        allFields.size() == expected.size()
+
+        when:
+        allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS.includeEnumConstants())
+
+        then:
+        for (String name : allFields*.name) {
+            assert expected.contains(name)
+        }
+        allFields.size() == expected.size()
     }
 }

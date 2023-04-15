@@ -21,7 +21,6 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.inject.annotation.AnnotatedElementValidator;
@@ -95,22 +94,8 @@ public class AnnotationUtils {
         this.filer = filer;
         this.visitorAttributes = visitorAttributes;
         this.processingEnv = processingEnv;
-        final SoftServiceLoader<AnnotatedElementValidator> validators = SoftServiceLoader.load(AnnotatedElementValidator.class);
-        final Iterator<ServiceDefinition<AnnotatedElementValidator>> i = validators.iterator();
-        AnnotatedElementValidator elementValidator = null;
-        while (i.hasNext()) {
-            final ServiceDefinition<AnnotatedElementValidator> validator = i.next();
-            if (validator.isPresent()) {
-                try {
-                    elementValidator = validator.load();
-                } catch (Throwable e) {
-                    // probably missing required dependencies to load the validator
-                }
-                break;
-            }
-        }
+        this.elementValidator = SoftServiceLoader.load(AnnotatedElementValidator.class).firstAvailable().orElse(null);
         this.javaAnnotationMetadataBuilder = newAnnotationBuilder();
-        this.elementValidator = elementValidator;
     }
 
     /**

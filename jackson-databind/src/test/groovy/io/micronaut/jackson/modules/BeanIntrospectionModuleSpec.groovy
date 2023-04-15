@@ -21,24 +21,155 @@ import com.fasterxml.jackson.databind.SerializerProvider
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.fasterxml.jackson.databind.annotation.JsonNaming
 import com.fasterxml.jackson.databind.annotation.JsonSerialize
+import com.fasterxml.jackson.dataformat.xml.XmlMapper
+import com.fasterxml.jackson.dataformat.xml.annotation.JacksonXmlElementWrapper
 import groovy.transform.EqualsAndHashCode
 import groovy.transform.PackageScope
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Creator
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.http.hateoas.JsonError
-import io.micronaut.http.hateoas.Link
 import io.micronaut.jackson.JacksonConfiguration
 import io.micronaut.jackson.modules.testcase.EmailTemplate
 import io.micronaut.jackson.modules.testcase.Notification
-import io.micronaut.jackson.modules.wrappers.*
+import io.micronaut.jackson.modules.testclasses.HTTPCheck
+import io.micronaut.jackson.modules.testclasses.InstanceInfo
+import io.micronaut.jackson.modules.wrappers.BooleanWrapper
+import io.micronaut.jackson.modules.wrappers.DoubleWrapper
+import io.micronaut.jackson.modules.wrappers.IntWrapper
+import io.micronaut.jackson.modules.wrappers.IntegerWrapper
+import io.micronaut.jackson.modules.wrappers.LongWrapper
+import io.micronaut.jackson.modules.wrappers.StringWrapper
 import spock.lang.Issue
 import spock.lang.Specification
+import spock.lang.Unroll
 
 import java.beans.ConstructorProperties
 import java.time.LocalDateTime
 
 class BeanIntrospectionModuleSpec extends Specification {
+
+    void "test serialize/deserialize wrap/unwrap - simple"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                'jackson.deserialization.UNWRAP_ROOT_VALUE': true,
+                'jackson.serialization.WRAP_ROOT_VALUE': true
+        )
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        Author author = new Author(name:"Bob")
+
+        def result = objectMapper.writeValueAsString(author)
+
+        then:
+        result == '{"Author":{"name":"Bob"}}'
+
+        when:
+        def read = objectMapper.readValue(result, Author)
+
+        then:
+        author == read
+
+    }
+
+    void "test serialize/deserialize wrap/unwrap -* complex"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                'jackson.deserialization.UNWRAP_ROOT_VALUE': true,
+                'jackson.serialization.WRAP_ROOT_VALUE': true
+        )
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        HTTPCheck check = new HTTPCheck(headers:[
+                Accept:['application/json', 'application/xml']
+        ] )
+
+        def result = objectMapper.writeValueAsString(check)
+
+        then:
+        result == '{"HTTPCheck":{"Header":{"Accept":["application/json","application/xml"]}}}'
+
+        when:
+        def read = objectMapper.readValue(result, HTTPCheck)
+
+        then:
+        check == read
+
+    }
+
+    void "test serialize/deserialize wrap/unwrap -* constructors"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                'jackson.deserialization.UNWRAP_ROOT_VALUE': true,
+                'jackson.serialization.WRAP_ROOT_VALUE': true
+        )
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        IntrospectionCreator check = new IntrospectionCreator("test")
+
+        def result = objectMapper.writeValueAsString(check)
+
+        then:
+        result == '{"IntrospectionCreator":{"label":"TEST"}}'
+
+        when:
+        def read = objectMapper.readValue(result, IntrospectionCreator)
+
+        then:
+        check == read
+
+    }
+
+    void "test serialize/deserialize wrap/unwrap -* constructors & JsonRootName"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                'jackson.deserialization.UNWRAP_ROOT_VALUE': true,
+                'jackson.serialization.WRAP_ROOT_VALUE': true
+        )
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        InstanceInfo check = new InstanceInfo("test")
+
+        def result = objectMapper.writeValueAsString(check)
+
+        then:
+        result == '{"instance":{"hostName":"test"}}'
+
+        when:
+        def read = objectMapper.readValue(result, InstanceInfo)
+
+        then:
+        check == read
+
+    }
+
+
+    void "test serialize/deserialize convertible values"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        HTTPCheck check = new HTTPCheck(headers:[
+                Accept:['application/json', 'application/xml']
+        ] )
+
+        def result = objectMapper.writeValueAsString(check)
+
+        then:
+        result == '{"Header":{"Accept":["application/json","application/xml"]}}'
+
+        when:
+        def read = objectMapper.readValue(result, HTTPCheck)
+
+        then:
+        check.header.getAll("Accept") == read.header.getAll("Accept")
+
+    }
 
     void "Bean introspection works with a bean without JsonIgnore annotations"() {
         given:
@@ -596,6 +727,7 @@ class BeanIntrospectionModuleSpec extends Specification {
     }
 
     @Introspected
+    @EqualsAndHashCode
     static class Author {
         String name
     }
@@ -824,6 +956,7 @@ class BeanIntrospectionModuleSpec extends Specification {
     }
 
     @Introspected
+    @EqualsAndHashCode
     static class IntrospectionCreator {
         private final String name
 
@@ -916,7 +1049,8 @@ class BeanIntrospectionModuleSpec extends Specification {
         }
     }
 
-    void "JsonIgnore on one accessor"() {
+    @Unroll("JsonIgnore is supported with ignoreReflectiveProperties: #ignoreReflectiveProperties")
+    void "JsonIgnore on one accessor"(boolean ignoreReflectiveProperties) {
         given:
         ApplicationContext ctx = ApplicationContext.run()
         ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
@@ -961,6 +1095,130 @@ class BeanIntrospectionModuleSpec extends Specification {
         @JsonIgnore
         public void setBar(String s) {
             this.bar = s
+        }
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/5907')
+    void "xml modifier"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        XmlMapper objectMapper = new XmlMapper()
+        objectMapper.registerModule(ctx.getBean(BeanIntrospectionModule))
+
+        expect:
+        objectMapper.writeValueAsString(new UsesXmlElementWrapper()) ==
+                '<UsesXmlElementWrapper><nestedItems><strings>foo</strings><strings>bar</strings></nestedItems></UsesXmlElementWrapper>'
+
+        cleanup:
+        ctx.close()
+    }
+
+    @Introspected
+    static class UsesXmlElementWrapper {
+        private List<String> strings = ["foo", "bar"];
+
+        @JacksonXmlElementWrapper(/*useWrapping = false, */localName = "nestedItems")
+        public List<String> getStrings() {
+            return strings
+        }
+    }
+
+    @Unroll("JsonProperty annotation is supported with ignoreReflectiveProperties: #ignoreReflectiveProperties")
+    void "JsonProperty support"(boolean ignoreReflectiveProperties) {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        expect:
+        objectMapper.writeValueAsString(new JsonPropertyBean(foo: 'x')) == '{"bar":"x"}'
+        objectMapper.readValue('{"bar":"x"}', JsonPropertyBean).foo == 'x'
+
+        cleanup:
+        ctx.close()
+
+        where:
+        // without reflection we only see JsonIgnore on the whole property
+        ignoreReflectiveProperties << [true, false]
+    }
+
+    @Introspected
+    static class JsonPropertyBean {
+
+        private String foo
+
+        @JsonProperty('bar')
+        public String getFoo() {
+            return foo
+        }
+
+        public void setFoo(String s) {
+            this.foo = s
+        }
+    }
+
+    void "JsonNaming support"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        expect:
+        objectMapper.writeValueAsString(new JsonNamingBean(fooBar: 'x')) == '{"foo_bar":"x"}'
+        objectMapper.readValue('{"foo_bar":"x"}', JsonNamingBean).fooBar == 'x'
+
+        cleanup:
+        ctx.close()
+
+        where:
+        // without reflection we only see JsonIgnore on the whole property
+        ignoreReflectiveProperties << [true, false]
+    }
+
+    @Introspected
+    @JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy)
+    static class JsonNamingBean {
+
+        private String fooBar
+
+        public String getFooBar() {
+            return fooBar
+        }
+
+        public void setFooBar(String s) {
+            this.fooBar = s
+        }
+    }
+
+    void "JsonNaming support in config"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(["jackson.property-naming-strategy": "SNAKE_CASE"])
+        ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        expect:
+        objectMapper.writeValueAsString(new JsonNamingBeanConfig(fooBar: 'x')) == '{"foo_bar":"x"}'
+        objectMapper.readValue('{"foo_bar":"x"}', JsonNamingBeanConfig).fooBar == 'x'
+
+        cleanup:
+        ctx.close()
+
+        where:
+        // without reflection we only see JsonIgnore on the whole property
+        ignoreReflectiveProperties << [true, false]
+    }
+
+    @Introspected
+    static class JsonNamingBeanConfig {
+
+        private String fooBar
+
+        public String getFooBar() {
+            return fooBar
+        }
+
+        public void setFooBar(String s) {
+            this.fooBar = s
         }
     }
 }

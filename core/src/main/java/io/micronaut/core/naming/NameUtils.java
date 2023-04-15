@@ -40,7 +40,7 @@ public class NameUtils {
     private static final String PREFIX_SET = "set";
     private static final String PREFIX_IS = "is";
     private static final Pattern ENVIRONMENT_VAR_SEQUENCE = Pattern.compile("^[\\p{Lu}_{0-9}]+");
-    private static final Pattern KEBAB_CASE_SEQUENCE = Pattern.compile("^(([a-z0-9])+(\\-|\\.|:)?)*([a-z0-9])+$");
+    private static final Pattern KEBAB_CASE_SEQUENCE = Pattern.compile("^(([a-z0-9])+([-.:])?)*([a-z0-9])+$");
     private static final Pattern KEBAB_REPLACEMENTS = Pattern.compile("[_ ]");
 
     /**
@@ -93,7 +93,7 @@ public class NameUtils {
         final String rest = name.substring(1);
 
         // Funky rule so that names like 'pNAME' will still work.
-        if (Character.isLowerCase(name.charAt(0)) && (rest.length() > 0) && Character.isUpperCase(rest.charAt(0))) {
+        if (Character.isLowerCase(name.charAt(0)) && (!rest.isEmpty()) && Character.isUpperCase(rest.charAt(0))) {
             return name;
         }
 
@@ -135,7 +135,7 @@ public class NameUtils {
     public static String dehyphenate(String name) {
         StringBuilder sb = new StringBuilder(name.length());
         for (String token : StringUtils.splitOmitEmptyStrings(name, '-')) {
-            if (token.length() > 0 && Character.isLetter(token.charAt(0))) {
+            if (!token.isEmpty() && Character.isLetter(token.charAt(0))) {
                 sb.append(Character.toUpperCase(token.charAt(0)));
                 sb.append(token.substring(1));
             } else {
@@ -229,7 +229,7 @@ public class NameUtils {
     public static boolean isWriterName(@NonNull String methodName, @NonNull String[] writePrefixes) {
         boolean isValid = false;
         for (String writePrefix : writePrefixes) {
-            if (writePrefix.length() == 0) {
+            if (writePrefix.isEmpty()) {
                 return true;
             }
             int len = methodName.length();
@@ -360,7 +360,7 @@ public class NameUtils {
         boolean isValid = false;
         for (String readPrefix : readPrefixes) {
             int prefixLength = 0;
-            if (readPrefix.length() == 0) {
+            if (readPrefix.isEmpty()) {
                 return true;
             } else if (methodName.startsWith(readPrefix)) {
                 prefixLength = readPrefix.length();
@@ -369,7 +369,8 @@ public class NameUtils {
             }
             int len = methodName.length();
             if (len > prefixLength) {
-                isValid = Character.isUpperCase(methodName.charAt(prefixLength));
+                char firstVarNameChar = methodName.charAt(prefixLength);
+                isValid = firstVarNameChar == '_' || firstVarNameChar == '$' || Character.isUpperCase(firstVarNameChar);
             }
 
             if (isValid) {
@@ -491,7 +492,7 @@ public class NameUtils {
     }
 
     private static String nameFor(String prefix, @NonNull String propertyName) {
-        if (prefix.length() == 0) {
+        if (prefix.isEmpty()) {
             return propertyName;
         }
 
@@ -511,7 +512,7 @@ public class NameUtils {
      * <ul>
      * <li>If the first or only character is Upper Case, it is made Lower Case
      * <li>UNLESS the second character is also Upper Case, when the String is
-     * returned unchanged <eul>.
+     * returned unchanged.
      * </ul>
      *
      * @param name The String to decapitalize
@@ -537,7 +538,7 @@ public class NameUtils {
                 return Character.toString(Character.toLowerCase(name.charAt(0)));
             }
             for (int i = 1; i < Math.min(length, 3); i++) {
-                if (Character.isLowerCase(name.charAt(i))) {
+                if (!Character.isUpperCase(name.charAt(i))) {
                     char[] chars = name.toCharArray();
                     chars[0] = Character.toLowerCase(chars[0]);
                     return new String(chars);
@@ -619,7 +620,7 @@ public class NameUtils {
 
     /**
      * Retrieves the extension of a file name.
-     * Ex: index.html -> html
+     * Ex: index.html -&gt; html
      *
      * @param filename The name of the file
      * @return The file extension
@@ -669,7 +670,7 @@ public class NameUtils {
 
     /**
      * Retrieves the fileName of a file without extension.
-     * Ex: index.html -> index
+     * Ex: index.html -&gt; index
      *
      * @param path The path of the file
      * @return The file name without extension

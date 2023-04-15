@@ -4,7 +4,7 @@ The regular api:http.client.HttpClient[] API is designed around simplifying mess
 
 The following example demonstrates rewriting requests under the URI `/proxy` to the URI `/real` onto the same server (although in a real environment you generally proxy to another server):
 
-snippet::io.micronaut.docs.http.client.proxy.ProxyFilter[tags="imports,class", indent=0, title="Customizing the Netty pipeline for Logbook"]
+snippet::io.micronaut.docs.http.client.proxy.ProxyFilter[tags="imports,class", indent=0, title="Proxy filter that rewrites original requests"]
 
 <1> The filter extends api:http.filter.HttpServerFilter[]
 <2> The api:http.client.ProxyHttpClient[] is injected into the constructor.

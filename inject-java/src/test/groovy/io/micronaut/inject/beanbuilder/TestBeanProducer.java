@@ -12,6 +12,17 @@ public class TestBeanProducer {
         return new BeanB();
     }
 
+    @TestProduces
+    public static BeanC beanC() {
+        return new BeanC();
+    }
+
+    @TestProduces
+    public InterfaceA interfaceA() {
+        return new InterfaceA() {
+        };
+    }
+
     public static class BeanA {
 
     }
@@ -19,4 +30,11 @@ public class TestBeanProducer {
     public static class BeanB {
 
     }
+
+    public static class BeanC {
+
+    }
+
+    public interface InterfaceA {}
+
 }

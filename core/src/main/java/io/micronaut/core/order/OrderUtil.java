@@ -112,6 +112,8 @@ public class OrderUtil {
     public static int getOrder(Object o) {
         if (o instanceof Ordered) {
             return getOrder((Ordered) o);
+        } else if (o instanceof AnnotationMetadata) {
+            return getOrder(((AnnotationMetadata) o));
         }
         return Ordered.LOWEST_PRECEDENCE;
     }

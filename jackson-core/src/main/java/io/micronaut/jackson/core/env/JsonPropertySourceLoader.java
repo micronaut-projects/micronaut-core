@@ -32,7 +32,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * <p>A {@link io.micronaut.context.env.PropertySourceLoader} that reads <tt>application.json</tt> files if they exist.</p>
+ * <p>A {@link io.micronaut.context.env.PropertySourceLoader} that reads {@code application.json} files if they exist.</p>
  *
  * @author Graeme Rocher
  * @since 1.0

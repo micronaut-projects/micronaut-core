@@ -2,14 +2,45 @@ package io.micronaut.inject.beanimport
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
+import io.smallrye.faulttolerance.CdiFaultToleranceSpi
 import io.smallrye.faulttolerance.CircuitBreakerMaintenanceImpl
 import io.smallrye.faulttolerance.DefaultAsyncExecutorProvider
 import io.smallrye.faulttolerance.DefaultExistingCircuitBreakerNames
 import io.smallrye.faulttolerance.DefaultFallbackHandlerProvider
 import io.smallrye.faulttolerance.DefaultFaultToleranceOperationProvider
 import io.smallrye.faulttolerance.ExecutorHolder
+import jakarta.inject.Named
+
+import java.nio.charset.StandardCharsets
 
 class BeanImportSpec extends AbstractTypeElementSpec {
+
+    void "test bean import with primitive array constructor"() {
+        given:
+        ApplicationContext context = buildContext('''
+package beanimporttest1;
+
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Named;
+import java.nio.charset.StandardCharsets;
+
+@Import(classes=io.micronaut.inject.beanimport.UpstreamByteConstructorBean.class)
+class Application {}
+
+@Factory
+class BytesFactory {
+    @Bean
+    @Named("some-bytes")
+    byte[] myBytes() {
+        return "test".getBytes(StandardCharsets.UTF_8);
+    }
+}
+''')
+        def bean = context.getBean(UpstreamByteConstructorBean)
+
+        expect:
+        bean.toString() == 'test'
+    }
 
     void 'test bean import for package'() {
         given:
@@ -23,7 +54,9 @@ class Application {}
         expect:
         context.containsBean(DefaultAsyncExecutorProvider)
         context.containsBean(CircuitBreakerMaintenanceImpl)
+        context.containsBean(CdiFaultToleranceSpi.EagerDependencies)
         context.containsBean(DefaultExistingCircuitBreakerNames)
+        context.containsBean(CdiFaultToleranceSpi.EagerDependencies)
         context.containsBean(DefaultFallbackHandlerProvider)
         context.getBeanDefinition(DefaultFallbackHandlerProvider)
                 .injectedFields.size() == 1
@@ -50,6 +83,7 @@ import io.smallrye.faulttolerance.*;
 @io.micronaut.context.annotation.Import(classes={
     DefaultAsyncExecutorProvider.class,
     CircuitBreakerMaintenanceImpl.class,
+    CdiFaultToleranceSpi.EagerDependencies.class,
     DefaultExistingCircuitBreakerNames.class,
     DefaultFallbackHandlerProvider.class,
     DefaultFaultToleranceOperationProvider.class,
@@ -61,6 +95,7 @@ class Application {}
         expect:
         context.containsBean(DefaultAsyncExecutorProvider)
         context.containsBean(CircuitBreakerMaintenanceImpl)
+        context.containsBean(CdiFaultToleranceSpi.EagerDependencies)
         context.containsBean(DefaultExistingCircuitBreakerNames)
         context.containsBean(DefaultFallbackHandlerProvider)
         context.getBeanDefinition(DefaultFallbackHandlerProvider)
@@ -77,5 +112,18 @@ class Application {}
                 .preDestroyMethods.first().requiresReflection()
         cleanup:
         context.close()
+    }
+}
+class UpstreamByteConstructorBean {
+
+    private final byte[] bytes;
+
+    public UpstreamByteConstructorBean(@Named("some-bytes") byte[] bytes) {
+        this.bytes = bytes;
+    }
+
+    @Override
+    public String toString() {
+        return new String(bytes, StandardCharsets.UTF_8);
     }
 }

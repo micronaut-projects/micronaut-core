@@ -26,6 +26,9 @@ import io.micronaut.http.client.bind.ClientRequestUriContext;
 
 import java.util.List;
 
+/**
+ * An {@link AnnotatedClientRequestBinder} implementation for {@link RequestAttribute}.
+ */
 public class AttributeClientRequestBinder implements AnnotatedClientRequestBinder<RequestAttribute> {
     @Override
     public void bind(

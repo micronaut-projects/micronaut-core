@@ -1,6 +1,7 @@
 package io.micronaut.http.server.netty.http2
 
 import io.micronaut.context.annotation.Property
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Body
@@ -35,7 +36,6 @@ import io.netty.handler.codec.http2.HttpToHttp2ConnectionHandlerBuilder
 import io.netty.handler.codec.http2.InboundHttp2ToHttpAdapterBuilder
 import io.netty.util.ReferenceCountUtil
 import jakarta.inject.Inject
-import org.jetbrains.annotations.NotNull
 import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
@@ -73,7 +73,7 @@ class H2cSpec extends Specification {
                 .channel(NioSocketChannel.class)
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
-                    protected void initChannel(@NotNull SocketChannel ch) throws Exception {
+                    protected void initChannel(@NonNull SocketChannel ch) throws Exception {
                         def http2Connection = new DefaultHttp2Connection(false)
                         def inboundAdapter = new InboundHttp2ToHttpAdapterBuilder(http2Connection)
                                 .maxContentLength(1000000)
@@ -93,7 +93,7 @@ class H2cSpec extends Specification {
                                 .addLast(upgradeHandler)
                                 .addLast(new ChannelInboundHandlerAdapter() {
                                     @Override
-                                    void channelRead(@NotNull ChannelHandlerContext ctx, @NotNull Object msg) throws Exception {
+                                    void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
                                         ctx.read()
                                         if (msg instanceof HttpMessage) {
                                             if (msg.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), -1) != 1) {
@@ -206,8 +206,14 @@ class H2cSpec extends Specification {
 
         CompletableFuture responseFuture = requestUpgrade(request)
 
-        expect:
-        ((FullHttpResponse) responseFuture.get(10, TimeUnit.SECONDS)).content().toString(StandardCharsets.UTF_8) == 'Example response: foo'
+        when:
+        def content = ((FullHttpResponse) responseFuture.get(10, TimeUnit.SECONDS)).content()
+
+        then:
+        content.toString(StandardCharsets.UTF_8) == 'Example response: foo'
+
+        cleanup:
+        content.release()
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6299')
@@ -219,8 +225,14 @@ class H2cSpec extends Specification {
 
         CompletableFuture responseFuture = requestUpgrade(request)
 
-        expect:
-        ((FullHttpResponse) responseFuture.get(10, TimeUnit.SECONDS)).content().toString(StandardCharsets.UTF_8) == 'Example response: foo'
+        when:
+        def content = ((FullHttpResponse) responseFuture.get(10, TimeUnit.SECONDS)).content()
+
+        then:
+        content.toString(StandardCharsets.UTF_8) == 'Example response: foo'
+
+        cleanup:
+        content.release()
     }
 
     @Controller("/h2c")

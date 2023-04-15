@@ -15,22 +15,21 @@
  */
 package io.micronaut.inject.qualifiers;
 
-import static io.micronaut.core.util.ArgumentUtils.check;
-
 import io.micronaut.context.Qualifier;
-import io.micronaut.context.annotation.Any;
-import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameResolver;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
 
 import java.lang.annotation.Annotation;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
+
+import static io.micronaut.core.util.ArgumentUtils.check;
 
 /**
  * Qualifies using a name.
@@ -60,26 +59,34 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
         check("beanType", beanType).notNull();
         check("candidates", candidates).notNull();
         return candidates.filter(candidate -> {
-            if (!beanType.isAssignableFrom(candidate.getBeanType())) {
+            if (!QualifierUtils.matchType(beanType, candidate)) {
                 return false;
             }
-            if (beanType != Object.class && candidate.getAnnotationMetadata().hasDeclaredAnnotation(Any.class)) {
+            if (QualifierUtils.matchAny(beanType, candidate)) {
                 return true;
             }
-            String typeName;
             AnnotationMetadata annotationMetadata = candidate.getAnnotationMetadata();
             // here we resolved the declared Qualifier of the bean
-            Optional<String> beanQualifier = annotationMetadata
+            String thisName = annotationMetadata
                     .findDeclaredAnnotation(AnnotationUtil.NAMED)
-                    .flatMap(AnnotationValue::stringValue);
-            typeName = beanQualifier.orElseGet(() -> {
-                if (candidate instanceof NameResolver) {
-                    Optional<String> resolvedName = ((NameResolver) candidate).resolveName();
-                    return resolvedName.orElse(candidate.getBeanType().getSimpleName());
+                    .flatMap(AnnotationValue::stringValue)
+                    .orElse(null);
+
+            if (thisName == null && candidate instanceof BeanDefinition) {
+                Qualifier<?> qualifier = ((BeanDefinition<?>) candidate).getDeclaredQualifier();
+                if (qualifier != null && qualifier.contains((Qualifier) this)) {
+                    return true;
                 }
-                return candidate.getBeanType().getSimpleName();
-            });
-            return typeName.equalsIgnoreCase(name) || typeName.equalsIgnoreCase(name + beanType.getSimpleName());
+            }
+            if (thisName == null) {
+                 if (candidate instanceof NameResolver) {
+                    Optional<String> resolvedName = ((NameResolver) candidate).resolveName();
+                    thisName = resolvedName.orElse(candidate.getBeanType().getSimpleName());
+                } else {
+                     thisName = candidate.getBeanType().getSimpleName();
+                 }
+            }
+            return thisName.equalsIgnoreCase(name) || thisName.equalsIgnoreCase(name + beanType.getSimpleName());
         });
     }
 
@@ -112,74 +119,4 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
         return name;
     }
 
-    /**
-     * @param <BT>           Bean type
-     * @param beanType       The bean type
-     * @param candidates     The candidates
-     * @param annotationName The annotation name
-     * @param qualifiedName The fully qualified name of the annotation
-     * @return A stream
-     */
-    protected <BT extends BeanType<T>> Stream<BT> reduceByAnnotation(Class<T> beanType, Stream<BT> candidates, String annotationName, String qualifiedName) {
-        return candidates.filter(candidate -> {
-                if (candidate.isPrimary() && Primary.class.getSimpleName().equals(annotationName)) {
-                    return true;
-                } else if (beanType != Object.class && candidate.getAnnotationMetadata().hasDeclaredAnnotation(Any.class)) {
-                    return true;
-                }
-                String candidateName;
-                if (candidate instanceof NameResolver) {
-                    candidateName = ((NameResolver) candidate).resolveName().orElse(candidate.getBeanType().getSimpleName());
-                } else {
-                    Optional<String> annotation = candidate.getAnnotationMetadata().stringValue(AnnotationUtil.NAMED);
-                    candidateName = annotation.orElse(candidate.getBeanType().getSimpleName());
-                }
-
-                if (candidateName.equalsIgnoreCase(annotationName)) {
-                    return true;
-                } else {
-
-                    String qualified = annotationName + beanType.getSimpleName();
-                    if (qualified.equals(candidateName)) {
-                        return true;
-                    }
-                }
-                return qualifiedName != null && candidate.getAnnotationMetadata().hasDeclaredAnnotation(qualifiedName);
-            }
-        );
-    }
-
-    /**
-     * @param <BT>           Bean type
-     * @param beanType       The bean type
-     * @param candidates     The candidates
-     * @param annotationName The annotation name
-     * @return A stream
-     */
-    protected <BT extends BeanType<T>> Stream<BT> reduceByName(Class<T> beanType, Stream<BT> candidates, String annotationName) {
-        return candidates.filter(candidate -> {
-                    if (candidate.isPrimary() && Primary.class.getSimpleName().equals(annotationName)) {
-                        return true;
-                    }
-                    String candidateName;
-                    if (candidate instanceof NameResolver) {
-                        candidateName = ((NameResolver) candidate).resolveName().orElse(candidate.getBeanType().getSimpleName());
-                    } else {
-                        Optional<String> annotation = candidate.getAnnotationMetadata().stringValue(AnnotationUtil.NAMED);
-                        candidateName = annotation.orElse(candidate.getBeanType().getSimpleName());
-                    }
-
-                    if (candidateName.equalsIgnoreCase(annotationName)) {
-                        return true;
-                    } else {
-
-                        String qualified = annotationName + beanType.getSimpleName();
-                        if (qualified.equals(candidateName)) {
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-        );
-    }
 }

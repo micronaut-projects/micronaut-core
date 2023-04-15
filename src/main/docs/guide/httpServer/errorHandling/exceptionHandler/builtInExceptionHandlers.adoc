@@ -9,7 +9,7 @@ Micronaut ships with several built-in handlers:
 | api:core.convert.exceptions.ConversionErrorException[]
 | api:http.server.exceptions.ConversionErrorHandler[]
 | api:web.router.exceptions.DuplicateRouteException[]
-| api:http.server.netty.converters.DuplicateRouteHandler[]
+| api:http.server.exceptions.DuplicateRouteHandler[]
 | api:http.exceptions.HttpStatusException[]
 | api:http.server.exceptions.HttpStatusHandler[]
 | `com.fasterxml.jackson.core.JsonProcessingException`
@@ -19,7 +19,7 @@ Micronaut ships with several built-in handlers:
 | api:core.bind.exceptions.UnsatisfiedArgumentException[]
 | api:http.server.exceptions.UnsatisfiedArgumentHandler[]
 | api:web.router.exceptions.UnsatisfiedRouteException[]
-| api:http.server.netty.converters.UnsatisfiedRouteHandler[]
+| api:http.server.exceptions.UnsatisfiedRouteHandler[]
 | `org.grails.datastore.mapping.validation.ValidationException`
-| api:validation.exceptions.ValidationExceptionHandler[]
+| link:{micronautgroovyapi}/io/micronaut/configuration/gorm/validation/ValidationExceptionHandler.html[ValidationExceptionHandler]
 |===

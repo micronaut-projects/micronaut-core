@@ -23,6 +23,7 @@ import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.Qualifier;
+import io.micronaut.context.RequiresCondition;
 import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.ConfigurationBuilder;
@@ -38,7 +39,9 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.PropertySource;
 import io.micronaut.context.annotation.Provided;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.core.annotation.AccessorsStyle;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -97,7 +100,6 @@ import io.micronaut.inject.visitor.BeanElementVisitor;
 import io.micronaut.inject.visitor.BeanElementVisitorContext;
 import io.micronaut.inject.visitor.VisitorContext;
 import jakarta.inject.Singleton;
-import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
@@ -138,9 +140,9 @@ import static io.micronaut.inject.visitor.BeanElementVisitor.VISITORS;
 
 /**
  * <p>Responsible for building {@link BeanDefinition} instances at compile time. Uses ASM build the class definition.</p>
- * <p>
+ *
  * <p>Should be used from AST frameworks to build bean definitions from source code data.</p>
- * <p>
+ *
  * <p>For example:</p>
  *
  * <pre>
@@ -191,6 +193,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private static final Method GET_BEAN_FOR_FIELD = getBeanLookupMethod("getBeanForField", false);
 
+    private static final Method GET_BEAN_FOR_ANNOTATION = getBeanLookupMethod("getBeanForAnnotation", false);
+
     private static final Method GET_BEAN_REGISTRATIONS_FOR_FIELD = getBeanLookupMethod("getBeanRegistrationsForField", true);
 
     private static final Method GET_BEAN_REGISTRATION_FOR_FIELD = getBeanLookupMethod("getBeanRegistrationForField", true);
@@ -218,6 +222,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final Method GET_STREAM_OF_TYPE_FOR_METHOD_ARGUMENT = getBeanLookupMethodForArgument("getStreamOfTypeForMethodArgument", true);
 
     private static final Method FIND_BEAN_FOR_METHOD_ARGUMENT = getBeanLookupMethodForArgument("findBeanForMethodArgument", true);
+
+    private static final Method CHECK_INJECTED_BEAN_PROPERTY_VALUE = ReflectionUtils.getRequiredInternalMethod(
+            AbstractInitializableBeanDefinition.class,
+            "checkInjectedBeanPropertyValue",
+            String.class,
+            Object.class,
+            String.class,
+            String.class);
 
     private static final Method GET_PROPERTY_VALUE_FOR_METHOD_ARGUMENT = ReflectionUtils.getRequiredInternalMethod(
             AbstractInitializableBeanDefinition.class,
@@ -354,7 +366,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             ExecutableMethod.class,
             Object.class
     ));
-    private static final Method METHOD_GET_BEAN = ReflectionUtils.getRequiredInternalMethod(DefaultBeanContext.class, "getBean", BeanResolutionContext.class, Class.class);
+    private static final Method METHOD_GET_BEAN = ReflectionUtils.getRequiredInternalMethod(DefaultBeanContext.class, "getBean", BeanResolutionContext.class, Class.class, Qualifier.class);
     private static final org.objectweb.asm.commons.Method COLLECTION_TO_ARRAY = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(Collection.class, "toArray", Object[].class)
     );
@@ -376,12 +388,21 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             ReflectionUtils.getRequiredMethod(AbstractInitializableBeanDefinition.class, "invokeMethodWithReflection", BeanResolutionContext.class, BeanContext.class, int.class, Object.class, Object[].class)
     );
 
+    private static final Type TYPE_REFLECTION_UTILS = Type.getType(ReflectionUtils.class);
+
+    private static final org.objectweb.asm.commons.Method GET_FIELD_WITH_REFLECTION_METHOD = org.objectweb.asm.commons.Method.getMethod(
+        ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "getField", Class.class, String.class, Object.class));
+
+    private static final org.objectweb.asm.commons.Method METHOD_INVOKE_METHOD = org.objectweb.asm.commons.Method.getMethod(
+        ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "invokeMethod", Object.class, java.lang.reflect.Method.class, Object[].class));
+
     private static final org.objectweb.asm.commons.Method BEAN_DEFINITION_CLASS_CONSTRUCTOR = new org.objectweb.asm.commons.Method(CONSTRUCTOR_NAME, getConstructorDescriptor(
             Class.class, // beanType
             AbstractInitializableBeanDefinition.MethodOrFieldReference.class, // constructor
             AnnotationMetadata.class, // annotationMetadata
             AbstractInitializableBeanDefinition.MethodReference[].class, // methodInjection
             AbstractInitializableBeanDefinition.FieldReference[].class, // fieldInjection
+            AbstractInitializableBeanDefinition.AnnotationReference[].class, // annotationInjection
             ExecutableMethodsDefinition.class, // executableMethodsDefinition
             Map.class, // typeArgumentsMap
             Optional.class, // scope
@@ -398,6 +419,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final String FIELD_CONSTRUCTOR = "$CONSTRUCTOR";
     private static final String FIELD_INJECTION_METHODS = "$INJECTION_METHODS";
     private static final String FIELD_INJECTION_FIELDS = "$INJECTION_FIELDS";
+    private static final String FIELD_ANNOTATION_INJECTIONS = "$ANNOTATION_INJECTIONS";
     private static final String FIELD_TYPE_ARGUMENTS = "$TYPE_ARGUMENTS";
     private static final String FIELD_INNER_CLASSES = "$INNER_CONFIGURATION_CLASSES";
     private static final String FIELD_EXPOSED_TYPES = "$EXPOSED_TYPES";
@@ -425,6 +447,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             Argument.class, // argument;
             boolean.class // requiresReflection;
     ));
+
+    private static final org.objectweb.asm.commons.Method ANNOTATION_REFERENCE_CONSTRUCTOR = new org.objectweb.asm.commons.Method(CONSTRUCTOR_NAME, getConstructorDescriptor(
+            Argument.class // argument;
+    ));
+
     private static final org.objectweb.asm.commons.Method METHOD_QUALIFIER_FOR_ARGUMENT =
             org.objectweb.asm.commons.Method.getMethod(
                     ReflectionUtils.getRequiredMethod(Qualifiers.class, "forArgument", Argument.class)
@@ -452,8 +479,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private static final org.objectweb.asm.commons.Method METHOD_QUALIFIER_BY_TYPE = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredMethod(Qualifiers.class, "byType", Class[].class)
     );
+
+    private static final org.objectweb.asm.commons.Method METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredMethod(BeanResolutionContext.class, "markDependentAsFactory")
+    );
     private static final Type TYPE_QUALIFIERS = Type.getType(Qualifiers.class);
     private static final Type TYPE_QUALIFIER = Type.getType(Qualifier.class);
+    private static final String MESSAGE_ONLY_SINGLE_CALL_PERMITTED = "Only a single call to visitBeanFactoryMethod(..) is permitted";
 
     private final ClassWriter classWriter;
     private final String beanFullClassName;
@@ -478,6 +510,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private final List<String> beanTypeInnerClasses;
     private GeneratorAdapter buildMethodVisitor;
     private GeneratorAdapter injectMethodVisitor;
+    private GeneratorAdapter checkIfShouldLoadMethodVisitor;
     private Label injectEnd = null;
     private GeneratorAdapter preDestroyMethodVisitor;
     private GeneratorAdapter postConstructMethodVisitor;
@@ -508,6 +541,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private final List<MethodVisitData> postConstructMethodVisits = new ArrayList<>(2);
     private final List<MethodVisitData> preDestroyMethodVisits = new ArrayList<>(2);
     private final List<MethodVisitData> allMethodVisits = new ArrayList<>(2);
+    private final Map<Type, List<AnnotationVisitData>> annotationInjectionPoints = new LinkedHashMap<>(2);
     private final Map<String, Boolean> isLifeCycleCache = new HashMap<>(2);
     private ExecutableMethodsDefinitionWriter executableMethodsDefinitionWriter;
 
@@ -613,7 +647,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             this.beanTypeElement = beanElementBuilder.getBeanType();
             this.packageName = this.beanTypeElement.getPackageName();
             this.isInterface = this.beanTypeElement.isInterface();
-            this.isAbstract = this.beanTypeElement.isAbstract();
+            this.isAbstract = beanElementBuilder.getProducingElement() instanceof ClassElement && this.beanTypeElement.isAbstract();
             this.beanFullClassName = this.beanTypeElement.getName();
             this.beanSimpleClassName = this.beanTypeElement.getSimpleName();
             if (uniqueIdentifier == null) {
@@ -712,9 +746,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @NonNull
     @Override
     public ClassElement[] getTypeArguments() {
-        final Map<String, ClassElement> args = this.typeArguments.get(this.getBeanTypeName());
-        if (CollectionUtils.isNotEmpty(args)) {
-            return args.values().toArray(new ClassElement[0]);
+        if (hasTypeArguments()) {
+            final Map<String, ClassElement> args = this.typeArguments.get(this.getBeanTypeName());
+            if (CollectionUtils.isNotEmpty(args)) {
+                return args.values().toArray(ClassElement.ZERO_CLASS_ELEMENTS);
+            }
         }
         return BeanDefinitionVisitor.super.getTypeArguments();
     }
@@ -820,15 +856,38 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      * @param factoryClass  The factory class
      * @param factoryMethod The factory method
      */
+    @Override
     public void visitBeanFactoryMethod(ClassElement factoryClass,
                                        MethodElement factoryMethod) {
         if (constructor != null) {
-            throw new IllegalStateException("Only a single call to visitBeanFactoryMethod(..) is permitted");
+            throw new IllegalStateException(MESSAGE_ONLY_SINGLE_CALL_PERMITTED);
         } else {
             constructor = factoryMethod;
-
             // now prepare the implementation of the build method. See BeanFactory interface
-            visitBuildFactoryMethodDefinition(factoryClass, factoryMethod);
+            visitBuildFactoryMethodDefinition(factoryClass, factoryMethod, factoryMethod.getParameters());
+            // now override the injectBean method
+            visitInjectMethodDefinition();
+        }
+    }
+
+    /**
+     * <p>In the case where the produced class is produced by a factory method annotated with
+     * {@link Bean} this method should be called.</p>
+     *
+     * @param factoryClass  The factory class
+     * @param factoryMethod The factory method
+     * @param parameters    The parameters
+     */
+    @Override
+    public void visitBeanFactoryMethod(ClassElement factoryClass,
+                                       MethodElement factoryMethod,
+                                       ParameterElement[] parameters) {
+        if (constructor != null) {
+            throw new IllegalStateException(MESSAGE_ONLY_SINGLE_CALL_PERMITTED);
+        } else {
+            constructor = factoryMethod;
+            // now prepare the implementation of the build method. See BeanFactory interface
+            visitBuildFactoryMethodDefinition(factoryClass, factoryMethod, parameters);
             // now override the injectBean method
             visitInjectMethodDefinition();
         }
@@ -841,13 +900,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      * @param factoryClass The factory class
      * @param factoryField The factory field
      */
+    @Override
     public void visitBeanFactoryField(ClassElement factoryClass, FieldElement factoryField) {
         if (constructor != null) {
-            throw new IllegalStateException("Only a single call to visitBeanFactoryMethod(..) is permitted");
+            throw new IllegalStateException(MESSAGE_ONLY_SINGLE_CALL_PERMITTED);
         } else {
             constructor = factoryField;
 
-            autoApplyNamed(factoryField);
+            autoApplyNamedIfPresent(factoryField, factoryField.getAnnotationMetadata());
             // now prepare the implementation of the build method. See BeanFactory interface
             visitBuildFactoryMethodDefinition(factoryClass, factoryField);
             // now override the injectBean method
@@ -1050,6 +1110,22 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             staticInit.putStatic(beanDefinitionType, FIELD_INJECTION_FIELDS, fieldsFieldType);
         }
 
+        if (!annotationInjectionPoints.isEmpty()) {
+            Type annotationInjectionsFieldType = Type.getType(AbstractInitializableBeanDefinition.AnnotationReference[].class);
+            classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_ANNOTATION_INJECTIONS,
+                annotationInjectionsFieldType.getDescriptor(), null, null);
+
+            List<Type> injectedTypes = new ArrayList<>(annotationInjectionPoints.keySet());
+            int length = injectedTypes.size();
+            pushNewArray(staticInit, AbstractInitializableBeanDefinition.AnnotationReference.class, length);
+
+            for (int i = 0; i < length; i++) {
+                Type annotationVisitData = injectedTypes.get(i);
+                pushStoreInArray(staticInit, i, length, () -> pushNewAnnotationReference(staticInit, annotationVisitData));
+            }
+            staticInit.putStatic(beanDefinitionType, FIELD_ANNOTATION_INJECTIONS, annotationInjectionsFieldType);
+        }
+
         if (!superBeanDefinition && hasTypeArguments()) {
             Type typeArgumentsFieldType = Type.getType(Map.class);
             classWriter.visitField(ACC_PRIVATE | ACC_FINAL | ACC_STATIC, FIELD_TYPE_ARGUMENTS, typeArgumentsFieldType.getDescriptor(), null, null);
@@ -1116,6 +1192,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             interceptedDisposeMethod.visitMaxs(1, 1);
             interceptedDisposeMethod.visitEnd();
         }
+        if (checkIfShouldLoadMethodVisitor != null) {
+            buildCheckIfShouldLoadMethod(checkIfShouldLoadMethodVisitor, annotationInjectionPoints);
+            checkIfShouldLoadMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, 10);
+        }
 
         getInterceptedType().ifPresent(t -> implementInterceptedTypeMethod(t, this.classWriter));
 
@@ -1125,6 +1205,72 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
         classWriter.visitEnd();
         this.beanFinalized = true;
+    }
+
+    private void buildCheckIfShouldLoadMethod(GeneratorAdapter adapter, Map<Type, List<AnnotationVisitData>> beanPropertyVisitData) {
+        List<Type> injectedTypes = new ArrayList<>(beanPropertyVisitData.keySet());
+
+        for (int currentTypeIndex = 0; currentTypeIndex < injectedTypes.size(); currentTypeIndex++) {
+            Type injectedType = injectedTypes.get(currentTypeIndex);
+            List<AnnotationVisitData> annotationVisitData = beanPropertyVisitData.get(injectedType);
+            boolean multiplePropertiesFromType = annotationVisitData.size() > 1;
+
+            Integer injectedBeanIndex = null;
+            for (int i = 0; i < annotationVisitData.size(); i++) {
+                int currentPropertyIndex = i;
+                boolean isLastProperty = currentTypeIndex == (injectedTypes.size() - 1) && currentPropertyIndex == (annotationVisitData.size() - 1);
+
+                AnnotationVisitData visitData = annotationVisitData.get(currentPropertyIndex);
+                MethodElement propertyGetter = visitData.memberPropertyGetter;
+                // load 'this'
+                adapter.loadThis();
+                // push injected bean property name
+                adapter.push(visitData.memberPropertyName);
+
+                if (injectedBeanIndex != null) {
+                    adapter.loadLocal(injectedBeanIndex);
+                } else {
+                    // load 'this'
+                    adapter.loadThis();
+                    // 1st argument load BeanResolutionContext
+                    adapter.loadArg(0);
+                    // 2nd argument load BeanContext
+                    adapter.loadArg(1);
+                    // 3rd argument the injected bean index
+                    adapter.push(currentTypeIndex);
+                    // push qualifier
+                    pushQualifier(adapter, visitData.memberBeanType, () -> resolveAnnotationArgument(adapter, currentPropertyIndex));
+                    // invoke getBeanForAnnotation
+                    pushInvokeMethodOnSuperClass(adapter, GET_BEAN_FOR_ANNOTATION);
+                    // cast the return value to the correct type
+                    pushCastToType(adapter, visitData.memberBeanType);
+
+                    // if multiple properties from same bean should be checked, saving bean to local variable
+                    if (multiplePropertiesFromType) {
+                        injectedBeanIndex = adapter.newLocal(injectedType);
+                        adapter.storeLocal(injectedBeanIndex);
+                        adapter.loadLocal(injectedBeanIndex);
+                    }
+                }
+
+                org.objectweb.asm.commons.Method propertyGetterMethod = org.objectweb.asm.commons.Method.getMethod(propertyGetter.getDescription(false));
+                // getter might be an interface method
+                if (visitData.memberBeanType.getType().isInterface()) {
+                    adapter.invokeInterface(injectedType, propertyGetterMethod);
+                } else {
+                    adapter.invokeVirtual(injectedType, propertyGetterMethod);
+                }
+                pushBoxPrimitiveIfNecessary(propertyGetterMethod.getReturnType(), adapter);
+                // pushing required arguments and invoking checkBeanPropertyValue
+                adapter.push(visitData.requiredValue);
+                adapter.push(visitData.notEqualsValue);
+                pushInvokeMethodOnSuperClass(adapter, CHECK_INJECTED_BEAN_PROPERTY_VALUE);
+
+                if (isLastProperty) {
+                    adapter.returnValue();
+                }
+            }
+        }
     }
 
     private void processAllBeanElementVisitors() {
@@ -1687,6 +1833,43 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     @Override
+    public void visitAnnotationMemberPropertyInjectionPoint(TypedElement annotationMemberBeanType,
+                                                            String annotationMemberProperty,
+                                                            @Nullable String requiredValue,
+                                                            @Nullable String notEqualsValue) {
+        ClassElement annotationMemberClassElement = annotationMemberBeanType.getType();
+        MethodElement memberPropertyGetter = annotationMemberClassElement.getBeanProperties()
+            .stream()
+            .filter(property -> property.getSimpleName().equals(annotationMemberProperty))
+            .findFirst()
+            .flatMap(PropertyElement::getReadMethod)
+            .orElse(null);
+
+        if (memberPropertyGetter == null) {
+            final String[] readPrefixes = annotationMemberBeanType.getAnnotationMetadata()
+                .getValue(AccessorsStyle.class, "readPrefixes", String[].class)
+                .orElse(new String[]{AccessorsStyle.DEFAULT_READ_PREFIX});
+
+            memberPropertyGetter = annotationMemberClassElement.getEnclosedElement(
+                    ElementQuery.ALL_METHODS
+                            .onlyAccessible(beanTypeElement)
+                            .onlyInstance()
+                            .named(name -> annotationMemberProperty.equals(NameUtils.getPropertyNameForGetter(name, readPrefixes)))
+                            .filter((e) -> !e.hasParameters())
+            ).orElse(null);
+        }
+
+        if (memberPropertyGetter == null) {
+            visitorContext.fail("Bean property [" + annotationMemberProperty + "] is not available on bean ["
+                                    + annotationMemberBeanType.getName() + "]", annotationMemberBeanType);
+        } else {
+            Type injectedType = JavaModelUtils.getTypeReference(annotationMemberClassElement);
+            annotationInjectionPoints.computeIfAbsent(injectedType, type -> new ArrayList<>(2))
+                                         .add(new AnnotationVisitData(annotationMemberBeanType, annotationMemberProperty, memberPropertyGetter , requiredValue, notEqualsValue));
+        }
+    }
+
+    @Override
     public void visitFieldValue(
             TypedElement declaringType,
             FieldElement fieldElement,
@@ -1871,7 +2054,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 pushCastToType(injectMethodVisitor, paramType);
             }
 
-            boolean isInterface = currentConfigBuilderState.isInterface();
+            boolean anInterface = currentConfigBuilderState.isInterface();
 
             if (isDurationWithTimeUnit) {
                 injectMethodVisitor.invokeVirtual(Type.getType(Duration.class), org.objectweb.asm.commons.Method.getMethod(
@@ -1881,7 +2064,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 injectMethodVisitor.getStatic(tu, "MILLISECONDS", tu);
             }
 
-            if (isInterface) {
+            if (anInterface) {
                 injectMethodVisitor.invokeInterface(builderType,
                         new org.objectweb.asm.commons.Method(methodName, methodDescriptor));
             } else {
@@ -2108,7 +2291,10 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                             Element element,
                                             String annotationName,
                                             Runnable resolveArgument) {
-        if (annotationName.equals(AnnotationUtil.NAMED)) {
+        if (annotationName.equals(Primary.NAME)) {
+            // primary is the same as no qualifier
+            generatorAdapter.visitInsn(ACONST_NULL);
+        } else if (annotationName.equals(AnnotationUtil.NAMED)) {
             final String n = element.stringValue(AnnotationUtil.NAMED)
                     .orElse(element.getName());
             if (!n.contains("$")) {
@@ -2618,6 +2804,16 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 false);
     }
 
+    private void visitCheckIfShouldLoadMethodDefinition() {
+        String desc = getMethodDescriptor("void", BeanResolutionContext.class.getName(), BeanContext.class.getName());
+        this.checkIfShouldLoadMethodVisitor = new GeneratorAdapter(classWriter.visitMethod(
+            ACC_PROTECTED,
+            "checkIfShouldLoad",
+            desc,
+            null,
+            null), ACC_PROTECTED, "checkIfShouldLoad", desc);
+    }
+
     @SuppressWarnings("MagicNumber")
     private void visitInjectMethodDefinition() {
         if (!isPrimitiveBean && !superBeanDefinition && injectMethodVisitor == null) {
@@ -2901,90 +3097,138 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void visitBuildFactoryMethodDefinition(
             ClassElement factoryClass,
-            Element factoryMethod) {
+            Element factoryElement, ParameterElement... parameters) {
         if (buildMethodVisitor == null) {
-            ParameterElement[] parameters;
-
-            if (factoryMethod instanceof MethodElement) {
-                parameters = ((MethodElement) factoryMethod).getParameters();
-            } else {
-                parameters = new ParameterElement[0];
-            }
 
             List<ParameterElement> parameterList = Arrays.asList(parameters);
             boolean isParametrized = isParametrized(parameters);
-            boolean isIntercepted = isConstructorIntercepted(factoryMethod);
+            boolean isIntercepted = isConstructorIntercepted(factoryElement);
             Type factoryType = JavaModelUtils.getTypeReference(factoryClass);
 
             defineBuilderMethod(isParametrized);
             // load this
 
             GeneratorAdapter buildMethodVisitor = this.buildMethodVisitor;
-            // for Factory beans first we need to lookup the the factory bean
-            // before invoking the method to instantiate
-            // the below code looks up the factory bean.
 
-            // Load the BeanContext for the method call
-            buildMethodVisitor.loadArg(1);
-            pushCastToType(buildMethodVisitor, DefaultBeanContext.class);
-            // load the first argument of the method (the BeanResolutionContext) to be passed to the method
-            buildMethodVisitor.loadArg(0);
-            // second argument is the bean type
-            buildMethodVisitor.push(factoryType);
-            buildMethodVisitor.invokeVirtual(
-                    Type.getType(DefaultBeanContext.class),
-                    org.objectweb.asm.commons.Method.getMethod(METHOD_GET_BEAN)
-            );
-
-            // store a reference to the bean being built at index 3
-            int factoryVar = buildMethodVisitor.newLocal(JavaModelUtils.getTypeReference(factoryClass));
-            buildMethodVisitor.storeLocal(factoryVar);
-            buildMethodVisitor.loadLocal(factoryVar);
-            pushCastToType(buildMethodVisitor, factoryClass);
+            int factoryVar  = -1;
+            // Skip initializing a producer instance for static producers
+            if (!factoryElement.isStatic()) {
+                factoryVar = pushGetFactoryBean(factoryClass, factoryType, buildMethodVisitor);
+            }
             String methodDescriptor = getMethodDescriptorForReturnType(beanType, parameterList);
             boolean hasInjectScope = false;
             if (isIntercepted) {
                 int constructorIndex = initInterceptedConstructorWriter(
                         buildMethodVisitor,
                         parameterList,
-                        new FactoryMethodDef(factoryType, factoryMethod, methodDescriptor, factoryVar)
+                        new FactoryMethodDef(factoryType, factoryElement, methodDescriptor, factoryVar)
                 );
                 // populate an Object[] of all constructor arguments
                 final int parametersIndex = createParameterArray(parameterList, buildMethodVisitor);
                 invokeConstructorChain(buildMethodVisitor, constructorIndex, parametersIndex, parameterList);
             } else {
-
-                if (!parameterList.isEmpty()) {
-                    hasInjectScope = pushConstructorArguments(buildMethodVisitor, parameters);
-                }
-                if (factoryMethod instanceof MethodElement) {
-                    buildMethodVisitor.visitMethodInsn(INVOKEVIRTUAL,
-                            factoryType.getInternalName(),
-                            factoryMethod.getName(),
-                            methodDescriptor,
-                            false
-                    );
+                if (factoryElement instanceof MethodElement) {
+                    MethodElement methodElement = (MethodElement) factoryElement;
+                    if (!methodElement.isReflectionRequired() && !parameterList.isEmpty()) {
+                        hasInjectScope = pushConstructorArguments(buildMethodVisitor, parameters);
+                    }
+                    if (methodElement.isReflectionRequired()) {
+                        if (methodElement.isStatic()) {
+                            buildMethodVisitor.push((String) null);
+                        }
+                        DispatchWriter.pushTypeUtilsGetRequiredMethod(buildMethodVisitor, factoryType, methodElement);
+                        buildMethodVisitor.dup();
+                        buildMethodVisitor.push(true);
+                        buildMethodVisitor.invokeVirtual(Type.getType(Method.class), org.objectweb.asm.commons.Method.getMethod(
+                            ReflectionUtils.getRequiredMethod(Method.class, "setAccessible", boolean.class)
+                        ));
+                        hasInjectScope = pushParametersAsArray(buildMethodVisitor, parameters);
+                        buildMethodVisitor.invokeStatic(TYPE_REFLECTION_UTILS, METHOD_INVOKE_METHOD);
+//                        buildMethodVisitor.push((String) null);
+                        if (methodElement.isReflectionRequired() && isPrimitiveBean) {
+                            // Reflection always returns Object, convert it to appropriate primitive
+                            pushCastToType(buildMethodVisitor, beanType);
+                        }
+                    } else
+                    if (methodElement.isStatic()) {
+                        buildMethodVisitor.invokeStatic(factoryType, new org.objectweb.asm.commons.Method(factoryElement.getName(), methodDescriptor));
+                    } else {
+                        buildMethodVisitor.invokeVirtual(factoryType, new org.objectweb.asm.commons.Method(factoryElement.getName(), methodDescriptor));
+                    }
                 } else {
-                    buildMethodVisitor.getField(
-                            factoryType,
-                            factoryMethod.getName(),
-                            beanType
-                    );
+                    FieldElement fieldElement = (FieldElement) factoryElement;
+                    if (fieldElement.isReflectionRequired()) {
+                        if (!fieldElement.isStatic()) {
+                            buildMethodVisitor.storeLocal(factoryVar);
+                        }
+                        buildMethodVisitor.push(factoryType);
+                        buildMethodVisitor.push(fieldElement.getName());
+                        if (fieldElement.isStatic()) {
+                            buildMethodVisitor.push((String) null);
+                        } else {
+                            buildMethodVisitor.loadLocal(factoryVar);
+                        }
+                        buildMethodVisitor.invokeStatic(TYPE_REFLECTION_UTILS, GET_FIELD_WITH_REFLECTION_METHOD);
+                        if (fieldElement.isReflectionRequired() && isPrimitiveBean) {
+                            // Reflection always returns Object, convert it to appropriate primitive
+                            pushCastToType(buildMethodVisitor, beanType);
+                        }
+                    } else if (fieldElement.isStatic()) {
+                        buildMethodVisitor.getStatic(factoryType, factoryElement.getName(), beanType);
+                    } else {
+                        buildMethodVisitor.getField(factoryType, factoryElement.getName(), beanType);
+                    }
                 }
             }
 
-
             this.buildInstanceLocalVarIndex = buildMethodVisitor.newLocal(beanType);
-            buildMethodVisitor.storeLocal(buildInstanceLocalVarIndex);
+            buildMethodVisitor.storeLocal(buildInstanceLocalVarIndex, beanType);
             if (!isPrimitiveBean) {
                 pushBeanDefinitionMethodInvocation(buildMethodVisitor, "injectBean");
                 pushCastToType(buildMethodVisitor, beanType);
                 buildMethodVisitor.storeLocal(buildInstanceLocalVarIndex);
             }
             destroyInjectScopeBeansIfNecessary(buildMethodVisitor, hasInjectScope);
-            buildMethodVisitor.loadLocal(buildInstanceLocalVarIndex);
+            buildMethodVisitor.loadLocal(buildInstanceLocalVarIndex, beanType);
             initLifeCycleMethodsIfNecessary();
         }
+    }
+
+    private int pushGetFactoryBean(ClassElement factoryClass, Type factoryType, GeneratorAdapter buildMethodVisitor) {
+        invokeCheckIfShouldLoadIfNecessary(buildMethodVisitor);
+        // for Factory beans first we need to lookup the factory bean
+        // before invoking the method to instantiate
+        // the below code looks up the factory bean.
+
+        // Load the BeanContext for the method call
+        buildMethodVisitor.loadArg(1);
+        pushCastToType(buildMethodVisitor, DefaultBeanContext.class);
+        // load the first argument of the method (the BeanResolutionContext) to be passed to the method
+        buildMethodVisitor.loadArg(0);
+        // second argument is the bean type
+        buildMethodVisitor.push(factoryType);
+        // third argument is the qualifier for the factory if any
+        pushQualifier(buildMethodVisitor, factoryClass, () -> {
+            buildMethodVisitor.push(factoryType);
+            buildMethodVisitor.push("factory");
+            invokeInterfaceStaticMethod(buildMethodVisitor, Argument.class, METHOD_CREATE_ARGUMENT_SIMPLE);
+        });
+        buildMethodVisitor.invokeVirtual(
+            Type.getType(DefaultBeanContext.class),
+            org.objectweb.asm.commons.Method.getMethod(METHOD_GET_BEAN)
+        );
+
+        int factoryVar = buildMethodVisitor.newLocal(factoryType);
+        buildMethodVisitor.storeLocal(factoryVar, factoryType);
+
+        // BeanResolutionContext
+        buildMethodVisitor.loadArg(0);
+        // .markDependentAsFactory()
+        buildMethodVisitor.invokeInterface(TYPE_RESOLUTION_CONTEXT, METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY);
+
+        buildMethodVisitor.loadLocal(factoryVar);
+        pushCastToType(buildMethodVisitor, factoryClass);
+        return factoryVar;
     }
 
     private void visitBuildMethodDefinition(MethodElement constructor, boolean requiresReflection) {
@@ -2997,6 +3241,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // load this
 
             GeneratorAdapter buildMethodVisitor = this.buildMethodVisitor;
+            invokeCheckIfShouldLoadIfNecessary(buildMethodVisitor);
 
             // if there is constructor interception present then we have to
             // build the parameters into an Object[] and build a constructor invocation
@@ -3051,6 +3296,23 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             buildMethodVisitor.loadLocal(buildInstanceLocalVarIndex);
             initLifeCycleMethodsIfNecessary();
             pushBoxPrimitiveIfNecessary(beanType, buildMethodVisitor);
+        }
+    }
+
+    private void invokeCheckIfShouldLoadIfNecessary(GeneratorAdapter buildMethodVisitor) {
+        AnnotationValue<Requires> requiresAnnotation = annotationMetadata.getAnnotation(Requires.class);
+        if (requiresAnnotation != null
+                && requiresAnnotation.stringValue(RequiresCondition.MEMBER_BEAN).isPresent()
+                && requiresAnnotation.stringValue(RequiresCondition.MEMBER_BEAN_PROPERTY).isPresent()) {
+            visitCheckIfShouldLoadMethodDefinition();
+
+            buildMethodVisitor.loadThis();
+            buildMethodVisitor.loadArg(0);
+            buildMethodVisitor.loadArg(1);
+            buildMethodVisitor.invokeVirtual(beanDefinitionType, org.objectweb.asm.commons.Method.getMethod(
+                ReflectionUtils.getRequiredMethod(AbstractInitializableBeanDefinition.class, "checkIfShouldLoad",
+                    BeanResolutionContext.class,
+                    BeanContext.class)));
         }
     }
 
@@ -3266,7 +3528,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         );
     }
 
-    @NotNull
+    @NonNull
     private String newInnerClassName() {
         return this.beanDefinitionName + "$" + ++innerClassIndex;
     }
@@ -3297,7 +3559,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                             parameter.getName(),
                             parameter,
                             parameter.getAnnotationMetadata(),
-                            parameterIndex
+                            parameterIndex,
+                            false
                     )
             );
         }
@@ -3325,7 +3588,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             final Element originatingElement = getOriginatingElements()[0];
             final boolean isFactoryMethod = (originatingElement instanceof MethodElement && !(originatingElement instanceof ConstructorElement));
             final boolean isProxyTarget = annotationMetadata.booleanValue(AnnotationUtil.ANN_AROUND, "proxyTarget").orElse(false) || isFactoryMethod;
-            // for beans that are @Around(proxyTarget=false) only the generated AOP impl should be intercepted
+            // for beans that are @Around(proxyTarget = false) only the generated AOP impl should be intercepted
             final boolean isAopType = StringUtils.isNotEmpty(interceptedType);
             final boolean isConstructorInterceptionCandidate = (isProxyTarget && !isAopType) || (isAopType && !isProxyTarget);
             final boolean hasAroundConstruct;
@@ -3373,7 +3636,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (size > 0) {
             for (int i = 0; i < parameters.length; i++) {
                 ParameterElement parameter = parameters[i];
-                pushConstructorArgument(buildMethodVisitor, parameter.getName(), parameter, parameter.getAnnotationMetadata(), i);
+                pushConstructorArgument(buildMethodVisitor, parameter.getName(), parameter, parameter.getAnnotationMetadata(), i, false);
                 if (parameter.hasDeclaredAnnotation(InjectScope.class)) {
                     hasInjectScope = true;
                 }
@@ -3382,11 +3645,28 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         return hasInjectScope;
     }
 
+    private boolean pushParametersAsArray(GeneratorAdapter buildMethodVisitor, ParameterElement[] parameters) {
+        final int pLen = parameters.length;
+        boolean hasInjectScope = false;
+        pushNewArray(buildMethodVisitor, Object.class, pLen);
+        for (int i = 0; i < pLen; i++) {
+            final ParameterElement parameter = parameters[i];
+            if (parameter.hasDeclaredAnnotation(InjectScope.class)) {
+                hasInjectScope = true;
+            }
+            int finalI = i;
+            pushStoreInArray(buildMethodVisitor, i, pLen, () ->
+                pushConstructorArgument(buildMethodVisitor, parameter.getName(), parameter, parameter.getAnnotationMetadata(), finalI, true)
+            );
+        }
+        return hasInjectScope;
+    }
+
     private void pushConstructorArgument(GeneratorAdapter buildMethodVisitor,
                                          String argumentName,
                                          ParameterElement argumentType,
                                          AnnotationMetadata annotationMetadata,
-                                         int index) {
+                                         int index, boolean castToObject) {
         if (isAnnotatedWithParameter(annotationMetadata) && isParametrized) {
             // load the args
             buildMethodVisitor.loadArg(3);
@@ -3461,7 +3741,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             if (isArray && hasGenericType) {
                 convertToArray(argumentType.getGenericType().fromArray(), buildMethodVisitor);
             }
-            pushCastToType(buildMethodVisitor, argumentType);
+            if (castToObject) {
+                if (argumentType.isPrimitive()) {
+                    pushCastToType(buildMethodVisitor, Object.class);
+                }
+            } else {
+                pushCastToType(buildMethodVisitor, argumentType);
+            }
         }
     }
 
@@ -3544,6 +3830,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             resolveFirstTypeArgument(visitor);
             resolveInnerTypeArgumentIfNeeded(visitor, type);
         }
+    }
+
+    private void resolveAnnotationArgument(GeneratorAdapter visitor, int index) {
+        visitor.getStatic(beanDefinitionType, FIELD_ANNOTATION_INJECTIONS, Type.getType(AbstractInitializableBeanDefinition.FieldReference[].class));
+        visitor.push(index);
+        visitor.arrayLoad(Type.getType(AbstractInitializableBeanDefinition.AnnotationReference.class));
+        visitor.getField(Type.getType(AbstractInitializableBeanDefinition.AnnotationReference.class), "argument", Type.getType(Argument.class));
     }
 
     private void resolveFieldArgument(GeneratorAdapter visitor, int fieldIndex) {
@@ -3757,7 +4050,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             } else {
                 protectedConstructor.getStatic(beanDefinitionType, FIELD_INJECTION_FIELDS, Type.getType(AbstractInitializableBeanDefinition.FieldReference[].class));
             }
-            // 6: `ExecutableMethod[]` executableMethods
+            // 6: `AbstractBeanDefinition2.AnnotationReference[].class` annotationInjection
+            if (annotationInjectionPoints.isEmpty()) {
+                protectedConstructor.push((String) null);
+            } else {
+                protectedConstructor.getStatic(beanDefinitionType, FIELD_ANNOTATION_INJECTIONS, Type.getType(AbstractInitializableBeanDefinition.AnnotationReference[].class));
+            }
+            // 7: `ExecutableMethod[]` executableMethods
             if (executableMethodsDefinitionWriter == null) {
                 protectedConstructor.push((String) null);
             } else {
@@ -3765,13 +4064,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 protectedConstructor.dup();
                 protectedConstructor.invokeConstructor(executableMethodsDefinitionWriter.getClassType(), METHOD_DEFAULT_CONSTRUCTOR);
             }
-            // 7: `Map<String, Argument<?>[]>` typeArgumentsMap
+            // 8: `Map<String, Argument<?>[]>` typeArgumentsMap
             if (!hasTypeArguments()) {
                 protectedConstructor.push((String) null);
             } else {
                 protectedConstructor.getStatic(beanDefinitionType, FIELD_TYPE_ARGUMENTS, Type.getType(Map.class));
             }
-            // 8: `Optional` scope
+            // 9: `Optional` scope
             String scope = annotationMetadata.getAnnotationNameByStereotype(AnnotationUtil.SCOPE).orElse(null);
             if (scope != null) {
                 protectedConstructor.push(scope);
@@ -3783,27 +4082,27 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 protectedConstructor.invokeStatic(TYPE_OPTIONAL, METHOD_OPTIONAL_EMPTY);
             }
 
-            // 9: `boolean` isAbstract
+            // 10: `boolean` isAbstract
             protectedConstructor.push(isAbstract);
-            // 10: `boolean` isProvided
+            // 11: `boolean` isProvided
             protectedConstructor.push(
                     annotationMetadata.hasDeclaredStereotype(Provided.class)
             );
-            // 11: `boolean` isIterable
+            // 12: `boolean` isIterable
             protectedConstructor.push(isIterable(annotationMetadata));
-            // 12: `boolean` isSingleton
+            // 13: `boolean` isSingleton
             protectedConstructor.push(
                     isSingleton(scope)
             );
-            // 13: `boolean` isPrimary
+            // 14: `boolean` isPrimary
             protectedConstructor.push(
                     annotationMetadata.hasDeclaredStereotype(Primary.class)
             );
-            // 14: `boolean` isConfigurationProperties
+            // 15: `boolean` isConfigurationProperties
             protectedConstructor.push(isConfigurationProperties);
-            // 15: isContainerType
+            // 16: isContainerType
             protectedConstructor.push(isContainerType());
-            // 16: requiresMethodProcessing
+            // 17: requiresMethodProcessing
             protectedConstructor.push(preprocessMethods);
 
             protectedConstructor.invokeConstructor(
@@ -3818,7 +4117,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private boolean isContainerType() {
-        return DefaultArgument.CONTAINER_TYPES.stream().map(Class::getName).anyMatch(c -> c.equals(beanFullClassName));
+        return beanTypeElement.isArray() || DefaultArgument.CONTAINER_TYPES.stream().map(Class::getName).anyMatch(c -> c.equals(beanFullClassName));
     }
 
     private boolean isConfigurationProperties(AnnotationMetadata annotationMetadata) {
@@ -3895,6 +4194,22 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         staticInit.invokeConstructor(Type.getType(AbstractInitializableBeanDefinition.FieldReference.class), FIELD_REFERENCE_CONSTRUCTOR);
     }
 
+    private void pushNewAnnotationReference(GeneratorAdapter staticInit, Type referencedType) {
+        staticInit.newInstance(Type.getType(AbstractInitializableBeanDefinition.AnnotationReference.class));
+        staticInit.dup();
+
+        // 1: argument
+        staticInit.push(referencedType);
+        invokeInterfaceStaticMethod(
+            staticInit,
+            Argument.class,
+            org.objectweb.asm.commons.Method.getMethod(
+                ReflectionUtils.getRequiredInternalMethod(Argument.class, "of", Class.class)));
+
+        staticInit.invokeConstructor(Type.getType(AbstractInitializableBeanDefinition.AnnotationReference.class),
+            ANNOTATION_REFERENCE_CONSTRUCTOR);
+    }
+
     private void pushAnnotationMetadata(GeneratorAdapter staticInit, AnnotationMetadata annotationMetadata) {
         if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA || annotationMetadata.isEmpty()) {
             staticInit.push((String) null);
@@ -3958,8 +4273,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         if (superType == TYPE_ABSTRACT_BEAN_DEFINITION || isSuperFactory) {
             for (Type typeParameter : typeParameters) {
 
-                ArrayAwareSignatureWriter ppsv = (ArrayAwareSignatureWriter)
-                        psv.visitTypeArgument('=');
+                SignatureVisitor ppsv = psv.visitTypeArgument('=');
                 visitTypeParameter(typeParameter, ppsv);
             }
         }
@@ -3969,6 +4283,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private void visitTypeParameter(Type typeParameter, SignatureVisitor ppsv) {
         final boolean isArray = typeParameter.getSort() == Type.ARRAY;
+        boolean isPrimitiveArray = false;
         if (isArray) {
             for (int i = 0; i < typeParameter.getDimensions(); i++) {
                 ppsv.visitArrayType();
@@ -3982,11 +4297,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             } else {
                 // primitive
                 ppsv.visitBaseType(elementType.getInternalName().charAt(0));
+                isPrimitiveArray = true;
             }
         } else {
             ppsv.visitClassType(typeParameter.getInternalName());
         }
-        if (isArray) {
+        if (isPrimitiveArray && ppsv instanceof ArrayAwareSignatureWriter) {
             ((ArrayAwareSignatureWriter) ppsv).visitEndArray();
         } else {
             ppsv.visitEnd();
@@ -4191,6 +4507,27 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @Override
     public Element[] getOriginatingElements() {
         return this.originatingElements.getOriginatingElements();
+    }
+
+    @Internal
+    private static final class AnnotationVisitData {
+        final TypedElement memberBeanType;
+        final String memberPropertyName;
+        final MethodElement memberPropertyGetter;
+        final String requiredValue;
+        final String notEqualsValue;
+
+        public AnnotationVisitData(TypedElement memberBeanType,
+                                   String memberPropertyName,
+                                   MethodElement memberPropertyGetter,
+                                   @Nullable String requiredValue,
+                                   @Nullable String notEqualsValue) {
+            this.memberBeanType = memberBeanType;
+            this.memberPropertyName = memberPropertyName;
+            this.memberPropertyGetter = memberPropertyGetter;
+            this.requiredValue = requiredValue;
+            this.notEqualsValue = notEqualsValue;
+        }
     }
 
     @Internal

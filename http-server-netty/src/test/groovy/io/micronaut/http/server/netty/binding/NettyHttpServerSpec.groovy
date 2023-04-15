@@ -199,15 +199,16 @@ class NettyHttpServerSpec extends Specification {
 
     void "test run Micronaut server when enabling both http and https"() {
         when:
-        int httpPort = SocketUtils.findAvailableTcpPort()
         PropertySource propertySource = PropertySource.of(
                 'micronaut.server.port':httpPort,
                 'micronaut.server.ssl.enabled': true,
+                'micronaut.server.ssl.port': -1,
                 'micronaut.server.ssl.buildSelfSigned': true,
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
                 'micronaut.server.dualProtocol':true
         )
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, propertySource, Environment.TEST)
+        int httpPort = (embeddedServer.boundPorts - embeddedServer.port).first()
 
         URL secureUrl = embeddedServer.getURL()
         HttpClient httpsClient = embeddedServer.applicationContext.createBean(HttpClient, secureUrl)

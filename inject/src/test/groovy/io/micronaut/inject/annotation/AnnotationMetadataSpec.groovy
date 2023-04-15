@@ -7,6 +7,8 @@ import io.micronaut.core.annotation.AnnotationValueBuilder
 import io.micronaut.core.annotation.TypeHint
 import spock.lang.Specification
 
+import java.lang.annotation.RetentionPolicy
+
 class AnnotationMetadataSpec extends Specification {
 
     void "test class values with string"() {
@@ -33,7 +35,19 @@ class AnnotationMetadataSpec extends Specification {
         metadata.stringValues(TypeHint).size() == 2
     }
 
-    AnnotationMetadata newMetadata(AnnotationValueBuilder...builders) {
+    void "test empty values then append"() {
+        given:
+        DefaultAnnotationMetadata metadata = new DefaultAnnotationMetadata([:], null, null, [:], null)
+        metadata.addAnnotation("foo.Bar", [:])
+
+        when:
+        metadata.addRepeatable("foo.Bar", new AnnotationValue("foo.Bar"), RetentionPolicy.RUNTIME)
+
+        then:
+        noExceptionThrown()
+    }
+
+    AnnotationMetadata newMetadata(AnnotationValueBuilder... builders) {
 
         def values = builders.collect({ it.build() })
 

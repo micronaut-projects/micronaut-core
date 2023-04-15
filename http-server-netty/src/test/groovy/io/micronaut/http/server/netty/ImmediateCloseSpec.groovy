@@ -13,6 +13,7 @@ import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
+import org.apache.http.client.methods.CloseableHttpResponse
 import org.apache.http.client.methods.HttpGet
 import org.apache.http.impl.client.CloseableHttpClient
 import org.apache.http.impl.client.HttpClients
@@ -24,23 +25,21 @@ class ImmediateCloseSpec extends Specification {
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6723')
     def 'immediate close of client connection should not lead to log message'() {
         given:
-        def ctx = ApplicationContext.run([
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': 'ImmediateCloseSpec',
-                //'micronaut.server.port': 8080
         ])
-        def embeddedServer = ctx.getBean(EmbeddedServer)
-        embeddedServer.start()
 
         when:
+        Holder holder = embeddedServer.applicationContext.getBean(Holder) // Get holder before the close is called and instance is destroyed
         HttpGet get = new HttpGet(embeddedServer.URI.toString() + '/empty')
         CloseableHttpClient httpClient = HttpClients.createDefault()
-        def response = httpClient.execute(get)
+        CloseableHttpResponse response = httpClient.execute(get)
         httpClient.close()
         embeddedServer.close() // wait for connection handling to finish
 
         then:
         response.getStatusLine().statusCode == 401
-        ctx.getBean(Holder).handleCount == 1
+        holder.handleCount == 1
         // can't check for log messages :(
 
         cleanup:

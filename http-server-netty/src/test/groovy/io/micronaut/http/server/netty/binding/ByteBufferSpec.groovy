@@ -20,6 +20,7 @@ import jakarta.inject.Inject
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import spock.lang.AutoCleanup
 import spock.lang.Specification
 import io.micronaut.core.async.annotation.SingleResult
 
@@ -32,6 +33,7 @@ class ByteBufferSpec extends Specification {
 
     @Inject
     @Client("/")
+    @AutoCleanup
     HttpClient rxClient
 
     void "test reading the body with a publisher of bytebuffers"() {

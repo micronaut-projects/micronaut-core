@@ -29,7 +29,7 @@ import java.util.ServiceLoader;
 @Internal
 final class WebSocketClientFactoryResolver {
 
-    private static WebSocketClientFactory factory;
+    private static volatile WebSocketClientFactory factory;
 
     static WebSocketClientFactory getFactory() {
         if (factory == null) {

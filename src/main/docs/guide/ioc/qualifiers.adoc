@@ -122,11 +122,11 @@ In addition to `@Primary`, there is also a api:context.annotation.Secondary[] an
 
 == Injecting Any Bean
 
-If you are not particular about which bean gets injected then you can use the ann:annotation.Any[] qualifier which will inject the first available bean, for example:
+If you are not particular about which bean gets injected then you can use the ann:context.annotation.Any[] qualifier which will inject the first available bean, for example:
 
 snippet::io.micronaut.docs.qualifiers.any.VehicleSpec[tags="any", indent=0, title="Injecting Any Instance"]
 
-The ann:annotation.Any[] qualifier is typically used in conjunction with the api:context.BeanProvider[] interface to allow more dynamic use cases. For example the following `Vehicle` implementation will start the `Engine` if the bean is present:
+The ann:context.annotation.Any[] qualifier is typically used in conjunction with the api:context.BeanProvider[] interface to allow more dynamic use cases. For example the following `Vehicle` implementation will start the `Engine` if the bean is present:
 
 snippet::io.micronaut.docs.qualifiers.any.Vehicle[tags="imports,clazz", indent=0, title="Using BeanProvider with Any"]
 

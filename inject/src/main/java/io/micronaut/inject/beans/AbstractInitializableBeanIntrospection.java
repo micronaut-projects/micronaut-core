@@ -24,6 +24,7 @@ import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanMethod;
 import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.core.beans.UnsafeBeanProperty;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
@@ -119,6 +120,35 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
     }
 
     /**
+     * Find {@link Method} representation at the method by index. Used by {@link ExecutableMethod#getTargetMethod()}.
+     *
+     * @param index The index
+     * @return The method
+     */
+    @UsedByGeneratedCode
+    @Internal
+    protected abstract Method getTargetMethodByIndex(int index);
+
+    /**
+     * Find {@link Method} representation at the method by index. Used by {@link ExecutableMethod#getTargetMethod()}.
+     *
+     * @param index The index
+     * @return The method
+     * @since 3.8.5
+     */
+    @UsedByGeneratedCode
+    // this logic must allow reflection
+    @SuppressWarnings("java:S3011")
+    protected final Method getAccessibleTargetMethodByIndex(int index) {
+        Method method = getTargetMethodByIndex(index);
+        if (ClassUtils.REFLECTION_LOGGER.isDebugEnabled()) {
+            ClassUtils.REFLECTION_LOGGER.debug("Reflectively accessing method {} of type {}", method, method.getDeclaringClass());
+        }
+        method.setAccessible(true);
+        return method;
+    }
+
+    /**
      * Triggers the invocation of the method at index.
      *
      * @param index  The method index
@@ -162,7 +192,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
 
     /**
      * Get all the bean properties annotated for the given type.
-     * Nullable result method version of {@see getIndexedProperty}.
+     * Nullable result method version of {@link #getIndexedProperty(Class, String)}.
      *
      * @param annotationType  The annotation type
      * @param annotationValue The annotation value
@@ -374,12 +404,14 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
      *
      * @param <P> The property type
      */
-    private final class BeanPropertyImpl<P> implements BeanProperty<B, P> {
+    private final class BeanPropertyImpl<P> implements UnsafeBeanProperty<B, P> {
 
         private final BeanPropertyRef<P> ref;
+        private final Class<?> typeOrWrapperType;
 
         private BeanPropertyImpl(BeanPropertyRef<P> ref) {
             this.ref = ref;
+            this.typeOrWrapperType = ReflectionUtils.getWrapperType(getType());
         }
 
         @NonNull
@@ -419,8 +451,13 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
                 throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + beanType);
             }
             if (isWriteOnly()) {
-                throw new UnsupportedOperationException("Cannot read from a write-only property");
+                throw new UnsupportedOperationException("Cannot read from a write-only property: " + getName());
             }
+            return dispatchOne(ref.getMethodIndex, bean, null);
+        }
+
+        @Override
+        public P getUnsafe(B bean) {
             return dispatchOne(ref.getMethodIndex, bean, null);
         }
 
@@ -434,9 +471,14 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
             if (isReadOnly()) {
                 throw new UnsupportedOperationException("Cannot write a read-only property: " + getName());
             }
-            if (value != null && !ReflectionUtils.getWrapperType(getType()).isInstance(value)) {
+            if (value != null && !typeOrWrapperType.isInstance(value)) {
                 throw new IllegalArgumentException("Specified value [" + value + "] is not of the correct type: " + getType());
             }
+            dispatchOne(ref.setMethodIndex, bean, value);
+        }
+
+        @Override
+        public void setUnsafe(B bean, P value) {
             dispatchOne(ref.setMethodIndex, bean, value);
         }
 
@@ -446,14 +488,19 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
             if (!beanType.isInstance(bean)) {
                 throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + beanType);
             }
-            if (value == get(bean)) {
+            return withValueUnsafe(bean, value);
+        }
+
+        @Override
+        public B withValueUnsafe(B bean, P value) {
+            if (value == getUnsafe(bean)) {
                 return bean;
             } else if (ref.withMethodIndex == -1) {
                 if (!ref.readyOnly && ref.setMethodIndex != -1) {
                     dispatchOne(ref.setMethodIndex, bean, value);
                     return bean;
                 }
-                return BeanProperty.super.withValue(bean, value);
+                return UnsafeBeanProperty.super.withValue(bean, value);
             } else {
                 return dispatchOne(ref.withMethodIndex, bean, value);
             }
@@ -559,7 +606,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
             if (ClassUtils.REFLECTION_LOGGER.isWarnEnabled()) {
                 ClassUtils.REFLECTION_LOGGER.warn("Using getTargetMethod for method {} on type {} requires the use of reflection. GraalVM configuration necessary", getName(), getDeclaringType());
             }
-            return ReflectionUtils.getRequiredMethod(getDeclaringType(), getMethodName(), getArgumentTypes());
+            return getTargetMethodByIndex(ref.methodIndex);
         }
 
         @Override

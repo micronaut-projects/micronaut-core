@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.cli.CommandLine;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.StringUtils;
 
@@ -36,10 +37,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.ServiceLoader;
 import java.util.Set;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
 
 /**
  * Implementation of {@link ApplicationContextBuilder}.
@@ -69,12 +67,26 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private boolean allowEmptyProviders = false;
     private boolean strictConversionChecking = false;
     private Boolean bootstrapEnvironment = null;
+    private boolean enableDefaultPropertySources = true;
 
     /**
      * Default constructor.
      */
     protected DefaultApplicationContextBuilder() {
-        loadApplicationContextCustomizer().configure(this);
+        loadApplicationContextCustomizer(resolveClassLoader()).configure(this);
+    }
+
+    DefaultApplicationContextBuilder(ClassLoader classLoader) {
+        loadApplicationContextCustomizer(classLoader).configure(this);
+        this.classLoader = classLoader;
+    }
+
+    private ClassLoader resolveClassLoader() {
+        final ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+        if (contextClassLoader != null) {
+            return contextClassLoader;
+        }
+        return DefaultApplicationContextBuilder.class.getClassLoader();
     }
 
     @Override
@@ -85,6 +97,17 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public boolean isStrictConversionChecking() {
         return strictConversionChecking;
+    }
+
+    @NonNull
+    public ApplicationContextBuilder enableDefaultPropertySources(boolean areEnabled) {
+        this.enableDefaultPropertySources = areEnabled;
+        return this;
+    }
+
+    @Override
+    public boolean isEnableDefaultPropertySources() {
+        return enableDefaultPropertySources;
     }
 
     @NonNull
@@ -384,14 +407,15 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
      * Returns a customizer which is the aggregation of all
      * customizers found on classpath via service loading.
      * @return an application customizer
+     * @param classLoader The class loader to use
      */
     @NonNull
-    private static ApplicationContextConfigurer loadApplicationContextCustomizer() {
-        ServiceLoader<ApplicationContextConfigurer> loader = ServiceLoader.load(
-                ApplicationContextConfigurer.class
-        );
-        List<ApplicationContextConfigurer> configurers = StreamSupport.stream(loader.spliterator(), false)
-                .collect(Collectors.toList());
+    private static ApplicationContextConfigurer loadApplicationContextCustomizer(@Nullable ClassLoader classLoader) {
+        SoftServiceLoader<ApplicationContextConfigurer> loader = classLoader != null ? SoftServiceLoader.load(
+                ApplicationContextConfigurer.class, classLoader
+        ) : SoftServiceLoader.load(ApplicationContextConfigurer.class);
+        List<ApplicationContextConfigurer> configurers = new ArrayList<>(10);
+        loader.collectAll(configurers);
         if (configurers.isEmpty()) {
             return ApplicationContextConfigurer.NO_OP;
         }

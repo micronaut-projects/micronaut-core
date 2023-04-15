@@ -30,6 +30,7 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import spock.lang.Issue
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 import java.time.LocalDate
@@ -76,7 +77,7 @@ class HttpHeadSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Not Found"
+        e.message == "Client '/': Not Found"
         e.status == HttpStatus.NOT_FOUND
     }
 
@@ -90,7 +91,7 @@ class HttpHeadSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error"
+        e.message == "Client '/': Internal Server Error"
         e.status == HttpStatus.INTERNAL_SERVER_ERROR
         !e.response.getBody(String).isPresent()
     }
@@ -105,7 +106,7 @@ class HttpHeadSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error"
+        e.message == "Client '/': Internal Server Error"
         e.status == HttpStatus.INTERNAL_SERVER_ERROR
     }
 
@@ -183,7 +184,7 @@ class HttpHeadSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == "Empty body"
+        ex.message == "Client '/': Empty body"
     }
 
     void "test simple get request with POJO list"() {
@@ -223,21 +224,21 @@ class HttpHeadSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == "Empty body"
+        ex.message == "Client '/head': Empty body"
 
         when:
         client.queryParam('foo', 'bar')
 
         then:
         ex = thrown(HttpClientResponseException)
-        ex.message == "Empty body"
+        ex.message == "Client '/head': Empty body"
 
         when:
         client.queryParam('foo%', 'bar')
 
         then:
         ex = thrown(HttpClientResponseException)
-        ex.message == "Empty body"
+        ex.message == "Client '/head': Empty body"
     }
 
     void "test body availability"() {
@@ -268,7 +269,7 @@ class HttpHeadSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Not Found"
+        e.message == "Client '/': Not Found"
         e.status == HttpStatus.NOT_FOUND
     }
 
@@ -280,7 +281,7 @@ class HttpHeadSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == "Empty body"
+        ex.message == "Client '/': Empty body"
     }
 
     void 'test format dates with @Format'() {
@@ -294,28 +295,28 @@ class HttpHeadSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == "Empty body"
+        ex.message == "Client '/head': Empty body"
 
         when:
         client.formatDateQuery(d)
 
         then:
         ex = thrown(HttpClientResponseException)
-        ex.message == "Empty body"
+        ex.message == "Client '/head': Empty body"
 
         when:
         client.formatDateTime(dt)
 
         then:
         ex = thrown(HttpClientResponseException)
-        ex.message == "Empty body"
+        ex.message == "Client '/head': Empty body"
 
         when:
         client.formatDateTimeQuery(dt)
 
         then:
         ex = thrown(HttpClientResponseException)
-        ex.message == "Empty body"
+        ex.message == "Client '/head': Empty body"
     }
 
     void "test no body returned"() {
@@ -324,7 +325,7 @@ class HttpHeadSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == "Empty body"
+        ex.message == "Client '/head': Empty body"
     }
 
     void "test a request with a custom host header"() {
@@ -335,7 +336,7 @@ class HttpHeadSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == "Empty body"
+        ex.message == "Client '/': Empty body"
 
     }
 
@@ -348,7 +349,7 @@ class HttpHeadSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == "Method Not Allowed"
+        ex.message == "Client '/head': Method Not Allowed"
 
         when:
         String body = client.toBlocking().retrieve(HttpRequest.GET("/head/no-head"), String)
@@ -387,6 +388,47 @@ class HttpHeadSpec extends Specification {
 
         then:
         !body.isPresent()
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/3685')
+    void "test that content-type header is present in head request"() {
+        when:
+        HttpResponse response = Flux.from(client.exchange(
+                HttpRequest.HEAD("/head/content-type"), String
+        )).blockFirst()
+
+        then:
+        response.status == HttpStatus.OK
+        !response.body.present
+        response.contentType.present
+        response.contentType.get() == MediaType.IMAGE_PNG_TYPE
+        response.contentLength == 10
+    }
+
+    void "test that content-type header is not present for head request when error results"() {
+        when:
+        Flux.from(client.exchange(
+                HttpRequest.HEAD("/head/empty"), String
+        )).blockFirst()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        def response = ex.response
+        !response.body.present
+        !response.contentType.present
+    }
+
+    void "test that content-type header is not present for head request when error route throws"() {
+        when:
+        Flux.from(client.exchange(
+                HttpRequest.HEAD("/head/thrownError"), String
+        )).blockFirst()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        def response = ex.response
+        !response.body.present
+        !response.contentType.present
     }
 
     @Requires(property = 'spec.name', value = 'HttpHeadSpec')
@@ -491,7 +533,26 @@ class HttpHeadSpec extends Specification {
         @Head("/no-content")
         @Status(HttpStatus.NO_CONTENT)
         void noContent() {}
+
+        @Head("/content-type")
+        HttpResponse<String> contentType() {
+            return HttpResponse.ok("ok")
+                    .contentType(MediaType.IMAGE_PNG_TYPE)
+                    .contentLength(10)
+        }
+
+        @Get("/thrownError")
+        HttpResponse<String> thrownError() {
+            throw new CustomErrorException();
+        }
+
+        @io.micronaut.http.annotation.Error
+        HttpResponse thrownErrorHandler(HttpRequest request, CustomErrorException ignored) {
+            throw new RuntimeException('error thrown: CustomErrorException')
+        }
     }
+
+    static class CustomErrorException extends RuntimeException { }
 
     static class Book {
         String title

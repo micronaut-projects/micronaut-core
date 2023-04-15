@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.ssl.ClientSslConfiguration
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.bootstrap.Bootstrap
@@ -29,14 +30,12 @@ import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioServerSocketChannel
 import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.ssl.SslHandshakeTimeoutException
-import org.jetbrains.annotations.NotNull
 import reactor.core.publisher.Flux
 import spock.lang.Ignore
 import spock.lang.Specification
 
 import javax.net.ssl.SSLHandshakeException
 import java.security.GeneralSecurityException
-import java.security.InvalidAlgorithmParameterException
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 
@@ -102,10 +101,10 @@ class SslSpec extends Specification {
 
     static class IgnoringChannelInitializer extends ChannelInitializer<Channel> {
         @Override
-        protected void initChannel(@NotNull Channel ch) throws Exception {
+        protected void initChannel(@NonNull Channel ch) throws Exception {
             ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
                 @Override
-                void channelRead(@NotNull ChannelHandlerContext ctx, @NotNull Object msg) throws Exception {
+                void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
                     // ignore
                 }
             })
@@ -128,7 +127,7 @@ class SslSpec extends Specification {
         where:
         url << [
                 'https://expired.badssl.com/',
-                //'https://wrong.host.badssl.com/', cert is for *.badssl.com, we accept that
+                'https://wrong.host.badssl.com/',
                 'https://self-signed.badssl.com/',
                 'https://untrusted-root.badssl.com/',
                 //'https://revoked.badssl.com/', not implemented

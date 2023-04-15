@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.configuration;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
@@ -39,6 +40,7 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -135,8 +137,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private AccessLogger accessLogger;
     private Http2Settings http2Settings = new Http2Settings();
     private boolean keepAliveOnServerError = DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR;
-    private boolean bindToRouterExposedPorts = true;
     private String pcapLoggingPathPattern = null;
+    private List<NettyListenerConfiguration> listeners = null;
 
     /**
      * Default empty constructor.
@@ -546,6 +548,22 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
+     * Get the explicit netty listener configurations, or {@code null} if they should be implicit.
+     * @return The listeners
+     */
+    public List<NettyListenerConfiguration> getListeners() {
+        return listeners;
+    }
+
+    /**
+     * Set the explicit netty listener configurations, or {@code null} if they should be implicit.
+     * @param listeners The listeners
+     */
+    public void setListeners(List<NettyListenerConfiguration> listeners) {
+        this.listeners = listeners;
+    }
+
+    /**
      * Http2 settings.
      */
     @ConfigurationProperties("http2")
@@ -586,20 +604,26 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          * Gets the {@code SETTINGS_ENABLE_PUSH} value. If unavailable, returns {@code null}.
          *
          * @return The {@code SETTINGS_ENABLE_PUSH} value. If unavailable, returns {@code null}.
+         * @deprecated The {@code SETTINGS_ENABLE_PUSH} setting makes no sense when sent by the
+         * server, and clients must reject any setting except {@code false} (the default) according
+         * to the spec.
          */
+        @Deprecated
         public Boolean getPushEnabled() {
             return settings.pushEnabled();
         }
 
         /**
-         * Sets the {@code SETTINGS_ENABLE_PUSH} value.
+         * Does nothing.
          *
          * @param enabled The {@code SETTINGS_ENABLE_PUSH} value.
+         * @deprecated The {@code SETTINGS_ENABLE_PUSH} setting makes no sense when sent by the
+         * server, and clients must reject any setting except {@code false} (the default) according
+         * to the spec. Netty will refuse to write this setting altogether. To prevent this, this
+         * setter now does nothing and will be removed in a future release.
          */
+        @Deprecated
         public void setPushEnabled(Boolean enabled) {
-            if (enabled != null) {
-                settings.pushEnabled(enabled);
-            }
         }
 
         /**
@@ -1030,6 +1054,157 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         @Override
         public Duration getShutdownTimeout() {
             return shutdownTimeout;
+        }
+    }
+
+    /**
+     * Netty listener configuration.
+     *
+     * @author yawkat
+     * @since 3.5.0
+     */
+    @EachProperty("listeners")
+    public static final class NettyListenerConfiguration {
+        private Family family = Family.TCP;
+        private boolean ssl;
+        @Nullable
+        private String host;
+        private int port;
+        private String path;
+        private boolean exposeDefaultRoutes = true;
+
+        /**
+         * Create a TCP listener configuration.
+         *
+         * @param host The host to bind to
+         * @param port The port to bind to
+         * @param ssl Whether to enable SSL
+         * @return The configuration with the given settings
+         */
+        @Internal
+        public static NettyListenerConfiguration createTcp(@Nullable String host, int port, boolean ssl) {
+            NettyListenerConfiguration configuration = new NettyListenerConfiguration();
+            configuration.setFamily(Family.TCP);
+            configuration.setHost(host);
+            configuration.setPort(port);
+            configuration.setSsl(ssl);
+            return configuration;
+        }
+
+        /**
+         * The address family of this listener.
+         * @return The address family of this listener.
+         */
+        public Family getFamily() {
+            return family;
+        }
+
+        /**
+         * The address family of this listener.
+         * @param family The address family of this listener.
+         */
+        public void setFamily(@NonNull Family family) {
+            Objects.requireNonNull(family, "family");
+            this.family = family;
+        }
+
+        /**
+         * Whether to enable SSL on this listener. Also requires {@link io.micronaut.http.ssl.SslConfiguration#isEnabled()}
+         * to be set.
+         * @return Whether to enable SSL on this listener.
+         */
+        public boolean isSsl() {
+            return ssl;
+        }
+
+        /**
+         * Whether to enable SSL on this listener. Also requires {@link io.micronaut.http.ssl.SslConfiguration#isEnabled()}
+         * to be set.
+         * @param ssl Whether to enable SSL on this listener.
+         */
+        public void setSsl(boolean ssl) {
+            this.ssl = ssl;
+        }
+
+        /**
+         * For TCP listeners, the host to bind to, or {@code null} to bind to all hosts.
+         * @return For TCP listeners, the host to bind to, or {@code null} to bind to all hosts.
+         */
+        @Nullable
+        public String getHost() {
+            return host;
+        }
+
+        /**
+         * For TCP listeners, the host to bind to, or {@code null} to bind to all hosts.
+         * @param host For TCP listeners, the host to bind to, or {@code null} to bind to all hosts.
+         */
+        public void setHost(@Nullable String host) {
+            this.host = host;
+        }
+
+        /**
+         * The TCP port to bind to. May be {@code -1} to bind to a random port.
+         * @return The TCP port to bind to. May be {@code -1} to bind to a random port.
+         */
+        public int getPort() {
+            return port;
+        }
+
+        /**
+         * The TCP port to bind to. May be {@code -1} to bind to a random port.
+         * @param port The TCP port to bind to. May be {@code -1} to bind to a random port.
+         */
+        public void setPort(int port) {
+            this.port = port;
+        }
+
+        /**
+         * For UNIX domain sockets, the path of the socket. For abstract domain sockets, this should start with a NUL byte.
+         * @return For UNIX domain sockets, the path of the socket. For abstract domain sockets, this should start with a NUL byte.
+         */
+        public String getPath() {
+            return path;
+        }
+
+        /**
+         * For UNIX domain sockets, the path of the socket. For abstract domain sockets, this should start with a NUL byte.
+         * @param path For UNIX domain sockets, the path of the socket. For abstract domain sockets, this should start with a NUL byte.
+         */
+        public void setPath(String path) {
+            this.path = path;
+        }
+
+        /**
+         * Whether to expose default routes on this listener.
+         * @return Whether to expose default routes on this listener.
+         */
+        @Internal
+        public boolean isExposeDefaultRoutes() {
+            return exposeDefaultRoutes;
+        }
+
+        /**
+         * Whether to expose default routes on this listener.
+         * @param exposeDefaultRoutes Whether to expose default routes on this listener.
+         */
+        @Internal
+        public void setExposeDefaultRoutes(boolean exposeDefaultRoutes) {
+            this.exposeDefaultRoutes = exposeDefaultRoutes;
+        }
+
+        /**
+         * Address family enum.
+         */
+        public enum Family {
+            /**
+             * TCP socket.
+             */
+            TCP,
+            /**
+             * UNIX domain socket.
+             */
+            UNIX,
         }
     }
 }

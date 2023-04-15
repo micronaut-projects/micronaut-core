@@ -34,6 +34,7 @@ import io.micronaut.ast.groovy.utils.PublicAbstractMethodVisitor
 import io.micronaut.ast.groovy.utils.PublicMethodVisitor
 import io.micronaut.ast.groovy.visitor.GroovyElementFactory
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
+import io.micronaut.context.RequiresCondition
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.ConfigurationBuilder
 import io.micronaut.context.annotation.ConfigurationInject
@@ -42,6 +43,7 @@ import io.micronaut.context.annotation.DefaultScope
 import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.Requires
 import io.micronaut.context.annotation.Value
 import io.micronaut.core.annotation.AccessorsStyle
 import io.micronaut.core.annotation.AnnotationClassValue
@@ -255,6 +257,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             populateProxyWriterConstructor(groovyClassElement, aopProxyWriter, groovyClassElement.getPrimaryConstructor().orElse(null))
             beanDefinitionWriters.put(node, aopProxyWriter)
             this.aopProxyWriter = aopProxyWriter
+            visitAnnotationMetadata(aopProxyWriter, annotationMetadata)
             visitIntroductionTypePublicMethods(aopProxyWriter, node)
             if (ArrayUtils.isNotEmpty(interfaceTypes)) {
                 List<AnnotationNode> annotationNodes = node.annotations
@@ -300,6 +303,22 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         }
     }
 
+    private void visitAnnotationMetadata(BeanDefinitionVisitor writer, AnnotationMetadata annotationMetadata) {
+        for (AnnotationValue<Requires> annotation: annotationMetadata.getAnnotationValuesByType(Requires.class)) {
+            annotation.stringValue(RequiresCondition.MEMBER_BEAN_PROPERTY)
+                    .ifPresent((String beanProperty) -> {
+                        annotation.stringValue(RequiresCondition.MEMBER_BEAN)
+                                .map{ String s -> compilationUnit.getAST().classes.find {ClassNode cn -> cn.name == s }}
+                                .map{elementFactory.newClassElement(it, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, it))}
+                                .ifPresent((ClassElement classElement) -> {
+                                    String requiredValue = annotation.stringValue().orElse(null);
+                                    String notEqualsValue = annotation.stringValue(RequiresCondition.MEMBER_NOT_EQUALS).orElse(null);
+                                    writer.visitAnnotationMemberPropertyInjectionPoint(classElement, beanProperty, requiredValue, notEqualsValue)
+                                })
+                    })
+        }
+    }
+
     private void populateIntroducedInterfaces(List<AnnotationNode> annotationNodes, Set<ClassNode> interfacesToVisit) {
         for (ann in annotationNodes) {
             if (ann.classNode.name == Introduction.class.getName()) {
@@ -338,7 +357,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             void accept(ClassNode classNode, MethodNode methodNode) {
                 AnnotationMetadata annotationMetadata
                 if (AstAnnotationUtils.isAnnotated(node.name, methodNode) || AstAnnotationUtils.hasAnnotation(methodNode, Override)) {
-                    annotationMetadata = AstAnnotationUtils.newBuilder(source, unit).buildForParent(node.name, node, methodNode)
+                    // Class annotations are referenced by concreteClassAnnotationMetadata
+                    annotationMetadata = AstAnnotationUtils.newBuilder(source, unit).buildForParent(node.name, null, methodNode)
                     annotationMetadata = new AnnotationMetadataHierarchy(concreteClassAnnotationMetadata, annotationMetadata)
                 } else {
                     annotationMetadata = new AnnotationMetadataReference(
@@ -717,6 +737,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
             returnType = methodNode.getReturnType()
             allTypeArguments = factoryMethodElement.returnType.allTypeArguments
+            visitAnnotationMetadata(beanMethodWriter, beanFactoryMetadata)
             beanMethodWriter.visitTypeArguments(allTypeArguments)
             beanMethodWriter.visitBeanFactoryMethod(
                     originatingElement,
@@ -745,6 +766,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
             returnType = factoryField.type.nativeType as ClassNode
             allTypeArguments = factoryField.type.allTypeArguments
+            visitAnnotationMetadata(beanMethodWriter, beanFactoryMetadata)
             beanMethodWriter.visitTypeArguments(allTypeArguments)
             beanMethodWriter.visitBeanFactoryField(
                     originatingElement,
@@ -1199,12 +1221,6 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         FieldNode fieldNode = propertyNode.field
         if (fieldNode.name == 'metaClass') return
         def modifiers = propertyNode.getModifiers()
-        if (Modifier.isStatic(modifiers)) {
-            if (isFactoryClass && AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, fieldNode).hasDeclaredStereotype(Bean.class)) {
-                AstMessageUtils.error(sourceUnit, propertyNode, "Beans produced from fields cannot be static")
-            }
-            return
-        }
         AnnotationMetadata fieldAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, fieldNode)
         if (Modifier.isFinal(modifiers) && !fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder)) {
             if (isFactoryClass && fieldAnnotationMetadata.hasDeclaredStereotype(Bean.class)) {
@@ -1359,9 +1375,10 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
 
     private void visitFactoryProperty(PropertyNode propertyNode, FieldNode fieldNode, AnnotationMetadata fieldAnnotationMetadata) {
 
+        def modifiers = propertyNode.isStatic() ? Modifier.STATIC | Modifier.PUBLIC : Modifier.PUBLIC
         def getterNode = new MethodNode(
                 getGetterName(propertyNode),
-                Modifier.PUBLIC,
+                modifiers,
                 fieldNode.type,
                 new Parameter[0],
                 null,
@@ -1429,6 +1446,7 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
             beanWriter = new BeanDefinitionWriter(groovyClassElement, configurationMetadataBuilder, groovyVisitorContext)
             beanWriter.visitTypeArguments(groovyClassElement.allTypeArguments)
             beanDefinitionWriters.put(classNode, beanWriter)
+            visitAnnotationMetadata(beanWriter, annotationMetadata)
 
             MethodElement constructor = groovyClassElement.getPrimaryConstructor().orElse(null)
 
@@ -1637,8 +1655,8 @@ final class InjectVisitor extends ClassCodeVisitorSupport {
         List<String> prefixes = Arrays.asList(annotationMetadata.getValue(AccessorsStyle.class, "writePrefixes", String[].class).orElse(["set"] as String[]))
         String configurationPrefix = annotationMetadata.getValue(ConfigurationBuilder.class, String.class)
                 .map({ value -> value + "."}).orElse("")
-        Set<String> includes = annotationMetadata.getValue(ConfigurationBuilder.class, "includes", Set.class).orElse(Collections.emptySet())
-        Set<String> excludes = annotationMetadata.getValue(ConfigurationBuilder.class, "excludes", Set.class).orElse(Collections.emptySet())
+        Set<String> includes = annotationMetadata.getValue(ConfigurationBuilder.class, "includes", Set.class).orElse(Collections.<String>emptySet())
+        Set<String> excludes = annotationMetadata.getValue(ConfigurationBuilder.class, "excludes", Set.class).orElse(Collections.<String>emptySet())
 
         SourceUnit source = this.sourceUnit
         CompilationUnit compilationUnit = this.compilationUnit

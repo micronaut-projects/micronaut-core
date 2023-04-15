@@ -23,7 +23,7 @@ import java.util.EventListener;
  * <p>Allows hooking into bean instantiation at the point prior to when {@link jakarta.annotation.PostConstruct}
  * initialization hooks have been called and in the case of bean {@link io.micronaut.context.BeanProvider} instances the
  * {@link io.micronaut.context.BeanProvider#get()} method has not yet been invoked.</p>
- * <p>
+ *
  * <p>This allows (for example) customization of bean properties prior to any initialization logic or factory logic.</p>
  *
  * @param <T> The event type

@@ -136,7 +136,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         this.introspectionName = computeIntrospectionName(name);
         this.introspectionType = getTypeReferenceForName(introspectionName);
         this.beanType = getTypeReferenceForName(name);
-        this.dispatchWriter = new DispatchWriter(introspectionType);
+        this.dispatchWriter = new DispatchWriter(introspectionType, Type.getType(AbstractInitializableBeanIntrospection.class));
     }
 
     /**
@@ -493,7 +493,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         staticInit.dup();
         // 1: return argument
         ClassElement genericReturnType = beanMethodData.methodElement.getGenericReturnType();
-        pushArgument(introspectionType, classWriter, staticInit, classElement.getName(), genericReturnType, defaults, loadTypeMethods);
+        pushReturnTypeArgument(introspectionType, classWriter, staticInit, classElement.getName(), genericReturnType, defaults, loadTypeMethods);
         // 2: name
         staticInit.push(beanMethodData.methodElement.getName());
         // 3: annotation metadata
@@ -618,6 +618,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
         dispatchWriter.buildDispatchOneMethod(classWriter);
         dispatchWriter.buildDispatchMethod(classWriter);
+        dispatchWriter.buildGetTargetMethodByIndex(classWriter);
         buildPropertyIndexOfMethod(classWriter);
         buildFindIndexedProperty(classWriter);
         buildGetIndexedProperties(classWriter);
@@ -916,7 +917,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private void writeIntrospectionReference(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
         Type superType = Type.getType(AbstractBeanIntrospectionReference.class);
         final String referenceName = targetClassType.getClassName();
-        classWriterOutputVisitor.visitServiceDescriptor(BeanIntrospectionReference.class, referenceName);
+        classWriterOutputVisitor.visitServiceDescriptor(BeanIntrospectionReference.class, referenceName, getOriginatingElement());
 
         try (OutputStream referenceStream = classWriterOutputVisitor.visitClass(referenceName, getOriginatingElements())) {
             startService(referenceWriter, BeanIntrospectionReference.class, targetClassType.getInternalName(), superType);

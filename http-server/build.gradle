@@ -1,9 +1,6 @@
-
-
-internalSanityChecks {
-    expectedServiceCount.put('io.micronaut.inject.BeanDefinitionReference', 30)
-    expectedServiceCount.put('io.micronaut.inject.BeanConfiguration', 1)
-}           
+plugins {
+    id "io.micronaut.build.internal.convention-library"
+}
 
 dependencies {
     api project(":websocket")
@@ -11,8 +8,11 @@ dependencies {
     api project(":router")
     compileOnly libs.kotlinx.coroutines.core
     compileOnly libs.kotlinx.coroutines.reactor
+    compileOnly(libs.micronaut.runtime.groovy)
     implementation libs.managed.reactor
     annotationProcessor project(":inject-java")
+
+    testImplementation libs.managed.netty.codec.http
 }
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

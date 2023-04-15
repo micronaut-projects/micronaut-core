@@ -15,15 +15,20 @@
  */
 package io.micronaut.http.server.netty.cors
 
+import io.micronaut.context.annotation.Replaces
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import io.micronaut.http.server.util.HttpHostResolver
+import jakarta.inject.Singleton
 import reactor.core.publisher.Flux
 
 import static io.micronaut.http.HttpHeaders.*
@@ -235,6 +240,24 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         !headerNames.contains(ACCESS_CONTROL_ALLOW_CREDENTIALS)
     }
 
+    void "test preflight request with controlled headers but http method doesn't exists"() {
+        given:
+        HttpResponse response = Flux.from(rxClient.exchange(
+                HttpRequest.OPTIONS('/test/arbitrary')
+                        .header(ACCESS_CONTROL_REQUEST_METHOD, 'POST')
+                        .header(ORIGIN, 'bar.com')
+                        .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Accept')
+        )).onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
+
+        expect:
+        response.code() == HttpStatus.METHOD_NOT_ALLOWED.code
+    }
+
     void "test control headers are applied to error response routes"() {
         when:
         Flux.from(rxClient.exchange(
@@ -292,12 +315,27 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         'micronaut.server.dateHeader': false]
     }
 
+    @Requires(property = 'spec.name', value = 'NettyCorsSpec')
+    @Replaces(HttpHostResolver.class)
+    @Singleton
+    static class HttpHostResolverReplacement implements HttpHostResolver {
+        @Override
+        String resolve(@Nullable HttpRequest request) {
+            "https://micronautexample.com"
+        }
+    }
+
     @Controller('/test')
     @Requires(property = 'spec.name', value = 'NettyCorsSpec')
     static class TestController {
 
         @Get
         HttpResponse index() {
+            HttpResponse.noContent()
+        }
+
+        @Post
+        HttpResponse indexPost() {
             HttpResponse.noContent()
         }
 

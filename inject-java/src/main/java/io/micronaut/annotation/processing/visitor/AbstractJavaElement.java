@@ -17,29 +17,46 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.annotation.processing.AnnotationUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
-import io.micronaut.inject.ast.*;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementModifier;
+import io.micronaut.inject.ast.MemberElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 
-import javax.lang.model.element.*;
+import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
-import javax.lang.model.type.*;
+import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.Modifier;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.ArrayType;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.IntersectionType;
+import javax.lang.model.type.NoType;
+import javax.lang.model.type.PrimitiveType;
+import javax.lang.model.type.TypeKind;
+import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.TypeVariable;
+import javax.lang.model.type.UnionType;
+import javax.lang.model.type.WildcardType;
 import java.lang.annotation.Annotation;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static javax.lang.model.element.Modifier.*;
+import static javax.lang.model.element.Modifier.PRIVATE;
+import static javax.lang.model.element.Modifier.PROTECTED;
+import static javax.lang.model.element.Modifier.PUBLIC;
 
 /**
  * An abstract class for other elements to extend from.
@@ -48,7 +65,7 @@ import static javax.lang.model.element.Modifier.*;
  * @author graemerocher
  * @since 1.0
  */
-public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Element, AnnotationMetadataDelegate {
+public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Element {
 
     private final Element element;
     private final JavaVisitorContext visitorContext;
@@ -76,7 +93,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         final AnnotationValue<T> av = builder.build();
         AnnotationUtils annotationUtils = visitorContext
                 .getAnnotationUtils();
-        this.annotationMetadata = annotationUtils
+        annotationMetadata = annotationUtils
                 .newAnnotationBuilder()
                 .annotate(annotationMetadata, av);
 
@@ -90,7 +107,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
 
         AnnotationUtils annotationUtils = visitorContext
                 .getAnnotationUtils();
-        this.annotationMetadata = annotationUtils
+        annotationMetadata = annotationUtils
                 .newAnnotationBuilder()
                 .annotate(annotationMetadata, annotationValue);
 
@@ -104,7 +121,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         try {
             AnnotationUtils annotationUtils = visitorContext
                     .getAnnotationUtils();
-            this.annotationMetadata = annotationUtils
+            annotationMetadata = annotationUtils
                     .newAnnotationBuilder()
                     .removeAnnotation(annotationMetadata, annotationType);
             return this;
@@ -117,12 +134,16 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
     public <T extends Annotation> io.micronaut.inject.ast.Element removeAnnotationIf(@NonNull Predicate<AnnotationValue<T>> predicate) {
         //noinspection ConstantConditions
         if (predicate != null) {
-            AnnotationUtils annotationUtils = visitorContext
-                    .getAnnotationUtils();
-            this.annotationMetadata = annotationUtils
-                    .newAnnotationBuilder()
-                    .removeAnnotationIf(annotationMetadata, predicate);
-            return this;
+            try {
+                AnnotationUtils annotationUtils = visitorContext
+                        .getAnnotationUtils();
+                annotationMetadata = annotationUtils
+                        .newAnnotationBuilder()
+                        .removeAnnotationIf(annotationMetadata, predicate);
+                return this;
+            } finally {
+                updateMetadataCaches();
+            }
         }
         return this;
     }
@@ -133,7 +154,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
         try {
             AnnotationUtils annotationUtils = visitorContext
                     .getAnnotationUtils();
-            this.annotationMetadata = annotationUtils
+            annotationMetadata = annotationUtils
                     .newAnnotationBuilder()
                     .removeStereotype(annotationMetadata, annotationType);
             return this;
@@ -155,8 +176,14 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             final Element nativeType = (Element) owningType.getNativeType();
             declaringTypeName = resolveCanonicalName(nativeType);
         } else {
-            final Element nativeType = (Element) this.getNativeType();
-            declaringTypeName = resolveCanonicalName(nativeType);
+            final Object nativeType = getNativeType();
+            if (nativeType instanceof TypeVariable) {
+                declaringTypeName = resolveCanonicalName(((TypeVariable) nativeType).asElement());
+            } else if (nativeType instanceof Element) {
+                declaringTypeName = resolveCanonicalName((Element) nativeType);
+            } else {
+                throw new IllegalStateException("Cannot determine type name from: " + nativeType);
+            }
         }
         return declaringTypeName;
     }
@@ -187,10 +214,16 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
 
     @Override
     public Set<ElementModifier> getModifiers() {
-        return this.element
+        return element
                 .getModifiers().stream()
                 .map(m -> ElementModifier.valueOf(m.name()))
                 .collect(Collectors.toSet());
+    }
+
+    @Override
+    public Optional<String> getDocumentation() {
+        String doc = visitorContext.getElements().getDocComment(element);
+        return Optional.ofNullable(doc != null ? doc.trim() : null);
     }
 
     @Override
@@ -403,6 +436,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
                 upperBounds = Stream.of(extendsBound);
             }
             return new JavaWildcardElement(
+                    wt,
                     upperBounds
                             .map(tm -> (JavaClassElement) mirrorToClassElement(tm, visitorContext, finalGenericsInfo, includeTypeAnnotations))
                             .collect(Collectors.toList()),

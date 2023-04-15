@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.http.context.event.HttpRequestReceivedEvent;
+import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
@@ -105,6 +106,10 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
             );
             final Throwable cause = e.getCause();
             ctx.fireExceptionCaught(cause != null ? cause : e);
+            if (msg instanceof StreamedHttpRequest) {
+                // discard any data that may come in
+                ((StreamedHttpRequest) msg).closeIfNoSubscriber();
+            }
         }
     }
 }

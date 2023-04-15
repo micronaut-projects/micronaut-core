@@ -15,6 +15,9 @@
  */
 package io.micronaut.inject.ast;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.ReflectiveAccess;
+
 import java.util.Collections;
 import java.util.Set;
 
@@ -49,5 +52,70 @@ public interface MemberElement extends Element {
      */
     default Set<ElementModifier> getModifiers() {
         return Collections.emptySet();
+    }
+
+    /**
+     * Returns whether this member element will require reflection to invoke or retrieve at runtime.
+     *
+     * <p>This method uses {@link #getOwningType()} as the calling type for this method.</p>
+     *
+     * @return Will return {@code true} if reflection is required.
+     * @since 3.4.0
+     */
+    default boolean isReflectionRequired() {
+        return isReflectionRequired(getOwningType());
+    }
+
+    /**
+     * Returns whether this member element will require reflection to invoke or retrieve at runtime.
+     *
+     * @param callingType The calling type
+     * @return Will return {@code true} if reflection is required.
+     * @since 3.4.0
+     */
+    default boolean isReflectionRequired(@NonNull ClassElement callingType) {
+        if (isPublic()) {
+            return false;
+        }
+        if (isPackagePrivate() || isProtected()) {
+            // the declaring type might be a super class in which
+            // case if the super class is in a different package then
+            // the method or field is not visible and hence reflection is required
+            final ClassElement declaringType = getDeclaringType();
+            return !declaringType.getPackageName().equals(callingType.getPackageName());
+        }
+        return isPrivate();
+    }
+
+    /**
+     * Returns whether this member element can be invoked or retrieved at runtime.
+     * It can be accessible by a simple invocation or a reflection invocation.
+     *
+     * <p>This method uses {@link #isReflectionRequired()} with a checks if the reflection access is allowed.
+     * By checking for {@link io.micronaut.core.annotation.ReflectiveAccess} annotation.
+     * </p>
+     *
+     * @return Will return {@code true} if is accessible.
+     * @since 3.7.0
+     */
+    default boolean isAccessible() {
+        return isAccessible(getOwningType());
+    }
+
+    /**
+     * Returns whether this member element can be invoked or retrieved at runtime.
+     * It can be accessible by a simple invocation or a reflection invocation.
+     *
+     * <p>This method uses {@link #isReflectionRequired()} with a checks if the reflection access is allowed.
+     * By checking for {@link io.micronaut.core.annotation.ReflectiveAccess} annotation.
+     * </p>
+     *
+     * @param callingType The calling type
+     * @return Will return {@code true} if is accessible.
+     * @since 3.7.0
+     */
+    default boolean isAccessible(@NonNull ClassElement callingType) {
+        return !isReflectionRequired(callingType) || hasAnnotation(ReflectiveAccess.class);
+
     }
 }

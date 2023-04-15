@@ -26,11 +26,11 @@ If your listener performs work that might take a while, use the ann:scheduling.a
 
 snippet::io.micronaut.docs.context.events.async.SampleEventListener,io.micronaut.docs.context.events.async.SampleEventListenerSpec[tags="imports,class",indent=0,title="Asynchronously listening for Events with `@EventListener`"]
 
-The event listener by default runs on the `scheduled` executor. You can configure this thread pool as required in `application.yml`:
+The event listener by default runs on the `scheduled` executor. You can configure this thread pool as required in your configuration file (e.g `application.yml`):
 
 //TODO: Move YAML snippet to ExecutorServiceConfigSpec
 .Configuring Scheduled Task Thread Pool
-[source,yaml]
+[configuration]
 ----
 micronaut:
   executors:

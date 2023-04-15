@@ -71,6 +71,8 @@ public class HealthEndpoint {
     private DetailsVisibility detailsVisible = DetailsVisibility.AUTHENTICATED;
     private StatusConfiguration statusConfiguration;
 
+    private boolean serviceReadyIndicatorEnabled = true;
+
     /**
      * @param healthAggregator            The {@link HealthAggregator}
      * @param healthIndicators            The {@link HealthIndicator}
@@ -138,6 +140,22 @@ public class HealthEndpoint {
     }
 
     /**
+     * Whether the {@link io.micronaut.management.health.indicator.service.ServiceReadyHealthIndicator} is enabled. Defaults to {@code true}.
+     * @return True if it is enabled.
+     */
+    public boolean isServiceReadyIndicatorEnabled() {
+        return serviceReadyIndicatorEnabled;
+    }
+
+    /**
+     * Set whether the {@link io.micronaut.management.health.indicator.service.ServiceReadyHealthIndicator} is enabled. Defaults to {@code true}.
+     * @param serviceReadyIndicatorEnabled True if the service ready indicator should be enabled.
+     */
+    public void setServiceReadyIndicatorEnabled(boolean serviceReadyIndicatorEnabled) {
+        this.serviceReadyIndicatorEnabled = serviceReadyIndicatorEnabled;
+    }
+
+    /**
      * @return The visibility policy for health information.
      */
     public DetailsVisibility getDetailsVisible() {
@@ -185,6 +203,7 @@ public class HealthEndpoint {
                 break;
             case ANONYMOUS:
                 showDetails = true;
+                break;
             default:
                 // no-op
         }

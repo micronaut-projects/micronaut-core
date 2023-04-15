@@ -95,4 +95,11 @@ public @interface CircuitBreaker {
      */
     @AliasFor(annotation = Retryable.class, member = "predicate")
     Class<? extends RetryPredicate> predicate() default DefaultRetryPredicate.class;
+
+    /**
+     * If {@code true} and the circuit is opened, it throws the original exception wrapped.
+     * in a {@link io.micronaut.retry.exception.CircuitOpenException}
+     * @return Whether to wrap the original exception in a {@link io.micronaut.retry.exception.CircuitOpenException}
+     */
+    boolean throwWrappedException() default false;
 }
