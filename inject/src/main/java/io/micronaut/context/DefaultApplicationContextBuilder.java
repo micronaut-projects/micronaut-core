@@ -100,6 +100,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @NonNull
+    @Override
     public ApplicationContextBuilder enableDefaultPropertySources(boolean areEnabled) {
         this.enableDefaultPropertySources = areEnabled;
         return this;

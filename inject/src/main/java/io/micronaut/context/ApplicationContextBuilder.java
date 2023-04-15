@@ -226,7 +226,7 @@ public interface ApplicationContextBuilder {
 
     /**
      * Enable strict conversion error checking.
-     *
+     * @param strict Whether to enable strict conversion error checking
      * @return This application
      * @since 3.9.0
      */

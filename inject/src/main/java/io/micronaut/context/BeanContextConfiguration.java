@@ -18,7 +18,6 @@ package io.micronaut.context;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.ConfigurationReader;
-import io.micronaut.core.annotation.Nullable;
 import jakarta.inject.Singleton;
 
 import java.lang.annotation.Annotation;
