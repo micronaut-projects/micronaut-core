@@ -45,7 +45,7 @@ public interface BeanContextConfiguration {
      * Enable strict conversion error checking.
      *
      * @return Whether to perform strict error checking for conversions
-     * @since 3.4.0
+     * @since 3.9.0
      */
     default boolean isStrictConversionChecking() {
         return false;
