@@ -15,13 +15,12 @@
  */
 package io.micronaut.annotation.processing;
 
-import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
-import io.micronaut.core.convert.value.MutableConvertibleValues;
-import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.inject.visitor.TypeElementVisitor;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
@@ -33,7 +32,14 @@ import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 
-import java.util.*;
+import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
+import io.micronaut.annotation.processing.visitor.log.MicronautMessager;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.convert.value.MutableConvertibleValues;
+import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
+import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
+import io.micronaut.inject.visitor.TypeElementVisitor;
 
 /**
  * Abstract annotation processor base class.
@@ -183,7 +189,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
-        this.messager = processingEnv.getMessager();
+        this.messager = new MicronautMessager(processingEnv);
         this.filer = processingEnv.getFiler();
         this.classWriterOutputVisitor = new AnnotationProcessingOutputVisitor(filer);
         this.elementUtils = processingEnv.getElementUtils();
