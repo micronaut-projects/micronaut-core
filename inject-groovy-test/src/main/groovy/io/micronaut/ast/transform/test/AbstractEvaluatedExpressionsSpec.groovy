@@ -55,7 +55,7 @@ class AbstractEvaluatedExpressionsSpec extends AbstractBeanDefinitionSpec {
             String exprFullName = exprClassName + i
             try {
                 def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName).newInstance()
-                result.add(exprClass.evaluate(new DefaultExpressionEvaluationContext(thisObject, null, applicationContext, null)))
+                result.add(exprClass.evaluate(new DefaultExpressionEvaluationContext(null, null, applicationContext, null)))
             } catch (ClassNotFoundException e) {
                 return null
             }
@@ -90,7 +90,7 @@ class AbstractEvaluatedExpressionsSpec extends AbstractBeanDefinitionSpec {
         try {
             def index = EvaluatedExpressionReference.nextIndex(exprClassName)
             def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprClassName + (index == 0 ? index : index - 1)).newInstance()
-            return exprClass.evaluate(new DefaultExpressionEvaluationContext(thisObject, null, applicationContext, null));
+            return exprClass.evaluate(new DefaultExpressionEvaluationContext(null, null, applicationContext, null));
         } catch (ClassNotFoundException e) {
             return null
         }
@@ -117,7 +117,7 @@ class AbstractEvaluatedExpressionsSpec extends AbstractBeanDefinitionSpec {
         try {
             def index = EvaluatedExpressionReference.nextIndex(exprFullName)
             def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName + (index == 0 ? index : index - 1)).newInstance()
-            return exprClass.evaluate(new DefaultExpressionEvaluationContext(thisObject, args, applicationContext, null));
+            return exprClass.evaluate(new DefaultExpressionEvaluationContext(null, args, applicationContext, null));
         } catch (ClassNotFoundException e) {
             return null
         }
