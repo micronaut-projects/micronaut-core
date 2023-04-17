@@ -24,6 +24,8 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.logging.LoggingSystemException;
 
+import java.io.File;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Iterator;
 import java.util.ServiceLoader;
@@ -36,6 +38,8 @@ import java.util.function.Supplier;
  * @since 3.8.4
  */
 public final class LogbackUtils {
+
+    private static final String DEFAULT_LOGBACK_13_PROGRAMMATIC_CONFIGURATOR = "ch.qos.logback.classic.util.DefaultJoranConfigurator";
 
     private LogbackUtils() {
     }
@@ -50,18 +54,35 @@ public final class LogbackUtils {
     public static void configure(@NonNull ClassLoader classLoader,
                                  @NonNull LoggerContext context,
                                  @NonNull String logbackXmlLocation) {
-        configure(context, logbackXmlLocation, () -> classLoader.getResource(logbackXmlLocation));
+        configure(context, logbackXmlLocation, () -> {
+            // Check classpath first
+            URL resource = classLoader.getResource(logbackXmlLocation);
+            if (resource != null) {
+                return resource;
+            }
+            // Check file system
+            File file = new File(logbackXmlLocation);
+            if (file.exists()) {
+                try {
+                    resource = file.toURI().toURL();
+                } catch (MalformedURLException e) {
+
+                    throw new LoggingSystemException("Error creating URL for off-classpath resource", e);
+                }
+            }
+            return resource;
+        });
     }
 
     /**
      * Configures a Logger Context.
-     *
+     * <p>
      * Searches fpr a custom {@link Configurator} via a service loader.
      * If not present it configures the context with the resource.
      *
-     * @param context  Logger Context
+     * @param context            Logger Context
      * @param logbackXmlLocation the location of the xml logback config file
-     * @param resourceSupplier A resource for example logback.xml
+     * @param resourceSupplier   A resource for example logback.xml
      */
     private static void configure(
         @NonNull LoggerContext context,
@@ -69,7 +90,7 @@ public final class LogbackUtils {
         Supplier<URL> resourceSupplier
     ) {
         Configurator configurator = loadFromServiceLoader();
-        if (configurator != null) {
+        if (isSupportedConfigurator(context, configurator)) {
             context.getStatusManager().add(new InfoStatus("Using " + configurator.getClass().getName(), context));
             programmaticConfiguration(context, configurator);
         } else {
@@ -84,6 +105,17 @@ public final class LogbackUtils {
                 throw new LoggingSystemException("Resource " + logbackXmlLocation + " not found");
             }
         }
+    }
+
+    private static boolean isSupportedConfigurator(LoggerContext context, Configurator configurator) {
+        if (configurator == null) {
+            return false;
+        }
+        if (DEFAULT_LOGBACK_13_PROGRAMMATIC_CONFIGURATOR.equals(configurator.getClass().getName())) {
+            context.getStatusManager().add(new InfoStatus("Skipping " + configurator.getClass().getName() + " as it's assumed to be from an unsupported version of Logback", context));
+            return false;
+        }
+        return true;
     }
 
     /**
