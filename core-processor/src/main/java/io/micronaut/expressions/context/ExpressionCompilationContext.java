@@ -17,6 +17,8 @@ package io.micronaut.expressions.context;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
@@ -32,6 +34,12 @@ import java.util.List;
  */
 @Internal
 public interface ExpressionCompilationContext {
+
+    /**
+     * @return Find the type that represents this.
+     */
+    @Nullable
+    ClassElement findThis();
 
     /**
      * Search methods in compilation context by name.

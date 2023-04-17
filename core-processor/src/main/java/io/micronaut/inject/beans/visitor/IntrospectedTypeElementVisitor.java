@@ -109,7 +109,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     index.getAndIncrement(),
                     element,
                     ce,
-                    metadata ? resolvedMetadata : null
+                    metadata ? resolvedMetadata : null,
+                    context
                 );
 
                 processElement(
@@ -136,7 +137,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                             j++,
                             element,
                             classElement,
-                            metadata ? element.getAnnotationMetadata() : null
+                            metadata ? element.getAnnotationMetadata() : null,
+                            context
                         );
 
                         processElement(metadata,
@@ -150,7 +152,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         } else {
             final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                 element,
-                metadata ? element.getAnnotationMetadata() : null
+                metadata ? element.getAnnotationMetadata() : null,
+                context
             );
             processElement(metadata, indexedAnnotations, element, writer);
         }

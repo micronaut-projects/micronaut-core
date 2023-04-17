@@ -32,6 +32,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -66,15 +67,15 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
 
     private BeanConstructor<B> beanConstructor;
 
-    public AbstractInitializableBeanIntrospection(Class<B> beanType,
+    protected AbstractInitializableBeanIntrospection(Class<B> beanType,
                                                   AnnotationMetadata annotationMetadata,
                                                   AnnotationMetadata constructorAnnotationMetadata,
                                                   Argument<?>[] constructorArguments,
                                                   BeanPropertyRef<Object>[] propertiesRefs,
                                                   BeanMethodRef<Object>[] methodsRefs) {
         this.beanType = beanType;
-        this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata;
-        this.constructorAnnotationMetadata = constructorAnnotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : constructorAnnotationMetadata;
+        this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
+        this.constructorAnnotationMetadata = constructorAnnotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : EvaluatedAnnotationMetadata.wrapIfNecessary(constructorAnnotationMetadata);
         this.constructorArguments = constructorArguments == null ? Argument.ZERO_ARGUMENTS : constructorArguments;
         if (propertiesRefs != null) {
             List<BeanProperty<B, Object>> beanProperties = new ArrayList<>(propertiesRefs.length);
@@ -408,10 +409,12 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
 
         private final BeanPropertyRef<P> ref;
         private final Class<?> typeOrWrapperType;
+        private final AnnotationMetadata annotationMetadata;
 
         private BeanPropertyImpl(BeanPropertyRef<P> ref) {
             this.ref = ref;
             this.typeOrWrapperType = ReflectionUtils.getWrapperType(getType());
+            this.annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(ref.argument.getAnnotationMetadata());
         }
 
         @NonNull
@@ -440,7 +443,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
 
         @Override
         public AnnotationMetadata getAnnotationMetadata() {
-            return ref.argument.getAnnotationMetadata();
+            return annotationMetadata;
         }
 
         @Nullable
@@ -574,7 +577,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
                 @NonNull
                 @Override
                 public AnnotationMetadata getAnnotationMetadata() {
-                    return ref.returnType.getAnnotationMetadata();
+                    return EvaluatedAnnotationMetadata.wrapIfNecessary(ref.returnType.getAnnotationMetadata());
                 }
             };
         }
@@ -678,7 +681,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
                              int methodIndex) {
             this.returnType = returnType;
             this.name = name;
-            this.annotationMetadata = annotationMetadata;
+            this.annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
             this.arguments = arguments;
             this.methodIndex = methodIndex;
         }

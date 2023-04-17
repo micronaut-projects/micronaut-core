@@ -23,6 +23,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.visitor.VisitorContext;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Type;
@@ -54,6 +55,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
     protected final AnnotationMetadata annotationMetadata;
     protected final Map<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
     protected final Map<String, Integer> defaults = new HashMap<>();
+    protected final EvaluatedExpressionProcessor evaluatedExpressionProcessor;
     private final boolean writeAnnotationDefault;
 
     /**
@@ -61,16 +63,20 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
      * @param originatingElements     The originating elements
      * @param annotationMetadata      The annotation metadata
      * @param writeAnnotationDefaults Whether to write annotation defaults
+     * @param visitorContext          The visitor context
      */
     protected AbstractAnnotationMetadataWriter(
-            String className,
-            OriginatingElements originatingElements,
-            AnnotationMetadata annotationMetadata,
-            boolean writeAnnotationDefaults) {
+        String className,
+        OriginatingElements originatingElements,
+        AnnotationMetadata annotationMetadata,
+        boolean writeAnnotationDefaults,
+        VisitorContext visitorContext) {
         super(originatingElements);
         this.targetClassType = getTypeReferenceForName(className);
         this.annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         this.writeAnnotationDefault = writeAnnotationDefaults;
+        this.evaluatedExpressionProcessor = new EvaluatedExpressionProcessor(visitorContext, getOriginatingElement());
+        this.evaluatedExpressionProcessor.processEvaluatedExpressions(this.annotationMetadata, null);
     }
 
     /**
@@ -78,16 +84,20 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
      * @param originatingElement     The originating element
      * @param annotationMetadata      The annotation metadata
      * @param writeAnnotationDefaults Whether to write annotation defaults
+     * @param visitorContext          The visitor context
      */
     protected AbstractAnnotationMetadataWriter(
             String className,
             Element originatingElement,
             AnnotationMetadata annotationMetadata,
-            boolean writeAnnotationDefaults) {
+            boolean writeAnnotationDefaults,
+            VisitorContext visitorContext) {
         super(originatingElement);
         this.targetClassType = getTypeReferenceForName(className);
         this.annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
         this.writeAnnotationDefault = writeAnnotationDefaults;
+        this.evaluatedExpressionProcessor = new EvaluatedExpressionProcessor(visitorContext, originatingElement);
+        this.evaluatedExpressionProcessor.processEvaluatedExpressions(this.annotationMetadata, null);
     }
 
     /**
