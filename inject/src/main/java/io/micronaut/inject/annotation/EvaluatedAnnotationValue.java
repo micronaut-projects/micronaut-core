@@ -18,6 +18,7 @@ package io.micronaut.inject.annotation;
 import io.micronaut.context.expressions.ConfigurableExpressionEvaluationContext;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.expressions.EvaluatedExpression;
 
 import java.lang.annotation.Annotation;
@@ -52,12 +53,13 @@ public final class EvaluatedAnnotationValue<A extends Annotation> extends Annota
     /**
      * Provide a copy of this annotation metadata with passed method arguments.
      *
+     * @param thisObject The object that represents this in a non-static context.
      * @param args arguments passed to method
      * @return copy of annotation metadata
      */
-    public EvaluatedAnnotationValue<A> withArguments(Object[] args) {
+    public EvaluatedAnnotationValue<A> withArguments(@Nullable Object thisObject, Object[] args) {
         return new EvaluatedAnnotationValue<>(
             annotationValue,
-            evaluationContext.setArguments(args));
+            evaluationContext.withArguments(thisObject, args));
     }
 }

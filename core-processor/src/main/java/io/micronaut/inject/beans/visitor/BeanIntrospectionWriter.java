@@ -41,6 +41,7 @@ import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.beans.AbstractInitializableBeanIntrospection;
 import io.micronaut.inject.processing.JavaModelUtils;
+import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.AbstractAnnotationMetadataWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.DispatchWriter;
@@ -125,9 +126,11 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      *
      * @param classElement           The class element
      * @param beanAnnotationMetadata The bean annotation metadata
+     * @param visitorContext          The visitor context
      */
-    BeanIntrospectionWriter(ClassElement classElement, AnnotationMetadata beanAnnotationMetadata) {
-        super(computeReferenceName(classElement.getName()), classElement, beanAnnotationMetadata, true);
+    BeanIntrospectionWriter(ClassElement classElement, AnnotationMetadata beanAnnotationMetadata,
+                            VisitorContext visitorContext) {
+        super(computeReferenceName(classElement.getName()), classElement, beanAnnotationMetadata, true, visitorContext);
         final String name = classElement.getName();
         this.classElement = classElement;
         this.referenceWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
@@ -145,14 +148,16 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      * @param originatingElement     The originating element
      * @param classElement           The class element
      * @param beanAnnotationMetadata The bean annotation metadata
+     * @param visitorContext          The visitor context
      */
     BeanIntrospectionWriter(
             String generatingType,
             int index,
             ClassElement originatingElement,
             ClassElement classElement,
-            AnnotationMetadata beanAnnotationMetadata) {
-        super(computeReferenceName(generatingType) + index, originatingElement, beanAnnotationMetadata, true);
+            AnnotationMetadata beanAnnotationMetadata,
+            VisitorContext visitorContext) {
+        super(computeReferenceName(generatingType) + index, originatingElement, beanAnnotationMetadata, true, visitorContext);
         final String className = classElement.getName();
         this.classElement = classElement;
         this.referenceWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
@@ -200,7 +205,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             boolean isReadOnly,
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Map<String, ClassElement> typeArguments) {
-
+        this.evaluatedExpressionProcessor.processEvaluatedExpressions(annotationMetadata, classElement);
         int readDispatchIndex = -1;
         if (readMember != null) {
             if (readMember instanceof MethodElement) {
@@ -276,6 +281,10 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         if (element != null && !element.isPrivate()) {
             int dispatchIndex = dispatchWriter.addMethod(classElement, element);
             beanMethods.add(new BeanMethodData(element, dispatchIndex));
+            this.evaluatedExpressionProcessor.processEvaluatedExpressions(element.getAnnotationMetadata(), classElement);
+            for (ParameterElement parameter : element.getParameters()) {
+                this.evaluatedExpressionProcessor.processEvaluatedExpressions(parameter.getAnnotationMetadata(), classElement);
+            }
         }
     }
 
@@ -300,6 +309,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
             // First write the introspection for the annotation metadata can be populated with defaults that reference will contain
             writeIntrospectionClass(classWriterOutputVisitor);
+            this.evaluatedExpressionProcessor.writeEvaluatedExpressions(classWriterOutputVisitor);
 
             loadTypeMethods.clear();
             // Second write the reference
@@ -965,6 +975,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      */
     void visitConstructor(MethodElement constructor) {
         this.constructor = constructor;
+        processConstructorEvaluatedMetadata(constructor);
     }
 
     /**
@@ -974,6 +985,14 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      */
     void visitDefaultConstructor(MethodElement constructor) {
         this.defaultConstructor = constructor;
+        processConstructorEvaluatedMetadata(constructor);
+    }
+
+    private void processConstructorEvaluatedMetadata(MethodElement constructor) {
+        this.evaluatedExpressionProcessor.processEvaluatedExpressions(constructor.getAnnotationMetadata(), null);
+        for (ParameterElement parameter : constructor.getParameters()) {
+            this.evaluatedExpressionProcessor.processEvaluatedExpressions(parameter.getAnnotationMetadata(), null);
+        }
     }
 
     private record ExceptionDispatchTarget(Class<?> exceptionType, String message) implements DispatchWriter.DispatchTarget {

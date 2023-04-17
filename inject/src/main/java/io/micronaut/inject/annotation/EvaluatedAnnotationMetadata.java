@@ -23,6 +23,7 @@ import io.micronaut.context.expressions.DefaultExpressionEvaluationContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.BeanDefinition;
 
 import java.lang.annotation.Annotation;
@@ -50,24 +51,25 @@ public final class EvaluatedAnnotationMetadata extends MappingAnnotationMetadata
     /**
      * Provide a copy of this annotation metadata with passed method arguments.
      *
+     * @param thisObject The object that represent this object
      * @param args arguments passed to method
      * @return copy of annotation metadata
      */
-    public EvaluatedAnnotationMetadata withArguments(Object[] args) {
+    public EvaluatedAnnotationMetadata withArguments(@Nullable Object thisObject, Object[] args) {
         return new EvaluatedAnnotationMetadata(
             delegateAnnotationMetadata,
-            evaluationContext.setArguments(args)
+            evaluationContext.withArguments(thisObject, args)
         );
     }
 
     @Override
     public void configure(BeanContext context) {
-        evaluationContext = evaluationContext.setBeanContext(context);
+        evaluationContext = evaluationContext.withBeanContext(context);
     }
 
     @Override
     public void setBeanDefinition(BeanDefinition<?> beanDefinition) {
-        evaluationContext = evaluationContext.setOwningBean(beanDefinition);
+        evaluationContext = evaluationContext.withOwningBean(beanDefinition);
     }
 
     public static AnnotationMetadata wrapIfNecessary(AnnotationMetadata targetMetadata) {

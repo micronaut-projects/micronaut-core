@@ -39,6 +39,7 @@ import io.micronaut.inject.BeanIdentifier;
 @Internal
 public final class DefaultExpressionEvaluationContext implements ConfigurableExpressionEvaluationContext {
 
+    private final Object thisObject;
     private final Object[] args;
     private final BeanContext beanContext;
     private final BeanDefinition<?> owningBean;
@@ -46,36 +47,57 @@ public final class DefaultExpressionEvaluationContext implements ConfigurableExp
     private BeanResolutionContext resolutionContext;
 
     public DefaultExpressionEvaluationContext() {
-        this(null, null, null);
+        this(null, null, null, null);
     }
 
-    public DefaultExpressionEvaluationContext(@Nullable Object[] args,
+    public DefaultExpressionEvaluationContext(@Nullable Object thisObject, @Nullable Object[] args,
                                               @Nullable BeanContext beanContext,
                                               @Nullable BeanDefinition<?> owningBean) {
+        this.thisObject = thisObject;
         this.args = args;
         this.beanContext = beanContext;
         this.owningBean = owningBean;
     }
 
     @Override
-    public ConfigurableExpressionEvaluationContext setArguments(Object[] args) {
-        DefaultExpressionEvaluationContext evaluationContext = new DefaultExpressionEvaluationContext(args, this.beanContext, this.owningBean);
+    public ConfigurableExpressionEvaluationContext withArguments(Object thisObject, Object[] args) {
+        DefaultExpressionEvaluationContext evaluationContext = new DefaultExpressionEvaluationContext(
+            thisObject, args,
+            this.beanContext,
+            this.owningBean
+        );
         evaluationContext.resolutionContext = resolutionContext;
         return evaluationContext;
     }
 
     @Override
-    public ConfigurableExpressionEvaluationContext setOwningBean(BeanDefinition<?> beanDefinition) {
-        DefaultExpressionEvaluationContext evaluationContext = new DefaultExpressionEvaluationContext(this.args, this.beanContext, beanDefinition);
+    public ConfigurableExpressionEvaluationContext withOwningBean(BeanDefinition<?> beanDefinition) {
+        DefaultExpressionEvaluationContext evaluationContext = new DefaultExpressionEvaluationContext(
+            thisObject, this.args,
+            this.beanContext,
+            beanDefinition
+        );
         evaluationContext.resolutionContext = resolutionContext;
         return evaluationContext;
     }
 
     @Override
-    public ConfigurableExpressionEvaluationContext setBeanContext(BeanContext beanContext) {
-        DefaultExpressionEvaluationContext evaluationContext = new DefaultExpressionEvaluationContext(this.args, beanContext, this.owningBean);
+    public ConfigurableExpressionEvaluationContext withBeanContext(BeanContext beanContext) {
+        DefaultExpressionEvaluationContext evaluationContext = new DefaultExpressionEvaluationContext(
+            thisObject, this.args,
+            beanContext,
+            this.owningBean
+        );
         evaluationContext.resolutionContext = resolutionContext;
         return evaluationContext;
+    }
+
+    @Override
+    public Object getThis() {
+        if (thisObject == null) {
+            throw new ExpressionEvaluationException("Current resolve 'this' within expression context. Expressions that resolve 'this' should be executed in a non-static context.");
+        }
+        return thisObject;
     }
 
     @Override

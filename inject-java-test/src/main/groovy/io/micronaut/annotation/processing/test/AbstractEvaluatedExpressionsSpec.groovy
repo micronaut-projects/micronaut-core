@@ -19,7 +19,6 @@ import io.micronaut.context.expressions.AbstractEvaluatedExpression
 import io.micronaut.context.expressions.DefaultExpressionEvaluationContext
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.core.expressions.EvaluatedExpressionReference
-import io.micronaut.expressions.context.ExpressionEvaluationContextRegistrar
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
 import org.intellij.lang.annotations.Language
@@ -63,7 +62,7 @@ abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec 
             String exprFullName = exprClassName + i
             try {
                 def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName).newInstance()
-                result.add(exprClass.evaluate(new DefaultExpressionEvaluationContext(null, applicationContext, null)))
+                result.add(exprClass.evaluate(new DefaultExpressionEvaluationContext(thisObject, null, applicationContext, null)))
             } catch (ClassNotFoundException e) {
                 return null
             }
@@ -99,7 +98,7 @@ abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec 
         try {
             def index = EvaluatedExpressionReference.nextIndex(exprFullName)
             def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName + (index == 0 ? index : index - 1)).newInstance()
-            exprClass.evaluate(new DefaultExpressionEvaluationContext(null, applicationContext, null))
+            exprClass.evaluate(new DefaultExpressionEvaluationContext(thisObject, null, applicationContext, null))
         } catch (ClassNotFoundException e) {
             return null
         }
@@ -125,7 +124,7 @@ abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec 
         try {
             def index = EvaluatedExpressionReference.nextIndex(exprFullName)
             def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName + (index == 0 ? index : index - 1)).newInstance()
-            return exprClass.evaluate(new DefaultExpressionEvaluationContext(args, applicationContext, null))
+            return exprClass.evaluate(new DefaultExpressionEvaluationContext(thisObject, args, applicationContext, null))
         } catch (ClassNotFoundException e) {
             return null
         }

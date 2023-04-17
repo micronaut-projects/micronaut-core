@@ -13,12 +13,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class ExampleJobTest {
 
     @Test
-    void testJobCondition(ExampleJob exampleJob, ExampleJobControl jobControl) throws InterruptedException {
-        assertTrue(jobControl.isPaused());
+    void testJobCondition(ExampleJob exampleJob) throws InterruptedException {
+        assertTrue(exampleJob.isPaused());
         assertFalse(exampleJob.hasJobRun());
         Thread.sleep(5000);
         assertFalse(exampleJob.hasJobRun());
-        jobControl.unpause();
+        exampleJob.unpause();
         await().atMost(3, SECONDS).until(exampleJob::hasJobRun);
         assertTrue(exampleJob.hasJobRun());
     }

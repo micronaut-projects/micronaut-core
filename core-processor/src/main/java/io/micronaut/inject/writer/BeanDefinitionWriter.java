@@ -41,7 +41,6 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.core.annotation.AccessorsStyle;
-import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -53,6 +52,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.ConversionServiceProvider;
+import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
@@ -64,11 +64,6 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
-import io.micronaut.expressions.EvaluatedExpressionWriter;
-import io.micronaut.expressions.context.ExpressionCompilationContext;
-import io.micronaut.expressions.context.ExpressionWithContext;
-import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory;
-import io.micronaut.expressions.util.EvaluatedExpressionsUtils;
 import io.micronaut.inject.AdvisedBeanType;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.DisposableBeanDefinition;
@@ -136,7 +131,6 @@ import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static io.micronaut.inject.visitor.BeanElementVisitor.VISITORS;
@@ -546,6 +540,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private final VisitorContext visitorContext;
     private final boolean isPrimitiveBean;
     private final List<String> beanTypeInnerClasses;
+    private final EvaluatedExpressionProcessor evaluatedExpressionProcessor;
     private GeneratorAdapter buildMethodVisitor;
     private GeneratorAdapter injectMethodVisitor;
     private GeneratorAdapter checkIfShouldLoadMethodVisitor;
@@ -582,9 +577,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private final Map<Type, List<AnnotationVisitData>> annotationInjectionPoints = new LinkedHashMap<>(2);
     private final Map<String, Boolean> isLifeCycleCache = new HashMap<>(2);
     private ExecutableMethodsDefinitionWriter executableMethodsDefinitionWriter;
-
-    private final Collection<ExpressionWithContext> evaluatedExpressions = new ArrayList<>(2);
-    private final DefaultExpressionCompilationContextFactory expressionCompilationContextFactory;
 
     private Object constructor; // MethodElement or FieldElement
     private boolean disabled = false;
@@ -720,14 +712,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.isConfigurationProperties = isConfigurationProperties(annotationMetadata);
         validateExposedTypes(annotationMetadata, visitorContext);
         this.visitorContext = visitorContext;
-        this.expressionCompilationContextFactory = new DefaultExpressionCompilationContextFactory(visitorContext);
-        processEvaluatedExpressions(this.annotationMetadata);
+        this.evaluatedExpressionProcessor = new EvaluatedExpressionProcessor(visitorContext, getOriginatingElement());
+        evaluatedExpressionProcessor.processEvaluatedExpressions(this.annotationMetadata, null);
 
         beanTypeInnerClasses = beanTypeElement.getEnclosedElements(ElementQuery.of(ClassElement.class))
                 .stream()
                 .filter(this::isConfigurationProperties)
                 .map(Element::getName)
-                .collect(Collectors.toList());
+                .toList();
         String prop = visitorContext.getOptions().get(OMIT_CONFPROP_INJECTION_POINTS);
         keepConfPropInjectPoints = prop == null || !prop.equals("true");
     }
@@ -994,9 +986,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // now implement the inject method
             visitInjectMethodDefinition();
 
-            processEvaluatedExpressions(constructor.getAnnotationMetadata());
+            evaluatedExpressionProcessor.processEvaluatedExpressions(constructor.getAnnotationMetadata(), null);
             for (ParameterElement parameter: constructor.getParameters()) {
-                processEvaluatedExpressions(parameter.getAnnotationMetadata());
+                evaluatedExpressionProcessor.processEvaluatedExpressions(parameter.getAnnotationMetadata(), null);
             }
         }
     }
@@ -1420,19 +1412,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     throw e;
                 }
             }
-            writeEvaluatedExpressions(visitor);
+            evaluatedExpressionProcessor.writeEvaluatedExpressions(visitor);
             out.write(toByteArray());
-        }
-    }
-
-    private void writeEvaluatedExpressions(ClassWriterOutputVisitor visitor) throws IOException {
-        for (ExpressionWithContext expressionMetadata: getEvaluatedExpressions()) {
-            EvaluatedExpressionWriter expressionWriter = new EvaluatedExpressionWriter(
-                expressionMetadata,
-                visitorContext,
-                getOriginatingElement());
-
-            expressionWriter.accept(visitor);
         }
     }
 
@@ -1570,7 +1551,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                           boolean requiresReflection,
                                           VisitorContext visitorContext) {
         MethodVisitData methodVisitData = new MethodVisitData(declaringType, methodElement, requiresReflection, methodElement.getAnnotationMetadata());
-        processEvaluatedExpressions(methodElement.getAnnotationMetadata());
+        evaluatedExpressionProcessor.processEvaluatedExpressions(methodElement.getAnnotationMetadata(), this.beanTypeElement);
         methodInjectionPoints.add(methodVisitData);
         allMethodVisits.add(methodVisitData);
         visitMethodInjectionPointInternal(methodVisitData, injectMethodVisitor, injectInstanceLocalVarIndex);
@@ -1604,7 +1585,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                      String interceptedProxyBridgeMethodName) {
 
         if (executableMethodsDefinitionWriter == null) {
-            executableMethodsDefinitionWriter = new ExecutableMethodsDefinitionWriter(visitorContext, annotationMetadata, beanDefinitionName, getBeanDefinitionReferenceClassName(), originatingElements);
+            executableMethodsDefinitionWriter = new ExecutableMethodsDefinitionWriter(
+                visitorContext,
+                evaluatedExpressionProcessor,
+                annotationMetadata,
+                beanDefinitionName,
+                getBeanDefinitionReferenceClassName(),
+                originatingElements
+            );
         }
         return executableMethodsDefinitionWriter.visitExecutableMethod(declaringType, methodElement, interceptedProxyClassName, interceptedProxyBridgeMethodName);
     }
@@ -1629,16 +1617,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return this.annotationMetadata;
-    }
-
-    @Override
-    public Set<ExpressionWithContext> getEvaluatedExpressions() {
-        return Stream.concat(
-            evaluatedExpressions.stream(),
-            executableMethodsDefinitionWriter != null
-                ? executableMethodsDefinitionWriter.getEvaluatedExpressions().stream()
-                : Stream.empty())
-            .collect(Collectors.toSet());
     }
 
     @Override
@@ -2194,7 +2172,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             Method methodToInvoke,
             boolean isArray,
             boolean requiresGenericType) {
-        processEvaluatedExpressions(annotationMetadata);
+        evaluatedExpressionProcessor.processEvaluatedExpressions(annotationMetadata, null);
 
         autoApplyNamedIfPresent(fieldElement, annotationMetadata);
 
@@ -2453,7 +2431,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         Type declaringTypeRef = JavaModelUtils.getTypeReference(declaringType);
         boolean hasInjectScope = false;
         for (ParameterElement value : argumentTypes) {
-            processEvaluatedExpressions(value.getAnnotationMetadata());
+            evaluatedExpressionProcessor.processEvaluatedExpressions(value.getAnnotationMetadata(), null);
             if (value.hasDeclaredAnnotation(InjectScope.class)) {
                 hasInjectScope = true;
             }
@@ -3167,9 +3145,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             ClassElement factoryClass,
             Element factoryElement, ParameterElement... parameters) {
         if (buildMethodVisitor == null) {
-            processEvaluatedExpressions(factoryElement.getAnnotationMetadata());
+            evaluatedExpressionProcessor.processEvaluatedExpressions(factoryElement.getAnnotationMetadata(), null);
             for (ParameterElement parameterElement: parameters) {
-                processEvaluatedExpressions(parameterElement.getAnnotationMetadata());
+                evaluatedExpressionProcessor.processEvaluatedExpressions(parameterElement.getAnnotationMetadata(), null);
             }
 
             List<ParameterElement> parameterList = Arrays.asList(parameters);
@@ -4208,7 +4186,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         protectedConstructor.push(preprocessMethods);
 
         // 9: hasEvaluatedExpressions
-        protectedConstructor.push(!getEvaluatedExpressions().isEmpty());
+        protectedConstructor.push(evaluatedExpressionProcessor.hasEvaluatedExpressions());
 
         protectedConstructor.invokeConstructor(PRECALCULATED_INFO, PRECALCULATED_INFO_CONSTRUCTOR);
     }
@@ -4589,22 +4567,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
     }
 
-    private void processEvaluatedExpressions(AnnotationMetadata annotationMetadata) {
-        if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
-            annotationMetadata = annotationMetadata.getDeclaredMetadata();
-        }
-
-        Collection<EvaluatedExpressionReference> expressionReferences =
-            EvaluatedExpressionsUtils.findEvaluatedExpressionReferences(annotationMetadata);
-
-        expressionReferences.stream()
-            .map(expressionReference -> {
-                ExpressionCompilationContext evaluationContext = expressionCompilationContextFactory.buildContext(expressionReference);
-                return new ExpressionWithContext(expressionReference, evaluationContext);
-            })
-            .forEach(evaluatedExpressions::add);
-    }
-
     @Override
     public Optional<String> getScope() {
         return annotationMetadata.getAnnotationNameByStereotype(AnnotationUtil.SCOPE);
@@ -4659,7 +4621,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     public static void finish() {
         AbstractAnnotationMetadataBuilder.clearMutated();
         AbstractAnnotationMetadataBuilder.clearCaches();
-        DefaultExpressionCompilationContextFactory.reset();
+        EvaluatedExpressionProcessor.reset();
     }
 
     @Internal

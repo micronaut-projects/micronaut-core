@@ -41,7 +41,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.core.value.OptionalValues;
-import io.micronaut.expressions.context.ExpressionWithContext;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ProxyBeanDefinition;
@@ -1300,11 +1299,6 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return proxyBeanDefinitionWriter.getAnnotationMetadata();
-    }
-
-    @Override
-    public Set<ExpressionWithContext> getEvaluatedExpressions() {
-        return proxyBeanDefinitionWriter.getEvaluatedExpressions();
     }
 
     @Override

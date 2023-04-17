@@ -12,6 +12,7 @@ import io.micronaut.annotation.processing.test.JavaParser
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Replaces
+import io.micronaut.context.annotation.Value
 import io.micronaut.context.visitor.ConfigurationReaderVisitor
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
@@ -26,6 +27,7 @@ import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
 import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.inject.ExecutableMethod
+import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.jackson.modules.BeanIntrospectionModule
@@ -49,6 +51,47 @@ import java.lang.reflect.Field
 import java.time.Instant
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+
+    void "test expressions in introspection properties"() {
+        given:
+        def introspection = buildBeanIntrospection('mixed.Test', '''
+package mixed;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Value;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+import java.lang.annotation.*;
+
+@Introspected
+class Test {
+    @Nullable
+    @Ann("#{'test'}")
+    private String foo;
+    public String getFoo() {
+        return foo;
+    }
+    public void setFoo(@Nullable String foo) {
+        this.foo = foo;
+    }
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface Ann {
+    String value();
+}
+''')
+        when:
+        def test = introspection.instantiate()
+        def prop = introspection.getRequiredProperty("foo", String)
+        test.foo = 'value'
+
+        then: 'expressions can be retrieved'
+        prop.get(test) == 'value'
+        prop.getAnnotationMetadata() instanceof EvaluatedAnnotationMetadata
+        prop.stringValue("mixed.Ann").get() == 'test'
+    }
 
     void "test mix getter and setter with interface type"() {
         def introspection = buildBeanIntrospection('mixed.Pet', '''

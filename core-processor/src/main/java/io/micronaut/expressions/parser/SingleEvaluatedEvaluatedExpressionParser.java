@@ -24,6 +24,7 @@ import io.micronaut.expressions.parser.ast.access.ElementMethodCall;
 import io.micronaut.expressions.parser.ast.access.EnvironmentAccess;
 import io.micronaut.expressions.parser.ast.access.SubscriptOperator;
 import io.micronaut.expressions.parser.ast.access.PropertyAccess;
+import io.micronaut.expressions.parser.ast.access.ThisAccess;
 import io.micronaut.expressions.parser.ast.conditional.ElvisOperator;
 import io.micronaut.expressions.parser.ast.conditional.TernaryExpression;
 import io.micronaut.expressions.parser.ast.literal.BoolLiteral;
@@ -62,48 +63,7 @@ import io.micronaut.expressions.parser.token.Tokenizer;
 import java.util.ArrayList;
 import java.util.List;
 
-import static io.micronaut.expressions.parser.token.TokenType.AND;
-import static io.micronaut.expressions.parser.token.TokenType.BEAN_CONTEXT;
-import static io.micronaut.expressions.parser.token.TokenType.BOOL;
-import static io.micronaut.expressions.parser.token.TokenType.COLON;
-import static io.micronaut.expressions.parser.token.TokenType.COMMA;
-import static io.micronaut.expressions.parser.token.TokenType.DECREMENT;
-import static io.micronaut.expressions.parser.token.TokenType.DIV;
-import static io.micronaut.expressions.parser.token.TokenType.DOT;
-import static io.micronaut.expressions.parser.token.TokenType.DOUBLE;
-import static io.micronaut.expressions.parser.token.TokenType.ELVIS;
-import static io.micronaut.expressions.parser.token.TokenType.EMPTY;
-import static io.micronaut.expressions.parser.token.TokenType.ENVIRONMENT;
-import static io.micronaut.expressions.parser.token.TokenType.EQ;
-import static io.micronaut.expressions.parser.token.TokenType.EXPRESSION_CONTEXT_REF;
-import static io.micronaut.expressions.parser.token.TokenType.FLOAT;
-import static io.micronaut.expressions.parser.token.TokenType.GT;
-import static io.micronaut.expressions.parser.token.TokenType.GTE;
-import static io.micronaut.expressions.parser.token.TokenType.IDENTIFIER;
-import static io.micronaut.expressions.parser.token.TokenType.R_SQUARE;
-import static io.micronaut.expressions.parser.token.TokenType.TYPE_IDENTIFIER;
-import static io.micronaut.expressions.parser.token.TokenType.INCREMENT;
-import static io.micronaut.expressions.parser.token.TokenType.INSTANCEOF;
-import static io.micronaut.expressions.parser.token.TokenType.INT;
-import static io.micronaut.expressions.parser.token.TokenType.LONG;
-import static io.micronaut.expressions.parser.token.TokenType.LT;
-import static io.micronaut.expressions.parser.token.TokenType.LTE;
-import static io.micronaut.expressions.parser.token.TokenType.L_PAREN;
-import static io.micronaut.expressions.parser.token.TokenType.L_SQUARE;
-import static io.micronaut.expressions.parser.token.TokenType.MATCHES;
-import static io.micronaut.expressions.parser.token.TokenType.MINUS;
-import static io.micronaut.expressions.parser.token.TokenType.MOD;
-import static io.micronaut.expressions.parser.token.TokenType.MUL;
-import static io.micronaut.expressions.parser.token.TokenType.NE;
-import static io.micronaut.expressions.parser.token.TokenType.NOT;
-import static io.micronaut.expressions.parser.token.TokenType.NULL;
-import static io.micronaut.expressions.parser.token.TokenType.OR;
-import static io.micronaut.expressions.parser.token.TokenType.PLUS;
-import static io.micronaut.expressions.parser.token.TokenType.POW;
-import static io.micronaut.expressions.parser.token.TokenType.QMARK;
-import static io.micronaut.expressions.parser.token.TokenType.R_PAREN;
-import static io.micronaut.expressions.parser.token.TokenType.SAFE_NAV;
-import static io.micronaut.expressions.parser.token.TokenType.STRING;
+import static io.micronaut.expressions.parser.token.TokenType.*;
 
 /**
  * Parser for building AST for single evaluated expression.
@@ -374,11 +334,17 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
             case IDENTIFIER -> evaluationContextAccess(false);
             case BEAN_CONTEXT -> beanContextAccess();
             case ENVIRONMENT -> environmentAccess();
+            case THIS -> thisAccess();
             case TYPE_IDENTIFIER -> typeIdentifier(true);
             case L_PAREN -> parenthesizedExpression();
             case STRING, INT, LONG, DOUBLE, FLOAT, BOOL, NULL -> literal();
             default -> throw new ExpressionParsingException("Unexpected token: " + lookahead.value());
         };
+    }
+
+    private ExpressionNode thisAccess() {
+        eat(THIS);
+        return new ThisAccess();
     }
 
     // EvaluationContextAccess

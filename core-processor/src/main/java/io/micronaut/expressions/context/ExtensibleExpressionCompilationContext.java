@@ -28,6 +28,13 @@ import io.micronaut.inject.ast.MethodElement;
  */
 @Internal
 public interface ExtensibleExpressionCompilationContext extends ExpressionCompilationContext {
+
+    /**
+     * @param classElement The type that represents this.
+     * @return extended context
+     */
+    ExtensibleExpressionCompilationContext withThis(@NonNull ClassElement classElement);
+
     /**
      * Extends compilation context with method element. Compilation context can only include
      * one method at the same time, so this method will return the context which will

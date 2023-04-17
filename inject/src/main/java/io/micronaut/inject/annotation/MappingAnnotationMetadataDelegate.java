@@ -17,6 +17,7 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
@@ -40,7 +41,8 @@ import java.util.function.Supplier;
  * @since 4.0.0
  * @author Sergey Gavrilov
  */
-public abstract class MappingAnnotationMetadataDelegate implements AnnotationMetadataDelegate {
+@Experimental
+public abstract sealed class MappingAnnotationMetadataDelegate implements AnnotationMetadataDelegate permits EvaluatedAnnotationMetadata {
     public abstract <T extends Annotation> AnnotationValue<T> mapAnnotationValue(AnnotationValue<T> av);
 
 
@@ -352,7 +354,11 @@ public abstract class MappingAnnotationMetadataDelegate implements AnnotationMet
 
     @Override
     public <T extends Annotation> AnnotationValue<T> getDeclaredAnnotation(Class<T> annotationClass) {
-        return AnnotationMetadataDelegate.super.getDeclaredAnnotation(annotationClass);
+        AnnotationValue<T> av = getAnnotationMetadata().getDeclaredAnnotation(annotationClass);
+        if (av != null) {
+            return mapAnnotationValue(av);
+        }
+        return null;
     }
 
     @Override
@@ -362,13 +368,21 @@ public abstract class MappingAnnotationMetadataDelegate implements AnnotationMet
 
     @Override
     public <T extends Annotation> AnnotationValue<T> getAnnotation(String annotation) {
-        return this.<T>findAnnotation(annotation).orElse(null);
+        AnnotationValue<T> av = getAnnotationMetadata().getAnnotation(annotation);
+        if (av != null) {
+            return mapAnnotationValue(av);
+        }
+        return null;
     }
 
     @Override
     public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(String annotation) {
-        Optional<AnnotationValue<T>> av = getAnnotationMetadata().findAnnotation(annotation);
-        return av.map(this::mapAnnotationValue);
+        AnnotationValue<Annotation> av = getAnnotationMetadata().getAnnotation(annotation);
+        if (av != null) {
+            //noinspection unchecked
+            return Optional.of((AnnotationValue<T>) mapAnnotationValue(av));
+        }
+        return Optional.empty();
     }
 
     @Override
@@ -417,6 +431,24 @@ public abstract class MappingAnnotationMetadataDelegate implements AnnotationMet
         return findAnnotation(annotationClass)
                    .map(av -> AnnotationMetadataSupport.buildAnnotation(annotationClass, av))
                    .orElse(null);
+    }
+
+    @Override
+    public <T extends Annotation> T synthesize(Class<T> annotationClass, String sourceAnnotation) {
+        AnnotationValue<T> av = getAnnotation(sourceAnnotation);
+        if (av != null) {
+            return AnnotationMetadataSupport.buildAnnotation(annotationClass, av);
+        }
+        return null;
+    }
+
+    @Override
+    public <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass, String sourceAnnotation) {
+        AnnotationValue<T> av = getDeclaredAnnotation(sourceAnnotation);
+        if (av != null) {
+            return AnnotationMetadataSupport.buildAnnotation(annotationClass, av);
+        }
+        return null;
     }
 
     @Override

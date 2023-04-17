@@ -283,7 +283,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             if (beanDefinitionWriter.isEnabled()) {
                 beanDefinitionWriter.accept(classWriterOutputVisitor);
                 BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
-                    new BeanDefinitionReferenceWriter(beanDefinitionWriter);
+                    new BeanDefinitionReferenceWriter(beanDefinitionWriter, this.javaVisitorContext);
                 beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing());
 
                 String className = beanDefinitionReferenceWriter.getBeanDefinitionQualifiedClassName();

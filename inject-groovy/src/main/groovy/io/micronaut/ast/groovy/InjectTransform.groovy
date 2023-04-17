@@ -85,7 +85,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     BeanConfigurationWriter writer = new BeanConfigurationWriter(
                             classNode.packageName,
                             groovyPackageElement,
-                            groovyPackageElement.getAnnotationMetadata()
+                            groovyPackageElement.getAnnotationMetadata(),
+                            visitorContext
                     )
                     try {
                         writer.accept(outputVisitor)
@@ -126,7 +127,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             String beanTypeName = beanDefWriter.beanTypeName
             AnnotatedNode beanClassNode = entry.key
             try {
-                BeanDefinitionReferenceWriter beanReferenceWriter = new BeanDefinitionReferenceWriter(beanDefWriter)
+                BeanDefinitionReferenceWriter beanReferenceWriter = new BeanDefinitionReferenceWriter(beanDefWriter, groovyVisitorContext)
                 beanReferenceWriter.setRequiresMethodProcessing(beanDefWriter.requiresMethodProcessing())
                 beanReferenceWriter.setContextScope(beanDefWriter.getAnnotationMetadata().hasDeclaredAnnotation(Context))
                 beanDefWriter.visitBeanDefinitionEnd()
