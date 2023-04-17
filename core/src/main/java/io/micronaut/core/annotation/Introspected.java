@@ -157,6 +157,13 @@ public @interface Introspected {
     String withPrefix() default "with";
 
     /**
+     * @return The package to write introspections to. By default, uses the class package.
+     * @since 3.9.0
+     */
+    @Experimental
+    String targetPackage() default "";
+
+    /**
      * Allow pre-computed indexes for property lookups based on an annotation and a member.
      *
      * @see io.micronaut.core.beans.BeanIntrospection#getIndexedProperty(Class, String)
