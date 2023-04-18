@@ -20,6 +20,7 @@ import io.micronaut.context.exceptions.BeanCreationException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.async.propagation.ReactivePropagation;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -400,7 +401,7 @@ public final class RouteExecutor {
         if (executorService != null) {
             if (routeInfo.isSuspended()) {
                 executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
-                        coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(request, contextView));
+                        coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(request, contextView, propagatedContext));
                         return Mono.from(
                             ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request)).toPublisher()
                         );
@@ -415,7 +416,7 @@ public final class RouteExecutor {
         } else {
             if (routeInfo.isSuspended()) {
                 executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
-                        coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(request, contextView));
+                        coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(request, contextView, propagatedContext));
                         return Mono.from(
                             ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request)).toPublisher()
                         );
@@ -439,14 +440,15 @@ public final class RouteExecutor {
                 if (body instanceof Optional) {
                     body = ((Optional<?>) body).orElse(null);
                 }
-                return createResponseForBody(httpRequest, body, routeMatch.getRouteInfo(), routeMatch);
+                return createResponseForBody(propagatedContext, httpRequest, body, routeMatch.getRouteInfo(), routeMatch);
             } catch (Throwable e) {
                 return ExecutionFlow.error(e);
             }
         });
     }
 
-    ExecutionFlow<MutableHttpResponse<?>> createResponseForBody(HttpRequest<?> request,
+    ExecutionFlow<MutableHttpResponse<?>> createResponseForBody(PropagatedContext propagatedContext,
+                                                                HttpRequest<?> request,
                                                                 Object body,
                                                                 RouteInfo<?> routeInfo,
                                                                 @Nullable
@@ -467,7 +469,10 @@ public final class RouteExecutor {
             boolean isReactive = routeInfo.isAsyncOrReactive() || (Publishers.isConvertibleToPublisher(body) && !(body instanceof HttpResponse<?>));
             if (isReactive) {
                 outgoingResponse = ReactiveExecutionFlow.fromPublisher(
-                    fromReactiveExecute(request, body, routeInfo)
+                    ReactivePropagation.propagate(
+                        propagatedContext,
+                        fromReactiveExecute(request, body, routeInfo)
+                    )
                 );
             } else if (body instanceof HttpStatus httpStatus) { // now we have the raw result, transform it as necessary
                 outgoingResponse = ExecutionFlow.just(HttpResponse.status(httpStatus));

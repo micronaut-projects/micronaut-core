@@ -17,6 +17,9 @@ dependencies {
     api project(':context')
     api project(':inject')
     api project(':aop')
+
+    implementation 'io.micrometer:context-propagation:1.0.2'
+
     compileOnly project(':core-reactive')
     compileOnly libs.managed.reactor
 

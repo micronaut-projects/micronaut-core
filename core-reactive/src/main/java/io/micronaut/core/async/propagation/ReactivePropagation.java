@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.context.propagation.reactive;
+package io.micronaut.core.async.propagation;
 
 import io.micronaut.core.propagation.PropagatedContext;
 import org.reactivestreams.Publisher;

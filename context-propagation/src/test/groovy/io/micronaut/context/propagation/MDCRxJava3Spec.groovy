@@ -23,7 +23,6 @@ import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
 import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
-import io.micronaut.context.propagation.reactive.ReactivePropagation
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.annotation.ExecuteOn
 import io.reactivex.rxjava3.core.Flowable
@@ -53,7 +52,7 @@ class MDCRxJava3Spec extends Specification {
     @Shared
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-            'mdc.rxjava2test.enabled': true
+            'mdc.rxjava3test.enabled': true
     ])
 
     @Shared
@@ -83,7 +82,7 @@ class MDCRxJava3Spec extends Specification {
     }
 
     @Controller("/mdc")
-    @Requires(property = 'mdc.rxjava2test.enabled')
+    @Requires(property = 'mdc.rxjava3test.enabled')
     static class MDCController {
 
         @Inject
@@ -150,7 +149,7 @@ class MDCRxJava3Spec extends Specification {
     }
 
     @Client("/mdc")
-    @Requires(property = 'mdc.rxjava2test.enabled')
+    @Requires(property = 'mdc.rxjava3test.enabled')
     static interface MDCClient {
 
         @Get("/test2")
@@ -164,7 +163,7 @@ class MDCRxJava3Spec extends Specification {
     }
 
     @Filter(MATCH_ALL_PATTERN)
-    @Requires(property = 'mdc.rxjava2test.enabled')
+    @Requires(property = 'mdc.rxjava3test.enabled')
     static class TracingHttpServerFilter implements HttpServerFilter {
 
         @Override
@@ -174,12 +173,9 @@ class MDCRxJava3Spec extends Specification {
                 String trackingId = request.headers.get("X-TrackingId")
                 MDC.put("trackingId", trackingId)
                 MDC.put("trackingId", trackingId)
-                return Mono.from(
-                        ReactivePropagation.propagate(
-                                PropagatedContext.get() + new MdcPropagationContext(),
-                                chain.proceed(request)
-                        )
-                )
+                (PropagatedContext.get() + new MdcPropagationContext()).propagate {
+                    return Mono.from(chain.proceed(request))
+                }
             } finally {
                 MDC.clear()
             }
@@ -187,7 +183,7 @@ class MDCRxJava3Spec extends Specification {
     }
 
     @Filter("/mdc/test**")
-    @Requires(property = 'mdc.rxjava2test.enabled')
+    @Requires(property = 'mdc.rxjava3test.enabled')
     static class TracingHttpClientFilter implements HttpClientFilter {
 
         @Override

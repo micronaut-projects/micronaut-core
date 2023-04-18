@@ -145,8 +145,10 @@ public class RequestLifecycle {
         return runWithFilters(() -> {
             PropagatedContext propagatedContext = PropagatedContext.get();
             return fulfillArguments(routeMatch)
-                .flatMap(rm -> routeExecutor.callRoute(propagatedContext, rm, request).flatMap(res -> handleStatusException(res, rm)))
-                .onErrorResume(this::onErrorNoFilter);
+                .flatMap(rm -> routeExecutor.callRoute(propagatedContext, rm, request)
+                    .flatMap(res -> handleStatusException(res, rm, propagatedContext))
+                )
+                .onErrorResume(exp -> onErrorNoFilter(exp, propagatedContext));
         });
     }
 
@@ -157,10 +159,10 @@ public class RequestLifecycle {
      * @return The response for the error
      */
     protected final ExecutionFlow<MutableHttpResponse<?>> onError(Throwable t) {
-        return runWithFilters(() -> onErrorNoFilter(t));
+        return runWithFilters(() -> onErrorNoFilter(t, PropagatedContext.get()));
     }
 
-    final ExecutionFlow<MutableHttpResponse<?>> onErrorNoFilter(Throwable t) {
+    private ExecutionFlow<MutableHttpResponse<?>> onErrorNoFilter(Throwable t, PropagatedContext propagatedContext) {
         // find the origination of the route
         Optional<RouteInfo> previousRequestRouteInfo = request.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class);
         Class<?> declaringType = previousRequestRouteInfo.map(RouteInfo::getDeclaringType).orElse(null);
@@ -182,7 +184,9 @@ public class RequestLifecycle {
             }
             try {
                 return ExecutionFlow.just(errorRoute)
-                    .flatMap(routeMatch -> routeExecutor.callRoute(PropagatedContext.get(), routeMatch, request).flatMap(res -> handleStatusException(res, routeMatch)))
+                    .flatMap(routeMatch -> routeExecutor.callRoute(propagatedContext, routeMatch, request)
+                        .flatMap(res -> handleStatusException(res, routeMatch, propagatedContext))
+                    )
                     .onErrorResume(u -> createDefaultErrorResponseFlow(request, u))
                     .<MutableHttpResponse<?>>map(response -> {
                         response.setAttribute(HttpAttributes.EXCEPTION, cause);
@@ -218,7 +222,7 @@ public class RequestLifecycle {
                             routeExecutor.logException(cause);
                         }
                         Object result = handler.handle(request, cause);
-                        return routeExecutor.createResponseForBody(request, result, routeInfo, null);
+                        return routeExecutor.createResponseForBody(propagatedContext, request, result, routeInfo, null);
                     } catch (Throwable e) {
                         return createDefaultErrorResponseFlow(request, e);
                     }
@@ -263,35 +267,34 @@ public class RequestLifecycle {
         });
         FilterRunner filterRunner = new FilterRunner(filters) {
             @Override
-            protected ExecutionFlow<? extends HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response) {
+            protected ExecutionFlow<? extends HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response, PropagatedContext propagatedContext) {
                 RequestLifecycle.this.request = request;
                 RouteInfo<?> routeInfo = response.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).orElse(null);
-                return handleStatusException((MutableHttpResponse<?>) response, routeInfo)
-                    .onErrorResume(throwable -> onErrorNoFilter(throwable));
+                return handleStatusException((MutableHttpResponse<?>) response, routeInfo, propagatedContext)
+                    .onErrorResume(throwable -> onErrorNoFilter(throwable, propagatedContext));
             }
 
             @Override
-            protected ExecutionFlow<? extends HttpResponse<?>> processFailure(HttpRequest<?> request, Throwable failure) {
+            protected ExecutionFlow<? extends HttpResponse<?>> processFailure(HttpRequest<?> request, Throwable failure, PropagatedContext propagatedContext) {
                 RequestLifecycle.this.request = request;
-                return onErrorNoFilter(failure);
+                return onErrorNoFilter(failure, propagatedContext);
             }
         };
         return filterRunner.run(request);
     }
 
-    private ExecutionFlow<MutableHttpResponse<?>> handleStatusException(MutableHttpResponse<?> response, RouteMatch<?> routeMatch) {
+    private ExecutionFlow<MutableHttpResponse<?>> handleStatusException(MutableHttpResponse<?> response, RouteMatch<?> routeMatch, PropagatedContext propagatedContext) {
         RouteInfo<?> routeInfo = routeMatch == null ? null : routeMatch.getRouteInfo();
-        return handleStatusException(response, routeInfo);
+        return handleStatusException(response, routeInfo, propagatedContext);
     }
 
-    private ExecutionFlow<MutableHttpResponse<?>> handleStatusException(MutableHttpResponse<?> response, RouteInfo<?> routeInfo) {
+    private ExecutionFlow<MutableHttpResponse<?>> handleStatusException(MutableHttpResponse<?> response, RouteInfo<?> routeInfo, PropagatedContext propagatedContext) {
         if (response.code() >= 400 && routeInfo != null && !routeInfo.isErrorRoute()) {
             RouteMatch<Object> statusRoute = routeExecutor.findStatusRoute(request, response.status(), routeInfo);
             if (statusRoute != null) {
-                PropagatedContext propagatedContext = PropagatedContext.get();
                 return fulfillArguments(statusRoute)
-                    .flatMap(rm -> routeExecutor.callRoute(propagatedContext, rm, request).flatMap(res -> handleStatusException(res, rm)))
-                    .onErrorResume(this::onErrorNoFilter);
+                    .flatMap(rm -> routeExecutor.callRoute(propagatedContext, rm, request).flatMap(res -> handleStatusException(res, rm, propagatedContext)))
+                    .onErrorResume(exp -> onErrorNoFilter(exp, propagatedContext));
             }
         }
         return ExecutionFlow.just(response);
@@ -375,8 +378,8 @@ public class RequestLifecycle {
             return runWithFilters(() -> {
                 PropagatedContext propagatedContext = PropagatedContext.get();
                 return fulfillArguments(statusRoute.get())
-                    .flatMap(routeMatch -> routeExecutor.callRoute(propagatedContext, routeMatch, request).flatMap(res -> handleStatusException(res, routeMatch)))
-                    .onErrorResume(this::onErrorNoFilter);
+                    .flatMap(routeMatch -> routeExecutor.callRoute(propagatedContext, routeMatch, request).flatMap(res -> handleStatusException(res, routeMatch, propagatedContext)))
+                    .onErrorResume(exp -> onErrorNoFilter(exp, propagatedContext));
             });
         }
         if (request.getMethod() != HttpMethod.HEAD) {

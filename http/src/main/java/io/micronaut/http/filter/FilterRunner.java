@@ -73,7 +73,7 @@ public class FilterRunner {
      * filters in the reverse order.
      */
     private final List<GenericHttpFilter> filters;
-    private final PropagatedContext initialPropagatedContext = PropagatedContext.get();
+    private final PropagatedContext initialPropagatedContext = PropagatedContext.getOrEmpty();
 
     /**
      * Create a new filter runner, to be used only once.
@@ -116,12 +116,13 @@ public class FilterRunner {
      * Transform a response, e.g. by replacing an error response with an exception. Called before
      * every filter.
      *
-     * @param request  The current request
-     * @param response The current response
+     * @param request           The current request
+     * @param response          The current response
+     * @param propagatedContext The propagated context
      * @return A flow that will be passed on to the next filter
      */
     @SuppressWarnings("java:S1452")
-    protected ExecutionFlow<? extends HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response) {
+    protected ExecutionFlow<? extends HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response, PropagatedContext propagatedContext) {
         return ExecutionFlow.just(response);
     }
 
@@ -129,12 +130,13 @@ public class FilterRunner {
      * Transform a failure, e.g. by replacing an exception with an error response. Called before
      * every filter.
      *
-     * @param request The current request
-     * @param failure The failure
+     * @param request           The current request
+     * @param failure           The failure
+     * @param propagatedContext The propagated context
      * @return A flow that will be passed on to the next filter
      */
     @SuppressWarnings("java:S1452")
-    protected ExecutionFlow<? extends HttpResponse<?>> processFailure(HttpRequest<?> request, Throwable failure) {
+    protected ExecutionFlow<? extends HttpResponse<?>> processFailure(HttpRequest<?> request, Throwable failure, PropagatedContext propagatedContext) {
         return ExecutionFlow.error(failure);
     }
 
@@ -170,7 +172,7 @@ public class FilterRunner {
             GenericHttpFilter filter = iterator.next();
             return processRequestFilter(filter, context, newContext -> filterRequest0(newContext, iterator))
                 .onErrorResume(throwable -> {
-                    return processFailure(context.request, throwable).map(context::withResponse)
+                    return processFailure(context.request, throwable, context.propagatedContext).map(context::withResponse)
                         .onErrorResume(throwable2 -> {
                             // Exception filtering scenario of the http client
                             return filterResponse(context, iterator, throwable2).map(context::withResponse);
@@ -191,11 +193,11 @@ public class FilterRunner {
             return processResponseFilter(filter, context, exception)
                 .flatMap(newContext -> {
                     if (context != newContext) {
-                        return processResponse(newContext.request, newContext.response).map(context::withResponse);
+                        return processResponse(newContext.request, newContext.response, context.propagatedContext).map(context::withResponse);
                     }
                     return ExecutionFlow.just(newContext);
                 })
-                .onErrorResume(throwable -> processFailure(context.request, throwable).map(context::withResponse))
+                .onErrorResume(throwable -> processFailure(context.request, throwable, context.propagatedContext).map(context::withResponse))
                 .flatMap(newContext -> filterResponse(newContext, iterator, newContext.response == null ? exception : null));
         } else if (context.response != null) {
             return ExecutionFlow.just(context.response);

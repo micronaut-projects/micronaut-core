@@ -52,17 +52,10 @@ class ContinuationArgumentBinder : TypedRequestArgumentBinder<Continuation<*>> {
         private val reactorContextPresent: Boolean = ClassUtils.isPresent("kotlinx.coroutines.reactor.ReactorContext", null);
 
         @JvmStatic
-        @Deprecated("Use the new method that takes a collection of coroutine context factories", ReplaceWith(
-            "setupCoroutineContext(source, contextView, emptyList())",
-            "io.micronaut.http.bind.binders.ContinuationArgumentBinder.Companion.setupCoroutineContext"
-        )
-        )
-        fun setupCoroutineContext(source: HttpRequest<*>, contextView: ContextView) {
-            setupCoroutineContext(source, contextView, emptyList())
-        }
-
-        @JvmStatic
-        fun setupCoroutineContext(source: HttpRequest<*>, contextView: ContextView, continuationArgumentBinderCoroutineContextFactories: Collection<HttpCoroutineContextFactory<*>>) {
+        fun setupCoroutineContext(source: HttpRequest<*>,
+                                  contextView: ContextView,
+                                  propagatedContext: PropagatedContext,
+                                  continuationArgumentBinderCoroutineContextFactories: Collection<HttpCoroutineContextFactory<*>>) {
             val customContinuation = source.getAttribute(CONTINUATION_ARGUMENT_ATTRIBUTE_KEY, CustomContinuation::class.java).orElse(null)
             if (customContinuation != null) {
                 var coroutineContext: CoroutineContext = Dispatchers.Default
@@ -72,6 +65,7 @@ class ContinuationArgumentBinder : TypedRequestArgumentBinder<Continuation<*>> {
                 if (reactorContextPresent) {
                     coroutineContext += propagateReactorContext(contextView)
                 }
+                coroutineContext += MicronautPropagatedContext(propagatedContext)
                 continuationArgumentBinderCoroutineContextFactories.forEach {
                     coroutineContext += it.create()
                 }

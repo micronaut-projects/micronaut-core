@@ -42,7 +42,7 @@ class ReactorRx2JavaSpec extends Specification {
 
     void "test RxJava2 integration"() {
         expect:
-        List<Tuple2> result = Flux.range(1, 1)
+        List<Tuple2> result = Flux.range(1, 100)
                 .flatMap {
                     String tracingId = UUID.randomUUID()
                     HttpRequest<Object> request = HttpRequest

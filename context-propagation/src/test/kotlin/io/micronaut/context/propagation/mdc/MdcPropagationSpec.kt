@@ -2,10 +2,9 @@ package io.micronaut.context.propagation.mdc
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
-import io.micronaut.context.propagation.reactive.ReactivePropagation
-import io.micronaut.core.propagation.PropagatedContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.order.Ordered
+import io.micronaut.core.propagation.PropagatedContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MutableHttpRequest
@@ -38,19 +37,23 @@ class MdcPropagationSpec {
 
     @Test
     fun testKotlinPropagation() {
-        val embeddedServer = ApplicationContext.run(EmbeddedServer::class.java,
-                mapOf("mdc.reactortest.enabled" to "true" as Any)
+        val embeddedServer = ApplicationContext.run(
+            EmbeddedServer::class.java,
+            mapOf("mdc.reactortest.enabled" to "true" as Any)
         )
         val client = embeddedServer.applicationContext.getBean(HttpClient::class.java)
 
         Flux.range(1, 1)
-                .flatMap {
-                    val tracingId = UUID.randomUUID().toString()
-                    val get = HttpRequest.POST<Any>("http://localhost:${embeddedServer.port}/trigger", NameRequestBody("sss-" + tracingId)).header("X-TrackingId", tracingId)
-                    client.retrieve(get, String::class.java)
-                }
-                .collectList()
-                .block()
+            .flatMap {
+                val tracingId = UUID.randomUUID().toString()
+                val get = HttpRequest.POST<Any>(
+                    "http://localhost:${embeddedServer.port}/trigger",
+                    NameRequestBody("sss-" + tracingId)
+                ).header("X-TrackingId", tracingId)
+                client.retrieve(get, String::class.java)
+            }
+            .collectList()
+            .block()
 
         embeddedServer.stop()
     }
@@ -112,8 +115,8 @@ class NamingClient(@Client(id = "/") private val client: HttpClient) {
         checkTrackingIds(trackingId, mdcTracingId)
         return withContext(Dispatchers.IO) {
             val uri: URI = UriBuilder.of("/greet")
-                    .queryParam("name", name)
-                    .build()
+                .queryParam("name", name)
+                .build()
 
             val request = HttpRequest.GET<String>(uri).apply {
                 header("X-TrackingId", trackingId)
@@ -132,18 +135,20 @@ class HttpApplicationEnterFilter : HttpServerFilter {
     private val logger = LoggerFactory.getLogger(this::class.java)
 
     override fun doFilter(request: HttpRequest<*>, chain: ServerFilterChain): Publisher<MutableHttpResponse<*>> {
-        val trackingId = request.headers["X-TrackingId"]
-        MDC.put(TRACKING_ID, trackingId)
-        logger.info("Application enter ($trackingId).")
+        try {
+            val trackingId = request.headers["X-TrackingId"]
+            MDC.put(TRACKING_ID, trackingId)
+            logger.info("Application enter ($trackingId).")
 
-        return Mono.from(
-                ReactivePropagation.propagate(
-                        PropagatedContext.getOrEmpty() + MdcPropagationContext(),
-                        chain.proceed(request)
-                )
-        ).doOnNext {
-            logger.info("Application exit ($trackingId).")
+            return (PropagatedContext.getOrEmpty() + MdcPropagationContext()).propagate {
+                Mono.from(chain.proceed(request)).doOnNext {
+                    logger.info("Application exit ($trackingId).")
+                }
+            }
+        } finally {
+            MDC.clear()
         }
+
     }
 }
 
@@ -162,7 +167,7 @@ class HttpClientFilter : HttpClientFilter {
         val mdcTracingId = MDC.get(TRACKING_ID)
         checkTrackingIds(trackingId, mdcTracingId)
         return Mono.from(chain.proceed(request))
-                .doOnNext { logRemoteRequestStatus(it, trackingId) }
+            .doOnNext { logRemoteRequestStatus(it, trackingId) }
     }
 
     private fun logRemoteRequestStatus(response: HttpResponse<*>, trackingId: String) {

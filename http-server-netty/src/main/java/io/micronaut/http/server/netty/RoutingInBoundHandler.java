@@ -233,7 +233,9 @@ final class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.microna
             ctx.writeAndFlush(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR));
             return;
         }
-        new NettyRequestLifecycle(this, ctx, nettyHttpRequest).handleException(cause);
+        try (PropagatedContext.InContext ignore = PropagatedContext.newContext(new ServerHttpRequestContext(nettyHttpRequest)).propagate()) {
+            new NettyRequestLifecycle(this, ctx, nettyHttpRequest).handleException(cause);
+        }
     }
 
     @Override

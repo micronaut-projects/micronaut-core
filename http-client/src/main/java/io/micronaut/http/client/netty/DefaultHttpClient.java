@@ -31,7 +31,6 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.order.Ordered;
-import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -76,7 +75,6 @@ import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ContextPathUtils;
-import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.filter.FilterOrder;
 import io.micronaut.http.filter.FilterRunner;
@@ -1116,75 +1114,71 @@ public class DefaultHttpClient implements
         @Nullable BlockHint blockHint) {
         AtomicReference<MutableHttpRequest<?>> requestWrapper = new AtomicReference<>(request);
 
-        try (PropagatedContext.InContext ignore = PropagatedContext.newContext(new ServerHttpRequestContext(request)).propagate()) {
-
-            RequestKey requestKey;
-            try {
-                requestKey = new RequestKey(this, requestURI);
-            } catch (HttpClientException e) {
-                return Flux.error(e);
-            }
-
-            Mono<ConnectionManager.PoolHandle> handlePublisher = connectionManager.connect(requestKey, blockHint);
-
-            Flux<io.micronaut.http.HttpResponse<O>> responsePublisher = handlePublisher.flatMapMany(poolHandle -> {
-                poolHandle.channel.pipeline()
-                    .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR, new HttpObjectAggregator(configuration.getMaxContentLength()) {
-                        @Override
-                        protected void finishAggregation(FullHttpMessage aggregated) throws Exception {
-                            // only set content-length if there's any content
-                            if (!HttpUtil.isContentLengthSet(aggregated) &&
-                                aggregated.content().readableBytes() > 0) {
-                                super.finishAggregation(aggregated);
-                            }
-                        }
-                    })
-                    .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, new HttpStreamsClientHandler());
-
-                return Flux.create(emitter -> {
-                    try {
-                        sendRequestThroughChannel(
-                            requestWrapper.get(),
-                            bodyType,
-                            errorType,
-                            emitter,
-                            requestKey.isSecure(),
-                            poolHandle
-                        );
-                    } catch (Exception e) {
-                        emitter.error(e);
-                    }
-                });
-            });
-
-            Publisher<io.micronaut.http.HttpResponse<O>> finalPublisher = applyFilterToResponsePublisher(
-                parentRequest,
-                request,
-                requestURI,
-                requestWrapper,
-                responsePublisher
-            );
-            Flux<io.micronaut.http.HttpResponse<O>> finalReactiveSequence = Flux.from(finalPublisher);
-            // apply timeout to flowable too in case a filter applied another policy
-            Optional<Duration> readTimeout = configuration.getReadTimeout();
-            if (readTimeout.isPresent()) {
-                // add an additional second, because generally the timeout should occur
-                // from the Netty request handling pipeline
-                final Duration rt = readTimeout.get();
-                if (!rt.isNegative()) {
-                    Duration duration = rt.plus(Duration.ofSeconds(1));
-                    finalReactiveSequence = finalReactiveSequence.timeout(duration) // todo: move to CM
-                        .onErrorResume(throwable -> {
-                            if (throwable instanceof TimeoutException) {
-                                return Flux.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
-                            }
-                            return Flux.error(throwable);
-                        });
-                }
-            }
-            return finalReactiveSequence;
-
+        RequestKey requestKey;
+        try {
+            requestKey = new RequestKey(this, requestURI);
+        } catch (HttpClientException e) {
+            return Flux.error(e);
         }
+
+        Mono<ConnectionManager.PoolHandle> handlePublisher = connectionManager.connect(requestKey, blockHint);
+
+        Flux<io.micronaut.http.HttpResponse<O>> responsePublisher = handlePublisher.flatMapMany(poolHandle -> {
+            poolHandle.channel.pipeline()
+                .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR, new HttpObjectAggregator(configuration.getMaxContentLength()) {
+                    @Override
+                    protected void finishAggregation(FullHttpMessage aggregated) throws Exception {
+                        // only set content-length if there's any content
+                        if (!HttpUtil.isContentLengthSet(aggregated) &&
+                            aggregated.content().readableBytes() > 0) {
+                            super.finishAggregation(aggregated);
+                        }
+                    }
+                })
+                .addLast(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM, new HttpStreamsClientHandler());
+
+            return Flux.create(emitter -> {
+                try {
+                    sendRequestThroughChannel(
+                        requestWrapper.get(),
+                        bodyType,
+                        errorType,
+                        emitter,
+                        requestKey.isSecure(),
+                        poolHandle
+                    );
+                } catch (Exception e) {
+                    emitter.error(e);
+                }
+            });
+        });
+
+        Publisher<io.micronaut.http.HttpResponse<O>> finalPublisher = applyFilterToResponsePublisher(
+            parentRequest,
+            request,
+            requestURI,
+            requestWrapper,
+            responsePublisher
+        );
+        Flux<io.micronaut.http.HttpResponse<O>> finalReactiveSequence = Flux.from(finalPublisher);
+        // apply timeout to flowable too in case a filter applied another policy
+        Optional<Duration> readTimeout = configuration.getReadTimeout();
+        if (readTimeout.isPresent()) {
+            // add an additional second, because generally the timeout should occur
+            // from the Netty request handling pipeline
+            final Duration rt = readTimeout.get();
+            if (!rt.isNegative()) {
+                Duration duration = rt.plus(Duration.ofSeconds(1));
+                finalReactiveSequence = finalReactiveSequence.timeout(duration) // todo: move to CM
+                    .onErrorResume(throwable -> {
+                        if (throwable instanceof TimeoutException) {
+                            return Flux.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
+                        }
+                        return Flux.error(throwable);
+                    });
+            }
+        }
+        return finalReactiveSequence;
     }
 
     /**
