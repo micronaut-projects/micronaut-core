@@ -24,6 +24,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReferenceCounted;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.HttpAttributes;
@@ -392,7 +393,7 @@ public final class RouteExecutor {
         return ExecutionFlow.just(forStatus(routeInfo, null).body(body));
     }
 
-    ExecutionFlow<MutableHttpResponse<?>> callRoute(RouteMatch<?> routeMatch, HttpRequest<?> request) {
+    ExecutionFlow<MutableHttpResponse<?>> callRoute(PropagatedContext propagatedContext, RouteMatch<?> routeMatch, HttpRequest<?> request) {
         RouteInfo<?> routeInfo = routeMatch.getRouteInfo();
         ExecutorService executorService = routeInfo.getExecutor(serverConfiguration.getThreadSelection());
         ExecutionFlow<MutableHttpResponse<?>> executeMethodResponseFlow;
@@ -401,46 +402,48 @@ public final class RouteExecutor {
                 executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
                         coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(request, contextView));
                         return Mono.from(
-                            ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(routeMatch, request)).toPublisher()
+                            ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request)).toPublisher()
                         );
                     }))
                     .putInContext(ServerRequestContext.KEY, request);
             } else if (routeInfo.isReactive()) {
-                executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(routeMatch, request))
+                executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request))
                     .putInContext(ServerRequestContext.KEY, request);
             } else {
-                executeMethodResponseFlow = ExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(routeMatch, request));
+                executeMethodResponseFlow = ExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request));
             }
         } else {
             if (routeInfo.isSuspended()) {
                 executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
                         coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(request, contextView));
                         return Mono.from(
-                            ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(routeMatch, request)).toPublisher()
+                            ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request)).toPublisher()
                         );
                     }))
                     .putInContext(ServerRequestContext.KEY, request);
             } else if (routeInfo.isReactive()) {
-                executeMethodResponseFlow = ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(routeMatch, request))
+                executeMethodResponseFlow = ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request))
                     .putInContext(ServerRequestContext.KEY, request);
             } else {
-                executeMethodResponseFlow = executeRouteAndConvertBody(routeMatch, request);
+                executeMethodResponseFlow = executeRouteAndConvertBody(propagatedContext, routeMatch, request);
             }
         }
         return executeMethodResponseFlow;
     }
 
-    private ExecutionFlow<MutableHttpResponse<?>> executeRouteAndConvertBody(RouteMatch<?> routeMatch, HttpRequest<?> httpRequest) {
-        try {
-            requestArgumentSatisfier.fulfillArgumentRequirementsAfterFilters(routeMatch, httpRequest);
-            Object body = ServerRequestContext.with(httpRequest, (Supplier<Object>) routeMatch::execute);
-            if (body instanceof Optional) {
-                body = ((Optional<?>) body).orElse(null);
+    private ExecutionFlow<MutableHttpResponse<?>> executeRouteAndConvertBody(PropagatedContext propagatedContext, RouteMatch<?> routeMatch, HttpRequest<?> httpRequest) {
+        return propagatedContext.propagate(() -> {
+            try {
+                requestArgumentSatisfier.fulfillArgumentRequirementsAfterFilters(routeMatch, httpRequest);
+                Object body = ServerRequestContext.with(httpRequest, (Supplier<Object>) routeMatch::execute);
+                if (body instanceof Optional) {
+                    body = ((Optional<?>) body).orElse(null);
+                }
+                return createResponseForBody(httpRequest, body, routeMatch.getRouteInfo(), routeMatch);
+            } catch (Throwable e) {
+                return ExecutionFlow.error(e);
             }
-            return createResponseForBody(httpRequest, body, routeMatch.getRouteInfo(), routeMatch);
-        } catch (Throwable e) {
-            return ExecutionFlow.error(e);
-        }
+        });
     }
 
     ExecutionFlow<MutableHttpResponse<?>> createResponseForBody(HttpRequest<?> request,

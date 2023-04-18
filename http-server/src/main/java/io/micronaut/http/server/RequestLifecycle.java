@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpAttributes;
@@ -141,10 +142,12 @@ public class RequestLifecycle {
                 "Not a WebSocket request");
         }
 
-        return runWithFilters(() ->
-            fulfillArguments(routeMatch)
-                .flatMap(rm -> routeExecutor.callRoute(rm, request).flatMap(res -> handleStatusException(res, rm)))
-                .onErrorResume(this::onErrorNoFilter));
+        return runWithFilters(() -> {
+            PropagatedContext propagatedContext = PropagatedContext.get();
+            return fulfillArguments(routeMatch)
+                .flatMap(rm -> routeExecutor.callRoute(propagatedContext, rm, request).flatMap(res -> handleStatusException(res, rm)))
+                .onErrorResume(this::onErrorNoFilter);
+        });
     }
 
     /**
@@ -179,7 +182,7 @@ public class RequestLifecycle {
             }
             try {
                 return ExecutionFlow.just(errorRoute)
-                    .flatMap(routeMatch -> routeExecutor.callRoute(routeMatch, request).flatMap(res -> handleStatusException(res, routeMatch)))
+                    .flatMap(routeMatch -> routeExecutor.callRoute(PropagatedContext.get(), routeMatch, request).flatMap(res -> handleStatusException(res, routeMatch)))
                     .onErrorResume(u -> createDefaultErrorResponseFlow(request, u))
                     .<MutableHttpResponse<?>>map(response -> {
                         response.setAttribute(HttpAttributes.EXCEPTION, cause);
@@ -285,8 +288,9 @@ public class RequestLifecycle {
         if (response.code() >= 400 && routeInfo != null && !routeInfo.isErrorRoute()) {
             RouteMatch<Object> statusRoute = routeExecutor.findStatusRoute(request, response.status(), routeInfo);
             if (statusRoute != null) {
+                PropagatedContext propagatedContext = PropagatedContext.get();
                 return fulfillArguments(statusRoute)
-                    .flatMap(rm -> routeExecutor.callRoute(rm, request).flatMap(res -> handleStatusException(res, rm)))
+                    .flatMap(rm -> routeExecutor.callRoute(propagatedContext, rm, request).flatMap(res -> handleStatusException(res, rm)))
                     .onErrorResume(this::onErrorNoFilter);
             }
         }
@@ -368,9 +372,12 @@ public class RequestLifecycle {
     protected final ExecutionFlow<MutableHttpResponse<?>> onStatusError(MutableHttpResponse<?> defaultResponse, String message) {
         Optional<RouteMatch<Object>> statusRoute = routeExecutor.router.findStatusRoute(defaultResponse.status(), request);
         if (statusRoute.isPresent()) {
-            return runWithFilters(() -> fulfillArguments(statusRoute.get())
-                .flatMap(routeMatch -> routeExecutor.callRoute(routeMatch, request).flatMap(res -> handleStatusException(res, routeMatch)))
-                .onErrorResume(this::onErrorNoFilter));
+            return runWithFilters(() -> {
+                PropagatedContext propagatedContext = PropagatedContext.get();
+                return fulfillArguments(statusRoute.get())
+                    .flatMap(routeMatch -> routeExecutor.callRoute(propagatedContext, routeMatch, request).flatMap(res -> handleStatusException(res, routeMatch)))
+                    .onErrorResume(this::onErrorNoFilter);
+            });
         }
         if (request.getMethod() != HttpMethod.HEAD) {
             defaultResponse = routeExecutor.errorResponseProcessor.processResponse(ErrorContext.builder(request)

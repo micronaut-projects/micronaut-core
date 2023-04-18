@@ -45,7 +45,7 @@ class RxJava2Instrumentation {
             if (scheduleHandler != null) {
                 runnable = scheduleHandler.apply(runnable);
             }
-            return PropagatedContext.getOrEmpty().propagate(runnable);
+            return PropagatedContext.wrapCurrent(runnable);
         });
     }
 

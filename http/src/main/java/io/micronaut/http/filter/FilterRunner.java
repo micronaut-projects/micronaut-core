@@ -25,6 +25,7 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 import io.micronaut.core.type.UnsafeExecutable;
@@ -72,6 +73,7 @@ public class FilterRunner {
      * filters in the reverse order.
      */
     private final List<GenericHttpFilter> filters;
+    private final PropagatedContext initialPropagatedContext = PropagatedContext.get();
 
     /**
      * Create a new filter runner, to be used only once.
@@ -145,7 +147,7 @@ public class FilterRunner {
      */
     @SuppressWarnings("java:S1452")
     public final ExecutionFlow<MutableHttpResponse<?>> run(HttpRequest<?> request) {
-        return (ExecutionFlow) filterRequest(new FilterContext(request), filters.listIterator());
+        return (ExecutionFlow) filterRequest(new FilterContext(request, initialPropagatedContext), filters.listIterator());
     }
 
     private ExecutionFlow<HttpResponse<?>> filterRequest(FilterContext context,
@@ -240,9 +242,9 @@ public class FilterRunner {
                 null,
                 continuation);
             if (executeOn == null) {
-                filterMethodFlow = before.filter(context, filterMethodContext);
+                filterMethodFlow = context.propagatedContext().propagate(() -> before.filter(context, filterMethodContext));
             } else {
-                filterMethodFlow = ExecutionFlow.async(executeOn, () -> before.filter(context, filterMethodContext));
+                filterMethodFlow = ExecutionFlow.async(executeOn, () -> context.propagatedContext().propagate(() -> before.filter(context, filterMethodContext)));
             }
             if (before.isSuspended()) {
                 return filterMethodFlow;
@@ -254,7 +256,7 @@ public class FilterRunner {
             if (executeOn == null) {
                 try {
                     return chainSuspensionPoint.processResult(
-                        around.bean().doFilter(context.request, chainSuspensionPoint)
+                        context.propagatedContext().propagate(() -> around.bean().doFilter(context.request, chainSuspensionPoint))
                     );
                 } catch (Exception e) {
                     return ExecutionFlow.error(e);
@@ -262,7 +264,9 @@ public class FilterRunner {
             } else {
                 return ExecutionFlow.async(executeOn, () -> {
                     try {
-                        return chainSuspensionPoint.processResult(around.bean().doFilter(context.request, chainSuspensionPoint));
+                        return chainSuspensionPoint.processResult(
+                            context.propagatedContext().propagate(() -> around.bean().doFilter(context.request, chainSuspensionPoint))
+                        );
                     } catch (Exception e) {
                         return ExecutionFlow.error(e);
                     }
@@ -310,9 +314,9 @@ public class FilterRunner {
                 exceptionToFilter,
                 null);
             if (executeOn == null) {
-                return after.filter(filterContext, filterMethodContext);
+                filterContext.propagatedContext().propagate(() -> after.filter(filterContext, filterMethodContext));
             } else {
-                return ExecutionFlow.async(executeOn, () -> after.filter(filterContext, filterMethodContext));
+                return ExecutionFlow.async(executeOn, () -> filterContext.propagatedContext().propagate(() -> after.filter(filterContext, filterMethodContext)));
             }
         }
         return ExecutionFlow.just(filterContext);
@@ -733,11 +737,12 @@ public class FilterRunner {
         FilterContext afterMethodContext();
     }
 
-    private record FilterContext(HttpRequest<?> request,
-                                 @Nullable HttpResponse<?> response) {
+    private record FilterContext(@NonNull HttpRequest<?> request,
+                                 @Nullable HttpResponse<?> response,
+                                 @NonNull PropagatedContext propagatedContext) {
 
-        FilterContext(HttpRequest<?> request) {
-            this(request, null);
+        FilterContext(HttpRequest<?> request, PropagatedContext propagatedContext) {
+            this(request, null, propagatedContext);
         }
 
         public FilterContext withRequest(@NonNull HttpRequest<?> request) {
@@ -748,7 +753,7 @@ public class FilterRunner {
                 throw new IllegalStateException("Cannot modify the request after response is set!");
             }
             Objects.requireNonNull(request);
-            return new FilterContext(request, response);
+            return new FilterContext(request, response, propagatedContext);
         }
 
         public FilterContext withResponse(@NonNull HttpResponse<?> response) {
@@ -757,7 +762,15 @@ public class FilterRunner {
             }
             Objects.requireNonNull(response);
             // New response should remove the failure
-            return new FilterContext(request, response);
+            return new FilterContext(request, response, propagatedContext);
+        }
+
+        public FilterContext withPropagatedContext(@NonNull PropagatedContext propagatedContext) {
+            if (this.propagatedContext == propagatedContext) {
+                return this;
+            }
+            Objects.requireNonNull(propagatedContext);
+            return new FilterContext(request, response, propagatedContext);
         }
 
     }

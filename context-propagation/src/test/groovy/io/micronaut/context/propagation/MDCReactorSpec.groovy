@@ -167,9 +167,9 @@ class MDCReactorSpec extends Specification {
             try {
                 String trackingId = request.headers.get("X-TrackingId")
                 MDC.put("trackingId", trackingId)
-                return PropagatedContext.get().plus(new MdcPropagationContext()).call {
+                return PropagatedContext.get().plus(new MdcPropagationContext()).propagate {
                     return Mono.from(chain.proceed(request)).contextWrite(ctx -> ctx.put("xyz", "abc"))
-                }.call()
+                }
             } finally {
                 MDC.clear()
             }

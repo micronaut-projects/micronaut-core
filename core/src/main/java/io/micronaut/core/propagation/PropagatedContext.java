@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.NonNull;
 
 import java.util.Optional;
 import java.util.concurrent.Callable;
+import java.util.function.Supplier;
 
 /**
  * The propagation across different threads using the context which is immutable and can be extended/reduced by different elements.
@@ -71,6 +72,28 @@ public interface PropagatedContext {
     @NonNull
     static Optional<PropagatedContext> find() {
         return PropagatedContextImpl.find();
+    }
+
+    /**
+     * Wrap runnable for this context to be propagated in.
+     *
+     * @param runnable The runnable
+     * @return new runnable or existing if the context is missing
+     */
+    @NonNull
+    static Runnable wrapCurrent(Runnable runnable) {
+        return PropagatedContext.find().map(ctx -> ctx.wrap(runnable)).orElse(runnable);
+    }
+
+    /**
+     * Wrap callable for this context to be propagated in.
+     *
+     * @param callable The callable
+     * @return new callable or existing if the context is missing
+     */
+    @NonNull
+    static <V> Callable<V> wrapCurrent(Callable<V> callable) {
+        return PropagatedContext.find().map(ctx -> ctx.wrap(callable)).orElse(callable);
     }
 
     /**
@@ -126,7 +149,7 @@ public interface PropagatedContext {
      * @return new runnable
      */
     @NonNull
-    default Runnable propagate(@NonNull Runnable runnable) {
+    default Runnable wrap(@NonNull Runnable runnable) {
         PropagatedContext propagatedContext = this;
         return () -> {
             try (InContext ignore = propagatedContext.propagate()) {
@@ -143,7 +166,7 @@ public interface PropagatedContext {
      * @return new callable
      */
     @NonNull
-    default <V> Callable<V> propagate(@NonNull Callable<V> callable) {
+    default <V> Callable<V> wrap(@NonNull Callable<V> callable) {
         PropagatedContext propagatedContext = this;
         return () -> {
             try (InContext ignore = propagatedContext.propagate()) {
@@ -153,20 +176,18 @@ public interface PropagatedContext {
     }
 
     /**
-     * Wrap callable for this context to be propagated in.
+     * Propagate the context for the supplier.
      *
-     * @param callable The callable
-     * @param <V>      The callable return type
-     * @return new callable
+     * @param supplier The supplier
+     * @param <V>      The supplier return type
+     * @return new supplier
      */
     @NonNull
-    default <V> Callable<V> call(@NonNull Callable<V> callable) {
+    default <V> V propagate(@NonNull Supplier<V> supplier) {
         PropagatedContext propagatedContext = this;
-        return () -> {
-            try (InContext ignore = propagatedContext.propagate()) {
-                return callable.call();
-            }
-        };
+        try (InContext ignore = propagatedContext.propagate()) {
+            return supplier.get();
+        }
     }
 
     /**

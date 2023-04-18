@@ -40,7 +40,7 @@ class ReactorInstrumentation {
 
     @PostConstruct
     void init() {
-        Schedulers.onScheduleHook(KEY, runnable -> PropagatedContext.getOrEmpty().propagate(runnable));
+        Schedulers.onScheduleHook(KEY, PropagatedContext::wrapCurrent);
     }
 
     @PreDestroy

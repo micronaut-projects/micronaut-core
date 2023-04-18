@@ -57,12 +57,12 @@ final class ExecutorServiceInstrumenter implements BeanCreatedEventListener<Exec
 
                     @Override
                     public <T> Callable<T> instrument(Callable<T> task) {
-                        return PropagatedContext.getOrEmpty().propagate(task);
+                        return PropagatedContext.wrapCurrent(task);
                     }
 
                     @Override
                     public Runnable instrument(Runnable command) {
-                        return PropagatedContext.getOrEmpty().propagate(command);
+                        return PropagatedContext.wrapCurrent(command);
                     }
                 };
             } else {
@@ -74,12 +74,12 @@ final class ExecutorServiceInstrumenter implements BeanCreatedEventListener<Exec
 
                     @Override
                     public <T> Callable<T> instrument(Callable<T> task) {
-                        return PropagatedContext.getOrEmpty().propagate(task);
+                        return PropagatedContext.wrapCurrent(task);
                     }
 
                     @Override
                     public Runnable instrument(Runnable command) {
-                        return PropagatedContext.getOrEmpty().propagate(command);
+                        return PropagatedContext.wrapCurrent(command);
                     }
                 };
             }
