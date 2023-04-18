@@ -316,7 +316,7 @@ public class FilterRunner {
                 exceptionToFilter,
                 null);
             if (executeOn == null) {
-                filterContext.propagatedContext().propagate(() -> after.filter(filterContext, filterMethodContext));
+                return filterContext.propagatedContext().propagate(() -> after.filter(filterContext, filterMethodContext));
             } else {
                 return ExecutionFlow.async(executeOn, () -> filterContext.propagatedContext().propagate(() -> after.filter(filterContext, filterMethodContext)));
             }
