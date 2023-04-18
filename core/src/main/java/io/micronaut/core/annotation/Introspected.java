@@ -65,7 +65,7 @@ public @interface Introspected {
      * The default values for the visibility attribute.
      */
      Introspected.Visibility[] DEFAULT_VISIBILITY = {Introspected.Visibility.DEFAULT};
-
+     
     /**
      * By default {@link Introspected} applies to the class it is applied on. However if classes are specified
      * introspections will instead be generated for each class specified. This is useful in cases where you cannot
@@ -177,6 +177,13 @@ public @interface Introspected {
      * @since 2.3.0
      */
     String withPrefix() default "with";
+
+    /**
+     * @return The package to write introspections to. By default, uses the class package.
+     * @since 3.9.0
+     */
+    @Experimental
+    String targetPackage() default "";
 
     /**
      * Allow pre-computed indexes for property lookups based on an annotation and a member.
