@@ -67,7 +67,7 @@ public @interface Introspected {
      Introspected.Visibility[] DEFAULT_VISIBILITY = {Introspected.Visibility.DEFAULT};
 
     /**
-     * By default {@link Introspected} applies to the class it is applied on. However if classes are specified
+     * By default {@link Introspected} applies to the class it is applied on. However, if classes are specified
      * introspections will instead be generated for each class specified. This is useful in cases where you cannot
      * alter the source code and wish to generate introspections for already compiled classes.
      *
