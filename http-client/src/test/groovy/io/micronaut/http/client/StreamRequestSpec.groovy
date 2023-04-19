@@ -88,8 +88,8 @@ class StreamRequestSpec extends Specification {
         )).contentType(MediaType.TEXT_PLAIN_TYPE), List)).blockFirst()
 
         then:
-        result.body().size() == 5
-        result.body() == ["Number 0", "Number 1", "Number 2", "Number 3", "Number 4"]
+        // no guarantee that the strings aren't merged, so we have to allow for it
+        result.body().join("") == "Number 0Number 1Number 2Number 3Number 4"
 
     }
 
