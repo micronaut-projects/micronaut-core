@@ -200,6 +200,7 @@ public class NettyConverters implements TypeConverterRegistrar {
      * @param service The conversion service
      * @param context The context to convert to
      * @param input The object to convert
+     * @param <T> Target type
      * @return The converted object
      */
     public static <T> Optional<T> refCountAwareConvert(ConversionService service, ReferenceCounted input, ArgumentConversionContext<T> context) {
@@ -207,7 +208,6 @@ public class NettyConverters implements TypeConverterRegistrar {
         postProcess(input, converted);
         return converted;
     }
-
 
     /**
      * This method converts a
@@ -218,6 +218,7 @@ public class NettyConverters implements TypeConverterRegistrar {
      * @param input The object to convert
      * @param targetType The type to convert to
      * @param context The context to convert with
+     * @param <T> Target type
      * @return The converted object
      */
     public static <T> Optional<T> refCountAwareConvert(ConversionService service, ReferenceCounted input, Class<T> targetType, ConversionContext context) {

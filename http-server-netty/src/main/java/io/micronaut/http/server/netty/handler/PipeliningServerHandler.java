@@ -271,7 +271,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     /**
      * An inbound handler is responsible for all incoming messages.
      */
-    private static abstract class InboundHandler {
+    private abstract static class InboundHandler {
         /**
          * @see #channelRead
          */
@@ -622,7 +622,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
     }
 
-    private static abstract class OutboundHandler {
+    private abstract static class OutboundHandler {
         /**
          * {@link OutboundAccess} that created this handler, for metadata access.
          */

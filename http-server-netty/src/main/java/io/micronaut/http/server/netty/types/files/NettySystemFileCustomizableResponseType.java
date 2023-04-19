@@ -16,7 +16,6 @@
 package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpHeaders;
@@ -32,8 +31,6 @@ import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.http.server.types.files.SystemFile;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.DefaultFileRegion;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpChunkedInput;
@@ -191,17 +188,6 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
         }
     }
 
-    // See https://httpwg.org/specs/rfc9110.html#rule.int-range
-    private static class IntRange {
-        private final long firstPos;
-        private final long lastPos;
-
-        IntRange(long firstPos, long lastPos) {
-            this.firstPos = firstPos;
-            this.lastPos = lastPos;
-        }
-    }
-
     private static RandomAccessFile open(File file) {
         try {
             return new RandomAccessFile(file, "r");
@@ -210,48 +196,14 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
         }
     }
 
-    /**
-     * Wrapper class around {@link RandomAccessFile} with two purposes: Leak detection, and implementation of
-     * {@link ChannelFutureListener} that closes the file when called.
-     */
-    private static final class FileHolder implements ChannelFutureListener {
-        //to avoid initializing Netty at build time
-        private static final Supplier<ResourceLeakDetector<RandomAccessFile>> LEAK_DETECTOR = SupplierUtil.memoized(() ->
-            ResourceLeakDetectorFactory.instance().newResourceLeakDetector(RandomAccessFile.class));
+    // See https://httpwg.org/specs/rfc9110.html#rule.int-range
+    private static class IntRange {
+        private final long firstPos;
+        private final long lastPos;
 
-        final RandomAccessFile raf;
-        final long length;
-
-        private final ResourceLeakTracker<RandomAccessFile> tracker;
-
-        private final File file;
-
-        FileHolder(File file) {
-            this.file = file;
-            raf = open(file);
-            this.tracker = LEAK_DETECTOR.get().track(raf);
-            try {
-                this.length = raf.length();
-            } catch (IOException e) {
-                close();
-                throw new CustomizableResponseTypeException("Could not determine file length", e);
-            }
-        }
-
-        @Override
-        public void operationComplete(@NonNull ChannelFuture future) throws Exception {
-            close();
-        }
-
-        void close() {
-            try {
-                raf.close();
-            } catch (IOException e) {
-                LOG.warn("An error occurred closing the file reference: " + file.getAbsolutePath(), e);
-            }
-            if (tracker != null) {
-                tracker.close(raf);
-            }
+        IntRange(long firstPos, long lastPos) {
+            this.firstPos = firstPos;
+            this.lastPos = lastPos;
         }
     }
 

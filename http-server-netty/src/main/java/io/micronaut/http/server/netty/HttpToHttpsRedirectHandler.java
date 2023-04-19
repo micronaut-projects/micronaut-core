@@ -34,6 +34,10 @@ import io.netty.handler.codec.http.HttpHeaderValues;
 /**
  * Handler to automatically redirect HTTP to HTTPS request when using dual protocol.
  *
+ * @param conversionService   The conversion service
+ * @param serverConfiguration The server configuration
+ * @param sslConfiguration    The SSL configuration
+ * @param hostResolver        The host resolver
  * @author Iván López
  * @since 2.5.0
  */

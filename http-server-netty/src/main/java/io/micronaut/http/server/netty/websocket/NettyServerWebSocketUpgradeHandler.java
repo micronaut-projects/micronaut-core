@@ -78,7 +78,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-public class NettyServerWebSocketUpgradeHandler implements RequestHandler {
+public final class NettyServerWebSocketUpgradeHandler implements RequestHandler {
 
     public static final String ID = ChannelPipelineCustomizer.HANDLER_WEBSOCKET_UPGRADE;
     public static final String SCHEME_WEBSOCKET = "ws://";
@@ -98,13 +98,16 @@ public class NettyServerWebSocketUpgradeHandler implements RequestHandler {
     private final NettyHttpServerConfiguration serverConfiguration;
     private WebSocketServerHandshaker handshaker;
     private boolean cancelUpgrade = false;
-    public RoutingInBoundHandler next;
+
+    private RoutingInBoundHandler next;
 
     /**
      * Default constructor.
      *
      * @param embeddedServices The embedded server services
      * @param webSocketSessionRepository The websocket session repository
+     * @param conversionService The conversion service
+     * @param serverConfiguration The server configuration
      */
     public NettyServerWebSocketUpgradeHandler(NettyEmbeddedServices embeddedServices,
                                               WebSocketSessionRepository webSocketSessionRepository,
@@ -268,6 +271,10 @@ public class NettyServerWebSocketUpgradeHandler implements RequestHandler {
     @Override
     public void removed() {
         cancelUpgrade = true;
+    }
+
+    public void setNext(RoutingInBoundHandler next) {
+        this.next = next;
     }
 
     private static final class WebsocketRequestLifecycle extends RequestLifecycle {

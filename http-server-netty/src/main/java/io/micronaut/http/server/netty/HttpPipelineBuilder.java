@@ -566,7 +566,7 @@ final class HttpPipelineBuilder {
 
             RequestHandler requestHandler = routingInBoundHandler;
             if (webSocketUpgradeHandler.isPresent()) {
-                webSocketUpgradeHandler.get().next = routingInBoundHandler;
+                webSocketUpgradeHandler.get().setNext(routingInBoundHandler);
                 requestHandler = webSocketUpgradeHandler.get();
             }
             if (server.getServerConfiguration().isDualProtocol() && server.getServerConfiguration().isHttpToHttpsRedirect() && !https) {
