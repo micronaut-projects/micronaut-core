@@ -5,11 +5,12 @@ import jakarta.inject.Singleton
 
 @Singleton
 class ExampleJob {
+    var paused = true
     private var jobRan = false
     @Scheduled(
         fixedRate = "1s",
-        condition = "#{!jobControl.paused}") // <1>
-    fun run(jobControl: ExampleJobControl) {
+        condition = "#{!this.paused}") // <1>
+    fun run() {
         println("Job Running")
         jobRan = true
     }
@@ -17,11 +18,6 @@ class ExampleJob {
     fun hasJobRun(): Boolean {
         return jobRan
     }
-}
-
-@Singleton
-class ExampleJobControl { // <2>
-    var paused = true
 
     fun unpause() {
         paused = false

@@ -17,6 +17,7 @@ package io.micronaut.expressions.context;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -42,11 +43,12 @@ public interface ExpressionCompilationContextFactory {
     /**
      * Builds expression evaluation context for expression reference.
      *
-     * @param expression expression reference
+     * @param expression  expression reference
+     * @param thisElement
      * @return evaluation context for method
      */
     @NonNull
-    ExpressionCompilationContext buildContext(EvaluatedExpressionReference expression);
+    ExpressionCompilationContext buildContext(EvaluatedExpressionReference expression, @Nullable ClassElement thisElement);
 
     /**
      * Adds evaluated expression context class element to context loader

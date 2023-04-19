@@ -116,7 +116,9 @@ public class TernaryExpression extends ExpressionNode {
 
     @Override
     protected ClassElement doResolveClassElement(ExpressionVisitorContext ctx) {
-        return ClassElement.of(doResolveType(ctx).getClassName());
+        String className = doResolveType(ctx).getClassName();
+        return ctx.visitorContext().getClassElement(className)
+            .orElse(ClassElement.of(className));
     }
 
     /**

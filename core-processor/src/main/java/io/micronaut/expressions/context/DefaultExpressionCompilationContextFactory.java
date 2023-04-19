@@ -58,14 +58,14 @@ public final class DefaultExpressionCompilationContextFactory implements Express
     @NonNull
     public ExpressionCompilationContext buildContextForMethod(@NonNull EvaluatedExpressionReference expression,
                                                               @NonNull MethodElement methodElement) {
-        return buildForExpression(expression)
+        return buildForExpression(expression, null)
                  .extendWith(methodElement);
     }
 
     @Override
     @NonNull
-    public ExpressionCompilationContext buildContext(EvaluatedExpressionReference expression) {
-        return buildForExpression(expression);
+    public ExpressionCompilationContext buildContext(EvaluatedExpressionReference expression, ClassElement thisElement) {
+        return buildForExpression(expression, thisElement);
     }
 
     @Override
@@ -75,7 +75,7 @@ public final class DefaultExpressionCompilationContextFactory implements Express
         return this;
     }
 
-    private ExtensibleExpressionCompilationContext buildForExpression(EvaluatedExpressionReference expression) {
+    private ExtensibleExpressionCompilationContext buildForExpression(EvaluatedExpressionReference expression, ClassElement thisElement) {
         String annotationName = expression.annotationName();
         String memberName = expression.annotationMember();
 
@@ -87,6 +87,9 @@ public final class DefaultExpressionCompilationContextFactory implements Express
             evaluationContext = addAnnotationMemberEvaluationContext(evaluationContext, annotation, memberName);
         }
 
+        if (thisElement != null) {
+            return evaluationContext.withThis(thisElement);
+        }
         return evaluationContext;
     }
 

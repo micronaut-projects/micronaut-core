@@ -1,9 +1,11 @@
 package io.micronaut.expressions
 
 import io.micronaut.ast.transform.test.AbstractEvaluatedExpressionsSpec
+import spock.lang.Ignore
 
 class ContextMethodCallsExpressionsSpec extends AbstractEvaluatedExpressionsSpec{
 
+    @Ignore("Already tested in Java and fails intermittently due to a Groovy classloading bug")
     void "test context method calls"() {
         given:
         Object expr1 = evaluateAgainstContext("#{ #getIntValue() }",

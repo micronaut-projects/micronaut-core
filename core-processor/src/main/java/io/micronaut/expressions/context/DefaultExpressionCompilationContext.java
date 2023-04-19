@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
@@ -47,19 +48,34 @@ public class DefaultExpressionCompilationContext implements ExtensibleExpression
     private final Collection<ClassElement> classElements;
     private final MethodElement methodElement;
 
+    private final ClassElement thisType;
+
     DefaultExpressionCompilationContext(ClassElement... classElements) {
-        this(null, classElements);
+        this(null, null, classElements);
     }
 
-    private DefaultExpressionCompilationContext(MethodElement methodElement,
+    private DefaultExpressionCompilationContext(ClassElement thisType,
+                                                MethodElement methodElement,
                                                 ClassElement... classElements) {
+        this.thisType = thisType;
         this.methodElement = methodElement;
         this.classElements = Arrays.asList(classElements);
     }
 
     @Override
-    public DefaultExpressionCompilationContext extendWith(MethodElement methodElement) {
+    public ExtensibleExpressionCompilationContext withThis(ClassElement classElement) {
         return new DefaultExpressionCompilationContext(
+            classElement,
+            methodElement,
+            classElements.toArray(ClassElement[]::new)
+        );
+    }
+
+    @Override
+    public DefaultExpressionCompilationContext extendWith(MethodElement methodElement) {
+        ClassElement resolvedThis = methodElement.isStatic() || methodElement instanceof ConstructorElement ? null : methodElement.getOwningType();
+        return new DefaultExpressionCompilationContext(
+            resolvedThis,
             methodElement,
             classElements.toArray(ClassElement[]::new)
         );
@@ -68,9 +84,15 @@ public class DefaultExpressionCompilationContext implements ExtensibleExpression
     @Override
     public DefaultExpressionCompilationContext extendWith(ClassElement classElement) {
         return new DefaultExpressionCompilationContext(
+            this.thisType,
             this.methodElement,
             ArrayUtils.concat(classElements.toArray(ClassElement[]::new), classElement)
         );
+    }
+
+    @Override
+    public ClassElement findThis() {
+        return thisType;
     }
 
     @Override

@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.visitor.VisitorContext;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
@@ -50,12 +51,14 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
      * @param packageName        The package name
      * @param originatingElement The originating element
      * @param annotationMetadata The annotation metadata
+     * @param visitorContext          The visitor context
      */
     public BeanConfigurationWriter(
-            String packageName,
-            Element originatingElement,
-            AnnotationMetadata annotationMetadata) {
-        super(packageName + '.' + CLASS_SUFFIX, originatingElement, annotationMetadata, true);
+        String packageName,
+        Element originatingElement,
+        AnnotationMetadata annotationMetadata,
+        VisitorContext visitorContext) {
+        super(packageName + '.' + CLASS_SUFFIX, originatingElement, annotationMetadata, true, visitorContext);
         this.packageName = packageName;
         this.configurationClassName = targetClassType.getClassName();
         this.configurationClassInternalName = targetClassType.getInternalName();

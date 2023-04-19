@@ -6,26 +6,23 @@ import jakarta.inject.Singleton;
 @Singleton
 public class ExampleJob {
     private boolean jobRan = false;
+    private boolean paused = true;
+
 
     @Scheduled(
         fixedRate = "1s",
-        condition = "#{!jobControl.paused}") // <1>
-    void run(ExampleJobControl jobControl) {
+        condition = "#{!this.paused}") // <1>
+    void run() {
         System.out.println("Job Running");
         this.jobRan = true;
     }
 
-    public boolean hasJobRun() {
-        return jobRan;
-    }
-}
-
-@Singleton
-class ExampleJobControl { // <2>
-    private boolean paused = true;
-
     public boolean isPaused() {
         return paused;
+    } // <2>
+
+    public boolean hasJobRun() {
+        return jobRan;
     }
 
     public void unpause() {
@@ -35,4 +32,6 @@ class ExampleJobControl { // <2>
     public void pause() {
         paused = true;
     }
+
 }
+

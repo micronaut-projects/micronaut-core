@@ -70,7 +70,7 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
         this.executionHandle = method;
         AnnotationMetadata metadata = executionHandle.getAnnotationMetadata();
         if (originalParameters.length > 0 && metadata instanceof EvaluatedAnnotationMetadata eam) {
-            this.annotationMetadata = eam.withArguments(originalParameters);
+            this.annotationMetadata = eam.withArguments(target, originalParameters);
         } else {
             this.annotationMetadata = metadata;
         }
