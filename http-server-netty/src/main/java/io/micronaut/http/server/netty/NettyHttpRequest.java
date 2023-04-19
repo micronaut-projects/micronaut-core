@@ -170,16 +170,17 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private final BodyConvertor bodyConvertor = newBodyConvertor();
 
     /**
-     * @param nettyRequest           The {@link io.netty.handler.codec.http.HttpRequest}
-     * @param ctx                    The {@link ChannelHandlerContext}
-     * @param environment            The Environment
-     * @param serverConfiguration    The {@link HttpServerConfiguration}
+     * @param nettyRequest        The {@link io.netty.handler.codec.http.HttpRequest}
+     * @param ctx                 The {@link ChannelHandlerContext}
+     * @param environment         The Environment
+     * @param serverConfiguration The {@link HttpServerConfiguration}
+     * @throws IllegalArgumentException When the request URI is invalid
      */
     @SuppressWarnings("MagicNumber")
     public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest,
                             ChannelHandlerContext ctx,
                             ConversionService environment,
-                            HttpServerConfiguration serverConfiguration) {
+                            HttpServerConfiguration serverConfiguration) throws IllegalArgumentException {
         super(nettyRequest, environment);
         Objects.requireNonNull(nettyRequest, "Netty request cannot be null");
         Objects.requireNonNull(ctx, "ChannelHandlerContext cannot be null");
@@ -206,6 +207,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
                 serverConfiguration
             );
         } catch (IllegalArgumentException iae) {
+            // invalid URI
             if (request instanceof StreamedHttpRequest streamed) {
                 streamed.closeIfNoSubscriber();
             } else {

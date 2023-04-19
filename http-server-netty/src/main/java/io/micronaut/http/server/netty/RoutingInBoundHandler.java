@@ -200,6 +200,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         try {
             mnRequest = new NettyHttpRequest<>(request, ctx, conversionService, serverConfiguration);
         } catch (IllegalArgumentException e) {
+            // invalid URI
             NettyHttpRequest<Object> errorRequest = new NettyHttpRequest<>(
                 new DefaultFullHttpRequest(request.protocolVersion(), request.method(), "/", Unpooled.EMPTY_BUFFER),
                 ctx,

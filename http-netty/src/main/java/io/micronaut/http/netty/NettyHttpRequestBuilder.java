@@ -69,11 +69,23 @@ public interface NettyHttpRequestBuilder {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * Directly convert this request to netty, including the body, if possible. If the body of this
+     * request has been changed, this will return an empty value.
+     *
+     * @return The request including the body
+     */
     @NonNull
     default Optional<HttpRequest> toHttpRequestDirect() {
         return Optional.empty();
     }
 
+    /**
+     * Convert this request to a netty request without the body. The caller will handle adding the
+     * body.
+     *
+     * @return The request excluding the body
+     */
     @NonNull
     HttpRequest toHttpRequestWithoutBody();
 
@@ -97,6 +109,13 @@ public interface NettyHttpRequestBuilder {
         return asBuilder(request).toHttpRequestWithoutBody();
     }
 
+    /**
+     * Transform the given request to an equivalent {@link NettyHttpRequestBuilder}, so that it can
+     * be transformed to a netty request.
+     *
+     * @param request The micronaut http request
+     * @return The builder for further operations
+     */
     static NettyHttpRequestBuilder asBuilder(@NonNull io.micronaut.http.HttpRequest<?> request) {
         boolean supportDirect = true;
         while (request instanceof HttpRequestWrapper<?> wrapper) {
