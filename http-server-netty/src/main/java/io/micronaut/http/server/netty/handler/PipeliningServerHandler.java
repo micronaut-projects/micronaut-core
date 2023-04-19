@@ -60,6 +60,7 @@ import reactor.util.concurrent.Queues;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Queue;
 
 /**
@@ -169,6 +170,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         if (outboundHandler != null) {
             outboundHandler.discard();
         }
+        for (OutboundAccess queued : outboundQueue) {
+            if (queued.handler != null) {
+                queued.handler.discard();
+            }
+        }
+        outboundQueue.clear();
         requestHandler.removed();
     }
 
@@ -551,7 +558,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          */
         private void writeContinue() {
             if (handler == null) {
-                handler = new ContinueOutboundHandler();
+                write(new ContinueOutboundHandler());
             }
         }
 
@@ -703,11 +710,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         private final OutboundAccess outboundAccess;
         private StreamedHttpResponse initialMessage;
         private Subscription subscription;
+        private boolean writtenLast = false;
 
         StreamingOutboundHandler(OutboundAccess outboundAccess, StreamedHttpResponse initialMessage) {
             super(outboundAccess);
             this.outboundAccess = outboundAccess;
-            this.initialMessage = initialMessage;
+            this.initialMessage = Objects.requireNonNull(initialMessage, "initialMessage");
         }
 
         @Override
@@ -735,16 +743,25 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 throw new IllegalStateException("onNext before request?");
             }
 
+            if (writtenLast) {
+                throw new IllegalStateException("Already written a LastHttpContent");
+            }
+
             if (initialMessage != null) {
                 write(initialMessage, false, false);
                 initialMessage = null;
             }
 
             if (!removed) {
+                if (httpContent instanceof LastHttpContent) {
+                    writtenLast = true;
+                }
                 write(httpContent, true, false);
                 if (ctx.channel().isWritable()) {
                     subscription.request(1);
                 }
+            } else {
+                httpContent.release();
             }
         }
 
@@ -796,7 +813,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     initialMessage = null;
                 }
 
-                write(DefaultLastHttpContent.EMPTY_LAST_CONTENT, true, outboundAccess.closeAfterWrite);
+                if (!writtenLast) {
+                    write(DefaultLastHttpContent.EMPTY_LAST_CONTENT, true, outboundAccess.closeAfterWrite);
+                }
                 requestHandler.responseWritten(outboundAccess.attachment);
                 PipeliningServerHandler.this.writeSome();
             }
@@ -829,7 +848,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 write(message.body(), bodyIsLast, bodyIsLast && outboundAccess.closeAfterWrite);
             }
             if (message.needLast()) {
-                write(DefaultLastHttpContent.EMPTY_LAST_CONTENT, false, outboundAccess.closeAfterWrite);
+                write(DefaultLastHttpContent.EMPTY_LAST_CONTENT, true, outboundAccess.closeAfterWrite);
             }
             outboundHandler = null;
             requestHandler.responseWritten(outboundAccess.attachment);

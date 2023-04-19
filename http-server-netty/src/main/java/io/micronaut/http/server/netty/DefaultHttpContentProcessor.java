@@ -75,6 +75,7 @@ public class DefaultHttpContentProcessor implements HttpContentProcessor {
     }
 
     private void fireExceedsLength(long receivedLength, long expected, ByteBufHolder message) {
+        message.release();
         throw new ContentLengthExceededException(expected, receivedLength);
     }
 }

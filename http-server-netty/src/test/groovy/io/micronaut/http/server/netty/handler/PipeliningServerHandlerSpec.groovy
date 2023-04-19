@@ -1,5 +1,7 @@
 package io.micronaut.http.server.netty.handler
 
+
+import io.micronaut.http.netty.stream.StreamedHttpRequest
 import io.micronaut.http.server.netty.DelegateStreamedHttpResponse
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
@@ -20,6 +22,7 @@ import io.netty.handler.codec.http.HttpRequest
 import io.netty.handler.codec.http.HttpResponse
 import io.netty.handler.codec.http.HttpResponseStatus
 import io.netty.handler.codec.http.HttpVersion
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Sinks
 import spock.lang.Specification
 
@@ -154,6 +157,43 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.checkException()
         mon.read == 2
         mon.flush == 1
+        ch.readOutbound() == resp
+        ch.readOutbound() == null
+    }
+
+    def 'continue support'() {
+        given:
+        def mon = new MonitorHandler()
+        def resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT)
+        def ch = new EmbeddedChannel(mon, new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
+                Flux.from((StreamedHttpRequest) request).collectList().subscribe { outboundAccess.writeFull(resp) }
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }))
+
+        expect:
+        mon.read == 1
+        mon.flush == 0
+
+        when:
+        def req = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/")
+        req.headers().add(HttpHeaderNames.EXPECT, HttpHeaderValues.CONTINUE)
+        req.headers().add(HttpHeaderNames.CONTENT_LENGTH, 3)
+        ch.writeInbound(req)
+        then:
+        HttpResponse cont = ch.readOutbound()
+        cont.status() == HttpResponseStatus.CONTINUE
+        ch.readOutbound() == null
+
+        when:
+        ch.writeInbound(new DefaultLastHttpContent(Unpooled.wrappedBuffer("foo".getBytes(StandardCharsets.UTF_8))))
+        then:
         ch.readOutbound() == resp
         ch.readOutbound() == null
     }

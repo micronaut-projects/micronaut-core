@@ -569,6 +569,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             if (request instanceof NettyHttpRequest<?> nettyRequest) {
                 // no need to wait, can release immediately
                 cleanupRequest(nettyRequest);
+                outboundAccess.attachment(null);
             }
             outboundAccess.writeFull((FullHttpResponse) nettyResponse);
         }

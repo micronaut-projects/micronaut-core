@@ -20,12 +20,14 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.netty.reactive.HotObservable;
+import io.micronaut.http.netty.stream.DelegateStreamedHttpRequest;
 import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessorAsReactiveProcessor;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.handler.codec.http.HttpContent;
+import io.netty.handler.codec.http.HttpRequest;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -57,6 +59,13 @@ public final class StreamingByteBody extends ManagedBody<Publisher<HttpContent>>
         prepareClaim().subscribe(intermediateBuffering);
         next(intermediateBuffering);
         return intermediateBuffering.completion;
+    }
+
+    @Override
+    public HttpRequest claimForReuse(HttpRequest request) {
+        Publisher<HttpContent> publisher = prepareClaim();
+        next(new HttpBodyReused());
+        return new DelegateStreamedHttpRequest(request, publisher);
     }
 
     @Override

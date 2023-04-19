@@ -88,9 +88,9 @@ import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
+import io.micronaut.http.netty.stream.DelegateStreamedHttpRequest;
 import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
 import io.micronaut.http.netty.stream.JsonSubscriber;
-import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.sse.Event;
@@ -129,6 +129,7 @@ import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioDatagramChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.TooLongFrameException;
+import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
@@ -176,7 +177,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
-import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.channels.ClosedChannelException;
@@ -1304,6 +1304,16 @@ public class DefaultHttpClient implements
             @Nullable Argument<?> bodyType,
             Consumer<? super Throwable> onError) throws HttpPostRequestEncoder.ErrorDataEncoderException {
 
+        NettyHttpRequestBuilder nettyRequestBuilder = NettyHttpRequestBuilder.asBuilder(request);
+        Optional<HttpRequest> direct = nettyRequestBuilder.toHttpRequestDirect();
+        String newUri = requestURI.getRawPath();
+        if (requestURI.getRawQuery() != null) {
+            newUri += "?" + requestURI.getRawQuery();
+        }
+        if (direct.isPresent()) {
+            return new NettyRequestWriter(direct.get().setUri(newUri), null);
+        }
+
         io.netty.handler.codec.http.HttpRequest nettyRequest;
         HttpPostRequestEncoder postRequestEncoder = null;
         if (permitsBody) {
@@ -1313,8 +1323,7 @@ public class DefaultHttpClient implements
                 Object bodyValue = body.get();
                 if (bodyValue instanceof CharSequence) {
                     ByteBuf byteBuf = charSequenceToByteBuf((CharSequence) bodyValue, requestContentType);
-                    request.body(byteBuf);
-                    nettyRequest = NettyHttpRequestBuilder.toHttpRequest(request);
+                    nettyRequest = withBytes(nettyRequestBuilder.toHttpRequestWithoutBody(), byteBuf);
                 } else {
                     postRequestEncoder = buildFormDataRequest(request, bodyValue);
                     nettyRequest = postRequestEncoder.finalizeRequest();
@@ -1390,13 +1399,8 @@ public class DefaultHttpClient implements
 
                         requestBodyPublisher = requestBodyPublisher.doOnError(onError);
 
-                        request.body(requestBodyPublisher);
-                        nettyRequest = NettyHttpRequestBuilder.toHttpRequest(request);
-                        try {
-                            nettyRequest.setUri(requestURI.toURL().getFile());
-                        } catch (MalformedURLException e) {
-                            //should never happen
-                        }
+                        nettyRequest = new DelegateStreamedHttpRequest(nettyRequestBuilder.toHttpRequestWithoutBody(), requestBodyPublisher);
+                        nettyRequest.setUri(newUri);
                         return new NettyRequestWriter(nettyRequest, null);
                     } else if (bodyValue instanceof CharSequence) {
                         bodyContent = charSequenceToByteBuf((CharSequence) bodyValue, requestContentType);
@@ -1416,24 +1420,30 @@ public class DefaultHttpClient implements
                                 decorate(new HttpClientException("Body [" + bodyValue + "] cannot be encoded to content type [" + requestContentType + "]. No possible codecs or converters found."))
                         );
                     }
+                } else {
+                    bodyContent = Unpooled.EMPTY_BUFFER;
                 }
-                request.body(bodyContent);
-                try {
-                    nettyRequest = NettyHttpRequestBuilder.toHttpRequest(request);
-                } finally {
-                    // reset body after encoding request in case of retry
-                    request.body(body.orElse(null));
-                }
+                nettyRequest = withBytes(nettyRequestBuilder.toHttpRequestWithoutBody(), bodyContent);
             }
         } else {
-            nettyRequest = NettyHttpRequestBuilder.toHttpRequest(request);
+            nettyRequest = withBytes(nettyRequestBuilder.toHttpRequestWithoutBody(), Unpooled.EMPTY_BUFFER);
         }
-        try {
-            nettyRequest.setUri(requestURI.toURL().getFile());
-        } catch (MalformedURLException e) {
-            //should never happen
-        }
+        nettyRequest.setUri(newUri);
         return new NettyRequestWriter(nettyRequest, postRequestEncoder);
+    }
+
+    private static FullHttpRequest withBytes(HttpRequest request, ByteBuf bytes) {
+        HttpHeaders headers = request.headers();
+        headers.remove(HttpHeaderNames.TRANSFER_ENCODING);
+        headers.set(HttpHeaderNames.CONTENT_LENGTH, bytes.readableBytes());
+        return new DefaultFullHttpRequest(
+            request.protocolVersion(),
+            request.method(),
+            request.uri(),
+            bytes,
+            headers,
+            LastHttpContent.EMPTY_LAST_CONTENT.trailingHeaders()
+        );
     }
 
     private Flux<MutableHttpResponse<?>> readBodyOnError(@Nullable Argument<?> errorType, @NonNull Flux<MutableHttpResponse<?>> publisher) {
@@ -1704,14 +1714,14 @@ public class DefaultHttpClient implements
                         headers.set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
                     }
                 }
-            } else if (!(nettyRequest instanceof StreamedHttpRequest)) {
-                headers.set(HttpHeaderNames.CONTENT_LENGTH, 0);
+            } else if (nettyRequest instanceof FullHttpRequest full) {
+                headers.set(HttpHeaderNames.CONTENT_LENGTH, full.content().readableBytes());
             }
         }
     }
 
     private HttpPostRequestEncoder buildFormDataRequest(MutableHttpRequest clientHttpRequest, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {
-        HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(NettyHttpRequestBuilder.toHttpRequest(clientHttpRequest), false);
+        HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(NettyHttpRequestBuilder.asBuilder(clientHttpRequest).toHttpRequestWithoutBody(), false);
 
         Map<String, Object> formData;
         if (bodyValue instanceof Map) {
@@ -1744,7 +1754,7 @@ public class DefaultHttpClient implements
 
     private HttpPostRequestEncoder buildMultipartRequest(MutableHttpRequest clientHttpRequest, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         HttpDataFactory factory = new DefaultHttpDataFactory(DefaultHttpDataFactory.MINSIZE);
-        io.netty.handler.codec.http.HttpRequest request = NettyHttpRequestBuilder.toHttpRequest(clientHttpRequest);
+        io.netty.handler.codec.http.HttpRequest request = NettyHttpRequestBuilder.asBuilder(clientHttpRequest).toHttpRequestWithoutBody();
         HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(factory, request, true, CharsetUtil.UTF_8, HttpPostRequestEncoder.EncoderMode.HTML5);
         if (bodyValue instanceof MultipartBody.Builder) {
             bodyValue = ((MultipartBody.Builder) bodyValue).build();
@@ -1853,13 +1863,13 @@ public class DefaultHttpClient implements
         return io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(scheme) || SCHEME_WSS.equalsIgnoreCase(scheme);
     }
 
+    private <E extends HttpClientException> E decorate(E exc) {
+        return HttpClientExceptionUtils.populateServiceId(exc, informationalServiceId, configuration);
+    }
+
     @FunctionalInterface
     interface ThrowingBiConsumer<T1, T2> {
         void accept(T1 t1, T2 t2) throws Exception;
-    }
-
-    private <E extends HttpClientException> E decorate(E exc) {
-        return HttpClientExceptionUtils.populateServiceId(exc, informationalServiceId, configuration);
     }
 
     /**

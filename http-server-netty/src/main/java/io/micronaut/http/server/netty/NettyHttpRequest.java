@@ -239,7 +239,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
     public final FormRouteCompleter formRouteCompleter() {
         if (formRouteCompleter == null) {
-            formRouteCompleter = new FormRouteCompleter(this, (RouteMatch<?>) getAttribute(HttpAttributes.ROUTE_MATCH).get());
+            formRouteCompleter = new FormRouteCompleter((RouteMatch<?>) getAttribute(HttpAttributes.ROUTE_MATCH).get(), getChannelHandlerContext().channel().eventLoop());
         }
         return formRouteCompleter;
     }
@@ -491,7 +491,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             }
 
             // request used to trigger our handlers
-            io.netty.handler.codec.http.HttpRequest inboundRequest = NettyHttpRequestBuilder.toHttpRequest(request);
+            io.netty.handler.codec.http.HttpRequest inboundRequest = NettyHttpRequestBuilder.asBuilder(request).toHttpRequestWithoutBody();
 
             // copy headers from our request
             for (Iterator<Map.Entry<CharSequence, CharSequence>> itr = headers.getNettyHeaders().iteratorCharSequence(); itr.hasNext(); ) {
@@ -571,13 +571,33 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         return ct != null && (ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) || ct.equals(MediaType.MULTIPART_FORM_DATA_TYPE));
     }
 
-    /**
-     * @return Return true if the request is form data.
-     */
-    @Internal
-    public final boolean isFormData() {
-        MediaType ct = getContentType().orElse(null);
-        return ct != null && (ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE));
+    @Override
+    public io.netty.handler.codec.http.HttpRequest toHttpRequest() {
+        // this is a bit awkward. we cannot expose the request directly, because the body is managed by rootBody().
+        // instead, we claim the body and return it as a new request.
+        // this method is used by the proxy client.
+        return toHttpRequestWithoutBody();
+    }
+
+    @Override
+    public Optional<io.netty.handler.codec.http.HttpRequest> toHttpRequestDirect() {
+        return Optional.of(rootBody().claimForReuse(nettyRequest));
+    }
+
+    @Override
+    public io.netty.handler.codec.http.HttpRequest toHttpRequestWithoutBody() {
+        if (nettyRequest instanceof FullHttpRequest) {
+            // do not include body, the body is owned by us
+            DefaultHttpRequest copy = new DefaultHttpRequest(
+                nettyRequest.protocolVersion(),
+                nettyRequest.method(),
+                nettyRequest.uri(),
+                nettyRequest.headers()
+            );
+            copy.setDecoderResult(nettyRequest.decoderResult());
+            return copy;
+        }
+        return nettyRequest;
     }
 
     @Override
@@ -785,6 +805,16 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         @Override
         public MutableHttpRequest<T> mutate() {
             return new NettyMutableHttpRequest();
+        }
+
+        @Override
+        public io.netty.handler.codec.http.HttpRequest toHttpRequestWithoutBody() {
+            return NettyHttpRequest.this.toHttpRequestWithoutBody();
+        }
+
+        @Override
+        public Optional<io.netty.handler.codec.http.HttpRequest> toHttpRequestDirect() {
+            return body != null ? Optional.empty() : NettyHttpRequest.this.toHttpRequestDirect();
         }
     }
 

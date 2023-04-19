@@ -49,7 +49,7 @@ public final class JsonContentProcessor extends AbstractHttpContentProcessor {
 
     private final JsonMapper jsonMapper;
     private final JsonCounter counter = new JsonCounter();
-    private final boolean tokenize;
+    private boolean tokenize;
     private ByteBuf singleBuffer;
     private CompositeByteBuf compositeBuffer;
 
@@ -83,6 +83,7 @@ public final class JsonContentProcessor extends AbstractHttpContentProcessor {
                 if (genericArgument.isPresent() && !Iterable.class.isAssignableFrom(genericArgument.get().getType()) && !isJsonStream) {
                     // if the generic argument is not a iterable type them stream the array into the publisher
                     counter.unwrapTopLevelArray();
+                    tokenize = true;
                 }
             }
         }

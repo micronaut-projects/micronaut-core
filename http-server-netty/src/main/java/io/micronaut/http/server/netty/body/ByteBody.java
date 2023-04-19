@@ -50,6 +50,16 @@ public sealed interface ByteBody extends HttpBody permits ImmediateByteBody, Str
     ExecutionFlow<ImmediateByteBody> buffer(ByteBufAllocator alloc);
 
     /**
+     * Claim this body and convert it back to a {@link HttpRequest}. This is used for proxying,
+     * where the request received by the server is reused by the client.
+     *
+     * @param request The input request (headers and such)
+     * @return The request including the body, either a {@link FullHttpRequest} or a
+     * {@link StreamedHttpRequest}
+     */
+    HttpRequest claimForReuse(HttpRequest request);
+
+    /**
      * Create a byte body for the given request. The request must be either a
      * {@link FullHttpRequest} or a {@link StreamedHttpRequest}.
      *

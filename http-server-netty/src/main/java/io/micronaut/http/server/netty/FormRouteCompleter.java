@@ -56,7 +56,7 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
     private static final Logger LOG = LoggerFactory.getLogger(FormRouteCompleter.class);
 
     final DelayedExecutionFlow<RouteMatch<?>> execute = DelayedExecutionFlow.create();
-    private final NettyHttpRequest<?> request;
+    private final EventLoop eventLoop;
     private boolean executed;
     private final RouteMatch<?> routeMatch;
     private Subscription upstreamSubscription;
@@ -64,8 +64,8 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
     private final Map<String, Claimant> claimants = new HashMap<>();
     private boolean upstreamDemanded = false;
 
-    FormRouteCompleter(NettyHttpRequest<?> request, RouteMatch<?> routeMatch) {
-        this.request = request;
+    FormRouteCompleter(RouteMatch<?> routeMatch, EventLoop eventLoop) {
+        this.eventLoop = eventLoop;
         this.routeMatch = routeMatch;
     }
 
@@ -120,14 +120,12 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
     }
 
     private void addData(MicronautHttpData<?> data) {
-        if (LOG.isTraceEnabled()) {
-            LOG.trace("Received HTTP Data for request [{}]: {}", request, data);
-        }
         allData.add(data);
         upstreamDemanded = false;
 
         String name = data.getName();
         Claimant claimant = claimants.get(name);
+        data.touch(claimant != null);
         if (claimant == null) {
             upstreamSubscription.request(1);
             return;
@@ -153,6 +151,14 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
         }
     }
 
+    private Claimant createClaimant(String name) {
+        Claimant claimant = new Claimant();
+        if (claimants.putIfAbsent(name, claimant) != null) {
+            throw new IllegalStateException("Field already claimed");
+        }
+        return claimant;
+    }
+
     /**
      * Claim all fields of the given name. In the returned publisher, each
      * {@link MicronautHttpData} may appear multiple times if there is new data.
@@ -161,11 +167,7 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
      * @return The publisher of data with this field name
      */
     public Flux<? extends MicronautHttpData<?>> claimFieldsRaw(String name) {
-        Claimant claimant = new Claimant();
-        if (claimants.putIfAbsent(name, claimant) != null) {
-            throw new IllegalStateException("Field already claimed");
-        }
-        return claimant.flux();
+        return createClaimant(name).flux();
     }
 
     /**
@@ -192,7 +194,9 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
      * @return The publisher of the complete fields
      */
     public Flux<? extends MicronautHttpData<?>> claimFieldsComplete(String name) {
-        return claimFieldsRaw(name).filter(MicronautHttpData::isCompleted);
+        Claimant claimant = createClaimant(name);
+        claimant.skipUnfinished = true;
+        return claimant.flux();
     }
 
     @Override
@@ -215,13 +219,18 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
     private class Claimant  {
         private final Sinks.Many<MicronautHttpData<?>> sink = Sinks.many().unicast().onBackpressureBuffer();
         private long demand;
+        private MicronautHttpData<?> last;
+        private MicronautHttpData<?> unsentIncomplete;
+        private boolean skipUnfinished = false;
 
         public Flux<MicronautHttpData<?>> flux() {
-            return sink.asFlux().doOnRequest(this::request);
+            return sink.asFlux()
+                .doOnRequest(this::request)
+                .doOnTerminate(this::releaseNotForwarded)
+                .doOnCancel(this::releaseNotForwarded);
         }
 
         private void request(long n) {
-            EventLoop eventLoop = request.getChannelHandlerContext().channel().eventLoop();
             if (!eventLoop.inEventLoop()) {
                 eventLoop.execute(() -> request(n));
                 return;
@@ -241,11 +250,29 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
         }
 
         public void send(MicronautHttpData<?> data) {
+            if (last != data) {
+                // take ownership for this claimant. FormRouteCompleter also keeps ownership for asMap
+                data.retain();
+                last = data;
+            }
+
+            if (skipUnfinished && !data.isCompleted()) {
+                unsentIncomplete = data;
+                return;
+            }
+
             demand--;
             if (sink.tryEmitNext(data) != Sinks.EmitResult.OK) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Failed to emit data for field {}", data.getName());
                 }
+            }
+        }
+
+        void releaseNotForwarded() {
+            if (unsentIncomplete != null) {
+                unsentIncomplete.release();
+                unsentIncomplete = null;
             }
         }
     }
