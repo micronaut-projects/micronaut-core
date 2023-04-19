@@ -39,8 +39,6 @@ import io.netty.util.AttributeKey;
 import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakDetectorFactory;
 import io.netty.util.ResourceLeakTracker;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -66,7 +64,6 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
 
     private static final int LENGTH_8K = 8192;
     private static final String UNIT_BYTES = "bytes";
-    private static final Logger LOG = LoggerFactory.getLogger(NettySystemFileCustomizableResponseType.class);
 
     protected Optional<FileCustomizableResponseType> delegate = Optional.empty();
 

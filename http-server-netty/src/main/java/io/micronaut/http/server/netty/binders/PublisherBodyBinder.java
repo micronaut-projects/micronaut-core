@@ -129,8 +129,8 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
         }
 
         Optional<?> converted;
-        if (o instanceof io.netty.util.ReferenceCounted) {
-            converted = NettyConverters.refCountAwareConvert(conversionService, (io.netty.util.ReferenceCounted) o, conversionContext);
+        if (o instanceof io.netty.util.ReferenceCounted rc) {
+            converted = NettyConverters.refCountAwareConvert(conversionService, rc, conversionContext);
         } else {
             converted = conversionService.convert(o, conversionContext);
         }

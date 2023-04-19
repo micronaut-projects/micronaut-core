@@ -34,7 +34,6 @@ import io.netty.channel.FileRegion;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpResponse;
-import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
@@ -814,7 +813,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 }
 
                 if (!writtenLast) {
-                    write(DefaultLastHttpContent.EMPTY_LAST_CONTENT, true, outboundAccess.closeAfterWrite);
+                    write(LastHttpContent.EMPTY_LAST_CONTENT, true, outboundAccess.closeAfterWrite);
                 }
                 requestHandler.responseWritten(outboundAccess.attachment);
                 PipeliningServerHandler.this.writeSome();
@@ -848,7 +847,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 write(message.body(), bodyIsLast, bodyIsLast && outboundAccess.closeAfterWrite);
             }
             if (message.needLast()) {
-                write(DefaultLastHttpContent.EMPTY_LAST_CONTENT, true, outboundAccess.closeAfterWrite);
+                write(LastHttpContent.EMPTY_LAST_CONTENT, true, outboundAccess.closeAfterWrite);
             }
             outboundHandler = null;
             requestHandler.responseWritten(outboundAccess.attachment);

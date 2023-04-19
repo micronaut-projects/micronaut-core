@@ -50,8 +50,9 @@ public interface NettyHttpRequestBuilder {
      * Converts this object to a streamed http request.
      *
      * @return The streamed request
+     * @deprecated Go through {@link #toHttpRequestDirect()} and {@link #toHttpRequestWithoutBody()} instead
      */
-    @Deprecated
+    @Deprecated(since = "4.0.0", forRemoval = true)
     @NonNull
     default StreamedHttpRequest toStreamHttpRequest() {
         throw new UnsupportedOperationException();
@@ -60,9 +61,10 @@ public interface NettyHttpRequestBuilder {
     /**
      * Converts this object to the most appropriate http request type.
      * @return The http request
+     * @deprecated Go through {@link #toHttpRequestDirect()} and {@link #toHttpRequestWithoutBody()} instead
      */
     @NonNull
-    @Deprecated
+    @Deprecated(since = "4.0.0", forRemoval = true)
     default HttpRequest toHttpRequest() {
         throw new UnsupportedOperationException();
     }
@@ -77,8 +79,9 @@ public interface NettyHttpRequestBuilder {
 
     /**
      * @return Is the request a stream.
+     * @deprecated Go through {@link #toHttpRequestDirect()} and {@link #toHttpRequestWithoutBody()} instead
      */
-    @Deprecated
+    @Deprecated(since = "4.0.0", forRemoval = true)
     default boolean isStream() {
         throw new UnsupportedOperationException();
     }
@@ -87,8 +90,9 @@ public interface NettyHttpRequestBuilder {
      * Convert the given request to a full http request.
      * @param request The request
      * @return The full request.
+     * @deprecated Go through {@link #toHttpRequestDirect()} and {@link #toHttpRequestWithoutBody()} instead
      */
-    @Deprecated
+    @Deprecated(since = "4.0.0", forRemoval = true)
     static @NonNull HttpRequest toHttpRequest(@NonNull io.micronaut.http.HttpRequest<?> request) {
         return asBuilder(request).toHttpRequestWithoutBody();
     }

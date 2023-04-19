@@ -74,5 +74,6 @@ record HttpToHttpsRedirectHandler(
 
     @Override
     public void handleUnboundError(Throwable cause) {
+        // this connection doesn't process requests, so just ignore errors
     }
 }

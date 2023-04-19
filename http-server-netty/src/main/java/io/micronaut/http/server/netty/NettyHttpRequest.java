@@ -572,10 +572,8 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     }
 
     @Override
+    @Deprecated
     public io.netty.handler.codec.http.HttpRequest toHttpRequest() {
-        // this is a bit awkward. we cannot expose the request directly, because the body is managed by rootBody().
-        // instead, we claim the body and return it as a new request.
-        // this method is used by the proxy client.
         return toHttpRequestWithoutBody();
     }
 
@@ -753,6 +751,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
         @NonNull
         @Override
+        @Deprecated
         public io.netty.handler.codec.http.FullHttpRequest toFullHttpRequest() {
             io.netty.handler.codec.http.HttpRequest nr = NettyHttpRequest.this.nettyRequest;
             if (nr instanceof io.netty.handler.codec.http.FullHttpRequest) {
@@ -771,6 +770,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
         @NonNull
         @Override
+        @Deprecated
         public StreamedHttpRequest toStreamHttpRequest() {
             if (isStream()) {
                 return (StreamedHttpRequest) NettyHttpRequest.this.nettyRequest;
@@ -790,6 +790,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
         @NonNull
         @Override
+        @Deprecated
         public io.netty.handler.codec.http.HttpRequest toHttpRequest() {
             if (isStream()) {
                 return toStreamHttpRequest();
@@ -798,6 +799,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         }
 
         @Override
+        @Deprecated
         public boolean isStream() {
             return NettyHttpRequest.this.nettyRequest instanceof StreamedHttpRequest;
         }

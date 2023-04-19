@@ -24,6 +24,7 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.LastHttpContent;
 
 import java.nio.charset.Charset;
 import java.util.ArrayList;
@@ -99,7 +100,7 @@ public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements Byt
             request.uri(),
             prepareClaim(),
             request.headers(),
-            DefaultLastHttpContent.EMPTY_LAST_CONTENT.trailingHeaders()
+            LastHttpContent.EMPTY_LAST_CONTENT.trailingHeaders()
         );
         copy.setDecoderResult(request.decoderResult());
         next(new HttpBodyReused());

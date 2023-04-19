@@ -24,6 +24,7 @@ import io.micronaut.http.server.netty.NettyHttpRequest;
 final class HttpBodyReused implements HttpBody {
     @Override
     public void release() {
+        // nothing to do
     }
 
     @Override
