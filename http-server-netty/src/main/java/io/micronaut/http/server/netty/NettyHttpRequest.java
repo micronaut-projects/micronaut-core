@@ -200,7 +200,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     public static NettyHttpRequest<?> createSafe(io.netty.handler.codec.http.HttpRequest request, ChannelHandlerContext ctx, ConversionService conversionService, NettyHttpServerConfiguration serverConfiguration) {
         try {
             return new NettyHttpRequest<>(
-                new DefaultFullHttpRequest(request.protocolVersion(), request.method(), request.uri(), Unpooled.EMPTY_BUFFER),
+                request,
                 ctx,
                 conversionService,
                 serverConfiguration
