@@ -155,7 +155,7 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
                 try {
                     // HttpChunkedInput will write the end marker (LastHttpContent) for us.
                     final HttpChunkedInput chunkedInput = new HttpChunkedInput(new TrackedChunkedFile(open(getFile()), position, contentLength, LENGTH_8K));
-                    return new CustomResponse(finalResponse, chunkedInput, false); // todo .addListener(file)
+                    return new CustomResponse(finalResponse, chunkedInput, false);
                 } catch (IOException e) {
                     throw new CustomizableResponseTypeException("Could not read file", e);
                 }
