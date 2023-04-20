@@ -39,6 +39,7 @@ import io.micronaut.http.uri.UriBuilder;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
+import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpContent;
@@ -264,6 +265,7 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
 
     @NonNull
     @Override
+    @Deprecated
     public FullHttpRequest toFullHttpRequest() {
         String uriStr = resolveUriPath();
         io.netty.handler.codec.http.HttpMethod method = getMethod(httpMethodName);
@@ -302,6 +304,7 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
 
     @NonNull
     @Override
+    @Deprecated
     public StreamedHttpRequest toStreamHttpRequest() {
         if (body instanceof Publisher) {
             String uriStr = resolveUriPath();
@@ -317,6 +320,7 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
 
     @NonNull
     @Override
+    @Deprecated
     public HttpRequest toHttpRequest() {
         if (isStream()) {
             return toStreamHttpRequest();
@@ -326,6 +330,17 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
     }
 
     @Override
+    public HttpRequest toHttpRequestWithoutBody() {
+        return new DefaultHttpRequest(
+            HttpVersion.HTTP_1_1,
+            getMethod(httpMethodName),
+            resolveUriPath(),
+            headers.getNettyHeaders()
+        );
+    }
+
+    @Override
+    @Deprecated
     public boolean isStream() {
         return body instanceof Publisher;
     }

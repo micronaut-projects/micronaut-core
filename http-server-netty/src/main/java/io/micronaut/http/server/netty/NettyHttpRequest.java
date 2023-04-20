@@ -51,6 +51,7 @@ import io.micronaut.http.server.netty.body.ByteBody;
 import io.micronaut.http.server.netty.body.HttpBody;
 import io.micronaut.http.server.netty.body.ImmediateMultiObjectBody;
 import io.micronaut.http.server.netty.body.ImmediateSingleObjectBody;
+import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.buffer.Unpooled;
@@ -62,6 +63,7 @@ import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
+import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.QueryStringDecoder;
 import io.netty.handler.codec.http.cookie.ClientCookieEncoder;
@@ -82,11 +84,13 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
+import java.security.cert.Certificate;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * Delegates to the Netty {@link io.netty.handler.codec.http.HttpRequest} instance.
@@ -166,16 +170,17 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private final BodyConvertor bodyConvertor = newBodyConvertor();
 
     /**
-     * @param nettyRequest           The {@link io.netty.handler.codec.http.HttpRequest}
-     * @param ctx                    The {@link ChannelHandlerContext}
-     * @param environment            The Environment
-     * @param serverConfiguration    The {@link HttpServerConfiguration}
+     * @param nettyRequest        The {@link io.netty.handler.codec.http.HttpRequest}
+     * @param ctx                 The {@link ChannelHandlerContext}
+     * @param environment         The Environment
+     * @param serverConfiguration The {@link HttpServerConfiguration}
+     * @throws IllegalArgumentException When the request URI is invalid
      */
     @SuppressWarnings("MagicNumber")
     public NettyHttpRequest(io.netty.handler.codec.http.HttpRequest nettyRequest,
                             ChannelHandlerContext ctx,
                             ConversionService environment,
-                            HttpServerConfiguration serverConfiguration) {
+                            HttpServerConfiguration serverConfiguration) throws IllegalArgumentException {
         super(nettyRequest, environment);
         Objects.requireNonNull(nettyRequest, "Netty request cannot be null");
         Objects.requireNonNull(ctx, "ChannelHandlerContext cannot be null");
@@ -191,6 +196,31 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         this.contentLength = headers.contentLength().orElse(-1);
         this.contentType = headers.contentType().orElse(null);
         this.origin = headers.getOrigin().orElse(null);
+    }
+
+    public static NettyHttpRequest<?> createSafe(io.netty.handler.codec.http.HttpRequest request, ChannelHandlerContext ctx, ConversionService conversionService, NettyHttpServerConfiguration serverConfiguration) {
+        try {
+            return new NettyHttpRequest<>(
+                request,
+                ctx,
+                conversionService,
+                serverConfiguration
+            );
+        } catch (IllegalArgumentException iae) {
+            // invalid URI
+            if (request instanceof StreamedHttpRequest streamed) {
+                streamed.closeIfNoSubscriber();
+            } else {
+                ((FullHttpRequest) request).release();
+            }
+
+            return new NettyHttpRequest<>(
+                new DefaultFullHttpRequest(request.protocolVersion(), request.method(), "/", Unpooled.EMPTY_BUFFER),
+                ctx,
+                conversionService,
+                serverConfiguration
+            );
+        }
     }
 
     public final ByteBody rootBody() {
@@ -211,7 +241,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
     public final FormRouteCompleter formRouteCompleter() {
         if (formRouteCompleter == null) {
-            formRouteCompleter = new FormRouteCompleter(this, (RouteMatch<?>) getAttribute(HttpAttributes.ROUTE_MATCH).get());
+            formRouteCompleter = new FormRouteCompleter((RouteMatch<?>) getAttribute(HttpAttributes.ROUTE_MATCH).get(), getChannelHandlerContext().channel().eventLoop());
         }
         return formRouteCompleter;
     }
@@ -338,6 +368,12 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     }
 
     @Override
+    public Optional<Certificate> getCertificate() {
+        Supplier<Certificate> sup = channelHandlerContext.channel().attr(HttpPipelineBuilder.CERTIFICATE_SUPPLIER_ATTRIBUTE.get()).get();
+        return sup == null ? Optional.empty() : Optional.ofNullable(sup.get());
+    }
+
+    @Override
     public Optional<T> getBody() {
         HttpBody lastBody = lastBody();
         if (lastBody instanceof ImmediateMultiObjectBody multi) {
@@ -388,9 +424,6 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         body.release();
         if (attributes != null) {
             attributes.values().forEach(this::releaseIfNecessary);
-        }
-        if (nettyRequest instanceof StreamedHttpRequest streamedHttpRequest) {
-            streamedHttpRequest.closeIfNoSubscriber();
         }
     }
 
@@ -460,7 +493,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             }
 
             // request used to trigger our handlers
-            io.netty.handler.codec.http.HttpRequest inboundRequest = NettyHttpRequestBuilder.toHttpRequest(request);
+            io.netty.handler.codec.http.HttpRequest inboundRequest = NettyHttpRequestBuilder.asBuilder(request).toHttpRequestWithoutBody();
 
             // copy headers from our request
             for (Iterator<Map.Entry<CharSequence, CharSequence>> itr = headers.getNettyHeaders().iteratorCharSequence(); itr.hasNext(); ) {
@@ -540,13 +573,31 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         return ct != null && (ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) || ct.equals(MediaType.MULTIPART_FORM_DATA_TYPE));
     }
 
-    /**
-     * @return Return true if the request is form data.
-     */
-    @Internal
-    public final boolean isFormData() {
-        MediaType ct = getContentType().orElse(null);
-        return ct != null && (ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE));
+    @Override
+    @Deprecated
+    public io.netty.handler.codec.http.HttpRequest toHttpRequest() {
+        return toHttpRequestWithoutBody();
+    }
+
+    @Override
+    public Optional<io.netty.handler.codec.http.HttpRequest> toHttpRequestDirect() {
+        return Optional.of(rootBody().claimForReuse(nettyRequest));
+    }
+
+    @Override
+    public io.netty.handler.codec.http.HttpRequest toHttpRequestWithoutBody() {
+        if (nettyRequest instanceof FullHttpRequest) {
+            // do not include body, the body is owned by us
+            DefaultHttpRequest copy = new DefaultHttpRequest(
+                nettyRequest.protocolVersion(),
+                nettyRequest.method(),
+                nettyRequest.uri(),
+                nettyRequest.headers()
+            );
+            copy.setDecoderResult(nettyRequest.decoderResult());
+            return copy;
+        }
+        return nettyRequest;
     }
 
     @Override
@@ -702,6 +753,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
         @NonNull
         @Override
+        @Deprecated
         public io.netty.handler.codec.http.FullHttpRequest toFullHttpRequest() {
             io.netty.handler.codec.http.HttpRequest nr = NettyHttpRequest.this.nettyRequest;
             if (nr instanceof io.netty.handler.codec.http.FullHttpRequest) {
@@ -720,6 +772,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
         @NonNull
         @Override
+        @Deprecated
         public StreamedHttpRequest toStreamHttpRequest() {
             if (isStream()) {
                 return (StreamedHttpRequest) NettyHttpRequest.this.nettyRequest;
@@ -739,6 +792,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
         @NonNull
         @Override
+        @Deprecated
         public io.netty.handler.codec.http.HttpRequest toHttpRequest() {
             if (isStream()) {
                 return toStreamHttpRequest();
@@ -747,6 +801,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         }
 
         @Override
+        @Deprecated
         public boolean isStream() {
             return NettyHttpRequest.this.nettyRequest instanceof StreamedHttpRequest;
         }
@@ -754,6 +809,16 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         @Override
         public MutableHttpRequest<T> mutate() {
             return new NettyMutableHttpRequest();
+        }
+
+        @Override
+        public io.netty.handler.codec.http.HttpRequest toHttpRequestWithoutBody() {
+            return NettyHttpRequest.this.toHttpRequestWithoutBody();
+        }
+
+        @Override
+        public Optional<io.netty.handler.codec.http.HttpRequest> toHttpRequestDirect() {
+            return body != null ? Optional.empty() : NettyHttpRequest.this.toHttpRequestDirect();
         }
     }
 

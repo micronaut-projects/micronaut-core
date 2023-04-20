@@ -32,7 +32,7 @@ class LogbookNettyServerCustomizer(private val logbook: Logbook) :
 
         override fun onStreamPipelineBuilt() {
             channel!!.pipeline().addBefore( // <5>
-                ChannelPipelineCustomizer.HANDLER_HTTP_STREAM,
+                ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND,
                 "logbook",
                 LogbookServerHandler(logbook)
             )

@@ -15,10 +15,6 @@
  */
 package io.micronaut.http.server.netty;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.concurrent.ExecutorService;
-
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
@@ -29,11 +25,15 @@ import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
+import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.socket.ServerSocketChannel;
+
+import java.util.List;
+import java.util.Optional;
+import java.util.concurrent.ExecutorService;
 
 /**
  * A delegating Netty embedded services instance.
@@ -90,7 +90,7 @@ interface DelegateNettyEmbeddedServices extends NettyEmbeddedServices {
     }
 
     @Override
-    default Optional<SimpleChannelInboundHandler<NettyHttpRequest<?>>> getWebSocketUpgradeHandler(NettyEmbeddedServer server) {
+    default Optional<NettyServerWebSocketUpgradeHandler> getWebSocketUpgradeHandler(NettyEmbeddedServer server) {
         return getDelegate().getWebSocketUpgradeHandler(server);
     }
 

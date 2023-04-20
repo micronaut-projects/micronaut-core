@@ -21,7 +21,6 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.multipart.HttpData;
-import io.netty.util.ReferenceCountUtil;
 
 import java.util.Collection;
 import java.util.concurrent.atomic.AtomicLong;
@@ -76,7 +75,7 @@ public class DefaultHttpContentProcessor implements HttpContentProcessor {
     }
 
     private void fireExceedsLength(long receivedLength, long expected, ByteBufHolder message) {
-        ReferenceCountUtil.safeRelease(message);
+        message.release();
         throw new ContentLengthExceededException(expected, receivedLength);
     }
 }

@@ -26,11 +26,11 @@ import io.micronaut.http.annotation.Body;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.server.RequestLifecycle;
 import io.micronaut.http.server.netty.body.ByteBody;
+import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
 import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType;
 import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.web.router.RouteMatch;
-import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
 import org.slf4j.Logger;
@@ -47,7 +47,7 @@ final class NettyRequestLifecycle extends RequestLifecycle {
     private static final Logger LOG = LoggerFactory.getLogger(NettyRequestLifecycle.class);
 
     private final RoutingInBoundHandler rib;
-    private final ChannelHandlerContext ctx;
+    private final PipeliningServerHandler.OutboundAccess outboundAccess;
 
     /**
      * Should only be used where netty-specific stuff is needed, such as reading the body or
@@ -55,18 +55,16 @@ final class NettyRequestLifecycle extends RequestLifecycle {
      */
     private final NettyHttpRequest<?> nettyRequest;
 
-    NettyRequestLifecycle(RoutingInBoundHandler rib, ChannelHandlerContext ctx, NettyHttpRequest<?> request) {
+    NettyRequestLifecycle(RoutingInBoundHandler rib, PipeliningServerHandler.OutboundAccess outboundAccess, NettyHttpRequest<?> request) {
         super(rib.routeExecutor, request);
         this.rib = rib;
-        this.ctx = ctx;
+        this.outboundAccess = outboundAccess;
         this.nettyRequest = request;
 
         multipartEnabled(rib.multipartEnabled);
     }
 
     void handleNormal() {
-        ctx.channel().config().setAutoRead(false);
-
         if (LOG.isDebugEnabled()) {
             HttpMethod httpMethod = request().getMethod();
             ServerRequestContext.set(request());
@@ -75,20 +73,23 @@ final class NettyRequestLifecycle extends RequestLifecycle {
 
         ExecutionFlow<MutableHttpResponse<?>> result;
 
-        // handle decoding failure
-        DecoderResult decoderResult = nettyRequest.getNativeRequest().decoderResult();
-        if (decoderResult.isFailure()) {
-            Throwable cause = decoderResult.cause();
-            HttpStatus status = cause instanceof TooLongFrameException ? HttpStatus.REQUEST_ENTITY_TOO_LARGE : HttpStatus.BAD_REQUEST;
-            result = onStatusError(
-                HttpResponse.status(status),
-                status.getReason()
-            );
-        } else {
-            result = normalFlow();
+        try {
+            // handle decoding failure
+            DecoderResult decoderResult = nettyRequest.getNativeRequest().decoderResult();
+            if (decoderResult.isFailure()) {
+                Throwable cause = decoderResult.cause();
+                HttpStatus status = cause instanceof TooLongFrameException ? HttpStatus.REQUEST_ENTITY_TOO_LARGE : HttpStatus.BAD_REQUEST;
+                result = onStatusError(
+                    HttpResponse.status(status),
+                    status.getReason()
+                );
+            } else {
+                result = normalFlow();
+            }
+            result.onComplete((response, throwable) -> rib.writeResponse(outboundAccess, nettyRequest, response, throwable));
+        } catch (Exception e) {
+            handleException(e);
         }
-
-        result.onComplete((response, throwable) -> rib.writeResponse(ctx, nettyRequest, response, throwable));
     }
 
     @Nullable
@@ -129,7 +130,6 @@ final class NettyRequestLifecycle extends RequestLifecycle {
     private ExecutionFlow<RouteMatch<?>> waitForBody(RouteMatch<?> routeMatch) {
         // note: shouldReadBody only works when fulfill has been called at least once
         if (nettyRequest.rootBody().next() != null) {
-            ctx.read();
             return ExecutionFlow.just(routeMatch);
         }
         HttpContentProcessor processor = rib.httpContentProcessorResolver.resolve(nettyRequest, routeMatch);
@@ -155,13 +155,12 @@ final class NettyRequestLifecycle extends RequestLifecycle {
                     return routeMatch;
                 });
         } else {
-            ctx.read();
             return ExecutionFlow.just(routeMatch);
         }
     }
 
     void handleException(Throwable cause) {
-        onError(cause).onComplete((response, throwable) -> rib.writeResponse(ctx, nettyRequest, response, throwable));
+        onError(cause).onComplete((response, throwable) -> rib.writeResponse(outboundAccess, nettyRequest, response, throwable));
     }
 
     private boolean needsBody(RouteMatch<?> routeMatch) {

@@ -66,6 +66,7 @@ public final class HttpContentProcessorAsReactiveProcessor {
                     processor.add(c, (List) out);
                     return Flux.fromIterable(out);
                 } catch (Throwable e) {
+                    c.touch();
                     return Flux.error(e);
                 }
             }), Flux.defer(() -> {

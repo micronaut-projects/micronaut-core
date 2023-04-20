@@ -85,7 +85,7 @@ class FuzzyInputSpec extends Specification {
         when:
         def embeddedChannel = embeddedServer.buildEmbeddedChannel(false)
 
-        embeddedChannel.writeOneInbound(Unpooled.wrappedBuffer(input));
+        embeddedChannel.writeInbound(Unpooled.wrappedBuffer(input));
         embeddedChannel.runPendingTasks();
 
         embeddedChannel.releaseOutbound()

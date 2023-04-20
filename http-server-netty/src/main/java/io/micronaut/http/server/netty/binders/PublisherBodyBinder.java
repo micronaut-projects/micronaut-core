@@ -19,7 +19,6 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
-import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
@@ -27,10 +26,10 @@ import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.http.server.netty.body.ImmediateByteBody;
+import io.micronaut.http.server.netty.converters.NettyConverters;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
-import io.netty.util.ReferenceCountUtil;
 import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -122,28 +121,23 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
      * @return The converted object
      */
     static Object convertAndRelease(ConversionService conversionService, ArgumentConversionContext<?> conversionContext, Object o) {
-        try {
-            if (o instanceof ByteBufHolder holder) {
-                o = holder.content();
-                if (!((ByteBuf) o).isReadable()) {
-                    return null;
-                }
+        if (o instanceof ByteBufHolder holder) {
+            o = holder.content();
+            if (!((ByteBuf) o).isReadable()) {
+                return null;
             }
+        }
 
-            Optional<?> converted = conversionService.convert(o, conversionContext);
-            if (converted.isPresent()) {
-                Object conv = converted.get();
-                if (conv instanceof ReferenceCounted rc) {
-                    rc.retain();
-                } else if (conv instanceof io.netty.util.ReferenceCounted rc) {
-                    rc.retain();
-                }
-                return conv;
-            } else {
-                throw extractError(o, conversionContext);
-            }
-        } finally {
-            ReferenceCountUtil.release(o);
+        Optional<?> converted;
+        if (o instanceof io.netty.util.ReferenceCounted rc) {
+            converted = NettyConverters.refCountAwareConvert(conversionService, rc, conversionContext);
+        } else {
+            converted = conversionService.convert(o, conversionContext);
+        }
+        if (converted.isPresent()) {
+            return converted.get();
+        } else {
+            throw extractError(o, conversionContext);
         }
     }
 }

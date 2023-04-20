@@ -16,12 +16,15 @@
 package io.micronaut.http.server.netty.body;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.handler.codec.http.DefaultHttpContent;
-import org.jetbrains.annotations.NotNull;
+import io.netty.handler.codec.http.DefaultFullHttpRequest;
+import io.netty.handler.codec.http.DefaultLastHttpContent;
+import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.LastHttpContent;
 
 import java.nio.charset.Charset;
 import java.util.ArrayList;
@@ -58,14 +61,14 @@ public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements Byt
         return next(processMultiImpl(processor, data));
     }
 
-    @NotNull
+    @NonNull
     private ImmediateMultiObjectBody processMultiImpl(HttpContentProcessor processor, ByteBuf data) throws Throwable {
         List<Object> out = new ArrayList<>(1);
         if (data.isReadable()) {
-            processor.add(new DefaultHttpContent(data), out);
-        } else {
-            data.release();
+            data.retain();
+            processor.add(new DefaultLastHttpContent(data), out);
         }
+        data.release();
         processor.complete(out);
         return new ImmediateMultiObjectBody(out);
     }
@@ -87,6 +90,21 @@ public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements Byt
     @Override
     public ExecutionFlow<ImmediateByteBody> buffer(ByteBufAllocator alloc) {
         return ExecutionFlow.just(this);
+    }
+
+    @Override
+    public HttpRequest claimForReuse(HttpRequest request) {
+        DefaultFullHttpRequest copy = new DefaultFullHttpRequest(
+            request.protocolVersion(),
+            request.method(),
+            request.uri(),
+            prepareClaim(),
+            request.headers(),
+            LastHttpContent.EMPTY_LAST_CONTENT.trailingHeaders()
+        );
+        copy.setDecoderResult(request.decoderResult());
+        next(new HttpBodyReused());
+        return copy;
     }
 
     public boolean empty() {

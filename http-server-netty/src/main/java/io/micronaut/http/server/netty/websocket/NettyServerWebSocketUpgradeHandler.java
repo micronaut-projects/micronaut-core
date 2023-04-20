@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.websocket;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
@@ -36,6 +37,10 @@ import io.micronaut.http.server.RequestLifecycle;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.netty.NettyEmbeddedServices;
 import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.http.server.netty.RoutingInBoundHandler;
+import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
+import io.micronaut.http.server.netty.handler.RequestHandler;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
@@ -47,10 +52,8 @@ import io.micronaut.websocket.context.WebSocketBean;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
-import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
@@ -65,6 +68,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 
 /**
@@ -74,7 +78,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHandler<NettyHttpRequest<?>> {
+public final class NettyServerWebSocketUpgradeHandler implements RequestHandler {
 
     public static final String ID = ChannelPipelineCustomizer.HANDLER_WEBSOCKET_UPGRADE;
     public static final String SCHEME_WEBSOCKET = "ws://";
@@ -90,31 +94,36 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     private final WebSocketSessionRepository webSocketSessionRepository;
     private final RouteExecutor routeExecutor;
     private final NettyEmbeddedServices nettyEmbeddedServices;
+    private final ConversionService conversionService;
+    private final NettyHttpServerConfiguration serverConfiguration;
     private WebSocketServerHandshaker handshaker;
     private boolean cancelUpgrade = false;
+
+    private RoutingInBoundHandler next;
 
     /**
      * Default constructor.
      *
      * @param embeddedServices The embedded server services
      * @param webSocketSessionRepository The websocket session repository
+     * @param conversionService The conversion service
+     * @param serverConfiguration The server configuration
      */
     public NettyServerWebSocketUpgradeHandler(NettyEmbeddedServices embeddedServices,
-                                              WebSocketSessionRepository webSocketSessionRepository) {
+                                              WebSocketSessionRepository webSocketSessionRepository,
+                                              ConversionService conversionService,
+                                              NettyHttpServerConfiguration serverConfiguration) {
         this.router = embeddedServices.getRouter();
         this.webSocketBeanRegistry = WebSocketBeanRegistry.forServer(embeddedServices.getApplicationContext());
         this.webSocketSessionRepository = webSocketSessionRepository;
         this.routeExecutor = embeddedServices.getRouteExecutor();
         this.nettyEmbeddedServices = embeddedServices;
+        this.conversionService = conversionService;
+        this.serverConfiguration = serverConfiguration;
     }
 
-    @Override
-    public boolean acceptInboundMessage(Object msg) {
-        return msg instanceof NettyHttpRequest && isWebSocketUpgrade((NettyHttpRequest<?>) msg);
-    }
-
-    private boolean isWebSocketUpgrade(@NonNull NettyHttpRequest<?> request) {
-        HttpHeaders headers = request.getNativeRequest().headers();
+    static boolean isWebSocketUpgrade(@NonNull io.netty.handler.codec.http.HttpRequest request) {
+        HttpHeaders headers = request.headers();
         if (headers.containsValue(HttpHeaderNames.CONNECTION, HttpHeaderValues.UPGRADE, true)) {
             return headers.containsValue(HttpHeaderNames.UPGRADE, WEB_SOCKET_HEADER_VALUE, true);
         }
@@ -122,23 +131,37 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     }
 
     @Override
-    protected final void channelRead0(ChannelHandlerContext ctx, NettyHttpRequest<?> msg) {
-        ServerRequestContext.set(msg);
+    public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
+        if (isWebSocketUpgrade(request)) {
+            NettyHttpRequest<?> msg = new NettyHttpRequest<>(request, ctx, conversionService, serverConfiguration);
 
-        Optional<UriRouteMatch<Object, Object>> optionalRoute = router.find(HttpMethod.GET, msg.getPath(), msg)
-            .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
-            .findFirst();
+            Optional<UriRouteMatch<Object, Object>> optionalRoute = router.find(HttpMethod.GET, msg.getPath(), msg)
+                .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
+                .findFirst();
 
-        WebsocketRequestLifecycle requestLifecycle = new WebsocketRequestLifecycle(routeExecutor, msg, optionalRoute.orElse(null));
-        ExecutionFlow<MutableHttpResponse<?>> responseFlow = ExecutionFlow.async(ctx.channel().eventLoop(), requestLifecycle::handle);
-        responseFlow.onComplete((response, throwable) -> {
-            if (response != null) {
-                writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, response);
-            }
-        });
+            WebsocketRequestLifecycle requestLifecycle = new WebsocketRequestLifecycle(routeExecutor, msg, optionalRoute.orElse(null));
+            ExecutionFlow<MutableHttpResponse<?>> responseFlow = ExecutionFlow.async(ctx.channel().eventLoop(), requestLifecycle::handle);
+            responseFlow.onComplete((response, throwable) -> {
+                if (response != null) {
+                    writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, response, outboundAccess);
+                }
+            });
+        } else {
+            next.accept(ctx, request, outboundAccess);
+        }
     }
 
-    private void writeResponse(ChannelHandlerContext ctx, NettyHttpRequest<?> msg, boolean shouldProceedNormally, MutableHttpResponse<?> actualResponse) {
+    @Override
+    public void handleUnboundError(Throwable cause) {
+        next.handleUnboundError(cause);
+    }
+
+    @Override
+    public void responseWritten(Object attachment) {
+        next.responseWritten(attachment);
+    }
+
+    private void writeResponse(ChannelHandlerContext ctx, NettyHttpRequest<?> msg, boolean shouldProceedNormally, MutableHttpResponse<?> actualResponse, PipeliningServerHandler.OutboundAccess outboundAccess) {
         if (cancelUpgrade) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Cancelling websocket upgrade, handler was removed while request was processing");
@@ -169,11 +192,10 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
                     routeExecutor.getCoroutineHelper().orElse(null));
                 pipeline.addBefore(ctx.name(), NettyServerWebSocketHandler.ID, webSocketHandler);
 
-                pipeline.remove(ChannelPipelineCustomizer.HANDLER_HTTP_STREAM);
-                pipeline.remove(NettyServerWebSocketUpgradeHandler.this);
-                ChannelHandler accessLoggerHandler = pipeline.get(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER);
-                if (accessLoggerHandler != null) {
-                    pipeline.remove(accessLoggerHandler);
+                pipeline.remove(ctx.name());
+                try {
+                    pipeline.remove(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER);
+                } catch (NoSuchElementException ignored) {
                 }
 
             } catch (Throwable e) {
@@ -183,7 +205,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
                 ctx.writeAndFlush(new CloseWebSocketFrame(CloseReason.INTERNAL_ERROR.getCode(), CloseReason.INTERNAL_ERROR.getReason()));
             }
         } else {
-            ctx.writeAndFlush(actualResponse);
+            next.writeResponse(outboundAccess, msg, actualResponse, null);
         }
     }
 
@@ -247,15 +269,12 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     }
 
     @Override
-    public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-        super.handlerRemoved(ctx);
+    public void removed() {
         cancelUpgrade = true;
     }
 
-    @Override
-    public void channelInactive(@NonNull ChannelHandlerContext ctx) throws Exception {
-        super.channelInactive(ctx);
-        cancelUpgrade = true;
+    public void setNext(RoutingInBoundHandler next) {
+        this.next = next;
     }
 
     private static final class WebsocketRequestLifecycle extends RequestLifecycle {

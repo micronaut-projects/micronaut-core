@@ -20,11 +20,13 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.Part;
 import io.micronaut.http.bind.binders.AnnotatedRequestArgumentBinder;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
-import io.micronaut.http.netty.stream.StreamedHttpRequest;
+import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.http.server.netty.converters.NettyConverters;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -38,7 +40,7 @@ import java.util.concurrent.CompletableFuture;
  * @author Denis Stepanov
  * @since 4.0.0
  */
-public class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgumentBinder<Part, T>, StreamedNettyRequestArgumentBinder<T> {
+public class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgumentBinder<Part, T>, RequestArgumentBinder<T> {
 
     private final ConversionService conversionService;
     private final CompletedFileUploadBinder completedFileUploadBinder;
@@ -53,10 +55,11 @@ public class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgumentBi
     }
 
     @Override
-    public BindingResult<T> bindForStreamedNettyRequest(ArgumentConversionContext<T> context,
-                                                        StreamedHttpRequest streamedHttpRequest,
-                                                        NettyHttpRequest<?> request) {
-        if (request.getContentType().isEmpty() || !request.isFormOrMultipartData()) {
+    public BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> request) {
+        if (!(request instanceof NettyHttpRequest<?> nettyRequest)) {
+            return BindingResult.unsatisfied();
+        }
+        if (request.getContentType().isEmpty() || !nettyRequest.isFormOrMultipartData()) {
             return BindingResult.unsatisfied();
         }
         if (completedFileUploadBinder.matches(context.getArgument().getType())) {
@@ -69,8 +72,8 @@ public class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgumentBi
         Argument<T> argument = context.getArgument();
         String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(argument.getName());
 
-        CompletableFuture<T> completableFuture = Mono.from(request.formRouteCompleter().claimFieldsComplete(inputName))
-            .map(d -> conversionService.convert(d, argument.getType(), context).orElse(null))
+        CompletableFuture<T> completableFuture = Mono.from(nettyRequest.formRouteCompleter().claimFieldsComplete(inputName))
+            .map(d -> NettyConverters.refCountAwareConvert(conversionService, d, argument.getType(), context).orElse(null))
             .toFuture();
 
         return new PendingRequestBindingResult<>() {

@@ -88,7 +88,7 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
                 multiObjectBody = nhr.rootBody()
                     .processMulti(processor);
             } catch (Throwable e) {
-                throw new RuntimeException(e);
+                return () -> Optional.of(Flux.<CompletedPart>error(e)::subscribe);
             }
             Set<ReferenceCounted> partial = new HashSet<>();
             //noinspection unchecked

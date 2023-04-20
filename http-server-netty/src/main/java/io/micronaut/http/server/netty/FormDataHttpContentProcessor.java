@@ -73,7 +73,8 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor {
         Charset characterEncoding = nettyHttpRequest.getCharacterEncoding();
         HttpServerConfiguration.MultipartConfiguration multipart = configuration.getMultipart();
         HttpDataFactory factory = new MicronautHttpData.Factory(multipart, characterEncoding);
-        final HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
+        // prevent the decoders from immediately parsing the content
+        HttpRequest nativeRequest = nettyHttpRequest.toHttpRequestWithoutBody();
         if (HttpPostRequestDecoder.isMultipart(nativeRequest)) {
             this.decoder = new HttpPostMultipartRequestDecoder(factory, nativeRequest, characterEncoding);
         } else {

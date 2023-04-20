@@ -23,13 +23,12 @@ import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.http.server.netty.types.NettyCustomizableResponseType;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.http.server.types.files.SystemFile;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpResponse;
 
 import java.io.File;
@@ -62,7 +61,7 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
 
     @SuppressWarnings("MagicNumber")
     @Override
-    public ChannelFuture handle(Object obj, HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
+    public NettyCustomizableResponseType.CustomResponse handle(Object obj, HttpRequest<?> request, MutableHttpResponse<?> response) {
         NettyFileCustomizableResponseType type;
         if (obj instanceof File) {
             type = new NettySystemFileCustomizableResponseType((File) obj);
@@ -88,7 +87,7 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
             long fileLastModifiedSeconds = lastModified / 1000;
             if (ifModifiedSinceDateSeconds == fileLastModifiedSeconds) {
                 FullHttpResponse nettyResponse = notModified(response);
-                return context.writeAndFlush(nettyResponse);
+                return new NettyCustomizableResponseType.CustomResponse(nettyResponse, null, false);
             }
         }
 
@@ -98,7 +97,7 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
         setDateAndCacheHeaders(response, lastModified);
 
         type.process(response);
-        return type.write(request, response, context);
+        return type.write(request, response);
     }
 
     @Override

@@ -75,7 +75,10 @@ public enum HttpAttributes implements CharSequence {
 
     /**
      * Attribute used to store a client Certificate (mutual authentication).
+     *
+     * @deprecated Use {@link HttpRequest#getCertificate()} instead
      */
+    @Deprecated
     X509_CERTIFICATE("javax.servlet.request.X509Certificate"),
 
     /**

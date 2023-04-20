@@ -16,7 +16,6 @@
 package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpHeaders;
@@ -26,30 +25,26 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
+import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.SmartHttpContentCompressor;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.http.server.types.files.SystemFile;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.DefaultFileRegion;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpChunkedInput;
-import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.stream.ChunkedFile;
 import io.netty.util.AttributeKey;
 import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakDetectorFactory;
 import io.netty.util.ResourceLeakTracker;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.channels.FileChannel;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -69,7 +64,6 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
 
     private static final int LENGTH_8K = 8192;
     private static final String UNIT_BYTES = "bytes";
-    private static final Logger LOG = LoggerFactory.getLogger(NettySystemFileCustomizableResponseType.class);
 
     protected Optional<FileCustomizableResponseType> delegate = Optional.empty();
 
@@ -110,7 +104,7 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
     }
 
     @Override
-    public ChannelFuture write(HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
+    public CustomResponse write(HttpRequest<?> request, MutableHttpResponse<?> response) {
 
         if (response instanceof NettyMutableHttpResponse) {
 
@@ -146,24 +140,19 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
 
             // Write the request data
             final DefaultHttpResponse finalResponse = new DefaultHttpResponse(nettyResponse.getNettyHttpVersion(), nettyResponse.getNettyHttpStatus(), nettyResponse.getNettyHeaders());
-            context.write(finalResponse, context.voidPromise());
-
-            FileHolder file = new FileHolder(getFile());
 
             // Write the content.
-            SmartHttpContentCompressor predicate = context.channel().attr(ZERO_COPY_PREDICATE.get()).get();
+            SmartHttpContentCompressor predicate = request instanceof NettyHttpRequest<?> nettyRequest ?
+                nettyRequest.getChannelHandlerContext().channel().attr(ZERO_COPY_PREDICATE.get()).get() : null;
             if (predicate != null && predicate.shouldSkip(finalResponse)) {
                 // SSL not enabled - can use zero-copy file transfer.
-                context.write(new DefaultFileRegion(file.raf.getChannel(), position, contentLength), context.newProgressivePromise())
-                    .addListener(file);
-                return context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
+                return new CustomResponse(finalResponse, new TrackedDefaultFileRegion(open(getFile()).getChannel(), position, contentLength), true);
             } else {
                 // SSL enabled - cannot use zero-copy file transfer.
                 try {
                     // HttpChunkedInput will write the end marker (LastHttpContent) for us.
-                    final HttpChunkedInput chunkedInput = new HttpChunkedInput(new ChunkedFile(file.raf, position, contentLength, LENGTH_8K));
-                    return context.writeAndFlush(chunkedInput, context.newProgressivePromise())
-                        .addListener(file);
+                    final HttpChunkedInput chunkedInput = new HttpChunkedInput(new TrackedChunkedFile(open(getFile()), position, contentLength, LENGTH_8K));
+                    return new CustomResponse(finalResponse, chunkedInput, false);
                 } catch (IOException e) {
                     throw new CustomizableResponseTypeException("Could not read file", e);
                 }
@@ -196,6 +185,14 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
         }
     }
 
+    private static RandomAccessFile open(File file) {
+        try {
+            return new RandomAccessFile(file, "r");
+        } catch (FileNotFoundException e) {
+            throw new CustomizableResponseTypeException("Could not find file", e);
+        }
+    }
+
     // See https://httpwg.org/specs/rfc9110.html#rule.int-range
     private static class IntRange {
         private final long firstPos;
@@ -207,51 +204,44 @@ public class NettySystemFileCustomizableResponseType extends SystemFile implemen
         }
     }
 
-    /**
-     * Wrapper class around {@link RandomAccessFile} with two purposes: Leak detection, and implementation of
-     * {@link ChannelFutureListener} that closes the file when called.
-     */
-    private static final class FileHolder implements ChannelFutureListener {
+    private static class TrackedDefaultFileRegion extends DefaultFileRegion {
         //to avoid initializing Netty at build time
-        private static final Supplier<ResourceLeakDetector<RandomAccessFile>> LEAK_DETECTOR = SupplierUtil.memoized(() ->
-            ResourceLeakDetectorFactory.instance().newResourceLeakDetector(RandomAccessFile.class));
+        private static final Supplier<ResourceLeakDetector<TrackedDefaultFileRegion>> LEAK_DETECTOR = SupplierUtil.memoized(() ->
+            ResourceLeakDetectorFactory.instance().newResourceLeakDetector(TrackedDefaultFileRegion.class));
 
-        final RandomAccessFile raf;
-        final long length;
+        private final ResourceLeakTracker<TrackedDefaultFileRegion> tracker;
 
-        private final ResourceLeakTracker<RandomAccessFile> tracker;
-
-        private final File file;
-
-        FileHolder(File file) {
-            this.file = file;
-            try {
-                this.raf = new RandomAccessFile(file, "r");
-            } catch (FileNotFoundException e) {
-                throw new CustomizableResponseTypeException("Could not find file", e);
-            }
-            this.tracker = LEAK_DETECTOR.get().track(raf);
-            try {
-                this.length = raf.length();
-            } catch (IOException e) {
-                close();
-                throw new CustomizableResponseTypeException("Could not determine file length", e);
-            }
+        public TrackedDefaultFileRegion(FileChannel fileChannel, long position, long count) {
+            super(fileChannel, position, count);
+            this.tracker = LEAK_DETECTOR.get().track(this);
         }
 
         @Override
-        public void operationComplete(@NonNull ChannelFuture future) throws Exception {
-            close();
+        protected void deallocate() {
+            super.deallocate();
+            if (tracker != null) {
+                tracker.close(this);
+            }
+        }
+    }
+
+    private static class TrackedChunkedFile extends ChunkedFile {
+        //to avoid initializing Netty at build time
+        private static final Supplier<ResourceLeakDetector<TrackedChunkedFile>> LEAK_DETECTOR = SupplierUtil.memoized(() ->
+            ResourceLeakDetectorFactory.instance().newResourceLeakDetector(TrackedChunkedFile.class));
+
+        private final ResourceLeakTracker<TrackedChunkedFile> tracker;
+
+        public TrackedChunkedFile(RandomAccessFile file, long offset, long length, int chunkSize) throws IOException {
+            super(file, offset, length, chunkSize);
+            this.tracker = LEAK_DETECTOR.get().track(this);
         }
 
-        void close() {
-            try {
-                raf.close();
-            } catch (IOException e) {
-                LOG.warn("An error occurred closing the file reference: " + file.getAbsolutePath(), e);
-            }
+        @Override
+        public void close() throws Exception {
+            super.close();
             if (tracker != null) {
-                tracker.close(raf);
+                tracker.close(this);
             }
         }
     }
