@@ -93,6 +93,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         final boolean metadata = introspected.booleanValue("annotationMetadata").orElse(true);
         final Set<String> includedAnnotations = CollectionUtils.setOf(introspected.stringValues("includedAnnotations"));
         final Set<AnnotationValue<Annotation>> indexedAnnotations = CollectionUtils.setOf(introspected.get("indexed", AnnotationValue[].class, new AnnotationValue[0]));
+        final String targetPackage = introspected.stringValue("targetPackage").orElse(element.getPackageName());
 
         if (!classes.isEmpty()) {
             AtomicInteger index = new AtomicInteger(0);
@@ -101,6 +102,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                     return;
                 }
                 final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
+                    targetPackage,
                     element.getName(),
                     index.getAndIncrement(),
                     element,
@@ -129,6 +131,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                             continue;
                         }
                         final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
+                            targetPackage,
                             element.getName(),
                             j++,
                             element,
@@ -147,6 +150,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             }
         } else {
             final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
+                targetPackage,
                 element,
                 metadata ? element.getAnnotationMetadata() : null,
                 context

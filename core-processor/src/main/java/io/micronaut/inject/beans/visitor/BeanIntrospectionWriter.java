@@ -128,13 +128,13 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      * @param beanAnnotationMetadata The bean annotation metadata
      * @param visitorContext          The visitor context
      */
-    BeanIntrospectionWriter(ClassElement classElement, AnnotationMetadata beanAnnotationMetadata,
+    BeanIntrospectionWriter(String targetPackage, ClassElement classElement, AnnotationMetadata beanAnnotationMetadata,
                             VisitorContext visitorContext) {
-        super(computeReferenceName(classElement.getName()), classElement, beanAnnotationMetadata, true, visitorContext);
+        super(computeReferenceName(targetPackage, classElement.getName()), classElement, beanAnnotationMetadata, true, visitorContext);
         final String name = classElement.getName();
         this.classElement = classElement;
         this.referenceWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-        this.introspectionName = computeIntrospectionName(name);
+        this.introspectionName = computeShortIntrospectionName(targetPackage, name);
         this.introspectionType = getTypeReferenceForName(introspectionName);
         this.beanType = getTypeReferenceForName(name);
         this.dispatchWriter = new DispatchWriter(introspectionType, Type.getType(AbstractInitializableBeanIntrospection.class));
@@ -151,17 +151,18 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      * @param visitorContext          The visitor context
      */
     BeanIntrospectionWriter(
+            String targetPackage,
             String generatingType,
             int index,
             ClassElement originatingElement,
             ClassElement classElement,
             AnnotationMetadata beanAnnotationMetadata,
             VisitorContext visitorContext) {
-        super(computeReferenceName(generatingType) + index, originatingElement, beanAnnotationMetadata, true, visitorContext);
+        super(computeReferenceName(targetPackage, generatingType) + index, originatingElement, beanAnnotationMetadata, true, visitorContext);
         final String className = classElement.getName();
         this.classElement = classElement;
         this.referenceWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-        this.introspectionName = computeIntrospectionName(generatingType, className);
+        this.introspectionName = computeIntrospectionName(targetPackage, className);
         this.introspectionType = getTypeReferenceForName(introspectionName);
         this.beanType = getTypeReferenceForName(className);
         this.dispatchWriter = new DispatchWriter(introspectionType);
@@ -949,22 +950,19 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     }
 
     @NonNull
-    private static String computeReferenceName(String className) {
-        String packageName = NameUtils.getPackageName(className);
+    private static String computeReferenceName(String packageName, String className) {
         final String shortName = NameUtils.getSimpleName(className);
         return packageName + ".$" + shortName + REFERENCE_SUFFIX;
     }
 
     @NonNull
-    private static String computeIntrospectionName(String className) {
-        String packageName = NameUtils.getPackageName(className);
+    private static String computeShortIntrospectionName(String packageName, String className) {
         final String shortName = NameUtils.getSimpleName(className);
         return packageName + ".$" + shortName + INTROSPECTION_SUFFIX;
     }
 
     @NonNull
-    private static String computeIntrospectionName(String generatingName, String className) {
-        final String packageName = NameUtils.getPackageName(generatingName);
+    private static String computeIntrospectionName(String packageName, String className) {
         return packageName + ".$" + className.replace('.', '_') + INTROSPECTION_SUFFIX;
     }
 
