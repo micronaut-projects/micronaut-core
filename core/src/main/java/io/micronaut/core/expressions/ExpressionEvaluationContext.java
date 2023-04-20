@@ -29,6 +29,15 @@ import io.micronaut.core.annotation.Nullable;
 public interface ExpressionEvaluationContext extends AutoCloseable {
 
     /**
+     * Expressions that are evaluated in non-static contexts can reference "this".
+     *
+     * <p>The object returned here is a reference to this.</p>
+     *
+     * @return The object that represents this.
+     */
+    @Nullable Object getThis();
+
+    /**
      * Provides method argument by index.
      *
      * @param index argument index

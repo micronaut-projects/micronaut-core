@@ -1,7 +1,6 @@
 package io.micronaut.expressions
 
 import io.micronaut.ast.transform.test.AbstractEvaluatedExpressionsSpec
-import io.micronaut.context.exceptions.ExpressionEvaluationException
 import spock.lang.Ignore
 
 @Ignore('''
@@ -10,6 +9,7 @@ import spock.lang.Ignore
 ''')
 class ContextPropertyAccessExpressionsSpec extends AbstractEvaluatedExpressionsSpec
 {
+    @Ignore("already tested in java and flakey in Groovy")
     void "test context property access"() {
         given:
         Object expr1 = evaluateAgainstContext("#{ #intValue }",
@@ -62,6 +62,4 @@ class ContextPropertyAccessExpressionsSpec extends AbstractEvaluatedExpressionsS
         expr3 instanceof String && expr3 == "test value"
         expr4 instanceof String && expr4 == "custom property"
     }
-
-
 }

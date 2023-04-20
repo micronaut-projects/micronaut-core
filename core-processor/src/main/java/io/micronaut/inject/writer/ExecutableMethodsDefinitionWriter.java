@@ -18,17 +18,11 @@ package io.micronaut.inject.writer;
 import io.micronaut.context.AbstractExecutableMethodsDefinition;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
-import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory;
-import io.micronaut.expressions.context.ExpressionCompilationContext;
-import io.micronaut.expressions.context.ExpressionWithContext;
-import io.micronaut.expressions.util.EvaluatedExpressionsUtils;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
-import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -48,7 +42,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -104,24 +97,24 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
     private final DispatchWriter methodDispatchWriter;
 
     private final Set<String> methodNames = new HashSet<>();
-    private final DefaultExpressionCompilationContextFactory expressionCompilationContextFactory;
-    private final Set<ExpressionWithContext> evaluatedExpressions = new HashSet<>();
     private final AnnotationMetadata annotationMetadataWithDefaults;
+    private final EvaluatedExpressionProcessor evaluatedExpressionProcessor;
     private ClassWriter classWriter;
 
     public ExecutableMethodsDefinitionWriter(VisitorContext visitorContext,
+                                             EvaluatedExpressionProcessor evaluatedExpressionProcessor,
                                              AnnotationMetadata annotationMetadataWithDefaults,
                                              String beanDefinitionClassName,
                                              String beanDefinitionReferenceClassName,
                                              OriginatingElements originatingElements) {
         super(originatingElements);
         this.annotationMetadataWithDefaults = annotationMetadataWithDefaults;
+        this.evaluatedExpressionProcessor = evaluatedExpressionProcessor;
         this.className = beanDefinitionClassName + CLASS_SUFFIX;
         this.internalName = getInternalName(className);
         this.thisType = Type.getObjectType(internalName);
         this.beanDefinitionReferenceClassName = beanDefinitionReferenceClassName;
         this.methodDispatchWriter = new DispatchWriter(thisType);
-        this.expressionCompilationContextFactory = new DefaultExpressionCompilationContextFactory(visitorContext);
     }
 
     /**
@@ -136,14 +129,6 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
      */
     public Type getClassType() {
         return thisType;
-    }
-
-    /**
-     * @return list of evaluated expressions.
-     */
-    @NonNull
-    public Set<ExpressionWithContext> getEvaluatedExpressions() {
-        return evaluatedExpressions;
     }
 
     private MethodElement getMethodElement(int index) {
@@ -214,7 +199,7 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
                                      MethodElement methodElement,
                                      String interceptedProxyClassName,
                                      String interceptedProxyBridgeMethodName) {
-        processEvaluatedExpressions(methodElement);
+        evaluatedExpressionProcessor.processEvaluatedExpressions(methodElement);
 
         String methodKey = methodElement.getName() +
                 "(" +
@@ -525,17 +510,5 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
         } else {
             throw new IllegalStateException("Unknown metadata: " + annotationMetadata);
         }
-    }
-
-    private void processEvaluatedExpressions(MethodElement methodElement) {
-        Collection<EvaluatedExpressionReference> expressionReferences =
-            EvaluatedExpressionsUtils.findEvaluatedExpressionReferences(methodElement.getDeclaredMetadata());
-
-        expressionReferences.stream()
-            .map(expression -> {
-                ExpressionCompilationContext evaluationContext = expressionCompilationContextFactory.buildContextForMethod(expression, methodElement);
-                return new ExpressionWithContext(expression, evaluationContext);
-            })
-            .forEach(evaluatedExpressions::add);
     }
 }

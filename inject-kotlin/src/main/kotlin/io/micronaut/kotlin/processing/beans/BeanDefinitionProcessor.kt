@@ -142,7 +142,7 @@ internal class BeanDefinitionProcessor(private val environment: SymbolProcessorE
             beanDefinitionWriter.visitBeanDefinitionEnd()
             if (beanDefinitionWriter.isEnabled) {
                 beanDefinitionWriter.accept(outputVisitor)
-                val beanDefinitionReferenceWriter = BeanDefinitionReferenceWriter(beanDefinitionWriter)
+                val beanDefinitionReferenceWriter = BeanDefinitionReferenceWriter(beanDefinitionWriter, visitorContext)
                 beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing())
                 val className = beanDefinitionReferenceWriter.beanDefinitionQualifiedClassName
                 processed.add(className)

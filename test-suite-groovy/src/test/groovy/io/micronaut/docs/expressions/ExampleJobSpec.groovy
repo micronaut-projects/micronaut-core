@@ -16,10 +16,9 @@ class ExampleJobSpec extends Specification {
     void testJobCondition(){
         given:
         ExampleJob exampleJob = ctx.getBean(ExampleJob)
-        ExampleJobControl jobControl = ctx.getBean(ExampleJobControl)
 
         expect:
-        jobControl.isPaused()
+        exampleJob.isPaused()
         !exampleJob.hasJobRun()
 
         when:
@@ -29,7 +28,7 @@ class ExampleJobSpec extends Specification {
         !exampleJob.hasJobRun()
 
         when:
-        jobControl.unpause()
+        exampleJob.unpause()
 
         then:
         await().atMost(3, SECONDS).until(exampleJob::hasJobRun)

@@ -126,7 +126,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                     Object bean = beanContext.getBean(beanType, declaredQualifier);
                     AnnotationValue<Scheduled> finalAnnotationValue = scheduledAnnotation;
                     if (finalAnnotationValue instanceof EvaluatedAnnotationValue<Scheduled> evaluated) {
-                        finalAnnotationValue = evaluated.withArguments(boundExecutable.getBoundArguments());
+                        finalAnnotationValue = evaluated.withArguments(bean, boundExecutable.getBoundArguments());
                     }
                     boolean shouldRun = finalAnnotationValue.booleanValue(MEMBER_CONDITION).orElse(true);
                     if (shouldRun) {
