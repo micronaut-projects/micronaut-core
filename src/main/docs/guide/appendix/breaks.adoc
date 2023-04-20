@@ -129,7 +129,7 @@ Interceptors with multiple interceptor bindings annotations now require the same
 New type converters can be added to api:core.convert.MutableConversionService[] retrieved from the bean context or by declaring a bean of type api:core.convert.TypeConverter[].
 To register a type converter into `ConversionService.SHARED`, the registration needs to be done via the service loader.
 
-==== `ExceptionHandler` with POJO response type no longer results in an exception
+==== `ExceptionHandler` with POJO response type no longer results in an error response
 
 Previously if you had an ExceptionHandler such as:
 
