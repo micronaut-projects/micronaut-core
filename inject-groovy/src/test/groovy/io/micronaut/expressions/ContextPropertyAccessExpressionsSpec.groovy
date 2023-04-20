@@ -1,9 +1,12 @@
 package io.micronaut.expressions
 
 import io.micronaut.ast.transform.test.AbstractEvaluatedExpressionsSpec
-import io.micronaut.context.exceptions.ExpressionEvaluationException
-import spock.lang.Ignore;
+import spock.lang.Ignore
 
+@Ignore('''
+    FLAKY: We already test the Java code-path, and this should be re-instated at some point, but until the flakiness is resolved we are disabling it.
+    It's our opinion that this is due to a Groovy bug where the classloader sometimes sees a different class depending on the order of the compilation.
+''')
 class ContextPropertyAccessExpressionsSpec extends AbstractEvaluatedExpressionsSpec
 {
     @Ignore("already tested in java and flakey in Groovy")
@@ -59,6 +62,4 @@ class ContextPropertyAccessExpressionsSpec extends AbstractEvaluatedExpressionsS
         expr3 instanceof String && expr3 == "test value"
         expr4 instanceof String && expr4 == "custom property"
     }
-
-
 }
