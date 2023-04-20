@@ -1,8 +1,12 @@
 package io.micronaut.expressions
 
 import io.micronaut.ast.transform.test.AbstractEvaluatedExpressionsSpec
+import spock.lang.Ignore
 
-
+@Ignore('''
+    FLAKY: We already test the Java code-path, and this should be re-instated at some point, but until the flakiness is resolved we are disabling it.
+    It's our opinion that this is due to a Groovy bug where the classloader sometimes sees a different class depending on the order of the compilation.
+''')
 class ArrayMethodsExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
 
     void "test primitive and wrapper varargs methods"() {
