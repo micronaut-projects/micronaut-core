@@ -33,6 +33,7 @@ import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.ast.TypedElement
 import io.micronaut.inject.ast.WildcardElement
+import jakarta.validation.Valid
 import spock.lang.Issue
 import spock.lang.PendingFeature
 import spock.lang.Unroll
@@ -2284,6 +2285,46 @@ class MyRepo implements Repo<MyBean, Long> {
         then:
             interfaces.size() == 1
             interfaces[0].simpleName == "Repo"
+    }
+
+    void "test interface type annotations"() {
+        ClassElement ce = buildClassElement('test.MyRepo', '''
+package test;
+import jakarta.validation.Valid;
+import java.util.List;
+
+interface MyRepo extends Repo<@Valid MyBean, Long> {
+}
+
+interface Repo<E, ID> extends GenericRepository<E, ID> {
+
+    void save(E entity);
+
+}
+
+interface GenericRepository<E, ID> {
+}
+
+
+class MyBean {
+    private String name;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+''')
+
+        when:
+            def method = ce.findMethod("save").get()
+            def type = method.parameters[0].getGenericType()
+        then:
+            type.hasAnnotation(Valid)
     }
 
     void validateBookArgument(ClassElement classElement) {

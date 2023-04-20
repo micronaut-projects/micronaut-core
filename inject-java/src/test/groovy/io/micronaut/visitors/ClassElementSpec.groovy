@@ -36,6 +36,7 @@ import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.ast.WildcardElement
 import jakarta.inject.Singleton
+import jakarta.validation.Valid
 import spock.lang.IgnoreIf
 import spock.lang.Issue
 import spock.lang.Requires
@@ -2894,6 +2895,46 @@ class MyBean {
             genRepo.get("E").simpleName == "MyBean"
             genRepo.get("E").getMethods().size() == 2
             genRepo.get("E").getFields().size() == 1
+    }
+
+    void "test interface type annotations"() {
+        ClassElement ce = buildClassElement('''
+package test;
+import jakarta.validation.Valid;
+import java.util.List;
+
+interface MyRepo extends Repo<@Valid MyBean, Long> {
+}
+
+interface Repo<E, ID> extends GenericRepository<E, ID> {
+
+    void save(E entity);
+
+}
+
+interface GenericRepository<E, ID> {
+}
+
+
+class MyBean {
+    private String name;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+''')
+
+        when:
+            def method = ce.findMethod("save").get()
+            def type = method.parameters[0].getGenericType()
+        then:
+            type.hasAnnotation(Valid)
     }
 
     private void assertListGenericArgument(ClassElement type, Closure cl) {
