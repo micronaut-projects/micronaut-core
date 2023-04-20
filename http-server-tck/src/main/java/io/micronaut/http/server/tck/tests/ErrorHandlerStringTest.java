@@ -28,6 +28,7 @@ import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.Map;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
 
@@ -43,12 +44,12 @@ public class ErrorHandlerStringTest {
     void testErrorHandlerWithStringReturn() throws IOException {
         asserts(SPEC_NAME,
             HttpRequest.GET("/exception/my").header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON),
-            (server, request) -> AssertionUtils.assertThrows(
+            (server, request) -> AssertionUtils.assertDoesNotThrow(
                 server,
                 request,
-                HttpStatus.INTERNAL_SERVER_ERROR,
+                HttpStatus.OK,
                 "hello",
-                null
+                Map.of(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
             )
         );
     }
