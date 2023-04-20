@@ -652,7 +652,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     /**
      * Mutable version of the request.
      */
-    private class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder {
+    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder {
 
         private URI uri = NettyHttpRequest.this.uri;
         @Nullable
