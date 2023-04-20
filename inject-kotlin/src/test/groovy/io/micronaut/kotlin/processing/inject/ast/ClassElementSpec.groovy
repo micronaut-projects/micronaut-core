@@ -16,6 +16,7 @@ import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.ast.WildcardElement
 import io.micronaut.kotlin.processing.visitor.KotlinClassElement
+import jakarta.validation.Valid
 import spock.lang.PendingFeature
 
 class ClassElementSpec extends AbstractKotlinCompilerSpec {
@@ -1919,6 +1920,36 @@ data class Cart(
 ''', cl -> cl.getPrimaryConstructor().get().parameters[1].getType().isAssignable(cl.findMethod("cartItemsNotNullable").get().getReturnType()))
         then:
             isAssignable
+    }
+
+    void "test interface type annotations"() {
+        ClassElement ce = buildClassElement('test.MyRepo', '''
+package test
+import jakarta.validation.Valid
+import java.util.List
+
+interface MyRepo : Repo<@Valid MyBean, Long> {
+}
+
+interface Repo<E, ID> : GenericRepository<E, ID> {
+
+    fun save(entity: E)
+
+}
+
+interface GenericRepository<E, ID>
+
+
+class MyBean {
+}
+
+''')
+
+        when:
+            def method = ce.findMethod("save").get()
+            def type = method.parameters[0].getGenericType()
+        then:
+            type.hasAnnotation(Valid)
     }
 
     private void assertListGenericArgument(ClassElement type, Closure cl) {
