@@ -560,7 +560,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             String argumentName = entry.getName();
             AnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(
                 entry.getAnnotationMetadata(),
-                entry.getType().getTypeAnnotationMetadata()
+                entry.getGenericType().getTypeAnnotationMetadata()
             ).merge();
             Map<String, ClassElement> typeArguments = classElement.getTypeArguments();
             pushCreateArgument(
