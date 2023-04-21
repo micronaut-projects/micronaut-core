@@ -85,9 +85,6 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private static final String FIELD_CONSTRUCTOR_ARGUMENTS = "$CONSTRUCTOR_ARGUMENTS";
     private static final String FIELD_BEAN_PROPERTIES_REFERENCES = "$PROPERTIES_REFERENCES";
     private static final String FIELD_BEAN_METHODS_REFERENCES = "$METHODS_REFERENCES";
-    private static final Method PROPERTY_INDEX_OF = Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(BeanIntrospection.class, "propertyIndexOf", String.class)
-    );
     private static final Method FIND_PROPERTY_BY_INDEX_METHOD = Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(AbstractInitializableBeanIntrospection.class, "getPropertyByIndex", int.class)
     );
@@ -575,7 +572,6 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         dispatchWriter.buildDispatchOneMethod(classWriter);
         dispatchWriter.buildDispatchMethod(classWriter);
         dispatchWriter.buildGetTargetMethodByIndex(classWriter);
-        buildPropertyIndexOfMethod(classWriter);
         buildFindIndexedProperty(classWriter);
         buildGetIndexedProperties(classWriter);
 
@@ -596,47 +592,6 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         try (OutputStream outputStream = classWriterOutputVisitor.visitClass(introspectionName, getOriginatingElements())) {
             outputStream.write(classWriter.toByteArray());
         }
-    }
-
-    private void buildPropertyIndexOfMethod(ClassWriter classWriter) {
-        GeneratorAdapter findMethod = new GeneratorAdapter(classWriter.visitMethod(
-                ACC_PUBLIC | ACC_FINAL,
-                PROPERTY_INDEX_OF.getName(),
-                PROPERTY_INDEX_OF.getDescriptor(),
-                null,
-                null),
-                ACC_PUBLIC | ACC_FINAL,
-                PROPERTY_INDEX_OF.getName(),
-                PROPERTY_INDEX_OF.getDescriptor()
-        );
-        new StringSwitchWriter() {
-
-            @Override
-            protected Set<String> getKeys() {
-                Set<String> keys = new HashSet<>();
-                for (BeanPropertyData prop : beanProperties) {
-                    keys.add(prop.name);
-                }
-                return keys;
-            }
-
-            @Override
-            protected void pushStringValue() {
-                findMethod.loadArg(0);
-            }
-
-            @Override
-            protected void onMatch(String value, Label end) {
-                findMethod.loadThis();
-                findMethod.push(getPropertyIndex(value));
-                findMethod.returnValue();
-            }
-
-        }.write(findMethod);
-        findMethod.push(-1);
-        findMethod.returnValue();
-        findMethod.visitMaxs(DEFAULT_MAX_STACK, 1);
-        findMethod.visitEnd();
     }
 
     private void buildFindIndexedProperty(ClassWriter classWriter) {
