@@ -27,6 +27,8 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.beans.KotlinExecutableMethodUtils;
 
@@ -44,14 +46,17 @@ import java.util.Optional;
  * @since 4.0.0
  */
 @Internal
-public class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> implements MethodBasedRouteInfo<T, R> {
+sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> implements MethodBasedRouteInfo<T, R>
+    permits DefaultRequestMatcher {
 
+    private static final RequestArgumentBinder[] ZERO_BINDERS = new RequestArgumentBinder[0];
     private final MethodExecutionHandle<T, R> targetMethod;
     private final String[] argumentNames;
     private final Map<String, Argument<?>> requiredInputs;
     private final boolean isVoid;
     private final Optional<Argument<?>> optionalBodyArgument;
     private final Optional<Argument<?>> optionalFullBodyArgument;
+    private final Optional<MessageBodyReader<?>> messageBodyReader;
 
     private RequestArgumentBinder<Object>[] argumentBinders;
     private final boolean needsBody;
@@ -64,8 +69,9 @@ public class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
                                        List<MediaType> consumesMediaTypes,
                                        List<MediaType> producesMediaTypes,
                                        boolean isPermitsBody,
-                                       boolean isErrorRoute) {
-        super(targetMethod, targetMethod.getReturnType(), consumesMediaTypes, producesMediaTypes, targetMethod.getDeclaringType(), isErrorRoute, isPermitsBody);
+                                       boolean isErrorRoute,
+                                       MessageBodyHandlerRegistry messageBodyHandlerRegistry) {
+        super(targetMethod, targetMethod.getReturnType(), consumesMediaTypes, producesMediaTypes, targetMethod.getDeclaringType(), isErrorRoute, isPermitsBody, messageBodyHandlerRegistry);
         this.targetMethod = targetMethod;
 
         Argument<?>[] arguments = targetMethod.getArguments();
@@ -97,7 +103,13 @@ public class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
             optionalBodyArgument = Optional.empty();
         }
         optionalFullBodyArgument = super.getFullBodyArgument();
+        this.messageBodyReader = optionalBodyArgument.flatMap(arg -> messageBodyHandlerRegistry.findReader(arg, consumesMediaTypes));
         needsBody = optionalBodyArgument.isPresent() || hasArg(arguments, HttpRequest.class);
+    }
+
+    @Override
+    public final Optional<MessageBodyReader<?>> getMessageBodyReader() {
+        return messageBodyReader;
     }
 
     private static boolean hasArg(Argument<?>[] arguments, Class<?> type) {
@@ -121,7 +133,7 @@ public class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
     private RequestArgumentBinder<Object>[] resolveArgumentBindersInternal(RequestBinderRegistry requestBinderRegistry) {
         Argument<?>[] arguments = targetMethod.getArguments();
         if (arguments.length == 0) {
-            return new RequestArgumentBinder[0];
+            return ZERO_BINDERS;
         }
 
         RequestArgumentBinder<Object>[] binders = new RequestArgumentBinder[arguments.length];

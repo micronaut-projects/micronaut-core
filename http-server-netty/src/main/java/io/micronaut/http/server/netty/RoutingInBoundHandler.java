@@ -270,12 +270,11 @@ public final class RoutingInBoundHandler implements RequestHandler {
         boolean isNotHead = nettyRequest.getMethod() != HttpMethod.HEAD;
 
         if (isNotHead) {
-            if (body instanceof Writable) {
+            if (body instanceof Writable writable) {
                 getIoExecutor().execute(() -> {
                     ByteBuf byteBuf = nettyRequest.getChannelHandlerContext().alloc().ioBuffer(128);
                     ByteBufOutputStream outputStream = new ByteBufOutputStream(byteBuf);
                     try {
-                        Writable writable = (Writable) body;
                         writable.writeTo(outputStream, nettyRequest.getCharacterEncoding());
                         response.body(byteBuf);
                         if (response.getContentType().isEmpty()) {
@@ -326,8 +325,8 @@ public final class RoutingInBoundHandler implements RequestHandler {
                             LOG.error("Error occurred writing publisher response: " + error.getMessage(), error);
                         }
                         HttpResponseStatus responseStatus;
-                        if (error instanceof HttpStatusException) {
-                            responseStatus = HttpResponseStatus.valueOf(((HttpStatusException) error).getStatus().getCode(), error.getMessage());
+                        if (error instanceof HttpStatusException statusException) {
+                            responseStatus = HttpResponseStatus.valueOf(statusException.getStatus().getCode(), error.getMessage());
                         } else {
                             responseStatus = HttpResponseStatus.INTERNAL_SERVER_ERROR;
                         }

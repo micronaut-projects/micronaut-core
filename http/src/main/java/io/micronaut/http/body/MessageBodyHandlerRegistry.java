@@ -1,12 +1,12 @@
 package io.micronaut.http.body;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -21,12 +21,12 @@ public interface MessageBodyHandlerRegistry {
      */
     MessageBodyHandlerRegistry EMPTY = new MessageBodyHandlerRegistry() {
         @Override
-        public <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type, MediaType mediaType) {
+        public <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type, List<MediaType> mediaType) {
             return Optional.empty();
         }
 
         @Override
-        public <T> Optional<MessageBodyWriter<T>> findWriter(Argument<T> type, MediaType mediaType) {
+        public <T> Optional<MessageBodyWriter<T>> findWriter(Argument<T> type, List<MediaType> mediaType) {
             return Optional.empty();
         }
 
@@ -41,7 +41,7 @@ public interface MessageBodyHandlerRegistry {
      */
     <T> Optional<MessageBodyReader<T>> findReader(
         @NonNull Argument<T> type,
-        @Nullable MediaType mediaType
+        @Nullable List<MediaType> mediaType
     );
 
     /**
@@ -53,6 +53,6 @@ public interface MessageBodyHandlerRegistry {
      */
     <T> Optional<MessageBodyWriter<T>> findWriter(
         @NonNull Argument<T> type,
-        @NonNull MediaType mediaType
+        @NonNull List<MediaType> mediaType
     );
 }

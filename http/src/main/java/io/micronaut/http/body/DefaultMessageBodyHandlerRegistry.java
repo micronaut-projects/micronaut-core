@@ -3,17 +3,22 @@ package io.micronaut.http.body;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.inject.BeanType;
+import jakarta.inject.Singleton;
 
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.annotation.Annotation;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -25,7 +30,8 @@ import java.util.stream.Stream;
  */
 @SuppressWarnings("unused")
 @Experimental
-public class DefaultMessageBodyHandlerRegistry implements MessageBodyHandlerRegistry {
+@Singleton
+public final class DefaultMessageBodyHandlerRegistry implements MessageBodyHandlerRegistry {
     private static final MessageBodyReader<Object> NO_READER  = new NoReader();
     private static final MessageBodyWriter<Object> NO_WRITER  = new NoWriter();
     private final Map<HandlerKey<?>, MessageBodyReader<?>> readers = new ConcurrentHashMap<>(10);
@@ -37,17 +43,17 @@ public class DefaultMessageBodyHandlerRegistry implements MessageBodyHandlerRegi
      * Default constructor.
      * @param beanLocator The bean locator.
      */
-    protected DefaultMessageBodyHandlerRegistry(BeanLocator beanLocator) {
+    DefaultMessageBodyHandlerRegistry(BeanLocator beanLocator) {
         this.beanLocator = beanLocator;
     }
 
     @Override
-    public <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type, MediaType mediaType) {
-        HandlerKey<T> key = new HandlerKey<>(type, mediaType);
+    public <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type, List<MediaType> mediaTypes) {
+        HandlerKey<T> key = new HandlerKey<>(type, mediaTypes);
         MessageBodyReader<?> messageBodyReader = readers.get(key);
         if (messageBodyReader == null) {
             @SuppressWarnings("unchecked") MessageBodyReader<T> reader = beanLocator
-                .findBean(Argument.of(MessageBodyReader.class, type), new MediaTypeQualifier<>(mediaType, Consumes.class))
+                .findBean(Argument.of(MessageBodyReader.class, type), new MediaTypeQualifier<>(mediaTypes, Consumes.class))
                 .orElse(null);
             if (reader != null) {
                 readers.put(key, reader);
@@ -65,7 +71,7 @@ public class DefaultMessageBodyHandlerRegistry implements MessageBodyHandlerRegi
     }
 
     @Override
-    public <T> Optional<MessageBodyWriter<T>> findWriter(Argument<T> type, MediaType mediaType) {
+    public <T> Optional<MessageBodyWriter<T>> findWriter(Argument<T> type, List<MediaType> mediaType) {
         HandlerKey<T> key = new HandlerKey<>(type, mediaType);
         MessageBodyWriter<?> messageBodyWriter = writers.get(key);
         if (messageBodyWriter == null) {
@@ -87,30 +93,30 @@ public class DefaultMessageBodyHandlerRegistry implements MessageBodyHandlerRegi
         }
     }
 
-    record HandlerKey<T>(Argument<T> type, MediaType mediaType) {
+    record HandlerKey<T>(Argument<T> type, List<MediaType> mediaTypes) {
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
             if (o == null || getClass() != o.getClass()) return false;
             HandlerKey<?> that = (HandlerKey<?>) o;
-            return type.equals(that.type) && mediaType.equals(that.mediaType);
+            return type.equals(that.type) && mediaTypes.equals(that.mediaTypes);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(type.typeHashCode(), mediaType);
+            return Objects.hash(type.typeHashCode(), mediaTypes);
         }
     }
 
-    private record MediaTypeQualifier<T>(MediaType mediaType,
+    private record MediaTypeQualifier<T>(List<MediaType> mediaTypes,
                                          Class<? extends Annotation> annotationType) implements Qualifier<T> {
 
         @Override
             public <B extends BeanType<T>> Stream<B> reduce(Class<T> beanType, Stream<B> candidates) {
                 return candidates.filter(c ->
-                    c.isAnnotationPresent(annotationType) && c.getAnnotationMetadata().stringValue(annotationType)
-                        .map(MediaType::new).map(m -> m.equals(mediaType)).orElse(false)
-                );
+                    c.isAnnotationPresent(annotationType) && Arrays.stream(c.getAnnotationMetadata().stringValues(annotationType))
+                        .anyMatch(mt -> mediaTypes.contains(new MediaType(mt))
+                ));
             }
 
             @Override
@@ -120,12 +126,12 @@ public class DefaultMessageBodyHandlerRegistry implements MessageBodyHandlerRegi
                     return false;
                 }
                 MediaTypeQualifier<?> that = (MediaTypeQualifier<?>) o;
-                return mediaType.equals(that.mediaType);
+                return mediaTypes.equals(that.mediaTypes);
             }
 
             @Override
             public int hashCode() {
-                return Objects.hash(mediaType);
+                return Objects.hash(mediaTypes);
             }
         }
 
@@ -139,6 +145,11 @@ public class DefaultMessageBodyHandlerRegistry implements MessageBodyHandlerRegi
         public Object read(Argument<Object> type, MediaType mediaType, HttpHeaders httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
             return null;
         }
+
+        @Override
+        public Object read(Argument<Object> type, MediaType mediaType, HttpHeaders httpHeaders, InputStream inputStream) throws CodecException {
+            return null;
+        }
     }
 
     private static final class NoWriter implements MessageBodyWriter<Object> {
@@ -148,7 +159,12 @@ public class DefaultMessageBodyHandlerRegistry implements MessageBodyHandlerRegi
         }
 
         @Override
-        public void writeTo(Argument<Object> type, MediaType mediaType, HttpHeaders httpHeaders, Writable writable) throws CodecException {
+        public void writeTo(Argument<Object> type, Object object, MediaType mediaType, MutableHttpHeaders httpHeaders, OutputStream outputStream) throws CodecException {
+            // no-op
+        }
+
+        @Override
+        public void writeTo(Argument<Object> type, Object object, MediaType mediaType, MutableHttpHeaders httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
             // no-op
         }
     }

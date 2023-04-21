@@ -23,6 +23,7 @@ import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.inject.MethodExecutionHandle;
 
 import java.util.List;
@@ -39,7 +40,7 @@ import java.util.function.Predicate;
  * @since 4.0.0
  */
 @Internal
-public class DefaultStatusRouteInfo<T, R> extends DefaultRequestMatcher<T, R> implements StatusRouteInfo<T, R> {
+public final class DefaultStatusRouteInfo<T, R> extends DefaultRequestMatcher<T, R> implements StatusRouteInfo<T, R> {
 
     private final Class<?> originatingType;
     private final HttpStatus status;
@@ -55,8 +56,9 @@ public class DefaultStatusRouteInfo<T, R> extends DefaultRequestMatcher<T, R> im
                                   List<MediaType> consumesMediaTypes,
                                   List<MediaType> producesMediaTypes,
                                   List<Predicate<HttpRequest<?>>> predicates,
-                                  ConversionService conversionService) {
-        super(targetMethod, bodyArgument, bodyArgumentName, consumesMediaTypes, producesMediaTypes, true, true, predicates);
+                                  ConversionService conversionService,
+                                  MessageBodyHandlerRegistry messageBodyHandlerRegistry) {
+        super(targetMethod, bodyArgument, bodyArgumentName, consumesMediaTypes, producesMediaTypes, true, true, predicates, messageBodyHandlerRegistry);
         this.originatingType = originatingType;
         this.status = status;
         this.conversionService = conversionService;

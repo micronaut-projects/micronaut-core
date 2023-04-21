@@ -22,6 +22,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.MethodExecutionHandle;
@@ -52,7 +53,6 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     private final ConversionService conversionService;
     private final ExecutorSelector executorSelector;
     private boolean noExecutor;
-    private ExecutorService executor;
 
     public DefaultUrlRouteInfo(HttpMethod httpMethod,
                                UriMatchTemplate uriMatchTemplate,
@@ -65,8 +65,9 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
                                List<Predicate<HttpRequest<?>>> predicates,
                                Integer port,
                                ConversionService conversionService,
-                               ExecutorSelector executorSelector) {
-        super(targetMethod, bodyArgument, bodyArgumentName, consumesMediaTypes, producesMediaTypes, httpMethod.permitsRequestBody(), false, predicates);
+                               ExecutorSelector executorSelector,
+                               MessageBodyHandlerRegistry messageBodyHandlerRegistry) {
+        super(targetMethod, bodyArgument, bodyArgumentName, consumesMediaTypes, producesMediaTypes, httpMethod.permitsRequestBody(), false, predicates, messageBodyHandlerRegistry);
         this.httpMethod = httpMethod;
         this.uriMatchTemplate = uriMatchTemplate;
         this.defaultCharset = defaultCharset;
@@ -128,8 +129,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         if (executorSelector == null || noExecutor) {
             return null;
         } else {
-            this.executor =
-                executorSelector.select(getTargetMethod(), threadSelection)
+            ExecutorService executor = executorSelector.select(getTargetMethod(), threadSelection)
                 .orElse(null);
             if (executor == null) {
                 noExecutor = true;

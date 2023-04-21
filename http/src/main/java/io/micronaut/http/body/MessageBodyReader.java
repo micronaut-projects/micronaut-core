@@ -9,6 +9,8 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecException;
 
+import java.io.InputStream;
+
 /**
  * An interface that allows reading a message body from the client or the server.
  *
@@ -43,4 +45,20 @@ public interface MessageBodyReader<T> {
         @Nullable MediaType mediaType,
         @NonNull HttpHeaders httpHeaders,
         @NonNull ByteBuffer<?> byteBuffer) throws CodecException;
+
+    /**
+     * Reads an object from the given byte buffer.
+     *
+     * @param type The type being decoded.
+     * @param mediaType The media type, can be {@code null}
+     * @param httpHeaders The HTTP headers
+     * @param inputStream The input stream
+     * @return The read object or {@code null}
+     * @throws CodecException If an error occurs decoding
+     */
+    @Nullable T read(
+        @NonNull Argument<T> type,
+        @Nullable MediaType mediaType,
+        @NonNull HttpHeaders httpHeaders,
+        @NonNull InputStream inputStream) throws CodecException;
 }

@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.inject.MethodExecutionHandle;
 
 import java.util.List;
@@ -33,7 +34,8 @@ import java.util.function.Predicate;
  * @since 4.0.0
  */
 @Internal
-public class DefaultRequestMatcher<T, R> extends DefaultMethodBasedRouteInfo<T, R> implements RequestMatcher {
+public sealed class DefaultRequestMatcher<T, R> extends DefaultMethodBasedRouteInfo<T, R> implements RequestMatcher
+    permits DefaultErrorRouteInfo, DefaultStatusRouteInfo, DefaultUrlRouteInfo {
 
     private final List<Predicate<HttpRequest<?>>> predicates;
 
@@ -44,8 +46,9 @@ public class DefaultRequestMatcher<T, R> extends DefaultMethodBasedRouteInfo<T, 
                                  List<MediaType> consumesMediaTypes,
                                  boolean isPermitsBody,
                                  boolean isErrorRoute,
-                                 List<Predicate<HttpRequest<?>>> predicates) {
-        super(targetMethod, bodyArgument, bodyArgumentName, producesMediaTypes, consumesMediaTypes, isPermitsBody, isErrorRoute);
+                                 List<Predicate<HttpRequest<?>>> predicates,
+                                 MessageBodyHandlerRegistry messageBodyHandlerRegistry) {
+        super(targetMethod, bodyArgument, bodyArgumentName, producesMediaTypes, consumesMediaTypes, isPermitsBody, isErrorRoute, messageBodyHandlerRegistry);
         this.predicates = predicates;
     }
 

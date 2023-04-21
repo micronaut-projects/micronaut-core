@@ -25,6 +25,8 @@ import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
+import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.scheduling.executor.ThreadSelection;
 
 import java.util.Collection;
@@ -46,6 +48,22 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
      * The default media type produced by routes.
      */
     List<MediaType> DEFAULT_PRODUCES = Collections.singletonList(MediaType.APPLICATION_JSON_TYPE);
+
+    /**
+     * @return The message body writer, if any.
+     * @since 4.0.0
+     */
+    default Optional<MessageBodyWriter<R>> getMessageBodyWriter() {
+        return Optional.empty();
+    }
+
+    /**
+     * @return The message body reader. if any.
+     * @since 4.0.0
+     */
+    default Optional<MessageBodyReader<?>> getMessageBodyReader() {
+        return Optional.empty();
+    }
 
     /**
      * @return The return type

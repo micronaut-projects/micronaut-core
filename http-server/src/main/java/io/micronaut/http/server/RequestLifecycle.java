@@ -28,6 +28,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.http.filter.GenericHttpFilter;
@@ -205,7 +206,8 @@ public class RequestLifecycle {
                             MediaType.fromType(handlerDefinition.getBeanType()).map(Collections::singletonList).orElse(Collections.emptyList()),
                             handlerDefinition.getBeanType(),
                             true,
-                            false
+                            false,
+                            MessageBodyHandlerRegistry.EMPTY
                     );
                 }
                 Supplier<ExecutionFlow<MutableHttpResponse<?>>> responseSupplier = () -> {

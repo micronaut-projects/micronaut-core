@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodReference;
 import io.micronaut.web.router.DefaultRouteInfo;
@@ -32,7 +33,7 @@ class ExecutableRouteInfo<T, R> extends DefaultRouteInfo<R> implements MethodRef
 
     ExecutableRouteInfo(ExecutableMethod<T, R> method,
                         boolean errorRoute) {
-        super(method, method.getReturnType(), List.of(), List.of(), method.getDeclaringType(), errorRoute, false);
+        super(method, method.getReturnType(), List.of(), List.of(), method.getDeclaringType(), errorRoute, false, MessageBodyHandlerRegistry.EMPTY);
         this.method = method;
     }
 

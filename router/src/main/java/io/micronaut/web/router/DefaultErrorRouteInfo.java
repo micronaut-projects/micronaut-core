@@ -23,6 +23,7 @@ import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.inject.MethodExecutionHandle;
 
 import java.util.List;
@@ -56,8 +57,9 @@ public final class DefaultErrorRouteInfo<T, R> extends DefaultRequestMatcher<T, 
                                  List<MediaType> consumesMediaTypes,
                                  List<MediaType> producesMediaTypes,
                                  List<Predicate<HttpRequest<?>>> predicates,
-                                 ConversionService conversionService) {
-        super(targetMethod, bodyArgument, bodyArgumentName, consumesMediaTypes, producesMediaTypes, true, true, predicates);
+                                 ConversionService conversionService,
+                                 MessageBodyHandlerRegistry messageBodyHandlerRegistry) {
+        super(targetMethod, bodyArgument, bodyArgumentName, consumesMediaTypes, producesMediaTypes, true, true, predicates, messageBodyHandlerRegistry);
         this.originatingType = originatingType;
         this.exceptionType = exceptionType;
         this.conversionService = conversionService;

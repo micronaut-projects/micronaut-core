@@ -32,6 +32,9 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.RouteCondition;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.uri.UriMatchTemplate;
@@ -84,6 +87,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     protected final Charset defaultCharset;
     private final ExecutorSelector executorSelector;
 
+    private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
+
     private DefaultUriRoute currentParentRoute;
     private final List<UriRoute> uriRoutes = new ArrayList<>();
     private final List<StatusRoute> statusRoutes = new ArrayList<>();
@@ -119,9 +124,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             Environment environment = applicationContext.getEnvironment();
             defaultCharset = environment.get("micronaut.application.default-charset", Charset.class, StandardCharsets.UTF_8);
             this.executorSelector = applicationContext.findBean(ExecutorSelector.class).orElse(null);
+            this.messageBodyHandlerRegistry = applicationContext.findBean(MessageBodyHandlerRegistry.class).orElse(MessageBodyHandlerRegistry.EMPTY);
         } else {
             defaultCharset = StandardCharsets.UTF_8;
             this.executorSelector = null;
+            this.messageBodyHandlerRegistry = MessageBodyHandlerRegistry.EMPTY;
         }
     }
 
@@ -397,7 +404,13 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     private UriRoute buildRoute(String httpMethodName, HttpMethod httpMethod, String uri, MethodExecutionHandle<Object, Object> executableHandle) {
         UriRoute route;
         if (currentParentRoute != null) {
-            route = new DefaultUriRoute(httpMethod, currentParentRoute.uriMatchTemplate.nest(uri), executableHandle, httpMethodName, conversionService);
+            route = new DefaultUriRoute(
+                httpMethod,
+                currentParentRoute.uriMatchTemplate.nest(uri),
+                executableHandle,
+                httpMethodName,
+                conversionService
+            );
             currentParentRoute.nestedRoutes.add((DefaultUriRoute) route);
         } else {
             route = new DefaultUriRoute(httpMethod, uri, executableHandle, httpMethodName, conversionService);
@@ -429,7 +442,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     /**
      * Abstract class for base {@link MethodBasedRouteInfo}.
      */
-    abstract static class AbstractRoute implements Route {
+    abstract class AbstractRoute implements Route {
         protected final List<Predicate<HttpRequest<?>>> conditions = new ArrayList<>();
         protected final MethodExecutionHandle<Object, Object> targetMethod;
         protected final ConversionService conversionService;
@@ -527,7 +540,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     /**
      * Default Error Route.
      */
-    static class DefaultErrorRoute extends AbstractRoute implements ErrorRoute {
+    final class DefaultErrorRoute extends AbstractRoute implements ErrorRoute {
 
         private final Class<? extends Throwable> error;
         private final Class<?> originatingClass;
@@ -567,7 +580,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                     consumesMediaTypes,
                     producesMediaTypes,
                     conditions,
-                    conversionService);
+                    conversionService,
+                    messageBodyHandlerRegistry);
         }
 
         @Override
@@ -643,7 +657,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     /**
      * Represents a route for an {@link io.micronaut.http.HttpStatus} code.
      */
-    static class DefaultStatusRoute extends AbstractRoute implements StatusRoute {
+    final class DefaultStatusRoute extends AbstractRoute implements StatusRoute {
 
         private final HttpStatus status;
         private final Class<?> originatingClass;
@@ -680,7 +694,9 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                     consumesMediaTypes,
                     producesMediaTypes,
                     conditions,
-                    conversionService);
+                    conversionService,
+                    messageBodyHandlerRegistry
+            );
         }
 
         @Override
@@ -751,20 +767,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         final UriMatchTemplate uriMatchTemplate;
         final List<DefaultUriRoute> nestedRoutes = new ArrayList<>(2);
         private Integer port;
-        private final RouteExecutorSelector executorSelector;
-
-        /**
-         * @param httpMethod The HTTP method
-         * @param uriTemplate The URI Template as a {@link CharSequence}
-         * @param targetMethod The target method execution handle
-         * @param conversionService The conversion service
-         */
-        DefaultUriRoute(HttpMethod httpMethod,
-                        CharSequence uriTemplate,
-                        MethodExecutionHandle<Object, Object> targetMethod,
-                        ConversionService conversionService) {
-            this(httpMethod, uriTemplate, targetMethod, httpMethod.name(), conversionService);
-        }
+        private final RouteExecutorSelector executorSelector = new RouteExecutorSelector();
 
         /**
          * @param httpMethod The HTTP method
@@ -779,21 +782,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                         String httpMethodName,
                         ConversionService conversionService) {
             this(httpMethod, uriTemplate, MediaType.APPLICATION_JSON_TYPE, targetMethod, httpMethodName, conversionService);
-        }
-
-        /**
-         * @param httpMethod The HTTP method
-         * @param uriTemplate The URI Template as a {@link CharSequence}
-         * @param mediaType The Media type
-         * @param targetMethod The target method execution handle
-         * @param conversionService The conversion service
-         */
-        DefaultUriRoute(HttpMethod httpMethod,
-                        CharSequence uriTemplate,
-                        MediaType mediaType,
-                        MethodExecutionHandle<Object, Object> targetMethod,
-                        ConversionService conversionService) {
-            this(httpMethod, uriTemplate, mediaType, targetMethod, httpMethod.name(), conversionService);
         }
 
         /**
@@ -817,19 +805,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param httpMethod The HTTP method
          * @param uriTemplate The URI Template as a {@link UriMatchTemplate}
          * @param targetMethod The target method execution handle
-         * @param conversionService The conversion service
-         */
-        DefaultUriRoute(HttpMethod httpMethod,
-                        UriMatchTemplate uriTemplate,
-                        MethodExecutionHandle<Object, Object> targetMethod,
-                        ConversionService conversionService) {
-            this(httpMethod, uriTemplate, targetMethod, httpMethod.name(), conversionService);
-        }
-
-        /**
-         * @param httpMethod The HTTP method
-         * @param uriTemplate The URI Template as a {@link UriMatchTemplate}
-         * @param targetMethod The target method execution handle
          * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
          * @param conversionService The conversion service
          */
@@ -839,21 +814,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                         String httpMethodName,
                         ConversionService conversionService) {
             this(httpMethod, uriTemplate, Collections.singletonList(MediaType.APPLICATION_JSON_TYPE), targetMethod, httpMethodName, conversionService);
-        }
-
-        /**
-         * @param httpMethod The HTTP method
-         * @param uriTemplate The URI Template as a {@link UriMatchTemplate}
-         * @param mediaTypes The media types
-         * @param targetMethod The target method execution handle
-         * @param conversionService The conversion service
-         */
-        DefaultUriRoute(HttpMethod httpMethod,
-                        UriMatchTemplate uriTemplate,
-                        List<MediaType> mediaTypes,
-                        MethodExecutionHandle<Object, Object> targetMethod,
-                        ConversionService conversionService) {
-            this(httpMethod, uriTemplate, mediaTypes, targetMethod, httpMethod.name(), conversionService);
         }
 
         /**
@@ -874,7 +834,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             this.httpMethod = httpMethod;
             this.uriMatchTemplate = uriTemplate;
             this.httpMethodName = httpMethodName;
-            this.executorSelector = new RouteExecutorSelector();
             if (targetMethod.isPresent(RouteCondition.class, AnnotationMetadata.VALUE_MEMBER)) {
                 AnnotationValue<RouteCondition> annotation = targetMethod.getAnnotation(RouteCondition.class);
                 if (annotation instanceof EvaluatedAnnotationValue<RouteCondition>) {
@@ -897,7 +856,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 conditions,
                 port,
                 conversionService,
-                executorSelector
+                executorSelector,
+                messageBodyHandlerRegistry
             );
         }
 
@@ -1098,7 +1058,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         public ResourceRoute consumes(MediaType... mediaTypes) {
             if (mediaTypes != null) {
                 for (Route route : resourceRoutes.values()) {
-                    route.produces(mediaTypes);
+                    route.consumes(mediaTypes);
                 }
             }
             return this;
