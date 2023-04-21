@@ -54,7 +54,7 @@ public class DefaultBodyAnnotationBinder<T> extends AbstractArgumentBinder<T> im
             return BindingResult.unsatisfied();
         }
 
-        Optional<?> body = source.getBody();
+        Optional<T> body = source.getBody(context.getArgument());
         if (body.isEmpty()) {
             return BindingResult.empty();
         }
