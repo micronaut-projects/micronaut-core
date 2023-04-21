@@ -31,6 +31,7 @@ import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.StringIntMap;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
 
@@ -64,6 +65,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
     private final Argument<?>[] constructorArguments;
     private final List<BeanProperty<B, Object>> beanProperties;
     private final List<BeanMethod<B, Object>> beanMethods;
+    private final StringIntMap beanPropertyIndex;
 
     private BeanConstructor<B> beanConstructor;
 
@@ -85,6 +87,10 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
             this.beanProperties = Collections.unmodifiableList(beanProperties);
         } else {
             this.beanProperties = Collections.emptyList();
+        }
+        this.beanPropertyIndex = new StringIntMap(beanProperties.size());
+        for (int i = 0; i < beanProperties.size(); i++) {
+            beanPropertyIndex.put(beanProperties.get(i).getName(), i);
         }
         if (methodsRefs != null) {
             List<BeanMethod<B, Object>> beanMethods = new ArrayList<>(methodsRefs.length);
@@ -118,6 +124,11 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
     @UsedByGeneratedCode
     protected BeanProperty<B, Object> getPropertyByIndex(int index) {
         return beanProperties.get(index);
+    }
+
+    @Override
+    public int propertyIndexOf(String name) {
+        return beanPropertyIndex.get(name, -1);
     }
 
     /**
