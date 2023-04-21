@@ -85,6 +85,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     private final EnvironmentProperties environmentProperties = EnvironmentProperties.fork(CURRENT_ENV);
 
     /**
+     * If you don't need to initialize SLF4J, set 'false'.
+     */
+    protected boolean logEnabled = true;
+
+    /**
      * Creates a new, initially empty, {@link PropertySourcePropertyResolver} for the given {@link ConversionService}.
      *
      * @param conversionService The {@link ConversionService}
@@ -366,7 +371,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                             converted = conversionService.convert(value, conversionContext);
                         }
 
-                        if (LOG.isTraceEnabled()) {
+                        if (logEnabled && LOG.isTraceEnabled()) {
                             if (converted.isPresent()) {
                                 LOG.trace("Resolved value [{}] for property: {}", converted.get(), name);
                             } else {
@@ -399,7 +404,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             }
 
         }
-        if (LOG.isTraceEnabled()) {
+        if (logEnabled) {
             LOG.trace("No value found for property: {}", name);
         }
 
@@ -569,7 +574,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         synchronized (catalog) {
             for (String property : properties) {
 
-                if (LOG.isTraceEnabled()) {
+                if (logEnabled) {
                     LOG.trace("Processing property key {}", property);
                 }
 
@@ -818,6 +823,28 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         if (propertyPlaceholderResolver instanceof AutoCloseable) {
             ((AutoCloseable) propertyPlaceholderResolver).close();
         }
+    }
+
+    /**
+     * Return logEnabled value.
+     *
+     * @return is log enabled
+     *
+     * @since 3.9.0
+     */
+    public boolean isLogEnabled() {
+        return logEnabled;
+    }
+
+    /**
+     * Setter for logEnabled.
+     *
+     * @param logEnabled is log enabled
+     *
+     * @since 3.9.0
+     */
+    public void setLogEnabled(boolean logEnabled) {
+        this.logEnabled = logEnabled;
     }
 
     /**

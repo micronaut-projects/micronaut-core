@@ -65,4 +65,28 @@ class ApplicationContextBuilderSpec extends Specification {
         config.environments.contains('foo')
         config.deduceEnvironments.get() == false
     }
+
+    void "test context configurer with own class loader"() {
+        given:
+        def loader = new GroovyClassLoader()
+        loader.parseClass("""
+    package io.micronaut.context
+    import io.micronaut.context.*
+
+    class TestContextConfigurer implements ApplicationContextConfigurer {
+
+        @Override
+        void configure(ApplicationContextBuilder builder) {
+            builder.environments("success")
+        }
+    }
+""")
+        loader.addURL(getClass().getResource("/test-meta-inf/"))
+
+        ApplicationContext context = ApplicationContext.builder(loader)
+            .start()
+
+        expect:
+        context.getEnvironment().getActiveNames().contains("success")
+    }
 }
