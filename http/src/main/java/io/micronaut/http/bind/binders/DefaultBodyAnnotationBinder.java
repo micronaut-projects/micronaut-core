@@ -53,11 +53,6 @@ public class DefaultBodyAnnotationBinder<T> extends AbstractArgumentBinder<T> im
         if (!source.getMethod().permitsRequestBody()) {
             return BindingResult.unsatisfied();
         }
-
-        Optional<T> body = source.getBody(context.getArgument());
-        if (body.isEmpty()) {
-            return BindingResult.empty();
-        }
         boolean annotatedAsBody = context.getAnnotationMetadata().hasAnnotation(Body.class);
         Optional<String> optionalBodyComponent = context.getAnnotationMetadata().stringValue(Body.class);
         String bodyComponent = optionalBodyComponent.orElseGet(() -> {
@@ -75,7 +70,15 @@ public class DefaultBodyAnnotationBinder<T> extends AbstractArgumentBinder<T> im
                 }
             }
         }
-        BindingResult<T> bindingResult = doConvert(body.get(), context);
+        Optional<T> body = source.getBody(context.getArgument());
+        if (body.isPresent()) {
+            return () -> body;
+        }
+        Optional<?> unknownBody = source.getBody();
+        if (unknownBody.isEmpty()) {
+            return BindingResult.unsatisfied();
+        }
+        BindingResult<T> bindingResult = doConvert(unknownBody.get(), context);
         if (!annotatedAsBody && bindingResult.getValue().isEmpty()) {
             return BindingResult.empty();
         }
