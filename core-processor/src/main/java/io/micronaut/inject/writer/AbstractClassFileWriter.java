@@ -547,22 +547,23 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             // the array index position
             generatorAdapter.push(i);
 
+            ClassElement genericType = entry.getGenericType();
+
             MutableAnnotationMetadata.contributeDefaults(
                 annotationMetadataWithDefaults,
                 entry.getAnnotationMetadata()
             );
             MutableAnnotationMetadata.contributeDefaults(
                 annotationMetadataWithDefaults,
-                entry.getType().getTypeAnnotationMetadata()
+                genericType.getTypeAnnotationMetadata()
             );
 
-            ClassElement classElement = entry.getGenericType();
             String argumentName = entry.getName();
             AnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(
                 entry.getAnnotationMetadata(),
-                entry.getGenericType().getTypeAnnotationMetadata()
+                genericType.getTypeAnnotationMetadata()
             ).merge();
-            Map<String, ClassElement> typeArguments = classElement.getTypeArguments();
+            Map<String, ClassElement> typeArguments = genericType.getTypeArguments();
             pushCreateArgument(
                     annotationMetadataWithDefaults,
                     declaringElementName,
@@ -570,7 +571,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
                     declaringClassWriter,
                     generatorAdapter,
                     argumentName,
-                    classElement,
+                    genericType,
                     annotationMetadata,
                     typeArguments, defaults, loadTypeMethods
             );
