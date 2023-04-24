@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
@@ -70,6 +71,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
@@ -373,6 +375,15 @@ public final class RouteExecutor {
         }
     }
 
+//    private <T> CompletionStage<T> applyExecutorToPublisher(CompletionStage<T> completionStage, @Nullable ExecutorService executor) {
+//        if (executor != null) {
+//            final Scheduler scheduler = Schedulers.fromExecutorService(executor);
+//            return completionStage.;
+//        } else {
+//            return Flux.from(publisher);
+//        }
+//    }
+
     private boolean isSingle(RouteInfo<?> finalRoute, Class<?> bodyClass) {
         return finalRoute.isSpecifiedSingle() || (finalRoute.isSingleResult() &&
             (finalRoute.isAsync() || finalRoute.isSuspended() || Publishers.isSingle(bodyClass)));
@@ -460,9 +471,12 @@ public final class RouteExecutor {
                 outgoingResponse = ExecutionFlow.just(newNotFoundError(request));
             }
         } else {
-            // special case HttpResponse because FullNettyClientHttpResponse implements Completable...
-            boolean isReactive = routeInfo.isAsyncOrReactive() || (Publishers.isConvertibleToPublisher(body) && !(body instanceof HttpResponse<?>));
-            if (isReactive) {
+            if (routeInfo.isAsync()) {
+                outgoingResponse = CompletableFutureExecutionFlow.just(
+                    fromFutureExecute(request, body, routeInfo)
+                );
+            } else if (routeInfo.isReactive() || (Publishers.isConvertibleToPublisher(body) && !(body instanceof HttpResponse<?>))) {
+                // special case HttpResponse because FullNettyClientHttpResponse implements Completable...
                 outgoingResponse = ReactiveExecutionFlow.fromPublisher(
                     fromReactiveExecute(request, body, routeInfo)
                 );
@@ -594,6 +608,47 @@ public final class RouteExecutor {
         }
         MutableHttpResponse<?> response = forStatus(routeInfo, null).body(body);
         return processPublisherBody(request, response, routeInfo);
+    }
+
+    private CompletableFuture<MutableHttpResponse<?>> fromFutureExecute(HttpRequest<?> request, Object body, RouteInfo<?> routeInfo) {
+        CompletionStage<Object> completionStage = conversionService.convertRequired(body, CompletionStage.class);
+        Supplier<MutableHttpResponse<?>> emptyResponse = () -> {
+            MutableHttpResponse<?> singleResponse;
+            if (routeInfo.isCompletable() || routeInfo.isVoid()) {
+                singleResponse = forStatus(routeInfo, HttpStatus.OK).header(HttpHeaders.CONTENT_LENGTH, "0");
+            } else {
+                singleResponse = newNotFoundError(request);
+            }
+            return singleResponse;
+        };
+        return completionStage.thenApply(o -> {
+            if (o == null) {
+                return emptyResponse.get();
+            }
+            MutableHttpResponse<?> singleResponse;
+            if (o instanceof Optional<?> optional) {
+                if (optional.isPresent()) {
+                    o = optional.get();
+                } else {
+                    return emptyResponse.get();
+                }
+            }
+            if (o instanceof HttpResponse<?> httpResponse) {
+                singleResponse = httpResponse.toMutableResponse();
+                final Argument<?> bodyArgument = routeInfo.getReturnType() // Future
+                    .getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT) //HttpResponse
+                    .getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT); //Body
+                if (bodyArgument.isAsyncOrReactive()) {
+                    throw new IllegalStateException("The body of the future cannot be another future or a publisher!");
+                }
+            } else if (o instanceof HttpStatus) {
+                singleResponse = forStatus(routeInfo, (HttpStatus) o);
+            } else {
+                singleResponse = forStatus(routeInfo, null)
+                    .body(o);
+            }
+            return singleResponse;
+        }).toCompletableFuture();
     }
 
     private Mono<MutableHttpResponse<?>> processPublisherBody(HttpRequest<?> request,

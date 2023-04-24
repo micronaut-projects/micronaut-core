@@ -21,6 +21,8 @@ import org.reactivestreams.Publisher
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionStage
 import java.util.concurrent.atomic.AtomicBoolean
 
 class InvocationStackSpec extends Specification {
@@ -39,6 +41,7 @@ class InvocationStackSpec extends Specification {
 
         where:
         method << ["blocking", "nonblocking", "executeOn",
+                   "completableFuture", "completionStage",
                    "withOneReactiveFilter", "withOneReactiveFilterExecuteOn",
                    "withTwoReactiveFilters", "withTwoReactiveFiltersExecuteOn",
                    "exception", "throwsExecuteOnEx"]
@@ -52,6 +55,12 @@ class InvocationStackSpec extends Specification {
 
         @Get("/nonblocking")
         String nonblocking()
+
+        @Get("/completableFuture")
+        String completableFuture();
+
+        @Get("/completionStage")
+        String completionStage();
 
         @Get("/with-one-reactive-filter")
         String withOneReactiveFilter()
@@ -89,15 +98,29 @@ class InvocationStackSpec extends Specification {
 
         @Get("/blocking")
         String blocking() {
-            checkInvocationStack(false)
+            checkInvocationStack(false, false)
             return "OK"
         }
 
         @Get("/nonblocking")
         @NonBlocking
         String nonblocking() {
-            checkInvocationStack(false)
+            checkInvocationStack(false, false)
             return "OK"
+        }
+
+        @Get("/completableFuture")
+        @NonBlocking
+        CompletableFuture<String> completableFuture() {
+            checkInvocationStack(false, false)
+            return CompletableFuture.completedFuture("OK")
+        }
+
+        @Get("/completionStage")
+        @NonBlocking
+        CompletionStage<String> completionStage() {
+            checkInvocationStack(false, false)
+            return CompletableFuture.completedStage("OK")
         }
 
         @Get("/with-one-reactive-filter")
@@ -105,7 +128,7 @@ class InvocationStackSpec extends Specification {
             if (!oneFilter.getExecuted().get()) {
                 throw new IllegalStateException()
             }
-            checkInvocationStack(false)
+            checkInvocationStack(false, false)
             return "OK"
         }
 
@@ -115,7 +138,7 @@ class InvocationStackSpec extends Specification {
             if (!oneFilter.getExecuted().get()) {
                 throw new IllegalStateException()
             }
-            checkInvocationStack(true)
+            checkInvocationStack(true, false)
             return "OK"
         }
 
@@ -124,7 +147,7 @@ class InvocationStackSpec extends Specification {
             if (!twoFilters1.getExecuted().get() || !twoFilters2.getExecuted().get()) {
                 throw new IllegalStateException()
             }
-            checkInvocationStack(false)
+            checkInvocationStack(false, false)
             return "OK"
         }
 
@@ -133,51 +156,51 @@ class InvocationStackSpec extends Specification {
             if (!twoFilters1.getExecuted().get() || !twoFilters2.getExecuted().get()) {
                 throw new IllegalStateException()
             }
-            checkInvocationStack(true)
+            checkInvocationStack(true, false)
             return "OK"
         }
 
         @Get("/execute-on")
         @ExecuteOn(TaskExecutors.IO)
         String scheduleBlocking() {
-            checkInvocationStack(true)
+            checkInvocationStack(true, false)
             return "OK"
         }
 
         @Get("/exception")
         String throwsEx() {
-            checkInvocationStack(false)
+            checkInvocationStack(false, false)
             throw new MyException()
         }
 
         @Error(MyException)
         HttpResponse<?> onException(MyException e) {
-            checkInvocationStack(false)
+            checkInvocationStack(false, false)
             return HttpResponse.ok("OK")
         }
 
         @Get("/exception-execute-on")
         String throwsExecuteOnEx() {
-            checkInvocationStack(false)
+            checkInvocationStack(false, false)
             throw new MyException2()
         }
 
         @ExecuteOn(TaskExecutors.IO)
         @Error(MyException2)
         HttpResponse<?> onExceptionExecuteOn(MyException2 e) {
-            checkInvocationStack(true)
+            checkInvocationStack(true, false)
             return HttpResponse.ok("OK")
         }
 
-        void checkInvocationStack(boolean allowExecutor) {
+        void checkInvocationStack(boolean allowExecutor, boolean allowReactor) {
             for (StackTraceElement s in new RuntimeException().getStackTrace()) {
-                if (!isKnownStack(s.className, allowExecutor)) {
+                if (!isKnownStack(s.className, allowExecutor, allowReactor)) {
                     throw new RuntimeException("Unknown stack member: " + s.className);
                 }
             }
         }
 
-        boolean isKnownStack(String className, boolean allowExecutor) {
+        boolean isKnownStack(String className, boolean allowExecutor, boolean allowReactor) {
             if (className.startsWith("java.util.concurrent")) {
                 return true
             }
@@ -193,8 +216,10 @@ class InvocationStackSpec extends Specification {
             if (className.startsWith("org.codehaus.groovy") || className.startsWith("org.apache.groovy")) {
                 return true // Spock
             }
-            if (className == "reactor.core.publisher.Mono" || className == "reactor.core.publisher.MonoFromPublisher") {
-                return true // added for kotlin context filters
+            if (allowReactor) {
+                if (className == "reactor.core.publisher.Mono" || className == "reactor.core.publisher.MonoFromPublisher") {
+                    return true // added for kotlin context filters
+                }
             }
             return false
         }
