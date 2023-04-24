@@ -243,8 +243,7 @@ class JacksonProcessorSpec extends Specification {
         then:
         foo != null
         foo.bd1.toPlainString() == dec.toPlainString()
-        foo.bd2.toPlainString() != dec.toPlainString()
-        foo.bd2.toPlainString() == "888.77945381695534"
+        foo.bd2.toPlainString() == dec.toPlainString()
     }
 
     void "test big integer"() {
