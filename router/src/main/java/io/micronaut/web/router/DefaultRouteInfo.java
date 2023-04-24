@@ -69,7 +69,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     private final Argument<?> bodyType;
     private final boolean isErrorRoute;
     private final boolean isPermitsBody;
-    private final Optional<MessageBodyWriter<R>> messageBodyWriter;
+    private final MessageBodyWriter<R> messageBodyWriter;
 
     public DefaultRouteInfo(ReturnType<? extends R> returnType,
                             Class<?> declaringType,
@@ -88,8 +88,8 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
                             MessageBodyHandlerRegistry messageBodyHandlerRegistry) {
         this.annotationMetadata = annotationMetadata;
         this.returnType = returnType;
-        bodyType = resolveBodyType(returnType);
-        this.messageBodyWriter = messageBodyHandlerRegistry.findWriter((Argument<R>) bodyType, producesMediaTypes);
+        this.bodyType = resolveBodyType(returnType);
+        this.messageBodyWriter = messageBodyHandlerRegistry.findWriter((Argument<R>) bodyType, producesMediaTypes).orElse(null);
         single = returnType.isSingleResult() ||
             (isReactive() && returnType.getFirstTypeVariable()
                 .filter(t -> HttpResponse.class.isAssignableFrom(t.getType())).isPresent()) ||
@@ -142,7 +142,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
-    public Optional<MessageBodyWriter<R>> getMessageBodyWriter() {
+    public MessageBodyWriter<R> getMessageBodyWriter() {
         return messageBodyWriter;
     }
 
@@ -164,7 +164,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
-    public Optional<Argument<?>> getBodyArgument() {
+    public Optional<Argument<?>> getRequestBodyType() {
         return Optional.empty();
     }
 
@@ -174,7 +174,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
-    public Argument<?> getBodyType() {
+    public Argument<?> getResponseBodyType() {
         return bodyType;
     }
 

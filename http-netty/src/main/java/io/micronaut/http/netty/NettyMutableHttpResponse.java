@@ -30,7 +30,9 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.MutableHttpMessage;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
@@ -63,7 +65,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Internal
 @TypeHint(value = NettyMutableHttpResponse.class)
-public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpResponseBuilder {
+public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpResponseBuilder {
     private static final ServerCookieEncoder DEFAULT_SERVER_COOKIE_ENCODER = ServerCookieEncoder.LAX;
 
     private final HttpVersion httpVersion;
@@ -79,6 +81,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
     private ServerCookieEncoder serverCookieEncoder = DEFAULT_SERVER_COOKIE_ENCODER;
 
     private final BodyConvertor bodyConvertor = newBodyConvertor();
+    private MessageBodyWriter<B> messageBodyWriter;
 
     /**
      * @param nettyResponse     The {@link FullHttpResponse}
@@ -165,6 +168,17 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
                 contentType(mediaType.get());
             }
         }
+    }
+
+    @Override
+    public Optional<MessageBodyWriter<B>> getBodyWriter() {
+        return Optional.ofNullable(messageBodyWriter);
+    }
+
+    @Override
+    public MutableHttpMessage<B> bodyWriter(MessageBodyWriter<B> messageBodyWriter) {
+        this.messageBodyWriter = messageBodyWriter;
+        return this;
     }
 
     /**

@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.HttpStatus;
@@ -53,16 +54,18 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
      * @return The message body writer, if any.
      * @since 4.0.0
      */
-    default Optional<MessageBodyWriter<R>> getMessageBodyWriter() {
-        return Optional.empty();
+    @Nullable
+    default MessageBodyWriter<R> getMessageBodyWriter() {
+        return null;
     }
 
     /**
      * @return The message body reader. if any.
      * @since 4.0.0
      */
-    default Optional<MessageBodyReader<?>> getMessageBodyReader() {
-        return Optional.empty();
+    @Nullable
+    default MessageBodyReader<?> getMessageBodyReader() {
+        return null;
     }
 
     /**
@@ -73,23 +76,52 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
     /**
      * @return The argument representing the data type being produced.
      */
-    Argument<?> getBodyType();
+    @NonNull
+    Argument<?> getResponseBodyType();
 
     /**
-     * @return The argument that represents the body
+     * Is the response body json formattable.
+     * @return The response body.
      */
-    Optional<Argument<?>> getBodyArgument();
+    default boolean isResponseBodyJsonFormattable() {
+        Argument<?> argument = getResponseBodyType();
+        return !(argument.getType() == byte[].class
+            || ByteBuffer.class.isAssignableFrom(argument.getType()));
+    }
 
     /**
-     * Like {@link #getBodyArgument()}, but excludes body arguments that may match only a part of
+     * @return The response body type
+     * @deprecated Use {@link #getResponseBodyType()} instead
+     */
+    @Deprecated(since = "4.0", forRemoval = true)
+    default Argument<?> getBodyType() {
+        return getResponseBodyType();
+    }
+
+    /**
+     * @return The argument that represents the body of the request
+     */
+    Optional<Argument<?>> getRequestBodyType();
+
+    /**
+     * @return The argument that represents the body of the request
+     * @deprecated UYse {@link #getRequestBodyType()} instead
+     */
+    @Deprecated(since = "4.0", forRemoval = true)
+    default Optional<Argument<?>> getBodyArgument() {
+        return getRequestBodyType();
+    }
+
+    /**
+     * Like {@link #getRequestBodyType()}, but excludes body arguments that may match only a part of
      * the body (i.e. that have no {@code @Body} annotation, or where the {@code @Body} has a value
      * set).
      *
      * @return The argument that represents the body
      */
     @Internal
-    default Optional<Argument<?>> getFullBodyArgument() {
-        return getBodyArgument()
+    default Optional<Argument<?>> getFullRequestBodyType() {
+        return getRequestBodyType()
             /*
             The getBodyArgument() method returns arguments for functions where it is
             not possible to dictate whether the argument is supposed to bind the entire

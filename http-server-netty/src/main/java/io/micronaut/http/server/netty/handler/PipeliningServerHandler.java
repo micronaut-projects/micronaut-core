@@ -18,17 +18,23 @@ package io.micronaut.http.server.netty.handler;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.exceptions.HttpStatusException;
+import io.micronaut.http.exceptions.MessageBodyException;
+import io.micronaut.http.netty.body.NettyMessageBodyWriter;
 import io.micronaut.http.netty.stream.DelegateStreamedHttpRequest;
 import io.micronaut.http.netty.stream.EmptyHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
-import io.micronaut.http.server.netty.types.NettyCustomizableResponseType;
+import io.micronaut.http.server.netty.SmartHttpContentCompressor;
+import io.micronaut.http.server.netty.body.SystemFileBodyWriter;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.DefaultFileRegion;
 import io.netty.channel.EventLoop;
 import io.netty.channel.FileRegion;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
@@ -36,6 +42,7 @@ import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpChunkedInput;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpRequest;
@@ -44,10 +51,14 @@ import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpUtil;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.handler.codec.http.LastHttpContent;
+import io.netty.handler.stream.ChunkedFile;
 import io.netty.handler.stream.ChunkedInput;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.util.ReferenceCountUtil;
+import io.netty.util.ResourceLeakDetector;
+import io.netty.util.ResourceLeakDetectorFactory;
+import io.netty.util.ResourceLeakTracker;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -56,11 +67,17 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 import reactor.util.concurrent.Queues;
 
+import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.nio.channels.FileChannel;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Queue;
+import java.util.function.Supplier;
+
+import static io.micronaut.http.server.netty.body.SystemFileBodyWriter.ZERO_COPY_PREDICATE;
 
 /**
  * Netty handler that handles incoming {@link HttpRequest}s and forwards them to a
@@ -71,6 +88,7 @@ import java.util.Queue;
  */
 @Internal
 public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter {
+    private static final int LENGTH_8K = 8192;
     private static final Logger LOG = LoggerFactory.getLogger(PipeliningServerHandler.class);
 
     private final RequestHandler requestHandler;
@@ -296,7 +314,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         void read(Object message) {
             HttpRequest request = (HttpRequest) message;
-            OutboundAccess outboundAccess = new OutboundAccess();
+            OutboundAccess outboundAccess = new OutboundAccess(ctx);
             outboundQueue.add(outboundAccess);
             if (request instanceof FullHttpRequest full) {
                 requestHandler.accept(ctx, full, outboundAccess);
@@ -506,7 +524,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     /**
      * Class that allows writing the response for the request this object is associated with.
      */
-    public final class OutboundAccess {
+    public final class OutboundAccess implements NettyMessageBodyWriter.NettyWriteContext {
+        private final ChannelHandlerContext ctx;
         /**
          * The handler that will perform the actual write operation.
          */
@@ -514,7 +533,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         private Object attachment = null;
         private boolean closeAfterWrite = false;
 
-        private OutboundAccess() {
+        private OutboundAccess(ChannelHandlerContext ctx) {
+            this.ctx = ctx;
+        }
+
+        @Override
+        public ByteBufAllocator alloc() {
+            return ctx.alloc();
         }
 
         /**
@@ -523,6 +548,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          *
          * @param attachment The attachment to forward
          */
+        @Override
         public void attachment(Object attachment) {
             this.attachment = attachment;
         }
@@ -530,6 +556,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         /**
          * Mark this channel to be closed after this response has been written.
          */
+        @Override
         public void closeAfterWrite() {
             closeAfterWrite = true;
         }
@@ -592,6 +619,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          *
          * @param response The response to write
          */
+        @Override
         public void writeFull(FullHttpResponse response) {
             preprocess(response);
             write(new FullOutboundHandler(this, response));
@@ -603,6 +631,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          *
          * @param response The response to write
          */
+        @Override
         public void writeStreamed(StreamedHttpResponse response) {
             preprocess(response);
             response.subscribe(new StreamingOutboundHandler(this, response));
@@ -615,9 +644,28 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          *
          * @param response The response to write
          */
-        public void writeStreamed(NettyCustomizableResponseType.CustomResponse response) {
+        @Override
+        public void writeStreamed(NettyMessageBodyWriter.CustomResponse response) {
             preprocess(response.response());
             write(new ChunkedOutboundHandler(this, response));
+        }
+
+        @Override
+        public void writeFile(HttpResponse response, RandomAccessFile randomAccessFile, long position, long contentLength) {
+            SmartHttpContentCompressor predicate = ctx.channel().attr(ZERO_COPY_PREDICATE.get()).get();
+            if (predicate != null && predicate.shouldSkip(response)) {
+                // SSL not enabled - can use zero-copy file transfer.
+                writeStreamed(new NettyMessageBodyWriter.CustomResponse(response, new TrackedDefaultFileRegion(randomAccessFile.getChannel(), position, contentLength), false));
+            } else {
+                // SSL enabled - cannot use zero-copy file transfer.
+                try {
+                    // HttpChunkedInput will write the end marker (LastHttpContent) for us.
+                    final HttpChunkedInput chunkedInput = new HttpChunkedInput(new TrackedChunkedFile(randomAccessFile, position, contentLength, LENGTH_8K));
+                    writeStreamed(new NettyMessageBodyWriter.CustomResponse(response, chunkedInput, false));
+                } catch (IOException e) {
+                    throw new MessageBodyException("Could not read file", e);
+                }
+            }
         }
     }
 
@@ -828,12 +876,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     /**
-     * Handler that writes a {@link NettyCustomizableResponseType.CustomResponse}.
+     * Handler that writes a files etc..
      */
     private final class ChunkedOutboundHandler extends OutboundHandler {
-        private final NettyCustomizableResponseType.CustomResponse message;
+        private final NettyMessageBodyWriter.CustomResponse message;
 
-        ChunkedOutboundHandler(OutboundAccess outboundAccess, NettyCustomizableResponseType.CustomResponse message) {
+        ChunkedOutboundHandler(OutboundAccess outboundAccess, NettyMessageBodyWriter.CustomResponse message) {
             super(outboundAccess);
             this.message = message;
         }
@@ -869,6 +917,48 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 fr.release();
             }
             outboundHandler = null;
+        }
+    }
+
+    private static class TrackedDefaultFileRegion extends DefaultFileRegion {
+        //to avoid initializing Netty at build time
+        private static final Supplier<ResourceLeakDetector<TrackedDefaultFileRegion>> LEAK_DETECTOR = SupplierUtil.memoized(() ->
+            ResourceLeakDetectorFactory.instance().newResourceLeakDetector(TrackedDefaultFileRegion.class));
+
+        private final ResourceLeakTracker<TrackedDefaultFileRegion> tracker;
+
+        public TrackedDefaultFileRegion(FileChannel fileChannel, long position, long count) {
+            super(fileChannel, position, count);
+            this.tracker = LEAK_DETECTOR.get().track(this);
+        }
+
+        @Override
+        protected void deallocate() {
+            super.deallocate();
+            if (tracker != null) {
+                tracker.close(this);
+            }
+        }
+    }
+
+    private static class TrackedChunkedFile extends ChunkedFile {
+        //to avoid initializing Netty at build time
+        private static final Supplier<ResourceLeakDetector<TrackedChunkedFile>> LEAK_DETECTOR = SupplierUtil.memoized(() ->
+            ResourceLeakDetectorFactory.instance().newResourceLeakDetector(TrackedChunkedFile.class));
+
+        private final ResourceLeakTracker<TrackedChunkedFile> tracker;
+
+        public TrackedChunkedFile(RandomAccessFile file, long offset, long length, int chunkSize) throws IOException {
+            super(file, offset, length, chunkSize);
+            this.tracker = LEAK_DETECTOR.get().track(this);
+        }
+
+        @Override
+        public void close() throws Exception {
+            super.close();
+            if (tracker != null) {
+                tracker.close(this);
+            }
         }
     }
 }

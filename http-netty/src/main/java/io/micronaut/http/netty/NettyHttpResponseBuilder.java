@@ -25,6 +25,8 @@ import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
@@ -86,30 +88,40 @@ public interface NettyHttpResponseBuilder {
      */
     static @NonNull HttpResponse toHttpResponse(@NonNull io.micronaut.http.HttpResponse<?> response) {
         Objects.requireNonNull(response, "The response cannot be null");
-        while (response instanceof HttpResponseWrapper) {
-            response = ((HttpResponseWrapper<?>) response).getDelegate();
+        while (response instanceof HttpResponseWrapper wrapper) {
+            response = wrapper.getDelegate();
         }
-        if (response instanceof NettyHttpResponseBuilder) {
-            return ((NettyHttpResponseBuilder) response).toHttpResponse();
-        }
-        // manual conversion
         HttpResponse fullHttpResponse;
-        ByteBuf byteBuf = response.getBody(ByteBuf.class).orElse(null);
-        if (byteBuf != null) {
-            fullHttpResponse = new DefaultFullHttpResponse(
+        if (response instanceof NettyHttpResponseBuilder builder) {
+            fullHttpResponse = builder.toHttpResponse();
+        } else {
+            // manual conversion
+            ByteBuf byteBuf = response.getBody(ByteBuf.class).orElse(null);
+            if (byteBuf != null) {
+                fullHttpResponse = new DefaultFullHttpResponse(
                     HttpVersion.HTTP_1_1,
                     HttpResponseStatus.valueOf(response.code(), response.reason()),
                     byteBuf
-            );
-        } else {
-            fullHttpResponse = new DefaultHttpResponse(
+                );
+            } else {
+                fullHttpResponse = new DefaultHttpResponse(
                     HttpVersion.HTTP_1_1,
                     HttpResponseStatus.valueOf(response.code(), response.reason())
-            );
+                );
+            }
+
+            response.getHeaders()
+                .forEach((s, strings) -> fullHttpResponse.headers().add(s, strings));
         }
 
-        response.getHeaders()
-                .forEach((s, strings) -> fullHttpResponse.headers().add(s, strings));
+        // does the response have a body
+        if (response instanceof FullHttpResponse || response instanceof StreamedHttpResponse) {
+            io.netty.handler.codec.http.HttpHeaders nettyHeaders = fullHttpResponse.headers();
+            // default to Transfer-Encoding: chunked if Content-Length not set or not already set
+            if (!nettyHeaders.contains(HttpHeaderNames.CONTENT_LENGTH) && !nettyHeaders.contains(HttpHeaderNames.TRANSFER_ENCODING)) {
+                nettyHeaders.set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+            }
+        }
         return fullHttpResponse;
     }
 
@@ -120,11 +132,10 @@ public interface NettyHttpResponseBuilder {
      */
     static @NonNull StreamedHttpResponse toStreamResponse(@NonNull io.micronaut.http.HttpResponse<?> response) {
         Objects.requireNonNull(response, "The response cannot be null");
-        while (response instanceof HttpResponseWrapper) {
-            response = ((HttpResponseWrapper<?>) response).getDelegate();
+        while (response instanceof HttpResponseWrapper wrapper) {
+            response = wrapper.getDelegate();
         }
-        if (response instanceof NettyHttpResponseBuilder) {
-            NettyHttpResponseBuilder builder = (NettyHttpResponseBuilder) response;
+        if (response instanceof NettyHttpResponseBuilder builder) {
             if (builder.isStream()) {
                 return builder.toStreamHttpResponse();
             } else {

@@ -56,7 +56,7 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
     private final boolean isVoid;
     private final Optional<Argument<?>> optionalBodyArgument;
     private final Optional<Argument<?>> optionalFullBodyArgument;
-    private final Optional<MessageBodyReader<?>> messageBodyReader;
+    private final MessageBodyReader<?> messageBodyReader;
 
     private RequestArgumentBinder<Object>[] argumentBinders;
     private final boolean needsBody;
@@ -102,13 +102,18 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
         } else {
             optionalBodyArgument = Optional.empty();
         }
-        optionalFullBodyArgument = super.getFullBodyArgument();
-        this.messageBodyReader = optionalBodyArgument.flatMap(arg -> messageBodyHandlerRegistry.findReader(arg, consumesMediaTypes));
+        optionalFullBodyArgument = super.getFullRequestBodyType();
+        this.messageBodyReader = optionalBodyArgument.flatMap(b -> {
+            if (b.isAsyncOrReactive() || b.isOptional()) {
+                b = b.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            }
+            return messageBodyHandlerRegistry.findReader(b, consumesMediaTypes);
+        }).orElse(null);
         needsBody = optionalBodyArgument.isPresent() || hasArg(arguments, HttpRequest.class);
     }
 
     @Override
-    public final Optional<MessageBodyReader<?>> getMessageBodyReader() {
+    public final MessageBodyReader<?> getMessageBodyReader() {
         return messageBodyReader;
     }
 
@@ -170,12 +175,12 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
     }
 
     @Override
-    public Optional<Argument<?>> getBodyArgument() {
+    public Optional<Argument<?>> getRequestBodyType() {
         return optionalBodyArgument;
     }
 
     @Override
-    public Optional<Argument<?>> getFullBodyArgument() {
+    public Optional<Argument<?>> getFullRequestBodyType() {
         return optionalFullBodyArgument;
     }
 

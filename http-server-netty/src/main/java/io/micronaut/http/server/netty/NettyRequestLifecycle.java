@@ -27,9 +27,9 @@ import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.server.RequestLifecycle;
 import io.micronaut.http.server.netty.body.ByteBody;
 import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
-import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType;
-import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
+import io.micronaut.http.server.types.files.StreamedFile;
+import io.micronaut.http.server.types.files.SystemFile;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
@@ -102,10 +102,10 @@ final class NettyRequestLifecycle extends RequestLifecycle {
                 if (url.getProtocol().equals("file")) {
                     File file = Paths.get(url.toURI()).toFile();
                     if (file.exists() && !file.isDirectory() && file.canRead()) {
-                        return new NettySystemFileCustomizableResponseType(file);
+                        return new SystemFile(file);
                     }
                 }
-                return new NettyStreamedFileCustomizableResponseType(url);
+                return new StreamedFile(url);
             } catch (URISyntaxException e) {
                 //no-op
             }

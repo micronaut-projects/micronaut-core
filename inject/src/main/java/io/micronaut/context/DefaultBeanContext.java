@@ -4189,7 +4189,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         }
     }
 
-    private class BeanContextUnsafeExecutionHandle extends BeanContextExecutionHandle implements UnsafeExecutionHandle<Object, Object> {
+    private final class BeanContextUnsafeExecutionHandle extends BeanContextExecutionHandle implements UnsafeExecutionHandle<Object, Object> {
 
         private final UnsafeExecutable<Object, Object> unsafeExecutionHandle;
 
@@ -4202,9 +4202,14 @@ public class DefaultBeanContext implements InitializableBeanContext {
         public Object invokeUnsafe(Object... arguments) {
             return unsafeExecutionHandle.invokeUnsafe(getTarget(), arguments);
         }
+
+        @Override
+        public String toString() {
+            return unsafeExecutionHandle.toString();
+        }
     }
 
-    private class BeanContextExecutionHandle implements MethodExecutionHandle<Object, Object> {
+    private sealed class BeanContextExecutionHandle implements MethodExecutionHandle<Object, Object> permits BeanContextUnsafeExecutionHandle {
 
         private final ExecutableMethod<Object, ?> method;
         private final BeanDefinition<?> beanDefinition;
@@ -4270,6 +4275,11 @@ public class DefaultBeanContext implements InitializableBeanContext {
         @Override
         public ExecutableMethod<Object, Object> getExecutableMethod() {
             return (ExecutableMethod<Object, Object>) method;
+        }
+
+        @Override
+        public String toString() {
+            return method.toString();
         }
     }
 }

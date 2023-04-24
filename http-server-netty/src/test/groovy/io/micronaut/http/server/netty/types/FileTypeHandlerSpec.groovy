@@ -30,10 +30,6 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
-import io.micronaut.http.server.netty.types.files.FileTypeHandler
-import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType
-import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType
 import io.micronaut.http.server.types.files.StreamedFile
 import io.micronaut.http.server.types.files.SystemFile
 import jakarta.inject.Inject
@@ -306,22 +302,6 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         response.header(CONTENT_TYPE) == "text/plain"
         Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
         response.body() == ("a".."z").join('')
-    }
-
-    void "test supports"() {
-        when:
-        FileTypeHandler fileTypeHandler = new FileTypeHandler(new NettyHttpServerConfiguration.FileTypeHandlerConfiguration())
-
-        then:
-        fileTypeHandler.supports(type) == expected
-
-        where:
-        type                                      | expected
-        NettySystemFileCustomizableResponseType   | true
-        NettyStreamedFileCustomizableResponseType | true
-        StreamedFile                              | true
-        File                                      | true
-        SystemFile                                | true
     }
 
     @Controller('/test')

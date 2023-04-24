@@ -40,9 +40,6 @@ import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.micronaut.http.server.netty.ssl.CertificateProvidedSslBuilder;
 import io.micronaut.http.server.netty.ssl.SelfSignedSslBuilder;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
-import io.micronaut.http.server.netty.types.DefaultCustomizableResponseTypeHandlerRegistry;
-import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
-import io.micronaut.http.server.netty.types.files.FileTypeHandler;
 import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
 import io.micronaut.http.server.netty.websocket.WebSocketUpgradeHandlerFactory;
 import io.micronaut.http.ssl.ServerSslConfiguration;
@@ -57,7 +54,6 @@ import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -159,16 +155,11 @@ public class DefaultNettyEmbeddedServerFactory
                                               boolean isDefaultServer,
                                               @Nullable ServerSslConfiguration sslConfiguration) {
         Objects.requireNonNull(configuration, "Netty HTTP server configuration cannot be null");
-        List<NettyCustomizableResponseTypeHandler<?>> handlers = Arrays.asList(
-                new FileTypeHandler(configuration.getFileTypeHandlerConfiguration()),
-                new StreamTypeHandler()
-        );
 
         if (isDefaultServer) {
             return new NettyHttpServer(
                     configuration,
                     this,
-                    new DefaultCustomizableResponseTypeHandlerRegistry(handlers.toArray(new NettyCustomizableResponseTypeHandler[0])),
                     true
             );
         } else {
@@ -176,7 +167,6 @@ public class DefaultNettyEmbeddedServerFactory
             return new NettyHttpServer(
                     configuration,
                     embeddedServices,
-                    new DefaultCustomizableResponseTypeHandlerRegistry(handlers.toArray(new NettyCustomizableResponseTypeHandler[0])),
                     false
             );
         }

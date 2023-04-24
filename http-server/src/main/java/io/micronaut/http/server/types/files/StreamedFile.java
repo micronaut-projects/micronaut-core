@@ -18,7 +18,7 @@ package io.micronaut.http.server.types.files;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.server.types.CustomizableResponseTypeException;
+import io.micronaut.http.exceptions.MessageBodyException;
 
 import java.io.File;
 import java.io.IOException;
@@ -91,7 +91,7 @@ public class StreamedFile implements FileCustomizableResponseType {
             this.inputStream = con.getInputStream();
             this.length = con.getContentLengthLong();
         } catch (IOException e) {
-            throw new CustomizableResponseTypeException("Could not open a connection to the URL: " + path, e);
+            throw new MessageBodyException("Could not open a connection to the URL: " + path, e);
         }
     }
 

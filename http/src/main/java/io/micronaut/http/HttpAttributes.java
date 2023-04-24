@@ -84,7 +84,12 @@ public enum HttpAttributes implements CharSequence {
     /**
      * Attribute used to store Available HTTP methods on the OPTIONS request.
      */
-    AVAILABLE_HTTP_METHODS(Constants.PREFIX + ".route.availableHttpMethods");
+    AVAILABLE_HTTP_METHODS(Constants.PREFIX + ".route.availableHttpMethods"),
+
+    /**
+     * The message body writer.
+     */
+    MESSAGE_BODY_WRITER(Constants.PREFIX + ".messageBodyWriter");
 
     private final String name;
 

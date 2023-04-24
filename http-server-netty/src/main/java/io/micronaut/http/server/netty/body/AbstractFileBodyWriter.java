@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty.types.files;
+package io.micronaut.http.server.netty.body;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
@@ -22,60 +23,39 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
+import io.micronaut.http.netty.body.NettyMessageBodyWriter;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
-import io.micronaut.http.server.netty.types.NettyCustomizableResponseType;
-import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
-import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
-import io.micronaut.http.server.types.CustomizableResponseTypeException;
-import io.micronaut.http.server.types.files.StreamedFile;
-import io.micronaut.http.server.types.files.SystemFile;
+import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.netty.handler.codec.http.FullHttpResponse;
 
-import java.io.File;
 import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 
 /**
- * Responsible for writing files out to the response in Netty.
- *
- * @author James Kleeh
- * @since 1.0
+ * Abstract implementation for types that write files.
  */
+@Experimental
 @Internal
-public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Object> {
-
-    // sorted array of entity headers
-    // https://tools.ietf.org/html/rfc2616#section-7.1
+abstract sealed class AbstractFileBodyWriter permits InputStreamBodyWriter, StreamFileBodyWriter, SystemFileBodyWriter {
     private static final String[] ENTITY_HEADERS = {HttpHeaders.ALLOW, HttpHeaders.CONTENT_ENCODING, HttpHeaders.CONTENT_LANGUAGE, HttpHeaders.CONTENT_LENGTH, HttpHeaders.CONTENT_LOCATION, HttpHeaders.CONTENT_MD5, HttpHeaders.CONTENT_RANGE, HttpHeaders.CONTENT_TYPE, HttpHeaders.EXPIRES, HttpHeaders.LAST_MODIFIED};
-    private static final Class<?>[] SUPPORTED_TYPES = new Class<?>[]{File.class, StreamedFile.class, NettyFileCustomizableResponseType.class, SystemFile.class};
-    private final NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration;
+    protected final NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration;
 
-    /**
-     * @param configuration The file type handler configuration
-     */
-    public FileTypeHandler(NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration) {
+    AbstractFileBodyWriter(NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration) {
         this.configuration = configuration;
     }
 
-    @SuppressWarnings("MagicNumber")
-    @Override
-    public NettyCustomizableResponseType.CustomResponse handle(Object obj, HttpRequest<?> request, MutableHttpResponse<?> response) {
-        NettyFileCustomizableResponseType type;
-        if (obj instanceof File) {
-            type = new NettySystemFileCustomizableResponseType((File) obj);
-        } else if (obj instanceof NettyFileCustomizableResponseType) {
-            type = (NettyFileCustomizableResponseType) obj;
-        } else if (obj instanceof StreamedFile) {
-            type = new NettyStreamedFileCustomizableResponseType((StreamedFile) obj);
-        } else if (obj instanceof SystemFile) {
-            type = new NettySystemFileCustomizableResponseType((SystemFile) obj);
-        } else {
-            throw new CustomizableResponseTypeException("FileTypeHandler only supports File or FileCustomizableResponseType types");
-        }
+    private static void copyNonEntityHeaders(MutableHttpResponse<?> from, MutableHttpResponse to) {
+        from.getHeaders().forEachValue((header, value) -> {
+            if (Arrays.binarySearch(ENTITY_HEADERS, header) < 0) {
+                to.getHeaders().add(header, value);
+            }
+        });
+    }
 
-        long lastModified = type.getLastModified();
+    protected boolean handleIfModifiedAndHeaders(HttpRequest<?> request, MutableHttpResponse<?> response, FileCustomizableResponseType systemFile, NettyMessageBodyWriter.NettyWriteContext context, NettyMutableHttpResponse<?> nettyResponse) {
+        long lastModified = systemFile.getLastModified();
 
         // Cache Validation
         ZonedDateTime ifModifiedSince = request.getHeaders().getDate(HttpHeaders.IF_MODIFIED_SINCE);
@@ -86,24 +66,16 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
             long ifModifiedSinceDateSeconds = ifModifiedSince.toEpochSecond();
             long fileLastModifiedSeconds = lastModified / 1000;
             if (ifModifiedSinceDateSeconds == fileLastModifiedSeconds) {
-                FullHttpResponse nettyResponse = notModified(response);
-                return new NettyCustomizableResponseType.CustomResponse(nettyResponse, null, false);
+                return true;
             }
         }
 
         if (!response.getHeaders().contains(HttpHeaders.CONTENT_TYPE)) {
-            response.header(HttpHeaders.CONTENT_TYPE, type.getMediaType().toString());
+            response.header(HttpHeaders.CONTENT_TYPE, systemFile.getMediaType().toString());
         }
         setDateAndCacheHeaders(response, lastModified);
-
-        type.process(response);
-        return type.write(request, response);
-    }
-
-    @Override
-    public boolean supports(Class<?> type) {
-        return Arrays.stream(SUPPORTED_TYPES)
-            .anyMatch((aClass -> aClass.isAssignableFrom(type)));
+        systemFile.process(nettyResponse);
+        return false;
     }
 
     /**
@@ -127,8 +99,8 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
         if (response.header(HttpHeaders.CACHE_CONTROL) == null) {
             NettyHttpServerConfiguration.FileTypeHandlerConfiguration.CacheControlConfiguration cacheConfig = configuration.getCacheControl();
             StringBuilder header = new StringBuilder(cacheConfig.getPublic() ? "public" : "private")
-                    .append(", max-age=")
-                    .append(configuration.getCacheSeconds());
+                .append(", max-age=")
+                .append(configuration.getCacheSeconds());
             response.header(HttpHeaders.CACHE_CONTROL, header.toString());
         }
 
@@ -146,19 +118,10 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
         headers.date(now);
     }
 
-    private static void copyNonEntityHeaders(MutableHttpResponse<?> from, MutableHttpResponse to) {
-        from.getHeaders().forEachValue((header, value) -> {
-            if (Arrays.binarySearch(ENTITY_HEADERS, header) < 0) {
-                to.getHeaders().add(header, value);
-            }
-        });
-    }
-
-    private FullHttpResponse notModified(MutableHttpResponse<?> originalResponse) {
+    protected FullHttpResponse notModified(MutableHttpResponse<?> originalResponse) {
         MutableHttpResponse response = HttpResponse.notModified();
-        copyNonEntityHeaders(originalResponse, response);
+        AbstractFileBodyWriter.copyNonEntityHeaders(originalResponse, response);
         setDateHeader(response);
         return ((NettyMutableHttpResponse) response).toFullHttpResponse();
     }
-
 }

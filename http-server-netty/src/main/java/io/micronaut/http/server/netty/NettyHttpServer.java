@@ -39,7 +39,6 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.exceptions.ServerStartupException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
-import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
 import io.micronaut.http.server.util.DefaultHttpHostResolver;
 import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.http.ssl.ServerSslConfiguration;
@@ -143,7 +142,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     public NettyHttpServer(
             NettyHttpServerConfiguration serverConfiguration,
             NettyEmbeddedServices nettyEmbeddedServices,
-            NettyCustomizableResponseTypeHandlerRegistry handlerRegistry,
             boolean isDefault) {
         this.isDefault = isDefault;
         this.serverConfiguration = serverConfiguration;
@@ -171,7 +169,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         );
         this.routingHandler = new RoutingInBoundHandler(
                 serverConfiguration,
-                handlerRegistry,
                 nettyEmbeddedServices,
                 ioExecutor,
                 httpContentProcessorResolver,
