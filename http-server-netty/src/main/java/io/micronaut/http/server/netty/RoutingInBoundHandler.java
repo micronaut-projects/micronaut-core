@@ -207,7 +207,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 serverConfiguration
             );
             outboundAccess.attachment(errorRequest);
-            new NettyRequestLifecycle(this, outboundAccess, errorRequest).handleException(e.getCause() == null ? e : e.getCause());
+            try (PropagatedContext.InContext ignore = PropagatedContext.newContext(new ServerHttpRequestContext(errorRequest)).propagate()) {
+                new NettyRequestLifecycle(this, outboundAccess, errorRequest).handleException(e.getCause() == null ? e : e.getCause());
+            }
             if (request instanceof StreamedHttpRequest streamed) {
                 streamed.closeIfNoSubscriber();
             } else {
