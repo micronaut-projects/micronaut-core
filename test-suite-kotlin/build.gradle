@@ -101,12 +101,3 @@ tasks.named("compileTestKotlin") {
 tasks.named("test") {
     useJUnitPlatform()
 }
-
-tasks.withType(Test).configureEach {
-    distribution {
-        enabled = false
-    }
-    predictiveSelection {
-        enabled = false
-    }
-}
