@@ -75,11 +75,6 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
-import io.netty.handler.codec.http2.Http2Error;
-import io.netty.handler.codec.http2.Http2Exception;
-import io.netty.util.concurrent.Future;
-import io.netty.util.concurrent.GenericFutureListener;
-import org.jetbrains.annotations.NotNull;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -295,8 +290,8 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
             MediaType finalResponseMediaType = responseMediaType;
             if (messageBodyWriter != null && responseBodyType.isInstance(body) && messageBodyWriter.isWriteable(responseBodyType, responseMediaType)) {
+                handleMissingConnectionHeader(response, nettyRequest);
                 if (messageBodyWriter instanceof NettyMessageBodyWriter<Object> nettyMessageBodyWriter) {
-                    handleMissingConnectionHeader(response, nettyRequest, outboundAccess);
                     if (nettyMessageBodyWriter.useIoExecutor()) {
                         getIoExecutor().execute(() -> writeNettyMessageBody(nettyRequest.getChannelHandlerContext(), nettyRequest, (MutableHttpResponse<Object>) response, body, responseBodyType, finalResponseMediaType, nettyMessageBodyWriter, outboundAccess));
                     } else {
@@ -521,6 +516,8 @@ public final class RoutingInBoundHandler implements RequestHandler {
         @NonNull MediaType mediaType) {
         if (body == null) {
             return;
+        } else {
+            message.contentType(mediaType);
         }
         if (body instanceof CharSequence) {
             ByteBuf byteBuf = Unpooled.wrappedBuffer(body.toString().getBytes(message.getCharacterEncoding()));
@@ -554,7 +551,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
     private void writeFinalNettyResponse(MutableHttpResponse<?> message, NettyHttpRequest<?> request, PipeliningServerHandler.OutboundAccess outboundAccess) {
         // default Connection header if not set explicitly
-        handleMissingConnectionHeader(message, request, outboundAccess);
+        handleMissingConnectionHeader(message, request);
         io.netty.handler.codec.http.HttpResponse nettyResponse = NettyHttpResponseBuilder.toHttpResponse(message);
         // close handled by HttpServerKeepAliveHandler
         if (request.getNativeRequest() instanceof StreamedHttpRequest streamed && !streamed.isConsumed()) {
@@ -565,7 +562,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         }
     }
 
-    private void handleMissingConnectionHeader(MutableHttpResponse<?> message, HttpRequest<?> request, PipeliningServerHandler.OutboundAccess outboundAccess) {
+    private void handleMissingConnectionHeader(MutableHttpResponse<?> message, HttpRequest<?> request) {
         int httpStatus = message.code();
 
         final io.micronaut.http.HttpVersion httpVersion = request.getHttpVersion();
@@ -574,12 +571,17 @@ public final class RoutingInBoundHandler implements RequestHandler {
         boolean decodeError = request instanceof NettyHttpRequest &&
             ((NettyHttpRequest<?>) request).getNativeRequest().decoderResult().isFailure();
 
-        if (!isHttp2 && !message.getHeaders().contains(HttpHeaders.CONNECTION)) {
+        MutableHttpHeaders headers = message.getHeaders();
+        if (!isHttp2 && !headers.contains(HttpHeaders.CONNECTION)) {
             if (!decodeError && (httpStatus < 500 || serverConfiguration.isKeepAliveOnServerError())) {
-                message.getHeaders().set(HttpHeaders.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+                headers.set(HttpHeaders.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
             } else {
-                message.getHeaders().set(HttpHeaders.CONNECTION, HttpHeaderValues.CLOSE);
+                headers.set(HttpHeaders.CONNECTION, HttpHeaderValues.CLOSE);
             }
+        }
+        // default to Transfer-Encoding: chunked if Content-Length not set or not already set
+        if (!headers.contains(HttpHeaders.CONTENT_LENGTH) && !headers.contains(HttpHeaders.TRANSFER_ENCODING)) {
+            headers.set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
         }
     }
 
