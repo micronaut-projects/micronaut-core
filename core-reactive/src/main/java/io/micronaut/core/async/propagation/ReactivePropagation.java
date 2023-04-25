@@ -41,12 +41,12 @@ public class ReactivePropagation {
      */
     public static <T> Publisher<T> propagate(PropagatedContext propagatedContext, Publisher<T> actual) {
         if (actual instanceof CorePublisher) {
-            return new CorePublisher<T>() {
+            return new CorePublisher<>() {
                 @Override
                 public void subscribe(CoreSubscriber<? super T> subscriber) {
                     CorePublisher<T> actualCorePublisher = (CorePublisher<T>) actual;
                     try (PropagatedContext.InContext ignore = propagatedContext.propagate()) {
-                        actualCorePublisher.subscribe((CoreSubscriber<? super T>) propagate(propagatedContext, subscriber));
+                        actualCorePublisher.subscribe(subscriber);
                     }
                 }
 
@@ -57,7 +57,7 @@ public class ReactivePropagation {
                         return;
                     }
                     try (PropagatedContext.InContext ignore = propagatedContext.propagate()) {
-                        actual.subscribe(propagate(propagatedContext, subscriber));
+                        actual.subscribe(subscriber);
                     }
                 }
             };
