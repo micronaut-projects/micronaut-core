@@ -655,7 +655,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             SmartHttpContentCompressor predicate = ctx.channel().attr(ZERO_COPY_PREDICATE.get()).get();
             if (predicate != null && predicate.shouldSkip(response)) {
                 // SSL not enabled - can use zero-copy file transfer.
-                writeStreamed(new NettyMessageBodyWriter.CustomResponse(response, new TrackedDefaultFileRegion(randomAccessFile.getChannel(), position, contentLength), false));
+                writeStreamed(new NettyMessageBodyWriter.CustomResponse(response, new TrackedDefaultFileRegion(randomAccessFile.getChannel(), position, contentLength), true));
             } else {
                 // SSL enabled - cannot use zero-copy file transfer.
                 try {

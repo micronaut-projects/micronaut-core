@@ -70,7 +70,6 @@ public class RequestLifecycle {
     private static final Logger LOG = LoggerFactory.getLogger(RequestLifecycle.class);
 
     private final RouteExecutor routeExecutor;
-    private final RequestArgumentSatisfier requestArgumentSatisfier;
     private HttpRequest<?> request;
     private boolean multipartEnabled = true;
 
@@ -81,7 +80,6 @@ public class RequestLifecycle {
     protected RequestLifecycle(RouteExecutor routeExecutor, HttpRequest<?> request) {
         this.routeExecutor = Objects.requireNonNull(routeExecutor, "routeExecutor");
         this.request = Objects.requireNonNull(request, "request");
-        this.requestArgumentSatisfier = routeExecutor.getRequestArgumentSatisfier();
     }
 
     /**
@@ -125,7 +123,10 @@ public class RequestLifecycle {
             //Check if there is a file for the route before returning route not found
             FileCustomizableResponseType fileCustomizableResponseType = findFile();
             if (fileCustomizableResponseType != null) {
-                return runWithFilters(() -> ExecutionFlow.just(HttpResponse.ok(fileCustomizableResponseType)));
+                return runWithFilters(() -> {
+                    MutableHttpResponse<FileCustomizableResponseType> fileResponse = HttpResponse.ok(fileCustomizableResponseType);
+                    return ExecutionFlow.just(fileResponse);
+                });
             }
             return onRouteMiss(request);
         }

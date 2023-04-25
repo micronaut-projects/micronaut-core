@@ -26,6 +26,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupFactory;
@@ -88,6 +89,7 @@ public class DefaultNettyEmbeddedServerFactory
     private final EventLoopGroupRegistry eventLoopGroupRegistry;
     private final Map<Class<?>, ApplicationEventPublisher<?>> cachedEventPublishers = new ConcurrentHashMap<>(5);
     private final WebSocketUpgradeHandlerFactory webSocketUpgradeHandlerFactory;
+    private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     private @Nullable ServerSslBuilder serverSslBuilder;
     private @Nullable ChannelOptionFactory channelOptionFactory;
     private List<ChannelOutboundHandler> outboundHandlers = Collections.emptyList();
@@ -97,6 +99,7 @@ public class DefaultNettyEmbeddedServerFactory
      * @param applicationContext The app ctx
      * @param routeExecutor The route executor
      * @param mediaTypeCodecRegistry The media type codec
+     * @param messageBodyHandlerRegistry The message body handler registery
      * @param staticResourceResolver The static resource resolver
      * @param nettyThreadFactory The netty thread factory
      * @param httpCompressionStrategy The http compression strategy
@@ -107,6 +110,7 @@ public class DefaultNettyEmbeddedServerFactory
     protected DefaultNettyEmbeddedServerFactory(ApplicationContext applicationContext,
                                                 RouteExecutor routeExecutor,
                                                 MediaTypeCodecRegistry mediaTypeCodecRegistry,
+                                                MessageBodyHandlerRegistry messageBodyHandlerRegistry,
                                                 StaticResourceResolver staticResourceResolver,
                                                 @Named(NettyThreadFactory.NAME) ThreadFactory nettyThreadFactory,
                                                 HttpCompressionStrategy httpCompressionStrategy,
@@ -114,6 +118,7 @@ public class DefaultNettyEmbeddedServerFactory
                                                 EventLoopGroupRegistry eventLoopGroupRegistry,
                                                 @Nullable WebSocketUpgradeHandlerFactory webSocketUpgradeHandlerFactory) {
         this.applicationContext = applicationContext;
+        this.messageBodyHandlerRegistry = messageBodyHandlerRegistry;
         this.requestArgumentSatisfier = routeExecutor.getRequestArgumentSatisfier();
         this.routeExecutor = routeExecutor;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
@@ -148,6 +153,11 @@ public class DefaultNettyEmbeddedServerFactory
     @NonNull
     protected NettyEmbeddedServer buildDefaultServer(@NonNull NettyHttpServerConfiguration configuration) {
         return buildInternal(configuration, true, null);
+    }
+
+    @Override
+    public MessageBodyHandlerRegistry getMessageBodyHandlerRegistry() {
+        return messageBodyHandlerRegistry;
     }
 
     @NonNull

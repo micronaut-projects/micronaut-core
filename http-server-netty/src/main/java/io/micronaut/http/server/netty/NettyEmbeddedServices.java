@@ -20,6 +20,7 @@ import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
@@ -50,6 +51,11 @@ import java.util.concurrent.ExecutorService;
  */
 @Internal
 public interface NettyEmbeddedServices {
+    /**
+     * @return The message body handler registry.
+     */
+    MessageBodyHandlerRegistry getMessageBodyHandlerRegistry();
+
     /**
      * @return The channel outbound handlers
      */

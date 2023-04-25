@@ -34,6 +34,8 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.MediaTypeProvider;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
@@ -86,6 +88,7 @@ import reactor.core.publisher.Flux;
 import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -117,6 +120,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
     final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     final Supplier<ExecutorService> ioExecutorSupplier;
     final boolean multipartEnabled;
+    private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     ExecutorService ioExecutor;
     final ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher;
     final RouteExecutor routeExecutor;
@@ -139,6 +143,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         ConversionService conversionService) {
         this.mediaTypeCodecRegistry = embeddedServerContext.getMediaTypeCodecRegistry();
         this.staticResourceResolver = embeddedServerContext.getStaticResourceResolver();
+        this.messageBodyHandlerRegistry = embeddedServerContext.getMessageBodyHandlerRegistry();
         this.ioExecutorSupplier = ioExecutor;
         this.requestArgumentSatisfier = embeddedServerContext.getRequestArgumentSatisfier();
         this.serverConfiguration = serverConfiguration;
@@ -272,11 +277,20 @@ public final class RoutingInBoundHandler implements RequestHandler {
             MediaType responseMediaType = response.getContentType().orElse(null);
             Argument<Object> responseBodyType = routeInfo != null ? (Argument<Object>) routeInfo.getResponseBodyType() : Argument.of((Class<Object>) body.getClass());
             if (responseMediaType == null) {
-                if (routeInfo != null) {
+                if (body instanceof MediaTypeProvider mediaTypeProvider) {
+                    responseMediaType = mediaTypeProvider.getMediaType();
+                } else if (routeInfo != null) {
                     responseMediaType = routeExecutor.resolveDefaultResponseContentType(nettyRequest, routeInfo);
                 } else {
                     responseMediaType = MediaType.APPLICATION_JSON_TYPE;
                 }
+            }
+
+            if (messageBodyWriter == null) {
+                // lookup write to use, any logic that hits this path should consider setting
+                // a body writer on the response before writing
+                messageBodyWriter = this.messageBodyHandlerRegistry
+                    .findWriter(responseBodyType, Collections.singletonList(responseMediaType)).orElse(null);
             }
 
             MediaType finalResponseMediaType = responseMediaType;
@@ -352,7 +366,8 @@ public final class RoutingInBoundHandler implements RequestHandler {
                     nettyRequest,
                     response,
                     routeInfo,
-                    body
+                    body,
+                    responseMediaType
                 );
 
                 writeFinalNettyResponse(
@@ -378,7 +393,8 @@ public final class RoutingInBoundHandler implements RequestHandler {
         Object body,
         Argument<Object> responseBodyType,
         MediaType finalResponseMediaType,
-        NettyMessageBodyWriter<Object> nettyMessageBodyWriter, PipeliningServerHandler.OutboundAccess outboundAccess) {
+        NettyMessageBodyWriter<Object> nettyMessageBodyWriter,
+        PipeliningServerHandler.OutboundAccess outboundAccess) {
         try {
             nettyMessageBodyWriter.writeTo(
                 nettyRequest,
@@ -390,7 +406,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             );
         } catch (CodecException e) {
             final MutableHttpResponse<?> errorResponse = routeExecutor.createDefaultErrorResponse(nettyRequest, e);
-            encodeResponseBody(context, nettyRequest, errorResponse, null, errorResponse.body());
+            encodeResponseBody(context, nettyRequest, errorResponse, null, errorResponse.body(), errorResponse.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE));
             writeFinalNettyResponse(
                 errorResponse,
                 nettyRequest,
@@ -501,15 +517,10 @@ public final class RoutingInBoundHandler implements RequestHandler {
         HttpRequest<?> request,
         MutableHttpResponse<?> message,
         @Nullable RouteInfo<Object> routeInfo,
-        Object body) {
+        Object body,
+        @NonNull MediaType mediaType) {
         if (body == null) {
             return;
-        }
-
-        MediaType mediaType = message.getContentType().orElse(null);
-        if (mediaType == null) {
-            mediaType = routeInfo != null ? routeExecutor.resolveDefaultResponseContentType(request, routeInfo) : MediaType.APPLICATION_JSON_TYPE;
-            message.contentType(mediaType);
         }
         if (body instanceof CharSequence) {
             ByteBuf byteBuf = Unpooled.wrappedBuffer(body.toString().getBytes(message.getCharacterEncoding()));
@@ -552,31 +563,6 @@ public final class RoutingInBoundHandler implements RequestHandler {
         } else {
             syncWriteAndFlushNettyResponse(outboundAccess, request, nettyResponse);
         }
-    }
-
-    @NotNull
-    private GenericFutureListener<Future<? super Void>> newRequestCompleter(HttpRequest<?> request, ChannelHandlerContext context) {
-        return future -> {
-            try {
-                if (!future.isSuccess()) {
-                    final Throwable throwable = future.cause();
-                    if (!isIgnorable(throwable)) {
-                        if (throwable instanceof Http2Exception.StreamException se && se.error() == Http2Error.STREAM_CLOSED) {
-                            // ignore
-                            return;
-                        }
-                        if (LOG.isErrorEnabled()) {
-                            LOG.error("Error writing final response: " + throwable.getMessage(), throwable);
-                        }
-                    }
-                }
-            } finally {
-                if (request instanceof NettyHttpRequest) {
-                    cleanupRequest((NettyHttpRequest<?>) request);
-                }
-                context.read();
-            }
-        };
     }
 
     private void handleMissingConnectionHeader(MutableHttpResponse<?> message, HttpRequest<?> request, PipeliningServerHandler.OutboundAccess outboundAccess) {

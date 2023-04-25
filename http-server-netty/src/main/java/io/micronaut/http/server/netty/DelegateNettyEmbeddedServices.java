@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
@@ -48,6 +49,11 @@ interface DelegateNettyEmbeddedServices extends NettyEmbeddedServices {
      */
     @NonNull
     NettyEmbeddedServices getDelegate();
+
+    @Override
+    default MessageBodyHandlerRegistry getMessageBodyHandlerRegistry() {
+        return getDelegate().getMessageBodyHandlerRegistry();
+    }
 
     @Override
     default List<ChannelOutboundHandler> getOutboundHandlers() {

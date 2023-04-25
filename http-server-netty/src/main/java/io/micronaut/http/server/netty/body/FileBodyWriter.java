@@ -23,8 +23,6 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.netty.body.NettyMessageBodyWriter;
 import io.micronaut.http.server.types.files.SystemFile;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerContext;
 import jakarta.inject.Singleton;
 
 import java.io.File;
