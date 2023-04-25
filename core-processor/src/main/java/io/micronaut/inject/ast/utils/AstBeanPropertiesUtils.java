@@ -262,15 +262,18 @@ public final class AstBeanPropertiesUtils {
             if (existingType != null && setterType.isAssignable(existingType)) {
                 // Override the setter because the type is higher
                 beanPropertyData.setter = methodElement;
-            } else if (beanPropertyData.setter.getDeclaringType().equals(classElement)) {
-                // skip
+            } else if (beanPropertyData.setter.getDeclaringType().equals(methodElement.getDeclaringType())) {
+                // the same declared type; skip - take the first setter
                 return;
-            } else {
+            } else if (classElement.isAssignable(beanPropertyData.setter.getDeclaringType())) {
                 // override must be a subclass
                 beanPropertyData.setter = methodElement;
+            } else {
+                return;
             }
+        } else {
+            beanPropertyData.setter = methodElement;
         }
-        beanPropertyData.setter = methodElement;
         if (isAccessor) {
             beanPropertyData.writeAccessKind = BeanProperties.AccessKind.METHOD;
         }
