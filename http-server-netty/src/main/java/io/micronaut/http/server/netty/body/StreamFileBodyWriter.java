@@ -52,7 +52,7 @@ public final class StreamFileBodyWriter extends AbstractFileBodyWriter implement
     @Override
     public void writeTo(HttpRequest<?> request, MutableHttpResponse<StreamedFile> outgoingResponse, Argument<StreamedFile> type, StreamedFile object, MediaType mediaType, NettyWriteContext nettyContext) throws CodecException {
         if (outgoingResponse instanceof NettyMutableHttpResponse<?> nettyResponse) {
-            if (handleIfModifiedAndHeaders(request, outgoingResponse, object, nettyContext, nettyResponse)) {
+            if (handleIfModifiedAndHeaders(request, outgoingResponse, object, nettyResponse)) {
                 nettyContext.writeFull(notModified(outgoingResponse));
             } else {
                 HttpHeaders nettyHeaders = nettyResponse.getNettyHeaders();

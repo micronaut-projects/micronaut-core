@@ -23,7 +23,6 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.netty.body.NettyMessageBodyWriter;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -54,7 +53,7 @@ abstract sealed class AbstractFileBodyWriter permits InputStreamBodyWriter, Stre
         });
     }
 
-    protected boolean handleIfModifiedAndHeaders(HttpRequest<?> request, MutableHttpResponse<?> response, FileCustomizableResponseType systemFile, NettyMessageBodyWriter.NettyWriteContext context, NettyMutableHttpResponse<?> nettyResponse) {
+    protected boolean handleIfModifiedAndHeaders(HttpRequest<?> request, MutableHttpResponse<?> response, FileCustomizableResponseType systemFile, NettyMutableHttpResponse<?> nettyResponse) {
         long lastModified = systemFile.getLastModified();
 
         // Cache Validation

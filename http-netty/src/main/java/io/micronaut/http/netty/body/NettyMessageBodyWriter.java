@@ -27,8 +27,6 @@ import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.channel.ChannelFuture;
-import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpResponse;
 
@@ -76,19 +74,6 @@ public interface NettyMessageBodyWriter<T> extends MessageBodyWriter<T> {
          * @return The bytebuf allocator.
          */
         ByteBufAllocator alloc();
-
-        /**
-         * Set an attachment. Defaults to
-         * {@code null}.
-         *
-         * @param attachment The attachment to forward
-         */
-        void attachment(Object attachment);
-
-        /**
-         * Mark this channel to be closed after this response has been written.
-         */
-        void closeAfterWrite();
 
         /**
          * Write a full response.

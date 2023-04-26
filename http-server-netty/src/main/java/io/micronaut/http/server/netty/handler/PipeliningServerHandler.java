@@ -26,7 +26,6 @@ import io.micronaut.http.netty.stream.DelegateStreamedHttpRequest;
 import io.micronaut.http.netty.stream.EmptyHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.server.netty.SmartHttpContentCompressor;
-import io.micronaut.http.server.netty.body.SystemFileBodyWriter;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
@@ -45,6 +44,7 @@ import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpChunkedInput;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
@@ -135,8 +135,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         this.requestHandler = requestHandler;
     }
 
-    private static boolean canHaveBody(HttpResponse message) {
-        HttpResponseStatus status = message.status();
+    public static boolean canHaveBody(HttpResponseStatus status) {
         // All 1xx (Informational), 204 (No Content), and 304 (Not Modified)
         // responses do not include a message body
         return !(status == HttpResponseStatus.CONTINUE || status == HttpResponseStatus.SWITCHING_PROTOCOLS ||
@@ -548,7 +547,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          *
          * @param attachment The attachment to forward
          */
-        @Override
         public void attachment(Object attachment) {
             this.attachment = attachment;
         }
@@ -556,24 +554,29 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         /**
          * Mark this channel to be closed after this response has been written.
          */
-        @Override
         public void closeAfterWrite() {
             closeAfterWrite = true;
         }
 
         private void preprocess(HttpResponse message) {
             if (message.protocolVersion().isKeepAliveDefault()) {
-                if (message.headers().contains(HttpHeaderNames.CONNECTION, "close", true)) {
+                if (message.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE, true)) {
                     closeAfterWrite();
+                } else if (closeAfterWrite) {
+                    // add the header
+                    message.headers().add(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
                 }
             } else {
-                if (!message.headers().contains(HttpHeaderNames.CONNECTION, "keep-alive", true)) {
+                if (!message.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE, true)) {
                     closeAfterWrite();
+                } else if (closeAfterWrite) {
+                    // remove the keep-alive header
+                    message.headers().remove(HttpHeaderNames.CONNECTION);
                 }
             }
             // According to RFC 7230 a server MUST NOT send a Content-Length or a Transfer-Encoding when the status
             // code is 1xx or 204, also a status code 304 may not have a Content-Length or Transfer-Encoding set.
-            if (!HttpUtil.isContentLengthSet(message) && !HttpUtil.isTransferEncodingChunked(message) && canHaveBody(message)) {
+            if (!HttpUtil.isContentLengthSet(message) && !HttpUtil.isTransferEncodingChunked(message) && canHaveBody(message.status())) {
                 HttpUtil.setKeepAlive(message, false);
                 closeAfterWrite();
             }

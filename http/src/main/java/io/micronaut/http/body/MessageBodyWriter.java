@@ -18,7 +18,6 @@ package io.micronaut.http.body;
 import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.order.Ordered;
@@ -27,7 +26,6 @@ import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.codec.CodecException;
 
 import java.io.OutputStream;
@@ -66,6 +64,7 @@ public interface MessageBodyWriter<T> extends Ordered {
      * @param outputStream The output stream
      * @throws CodecException If an error occurs decoding
      */
+    // todo: "bake" with known argument type
     void writeTo(
         @NonNull Argument<T> type,
         T object,

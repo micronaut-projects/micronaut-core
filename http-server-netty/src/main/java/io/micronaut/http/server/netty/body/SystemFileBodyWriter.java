@@ -66,7 +66,7 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
             if (!systemFile.getFile().canRead()) {
                 throw new MessageBodyException("Could not find file");
             }
-            if (handleIfModifiedAndHeaders(request, response, systemFile, nettyContext, nettyResponse)) {
+            if (handleIfModifiedAndHeaders(request, response, systemFile, nettyResponse)) {
                 nettyContext.writeFull(notModified(response));
             } else {
 

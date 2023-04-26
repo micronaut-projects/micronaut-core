@@ -29,14 +29,12 @@ import io.micronaut.http.body.MessageBodyHandler;
 import io.micronaut.http.body.TextPlainHandler;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.netty.NettyHttpHeaders;
-import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import jakarta.inject.Singleton;
@@ -57,11 +55,12 @@ final class NettyTextPlainHandler implements MessageBodyHandler<String>, NettyMe
         NettyHttpHeaders nettyHttpHeaders = (NettyHttpHeaders) headers;
         io.netty.handler.codec.http.HttpHeaders nettyHeaders = nettyHttpHeaders.getNettyHeaders();
         if (!nettyHttpHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
-            nettyHttpHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType);
+            nettyHttpHeaders.set(HttpHeaderNames.CONTENT_TYPE, mediaType);
         }
+        nettyHeaders.set(HttpHeaderNames.CONTENT_LENGTH, byteBuf.readableBytes());
         FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(
             HttpVersion.HTTP_1_1,
-            HttpResponseStatus.OK,
+            HttpResponseStatus.valueOf(outgoingResponse.code(), outgoingResponse.reason()),
             byteBuf,
             nettyHeaders,
             EmptyHttpHeaders.INSTANCE
