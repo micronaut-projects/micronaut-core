@@ -13,7 +13,13 @@ import io.micronaut.http.codec.CodecException;
  */
 @Internal
 @Experimental
-public interface NettyWriteClosure<T> extends MessageBodyWriter.WriteClosure<T> {
+public abstract class NettyWriteClosure<T> extends MessageBodyWriter.WriteClosure<T> {
+    public NettyWriteClosure() {
+    }
+
+    public NettyWriteClosure(boolean blocking) {
+        super(blocking);
+    }
 
     /**
      * Reads an object from the given byte buffer.
@@ -25,7 +31,7 @@ public interface NettyWriteClosure<T> extends MessageBodyWriter.WriteClosure<T> 
      * @throws CodecException If an error occurs decoding
      */
     @NonNull
-    void writeTo(
+    public abstract void writeTo(
         @NonNull HttpRequest<?> request,
         @NonNull MutableHttpResponse<T> outgoingResponse,
         @NonNull T object,

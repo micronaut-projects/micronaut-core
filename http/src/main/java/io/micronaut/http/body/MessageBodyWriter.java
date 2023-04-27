@@ -84,7 +84,20 @@ public interface MessageBodyWriter<T> extends Ordered {
      *
      * @param <T> The body type
      */
-    interface WriteClosure<T> {
+    abstract class WriteClosure<T> {
+        private final boolean blocking;
+
+        public WriteClosure() {
+            this(false);
+        }
+
+        /**
+         * @param blocking see {@link #isBlocking()}
+         */
+        public WriteClosure(boolean blocking) {
+            this.blocking = blocking;
+        }
+
         /**
          * {@code true} iff this closure can do a blocking <i>read</i> on the object it receives.
          * For example, if this closure writes from an {@code InputStream}, that operation may be
@@ -93,8 +106,8 @@ public interface MessageBodyWriter<T> extends Ordered {
          * {@link #writeTo(Object, MutableHeaders, OutputStream)} may still block because the
          * {@link OutputStream} that is passed as the write destination may still block.
          */
-        default boolean isBlocking() {
-            return false;
+        public final boolean isBlocking() {
+            return blocking;
         }
 
         /**
@@ -105,7 +118,7 @@ public interface MessageBodyWriter<T> extends Ordered {
          * @param outputStream The output stream
          * @throws CodecException If an error occurs decoding
          */
-        void writeTo(
+        public abstract void writeTo(
             T object,
             @NonNull MutableHeaders outgoingHeaders,
             @NonNull OutputStream outputStream) throws CodecException;
@@ -119,7 +132,7 @@ public interface MessageBodyWriter<T> extends Ordered {
          * @throws CodecException If an error occurs decoding
          */
         @NonNull
-        default ByteBuffer<?> writeTo(
+        public ByteBuffer<?> writeTo(
             T object,
             @NonNull MutableHeaders outgoingHeaders,
             @NonNull ByteBufferFactory<?, ?> bufferFactory) throws CodecException {

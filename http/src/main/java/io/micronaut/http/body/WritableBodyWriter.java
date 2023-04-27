@@ -33,12 +33,7 @@ public final class WritableBodyWriter implements MessageBodyWriter<Writable> {
 
     @Override
     public WriteClosure<Writable> prepare(Argument<Writable> type, MediaType mediaType) {
-        return new WriteClosure<Writable>() {
-            @Override
-            public boolean isBlocking() {
-                return true;
-            }
-
+        return new WriteClosure<Writable>(true) {
             @Override
             public void writeTo(Writable object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
                 if (mediaType != null && !outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {

@@ -661,16 +661,12 @@ public final class RoutingInBoundHandler implements RequestHandler {
         }
     }
 
-    private final class CompatNettyWriteClosure<T> implements NettyWriteClosure<T> {
+    private final class CompatNettyWriteClosure<T> extends NettyWriteClosure<T> {
         private final MessageBodyWriter.WriteClosure<T> delegate;
 
         CompatNettyWriteClosure(MessageBodyWriter.WriteClosure<T> delegate) {
+            super(delegate.isBlocking());
             this.delegate = delegate;
-        }
-
-        @Override
-        public boolean isBlocking() {
-            return delegate.isBlocking();
         }
 
         @Override

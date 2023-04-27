@@ -52,12 +52,7 @@ final class NettyWritableBodyWriter implements NettyMessageBodyWriter<Writable> 
 
     @Override
     public WriteClosure<Writable> prepare(Argument<Writable> type, MediaType mediaType) {
-        return new NettyWriteClosure<Writable>() {
-            @Override
-            public boolean isBlocking() {
-                return true;
-            }
-
+        return new NettyWriteClosure<Writable>(true) {
             @Override
             public void writeTo(HttpRequest<?> request, MutableHttpResponse<Writable> outgoingResponse, Writable object, NettyWriteContext nettyContext) throws CodecException {
                 ByteBuf byteBuf = nettyContext.alloc().ioBuffer(128);
