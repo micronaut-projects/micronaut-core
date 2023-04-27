@@ -18,94 +18,59 @@ package io.micronaut.expressions.parser.ast.operator.binary;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
-import io.micronaut.expressions.parser.exception.ExpressionCompilationException;
-import org.objectweb.asm.Label;
 import org.objectweb.asm.Type;
-import org.objectweb.asm.commons.GeneratorAdapter;
 
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.BOOLEAN;
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.DOUBLE;
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.FLOAT;
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.LONG;
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.computeNumericOperationTargetType;
 import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isNumeric;
-import static io.micronaut.expressions.parser.ast.util.TypeDescriptors.isOneOf;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushPrimitiveCastIfNecessary;
-import static io.micronaut.expressions.parser.ast.util.EvaluatedExpressionCompilationUtils.pushUnboxPrimitiveIfNecessary;
-import static org.objectweb.asm.Opcodes.DCMPL;
-import static org.objectweb.asm.Opcodes.FCMPL;
-import static org.objectweb.asm.Opcodes.GOTO;
-import static org.objectweb.asm.Opcodes.LCMP;
-import static org.objectweb.asm.Type.BOOLEAN_TYPE;
 
 /**
- * Abstract expression AST node for relational operators.
+ * Abstract expression AST node for relational operations. Relational operations can
+ * be applied to numeric types or types that are {@link Comparable} to each other. It
+ * is unclear at AST building stage what kind of relational operation will be performed, so
+ * this node does not directly include bytecode generation logic. At type resolution stage it
+ * instantiates either {@link NumericComparisonOperation} or {@link ComparablesComparisonOperation}
+ * and delegates bytecode generation to respective node instance.
  *
  * @author Sergey Gavrilov
  * @since 4.0.0
  */
 @Internal
-public abstract sealed class RelationalOperator extends BinaryOperator permits GtOperator,
+public abstract sealed class RelationalOperator extends ExpressionNode permits GtOperator,
                                                                                GteOperator,
                                                                                LtOperator,
                                                                                LteOperator {
+    protected final ExpressionNode leftOperand;
+    protected final ExpressionNode rightOperand;
+
+    private ExpressionNode comparisonOperation;
+
     public RelationalOperator(ExpressionNode leftOperand, ExpressionNode rightOperand) {
-        super(leftOperand, rightOperand);
-        this.nodeType = BOOLEAN;
-    }
-
-    @Override
-    protected Type resolveOperationType(Type leftOperandType,
-                                        Type rightOperandType) {
-        if (!isNumeric(leftOperandType) || !isNumeric(rightOperandType)) {
-            throw new ExpressionCompilationException("Relational operation can only be applied to" +
-                                                         " numeric types");
-        }
-
-        return BOOLEAN_TYPE;
-    }
-
-    @Override
-    public void generateBytecode(ExpressionVisitorContext ctx) {
-        GeneratorAdapter mv = ctx.methodVisitor();
-
-        Type leftType = leftOperand.resolveType(ctx);
-        Type rightType = rightOperand.resolveType(ctx);
-
-        Type targetType = computeNumericOperationTargetType(leftType, rightType);
-
-        leftOperand.compile(ctx);
-        pushUnboxPrimitiveIfNecessary(leftType, mv);
-        pushPrimitiveCastIfNecessary(leftType, targetType, mv);
-
-        rightOperand.compile(ctx);
-        pushUnboxPrimitiveIfNecessary(rightType, mv);
-        pushPrimitiveCastIfNecessary(rightType, targetType, mv);
-
-        Label elseLabel = new Label();
-        Label endOfCmpLabel = new Label();
-
-        if (isOneOf(targetType, DOUBLE, FLOAT, LONG)) {
-            String targetDescriptor = targetType.getDescriptor();
-            switch (targetDescriptor) {
-                case "D" -> mv.visitInsn(DCMPL);
-                case "F" -> mv.visitInsn(FCMPL);
-                case "J" -> mv.visitInsn(LCMP);
-                default -> { }
-            }
-            mv.visitJumpInsn(nonIntComparisonOpcode(), elseLabel);
-        } else {
-            mv.visitJumpInsn(intComparisonOpcode(), elseLabel);
-        }
-
-        mv.push(true);
-        mv.visitJumpInsn(GOTO, endOfCmpLabel);
-        mv.visitLabel(elseLabel);
-        mv.push(false);
-        mv.visitLabel(endOfCmpLabel);
+        this.leftOperand = leftOperand;
+        this.rightOperand = rightOperand;
     }
 
     protected abstract Integer intComparisonOpcode();
 
     protected abstract Integer nonIntComparisonOpcode();
+
+    @Override
+    protected Type doResolveType(ExpressionVisitorContext ctx) {
+        Type leftType = leftOperand.resolveType(ctx);
+        Type rightType = rightOperand.resolveType(ctx);
+
+        if (isNumeric(leftType) && isNumeric(rightType)) {
+            comparisonOperation = new NumericComparisonOperation(
+                leftOperand, rightOperand,
+                intComparisonOpcode(), nonIntComparisonOpcode());
+        } else {
+            comparisonOperation = new ComparablesComparisonOperation(
+                leftOperand, rightOperand, nonIntComparisonOpcode());
+        }
+
+        return comparisonOperation.resolveType(ctx);
+    }
+
+    @Override
+    public void generateBytecode(ExpressionVisitorContext ctx) {
+        comparisonOperation.compile(ctx);
+    }
 }

@@ -324,6 +324,7 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
     //  : EvaluationContextAccess
     //  | BeanContextAccess
     //  | EnvironmentAccess
+    //  | ThisAccess
     //  | TypeIdentifier
     //  | ParenthesizedExpression
     //  | Literal
@@ -342,6 +343,9 @@ public final class SingleEvaluatedEvaluatedExpressionParser implements Evaluated
         };
     }
 
+    // ThisAccess
+    //  : 'this'
+    //  ;
     private ExpressionNode thisAccess() {
         eat(THIS);
         return new ThisAccess();

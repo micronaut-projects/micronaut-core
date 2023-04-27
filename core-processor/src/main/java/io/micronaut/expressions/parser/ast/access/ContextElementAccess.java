@@ -46,8 +46,7 @@ public final class ContextElementAccess extends ExpressionNode {
 
     private final String name;
 
-    private ContextMethodCall contextPropertyMethodCall;
-    private ContextMethodParameterAccess contextMethodParameterAccess;
+    private ExpressionNode contextOperation;
 
     public ContextElementAccess(String name) {
         this.name = name;
@@ -55,52 +54,24 @@ public final class ContextElementAccess extends ExpressionNode {
 
     @Override
     protected void generateBytecode(ExpressionVisitorContext ctx) {
-        if (contextMethodParameterAccess != null) {
-            contextMethodParameterAccess.compile(ctx);
-        } else if (contextPropertyMethodCall != null) {
-            contextPropertyMethodCall.compile(ctx);
-        }
+        contextOperation.compile(ctx);
     }
 
     @Override
     protected ClassElement doResolveClassElement(ExpressionVisitorContext ctx) {
-        ExpressionCompilationContext evaluationContext = ctx.compilationContext();
-
-        List<PropertyElement> propertyElements = evaluationContext.findProperties(name);
-        List<ParameterElement> parameterElements = evaluationContext.findParameters(name);
-
-        int totalElements = propertyElements.size() + parameterElements.size();
-
-        if (totalElements == 0) {
-            throw new ExpressionCompilationException(
-                "No element with name [" + name + "] available in evaluation context");
-        } else if (totalElements > 1) {
-            throw new ExpressionCompilationException(
-                "Ambiguous expression evaluation context reference. Found " + totalElements +
-                    " elements with name [" + name + "]");
-        }
-
-        if (!propertyElements.isEmpty()) {
-
-            PropertyElement property = propertyElements.iterator().next();
-            String readMethodName =
-                property.getReadMethod()
-                    .orElseThrow(() -> new ExpressionCompilationException(
-                        "Failed to obtain read method for property [" + name + "]"))
-                    .getName();
-
-            contextPropertyMethodCall = new ContextMethodCall(readMethodName, emptyList());
-            return contextPropertyMethodCall.resolveClassElement(ctx);
-
-        }
-
-        ParameterElement parameter = parameterElements.iterator().next();
-        contextMethodParameterAccess = new ContextMethodParameterAccess(parameter);
-        return contextMethodParameterAccess.resolveClassElement(ctx);
+        return resolveContextOperation(ctx).resolveClassElement(ctx);
     }
 
     @Override
     public Type doResolveType(ExpressionVisitorContext ctx) {
+        return resolveContextOperation(ctx).resolveType(ctx);
+    }
+
+    private ExpressionNode resolveContextOperation(ExpressionVisitorContext ctx) {
+        if (contextOperation != null) {
+            return contextOperation;
+        }
+
         ExpressionCompilationContext evaluationContext = ctx.compilationContext();
 
         List<PropertyElement> propertyElements = evaluationContext.findProperties(name);
@@ -118,7 +89,6 @@ public final class ContextElementAccess extends ExpressionNode {
         }
 
         if (!propertyElements.isEmpty()) {
-
             PropertyElement property = propertyElements.iterator().next();
             String readMethodName =
                 property.getReadMethod()
@@ -126,13 +96,12 @@ public final class ContextElementAccess extends ExpressionNode {
                         "Failed to obtain read method for property [" + name + "]"))
                     .getName();
 
-            contextPropertyMethodCall = new ContextMethodCall(readMethodName, emptyList());
-            return contextPropertyMethodCall.resolveType(ctx);
-
+            contextOperation = new ContextMethodCall(readMethodName, emptyList());
+        } else {
+            ParameterElement parameter = parameterElements.iterator().next();
+            contextOperation = new ContextMethodParameterAccess(parameter);
         }
 
-        ParameterElement parameter = parameterElements.iterator().next();
-        contextMethodParameterAccess = new ContextMethodParameterAccess(parameter);
-        return contextMethodParameterAccess.resolveType(ctx);
+        return contextOperation;
     }
 }
