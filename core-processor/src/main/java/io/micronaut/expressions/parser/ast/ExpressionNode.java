@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import org.objectweb.asm.Type;
 
 /**
@@ -88,7 +89,14 @@ public abstract class ExpressionNode {
      * @param ctx The expression compilation context
      * @return The resolved type
      */
-    protected abstract ClassElement doResolveClassElement(ExpressionVisitorContext ctx);
+    protected ClassElement doResolveClassElement(ExpressionVisitorContext ctx) {
+        Type type = doResolveType(ctx);
+        try {
+            return PrimitiveElement.valueOf(type.getClassName());
+        } catch (IllegalArgumentException e) {
+            return ClassElement.of(type.getClassName());
+        }
+    }
 
     /**
      * Resolves expression AST node type.

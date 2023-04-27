@@ -17,10 +17,7 @@ package io.micronaut.expressions.parser.ast.operator.binary;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.expressions.parser.ast.ExpressionNode;
-import io.micronaut.expressions.parser.ast.conditional.ElvisOperator;
 import io.micronaut.expressions.parser.compilation.ExpressionVisitorContext;
-import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.PrimitiveElement;
 import org.objectweb.asm.Type;
 
 /**
@@ -30,7 +27,11 @@ import org.objectweb.asm.Type;
  * @since 4.0.0
  */
 @Internal
-public abstract sealed class BinaryOperator extends ExpressionNode permits AddOperator, EqOperator, LogicalOperator, MathOperator, PowOperator, RelationalOperator {
+public abstract sealed class BinaryOperator extends ExpressionNode permits AddOperator,
+                                                                           EqOperator,
+                                                                           LogicalOperator,
+                                                                           MathOperator,
+                                                                           PowOperator {
     protected final ExpressionNode leftOperand;
     protected final ExpressionNode rightOperand;
 
@@ -44,16 +45,6 @@ public abstract sealed class BinaryOperator extends ExpressionNode permits AddOp
         Type leftType = leftOperand.resolveType(ctx);
         Type rightType = rightOperand.resolveType(ctx);
         return resolveOperationType(leftType, rightType);
-    }
-
-    @Override
-    protected ClassElement doResolveClassElement(ExpressionVisitorContext ctx) {
-        Type type = doResolveType(ctx);
-        try {
-            return PrimitiveElement.valueOf(type.getClassName());
-        } catch (IllegalArgumentException e) {
-            return ClassElement.of(type.getClassName());
-        }
     }
 
     protected abstract Type resolveOperationType(Type leftOperandType,

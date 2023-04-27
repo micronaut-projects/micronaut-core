@@ -104,6 +104,52 @@ abstract class AbstractEvaluatedExpressionsSpec extends AbstractTypeElementSpec 
         }
     }
 
+    Object evaluateMultipleAgainstContext(@Language("java") String contextClass, String... expressions) {
+
+        String expr = ""
+        for (int i = 0; i < expressions.length; i++) {
+            expr += """
+
+                @Value("${expressions[i]}")
+                public Object field${i};
+
+            """
+        }
+
+        def cls = """
+            package test;
+            import io.micronaut.context.annotation.Value;
+            import jakarta.inject.Singleton;
+
+            ${contextClass}
+
+            @Singleton
+            class Expr {
+                ${expr}
+            }
+        """.stripIndent().stripLeading()
+
+        def applicationContext = buildContext(cls)
+        def classLoader = applicationContext.classLoader
+
+        def exprClassName = 'test.$Expr$Expr'
+        def startingIndex = EvaluatedExpressionReference.nextIndex(exprClassName) - expressions.length
+
+        List<Object> result = new ArrayList<>()
+        for (int i = startingIndex; i < startingIndex + expressions.size(); i++) {
+            String exprFullName = exprClassName + i
+            try {
+                def exprClass = (AbstractEvaluatedExpression) classLoader.loadClass(exprFullName).newInstance()
+                result.add(exprClass.evaluate(new DefaultExpressionEvaluationContext(null, null, applicationContext,
+                        null)))
+            } catch (ClassNotFoundException e) {
+                return null
+            }
+        }
+
+        return result
+    }
+
     Object evaluateSingle(String className,
                           @Language("java") String cls) {
         return evaluateSingle(className, cls, null)

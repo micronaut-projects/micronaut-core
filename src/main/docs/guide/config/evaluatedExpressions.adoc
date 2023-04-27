@@ -128,7 +128,8 @@ You can also change evaluation order by using brackets `()`.
 
 Equality check is supported for both primitive types and objects. It is performed using `Object.equals()` method.
 
-`>`, `<`, `>=`, `\<=` operations can only be applied to numeric types.
+`>`, `<`, `>=`, `\<=` operations can be applied to numeric types or types that implement `java.lang.Comparable`
+interface.
 
 `matches` keyword can be used to determine whether a string matches provided regular expression which has to
 be specified as string literal. The regular expression itself will be checked for validity at compilation time.
@@ -412,7 +413,7 @@ class ContextConsumer {
 }
 ----
 
-==== Retrieving Beans from Bean Context
+=== Retrieving Beans from Bean Context
 
 A predefined syntax construct `ctx[...]` can be used to retrieve beans from bean
 context. The argument inside square brackets has to be a fully qualified class name (note that `T(...)` wrapper is
@@ -425,7 +426,7 @@ optional and can be omitted for simplicity).
 #{ ctx[io.micronaut.example.ContextBean] }
 ----
 
-==== Retrieving Environment Properties
+=== Retrieving Environment Properties
 
 A syntax construct `env[...]` can be used to retrieve environment properties by name.
 The expression inside square brackets has to resolve to string value, otherwise compilation will fail. If property

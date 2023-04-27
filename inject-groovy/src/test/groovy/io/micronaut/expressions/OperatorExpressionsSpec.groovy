@@ -591,6 +591,243 @@ class OperatorExpressionsSpec extends AbstractEvaluatedExpressionsSpec {
         results[23] instanceof Boolean && results[23] == true
     }
 
+    void "test comparables"() {
+        given:
+        Object[] results = evaluateMultipleAgainstContext("""
+
+            record NonComparable(int value) {}
+
+            class Comp1 implements Comparable<Comp1> {
+
+                private final int value
+
+                Comp1(int value) {
+                    this.value = value
+                }
+
+                @Override
+                int compareTo(Comp1 o) {
+                    return value - o.value
+                }
+            }
+
+            class InheritedComp extends Comp1 {
+                InheritedComp(int value) {
+                    super(value)
+                }
+            }
+
+            class Comp2 implements Comparable<NonComparable> {
+                private final int value
+
+                Comp2(int value) {
+                    this.value = value
+                }
+
+                @Override
+                int compareTo(NonComparable o) {
+                    return value - o.value()
+                }
+
+            }
+
+            class Comp3 implements Comparable<Integer> {
+
+                private final int value
+
+                Comp3(int value) {
+                    this.value = value
+                }
+
+                @Override
+                int compareTo(Integer i) {
+                    return value - i
+                }
+
+            }
+
+            class Comp4 implements Comparable {
+
+                private final int value
+
+                Comp4(int value) {
+                    this.value = value
+                }
+
+                @Override
+                int compareTo(Object i) {
+                    return value - (Integer) i
+                }
+            }
+
+            @jakarta.inject.Singleton
+            class Context {
+
+                NonComparable nonComp(int value) {
+                    return new NonComparable(value)
+                }
+
+                InheritedComp inheritedComp(int value) {
+                    return new InheritedComp(value)
+                }
+
+                Comparable<Comp1> compInterface(int value) {
+                    return new Comp1(value)
+                }
+
+                Comp1 comp1(int value) {
+                    return new Comp1(value)
+                }
+
+                Comp2 comp2(int value) {
+                    return new Comp2(value)
+                }
+
+                Comp3 comp3(int value) {
+                    return new Comp3(value)
+                }
+
+                Comp4 comp4(int value) {
+                    return new Comp4(value)
+                }
+            }
+
+        """,
+                // comparable to itself
+                "#{ comp1(10) > comp1(7) }", // 0
+                "#{ comp1(10) < comp1(7) }",            // 1
+                "#{ comp1(10) <= comp1(7) }",           // 2
+                "#{ comp1(7) >= comp1(7) }",            // 3
+                "#{ comp1(7) < comp1(8) }",             // 4
+                "#{ comp1(7) <= comp1(8) }",            // 5
+                "#{ comp1(7) > comp1(8) }",             // 6
+                "#{ comp1(7) >= comp1(8) }",            // 7
+
+                // left to right comparable
+                "#{ comp2(10) > nonComp(7) }",          // 8
+                "#{ comp2(10) < nonComp(7) }",          // 9
+                "#{ comp2(10) <= nonComp(7) }",         // 10
+                "#{ comp2(7) >= nonComp(7) }",          // 11
+                "#{ comp2(7) < nonComp(8) }",           // 12
+                "#{ comp2(7) <= nonComp(8) }",          // 13
+                "#{ comp2(7) > nonComp(8) }",           // 14
+                "#{ comp2(7) >= nonComp(8) }",          // 15
+
+                // right to left comparable
+                "#{ nonComp(10) > comp2(7) }",          // 16
+                "#{ nonComp(10) < comp2(7) }",          // 17
+                "#{ nonComp(10) <= comp2(7) }",         // 18
+                "#{ nonComp(7) >= comp2(7) }",          // 19
+                "#{ nonComp(7) < comp2(8) }",           // 20
+                "#{ nonComp(7) <= comp2(8) }",          // 21
+                "#{ nonComp(7) > comp2(8) }",           // 22
+                "#{ nonComp(7) >= comp2(8) }",          // 23
+
+                // comparable to primitive
+                "#{ comp3(10) > 7 }",                   // 24
+                "#{ comp3(10) < 7 }",                   // 25
+                "#{ comp3(10) <= 7 }",                  // 26
+                "#{ comp3(7) >= 7 }",                   // 27
+                "#{ comp3(7) < 8 }",                    // 28
+                "#{ comp3(7) <= 8 }",                   // 29
+                "#{ comp3(7) > 8 }",                    // 30
+                "#{ comp3(7) >= 8 }",                   // 31
+
+                // primitive to comparable
+                "#{ 10 > comp3(7) }",                   // 32
+                "#{ 10 < comp3(7) }",                   // 33
+                "#{ 10 <= comp3(7) }",                  // 34
+                "#{ 7 >= comp3(7) }",                   // 35
+                "#{ 7 < comp3(8) }",                    // 36
+                "#{ 7 <= comp3(8) }",                   // 37
+                "#{ 7 > comp3(8) }",                    // 38
+                "#{ 7 >= comp3(8) }",                   // 39
+
+                // inherited comparable
+                "#{ comp1(10) > inheritedComp(7) }",    // 40
+                "#{ comp1(10) < inheritedComp(7) }",    // 41
+                "#{ inheritedComp(10) > comp1(7) }",    // 42
+                "#{ inheritedComp(10) < comp1(7) }",    // 43
+
+                // interface comparable
+                "#{ compInterface(10) < comp1(7) }",    // 44
+                "#{ compInterface(10) > comp1(7) }",    // 45
+                "#{ comp1(10) < compInterface(7) }",    // 46
+                "#{ comp1(10) > compInterface(7) }",    // 47
+
+                // raw comparable
+                "#{ comp4(10) > 7 }",                   // 48
+                "#{ 7 > comp4(10) }"                    // 49
+        )
+
+        expect:
+        // comparable to itself
+        results[0] instanceof Boolean && results[0] == true
+        results[1] instanceof Boolean && results[1] == false
+        results[2] instanceof Boolean && results[2] == false
+        results[3] instanceof Boolean && results[3] == true
+        results[4] instanceof Boolean && results[4] == true
+        results[5] instanceof Boolean && results[5] == true
+        results[6] instanceof Boolean && results[6] == false
+        results[7] instanceof Boolean && results[7] == false
+
+        // left to right comparable
+        results[8] instanceof Boolean && results[8] == true
+        results[9] instanceof Boolean && results[9] == false
+        results[10] instanceof Boolean && results[10] == false
+        results[11] instanceof Boolean && results[11] == true
+        results[12] instanceof Boolean && results[12] == true
+        results[13] instanceof Boolean && results[13] == true
+        results[14] instanceof Boolean && results[14] == false
+        results[15] instanceof Boolean && results[15] == false
+
+        // right to left comparable
+        results[16] instanceof Boolean && results[16] == true
+        results[17] instanceof Boolean && results[17] == false
+        results[18] instanceof Boolean && results[18] == false
+        results[19] instanceof Boolean && results[19] == true
+        results[20] instanceof Boolean && results[20] == true
+        results[21] instanceof Boolean && results[21] == true
+        results[22] instanceof Boolean && results[22] == false
+        results[23] instanceof Boolean && results[23] == false
+
+        // comparable to primitive
+        results[24] instanceof Boolean && results[24] == true
+        results[25] instanceof Boolean && results[25] == false
+        results[26] instanceof Boolean && results[26] == false
+        results[27] instanceof Boolean && results[27] == true
+        results[28] instanceof Boolean && results[28] == true
+        results[29] instanceof Boolean && results[29] == true
+        results[30] instanceof Boolean && results[30] == false
+        results[31] instanceof Boolean && results[31] == false
+
+        // primitive to comparable
+        results[32] instanceof Boolean && results[32] == true
+        results[33] instanceof Boolean && results[33] == false
+        results[34] instanceof Boolean && results[34] == false
+        results[35] instanceof Boolean && results[35] == true
+        results[36] instanceof Boolean && results[36] == true
+        results[37] instanceof Boolean && results[37] == true
+        results[38] instanceof Boolean && results[38] == false
+        results[39] instanceof Boolean && results[39] == false
+
+        // inherited comparable
+        results[40] instanceof Boolean && results[40] == true
+        results[41] instanceof Boolean && results[41] == false
+        results[42] instanceof Boolean && results[42] == true
+        results[43] instanceof Boolean && results[43] == false
+
+        // comparable interface
+        results[44] instanceof Boolean && results[44] == false
+        results[45] instanceof Boolean && results[45] == true
+        results[46] instanceof Boolean && results[46] == false
+        results[47] instanceof Boolean && results[47] == true
+
+        // raw comparable
+        results[48] instanceof Boolean && results[48] == true
+        results[49] instanceof Boolean && results[49] == false
+    }
+
     void "test '==' operator"() {
         given:
         List<Object> results = evaluateMultiple(
