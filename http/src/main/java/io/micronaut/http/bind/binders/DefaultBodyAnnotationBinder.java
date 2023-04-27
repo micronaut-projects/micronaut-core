@@ -17,6 +17,7 @@ package io.micronaut.http.bind.binders;
 
 import io.micronaut.core.bind.annotation.AbstractArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.http.HttpRequest;
@@ -67,7 +68,7 @@ public class DefaultBodyAnnotationBinder<T> extends AbstractArgumentBinder<T> im
             return context.getArgument().getName();
         });
         if (bodyComponent != null) {
-            Optional<ConvertibleValues> convertibleValuesBody = source.getBody(ConvertibleValues.class);
+            Optional<ConvertibleValues> convertibleValuesBody = ConversionService.SHARED.convert(body.get(), ConversionContext.of(ConvertibleValues.class));
             if (convertibleValuesBody.isPresent()) {
                 BindingResult<T> convertibleValuesBindingResult = doBind(context, convertibleValuesBody.get(), bodyComponent);
                 if (convertibleValuesBindingResult.getValue().isPresent() || !convertibleValuesBindingResult.getConversionErrors().isEmpty()) {
