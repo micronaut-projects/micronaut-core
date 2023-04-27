@@ -46,15 +46,10 @@ final class NettyWritableBodyWriter implements NettyMessageBodyWriter<Writable> 
     private final WritableBodyWriter defaultWritable = new WritableBodyWriter();
 
     @Override
-    public boolean isWriteable(Argument<Writable> type, MediaType mediaType) {
-        return true;
-    }
-
-    @Override
-    public WriteClosure<Writable> prepare(Argument<Writable> type, MediaType mediaType) {
+    public WriteClosure<Writable> prepare(Argument<Writable> type) {
         return new NettyWriteClosure<Writable>(true) {
             @Override
-            public void writeTo(HttpRequest<?> request, MutableHttpResponse<Writable> outgoingResponse, Writable object, NettyWriteContext nettyContext) throws CodecException {
+            public void writeTo(HttpRequest<?> request, MutableHttpResponse<Writable> outgoingResponse, MediaType mediaType, Writable object, NettyWriteContext nettyContext) throws CodecException {
                 ByteBuf byteBuf = nettyContext.alloc().ioBuffer(128);
                 MutableHttpHeaders outgoingHeaders = outgoingResponse.getHeaders();
                 if (mediaType != null && !outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
@@ -76,8 +71,9 @@ final class NettyWritableBodyWriter implements NettyMessageBodyWriter<Writable> 
             }
 
             @Override
-            public void writeTo(Writable object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-                defaultWritable.prepare(type, mediaType).writeTo(object, outgoingHeaders, outputStream);
+            public void writeTo(MediaType mediaType, Writable object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+                // ideally we would cache the closure returned by prepare, but this code path should never be hit anyway
+                defaultWritable.prepare(type).writeTo(mediaType, object, outgoingHeaders, outputStream);
             }
         };
     }

@@ -44,10 +44,10 @@ public final class InputStreamBodyWriter extends AbstractFileBodyWriter implemen
     }
 
     @Override
-    public WriteClosure<InputStream> prepare(Argument<InputStream> type, MediaType mediaType) {
+    public WriteClosure<InputStream> prepare(Argument<InputStream> type) {
         return new NettyWriteClosure<InputStream>() {
             @Override
-            public void writeTo(HttpRequest<?> request, MutableHttpResponse<InputStream> outgoingResponse, InputStream object, NettyWriteContext nettyContext) throws CodecException {
+            public void writeTo(HttpRequest<?> request, MutableHttpResponse<InputStream> outgoingResponse, MediaType mediaType, InputStream object, NettyWriteContext nettyContext) throws CodecException {
                 if (outgoingResponse instanceof NettyMutableHttpResponse<?> nettyResponse) {
                     final DefaultHttpResponse finalResponse = new DefaultHttpResponse(
                         nettyResponse.getNettyHttpVersion(),
@@ -62,7 +62,7 @@ public final class InputStreamBodyWriter extends AbstractFileBodyWriter implemen
             }
 
             @Override
-            public void writeTo(InputStream object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+            public void writeTo(MediaType mediaType, InputStream object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
                 throw new UnsupportedOperationException("Can only be used in a Netty context");
             }
         };

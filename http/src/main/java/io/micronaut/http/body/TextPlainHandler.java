@@ -44,15 +44,10 @@ public final class TextPlainHandler implements MessageBodyHandler<String> {
     }
 
     @Override
-    public boolean isWriteable(Argument<String> type, MediaType mediaType) {
-        return true;
-    }
-
-    @Override
-    public WriteClosure<String> prepare(Argument<String> type, MediaType mediaType) {
+    public WriteClosure<String> prepare(Argument<String> type) {
         return new WriteClosure<String>() {
             @Override
-            public void writeTo(String object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+            public void writeTo(MediaType mediaType, String object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
                 if (!outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
                     outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType);
                 }

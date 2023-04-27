@@ -60,13 +60,13 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
 
     private final NettyWriteClosure<SystemFile> writeClosure = new NettyWriteClosure<>() {
         @Override
-        public void writeTo(HttpRequest<?> request, MutableHttpResponse<SystemFile> outgoingResponse, SystemFile object, NettyWriteContext nettyContext) throws CodecException {
+        public void writeTo(HttpRequest<?> request, MutableHttpResponse<SystemFile> outgoingResponse, MediaType mediaType, SystemFile object, NettyWriteContext nettyContext) throws CodecException {
             SystemFileBodyWriter.this.writeTo(request, outgoingResponse, object, nettyContext);
         }
 
 
         @Override
-        public void writeTo(SystemFile file, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+        public void writeTo(MediaType mediaType, SystemFile file, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
             throw new UnsupportedOperationException("Can only be used in a Netty context");
         }
     };
@@ -76,7 +76,7 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
     }
 
     @Override
-    public WriteClosure<SystemFile> prepare(Argument<SystemFile> type, MediaType mediaType) {
+    public WriteClosure<SystemFile> prepare(Argument<SystemFile> type) {
         return writeClosure;
     }
 

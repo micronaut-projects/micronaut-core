@@ -220,7 +220,7 @@ public final class DefaultMessageBodyHandlerRegistry implements MessageBodyHandl
         }
 
         @Override
-        public WriteClosure<Object> prepare(Argument<Object> type, MediaType mediaType) {
+        public WriteClosure<Object> prepare(Argument<Object> type) {
             return null;
         }
     }

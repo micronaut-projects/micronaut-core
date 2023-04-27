@@ -50,11 +50,11 @@ final class NettyTextPlainHandler implements MessageBodyHandler<String>, NettyMe
     private final TextPlainHandler defaultHandler = new TextPlainHandler();
 
     @Override
-    public WriteClosure<String> prepare(Argument<String> type, MediaType mediaType) {
+    public WriteClosure<String> prepare(Argument<String> type) {
         return new NettyWriteClosure<String>() {
 
             @Override
-            public void writeTo(HttpRequest<?> request, MutableHttpResponse<String> outgoingResponse, String object, NettyWriteContext nettyContext) throws CodecException {
+            public void writeTo(HttpRequest<?> request, MutableHttpResponse<String> outgoingResponse, MediaType mediaType, String object, NettyWriteContext nettyContext) throws CodecException {
                 MutableHttpHeaders headers = outgoingResponse.getHeaders();
                 ByteBuf byteBuf = Unpooled.wrappedBuffer(object.getBytes(MessageBodyWriter.getCharset(headers)));
                 NettyHttpHeaders nettyHttpHeaders = (NettyHttpHeaders) headers;
@@ -74,8 +74,8 @@ final class NettyTextPlainHandler implements MessageBodyHandler<String>, NettyMe
             }
 
             @Override
-            public void writeTo(String object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-                defaultHandler.prepare(type, mediaType).writeTo(object, outgoingHeaders, outputStream);
+            public void writeTo(MediaType mediaType, String object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+                defaultHandler.prepare(type).writeTo(mediaType, object, outgoingHeaders, outputStream);
             }
         };
     }

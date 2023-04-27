@@ -69,10 +69,15 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {
     }
 
     @Override
-    public WriteClosure<T> prepare(Argument<T> type, MediaType mediaType) {
+    public WriteClosure<T> prepare(Argument<T> type) {
         return new WriteClosure<T>() {
             @Override
-            public void writeTo(T object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+            public boolean isWriteable(MediaType mediaType) {
+                return mediaType != null && mediaType.getExtension().equals(MediaType.EXTENSION_JSON);
+            }
+
+            @Override
+            public void writeTo(MediaType mediaType, T object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
                 outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
                 jsonMediaTypeCodec.encode(
                     type,
@@ -81,7 +86,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {
             }
 
             @Override
-            public ByteBuffer<?> writeTo(T object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
+            public ByteBuffer<?> writeTo(MediaType mediaType, T object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
                 outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
                 return jsonMediaTypeCodec.encode(
                     type,

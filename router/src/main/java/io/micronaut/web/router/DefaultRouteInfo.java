@@ -69,7 +69,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     private final Argument<?> bodyType;
     private final boolean isErrorRoute;
     private final boolean isPermitsBody;
-    private final MessageBodyWriter<R> messageBodyWriter;
+    private final MessageBodyWriter.WriteClosure<R> messageBodyWriter;
 
     public DefaultRouteInfo(ReturnType<? extends R> returnType,
                             Class<?> declaringType,
@@ -89,7 +89,9 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
         this.annotationMetadata = annotationMetadata;
         this.returnType = returnType;
         this.bodyType = resolveBodyType(returnType);
-        this.messageBodyWriter = messageBodyHandlerRegistry.findWriter((Argument<R>) bodyType, producesMediaTypes).orElse(null);
+        this.messageBodyWriter = messageBodyHandlerRegistry.findWriter((Argument<R>) bodyType, producesMediaTypes)
+            .map(w -> w.prepare((Argument<R>) bodyType))
+            .orElse(null);
         single = returnType.isSingleResult() ||
             (isReactive() && returnType.getFirstTypeVariable()
                 .filter(t -> HttpResponse.class.isAssignableFrom(t.getType())).isPresent()) ||
@@ -142,7 +144,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
-    public MessageBodyWriter<R> getMessageBodyWriter() {
+    public MessageBodyWriter.WriteClosure<R> getMessageBodyWriter() {
         return messageBodyWriter;
     }
 

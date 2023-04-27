@@ -35,7 +35,7 @@ public final class FileBodyWriter implements NettyMessageBodyWriter<File> {
     private final SystemFileBodyWriter systemFileBodyWriter;
     private final NettyWriteClosure<File> closure = new NettyWriteClosure<File>() {
         @Override
-        public void writeTo(HttpRequest<?> request, MutableHttpResponse<File> outgoingResponse, File object, NettyWriteContext nettyContext) throws CodecException {
+        public void writeTo(HttpRequest<?> request, MutableHttpResponse<File> outgoingResponse, MediaType mediaType, File object, NettyWriteContext nettyContext) throws CodecException {
             SystemFile systemFile = new SystemFile(object);
             MutableHttpResponse<SystemFile> newResponse = outgoingResponse.body(systemFile);
             systemFileBodyWriter.writeTo(
@@ -47,7 +47,7 @@ public final class FileBodyWriter implements NettyMessageBodyWriter<File> {
         }
 
         @Override
-        public void writeTo(File object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+        public void writeTo(MediaType mediaType, File object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
             throw new UnsupportedOperationException("Can only be used in a Netty context");
         }
     };
@@ -57,7 +57,7 @@ public final class FileBodyWriter implements NettyMessageBodyWriter<File> {
     }
 
     @Override
-    public WriteClosure<File> prepare(Argument<File> type, MediaType mediaType) {
+    public WriteClosure<File> prepare(Argument<File> type) {
         return closure;
     }
 }

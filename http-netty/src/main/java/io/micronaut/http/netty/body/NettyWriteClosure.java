@@ -4,6 +4,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.codec.CodecException;
@@ -26,6 +27,7 @@ public abstract class NettyWriteClosure<T> extends MessageBodyWriter.WriteClosur
      *
      * @param request          The associated request
      * @param outgoingResponse The outgoing response.
+     * @param mediaType        The media type
      * @param object           The object to write
      * @param nettyContext     The netty context
      * @throws CodecException If an error occurs decoding
@@ -34,6 +36,7 @@ public abstract class NettyWriteClosure<T> extends MessageBodyWriter.WriteClosur
     public abstract void writeTo(
         @NonNull HttpRequest<?> request,
         @NonNull MutableHttpResponse<T> outgoingResponse,
+        @NonNull MediaType mediaType,
         @NonNull T object,
         @NonNull NettyWriteContext nettyContext) throws CodecException;
 }

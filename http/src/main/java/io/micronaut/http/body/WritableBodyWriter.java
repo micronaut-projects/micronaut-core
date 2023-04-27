@@ -32,10 +32,10 @@ import java.io.OutputStream;
 public final class WritableBodyWriter implements MessageBodyWriter<Writable> {
 
     @Override
-    public WriteClosure<Writable> prepare(Argument<Writable> type, MediaType mediaType) {
+    public WriteClosure<Writable> prepare(Argument<Writable> type) {
         return new WriteClosure<Writable>(true) {
             @Override
-            public void writeTo(Writable object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+            public void writeTo(MediaType mediaType, Writable object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
                 if (mediaType != null && !outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
                     outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType);
                 }

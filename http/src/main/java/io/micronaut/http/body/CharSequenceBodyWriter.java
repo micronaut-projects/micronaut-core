@@ -30,10 +30,10 @@ import java.io.OutputStream;
 @Experimental
 public final class CharSequenceBodyWriter implements MessageBodyWriter<CharSequence> {
     @Override
-    public WriteClosure<CharSequence> prepare(Argument<CharSequence> type, MediaType mediaType) {
+    public WriteClosure<CharSequence> prepare(Argument<CharSequence> type) {
         return new WriteClosure<CharSequence>() {
             @Override
-            public void writeTo(CharSequence object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+            public void writeTo(MediaType mediaType, CharSequence object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
                 if (!outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
                     outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType);
                 }
