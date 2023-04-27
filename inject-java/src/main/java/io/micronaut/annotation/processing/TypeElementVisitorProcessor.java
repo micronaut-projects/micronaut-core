@@ -511,9 +511,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 executableElement,
                 javaVisitorContext.getElementAnnotationMetadataFactory()
             );
-            if (methodElement.getDeclaringType().isAssignable(Enum.class)) {
-                return null;
-            }
             for (LoadedVisitor visitor : visitors) {
                 if (visitor.matchesElement(methodElement)) {
                     visitor.getVisitor().visitMethod(methodElement, javaVisitorContext);
