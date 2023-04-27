@@ -21,6 +21,7 @@ import io.micronaut.core.convert.ConversionError;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * <p>An interface capable of binding the value of an {@link io.micronaut.core.type.Argument} from a source</p>.
@@ -78,6 +79,11 @@ public interface ArgumentBinder<T, S> {
             public boolean isSatisfied() {
                 return false;
             }
+
+            @Override
+            public BindingResult map(Function transform) {
+                return this;
+            }
         };
 
         /**
@@ -114,6 +120,10 @@ public interface ArgumentBinder<T, S> {
         @SuppressWarnings({"java:S3655", "OptionalGetWithoutIsPresent"})
         default T get() {
             return getValue().get();
+        }
+
+        default <R> BindingResult<R> map(Function<T, BindingResult<R>> transform) {
+            return new MappedBindingResult<>(this, transform);
         }
 
         /**

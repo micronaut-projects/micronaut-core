@@ -16,6 +16,8 @@
 package io.micronaut.http.server.netty.body;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.server.netty.FormRouteCompleter;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.json.convert.LazyJsonNode;
@@ -28,6 +30,7 @@ import reactor.core.publisher.Flux;
 
 import java.io.InputStream;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -76,6 +79,28 @@ public final class ImmediateSingleObjectBody extends ManagedBody<Object> impleme
      */
     public Object valueUnclaimed() {
         return value();
+    }
+
+    public Optional<ImmediateSingleObjectBody> convert(ConversionService conversionService, ArgumentConversionContext<?> context) {
+        Object o = prepareClaim();
+        Optional<?> converted;
+        if (o instanceof io.netty.util.ReferenceCounted rc) {
+            converted = conversionService.convert(rc, context);
+            // stolen from NettyConverters.refCountAwareConvert. We don't need the isEmpty branch,
+            // because we don't call next() in that case and don't transfer ownership.
+            if (converted.isPresent()) {
+                rc.touch();
+                Object item = converted.get();
+                // this is not great, but what can we do?
+                boolean targetRefCounted = item instanceof ReferenceCounted || item instanceof io.micronaut.core.io.buffer.ReferenceCounted;
+                if (!targetRefCounted) {
+                    rc.release();
+                }
+            }
+        } else {
+            converted = conversionService.convert(o, context);
+        }
+        return converted.map(p -> next(new ImmediateSingleObjectBody(p)));
     }
 
     @Override

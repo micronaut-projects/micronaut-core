@@ -23,6 +23,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
@@ -85,8 +86,10 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.security.cert.Certificate;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -155,6 +158,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private final ByteBody body;
     @Nullable
     private FormRouteCompleter formRouteCompleter;
+    private final List<ExecutionFlow<?>> routeWaitsFor = new ArrayList<>();
 
     /**
      * Set to {@code true} when the {@link #headers} may have been mutated. If this is not the case,
@@ -227,7 +231,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         return body;
     }
 
-    private HttpBody lastBody() {
+    public HttpBody lastBody() {
         HttpBody body = rootBody();
         while (true) {
             HttpBody next = body.next();
@@ -237,6 +241,14 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             body = next;
         }
         return body;
+    }
+
+    public void addRouteWaitsFor(ExecutionFlow<?> executionFlow) {
+        routeWaitsFor.add(executionFlow);
+    }
+
+    public List<ExecutionFlow<?>> getRouteWaitsFor() {
+        return routeWaitsFor;
     }
 
     public final FormRouteCompleter formRouteCompleter() {

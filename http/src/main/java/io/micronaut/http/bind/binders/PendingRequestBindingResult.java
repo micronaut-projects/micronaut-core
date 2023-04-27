@@ -18,6 +18,8 @@ package io.micronaut.http.bind.binders;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.bind.ArgumentBinder;
 
+import java.util.function.Function;
+
 /**
  * A variation of {@link io.micronaut.core.bind.ArgumentBinder.BindingResult} that indicates
  * that the binding result is pending and the value should be checked later.
@@ -48,4 +50,8 @@ public interface PendingRequestBindingResult<T> extends ArgumentBinder.BindingRe
         return !isPending() && ArgumentBinder.BindingResult.super.isPresentAndSatisfied();
     }
 
+    @Override
+    default <R> ArgumentBinder.BindingResult<R> map(Function<T, ArgumentBinder.BindingResult<R>> transform) {
+        return new MappedPendingRequestBindingResult<>(this, transform);
+    }
 }

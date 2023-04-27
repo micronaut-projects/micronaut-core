@@ -129,43 +129,29 @@ final class NettyRequestLifecycle extends RequestLifecycle {
      */
     private ExecutionFlow<RouteMatch<?>> waitForBody(RouteMatch<?> routeMatch) {
         // note: shouldReadBody only works when fulfill has been called at least once
-        if (nettyRequest.rootBody().next() != null) {
-            return ExecutionFlow.just(routeMatch);
-        }
-        HttpContentProcessor processor = rib.httpContentProcessorResolver.resolve(nettyRequest, routeMatch);
-        ByteBody rootBody = nettyRequest.rootBody();
-        if (processor instanceof FormDataHttpContentProcessor && nettyRequest.isFormOrMultipartData()) {
-            FormRouteCompleter frc = nettyRequest.formRouteCompleter();
-            try {
-                rootBody.processMulti(processor).handleForm(frc);
-            } catch (Throwable e) {
-                return ExecutionFlow.error(e);
+        if (nettyRequest.rootBody().next() == null) {
+            HttpContentProcessor processor = rib.httpContentProcessorResolver.resolve(nettyRequest, routeMatch);
+            ByteBody rootBody = nettyRequest.rootBody();
+            // Not annotated body argument
+            if (processor instanceof FormDataHttpContentProcessor && nettyRequest.isFormOrMultipartData()) {
+                FormRouteCompleter frc = nettyRequest.formRouteCompleter();
+                try {
+                    rootBody.processMulti(processor).handleForm(frc);
+                } catch (Throwable e) {
+                    return ExecutionFlow.error(e);
+                }
+                nettyRequest.addRouteWaitsFor(frc.execute);
             }
-            return frc.execute;
-        } else if (needsBody(routeMatch)) {
-            return rootBody.buffer(nettyRequest.getChannelHandlerContext().alloc())
-                .map(ibb -> {
-                    try {
-                        ibb.processMulti(processor);
-                    } catch (RuntimeException e) {
-                        throw e;
-                    } catch (Throwable e) {
-                        throw new RuntimeException(e);
-                    }
-                    return routeMatch;
-                });
-        } else {
-            return ExecutionFlow.just(routeMatch);
         }
+        ExecutionFlow<?> waitFor = ExecutionFlow.just(null);
+        for (ExecutionFlow<?> step : nettyRequest.getRouteWaitsFor()) {
+            waitFor = waitFor.then(() -> step);
+        }
+        return waitFor.map(v -> routeMatch);
     }
 
     void handleException(Throwable cause) {
         onError(cause).onComplete((response, throwable) -> rib.writeResponse(outboundAccess, nettyRequest, response, throwable));
-    }
-
-    private boolean needsBody(RouteMatch<?> routeMatch) {
-        // Not annotated body argument
-        return routeMatch.getRouteInfo().needsRequestBody() || !routeMatch.isFulfilled();
     }
 
 }
