@@ -69,21 +69,26 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {
     }
 
     @Override
-    public void writeTo(Argument<T> type, T object, MediaType mediaType, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-        outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
-        jsonMediaTypeCodec.encode(
-            type,
-            outputStream
-        );
-    }
+    public WriteClosure<T> prepare(Argument<T> type, MediaType mediaType) {
+        return new WriteClosure<T>() {
+            @Override
+            public void writeTo(T object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+                outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
+                jsonMediaTypeCodec.encode(
+                    type,
+                    outputStream
+                );
+            }
 
-    @Override
-    public ByteBuffer<?> writeTo(Argument<T> type, T object, MediaType mediaType, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
-        outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
-        return jsonMediaTypeCodec.encode(
-            type,
-            object,
-            bufferFactory
-        );
+            @Override
+            public ByteBuffer<?> writeTo(T object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
+                outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
+                return jsonMediaTypeCodec.encode(
+                    type,
+                    object,
+                    bufferFactory
+                );
+            }
+        };
     }
 }

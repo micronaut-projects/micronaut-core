@@ -26,6 +26,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.MessageBodyHandler;
+import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.TextPlainHandler;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.netty.NettyHttpHeaders;
@@ -49,32 +50,38 @@ final class NettyTextPlainHandler implements MessageBodyHandler<String>, NettyMe
     private final TextPlainHandler defaultHandler = new TextPlainHandler();
 
     @Override
-    public void writeTo(HttpRequest<?> request, MutableHttpResponse<String> outgoingResponse, Argument<String> type, String object, MediaType mediaType, NettyWriteContext nettyContext) throws CodecException {
-        MutableHttpHeaders headers = outgoingResponse.getHeaders();
-        ByteBuf byteBuf = Unpooled.wrappedBuffer(object.getBytes(getCharset(headers)));
-        NettyHttpHeaders nettyHttpHeaders = (NettyHttpHeaders) headers;
-        io.netty.handler.codec.http.HttpHeaders nettyHeaders = nettyHttpHeaders.getNettyHeaders();
-        if (!nettyHttpHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
-            nettyHttpHeaders.set(HttpHeaderNames.CONTENT_TYPE, mediaType);
-        }
-        nettyHeaders.set(HttpHeaderNames.CONTENT_LENGTH, byteBuf.readableBytes());
-        FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(
-            HttpVersion.HTTP_1_1,
-            HttpResponseStatus.valueOf(outgoingResponse.code(), outgoingResponse.reason()),
-            byteBuf,
-            nettyHeaders,
-            EmptyHttpHeaders.INSTANCE
-        );
-        nettyContext.writeFull(fullHttpResponse);
+    public WriteClosure<String> prepare(Argument<String> type, MediaType mediaType) {
+        return new NettyWriteClosure<String>() {
+
+            @Override
+            public void writeTo(HttpRequest<?> request, MutableHttpResponse<String> outgoingResponse, String object, NettyWriteContext nettyContext) throws CodecException {
+                MutableHttpHeaders headers = outgoingResponse.getHeaders();
+                ByteBuf byteBuf = Unpooled.wrappedBuffer(object.getBytes(MessageBodyWriter.getCharset(headers)));
+                NettyHttpHeaders nettyHttpHeaders = (NettyHttpHeaders) headers;
+                io.netty.handler.codec.http.HttpHeaders nettyHeaders = nettyHttpHeaders.getNettyHeaders();
+                if (!nettyHttpHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
+                    nettyHttpHeaders.set(HttpHeaderNames.CONTENT_TYPE, mediaType);
+                }
+                nettyHeaders.set(HttpHeaderNames.CONTENT_LENGTH, byteBuf.readableBytes());
+                FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(
+                    HttpVersion.HTTP_1_1,
+                    HttpResponseStatus.valueOf(outgoingResponse.code(), outgoingResponse.reason()),
+                    byteBuf,
+                    nettyHeaders,
+                    EmptyHttpHeaders.INSTANCE
+                );
+                nettyContext.writeFull(fullHttpResponse);
+            }
+
+            @Override
+            public void writeTo(String object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+                defaultHandler.prepare(type, mediaType).writeTo(object, outgoingHeaders, outputStream);
+            }
+        };
     }
 
     @Override
     public String read(Argument<String> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
         return defaultHandler.read(type, mediaType, httpHeaders, inputStream);
-    }
-
-    @Override
-    public void writeTo(Argument<String> type, String object, MediaType mediaType, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-        defaultHandler.writeTo(type, object, mediaType, outgoingHeaders, outputStream);
     }
 }

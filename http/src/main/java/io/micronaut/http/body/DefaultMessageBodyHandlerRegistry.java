@@ -19,11 +19,9 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
-import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
@@ -33,7 +31,6 @@ import io.micronaut.inject.BeanType;
 import jakarta.inject.Singleton;
 
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.Collection;
@@ -223,12 +220,7 @@ public final class DefaultMessageBodyHandlerRegistry implements MessageBodyHandl
         }
 
         @Override
-        public void writeTo(Argument<Object> type, Object object, MediaType mediaType, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-            // no-op
-        }
-
-        @Override
-        public ByteBuffer<?> writeTo(Argument<Object> type, Object object, MediaType mediaType, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
+        public WriteClosure<Object> prepare(Argument<Object> type, MediaType mediaType) {
             return null;
         }
     }

@@ -30,16 +30,27 @@ import java.io.OutputStream;
 @Singleton
 @Experimental
 public final class WritableBodyWriter implements MessageBodyWriter<Writable> {
+
     @Override
-    public void writeTo(Argument<Writable> type, Writable object, MediaType mediaType, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-        if (mediaType != null && !outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
-            outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType);
-        }
-        try {
-            object.writeTo(outputStream, getCharset(outgoingHeaders));
-            outputStream.flush();
-        } catch (IOException e) {
-            throw new CodecException("Error writing body text: " + e.getMessage(), e);
-        }
+    public WriteClosure<Writable> prepare(Argument<Writable> type, MediaType mediaType) {
+        return new WriteClosure<Writable>() {
+            @Override
+            public boolean isBlocking() {
+                return true;
+            }
+
+            @Override
+            public void writeTo(Writable object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+                if (mediaType != null && !outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
+                    outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType);
+                }
+                try {
+                    object.writeTo(outputStream, MessageBodyWriter.getCharset(outgoingHeaders));
+                    outputStream.flush();
+                } catch (IOException e) {
+                    throw new CodecException("Error writing body text: " + e.getMessage(), e);
+                }
+            }
+        };
     }
 }

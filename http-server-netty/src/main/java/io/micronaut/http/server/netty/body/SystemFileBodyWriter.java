@@ -27,10 +27,12 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.MessageBodyException;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.netty.body.NettyMessageBodyWriter;
+import io.micronaut.http.netty.body.NettyWriteClosure;
+import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.server.netty.SmartHttpContentCompressor;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.types.files.SystemFile;
@@ -51,17 +53,34 @@ import static io.micronaut.http.HttpHeaders.CONTENT_RANGE;
 @Singleton
 @Experimental
 @Internal
-public final class SystemFileBodyWriter extends AbstractFileBodyWriter implements NettyMessageBodyWriter<SystemFile> {
+public final class SystemFileBodyWriter extends AbstractFileBodyWriter implements MessageBodyWriter<SystemFile> {
     public static final Supplier<AttributeKey<SmartHttpContentCompressor>> ZERO_COPY_PREDICATE =
         SupplierUtil.memoized(() -> AttributeKey.newInstance("zero-copy-predicate"));
     private static final String UNIT_BYTES = "bytes";
+
+    private final NettyWriteClosure<SystemFile> writeClosure = new NettyWriteClosure<>() {
+        @Override
+        public void writeTo(HttpRequest<?> request, MutableHttpResponse<SystemFile> outgoingResponse, SystemFile object, NettyWriteContext nettyContext) throws CodecException {
+            SystemFileBodyWriter.this.writeTo(request, outgoingResponse, object, nettyContext);
+        }
+
+
+        @Override
+        public void writeTo(SystemFile file, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+            throw new UnsupportedOperationException("Can only be used in a Netty context");
+        }
+    };
 
     public SystemFileBodyWriter(NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration) {
         super(configuration);
     }
 
     @Override
-    public void writeTo(HttpRequest<?> request, MutableHttpResponse<SystemFile> response, Argument<SystemFile> type, SystemFile systemFile, MediaType mediaType, NettyWriteContext nettyContext) throws CodecException {
+    public WriteClosure<SystemFile> prepare(Argument<SystemFile> type, MediaType mediaType) {
+        return writeClosure;
+    }
+
+    public void writeTo(HttpRequest<?> request, MutableHttpResponse<SystemFile> response, SystemFile systemFile, NettyWriteContext nettyContext) throws CodecException {
         if (response instanceof NettyMutableHttpResponse<?> nettyResponse) {
             if (!systemFile.getFile().canRead()) {
                 throw new MessageBodyException("Could not find file");
@@ -130,11 +149,6 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
         } catch (FileNotFoundException e) {
             throw new MessageBodyException("Could not find file", e);
         }
-    }
-
-    @Override
-    public void writeTo(Argument<SystemFile> type, SystemFile file, MediaType mediaType, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-        throw new UnsupportedOperationException("Can only be used in a Netty context");
     }
 
     @Nullable

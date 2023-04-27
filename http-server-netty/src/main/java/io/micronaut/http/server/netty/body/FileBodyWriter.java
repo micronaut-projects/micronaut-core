@@ -22,6 +22,8 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.netty.body.NettyMessageBodyWriter;
+import io.micronaut.http.netty.body.NettyWriteClosure;
+import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.server.types.files.SystemFile;
 import jakarta.inject.Singleton;
 
@@ -30,36 +32,32 @@ import java.io.OutputStream;
 
 @Singleton
 public final class FileBodyWriter implements NettyMessageBodyWriter<File> {
-    private static final Argument<SystemFile> SYSTEM_FILE_ARGUMENT = Argument.of(SystemFile.class);
     private final SystemFileBodyWriter systemFileBodyWriter;
+    private final NettyWriteClosure<File> closure = new NettyWriteClosure<File>() {
+        @Override
+        public void writeTo(HttpRequest<?> request, MutableHttpResponse<File> outgoingResponse, File object, NettyWriteContext nettyContext) throws CodecException {
+            SystemFile systemFile = new SystemFile(object);
+            MutableHttpResponse<SystemFile> newResponse = outgoingResponse.body(systemFile);
+            systemFileBodyWriter.writeTo(
+                request,
+                newResponse,
+                systemFile,
+                nettyContext
+            );
+        }
+
+        @Override
+        public void writeTo(File object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+            throw new UnsupportedOperationException("Can only be used in a Netty context");
+        }
+    };
 
     public FileBodyWriter(SystemFileBodyWriter systemFileBodyWriter) {
         this.systemFileBodyWriter = systemFileBodyWriter;
     }
 
     @Override
-    public void writeTo(HttpRequest<?> request, MutableHttpResponse<File> outgoingResponse, Argument<File> type, File object, MediaType mediaType, NettyWriteContext nettyContext) throws CodecException {
-        SystemFile systemFile = new SystemFile(object);
-        MutableHttpResponse<SystemFile> newResponse = outgoingResponse.body(systemFile);
-        this.systemFileBodyWriter.writeTo(
-            request,
-            newResponse,
-            SYSTEM_FILE_ARGUMENT,
-            systemFile,
-            systemFile.getMediaType(),
-            nettyContext
-        );
-    }
-
-    @Override
-    public void writeTo(Argument<File> type, File object, MediaType mediaType, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-        SystemFile systemFile = new SystemFile(object);
-        systemFileBodyWriter.writeTo(
-            SYSTEM_FILE_ARGUMENT,
-            systemFile,
-            systemFile.getMediaType(),
-            outgoingHeaders,
-            outputStream
-        );
+    public WriteClosure<File> prepare(Argument<File> type, MediaType mediaType) {
+        return closure;
     }
 }

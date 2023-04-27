@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.IOUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
-import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
@@ -31,7 +30,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 
 @Produces(MediaType.TEXT_PLAIN)
 @Consumes(MediaType.TEXT_PLAIN)
@@ -49,23 +47,25 @@ public final class TextPlainHandler implements MessageBodyHandler<String> {
     }
 
     @Override
-    public String read(Argument<String> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
-        try {
-            return IOUtils.readText(new BufferedReader(new InputStreamReader(inputStream, getCharset(httpHeaders))));
-        } catch (IOException e) {
-            throw new CodecException("Error reading body text: " + e.getMessage(), e);
-        }
+    public WriteClosure<String> prepare(Argument<String> type, MediaType mediaType) {
+        return (object, outgoingHeaders, outputStream) -> {
+            if (!outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
+                outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType);
+            }
+            try {
+                outputStream.write(object.getBytes(MessageBodyWriter.getCharset(outgoingHeaders)));
+            } catch (IOException e) {
+                throw new CodecException("Error writing body text: " + e.getMessage(), e);
+            }
+        };
     }
 
     @Override
-    public void writeTo(Argument<String> type, String object, MediaType mediaType, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-        if (!outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
-            outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType);
-        }
+    public String read(Argument<String> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
         try {
-            outputStream.write(object.getBytes(getCharset(outgoingHeaders)));
+            return IOUtils.readText(new BufferedReader(new InputStreamReader(inputStream, MessageBodyWriter.getCharset(httpHeaders))));
         } catch (IOException e) {
-            throw new CodecException("Error writing body text: " + e.getMessage(), e);
+            throw new CodecException("Error reading body text: " + e.getMessage(), e);
         }
     }
 }

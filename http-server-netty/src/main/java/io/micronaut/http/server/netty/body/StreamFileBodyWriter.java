@@ -25,6 +25,8 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.body.NettyMessageBodyWriter;
+import io.micronaut.http.netty.body.NettyWriteClosure;
+import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.netty.handler.codec.http.DefaultHttpResponse;
@@ -50,39 +52,40 @@ public final class StreamFileBodyWriter extends AbstractFileBodyWriter implement
     }
 
     @Override
-    public void writeTo(HttpRequest<?> request, MutableHttpResponse<StreamedFile> outgoingResponse, Argument<StreamedFile> type, StreamedFile object, MediaType mediaType, NettyWriteContext nettyContext) throws CodecException {
-        if (outgoingResponse instanceof NettyMutableHttpResponse<?> nettyResponse) {
-            if (handleIfModifiedAndHeaders(request, outgoingResponse, object, nettyResponse)) {
-                nettyContext.writeFull(notModified(outgoingResponse));
-            } else {
-                HttpHeaders nettyHeaders = nettyResponse.getNettyHeaders();
-                long length = object.getLength();
-                if (length > -1) {
-                    nettyHeaders.set(HttpHeaderNames.CONTENT_LENGTH, length);
+    public WriteClosure<StreamedFile> prepare(Argument<StreamedFile> type, MediaType mediaType) {
+        return new NettyWriteClosure<StreamedFile>() {
+            @Override
+            public void writeTo(HttpRequest<?> request, MutableHttpResponse<StreamedFile> outgoingResponse, StreamedFile object, NettyWriteContext nettyContext) throws CodecException {
+                if (outgoingResponse instanceof NettyMutableHttpResponse<?> nettyResponse) {
+                    if (handleIfModifiedAndHeaders(request, outgoingResponse, object, nettyResponse)) {
+                        nettyContext.writeFull(notModified(outgoingResponse));
+                    } else {
+                        HttpHeaders nettyHeaders = nettyResponse.getNettyHeaders();
+                        long length = object.getLength();
+                        if (length > -1) {
+                            nettyHeaders.set(HttpHeaderNames.CONTENT_LENGTH, length);
+                        } else {
+                            nettyHeaders.set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+                        }
+                        final DefaultHttpResponse finalResponse = new DefaultHttpResponse(
+                            nettyResponse.getNettyHttpVersion(),
+                            nettyResponse.getNettyHttpStatus(),
+                            nettyHeaders
+                        );
+                        InputStream inputStream = object.getInputStream();
+                        HttpChunkedInput chunkedInput = new HttpChunkedInput(new ChunkedStream(inputStream));
+                        nettyContext.writeChunked(finalResponse, chunkedInput);
+                    }
+
                 } else {
-                    nettyHeaders.set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+                    throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + outgoingResponse);
                 }
-                final DefaultHttpResponse finalResponse = new DefaultHttpResponse(
-                    nettyResponse.getNettyHttpVersion(),
-                    nettyResponse.getNettyHttpStatus(),
-                    nettyHeaders
-                );
-                InputStream inputStream = object.getInputStream();
-                HttpChunkedInput chunkedInput = new HttpChunkedInput(new ChunkedStream(inputStream));
-                nettyContext.writeStreamed(new CustomResponse(
-                    finalResponse,
-                    chunkedInput,
-                    true
-                ));
             }
 
-        } else {
-            throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + outgoingResponse);
-        }
-    }
-
-    @Override
-    public void writeTo(Argument<StreamedFile> type, StreamedFile object, MediaType mediaType, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-        throw new UnsupportedOperationException("Can only be used in a Netty context");
+            @Override
+            public void writeTo(StreamedFile object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+                throw new UnsupportedOperationException("Can only be used in a Netty context");
+            }
+        };
     }
 }

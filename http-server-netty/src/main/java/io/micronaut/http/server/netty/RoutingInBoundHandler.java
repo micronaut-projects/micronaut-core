@@ -24,8 +24,10 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -43,7 +45,8 @@ import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.netty.body.NettyMessageBodyWriter;
+import io.micronaut.http.netty.body.NettyWriteClosure;
+import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.netty.stream.JsonSubscriber;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
@@ -78,6 +81,7 @@ import reactor.core.publisher.Flux;
 
 import javax.net.ssl.SSLException;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.channels.ClosedChannelException;
 import java.util.Collections;
 import java.util.List;
@@ -303,26 +307,13 @@ public final class RoutingInBoundHandler implements RequestHandler {
                     .findWriter(responseBodyType, Collections.singletonList(responseMediaType)).orElse(null);
             }
 
-            MediaType finalResponseMediaType = responseMediaType;
             if (messageBodyWriter != null && responseBodyType.isInstance(body) && messageBodyWriter.isWriteable(responseBodyType, responseMediaType)) {
+                NettyWriteClosure<Object> closure = wrap(messageBodyWriter.prepare(responseBodyType, responseMediaType));
                 handleMissingConnectionHeader(response, nettyRequest, outboundAccess);
-                if (messageBodyWriter instanceof NettyMessageBodyWriter<Object> nettyMessageBodyWriter) {
-                    if (nettyMessageBodyWriter.useIoExecutor()) {
-                        getIoExecutor().execute(() -> writeNettyMessageBody(nettyRequest.getChannelHandlerContext(), nettyRequest, (MutableHttpResponse<Object>) response, body, responseBodyType, finalResponseMediaType, nettyMessageBodyWriter, outboundAccess));
-                    } else {
-                        writeNettyMessageBody(nettyRequest.getChannelHandlerContext(), nettyRequest, (MutableHttpResponse<Object>) response, body, responseBodyType, finalResponseMediaType, nettyMessageBodyWriter, outboundAccess);
-                    }
+                if (closure.isBlocking()) {
+                    getIoExecutor().execute(() -> writeNettyMessageBody(nettyRequest.getChannelHandlerContext(), nettyRequest, (MutableHttpResponse<Object>) response, body, closure, outboundAccess));
                 } else {
-                    NettyByteBufferFactory bufferFactory = new NettyByteBufferFactory(nettyRequest.getChannelHandlerContext().alloc());
-                    ByteBuffer<?> byteBuffer = messageBodyWriter.writeTo(
-                        responseBodyType,
-                        body,
-                        responseMediaType,
-                        response.getHeaders(),
-                        bufferFactory
-                    );
-                    setResponseBody(response, (ByteBuf) byteBuffer.asNativeBuffer());
-                    writeFinalNettyResponse(response, nettyRequest, outboundAccess);
+                    writeNettyMessageBody(nettyRequest.getChannelHandlerContext(), nettyRequest, (MutableHttpResponse<Object>) response, body, closure, outboundAccess);
                 }
             } else {
                 encodeResponseBody(
@@ -355,17 +346,13 @@ public final class RoutingInBoundHandler implements RequestHandler {
         NettyHttpRequest<?> nettyRequest,
         MutableHttpResponse<Object> response,
         Object body,
-        Argument<Object> responseBodyType,
-        MediaType finalResponseMediaType,
-        NettyMessageBodyWriter<Object> nettyMessageBodyWriter,
+        NettyWriteClosure<Object> nettyMessageBodyWriter,
         PipeliningServerHandler.OutboundAccess outboundAccess) {
         try {
             nettyMessageBodyWriter.writeTo(
                 nettyRequest,
                 response,
-                responseBodyType,
                 body,
-                finalResponseMediaType,
                 outboundAccess
             );
         } catch (CodecException e) {
@@ -400,10 +387,8 @@ public final class RoutingInBoundHandler implements RequestHandler {
             httpContentPublisher = bodyPublisher.map(message -> {
                 MessageBodyWriter<Object> messageBodyWriter = routeInfo.getMessageBodyWriter();
                 if (messageBodyWriter != null && responseBodyType.isInstance(message) && messageBodyWriter.isWriteable(responseBodyType, finalMediaType)) {
-                    ByteBuffer<?> byteBuffer = messageBodyWriter.writeTo(
-                        responseBodyType,
+                    ByteBuffer<?> byteBuffer = messageBodyWriter.prepare(responseBodyType, finalMediaType).writeTo(
                         message,
-                        finalMediaType,
                         response.getHeaders(),
                         byteBufferFactory
                     );
@@ -668,4 +653,46 @@ public final class RoutingInBoundHandler implements RequestHandler {
         return cause instanceof IOException && message != null && IGNORABLE_ERROR_MESSAGE.matcher(message).matches();
     }
 
+    <T> NettyWriteClosure<T> wrap(MessageBodyWriter.WriteClosure<T> closure) {
+        if (closure instanceof NettyWriteClosure<T> nettyClosure) {
+            return nettyClosure;
+        } else {
+            return new CompatNettyWriteClosure<>(closure);
+        }
+    }
+
+    private final class CompatNettyWriteClosure<T> implements NettyWriteClosure<T> {
+        private final MessageBodyWriter.WriteClosure<T> delegate;
+
+        CompatNettyWriteClosure(MessageBodyWriter.WriteClosure<T> delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override
+        public boolean isBlocking() {
+            return delegate.isBlocking();
+        }
+
+        @Override
+        public void writeTo(HttpRequest<?> request, MutableHttpResponse<T> outgoingResponse, T object, NettyWriteContext nettyContext) throws CodecException {
+            NettyByteBufferFactory bufferFactory = new NettyByteBufferFactory(nettyContext.alloc());
+            ByteBuffer<?> byteBuffer = delegate.writeTo(
+                object,
+                outgoingResponse.getHeaders(),
+                bufferFactory
+            );
+            setResponseBody(outgoingResponse, (ByteBuf) byteBuffer.asNativeBuffer());
+            writeFinalNettyResponse(outgoingResponse, (NettyHttpRequest<?>) request, (PipeliningServerHandler.OutboundAccess) nettyContext);
+        }
+
+        @Override
+        public void writeTo(T object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+            delegate.writeTo(object, outgoingHeaders, outputStream);
+        }
+
+        @Override
+        public ByteBuffer<?> writeTo(T object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
+            return delegate.writeTo(object, outgoingHeaders, bufferFactory);
+        }
+    }
 }

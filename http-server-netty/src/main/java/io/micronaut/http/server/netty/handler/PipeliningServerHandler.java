@@ -21,7 +21,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.exceptions.MessageBodyException;
-import io.micronaut.http.netty.body.NettyMessageBodyWriter;
+import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.netty.stream.DelegateStreamedHttpRequest;
 import io.micronaut.http.netty.stream.EmptyHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
@@ -306,6 +306,19 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     /**
+     * Wrapper class for a netty response with a special body type, like
+     * {@link HttpChunkedInput} or
+     * {@link FileRegion}.
+     *
+     * @param response The response
+     * @param body     The body, or {@code null} if there is no body
+     * @param needLast Whether to finish the response with a
+     *                 {@link LastHttpContent}
+     */
+    public static final record CustomResponse(HttpResponse response, @Nullable Object body, boolean needLast) {
+    }
+
+    /**
      * Base {@link InboundHandler} that handles {@link HttpRequest}s and then determines how to
      * deal with the body.
      */
@@ -523,7 +536,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     /**
      * Class that allows writing the response for the request this object is associated with.
      */
-    public final class OutboundAccess implements NettyMessageBodyWriter.NettyWriteContext {
+    public final class OutboundAccess implements NettyWriteContext {
         private final ChannelHandlerContext ctx;
         /**
          * The handler that will perform the actual write operation.
@@ -647,10 +660,18 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          *
          * @param response The response to write
          */
-        @Override
-        public void writeStreamed(NettyMessageBodyWriter.CustomResponse response) {
+        private void writeStreamed(CustomResponse response) {
             preprocess(response.response());
             write(new ChunkedOutboundHandler(this, response));
+        }
+
+        @Override
+        public void writeChunked(HttpResponse response, HttpChunkedInput chunkedInput) {
+            writeStreamed(new CustomResponse(
+                response,
+                chunkedInput,
+                true // todo: why needLast true? HttpChunkedInput should include the LastHttpContent
+            ));
         }
 
         @Override
@@ -658,13 +679,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             SmartHttpContentCompressor predicate = ctx.channel().attr(ZERO_COPY_PREDICATE.get()).get();
             if (predicate != null && predicate.shouldSkip(response)) {
                 // SSL not enabled - can use zero-copy file transfer.
-                writeStreamed(new NettyMessageBodyWriter.CustomResponse(response, new TrackedDefaultFileRegion(randomAccessFile.getChannel(), position, contentLength), true));
+                writeStreamed(new CustomResponse(response, new TrackedDefaultFileRegion(randomAccessFile.getChannel(), position, contentLength), true));
             } else {
                 // SSL enabled - cannot use zero-copy file transfer.
                 try {
                     // HttpChunkedInput will write the end marker (LastHttpContent) for us.
                     final HttpChunkedInput chunkedInput = new HttpChunkedInput(new TrackedChunkedFile(randomAccessFile, position, contentLength, LENGTH_8K));
-                    writeStreamed(new NettyMessageBodyWriter.CustomResponse(response, chunkedInput, false));
+                    writeStreamed(new CustomResponse(response, chunkedInput, false));
                 } catch (IOException e) {
                     throw new MessageBodyException("Could not read file", e);
                 }
@@ -882,9 +903,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * Handler that writes a files etc..
      */
     private final class ChunkedOutboundHandler extends OutboundHandler {
-        private final NettyMessageBodyWriter.CustomResponse message;
+        private final CustomResponse message;
 
-        ChunkedOutboundHandler(OutboundAccess outboundAccess, NettyMessageBodyWriter.CustomResponse message) {
+        ChunkedOutboundHandler(OutboundAccess outboundAccess, CustomResponse message) {
             super(outboundAccess);
             this.message = message;
         }

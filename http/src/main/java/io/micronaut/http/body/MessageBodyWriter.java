@@ -48,58 +48,28 @@ public interface MessageBodyWriter<T> extends Ordered {
      *
      * @param type      The type
      * @param mediaType The media type, can  be {@code null}
-     * @return True if is readable
+     * @return True if is writable
      */
     default boolean isWriteable(@NonNull Argument<T> type, @Nullable MediaType mediaType) {
         return true;
     }
 
     /**
-     * Writes an object to the given output stream.
+     * Prepare a {@link WriteClosure} that will write the given type and media type. This can be
+     * used for precomputing some route data.
      *
-     * @param type         The type being decoded.
-     * @param object       The object to write
-     * @param mediaType    The media type, can  be {@code null}
-     * @param outgoingHeaders  The HTTP headers
-     * @param outputStream The output stream
-     * @throws CodecException If an error occurs decoding
+     * @param type      The type
+     * @param mediaType The media type, can  be {@code null}
+     * @return The closure
      */
-    // todo: "bake" with known argument type
-    void writeTo(
-        @NonNull Argument<T> type,
-        T object,
-        @NonNull MediaType mediaType,
-        @NonNull MutableHeaders outgoingHeaders,
-        @NonNull OutputStream outputStream) throws CodecException;
-
-    /**
-     * Writes an object to the given stream.
-     *
-     * @param type        The type being decoded.
-     * @param object      The object to write
-     * @param mediaType   The media type, can  be {@code null}
-     * @param outgoingHeaders The HTTP headers
-     * @param bufferFactory A byte buffer factory
-     * @throws CodecException If an error occurs decoding
-     */
-    @NonNull
-    default ByteBuffer<?> writeTo(
-        @NonNull Argument<T> type,
-        T object,
-        @NonNull MediaType mediaType,
-        @NonNull MutableHeaders outgoingHeaders,
-        @NonNull ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
-        ByteBuffer<?> buffer = bufferFactory.buffer();
-        writeTo(type, object, mediaType, outgoingHeaders, buffer.toOutputStream());
-        return buffer;
-    }
+    WriteClosure<T> prepare(@NonNull Argument<T> type, @Nullable MediaType mediaType);
 
     /**
      * Resolve the charset.
      * @param headers The headers
      * @return The charset
      */
-    default @NonNull Charset getCharset(@NonNull Headers headers) {
+    static @NonNull Charset getCharset(@NonNull Headers headers) {
         if (headers instanceof HttpHeaders httpHeaders) {
             Charset charset = httpHeaders.acceptCharset();
             if (charset != null) {
@@ -107,5 +77,55 @@ public interface MessageBodyWriter<T> extends Ordered {
             }
         }
         return StandardCharsets.UTF_8;
+    }
+
+    /**
+     * Write closure that can write a specific body type with a specific media type.
+     *
+     * @param <T> The body type
+     */
+    interface WriteClosure<T> {
+        /**
+         * {@code true} iff this closure can do a blocking <i>read</i> on the object it receives.
+         * For example, if this closure writes from an {@code InputStream}, that operation may be
+         * blocking and this method returns {@code true}.<br>
+         * Note that even when this is {@code false},
+         * {@link #writeTo(Object, MutableHeaders, OutputStream)} may still block because the
+         * {@link OutputStream} that is passed as the write destination may still block.
+         */
+        default boolean isBlocking() {
+            return false;
+        }
+
+        /**
+         * Writes an object to the given output stream.
+         *
+         * @param object       The object to write
+         * @param outgoingHeaders  The HTTP headers
+         * @param outputStream The output stream
+         * @throws CodecException If an error occurs decoding
+         */
+        void writeTo(
+            T object,
+            @NonNull MutableHeaders outgoingHeaders,
+            @NonNull OutputStream outputStream) throws CodecException;
+
+        /**
+         * Writes an object to the given stream.
+         *
+         * @param object      The object to write
+         * @param outgoingHeaders The HTTP headers
+         * @param bufferFactory A byte buffer factory
+         * @throws CodecException If an error occurs decoding
+         */
+        @NonNull
+        default ByteBuffer<?> writeTo(
+            T object,
+            @NonNull MutableHeaders outgoingHeaders,
+            @NonNull ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
+            ByteBuffer<?> buffer = bufferFactory.buffer();
+            writeTo(object, outgoingHeaders, buffer.toOutputStream());
+            return buffer;
+        }
     }
 }
