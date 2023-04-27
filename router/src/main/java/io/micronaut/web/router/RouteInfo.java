@@ -85,7 +85,7 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
      */
     default boolean isResponseBodyJsonFormattable() {
         Argument<?> argument = getResponseBodyType();
-        // todo: ByteBuf?
+        // it would be nice to support netty ByteBuf here, but it's not clear how.
         return !(argument.getType() == byte[].class
             || ByteBuffer.class.isAssignableFrom(argument.getType()));
     }

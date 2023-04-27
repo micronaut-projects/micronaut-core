@@ -177,7 +177,7 @@ class HttpHeadSpec extends Specification {
 
         then:
         !response.contentType.isPresent()
-        response.contentLength == 0
+        response.contentLength == -1
         response.status == HttpStatus.OK
         !body.isPresent()
     }
@@ -204,7 +204,7 @@ class HttpHeadSpec extends Specification {
 
         then:
         !response.contentType.isPresent()
-        response.contentLength == 0
+        response.contentLength == -1
         response.status == HttpStatus.OK
         !body.isPresent()
     }
