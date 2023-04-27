@@ -15,10 +15,10 @@
  */
 package io.micronaut.http.client.aop
 
-import io.micronaut.context.annotation.Requires
-import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.context.exceptions.ConfigurationException
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -129,6 +129,7 @@ class StreamSpec extends Specification {
 
     @Unroll
     void "JSON is still just text (variation #n)"() {
+        // todo: 3 is broken by RouteInfo.isResponseBodyJsonFormattable not excluding ByteBuf
         given:
         StreamEchoClient myClient = context.getBean(StreamEchoClient)
         expect:

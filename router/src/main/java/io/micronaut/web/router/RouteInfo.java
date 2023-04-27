@@ -85,6 +85,7 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
      */
     default boolean isResponseBodyJsonFormattable() {
         Argument<?> argument = getResponseBodyType();
+        // todo: ByteBuf?
         return !(argument.getType() == byte[].class
             || ByteBuffer.class.isAssignableFrom(argument.getType()));
     }

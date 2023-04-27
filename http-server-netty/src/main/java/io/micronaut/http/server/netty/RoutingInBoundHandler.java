@@ -529,7 +529,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             outboundAccess.writeStreamed(streamed);
         } else {
             FullHttpResponse fullResponse = (FullHttpResponse) nettyResponse;
-            if (PipeliningServerHandler.canHaveBody(fullResponse.status())) {
+            if (PipeliningServerHandler.canHaveBody(fullResponse.status()) && request.getMethod() != HttpMethod.HEAD) {
                 nettyResponse.headers().set(HttpHeaderNames.CONTENT_LENGTH, fullResponse.content().readableBytes());
             }
             outboundAccess.writeFull(fullResponse);
