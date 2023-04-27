@@ -22,6 +22,7 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
+import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
@@ -31,6 +32,7 @@ import io.micronaut.inject.BeanType;
 import jakarta.inject.Singleton;
 
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.Collection;
@@ -220,8 +222,8 @@ public final class DefaultMessageBodyHandlerRegistry implements MessageBodyHandl
         }
 
         @Override
-        public WriteClosure<Object> prepare(Argument<Object> type) {
-            return null;
+        public void writeTo(Argument<Object> type, MediaType mediaType, Object object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+            throw new UnsupportedOperationException();
         }
     }
 }

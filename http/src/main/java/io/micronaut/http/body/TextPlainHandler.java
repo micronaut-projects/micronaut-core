@@ -44,20 +44,15 @@ public final class TextPlainHandler implements MessageBodyHandler<String> {
     }
 
     @Override
-    public WriteClosure<String> prepare(Argument<String> type) {
-        return new WriteClosure<String>() {
-            @Override
-            public void writeTo(MediaType mediaType, String object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-                if (!outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
-                    outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType);
-                }
-                try {
-                    outputStream.write(object.getBytes(MessageBodyWriter.getCharset(outgoingHeaders)));
-                } catch (IOException e) {
-                    throw new CodecException("Error writing body text: " + e.getMessage(), e);
-                }
-            }
-        };
+    public void writeTo(Argument<String> type, MediaType mediaType, String object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+        if (!outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
+            outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType);
+        }
+        try {
+            outputStream.write(object.getBytes(MessageBodyWriter.getCharset(outgoingHeaders)));
+        } catch (IOException e) {
+            throw new CodecException("Error writing body text: " + e.getMessage(), e);
+        }
     }
 
     @Override

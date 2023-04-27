@@ -55,7 +55,7 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
      * @since 4.0.0
      */
     @Nullable
-    default MessageBodyWriter.WriteClosure<R> getMessageBodyWriter() {
+    default MessageBodyWriter<R> getMessageBodyWriter() {
         return null;
     }
 

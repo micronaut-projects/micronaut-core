@@ -69,31 +69,21 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {
     }
 
     @Override
-    public WriteClosure<T> prepare(Argument<T> type) {
-        return new WriteClosure<T>() {
-            @Override
-            public boolean isWriteable(MediaType mediaType) {
-                return mediaType != null && mediaType.getExtension().equals(MediaType.EXTENSION_JSON);
-            }
+    public void writeTo(Argument<T> type, MediaType mediaType, T object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+        outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
+        jsonMediaTypeCodec.encode(
+            type,
+            outputStream
+        );
+    }
 
-            @Override
-            public void writeTo(MediaType mediaType, T object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-                outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
-                jsonMediaTypeCodec.encode(
-                    type,
-                    outputStream
-                );
-            }
-
-            @Override
-            public ByteBuffer<?> writeTo(MediaType mediaType, T object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
-                outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
-                return jsonMediaTypeCodec.encode(
-                    type,
-                    object,
-                    bufferFactory
-                );
-            }
-        };
+    @Override
+    public ByteBuffer<?> writeTo(Argument<T> type, MediaType mediaType, T object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
+        outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
+        return jsonMediaTypeCodec.encode(
+            type,
+            object,
+            bufferFactory
+        );
     }
 }

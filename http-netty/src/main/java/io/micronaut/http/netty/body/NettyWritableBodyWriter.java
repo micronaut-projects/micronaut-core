@@ -42,39 +42,38 @@ import java.io.OutputStream;
 
 @Replaces(WritableBodyWriter.class)
 @Singleton
-final class NettyWritableBodyWriter implements NettyMessageBodyWriter<Writable> {
+final class NettyWritableBodyWriter implements NettyBodyWriter<Writable> {
     private final WritableBodyWriter defaultWritable = new WritableBodyWriter();
 
     @Override
-    public WriteClosure<Writable> prepare(Argument<Writable> type) {
-        return new NettyWriteClosure<Writable>(true) {
-            @Override
-            public void writeTo(HttpRequest<?> request, MutableHttpResponse<Writable> outgoingResponse, MediaType mediaType, Writable object, NettyWriteContext nettyContext) throws CodecException {
-                ByteBuf byteBuf = nettyContext.alloc().ioBuffer(128);
-                MutableHttpHeaders outgoingHeaders = outgoingResponse.getHeaders();
-                if (mediaType != null && !outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
-                    outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType);
-                }
-                try (ByteBufOutputStream outputStream = new ByteBufOutputStream(byteBuf)) {
-                    DefaultFullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(
-                        HttpVersion.HTTP_1_1,
-                        HttpResponseStatus.valueOf(outgoingResponse.code(), outgoingResponse.reason()),
-                        byteBuf,
-                        ((NettyHttpHeaders) outgoingHeaders).getNettyHeaders(),
-                        EmptyHttpHeaders.INSTANCE
-                    );
-                    object.writeTo(outputStream, MessageBodyWriter.getCharset(outgoingHeaders));
-                    nettyContext.writeFull(fullHttpResponse);
-                } catch (IOException e) {
-                    throw new MessageBodyException("Error writing body from writable", e);
-                }
-            }
+    public boolean isBlocking() {
+        return true;
+    }
 
-            @Override
-            public void writeTo(MediaType mediaType, Writable object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-                // ideally we would cache the closure returned by prepare, but this code path should never be hit anyway
-                defaultWritable.prepare(type).writeTo(mediaType, object, outgoingHeaders, outputStream);
-            }
-        };
+    @Override
+    public void writeTo(HttpRequest<?> request, MutableHttpResponse<Writable> outgoingResponse, Argument<Writable> type, MediaType mediaType, Writable object, NettyWriteContext nettyContext) throws CodecException {
+        ByteBuf byteBuf = nettyContext.alloc().ioBuffer(128);
+        MutableHttpHeaders outgoingHeaders = outgoingResponse.getHeaders();
+        if (mediaType != null && !outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
+            outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType);
+        }
+        try (ByteBufOutputStream outputStream = new ByteBufOutputStream(byteBuf)) {
+            DefaultFullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(
+                HttpVersion.HTTP_1_1,
+                HttpResponseStatus.valueOf(outgoingResponse.code(), outgoingResponse.reason()),
+                byteBuf,
+                ((NettyHttpHeaders) outgoingHeaders).getNettyHeaders(),
+                EmptyHttpHeaders.INSTANCE
+            );
+            object.writeTo(outputStream, MessageBodyWriter.getCharset(outgoingHeaders));
+            nettyContext.writeFull(fullHttpResponse);
+        } catch (IOException e) {
+            throw new MessageBodyException("Error writing body from writable", e);
+        }
+    }
+
+    @Override
+    public void writeTo(Argument<Writable> type, MediaType mediaType, Writable object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+        defaultWritable.writeTo(type, mediaType, object, outgoingHeaders, outputStream);
     }
 }

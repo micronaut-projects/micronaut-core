@@ -36,7 +36,7 @@ public interface MutableHttpMessage<B> extends HttpMessage<B> {
      * @return This response
      * @since 4.0.0
      */
-    default MutableHttpMessage<B> bodyWriter(MessageBodyWriter.WriteClosure<B> messageBodyWriter) {
+    default MutableHttpMessage<B> bodyWriter(MessageBodyWriter<B> messageBodyWriter) {
         setAttribute(HttpAttributes.MESSAGE_BODY_WRITER, messageBodyWriter);
         return this;
     }

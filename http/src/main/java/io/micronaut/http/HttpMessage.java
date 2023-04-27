@@ -67,8 +67,8 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
      * @since 4.0.0
      */
     @SuppressWarnings({"rawtypes", "unchecked"})
-    default Optional<MessageBodyWriter.WriteClosure<B>> getBodyWriter() {
-        return (Optional) getAttribute(HttpAttributes.MESSAGE_BODY_WRITER, MessageBodyWriter.WriteClosure.class);
+    default Optional<MessageBodyWriter<B>> getBodyWriter() {
+        return (Optional) getAttribute(HttpAttributes.MESSAGE_BODY_WRITER, MessageBodyWriter.class);
     }
 
     /**

@@ -30,19 +30,14 @@ import java.io.OutputStream;
 @Experimental
 public final class CharSequenceBodyWriter implements MessageBodyWriter<CharSequence> {
     @Override
-    public WriteClosure<CharSequence> prepare(Argument<CharSequence> type) {
-        return new WriteClosure<CharSequence>() {
-            @Override
-            public void writeTo(MediaType mediaType, CharSequence object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-                if (!outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
-                    outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType);
-                }
-                try {
-                    outputStream.write(object.toString().getBytes(MessageBodyWriter.getCharset(outgoingHeaders)));
-                } catch (IOException e) {
-                    throw new CodecException("Error writing body text: " + e.getMessage(), e);
-                }
-            }
-        };
+    public void writeTo(Argument<CharSequence> type, MediaType mediaType, CharSequence object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+        if (!outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
+            outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType);
+        }
+        try {
+            outputStream.write(object.toString().getBytes(MessageBodyWriter.getCharset(outgoingHeaders)));
+        } catch (IOException e) {
+            throw new CodecException("Error writing body text: " + e.getMessage(), e);
+        }
     }
 }

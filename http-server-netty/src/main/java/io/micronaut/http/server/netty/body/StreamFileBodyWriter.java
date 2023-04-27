@@ -24,8 +24,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.netty.body.NettyMessageBodyWriter;
-import io.micronaut.http.netty.body.NettyWriteClosure;
+import io.micronaut.http.netty.body.NettyBodyWriter;
 import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.types.files.StreamedFile;
@@ -45,47 +44,43 @@ import java.io.OutputStream;
 @Singleton
 @Experimental
 @Internal
-public final class StreamFileBodyWriter extends AbstractFileBodyWriter implements NettyMessageBodyWriter<StreamedFile> {
+public final class StreamFileBodyWriter extends AbstractFileBodyWriter implements NettyBodyWriter<StreamedFile> {
     private final Logger LOG = LoggerFactory.getLogger(StreamFileBodyWriter.class);
+
     StreamFileBodyWriter(NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration) {
         super(configuration);
     }
 
     @Override
-    public WriteClosure<StreamedFile> prepare(Argument<StreamedFile> type) {
-        return new NettyWriteClosure<StreamedFile>() {
-            @Override
-            public void writeTo(HttpRequest<?> request, MutableHttpResponse<StreamedFile> outgoingResponse, MediaType mediaType, StreamedFile object, NettyWriteContext nettyContext) throws CodecException {
-                if (outgoingResponse instanceof NettyMutableHttpResponse<?> nettyResponse) {
-                    if (handleIfModifiedAndHeaders(request, outgoingResponse, object, nettyResponse)) {
-                        nettyContext.writeFull(notModified(outgoingResponse));
-                    } else {
-                        HttpHeaders nettyHeaders = nettyResponse.getNettyHeaders();
-                        long length = object.getLength();
-                        if (length > -1) {
-                            nettyHeaders.set(HttpHeaderNames.CONTENT_LENGTH, length);
-                        } else {
-                            nettyHeaders.set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
-                        }
-                        final DefaultHttpResponse finalResponse = new DefaultHttpResponse(
-                            nettyResponse.getNettyHttpVersion(),
-                            nettyResponse.getNettyHttpStatus(),
-                            nettyHeaders
-                        );
-                        InputStream inputStream = object.getInputStream();
-                        HttpChunkedInput chunkedInput = new HttpChunkedInput(new ChunkedStream(inputStream));
-                        nettyContext.writeChunked(finalResponse, chunkedInput);
-                    }
-
+    public void writeTo(HttpRequest<?> request, MutableHttpResponse<StreamedFile> outgoingResponse, Argument<StreamedFile> type, MediaType mediaType, StreamedFile object, NettyWriteContext nettyContext) throws CodecException {
+        if (outgoingResponse instanceof NettyMutableHttpResponse<?> nettyResponse) {
+            if (handleIfModifiedAndHeaders(request, outgoingResponse, object, nettyResponse)) {
+                nettyContext.writeFull(notModified(outgoingResponse));
+            } else {
+                HttpHeaders nettyHeaders = nettyResponse.getNettyHeaders();
+                long length = object.getLength();
+                if (length > -1) {
+                    nettyHeaders.set(HttpHeaderNames.CONTENT_LENGTH, length);
                 } else {
-                    throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + outgoingResponse);
+                    nettyHeaders.set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
                 }
+                final DefaultHttpResponse finalResponse = new DefaultHttpResponse(
+                    nettyResponse.getNettyHttpVersion(),
+                    nettyResponse.getNettyHttpStatus(),
+                    nettyHeaders
+                );
+                InputStream inputStream = object.getInputStream();
+                HttpChunkedInput chunkedInput = new HttpChunkedInput(new ChunkedStream(inputStream));
+                nettyContext.writeChunked(finalResponse, chunkedInput);
             }
 
-            @Override
-            public void writeTo(MediaType mediaType, StreamedFile object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
-                throw new UnsupportedOperationException("Can only be used in a Netty context");
-            }
-        };
+        } else {
+            throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + outgoingResponse);
+        }
+    }
+
+    @Override
+    public void writeTo(Argument<StreamedFile> type, MediaType mediaType, StreamedFile object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+        throw new UnsupportedOperationException("Can only be used in a Netty context");
     }
 }

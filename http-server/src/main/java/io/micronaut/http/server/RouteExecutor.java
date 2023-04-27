@@ -491,7 +491,7 @@ public final class RouteExecutor {
                 response.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
             }
             response.setAttribute(HttpAttributes.ROUTE_INFO, routeInfo);
-            response.bodyWriter((MessageBodyWriter.WriteClosure) routeInfo.getMessageBodyWriter());
+            response.bodyWriter((MessageBodyWriter) routeInfo.getMessageBodyWriter());
             return response;
         });
         return outgoingResponse;

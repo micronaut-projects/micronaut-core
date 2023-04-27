@@ -81,7 +81,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
     private ServerCookieEncoder serverCookieEncoder = DEFAULT_SERVER_COOKIE_ENCODER;
 
     private final BodyConvertor bodyConvertor = newBodyConvertor();
-    private MessageBodyWriter.WriteClosure<B> messageBodyWriter;
+    private MessageBodyWriter<B> messageBodyWriter;
 
     /**
      * @param nettyResponse     The {@link FullHttpResponse}
@@ -171,12 +171,12 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
     }
 
     @Override
-    public Optional<MessageBodyWriter.WriteClosure<B>> getBodyWriter() {
+    public Optional<MessageBodyWriter<B>> getBodyWriter() {
         return Optional.ofNullable(messageBodyWriter);
     }
 
     @Override
-    public MutableHttpMessage<B> bodyWriter(MessageBodyWriter.WriteClosure<B> messageBodyWriter) {
+    public MutableHttpMessage<B> bodyWriter(MessageBodyWriter<B> messageBodyWriter) {
         this.messageBodyWriter = messageBodyWriter;
         return this;
     }
