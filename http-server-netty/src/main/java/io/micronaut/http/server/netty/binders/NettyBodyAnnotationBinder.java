@@ -11,6 +11,8 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.server.HttpServerConfiguration;
+import io.micronaut.http.server.netty.DefaultHttpContentProcessorResolver;
+import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.NettyHttpRequest;
@@ -69,7 +71,12 @@ class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> {
             return BindingResult.empty();
         }
 
-        HttpContentProcessor contentProcessor = httpContentProcessorResolver.resolve(nhr, context.getArgument()).resultType(context.getArgument());
+        HttpContentProcessor contentProcessor;
+        if (nhr.isFormOrMultipartData() && !DefaultHttpContentProcessorResolver.isRaw(context.getArgument())) {
+            contentProcessor = new FormDataHttpContentProcessor(nhr, httpServerConfiguration);
+        } else {
+            contentProcessor = httpContentProcessorResolver.resolve(nhr, context.getArgument()).resultType(context.getArgument());
+        }
 
         ExecutionFlow<ImmediateByteBody> buffered = nhr.rootBody()
             .buffer(nhr.getChannelHandlerContext().alloc());

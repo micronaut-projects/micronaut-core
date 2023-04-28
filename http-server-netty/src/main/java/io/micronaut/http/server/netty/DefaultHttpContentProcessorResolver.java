@@ -51,7 +51,7 @@ import java.util.function.Function;
  */
 @Singleton
 @Internal
-class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolver {
+public class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolver {
 
     private static final Set<Class<?>> RAW_BODY_TYPES = CollectionUtils.setOf(String.class, byte[].class, ByteBuffer.class, InputStream.class);
 
@@ -93,8 +93,11 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
         if (bodyType.getType() == HttpRequest.class) {
             bodyType = bodyType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
         }
-        boolean isRaw = RAW_BODY_TYPES.contains(bodyType.getType());
-        return resolve(request, isRaw);
+        return resolve(request, isRaw(bodyType));
+    }
+
+    public static boolean isRaw(Argument<?> bodyType) {
+        return RAW_BODY_TYPES.contains(bodyType.getType());
     }
 
     @Override

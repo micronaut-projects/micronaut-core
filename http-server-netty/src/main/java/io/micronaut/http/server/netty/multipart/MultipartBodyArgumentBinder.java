@@ -21,18 +21,15 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.multipart.CompletedPart;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.multipart.MultipartBody;
-import io.micronaut.http.server.netty.DefaultHttpContentProcessor;
+import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessor;
-import io.micronaut.http.server.netty.HttpContentSubscriberFactory;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.http.server.netty.body.MultiObjectBody;
-import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
@@ -79,10 +76,7 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
     @Override
     public BindingResult<MultipartBody> bind(ArgumentConversionContext<MultipartBody> context, HttpRequest<?> source) {
         if (source instanceof NettyHttpRequest<?> nhr) {
-            HttpContentProcessor processor = beanLocator.findBean(HttpContentSubscriberFactory.class,
-                    new ConsumesMediaTypeQualifier<>(MediaType.MULTIPART_FORM_DATA_TYPE))
-                .map(factory -> factory.build(nhr))
-                .orElse(new DefaultHttpContentProcessor(nhr, httpServerConfiguration.get()));
+            HttpContentProcessor processor = new FormDataHttpContentProcessor(nhr, httpServerConfiguration.get());
             MultiObjectBody multiObjectBody;
             try {
                 multiObjectBody = nhr.rootBody()
