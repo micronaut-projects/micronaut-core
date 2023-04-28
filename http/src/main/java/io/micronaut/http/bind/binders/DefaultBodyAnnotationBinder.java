@@ -65,14 +65,18 @@ public class DefaultBodyAnnotationBinder<T> extends AbstractArgumentBinder<T> im
             return context.getArgument().getName();
         });
         if (bodyComponent != null) {
-            return bindFullBodyConvertibleValues(source).map(cv -> doBind(context, cv, bodyComponent));
+            return bindBodyPart(context, source, bodyComponent);
         } else {
             return bindFullBody(context, source);
         }
     }
 
+    protected BindingResult<T> bindBodyPart(ArgumentConversionContext<T> context, HttpRequest<?> source, String bodyComponent) {
+        return bindFullBodyConvertibleValues(source).map(cv -> doBind(context, cv, bodyComponent));
+    }
+
     @SuppressWarnings({"unchecked", "rawtypes"})
-    public BindingResult<ConvertibleValues<?>> bindFullBodyConvertibleValues(HttpRequest<?> source) {
+    protected BindingResult<ConvertibleValues<?>> bindFullBodyConvertibleValues(HttpRequest<?> source) {
         Optional<ConvertibleValues> convertibleValuesBody = source.getBody(ConvertibleValues.class);
         return () -> (Optional) convertibleValuesBody;
     }

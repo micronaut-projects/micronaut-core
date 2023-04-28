@@ -11,6 +11,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.server.HttpServerConfiguration;
+import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.body.ImmediateByteBody;
@@ -34,7 +35,16 @@ class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> {
     }
 
     @Override
-    public BindingResult<ConvertibleValues<?>> bindFullBodyConvertibleValues(HttpRequest<?> source) {
+    protected BindingResult<T> bindBodyPart(ArgumentConversionContext<T> context, HttpRequest<?> source, String bodyComponent) {
+        if (source instanceof NettyHttpRequest<?> nhr && nhr.isFormOrMultipartData()) {
+            return PartUploadAnnotationBinder.bindPart(conversionService, context, nhr, bodyComponent, true);
+        } else {
+            return super.bindBodyPart(context, source, bodyComponent);
+        }
+    }
+
+    @Override
+    protected BindingResult<ConvertibleValues<?>> bindFullBodyConvertibleValues(HttpRequest<?> source) {
         if (!(source instanceof NettyHttpRequest<?> nhr)) {
             return super.bindFullBodyConvertibleValues(source);
         }
@@ -43,7 +53,7 @@ class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> {
             return (BindingResult<ConvertibleValues<?>>) existing.get();
         } else {
             //noinspection unchecked
-            BindingResult<ConvertibleValues<?>> result = (BindingResult<ConvertibleValues<?>>) bindFullBody((ArgumentConversionContext<T>) ConversionContext.of(ConvertibleValues.class), source);
+            BindingResult<ConvertibleValues<?>> result = (BindingResult<ConvertibleValues<?>>) bindFullBody((ArgumentConversionContext<T>) ConversionContext.of(ConvertibleValues.class), nhr);
             nhr.setAttribute(ATTR_CONVERTIBLE_BODY, result);
             return result;
         }
@@ -58,6 +68,8 @@ class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> {
             return BindingResult.empty();
         }
 
+        HttpContentProcessor contentProcessor = httpContentProcessorResolver.resolve(nhr, context.getArgument()).resultType(context.getArgument());
+
         ExecutionFlow<ImmediateByteBody> buffered = nhr.rootBody()
             .buffer(nhr.getChannelHandlerContext().alloc());
 
@@ -68,20 +80,20 @@ class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> {
             {
                 // NettyRequestLifecycle will "subscribe" to the execution flow added to routeWaitsFor,
                 // so we can't subscribe directly ourselves. Instead, use the side effect of a map.
-                nhr.addRouteWaitsFor(buffered.map(imm -> {
+                nhr.addRouteWaitsFor(buffered.flatMap(imm -> {
                     try {
                         //noinspection unchecked
                         result = imm.processSingle(
-                                httpContentProcessorResolver.resolve(nhr, context.getArgument()).resultType(context.getArgument()),
+                                contentProcessor,
                                 httpServerConfiguration.getDefaultCharset(),
                                 nhr.getChannelHandlerContext().alloc()
                             )
                             .convert(conversionService, context)
                             .map(o -> (T) o.claimForExternal());
+                        return ExecutionFlow.just(null);
                     } catch (Throwable e) {
-                        result = Optional.empty();
+                        return ExecutionFlow.error(e);
                     }
-                    return null;
                 }));
             }
 
