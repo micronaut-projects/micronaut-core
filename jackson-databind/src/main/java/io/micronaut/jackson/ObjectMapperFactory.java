@@ -100,6 +100,24 @@ public class ObjectMapperFactory {
     }
 
     /**
+     * Set additional serializers.
+     * @param serializers The serializers
+     * @since 4.0
+     */
+    public void setSerializers(JsonSerializer... serializers) {
+        this.serializers = serializers;
+    }
+
+    /**
+     * Set additional deserializers.
+     * @param deserializers The deserializers
+     * @since 4.0
+     */
+    public void setDeserializers(JsonDeserializer... deserializers) {
+        this.deserializers = deserializers;
+    }
+
+    /**
      * Builds the core Jackson {@link ObjectMapper} from the optional configuration and {@link JsonFactory}.
      *
      * @param jacksonConfiguration The configuration

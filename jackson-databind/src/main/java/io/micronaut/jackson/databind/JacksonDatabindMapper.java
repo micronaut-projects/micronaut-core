@@ -37,6 +37,8 @@ import io.micronaut.jackson.core.parser.JacksonCoreParserFactory;
 import io.micronaut.jackson.core.parser.JacksonCoreProcessor;
 import io.micronaut.jackson.core.tree.JsonNodeTreeCodec;
 import io.micronaut.jackson.core.tree.TreeGenerator;
+import io.micronaut.jackson.serialize.JsonNodeDeserializer;
+import io.micronaut.jackson.serialize.JsonNodeSerializer;
 import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.JsonStreamConfig;
@@ -79,7 +81,14 @@ public final class JacksonDatabindMapper implements JsonMapper {
 
     @Internal
     public JacksonDatabindMapper() {
-        this(new ObjectMapperFactory().objectMapper(null, null));
+        this(createDefaultMapper());
+    }
+
+    private static ObjectMapper createDefaultMapper() {
+        ObjectMapperFactory objectMapperFactory = new ObjectMapperFactory();
+        objectMapperFactory.setDeserializers(new JsonNodeDeserializer());
+        objectMapperFactory.setSerializers(new JsonNodeSerializer());
+        return objectMapperFactory.objectMapper(null, null);
     }
 
     @Internal
