@@ -128,26 +128,21 @@ final class NettyRequestLifecycle extends RequestLifecycle {
      * This method also sometimes fulfills more controller parameters with form data.
      */
     private ExecutionFlow<RouteMatch<?>> waitForBody(RouteMatch<?> routeMatch) {
-        // note: shouldReadBody only works when fulfill has been called at least once
-        if (nettyRequest.rootBody().next() == null) {
-            HttpContentProcessor processor = rib.httpContentProcessorResolver.resolve(nettyRequest, routeMatch);
+        // if there is a binder that needs form content, actually process the body now. We need to
+        // do this after all binders are done because all createClaimant calls must be done before
+        // the FormRouteCompleter can process data.
+        if (nettyRequest.hasFormRouteCompleter()) {
+            FormDataHttpContentProcessor processor = new FormDataHttpContentProcessor(nettyRequest, rib.serverConfiguration);
             ByteBody rootBody = nettyRequest.rootBody();
-            // Not annotated body argument
-            if (processor instanceof FormDataHttpContentProcessor && nettyRequest.isFormOrMultipartData()) {
-                FormRouteCompleter frc = nettyRequest.formRouteCompleter();
-                try {
-                    rootBody.processMulti(processor).handleForm(frc);
-                } catch (Throwable e) {
-                    return ExecutionFlow.error(e);
-                }
-                nettyRequest.addRouteWaitsFor(frc.execute);
+            FormRouteCompleter formRouteCompleter = nettyRequest.formRouteCompleter();
+            try {
+                rootBody.processMulti(processor).handleForm(formRouteCompleter);
+                nettyRequest.addRouteWaitsFor(formRouteCompleter.execute);
+            } catch (Throwable e) {
+                return ExecutionFlow.error(e);
             }
         }
-        ExecutionFlow<?> waitFor = ExecutionFlow.just(null);
-        for (ExecutionFlow<?> step : nettyRequest.getRouteWaitsFor()) {
-            waitFor = waitFor.then(() -> step);
-        }
-        return waitFor.map(v -> routeMatch);
+        return nettyRequest.getRouteWaitsFor().map(v -> routeMatch);
     }
 
     void handleException(Throwable cause) {

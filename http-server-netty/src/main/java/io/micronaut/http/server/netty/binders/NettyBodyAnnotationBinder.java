@@ -37,6 +37,7 @@ class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> {
     @Override
     protected BindingResult<T> bindBodyPart(ArgumentConversionContext<T> context, HttpRequest<?> source, String bodyComponent) {
         if (source instanceof NettyHttpRequest<?> nhr && nhr.isFormOrMultipartData()) {
+            // skipClaimed=true because for unmatched binding, both this binder and PartUploadAnnotationBinder can be called on the same parameter
             return PartUploadAnnotationBinder.bindPart(conversionService, context, nhr, bodyComponent, true);
         } else {
             return super.bindBodyPart(context, source, bodyComponent);

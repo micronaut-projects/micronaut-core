@@ -86,10 +86,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.security.cert.Certificate;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -158,7 +156,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private final ByteBody body;
     @Nullable
     private FormRouteCompleter formRouteCompleter;
-    private final List<ExecutionFlow<?>> routeWaitsFor = new ArrayList<>();
+    private ExecutionFlow<?> routeWaitsFor = ExecutionFlow.just(null);
 
     /**
      * Set to {@code true} when the {@link #headers} may have been mutated. If this is not the case,
@@ -244,18 +242,23 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     }
 
     public void addRouteWaitsFor(ExecutionFlow<?> executionFlow) {
-        routeWaitsFor.add(executionFlow);
+        routeWaitsFor = routeWaitsFor.then(() -> executionFlow);
     }
 
-    public List<ExecutionFlow<?>> getRouteWaitsFor() {
+    public ExecutionFlow<?> getRouteWaitsFor() {
         return routeWaitsFor;
     }
 
     public final FormRouteCompleter formRouteCompleter() {
+        assert isFormOrMultipartData();
         if (formRouteCompleter == null) {
             formRouteCompleter = new FormRouteCompleter((RouteMatch<?>) getAttribute(HttpAttributes.ROUTE_MATCH).get(), getChannelHandlerContext().channel().eventLoop());
         }
         return formRouteCompleter;
+    }
+
+    public final boolean hasFormRouteCompleter() {
+        return formRouteCompleter != null;
     }
 
     @Override
