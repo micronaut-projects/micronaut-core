@@ -22,6 +22,7 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -42,7 +43,7 @@ final class PropagatedContextImpl implements PropagatedContext {
     private static final PropagatedContext.InContext NO_OP = () -> {
     };
 
-    private static final ThreadLocal<PropagatedContextImpl> THREAD_CONTEXT = new ThreadLocal<PropagatedContextImpl>() {
+    private static final ThreadLocal<PropagatedContextImpl> THREAD_CONTEXT = new ThreadLocal<>() {
         @Override
         public String toString() {
             return "Micronaut Propagation Context";
@@ -103,6 +104,7 @@ final class PropagatedContextImpl implements PropagatedContext {
         return propagatedContext;
     }
 
+    @Override
     public PropagatedContextImpl plus(PropagatedContextElement element) {
         ArrayList<PropagatedContextElement> newElements = new ArrayList<>(elements.size() + 1);
         newElements.addAll(elements);
@@ -111,12 +113,12 @@ final class PropagatedContextImpl implements PropagatedContext {
     }
 
     @Override
-    public <T> Optional<T> find(Class<T> elementType) {
+    public <T extends PropagatedContextElement> Optional<T> find(Class<T> elementType) {
         return Optional.ofNullable(findElement(elementType));
     }
 
     @Override
-    public <T> T get(Class<T> elementType) {
+    public <T extends PropagatedContextElement> T get(Class<T> elementType) {
         T element = findElement(elementType);
         if (element == null) {
             throw new NoSuchElementException();
@@ -124,13 +126,20 @@ final class PropagatedContextImpl implements PropagatedContext {
         return element;
     }
 
-    public <T> T findElement(Class<T> elementType) {
-        for (PropagatedContextElement element : elements) {
+    private <T extends PropagatedContextElement> T findElement(Class<T> elementType) {
+        ListIterator<PropagatedContextElement> listIterator = elements.listIterator(elements.size());
+        while (listIterator.hasPrevious()) {
+            PropagatedContextElement element = listIterator.previous();
             if (elementType.isInstance(element)) {
                 return (T) element;
             }
         }
         return null;
+    }
+
+    @Override
+    public List<PropagatedContextElement> getAllElements() {
+        return elements;
     }
 
     @Override

@@ -18,6 +18,7 @@ package io.micronaut.core.propagation;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.function.Supplier;
@@ -123,7 +124,7 @@ public interface PropagatedContext {
      * @param <T> The element's type
      * @return optional element
      */
-    <T> Optional<T> find(@NonNull Class<T> elementType);
+    <T extends PropagatedContextElement> Optional<T> find(@NonNull Class<T> elementType);
 
     /**
      * Gets element of type.
@@ -132,7 +133,14 @@ public interface PropagatedContext {
      * @param <T> The element's type
      * @return an element or exception
      */
-    <T> T get(@NonNull Class<T> elementType);
+    <T extends PropagatedContextElement> T get(@NonNull Class<T> elementType);
+
+    /**
+     * Gets all elements.
+     *
+     * @return all elements.
+     */
+    List<PropagatedContextElement> getAllElements();
 
     /**
      * Propagate the context using try-resource block.
