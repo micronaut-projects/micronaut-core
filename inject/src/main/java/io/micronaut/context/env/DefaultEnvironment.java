@@ -125,7 +125,19 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @param configuration The configuration
      */
     public DefaultEnvironment(@NonNull ApplicationContextConfiguration configuration) {
+        this(configuration, true);
+    }
+
+    /**
+     * Construct a new environment for the given configuration.
+     *
+     * @param configuration The configuration
+     * @param logEnabled flag to enable or disable logger
+     */
+    public DefaultEnvironment(@NonNull ApplicationContextConfiguration configuration, boolean logEnabled) {
         super(configuration.getConversionService());
+
+        this.logEnabled = logEnabled;
         this.configuration = configuration;
         this.resourceLoader = configuration.getResourceLoader();
 
