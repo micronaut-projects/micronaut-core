@@ -47,6 +47,7 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
     private final BeanLocator beanLocator;
     private final BeanProvider<HttpServerConfiguration> httpServerConfiguration;
     private final BeanProvider<ExecutorService> executorService;
+    private final NettyBodyAnnotationBinder<Object> nettyBodyAnnotationBinder;
 
     /**
      * Default constructor.
@@ -55,28 +56,28 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
      * @param beanLocator                  The bean locator
      * @param httpServerConfiguration      The server config
      * @param executorService
+     * @param nettyBodyAnnotationBinder
      */
     NettyBinderRegistrar(ConversionService conversionService,
                          HttpContentProcessorResolver httpContentProcessorResolver,
                          BeanLocator beanLocator,
                          BeanProvider<HttpServerConfiguration> httpServerConfiguration,
                          @Named(TaskExecutors.BLOCKING)
-                         BeanProvider<ExecutorService> executorService) {
+                         BeanProvider<ExecutorService> executorService,
+                         NettyBodyAnnotationBinder<Object> nettyBodyAnnotationBinder) {
         this.conversionService = conversionService;
         this.httpContentProcessorResolver = httpContentProcessorResolver;
         this.beanLocator = beanLocator;
         this.httpServerConfiguration = httpServerConfiguration;
         this.executorService = executorService;
+        this.nettyBodyAnnotationBinder = nettyBodyAnnotationBinder;
     }
 
     @Override
     public RequestBinderRegistry onCreated(BeanCreatedEvent<RequestBinderRegistry> event) {
         RequestBinderRegistry registry = event.getBean();
         registry.addArgumentBinder(new CompletableFutureBodyBinder(
-                httpContentProcessorResolver,
-                conversionService,
-                httpServerConfiguration
-        ));
+            nettyBodyAnnotationBinder));
         registry.addArgumentBinder(new MultipartBodyArgumentBinder(
                 beanLocator,
                 httpServerConfiguration

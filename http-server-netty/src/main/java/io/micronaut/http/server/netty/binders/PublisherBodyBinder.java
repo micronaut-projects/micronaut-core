@@ -95,7 +95,7 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
         return BindingResult.empty();
     }
 
-    private static RuntimeException extractError(Object message, ArgumentConversionContext<?> conversionContext) {
+    static RuntimeException extractError(Object message, ArgumentConversionContext<?> conversionContext) {
         Optional<ConversionError> lastError = conversionContext.getLastError();
         if (lastError.isPresent()) {
             if (LOG.isDebugEnabled()) {

@@ -114,7 +114,7 @@ class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> {
         };
     }
 
-    private Optional<T> transform(NettyHttpRequest<?> nhr, ArgumentConversionContext<T> context, ImmediateByteBody imm) throws Throwable {
+    Optional<T> transform(NettyHttpRequest<?> nhr, ArgumentConversionContext<T> context, ImmediateByteBody imm) throws Throwable {
         if (!DefaultHttpContentProcessorResolver.isRaw(context.getArgument())) {
             if (nhr.isFormOrMultipartData()) {
                 return imm.processSingle(
