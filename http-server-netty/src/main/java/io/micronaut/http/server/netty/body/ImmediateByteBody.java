@@ -15,9 +15,15 @@
  */
 package io.micronaut.http.server.netty.body;
 
+import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.Headers;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.HttpContentProcessor;
@@ -64,7 +70,7 @@ public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements Byt
     }
 
     @Override
-    public MultiObjectBody rawContent(HttpServerConfiguration configuration) throws ContentLengthExceededException {
+    public ImmediateSingleObjectBody rawContent(HttpServerConfiguration configuration) throws ContentLengthExceededException {
         ByteBuf buf = prepareClaim();
         checkLength(configuration, buf.readableBytes());
         return next(new ImmediateSingleObjectBody(buf));
@@ -100,6 +106,25 @@ public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements Byt
      */
     public ImmediateSingleObjectBody processSingle(HttpContentProcessor processor, Charset defaultCharset, ByteBufAllocator alloc) throws Throwable {
         return next(processMultiImpl(processor, prepareClaim()).single(defaultCharset, alloc));
+    }
+
+    /**
+     * Process this body using the given {@link MessageBodyReader}.
+     *
+     * @param configuration The server configuration. Used for checking body length restrictions
+     * @param reader        The reader
+     * @param type          The type to parse to
+     * @param mediaType     The request media type
+     * @param httpHeaders   The request headers
+     * @param <T>           The type to parse to
+     * @return The parsed value
+     */
+    public <T> ImmediateSingleObjectBody processSingle(HttpServerConfiguration configuration, MessageBodyReader<T> reader, Argument<T> type, MediaType mediaType, Headers httpHeaders) {
+        ByteBuf buf = prepareClaim();
+        checkLength(configuration, buf.readableBytes());
+        ByteBuffer<ByteBuf> wrapped = NettyByteBufferFactory.DEFAULT.wrap(buf);
+        T read = reader.read(type, mediaType, httpHeaders, wrapped);
+        return next(new ImmediateSingleObjectBody(read));
     }
 
     @Override

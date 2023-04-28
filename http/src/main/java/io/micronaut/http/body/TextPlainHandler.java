@@ -17,6 +17,7 @@ package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.IOUtils;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
@@ -62,5 +63,10 @@ public final class TextPlainHandler implements MessageBodyHandler<String> {
         } catch (IOException e) {
             throw new CodecException("Error reading body text: " + e.getMessage(), e);
         }
+    }
+
+    @Override
+    public String read(Argument<String> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
+        return byteBuffer.toString(MessageBodyWriter.getCharset(httpHeaders));
     }
 }

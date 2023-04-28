@@ -17,6 +17,7 @@ package io.micronaut.json.body;
 
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
@@ -49,10 +50,11 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {
 
     @Override
     public T read(Argument<T> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
-        return jsonMediaTypeCodec.decode(
-            type,
-            byteBuffer
-        );
+        T decoded = jsonMediaTypeCodec.decode(type, byteBuffer);
+        if (byteBuffer instanceof ReferenceCounted rc) {
+            rc.release();
+        }
+        return decoded;
     }
 
     @Override

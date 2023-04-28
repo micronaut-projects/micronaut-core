@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
@@ -64,11 +65,16 @@ public interface MessageBodyReader<T> extends Ordered {
         @Nullable MediaType mediaType,
         @NonNull Headers httpHeaders,
         @NonNull ByteBuffer<?> byteBuffer) throws CodecException {
+        T read;
         try (InputStream inputStream = byteBuffer.toInputStream()) {
-            return read(type, mediaType, httpHeaders, inputStream);
+            read = read(type, mediaType, httpHeaders, inputStream);
         } catch (IOException e) {
             throw new CodecException("Error reading message body: " + e.getMessage(), e);
         }
+        if (byteBuffer instanceof ReferenceCounted rc) {
+            rc.release();
+        }
+        return read;
     }
 
     /**

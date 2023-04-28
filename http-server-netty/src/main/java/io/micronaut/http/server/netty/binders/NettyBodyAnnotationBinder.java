@@ -8,12 +8,15 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.DefaultHttpContentProcessorResolver;
 import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
-import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.body.ImmediateByteBody;
@@ -29,11 +32,13 @@ class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> {
 
     private final HttpContentProcessorResolver httpContentProcessorResolver;
     private final HttpServerConfiguration httpServerConfiguration;
+    private final MessageBodyHandlerRegistry bodyHandlerRegistry;
 
-    public NettyBodyAnnotationBinder(ConversionService conversionService, HttpContentProcessorResolver httpContentProcessorResolver, HttpServerConfiguration httpServerConfiguration) {
+    public NettyBodyAnnotationBinder(ConversionService conversionService, HttpContentProcessorResolver httpContentProcessorResolver, HttpServerConfiguration httpServerConfiguration, MessageBodyHandlerRegistry bodyHandlerRegistry) {
         super(conversionService);
         this.httpContentProcessorResolver = httpContentProcessorResolver;
         this.httpServerConfiguration = httpServerConfiguration;
+        this.bodyHandlerRegistry = bodyHandlerRegistry;
     }
 
     @Override
@@ -71,13 +76,6 @@ class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> {
             return BindingResult.empty();
         }
 
-        HttpContentProcessor contentProcessor;
-        if (nhr.isFormOrMultipartData() && !DefaultHttpContentProcessorResolver.isRaw(context.getArgument())) {
-            contentProcessor = new FormDataHttpContentProcessor(nhr, httpServerConfiguration);
-        } else {
-            contentProcessor = httpContentProcessorResolver.resolve(nhr, context.getArgument()).resultType(context.getArgument());
-        }
-
         ExecutionFlow<ImmediateByteBody> buffered = nhr.rootBody()
             .buffer(nhr.getChannelHandlerContext().alloc());
 
@@ -90,14 +88,7 @@ class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> {
                 // so we can't subscribe directly ourselves. Instead, use the side effect of a map.
                 nhr.addRouteWaitsFor(buffered.flatMap(imm -> {
                     try {
-                        //noinspection unchecked
-                        result = imm.processSingle(
-                                contentProcessor,
-                                httpServerConfiguration.getDefaultCharset(),
-                                nhr.getChannelHandlerContext().alloc()
-                            )
-                            .convert(conversionService, context)
-                            .map(o -> (T) o.claimForExternal());
+                        result = transform(nhr, context, imm);
                         return ExecutionFlow.just(null);
                     } catch (Throwable e) {
                         return ExecutionFlow.error(e);
@@ -121,5 +112,41 @@ class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> {
                 return context.getLastError().map(List::of).orElseGet(List::of);
             }
         };
+    }
+
+    private Optional<T> transform(NettyHttpRequest<?> nhr, ArgumentConversionContext<T> context, ImmediateByteBody imm) throws Throwable {
+        if (!DefaultHttpContentProcessorResolver.isRaw(context.getArgument())) {
+            if (nhr.isFormOrMultipartData()) {
+                return imm.processSingle(
+                        new FormDataHttpContentProcessor(nhr, httpServerConfiguration),
+                        httpServerConfiguration.getDefaultCharset(),
+                        nhr.getChannelHandlerContext().alloc()
+                    )
+                    .convert(conversionService, context)
+                    .map(o -> (T) o.claimForExternal());
+            }
+
+            MediaType mediaType = nhr.getContentType().orElse(null);
+            if (mediaType != null) {
+                Optional<MessageBodyReader<T>> reader = bodyHandlerRegistry.findReader(context.getArgument(), List.of(mediaType));
+                if (reader.isPresent()) {
+                    try {
+                        //noinspection unchecked
+                        return Optional.ofNullable((T) imm.processSingle(httpServerConfiguration, reader.get(), context.getArgument(), mediaType, nhr.getHeaders()).claimForExternal());
+                    } catch (CodecException ce) {
+                        if (ce.getCause() instanceof Exception e) {
+                            context.reject(e);
+                        } else {
+                            context.reject(ce);
+                        }
+                        return Optional.empty();
+                    }
+                }
+            }
+        }
+        //noinspection unchecked
+        return imm.rawContent(httpServerConfiguration)
+            .convert(conversionService, context)
+            .map(o -> (T) o.claimForExternal());
     }
 }
