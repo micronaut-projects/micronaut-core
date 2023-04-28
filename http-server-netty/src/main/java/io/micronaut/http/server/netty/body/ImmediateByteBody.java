@@ -18,6 +18,8 @@ package io.micronaut.http.server.netty.body;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -59,6 +61,19 @@ public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements Byt
         }
 
         return next(processMultiImpl(processor, data));
+    }
+
+    @Override
+    public MultiObjectBody rawContent(HttpServerConfiguration configuration) throws ContentLengthExceededException {
+        ByteBuf buf = prepareClaim();
+        checkLength(configuration, buf.readableBytes());
+        return next(new ImmediateSingleObjectBody(buf));
+    }
+
+    static void checkLength(HttpServerConfiguration configuration, long n) {
+        if (n > configuration.getMaxRequestSize()) {
+            throw new ContentLengthExceededException(configuration.getMaxRequestSize(), n);
+        }
     }
 
     @NonNull

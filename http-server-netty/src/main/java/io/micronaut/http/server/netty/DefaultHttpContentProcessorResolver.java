@@ -72,6 +72,7 @@ public class DefaultHttpContentProcessorResolver implements HttpContentProcessor
 
     @Override
     @NonNull
+    @Deprecated
     public HttpContentProcessor resolve(@NonNull NettyHttpRequest<?> request, @NonNull RouteMatch<?> route) {
         Argument<?> bodyType = route.getRouteInfo().getFullRequestBodyType()
                 .orElseGet(() -> {

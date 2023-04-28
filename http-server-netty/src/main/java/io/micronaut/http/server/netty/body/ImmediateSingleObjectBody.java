@@ -21,8 +21,8 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.server.netty.FormRouteCompleter;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.json.convert.LazyJsonNode;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.util.ReferenceCounted;
 import org.reactivestreams.Publisher;
@@ -105,7 +105,7 @@ public final class ImmediateSingleObjectBody extends ManagedBody<Object> impleme
 
     @Override
     public InputStream coerceToInputStream(ByteBufAllocator alloc) {
-        return new ByteBufInputStream(((ByteBufHolder) claim()).content(), true);
+        return new ByteBufInputStream((ByteBuf) claim(), true);
     }
 
     @Override

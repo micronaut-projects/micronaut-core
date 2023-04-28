@@ -82,8 +82,8 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
                 httpServerConfiguration
         ));
         registry.addArgumentBinder(new InputStreamBodyBinder(
-                httpContentProcessorResolver
-        ));
+                httpContentProcessorResolver,
+                httpServerConfiguration.get()));
         NettyStreamingFileUpload.Factory fileUploadFactory = new NettyStreamingFileUpload.Factory(httpServerConfiguration.get().getMultipart(), executorService.get());
         registry.addArgumentBinder(new StreamingFileUploadBinder(
             conversionService,

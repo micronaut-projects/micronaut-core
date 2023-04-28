@@ -19,8 +19,10 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.netty.reactive.HotObservable;
 import io.micronaut.http.netty.stream.DelegateStreamedHttpRequest;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessorAsReactiveProcessor;
 import io.netty.buffer.ByteBuf;
@@ -44,13 +46,22 @@ import java.util.concurrent.locks.ReentrantLock;
  */
 @Internal
 public final class StreamingByteBody extends ManagedBody<Publisher<HttpContent>> implements ByteBody {
-    StreamingByteBody(Publisher<HttpContent> publisher) {
+    private final long advertisedLength;
+
+    StreamingByteBody(Publisher<HttpContent> publisher, long advertisedLength) {
         super(publisher);
+        this.advertisedLength = advertisedLength;
     }
 
     @Override
     public MultiObjectBody processMulti(HttpContentProcessor processor) {
         return next(new StreamingMultiObjectBody(HttpContentProcessorAsReactiveProcessor.asPublisher(processor, prepareClaim())));
+    }
+
+    @Override
+    public MultiObjectBody rawContent(HttpServerConfiguration configuration) {
+        ImmediateByteBody.checkLength(configuration, advertisedLength);
+        return next(new StreamingMultiObjectBody(new LengthCheckPublisher(configuration, prepareClaim())));
     }
 
     @Override
@@ -178,6 +189,68 @@ public final class StreamingByteBody extends ManagedBody<Publisher<HttpContent>>
         @Override
         public HttpBody next() {
             return next;
+        }
+    }
+
+    private static final class LengthCheckPublisher implements Publisher<ByteBuf>, Subscriber<HttpContent> {
+        private final HttpServerConfiguration configuration;
+        private final Publisher<HttpContent> upstream;
+        private Subscriber<? super ByteBuf> downstream;
+        private Subscription subscription;
+        private long received = 0;
+        private boolean exceeded = false;
+
+        LengthCheckPublisher(HttpServerConfiguration configuration, Publisher<HttpContent> upstream) {
+            this.configuration = configuration;
+            this.upstream = upstream;
+        }
+
+        @Override
+        public void subscribe(Subscriber<? super ByteBuf> s) {
+            downstream = s;
+            upstream.subscribe(this);
+        }
+
+        @Override
+        public void onSubscribe(Subscription s) {
+            subscription = s;
+            downstream.onSubscribe(s);
+        }
+
+        @Override
+        public void onNext(HttpContent httpContent) {
+            if (exceeded) {
+                httpContent.release();
+                return;
+            }
+
+            ByteBuf buf = httpContent.content();
+
+            received += buf.readableBytes();
+            try {
+                ImmediateByteBody.checkLength(configuration, received);
+            } catch (ContentLengthExceededException fail) {
+                exceeded = true;
+                httpContent.release();
+                downstream.onError(fail);
+                subscription.cancel();
+                return;
+            }
+            downstream.onNext(buf);
+        }
+
+        @Override
+        public void onError(Throwable t) {
+            if (!exceeded) {
+                downstream.onError(t);
+            }
+        }
+
+        @Override
+        public void onComplete() {
+            if (!exceeded) {
+                downstream.onComplete();
+            }
         }
     }
 }

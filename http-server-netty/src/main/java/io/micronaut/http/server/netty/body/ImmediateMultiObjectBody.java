@@ -88,7 +88,7 @@ public final class ImmediateMultiObjectBody extends ManagedBody<List<?>> impleme
     private static CompositeByteBuf coerceToComposite(List<?> objects, ByteBufAllocator alloc) {
         CompositeByteBuf composite = alloc.compositeBuffer();
         for (Object object : objects) {
-            composite.addComponent(true, ((ByteBufHolder) object).content());
+            composite.addComponent(true, (ByteBuf) object);
         }
         return composite;
     }
@@ -126,7 +126,7 @@ public final class ImmediateMultiObjectBody extends ManagedBody<List<?>> impleme
         List<?> objects = claim();
         ByteBuf buf = switch (objects.size()) {
             case 0 -> Unpooled.EMPTY_BUFFER;
-            case 1 -> ((ByteBufHolder) objects.get(0)).content();
+            case 1 -> (ByteBuf) objects.get(0);
             default -> coerceToComposite(objects, alloc);
         };
         return new ByteBufInputStream(buf, true);

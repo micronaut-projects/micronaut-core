@@ -40,6 +40,7 @@ public interface HttpContentProcessorResolver {
      * @return The content processor
      */
     @NonNull
+    @Deprecated
     HttpContentProcessor resolve(@NonNull NettyHttpRequest<?> request, @NonNull RouteMatch<?> route);
 
     /**

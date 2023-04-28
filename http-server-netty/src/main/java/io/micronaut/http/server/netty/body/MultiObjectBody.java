@@ -37,8 +37,7 @@ public sealed interface MultiObjectBody extends HttpBody permits ImmediateMultiO
     /**
      * Coerce this value to an {@link InputStream}. This implements
      * {@link io.micronaut.http.server.netty.binders.InputStreamBodyBinder}. Requires the objects
-     * of this body to be {@link io.netty.buffer.ByteBuf}s or
-     * {@link io.netty.buffer.ByteBufHolder}s.<br>
+     * of this body to be {@link io.netty.buffer.ByteBuf}s.<br>
      * Ownership is transferred to the stream, it must be closed to release all buffers.
      *
      * @param alloc The buffer allocator to use

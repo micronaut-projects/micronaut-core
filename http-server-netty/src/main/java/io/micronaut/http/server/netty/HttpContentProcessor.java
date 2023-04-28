@@ -35,6 +35,7 @@ import java.util.Collection;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Deprecated
 public interface HttpContentProcessor extends Toggleable {
     /**
      * Process more data.

@@ -22,7 +22,6 @@ import io.micronaut.http.netty.reactive.HotObservable;
 import io.micronaut.http.server.netty.FormRouteCompleter;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.ByteBufHolder;
 import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -59,8 +58,9 @@ public final class StreamingMultiObjectBody extends ManagedBody<Publisher<?>> im
 
     @Override
     public InputStream coerceToInputStream(ByteBufAllocator alloc) {
-        PublisherAsBlocking publisherAsBlocking = new PublisherAsBlocking();
-        claim().subscribe(publisherAsBlocking);
+        PublisherAsBlocking<ByteBuf> publisherAsBlocking = new PublisherAsBlocking<>();
+        //noinspection unchecked
+        ((Publisher<ByteBuf>) claim()).subscribe(publisherAsBlocking);
         return new PublisherAsStream(publisherAsBlocking);
     }
 
@@ -83,7 +83,7 @@ public final class StreamingMultiObjectBody extends ManagedBody<Publisher<?>> im
     /**
      * A subscriber that allows blocking reads from a publisher. Handles resource cleanup properly.
      */
-    private static final class PublisherAsBlocking implements Subscriber<Object>, Closeable {
+    private static final class PublisherAsBlocking<T> implements Subscriber<T>, Closeable {
         private final Lock lock = new ReentrantLock();
         private final Condition newDataCondition = lock.newCondition();
         /**
@@ -94,7 +94,7 @@ public final class StreamingMultiObjectBody extends ManagedBody<Publisher<?>> im
         /**
          * Pending object, this field is used to transfer from {@link #onNext} to {@link #take}.
          */
-        private Object swap;
+        private T swap;
         /**
          * The upstream subscription.
          */
@@ -128,7 +128,7 @@ public final class StreamingMultiObjectBody extends ManagedBody<Publisher<?>> im
         }
 
         @Override
-        public void onNext(Object o) {
+        public void onNext(T o) {
             lock.lock();
             try {
                 if (closed) {
@@ -175,13 +175,13 @@ public final class StreamingMultiObjectBody extends ManagedBody<Publisher<?>> im
          * @return The next object, or {@code null} if the stream is done
          */
         @Nullable
-        public Object take() throws InterruptedException {
+        public T take() throws InterruptedException {
             boolean demanded = false;
             while (true) {
                 Subscription subscription;
                 lock.lock();
                 try {
-                    Object swap = this.swap;
+                    T swap = this.swap;
                     if (swap != null) {
                         this.swap = null;
                         return swap;
@@ -224,10 +224,10 @@ public final class StreamingMultiObjectBody extends ManagedBody<Publisher<?>> im
     }
 
     private static final class PublisherAsStream extends InputStream {
-        private final PublisherAsBlocking publisherAsBlocking;
+        private final PublisherAsBlocking<ByteBuf> publisherAsBlocking;
         private ByteBuf buffer;
 
-        private PublisherAsStream(PublisherAsBlocking publisherAsBlocking) {
+        private PublisherAsStream(PublisherAsBlocking<ByteBuf> publisherAsBlocking) {
             this.publisherAsBlocking = publisherAsBlocking;
         }
 
@@ -242,7 +242,7 @@ public final class StreamingMultiObjectBody extends ManagedBody<Publisher<?>> im
         public int read(@NonNull byte[] b, int off, int len) throws IOException {
             while (buffer == null) {
                 try {
-                    Object o = publisherAsBlocking.take();
+                    ByteBuf o = publisherAsBlocking.take();
                     if (o == null) {
                         if (publisherAsBlocking.failure == null) {
                             return -1;
@@ -250,11 +250,10 @@ public final class StreamingMultiObjectBody extends ManagedBody<Publisher<?>> im
                             throw new IOException(publisherAsBlocking.failure);
                         }
                     }
-                    ByteBuf buf = o instanceof ByteBufHolder holder ? holder.content() : (ByteBuf) o;
-                    if (!buf.isReadable()) {
+                    if (!o.isReadable()) {
                         continue;
                     }
-                    buffer = buf;
+                    buffer = o;
                 } catch (InterruptedException e) {
                     throw new InterruptedIOException();
                 }
