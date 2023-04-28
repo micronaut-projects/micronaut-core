@@ -169,7 +169,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
             return projectDir;
         }
         // let's find the projectDir
-        Optional<GeneratedFile> dummyFile = visitGeneratedFile("dummy");
+        Optional<GeneratedFile> dummyFile = visitGeneratedFile("dummy" + System.nanoTime());
         if (dummyFile.isPresent()) {
             URI uri = dummyFile.get().toURI();
             // happens in tests 'mem:///CLASS_OUTPUT/dummy'
