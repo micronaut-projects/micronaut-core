@@ -94,7 +94,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                             final EmbeddedServer embeddedServer = (EmbeddedServer) embeddedApplication;
                             if (LOG.isInfoEnabled()) {
                                 long took = elapsedMillis(start);
-                                URL url = embeddedServer.getURL();
+                                URL url = embeddedServer.getURLWithContextPath();
                                 LOG.info("Startup completed in {}ms. Server Running: {}", took, url);
                             }
                             keepAlive = embeddedServer.isKeepAlive();

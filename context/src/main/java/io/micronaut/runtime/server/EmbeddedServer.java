@@ -50,6 +50,11 @@ public interface EmbeddedServer extends EmbeddedApplication<EmbeddedServer> {
     URL getURL();
 
     /**
+     * @return The full URL to the server with the context path
+     */
+    URL getURLWithContextPath();
+
+    /**
      * @return The full URI to the server
      */
     URI getURI();
