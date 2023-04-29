@@ -86,15 +86,16 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     protected final Map<String, Object>[] catalog = new Map[58];
     protected final Map<String, Object>[] rawCatalog = new Map[58];
     protected final Map<String, Object>[] nonGenerated = new Map[58];
-    private final SecureRandom random = new SecureRandom();
-    private final Map<String, Boolean> containsCache = new ConcurrentHashMap<>(20);
-    private final Map<String, Object> resolvedValueCache = new ConcurrentHashMap<>(20);
-    private final EnvironmentProperties environmentProperties = EnvironmentProperties.fork(CURRENT_ENV);
 
     /**
      * If you don't need to initialize SLF4J, set 'false'.
      */
     protected boolean logEnabled = true;
+
+    private final SecureRandom random = new SecureRandom();
+    private final Map<String, Boolean> containsCache = new ConcurrentHashMap<>(20);
+    private final Map<String, Object> resolvedValueCache = new ConcurrentHashMap<>(20);
+    private final EnvironmentProperties environmentProperties = EnvironmentProperties.fork(CURRENT_ENV);
 
     /**
      * Creates a new, initially empty, {@link PropertySourcePropertyResolver} for the given {@link ConversionService}.
