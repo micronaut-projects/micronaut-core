@@ -749,8 +749,10 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     private class Listener extends ChannelInitializer<Channel> {
         Channel serverChannel;
-        private NettyServerCustomizer listenerCustomizer;
+
         NettyHttpServerConfiguration.NettyListenerConfiguration config;
+
+        private NettyServerCustomizer listenerCustomizer;
 
         private volatile HttpPipelineBuilder httpPipelineBuilder;
 
