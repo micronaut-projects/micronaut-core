@@ -269,7 +269,7 @@ class BinaryWebSocketSpec extends Specification {
         def ctx = ApplicationContext.run([
                 'spec.name'            : 'test per-message compression',
                 'micronaut.server.port': -1,
-                'micronaut.http.client.ws-per-message-deflate': false
+                'micronaut.http.client.ws.compression.enabled': false
         ])
         def compressionDetectionCustomizer = ctx.getBean(CompressionDetectionCustomizer)
         EmbeddedServer embeddedServer = ctx.getBean(EmbeddedServer)

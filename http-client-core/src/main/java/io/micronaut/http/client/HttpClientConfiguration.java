@@ -106,11 +106,6 @@ public abstract class HttpClientConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_ALLOW_BLOCK_EVENT_LOOP = false;
 
-    /**
-     * The default websocket per message deflate value.
-     */
-    public static final boolean DEFAULT_WS_PER_MESSAGE_DEFLATE = true;
-
     private Map<String, Object> channelOptions = Collections.emptyMap();
 
     private Integer numOfThreads = null;
@@ -151,8 +146,6 @@ public abstract class HttpClientConfiguration {
     private boolean followRedirects = DEFAULT_FOLLOW_REDIRECTS;
 
     private boolean exceptionOnErrorStatus = DEFAULT_EXCEPTION_ON_ERROR_STATUS;
-
-    private boolean wsPerMessageDeflate = DEFAULT_WS_PER_MESSAGE_DEFLATE;
 
     private SslConfiguration sslConfiguration = new ClientSslConfiguration();
 
@@ -221,7 +214,6 @@ public abstract class HttpClientConfiguration {
             this.sslConfiguration = copy.sslConfiguration;
             this.threadFactory = copy.threadFactory;
             this.httpVersion = copy.httpVersion;
-            this.wsPerMessageDeflate = copy.wsPerMessageDeflate;
         }
     }
 
@@ -310,6 +302,13 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * Obtains the WebSocket compression configuration.
+     *
+     * @return The WebSocket compression configuration.
+     */
+    public abstract WebSocketCompressionConfiguration getWebSocketCompressionConfiguration();
+
+    /**
      * @return Whether redirects should be followed
      */
     public boolean isFollowRedirects() {
@@ -321,13 +320,6 @@ public abstract class HttpClientConfiguration {
      */
     public boolean isExceptionOnErrorStatus() {
         return exceptionOnErrorStatus;
-    }
-
-    /**
-     * @return Whether the per message deflate extension is enabled for websocket connections.
-     */
-    public boolean isWsPerMessageDeflate() {
-        return wsPerMessageDeflate;
     }
 
     /**
@@ -362,16 +354,6 @@ public abstract class HttpClientConfiguration {
      */
     public void setFollowRedirects(boolean followRedirects) {
         this.followRedirects = followRedirects;
-    }
-
-    /**
-     * Sets whether the per message deflate extension is enabled for websocket connections.
-     * Default value ({@link io.micronaut.http.client.HttpClientConfiguration#DEFAULT_WS_PER_MESSAGE_DEFLATE}).
-     *
-     * @param wsPerMessageDeflate
-     */
-    public void setWsPerMessageDeflate(boolean wsPerMessageDeflate) {
-        this.wsPerMessageDeflate = wsPerMessageDeflate;
     }
 
     /**
@@ -958,4 +940,41 @@ public abstract class HttpClientConfiguration {
         }
     }
 
+    /**
+     * Configuration for WebSocket client compression extensions.
+     */
+    public static class WebSocketCompressionConfiguration implements Toggleable {
+
+        /**
+         * The prefix to use for configuration.
+         */
+        public static final String PREFIX = "ws.compression";
+
+        /**
+         * The default enable value.
+         */
+        @SuppressWarnings("WeakerAccess")
+        public static final boolean DEFAULT_ENABLED = true;
+
+        private boolean enabled = DEFAULT_ENABLED;
+
+        /**
+         * Whether deflate compression is enabled for client WebSocket connections.
+         *
+         * @return True if the per message deflate extension is enabled.
+         */
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        /**
+         * Sets whether the per message deflate extension is enabled for WebSocket connections.
+         * Default value ({@link io.micronaut.http.client.HttpClientConfiguration.WebSocketCompressionConfiguration#DEFAULT_ENABLED}).
+         *
+         * @param enabled True is it is enabled.
+         */
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+    }
 }

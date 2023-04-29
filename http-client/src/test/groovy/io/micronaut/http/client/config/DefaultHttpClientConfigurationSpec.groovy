@@ -57,9 +57,7 @@ class DefaultHttpClientConfigurationSpec extends Specification {
         'shutdown-timeout'          | 'shutdownTimeout'        | '100ms' | Optional.of(Duration.ofMillis(100))
         'shutdown-timeout'          | 'shutdownTimeout'        | '15s'   | Optional.of(Duration.ofSeconds(15))
         'follow-redirects'          | 'followRedirects'        | 'false' | false
-        'ws-per-message-deflate'    | 'wsPerMessageDeflate'    | 'false' | false
     }
-
 
     void "test pool config"() {
         given:
@@ -71,6 +69,25 @@ class DefaultHttpClientConfigurationSpec extends Specification {
 
         expect:
         poolConfig[property] == expected
+
+        cleanup:
+        ctx.close()
+
+        where:
+        key               | property         | value   | expected
+        'enabled'         | 'enabled'        | 'false' | false
+    }
+
+    void "test WebSocket compression config"() {
+        given:
+        def ctx = ApplicationContext.run(
+                ("micronaut.http.client.ws.compression.$key".toString()): value
+        )
+        HttpClientConfiguration config = ctx.getBean(HttpClientConfiguration)
+        HttpClientConfiguration.WebSocketCompressionConfiguration compressionConfig = config.getWebSocketCompressionConfiguration()
+
+        expect:
+        compressionConfig[property] == expected
 
         cleanup:
         ctx.close()

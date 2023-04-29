@@ -467,7 +467,7 @@ public class ConnectionManager {
                 }
 
                 try {
-                    if (configuration.isWsPerMessageDeflate()) {
+                    if (configuration.getWebSocketCompressionConfiguration().isEnabled()) {
                         pipeline.addLast(WebSocketClientCompressionHandler.INSTANCE);
                     }
                     ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_WEBSOCKET_CLIENT, handler);
