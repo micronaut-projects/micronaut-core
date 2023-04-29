@@ -431,9 +431,13 @@ public class ReflectionUtils {
 
     /**
      * Gets the value of the given field reflectively.
+     *
      * @param clazz The class
      * @param fieldName The fieldName
      * @param instance The instance
+     *
+     * @return field value of instance
+     *
      * @since 3.7.0
      */
     @UsedByGeneratedCode
