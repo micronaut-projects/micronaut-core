@@ -91,4 +91,9 @@ public @interface Retryable {
      * @return The capture exception types (defaults to RuntimeException)
      */
     Class<? extends Throwable> capturedException() default RuntimeException.class;
+
+    /**
+     * @return The callback function when all attempts failed
+     */
+     Class<? extends Object> runnable() default RuntimeException.class;
 }

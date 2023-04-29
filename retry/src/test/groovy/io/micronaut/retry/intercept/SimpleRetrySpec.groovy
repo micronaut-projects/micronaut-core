@@ -225,6 +225,23 @@ class SimpleRetrySpec extends Specification {
             context.stop()
     }
 
+    void "test retry with runnable"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+        CounterService counterService = context.getBean(CounterService)
+
+        when:
+        counterService.getCountRunnable()
+        counterService.countThreshold = 7
+
+
+        then: "retry kicks in and the function in runnable is called"
+        thrown(MyCustomException)
+        counterService.countRunnable == 6
+
+        cleanup:
+        context.stop()
+    }
 
     void "test retry with includes"() {
         given:
@@ -348,6 +365,12 @@ class SimpleRetrySpec extends Specification {
         }
     }
 
+        static class MyRunnableFunction {
+        void test(){
+            throw new MyCustomException();
+        }
+    }
+
     @Singleton
     static class CounterService {
         int count = 0
@@ -365,6 +388,7 @@ class SimpleRetrySpec extends Specification {
         int countPreThreshold = 3
         int countThrowable = 0;
         int countThrowableUncaptured = 0;
+        int countRunnable = 0
 
         @Retryable(attempts = '5', delay = '5ms')
         int getCountSync() {
@@ -401,6 +425,15 @@ class SimpleRetrySpec extends Specification {
                 }
                 return countRx
             })
+        }
+
+        @Retryable(attempts = '5', delay = '5ms', runnable = MyRunnableFunction.class)
+        Integer getCountRunnable(){
+            countRunnable++
+            if(countRunnable < countThreshold) {
+                throw new IllegalStateException("Bad count")
+            }
+            return countRunnable
         }
 
         @Retryable(attempts = '5', delay = '5ms', includes = MyCustomException.class)
