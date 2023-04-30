@@ -17,8 +17,6 @@ package io.micronaut.context.env.yaml;
 
 import io.micronaut.context.env.AbstractPropertySourceLoader;
 import io.micronaut.core.util.CollectionUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.yaml.snakeyaml.Yaml;
 
 import java.io.InputStream;
@@ -34,7 +32,12 @@ import java.util.Set;
  */
 public class YamlPropertySourceLoader extends AbstractPropertySourceLoader {
 
-    private static final Logger LOG = LoggerFactory.getLogger(YamlPropertySourceLoader.class);
+    public YamlPropertySourceLoader() {
+    }
+
+    public YamlPropertySourceLoader(boolean logEnabled) {
+        super(logEnabled);
+    }
 
     @Override
     public boolean isEnabled() {
@@ -61,17 +64,13 @@ public class YamlPropertySourceLoader extends AbstractPropertySourceLoader {
                 Object object = i.next();
                 if (object instanceof Map) {
                     Map map = (Map) object;
-                    if (logEnabled) {
-                        LOG.trace("Processing YAML: {}", map);
-                    }
+                    log.trace("Processing YAML: {}", map);
                     String prefix = "";
                     processMap(finalMap, map, prefix);
                 }
             }
         } else {
-            if (logEnabled) {
-                LOG.trace("PropertySource [{}] produced no YAML content", name);
-            }
+            log.trace("PropertySource [{}] produced no YAML content", name);
         }
     }
 
