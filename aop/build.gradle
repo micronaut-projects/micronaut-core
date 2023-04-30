@@ -13,10 +13,10 @@ dependencies {
     api project(':inject')
     api project(':core')
     compileOnly project(':core-reactive')
-    compileOnly libs.kotlinx.coroutines.core
+    compileOnly libs.managed.kotlinx.coroutines.core
 }
 
 tasks.named("compileKotlin") {
-    kotlinOptions.jvmTarget = "1.8"
-    kotlinOptions.languageVersion = "1.6"
+    kotlinOptions.jvmTarget = "17"
+    kotlinOptions.languageVersion = "1.7"
 }

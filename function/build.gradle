@@ -5,8 +5,9 @@ plugins {
 dependencies {
 	annotationProcessor project(":inject-java")
 
-    api project(":runtime")    
+    api project(":inject")
     api project(":http")
 
     testAnnotationProcessor project(":inject-java")
+    testImplementation project(":jackson-databind")
 }

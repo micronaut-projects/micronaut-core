@@ -31,7 +31,7 @@ import java.io.IOException;
  * @since 3.1
  */
 @Singleton
-final class JsonNodeSerializer extends JsonSerializer<JsonNode> {
+public final class JsonNodeSerializer extends JsonSerializer<JsonNode> {
     @Override
     public void serialize(JsonNode value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
         if (value == null) {

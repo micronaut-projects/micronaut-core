@@ -21,7 +21,6 @@ import io.netty.buffer.ByteBuf
 import io.netty.buffer.CompositeByteBuf
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelOption
-import spock.lang.PendingFeature
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
@@ -67,7 +66,6 @@ class ConverterRegistrySpec extends Specification {
         ctx1.close()
     }
 
-    @PendingFeature
     def "test convert string to channel option after context reset"() {
         given:
         ApplicationContext ctx1 = ApplicationContext.run()
@@ -82,7 +80,6 @@ class ConverterRegistrySpec extends Specification {
         ctx2.stop()
 
         then:
-        // this fails, the converter has been removed by ctx2.stop()
         ctx1.getBean(ConversionService).convert("AUTO_READ", ChannelOption).get() == ChannelOption.AUTO_READ
 
         cleanup:

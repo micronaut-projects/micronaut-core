@@ -1,10 +1,13 @@
 package io.micronaut.inject.visitor.beans
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.type.GenericPlaceholder
+import spock.lang.Issue
 
 class BeanIntrospectionGenericsSpec
         extends AbstractTypeElementSpec {
+
     void "test generic placeholder for bean properties"() {
         given:
         def introspection = buildBeanIntrospection('test.Test', '''

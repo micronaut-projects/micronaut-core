@@ -59,6 +59,7 @@ public interface ArgumentBinder<T, S> {
      * @param <T>
      */
     interface BindingResult<T> {
+
         /**
          * An empty but satisfied result.
          */
@@ -95,7 +96,7 @@ public interface ArgumentBinder<T, S> {
          * @return Was the binding requirement satisfied
          */
         default boolean isSatisfied() {
-            return getConversionErrors() == Collections.EMPTY_LIST;
+            return getConversionErrors().isEmpty();
         }
 
         /**
@@ -110,8 +111,27 @@ public interface ArgumentBinder<T, S> {
          *
          * @return The value
          */
+        @SuppressWarnings({"java:S3655", "OptionalGetWithoutIsPresent"})
         default T get() {
             return getValue().get();
+        }
+
+        /**
+         * @param <R> The result type
+         * @return An empty but satisfied result.
+         * @since 4.0.0
+         */
+        static <R> BindingResult<R> empty() {
+            return BindingResult.EMPTY;
+        }
+
+        /**
+         * @param <R> The result type
+         * @return An empty but unsatisfied result.
+         * @since 4.0.0
+         */
+        static <R> BindingResult<R> unsatisfied() {
+            return UNSATISFIED;
         }
     }
 }

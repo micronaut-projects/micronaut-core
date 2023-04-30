@@ -27,7 +27,19 @@ import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.ObjectCodec;
 import com.fasterxml.jackson.core.SerializableString;
 import com.fasterxml.jackson.core.io.SerializedString;
-import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.BeanDescription;
+import com.fasterxml.jackson.databind.DeserializationConfig;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.PropertyMetadata;
+import com.fasterxml.jackson.databind.PropertyName;
+import com.fasterxml.jackson.databind.PropertyNamingStrategy;
+import com.fasterxml.jackson.databind.SerializationConfig;
+import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
@@ -200,7 +212,7 @@ public class BeanIntrospectionModule extends SimpleModule {
         AnnotationValue<?> jsonSerializeAnnotation = beanProperty.getAnnotation(annotationType);
         if (jsonSerializeAnnotation != null) {
             // ideally, we'd use SerializerProvider here, but it's not exposed to the BeanSerializerModifier
-            Class using = jsonSerializeAnnotation.classValue("using").orElse(null);
+            Class<?> using = jsonSerializeAnnotation.classValue("using").orElse(null);
             if (using != null) {
                 BeanIntrospection<Object> usingIntrospection = findIntrospection(using);
                 if (usingIntrospection != null) {
@@ -291,7 +303,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                         }
                     }
                 };
-                
+
                 newBuilder.setAnyGetter(builder.getAnyGetter());
                 final List<BeanPropertyWriter> properties = builder.getProperties();
                 final Collection<BeanProperty<Object, Object>> beanProperties = introspection.getBeanProperties();
@@ -335,7 +347,9 @@ public class BeanIntrospectionModule extends SimpleModule {
                     final List<BeanPropertyWriter> newProperties = new ArrayList<>(properties);
                     Map<String, BeanProperty<Object, Object>> named = new LinkedHashMap<>();
                     for (BeanProperty<Object, Object> beanProperty : beanProperties) {
-                        named.put(getName(config, namingStrategy, beanProperty), beanProperty);
+                        if (!beanProperty.isWriteOnly()) {
+                            named.put(getName(config, namingStrategy, beanProperty), beanProperty);
+                        }
                     }
                     for (int i = 0; i < properties.size(); i++) {
                         final BeanPropertyWriter existing = properties.get(i);
@@ -533,6 +547,22 @@ public class BeanIntrospectionModule extends SimpleModule {
                                             property.set(instance, value);
                                         }
                                         return null;
+                                    }
+
+                                    @Override
+                                    public JsonFormat.Value findPropertyFormat(MapperConfig<?> config, Class<?> baseType) {
+                                        JsonFormat.Value v1 = config.getDefaultPropertyFormat(baseType);
+                                        JsonFormat.Value v2 = null;
+                                        if (property != null) {
+                                            AnnotationValue<JsonFormat> formatAnnotation = property.getAnnotation(JsonFormat.class);
+                                            if (formatAnnotation != null) {
+                                                v2 = parseJsonFormat(formatAnnotation);
+                                            }
+                                        }
+                                        if (v1 == null) {
+                                            return (v2 == null) ? EMPTY_FORMAT : v2;
+                                        }
+                                        return (v2 == null) ? v1 : v1.withOverrides(v2);
                                     }
                                 };
                             }

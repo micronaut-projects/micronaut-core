@@ -19,9 +19,11 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.http.HttpMethod
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Error
+import io.micronaut.http.bind.RequestBinderRegistry
 import io.micronaut.web.router.GroovyRouteBuilder
 import io.micronaut.web.router.RouteMatch
 import io.micronaut.web.router.Router
@@ -74,16 +76,19 @@ class GroovyRouteBuilderSpec extends Specification {
         given:
         def context = new DefaultApplicationContext("test").start()
         Router router = context.getBean(Router)
+        RequestBinderRegistry requestBinderRegistry = context.getBean(RequestBinderRegistry)
 
+        def route = router.route(ErrorHandlingController, bean).get()
         expect:
-        router.route(ErrorHandlingController, new A()).get().execute() == "c"
-        router.route(ErrorHandlingController, new B()).get().execute() == "c"
-        router.route(ErrorHandlingController, new C()).get().execute() == "c"
-        router.route(ErrorHandlingController, new D()).get().execute() == "e"
-        router.route(ErrorHandlingController, new E()).get().execute() == "e"
+        route.fulfillBeforeFilters(requestBinderRegistry, Mock(HttpRequest))
+        route.execute() == result
 
         cleanup:
         context.stop()
+
+        where:
+        bean << [new A(), new B(), new C(), new D(), new E()]
+        result << ["c", "c", "c", "e", "e"]
     }
 
     // tag::routes[]

@@ -1,4 +1,4 @@
-Micronaut can be set up within Visual Studio Code in one of two ways. 
+The Micronaut framework can be set up within Visual Studio Code in one of two ways.
 
 ==== Option 1) GraalVM Extension Pack for Java
 

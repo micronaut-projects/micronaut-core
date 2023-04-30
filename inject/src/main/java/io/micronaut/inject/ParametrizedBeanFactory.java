@@ -18,6 +18,7 @@ package io.micronaut.inject;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.exceptions.BeanInstantiationException;
+import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.type.Argument;
 
 import java.util.Map;
@@ -29,6 +30,8 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Deprecated(since = "4")
+@NextMajorVersion("Should be removed after Micronaut 4 Milestone 1")
 public interface ParametrizedBeanFactory<T> extends BeanFactory<T> {
 
     /**

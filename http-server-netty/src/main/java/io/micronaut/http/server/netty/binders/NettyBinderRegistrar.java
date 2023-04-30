@@ -17,18 +17,18 @@ package io.micronaut.http.server.netty.binders;
 
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanProvider;
+import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.multipart.MultipartBodyArgumentBinder;
+import io.micronaut.http.server.netty.multipart.NettyStreamingFileUpload;
 import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Named;
-import jakarta.inject.Singleton;
 
 import java.util.concurrent.ExecutorService;
 
@@ -38,11 +38,11 @@ import java.util.concurrent.ExecutorService;
  * @author graemerocher
  * @since 2.0.0
  */
-@Singleton
+@Prototype
 @Internal
 class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegistry> {
 
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
     private final HttpContentProcessorResolver httpContentProcessorResolver;
     private final BeanLocator beanLocator;
     private final BeanProvider<HttpServerConfiguration> httpServerConfiguration;
@@ -51,19 +51,18 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
     /**
      * Default constructor.
      *
-     * @param conversionService            The conversion service
      * @param httpContentProcessorResolver The processor resolver
      * @param beanLocator                  The bean locator
      * @param httpServerConfiguration      The server config
-     * @param executorService              The executor to offload blocking operations
+     * @param executorService
      */
-    NettyBinderRegistrar(
-            @Nullable ConversionService<?> conversionService,
-            HttpContentProcessorResolver httpContentProcessorResolver,
-            BeanLocator beanLocator,
-            BeanProvider<HttpServerConfiguration> httpServerConfiguration,
-            @Named(TaskExecutors.IO) BeanProvider<ExecutorService> executorService) {
-        this.conversionService = conversionService == null ? ConversionService.SHARED : conversionService;
+    NettyBinderRegistrar(ConversionService conversionService,
+                         HttpContentProcessorResolver httpContentProcessorResolver,
+                         BeanLocator beanLocator,
+                         BeanProvider<HttpServerConfiguration> httpServerConfiguration,
+                         @Named(TaskExecutors.BLOCKING)
+                         BeanProvider<ExecutorService> executorService) {
+        this.conversionService = conversionService;
         this.httpContentProcessorResolver = httpContentProcessorResolver;
         this.beanLocator = beanLocator;
         this.httpServerConfiguration = httpServerConfiguration;
@@ -73,18 +72,35 @@ class NettyBinderRegistrar implements BeanCreatedEventListener<RequestBinderRegi
     @Override
     public RequestBinderRegistry onCreated(BeanCreatedEvent<RequestBinderRegistry> event) {
         RequestBinderRegistry registry = event.getBean();
-        registry.addRequestArgumentBinder(new CompletableFutureBodyBinder(
+        registry.addArgumentBinder(new CompletableFutureBodyBinder(
                 httpContentProcessorResolver,
-                conversionService
+                conversionService,
+                httpServerConfiguration
         ));
-        registry.addRequestArgumentBinder(new MultipartBodyArgumentBinder(
+        registry.addArgumentBinder(new MultipartBodyArgumentBinder(
                 beanLocator,
                 httpServerConfiguration
         ));
-        registry.addRequestArgumentBinder(new InputStreamBodyBinder(
-                httpContentProcessorResolver,
-                executorService.get()
+        registry.addArgumentBinder(new InputStreamBodyBinder(
+                httpContentProcessorResolver
         ));
+        NettyStreamingFileUpload.Factory fileUploadFactory = new NettyStreamingFileUpload.Factory(httpServerConfiguration.get().getMultipart(), executorService.get());
+        registry.addArgumentBinder(new StreamingFileUploadBinder(
+            conversionService,
+            fileUploadFactory)
+        );
+        CompletedFileUploadBinder completedFileUploadBinder = new CompletedFileUploadBinder(conversionService);
+        registry.addArgumentBinder(completedFileUploadBinder);
+        PublisherPartUploadBinder publisherPartUploadBinder = new PublisherPartUploadBinder(conversionService, fileUploadFactory);
+        registry.addArgumentBinder(publisherPartUploadBinder);
+        PartUploadAnnotationBinder<Object> partUploadAnnotationBinder = new PartUploadAnnotationBinder<>(
+            conversionService,
+            completedFileUploadBinder,
+            publisherPartUploadBinder
+        );
+        registry.addArgumentBinder(partUploadAnnotationBinder);
+
+        registry.addUnmatchedRequestArgumentBinder(partUploadAnnotationBinder);
         return registry;
     }
 }

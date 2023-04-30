@@ -244,6 +244,8 @@ class NameUtilsSpec extends Specification {
         "getFoo" | true
         "getfoo" | false
         "a"      | false
+        "get_foo" | true
+        'get$foo' | true
     }
 
     @Unroll
@@ -295,6 +297,8 @@ class NameUtilsSpec extends Specification {
         "isFoo"   | ["get"]         | true
         "isfoo"   | ["get"]         | false
         "getFoo"  | ["get"]         | true
+        'get$foo' | ["get"]         | true
+        'get_foo' | ["get"]         | true
         "getfoo"  | ["get"]         | false
         "a"       | ["get"]         | false
         "foo"     | ["with"]        | false
@@ -320,6 +324,8 @@ class NameUtilsSpec extends Specification {
         name      | prefixes        | isValid
         "foo"     | ["set"]         | false
         "setFoo"  | ["set"]         | true
+        'set$foo' | ["set"]         | true
+        'set_foo' | ["set"]         | true
         "setfoo"  | ["set"]         | false
         "a"       | ["set"]         | false
         "foo"     | ["with"]        | false

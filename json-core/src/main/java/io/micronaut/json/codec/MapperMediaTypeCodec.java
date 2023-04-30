@@ -254,8 +254,15 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
             return allocator.copiedBuffer((byte[]) object);
         }
         ByteBuffer<B> buffer = allocator.buffer();
-        OutputStream outputStream = buffer.toOutputStream();
-        encode(object, outputStream);
+        try {
+            OutputStream outputStream = buffer.toOutputStream();
+            encode(object, outputStream);
+        } catch (Throwable t) {
+            if (buffer instanceof ReferenceCounted) {
+                ((ReferenceCounted) buffer).release();
+            }
+            throw t;
+        }
         return buffer;
     }
 

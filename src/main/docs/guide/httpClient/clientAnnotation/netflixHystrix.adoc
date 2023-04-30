@@ -9,7 +9,7 @@ $ mn create-app my-app --features netflix-hystrix
 
 https://github.com/Netflix/Hystrix[Netflix Hystrix] is a fault tolerance library developed by the Netflix team and is designed to improve resilience of interprocess communication.
 
-Micronaut integrates with Hystrix through the `netflix-hystrix` module, which you can add to your build:
+The Micronaut framework integrates with Hystrix through the `netflix-hystrix` module, which you can add to your build:
 
 dependency:io.micronaut.netflix:micronaut-netflix-hystrix[]
 
@@ -34,10 +34,10 @@ TIP: For information on how to customize the Hystrix thread pool, group, and pro
 
 == Enabling Hystrix Stream and Dashboard
 
-You can enable a Server Sent Event stream to feed into the https://github.com/Netflix-Skunkworks/hystrix-dashboard[Hystrix Dashboard] by setting the `hystrix.stream.enabled` setting to `true` in `application.yml`:
+You can enable a Server Sent Event stream to feed into the https://github.com/Netflix-Skunkworks/hystrix-dashboard[Hystrix Dashboard] by setting the `hystrix.stream.enabled` setting to `true` in your configuration file (e.g `application.yml`):
 
 .Enabling Hystrix Stream
-[source,yaml]
+[configuration]
 ----
 hystrix:
   stream:

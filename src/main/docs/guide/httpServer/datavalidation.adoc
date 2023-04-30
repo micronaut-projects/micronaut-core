@@ -1,21 +1,23 @@
 It is easy to validate incoming data with Micronaut controllers using <<validation, Validation Advice>>.
 
-Micronaut provides native support for the `javax.validation` annotations with the `micronaut-validation` dependency:
+The Micronaut framework provides native support for the `jakarta.validation` annotations with the `micronaut-validation` dependency:
 
-dependency::micronaut-validation[]
+dependency:micronaut-validation-processor[groupId="io.micronaut.validation",scope="annotationProcessor"]
 
-Or full JSR 380 compliance with the `micronaut-hibernate-validator` dependency:
+dependency:micronaut-validation[groupId="io.micronaut.validation"]
+
+Or full https://beanvalidation.org/2.0/spec/[JSR 380] compliance with the `micronaut-hibernate-validator` dependency:
 
 dependency:micronaut-hibernate-validator[groupId="io.micronaut.beanvalidation"]
 
-We can validate parameters using `javax.validation` annotations and the api:validation.Validated[] annotation at the class level.
+We can validate parameters using `jakarta.validation` annotations and the api:validation.Validated[] annotation at the class level.
 
 snippet::io.micronaut.docs.datavalidation.params.EmailController[tags="imports,clazz", indent=0,title="Example"]
 
 <1> Annotate controller with api:validation.Validated[]
 <2> `subject` and `recipient` cannot be blank.
 
-If a validation error occurs a `javax.validation.ConstraintViolationException` is thrown. By default, the integrated `io.micronaut.validation.exception.ConstraintExceptionHandler` handles the exception, leading to a behaviour as shown in the following test:
+If a validation error occurs a `jakarta.validation.ConstraintViolationException` is thrown. By default, the integrated `io.micronaut.validation.exception.ConstraintExceptionHandler` handles the exception, leading to a behaviour as shown in the following test:
 
 snippet::io.micronaut.docs.datavalidation.params.EmailControllerSpec[tags="paramsvalidated",indent=0,title="Example Test"]
 
@@ -25,7 +27,7 @@ Often you may want to use POJOs as controller method parameters.
 
 snippet::io.micronaut.docs.datavalidation.pogo.Email[tags="clazz", indent=0]
 
-<1> You can use `javax.validation` annotations in your POJOs.
+<1> You can use `jakarta.validation` annotations in your POJOs.
 
 Annotate your controller with api:validation.Validated[], and annotate the binding POJO with `@Valid`.
 

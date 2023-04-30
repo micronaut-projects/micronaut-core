@@ -15,7 +15,7 @@ A RabbitMQ connection factory bean will be provided based on the configuration v
 
 For example:
 
-[source,yaml]
+[configuration]
 ----
 rabbitmq:
   uri: amqp://user:pass@host:10000/vhost

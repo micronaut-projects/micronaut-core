@@ -10,7 +10,7 @@ class ValidatedNonBeanSpec extends AbstractBeanDefinitionSpec {
         BeanDefinition beanDefinition = buildBeanDefinition("test.DefaultContract", """
 package test
 
-import javax.validation.constraints.NotNull
+import jakarta.validation.constraints.NotNull
 import io.micronaut.context.annotation.*
 import jakarta.inject.Singleton
 

@@ -236,9 +236,9 @@ public class MultiValuesConverterFactory {
      */
     private abstract static class AbstractConverterFromMultiValues<T>
             implements FormattingTypeConverter<ConvertibleMultiValues, T, Format> {
-        protected ConversionService<?> conversionService;
+        protected ConversionService conversionService;
 
-        AbstractConverterFromMultiValues(ConversionService<?> conversionService) {
+        AbstractConverterFromMultiValues(ConversionService conversionService) {
             this.conversionService = conversionService;
         }
 
@@ -257,15 +257,15 @@ public class MultiValuesConverterFactory {
             ArgumentConversionContext<T> context = (ArgumentConversionContext<T>) conversionContext;
 
             String format = conversionContext.getAnnotationMetadata()
-                    .getValue(Format.class, String.class).orElse(null);
+                    .stringValue(Format.class).orElse(null);
             if (format == null) {
                 return Optional.empty();
             }
 
-            String name = conversionContext.getAnnotationMetadata().getValue(Bindable.class, String.class)
+            String name = conversionContext.getAnnotationMetadata().stringValue(Bindable.class)
                     .orElse(context.getArgument().getName());
             String defaultValue = conversionContext.getAnnotationMetadata()
-                    .getValue(Bindable.class, "defaultValue", String.class)
+                    .stringValue(Bindable.class, "defaultValue")
                     .orElse(null);
 
             switch (normalizeFormatName(format)) {
@@ -336,7 +336,7 @@ public class MultiValuesConverterFactory {
      * A converter to convert from {@link ConvertibleMultiValues} to an {@link Iterable}.
      */
     public static class MultiValuesToIterableConverter extends AbstractConverterFromMultiValues<Iterable> {
-        public MultiValuesToIterableConverter(ConversionService<?> conversionService) {
+        public MultiValuesToIterableConverter(ConversionService conversionService) {
             super(conversionService);
         }
 
@@ -407,7 +407,7 @@ public class MultiValuesConverterFactory {
      * A converter to convert from {@link ConvertibleMultiValues} to an {@link Map}.
      */
     public static class MultiValuesToMapConverter extends AbstractConverterFromMultiValues<Map> {
-        public MultiValuesToMapConverter(ConversionService<?> conversionService) {
+        public MultiValuesToMapConverter(ConversionService conversionService) {
             super(conversionService);
         }
 
@@ -484,7 +484,7 @@ public class MultiValuesConverterFactory {
      */
     public static class MultiValuesToObjectConverter extends AbstractConverterFromMultiValues<Object> {
 
-        public MultiValuesToObjectConverter(ConversionService<?> conversionService) {
+        public MultiValuesToObjectConverter(ConversionService conversionService) {
             super(conversionService);
         }
 
@@ -524,7 +524,7 @@ public class MultiValuesConverterFactory {
                 Object[] constructorParameters = new Object[constructorArguments.length];
                 for (int i = 0; i < constructorArguments.length; ++i) {
                     Argument<?> argument = constructorArguments[i];
-                    String name = argument.getAnnotationMetadata().getValue(Bindable.class, String.class)
+                    String name = argument.getAnnotationMetadata().stringValue(Bindable.class)
                             .orElse(argument.getName());
                     constructorParameters[i] = conversionService.convert(values.get(name), ConversionContext.of(argument))
                             .orElse(null);
@@ -556,9 +556,9 @@ public class MultiValuesConverterFactory {
      */
     public abstract static class AbstractConverterToMultiValues<T>
             implements FormattingTypeConverter<T, ConvertibleMultiValues, Format> {
-        protected ConversionService<?> conversionService;
+        protected ConversionService conversionService;
 
-        public AbstractConverterToMultiValues(ConversionService<?> conversionService) {
+        public AbstractConverterToMultiValues(ConversionService conversionService) {
             this.conversionService = conversionService;
         }
 
@@ -575,12 +575,12 @@ public class MultiValuesConverterFactory {
             // noinspection unchecked
             ArgumentConversionContext<Object> context = (ArgumentConversionContext<Object>) conversionContext;
 
-            String format = conversionContext.getAnnotationMetadata().getValue(Format.class, String.class).orElse(null);
+            String format = conversionContext.getAnnotationMetadata().stringValue(Format.class).orElse(null);
             if (format == null) {
                 return Optional.empty();
             }
 
-            String name = conversionContext.getAnnotationMetadata().getValue(Bindable.class, String.class)
+            String name = conversionContext.getAnnotationMetadata().stringValue(Bindable.class)
                     .orElse(context.getArgument().getName());
 
             MutableConvertibleMultiValuesMap<String> parameters = new MutableConvertibleMultiValuesMap<>();
@@ -655,7 +655,7 @@ public class MultiValuesConverterFactory {
      * A converter from {@link Iterable} to {@link ConvertibleMultiValues}.
      */
     public static class IterableToMultiValuesConverter extends AbstractConverterToMultiValues<Iterable> {
-        public IterableToMultiValuesConverter(ConversionService<?> conversionService) {
+        public IterableToMultiValuesConverter(ConversionService conversionService) {
             super(conversionService);
         }
 
@@ -704,7 +704,7 @@ public class MultiValuesConverterFactory {
      * A converter from {@link Map} to {@link ConvertibleMultiValues}.
      */
     public static class MapToMultiValuesConverter extends AbstractConverterToMultiValues<Map> {
-        public MapToMultiValuesConverter(ConversionService<?> conversionService) {
+        public MapToMultiValuesConverter(ConversionService conversionService) {
             super(conversionService);
         }
 
@@ -759,7 +759,7 @@ public class MultiValuesConverterFactory {
      * A converter from generic {@link Object} to {@link ConvertibleMultiValues}.
      */
     public static class ObjectToMultiValuesConverter extends AbstractConverterToMultiValues<Object> {
-        public ObjectToMultiValuesConverter(ConversionService<?> conversionService) {
+        public ObjectToMultiValuesConverter(ConversionService conversionService) {
             super(conversionService);
         }
 
@@ -775,7 +775,7 @@ public class MultiValuesConverterFactory {
             }
 
             for (BeanProperty<Object, Object> property: beanWrapper.getBeanProperties()) {
-                String key = property.getValue(Bindable.class, String.class).orElse(property.getName());
+                String key = property.stringValue(Bindable.class).orElse(property.getName());
                 ArgumentConversionContext<String> conversionContext =
                         ConversionContext.STRING.with(property.getAnnotationMetadata());
                 conversionService.convert(property.get(object), conversionContext).ifPresent(value -> {

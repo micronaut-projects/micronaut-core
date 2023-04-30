@@ -4,3 +4,4 @@ io.micronaut.inject.visitor.AllClassesVisitor
 io.micronaut.inject.visitor.ControllerGetVisitor
 io.micronaut.inject.visitor.IntroductionVisitor
 io.micronaut.inject.visitor.MutatingVisitor
+io.micronaut.expressions.ContextRegistrar

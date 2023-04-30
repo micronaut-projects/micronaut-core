@@ -68,6 +68,7 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
                 return s != null && s.isOpen() && filter.test(s);
             }).sync();
         } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             throw new WebSocketSessionException("Broadcast Interrupted");
         }
     }

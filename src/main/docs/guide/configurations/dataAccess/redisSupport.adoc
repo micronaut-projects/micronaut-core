@@ -1,4 +1,4 @@
-Micronaut features automatic configuration of the https://lettuce.io[Lettuce] driver for https://redis.io[Redis] via the `redis-lettuce` module.
+The Micronaut framework features automatic configuration of the https://lettuce.io[Lettuce] driver for https://redis.io[Redis] via the `redis-lettuce` module.
 
 == Configuring Lettuce
 [TIP]
@@ -18,10 +18,10 @@ To configure the Lettuce driver, first add the `redis-lettuce` module to your bu
 compile "io.micronaut.redis:micronaut-redis-lettuce"
 ----
 
-Then configure the URI of the Redis server in `application.yml`:
+Then configure the URI of the Redis server in your configuration file (e.g `application.yml`):
 
 .Configuring `redis.uri`
-[source,yaml]
+[configuration]
 ----
 redis:
   uri: redis://localhost

@@ -31,7 +31,7 @@ import java.util.*;
 public class SimpleHttpHeaders implements MutableHttpHeaders {
 
     private final MutableConvertibleMultiValuesMap<String> headers = new MutableConvertibleMultiValuesMap<>();
-    private final ConversionService conversionService;
+    private ConversionService conversionService;
 
     /**
      * Map-based implementation of {@link MutableHttpHeaders}.
@@ -92,5 +92,10 @@ public class SimpleHttpHeaders implements MutableHttpHeaders {
     public MutableHttpHeaders remove(CharSequence header) {
         headers.remove(header.toString());
         return this;
+    }
+
+    @Override
+    public void setConversionService(ConversionService conversionService) {
+        this.conversionService = conversionService;
     }
 }

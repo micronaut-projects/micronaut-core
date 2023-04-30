@@ -29,7 +29,7 @@ package elemann1;
 
 import io.micronaut.context.annotation.*;
 import java.net.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import io.micronaut.aop.introduction.Stub;
 
 @Stub
@@ -81,11 +81,11 @@ import io.micronaut.core.annotation.Introspected;
 @Introspected
 class Test {
     private String name;
-    
-    public String getName() { 
+
+    public String getName() {
         return name;
     }
-    
+
     public void setName(String name) {
         this.name = name;
     }

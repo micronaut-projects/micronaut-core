@@ -46,6 +46,8 @@ import java.util.stream.Stream;
  */
 public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>> {
     public static final String META_INF_SERVICES = "META-INF/services";
+    private static final MethodHandles.Lookup LOOKUP = MethodHandles.publicLookup();
+    private static final MethodType VOID_TYPE = MethodType.methodType(void.class);
 
     private static final Map<String, SoftServiceLoader.StaticServiceLoader<?>> STATIC_SERVICES =
             StaticOptimizations.get(Optimizations.class)
@@ -58,11 +60,11 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     private final Predicate<String> condition;
     private boolean allowFork = true;
 
-    private SoftServiceLoader(Class<S> serviceType, ClassLoader classLoader) {
+    private SoftServiceLoader(Class<S> serviceType, @Nullable ClassLoader classLoader) {
         this(serviceType, classLoader, (String name) -> true);
     }
 
-    private SoftServiceLoader(Class<S> serviceType, ClassLoader classLoader, Predicate<String> condition) {
+    private SoftServiceLoader(Class<S> serviceType, @Nullable ClassLoader classLoader, Predicate<String> condition) {
         this.serviceType = serviceType;
         this.classLoader = classLoader == null ? ClassLoader.getSystemClassLoader() : classLoader;
         this.condition = condition == null ? (String name) -> true : condition;
@@ -150,7 +152,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             return Optional.of(i.next());
         }
 
-        @SuppressWarnings("unchecked") Class<S> alternativeClass = ClassUtils.forName(alternative, classLoader)
+        @SuppressWarnings("unchecked") Class<S> alternativeClass = (Class<S>) ClassUtils.forName(alternative, classLoader)
                 .orElse(null);
         if (alternativeClass != null) {
             return Optional.of(createService(alternative, alternativeClass));
@@ -183,14 +185,15 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             try {
                 @SuppressWarnings("unchecked") final Class<S> loadedClass =
                         (Class<S>) Class.forName(className, false, classLoader);
-                S result = loadedClass.getDeclaredConstructor().newInstance();
+                // MethodHandler should more performant than the basic reflection
+                S result = (S) LOOKUP.findConstructor(loadedClass, VOID_TYPE).invoke();
                 if (predicate != null && !predicate.test(result)) {
                     return null;
                 }
                 return result;
-            } catch (NoClassDefFoundError | ClassNotFoundException | NoSuchMethodException e) {
+            } catch (NoClassDefFoundError | ClassNotFoundException | NoSuchMethodException | IllegalAccessException e) {
                 // Ignore
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 throw new ServiceLoadingException(e);
             }
             return null;
@@ -266,19 +269,6 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * @param name The name
      * @param loadedClass The loaded class
      * @return The service definition
-     * @deprecated No longer used
-     */
-    @SuppressWarnings({"unchecked", "ProtectedMemberInFinalClass", "OptionalUsedAsFieldOrParameterType", "java:S3740",
-            "java:S1133", "rawtypes"})
-    @Deprecated
-    protected ServiceDefinition<S> newService(String name, Optional<Class> loadedClass) {
-        return new DefaultServiceDefinition<>(name, loadedClass.orElse(null));
-    }
-
-    /**
-     * @param name The name
-     * @param loadedClass The loaded class
-     * @return The service definition
      */
     private ServiceDefinition<S> createService(String name, Class<S> loadedClass) {
         return new DefaultServiceDefinition<>(name, loadedClass);
@@ -297,8 +287,6 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
      * @param <S> The service type
      */
     public static final class StaticDefinition<S> implements ServiceDefinition<S> {
-        private static final MethodHandles.Lookup LOOKUP = MethodHandles.publicLookup();
-        private static final MethodType VOID_TYPE = MethodType.methodType(void.class);
 
         private final String name;
         private final Supplier<S> value;
@@ -380,7 +368,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             return findAll(condition)
                     .map(ServiceDefinition::load)
                     .filter(s -> predicate == null || predicate.test(s))
-                    .collect(Collectors.toList());
+                    .toList();
         }
     }
 

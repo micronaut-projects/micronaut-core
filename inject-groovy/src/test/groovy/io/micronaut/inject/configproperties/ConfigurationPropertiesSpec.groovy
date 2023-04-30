@@ -17,6 +17,7 @@ package io.micronaut.inject.configproperties
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.context.annotation.BeanProperties
 import io.micronaut.context.env.PropertySource
 import spock.lang.Specification
 /**
@@ -61,6 +62,26 @@ class ConfigurationPropertiesSpec extends Specification {
         config.defaultValue == 9999
         config.primitiveDefaultValue == 9999
         config.inner.enabled
+        !applicationContext.getBeanDefinition(MyConfig).getAnnotation(BeanProperties.class)
+    }
+
+    void "test optional configuration"() {
+        ApplicationContext context = ApplicationContext.run([
+                "config.optional.str": "tst",
+                "config.optional.dbl": "123.123",
+                "config.optional.itgr": "456",
+                "config.optional.lng": "334455",
+        ])
+        OptionalProperties config = context.getBean(OptionalProperties.class)
+
+        expect:
+            config.getStr().get() == "tst"
+            config.getDbl().asDouble == 123.123 as double
+            config.getItgr().asInt == 456
+            config.getLng().asLong == 334455
+
+        cleanup:
+            context.close()
     }
 
 }

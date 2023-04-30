@@ -38,27 +38,37 @@ import io.micronaut.core.annotation.NonNull;
 @Internal
 abstract class AbstractBeanContextConditional implements BeanContextConditional, AnnotationMetadataProvider {
 
-    static final Logger LOG = LoggerFactory.getLogger(Condition.class);
-
     @Override
     public boolean isEnabled(@NonNull BeanContext context, @Nullable BeanResolutionContext resolutionContext) {
         AnnotationMetadata annotationMetadata = getAnnotationMetadata();
         Condition condition = annotationMetadata.hasStereotype(Requires.class) ? new RequiresCondition(annotationMetadata) : null;
+        DefaultBeanContext defaultBeanContext = (DefaultBeanContext) context;
         DefaultConditionContext<AbstractBeanContextConditional> conditionContext = new DefaultConditionContext<>(
-                (DefaultBeanContext) context,
+                defaultBeanContext,
                 this, resolutionContext);
         boolean enabled = condition == null || condition.matches(conditionContext);
-        if (LOG.isDebugEnabled() && !enabled) {
-            if (this instanceof BeanConfiguration) {
-                LOG.debug(this + " will not be loaded due to failing conditions:");
-            } else {
-                LOG.debug("Bean [" + this + "] will not be loaded due to failing conditions:");
+        if (!enabled) {
+            if (ConditionLog.LOG.isDebugEnabled()) {
+                if (this instanceof BeanConfiguration) {
+                    ConditionLog.LOG.debug("{} will not be loaded due to failing conditions:", this);
+                } else {
+                    ConditionLog.LOG.debug("Bean [{}] will not be loaded due to failing conditions:", this);
+                }
+                for (Failure failure : conditionContext.getFailures()) {
+                    ConditionLog.LOG.debug("* {}", failure.getMessage());
+                }
             }
-            for (Failure failure : conditionContext.getFailures()) {
-                LOG.debug("* {}", failure.getMessage());
-            }
+            defaultBeanContext.trackDisabledComponent(conditionContext);
         }
 
         return enabled;
+    }
+
+    @SuppressWarnings("java:S3416")
+    static final class ConditionLog {
+        static final Logger LOG = LoggerFactory.getLogger(Condition.class);
+
+        private ConditionLog() {
+        }
     }
 }

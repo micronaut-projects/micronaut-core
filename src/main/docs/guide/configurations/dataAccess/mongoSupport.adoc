@@ -9,14 +9,14 @@ $ mn create-app my-app --features mongo-reactive
 ----
 ====
 
-Micronaut can automatically configure the native MongoDB Java driver. To use this, add the following dependency to your build:
+The Micronaut framework can automatically configure the native MongoDB Java driver. To use this, add the following dependency to your build:
 
 dependency:micronaut-mongo-reactive[groupId="io.micronaut.mongodb"]
 
-Then configure the URI of the MongoDB server in `application.yml`:
+Then configure the URI of the MongoDB server in your configuration file (e.g `application.yml`):
 
 .Configuring a MongoDB server
-[source,yaml]
+[configuration]
 ----
 mongodb:
   uri: mongodb://username:password@localhost:27017/databaseName
@@ -30,7 +30,7 @@ To use the blocking driver, add a dependency to your build on the mongo-java-dri
 
 [source,groovy]
 ----
-compile "org.mongodb:mongo-java-driver"
+runtimeOnly "org.mongodb:mongo-java-driver"
 ----
 
 Then the blocking https://mongodb.github.io/mongo-java-driver/3.7/javadoc/com/mongodb/MongoClient.html[MongoClient] will be available for injection.

@@ -17,12 +17,12 @@ package io.micronaut.context.annotation;
 
 import jakarta.inject.Singleton;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * <p>This annotation allows driving the production of {@link Bean} definitions from either configuration or the
@@ -89,7 +89,7 @@ public @interface EachProperty {
      *
      * @return The property that this bean is driven by
      */
-    @AliasFor(annotation = ConfigurationReader.class, member = "value")
+    @AliasFor(annotation = ConfigurationReader.class, member = ConfigurationReader.PREFIX)
     String value();
 
     /**

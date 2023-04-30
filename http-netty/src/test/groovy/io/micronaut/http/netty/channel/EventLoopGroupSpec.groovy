@@ -23,7 +23,7 @@ class EventLoopGroupSpec extends Specification {
         then:
         !eventLoopGroup.isTerminated()
         eventLoopGroup.executorCount() == NettyRuntime.availableProcessors() * 2
-        ResourceLeakDetector.level == ResourceLeakDetector.Level.SIMPLE
+        ResourceLeakDetector.level == ResourceLeakDetector.Level.DISABLED
 
         when:
         context.close()

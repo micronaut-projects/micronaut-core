@@ -17,8 +17,8 @@ package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
-import io.micronaut.core.util.functional.ThrowingSupplier;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.util.functional.ThrowingSupplier;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.multipart.PartData;
@@ -48,7 +48,7 @@ import java.util.concurrent.ExecutorService;
  * @since 1.0
  */
 @Internal
-public class NettyStreamingFileUpload implements StreamingFileUpload {
+public final class NettyStreamingFileUpload implements StreamingFileUpload {
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyStreamingFileUpload.class);
     private io.netty.handler.codec.http.multipart.FileUpload fileUpload;
@@ -56,13 +56,7 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
     private final HttpServerConfiguration.MultipartConfiguration configuration;
     private final Flux<PartData> subject;
 
-    /**
-     * @param httpData               The file upload (the data)
-     * @param multipartConfiguration The multipart configuration
-     * @param ioExecutor             The IO executor
-     * @param subject                The subject
-     */
-    public NettyStreamingFileUpload(
+    private NettyStreamingFileUpload(
         io.netty.handler.codec.http.multipart.FileUpload httpData,
         HttpServerConfiguration.MultipartConfiguration multipartConfiguration,
         ExecutorService ioExecutor,
@@ -154,7 +148,7 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
     private Publisher<Boolean> transferTo(ThrowingSupplier<OutputStream, IOException> outputStreamSupplier) {
         return Mono.<Boolean>create(emitter ->
 
-                subject.subscribeOn(Schedulers.fromExecutorService(ioExecutor))
+                subject.publishOn(Schedulers.fromExecutorService(ioExecutor))
                         .subscribe(new Subscriber<PartData>() {
                             Subscription subscription;
                             OutputStream outputStream;
@@ -181,6 +175,7 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
 
                             @Override
                             public void onError(Throwable t) {
+                                discard();
                                 emitter.error(t);
                                 try {
                                     if (outputStream != null) {
@@ -195,6 +190,7 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
 
                             @Override
                             public void onComplete() {
+                                discard();
                                 try {
                                     outputStream.close();
                                     emitter.success(true);
@@ -212,5 +208,23 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
                             }
                         })
         ).flux();
+    }
+
+    /**
+     * Factory for instances of {@link NettyStreamingFileUpload}. Wraps the fixed requirements that
+     * don't depend on request.
+     *
+     * @param ioExecutor The IO executor
+     * @param multipartConfiguration The multipart configuration
+     */
+    @Internal
+    public record Factory(
+        HttpServerConfiguration.MultipartConfiguration multipartConfiguration,
+        ExecutorService ioExecutor
+    ) {
+        public NettyStreamingFileUpload create(io.netty.handler.codec.http.multipart.FileUpload httpData,
+                                               Flux<PartData> subject) {
+            return new NettyStreamingFileUpload(httpData, multipartConfiguration, ioExecutor, subject);
+        }
     }
 }

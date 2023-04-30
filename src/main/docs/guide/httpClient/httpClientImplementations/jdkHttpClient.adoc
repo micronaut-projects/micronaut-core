@@ -1,0 +1,15 @@
+To use an implementation based on https://openjdk.org/groups/net/httpclient/intro.html[Java HTTP Client], add the following dependency to your build:
+
+dependency:micronaut-http-client-jdk[]
+
+NOTE: This implementation of the Micronaut HTTP Client is available since Micronaut Framework 4.0.
+
+The implementation based on https://openjdk.org/groups/net/httpclient/intro.html[Java HTTP Client] does not support the following features:
+
+* <<proxyClient,Proxy request>> support (we do support <<proxy,HTTP Proxies>>).
+* Client Filters.
+* Streaming support.
+* Multipart requests.
+* H2C and HTTP/3.
+
+If you require any of these, we recommend you use the <<nettyHttpClient, implementation of the HTTP Client based on Netty>>.

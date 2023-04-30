@@ -15,14 +15,18 @@
  */
 package io.micronaut.core.annotation;
 
+import io.micronaut.core.expressions.EvaluatedExpression;
+import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.reflect.ReflectionUtils;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * A build for annotation values.
@@ -36,8 +40,10 @@ public class AnnotationValueBuilder<T extends Annotation> {
     private final String annotationName;
     private final Map<CharSequence, Object> values = new LinkedHashMap<>(5);
     private final RetentionPolicy retentionPolicy;
-    private final List<AnnotationValue<?>> stereotypes = new ArrayList<>();
-    private final Map<String, Object> defaultValues = new LinkedHashMap<>();
+    @Nullable
+    private List<AnnotationValue<?>> stereotypes;
+    @Nullable
+    private Map<CharSequence, Object> defaultValues;
 
     /**
      * Default constructor.
@@ -81,6 +87,8 @@ public class AnnotationValueBuilder<T extends Annotation> {
     AnnotationValueBuilder(AnnotationValue<T> value, RetentionPolicy retentionPolicy) {
         this.annotationName = value.getAnnotationName();
         this.values.putAll(value.getValues());
+        this.defaultValues = value.getDefaultValues();
+        this.stereotypes = value.getStereotypes() == null ? null : new ArrayList<>(value.getStereotypes());
         this.retentionPolicy = retentionPolicy != null ? retentionPolicy : RetentionPolicy.RUNTIME;
     }
 
@@ -103,8 +111,82 @@ public class AnnotationValueBuilder<T extends Annotation> {
     @NonNull
     public AnnotationValueBuilder<T> stereotype(AnnotationValue<?> annotation) {
         if (annotation != null) {
+            if (stereotypes == null) {
+                stereotypes = new ArrayList<>(10);
+            }
             stereotypes.add(annotation);
         }
+        return this;
+    }
+
+    /**
+     * Replaces the stereotype annotation.
+     *
+     * @param originalAnnotationValue The original annotation value
+     * @param newAnnotationValue The new annotation value
+     * @return This builder
+     * @since 4.0.0
+     */
+    @NonNull
+    public AnnotationValueBuilder<T> replaceStereotype(@NonNull AnnotationValue<?> originalAnnotationValue,
+                                                       @NonNull AnnotationValue<?> newAnnotationValue) {
+        Objects.requireNonNull(stereotypes);
+        List<AnnotationValue<?>> values = new ArrayList<>(stereotypes);
+        int index = values.indexOf(originalAnnotationValue);
+        if (index < 0) {
+            throw new IllegalArgumentException("Unknown original annotation value!");
+        }
+        values.set(index, newAnnotationValue);
+        stereotypes = values;
+        return this;
+    }
+
+    /**
+     * Removes the stereotype annotation.
+     *
+     * @param annotationValueToRemove The annotation value to remove
+     * @return This builder
+     * @since 4.0.0
+     */
+    @NonNull
+    public AnnotationValueBuilder<T> removeStereotype(@NonNull AnnotationValue<?> annotationValueToRemove) {
+        Objects.requireNonNull(stereotypes);
+        List<AnnotationValue<?>> values = new ArrayList<>(stereotypes);
+        int index = values.indexOf(annotationValueToRemove);
+        if (index < 0) {
+            throw new IllegalArgumentException("Unknown annotation value!");
+        }
+        values.remove(index);
+        stereotypes = values;
+        return this;
+    }
+
+    /**
+     * Adds a stereotypes of the annotation.
+     *
+     * @param newStereotypes The stereotypes
+     * @return This builder
+     * @since 4.0.0
+     */
+    @NonNull
+    public AnnotationValueBuilder<T> stereotypes(@NonNull Collection<AnnotationValue<?>> newStereotypes) {
+        if (stereotypes == null) {
+            stereotypes = new ArrayList<>(10);
+        }
+        stereotypes.addAll(newStereotypes);
+        return this;
+    }
+
+    /**
+     * Replaces stereotypes of the annotation.
+     *
+     * @param newStereotypes The stereotypes
+     * @return This builder
+     * @since 4.0.0
+     */
+    @NonNull
+    public AnnotationValueBuilder<T> replaceStereotypes(@NonNull Collection<AnnotationValue<?>> newStereotypes) {
+        stereotypes = new ArrayList<>(newStereotypes);
         return this;
     }
 
@@ -115,9 +197,13 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @return This builder
      */
     @NonNull
-    public AnnotationValueBuilder<T> defaultValues(Map<String, Object> defaultValues) {
+    public AnnotationValueBuilder<T> defaultValues(Map<? extends CharSequence, Object> defaultValues) {
         if (defaultValues != null) {
-            this.defaultValues.putAll(defaultValues);
+            if (this.defaultValues == null) {
+                this.defaultValues = new LinkedHashMap<>(defaultValues);
+            } else {
+                this.defaultValues.putAll(defaultValues);
+            }
         }
         return this;
     }
@@ -690,7 +776,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
             for (Map.Entry<CharSequence, Object> entry: members.entrySet()) {
                 Object value = entry.getValue();
                 if (value != null) {
-                    Class clazz = value.getClass();
+                    Class<?> clazz = value.getClass();
                     boolean isArray = clazz.isArray();
                     if (isArray) {
                         clazz = clazz.getComponentType();
@@ -704,7 +790,9 @@ public class AnnotationValueBuilder<T extends Annotation> {
                                     clazz == String.class ||
                                     clazz == Enum.class ||
                                     clazz == AnnotationClassValue.class ||
-                                    clazz == AnnotationValue.class
+                                    clazz == AnnotationValue.class ||
+                                    clazz == EvaluatedExpressionReference.class ||
+                                    clazz == EvaluatedExpression.class
                             );
                     if (!isValid) {
                         throw new IllegalArgumentException("The member named [" + entry.getKey().toString() + "] with type [" + value.getClass().getName() + "] is not a valid member type");

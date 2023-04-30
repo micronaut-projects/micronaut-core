@@ -36,17 +36,23 @@ import java.util.function.Consumer
 // which is not included in this test suite
 //@IgnoreIf({ !Jvm.current.isJava9Compatible() })
 class Http2RequestSpec extends Specification {
-    @Shared @AutoCleanup EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
-            'micronaut.server.ssl.enabled': true,
-            "micronaut.server.http-version" : "2.0",
-            "micronaut.http.client.http-version" : "2.0",
-            'micronaut.server.ssl.buildSelfSigned': true,
-            'micronaut.server.ssl.port': -1,
-            "micronaut.http.client.log-level" : "TRACE",
-            "micronaut.server.netty.log-level" : "TRACE",
-            'micronaut.http.client.ssl.insecure-trust-all-certificates': true
-    ])
+    @Shared @AutoCleanup EmbeddedServer server = ApplicationContext.run(EmbeddedServer, config())
     HttpClient client = server.getApplicationContext().getBean(HttpClient)
+
+    Map config() {
+        // overridden for Http3RequestSpec
+        return [
+                'micronaut.server.ssl.enabled': true,
+                "micronaut.http.client.plaintext-mode" : "h2c",
+                "micronaut.http.client.alpn-modes" : ["h2"],
+                'micronaut.server.ssl.buildSelfSigned': true,
+                'micronaut.server.ssl.port': -1,
+                'micronaut.server.http-version': '2.0',
+                "micronaut.http.client.log-level" : "TRACE",
+                "micronaut.server.netty.log-level" : "TRACE",
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true
+        ]
+    }
 
     void "test make HTTP/2 stream request"() {
         when:"A non stream request is executed"
@@ -152,6 +158,7 @@ class Http2RequestSpec extends Specification {
                 "micronaut.server.http-version" : "2.0",
                 'micronaut.server.ssl.buildSelfSigned': true,
                 'micronaut.server.ssl.port': -1,
+                "micronaut.http.client.http-version" : "1.1",
                 "micronaut.http.client.log-level" : "TRACE",
                 "micronaut.server.netty.log-level" : "TRACE",
                 'micronaut.http.client.ssl.insecure-trust-all-certificates': true
@@ -198,6 +205,7 @@ class Http2RequestSpec extends Specification {
                 "micronaut.server.http-version" : "2.0",
                 'micronaut.server.ssl.buildSelfSigned': true,
                 'micronaut.server.ssl.port': -1,
+                "micronaut.http.client.http-version" : "1.1",
                 "micronaut.http.client.log-level" : "TRACE",
                 "micronaut.server.netty.log-level" : "TRACE"
         ])

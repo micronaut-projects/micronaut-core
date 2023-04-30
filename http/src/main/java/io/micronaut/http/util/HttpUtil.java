@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.util;
 
-import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMessage;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
@@ -77,27 +76,7 @@ public class HttpUtil {
             if (contentTypeCharset.isPresent()) {
                 return contentTypeCharset;
             } else {
-                return request
-                    .getHeaders()
-                    .findFirst(HttpHeaders.ACCEPT_CHARSET)
-                    .map(text -> {
-                        int len = text.length();
-                        if (len == 0 || (len == 1 && text.charAt(0) == '*')) {
-                            return StandardCharsets.UTF_8;
-                        }
-                        if (text.indexOf(';') > -1) {
-                            text = text.split(";")[0];
-                        }
-                        if (text.indexOf(',') > -1) {
-                            text = text.split(",")[0];
-                        }
-                        try {
-                            return Charset.forName(text);
-                        } catch (Exception e) {
-                            // unsupported charset, default to UTF-8
-                            return StandardCharsets.UTF_8;
-                        }
-                    });
+                return Optional.ofNullable(request.getHeaders().acceptCharset());
             }
         } catch (UnsupportedCharsetException e) {
             return Optional.empty();

@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationUtil
 import jakarta.inject.Named
-import javax.validation.constraints.Size
+import jakarta.validation.constraints.Size
 
 class ArgumentAnnotationMetadataSpec extends AbstractTypeElementSpec {
 
@@ -32,7 +32,7 @@ package test;
 class Test {
 
     void test(@jakarta.inject.Named("foo") String id) {
-    
+
     }
 }
 ''', 'test', 'id')
@@ -53,8 +53,8 @@ package test;
 class Test {
 
     @io.micronaut.context.annotation.Executable
-    void test(@javax.validation.constraints.Size(max=1024) byte[] id) {
-    
+    void test(@jakarta.validation.constraints.Size(max=1024) byte[] id) {
+
     }
 }
 ''', 'test', 'id')
@@ -78,7 +78,7 @@ class Test implements TestApi {
     @jakarta.annotation.PostConstruct
     @java.lang.Override
     public void test(String id) {
-    
+
     }
 }
 
@@ -90,7 +90,7 @@ interface TestApi {
 
 @Inherited
 @Retention(RetentionPolicy.RUNTIME)
-@jakarta.inject.Named("foo") 
+@jakarta.inject.Named("foo")
 @interface MyAnn {}
 ''', 'test', 'id')
 

@@ -22,15 +22,13 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.http.server.netty.types.NettyCustomizableResponseType;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.http.server.types.files.SystemFile;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpResponse;
 
 import java.io.File;
@@ -50,8 +48,8 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
 
     // sorted array of entity headers
     // https://tools.ietf.org/html/rfc2616#section-7.1
-    private static final String[] ENTITY_HEADERS = new String[] {HttpHeaders.ALLOW, HttpHeaders.CONTENT_ENCODING, HttpHeaders.CONTENT_LANGUAGE, HttpHeaders.CONTENT_LENGTH, HttpHeaders.CONTENT_LOCATION, HttpHeaders.CONTENT_MD5, HttpHeaders.CONTENT_RANGE, HttpHeaders.CONTENT_TYPE, HttpHeaders.EXPIRES, HttpHeaders.LAST_MODIFIED};
-    private static final Class<?>[] SUPPORTED_TYPES = new Class[]{File.class, StreamedFile.class, NettyFileCustomizableResponseType.class, SystemFile.class};
+    private static final String[] ENTITY_HEADERS = {HttpHeaders.ALLOW, HttpHeaders.CONTENT_ENCODING, HttpHeaders.CONTENT_LANGUAGE, HttpHeaders.CONTENT_LENGTH, HttpHeaders.CONTENT_LOCATION, HttpHeaders.CONTENT_MD5, HttpHeaders.CONTENT_RANGE, HttpHeaders.CONTENT_TYPE, HttpHeaders.EXPIRES, HttpHeaders.LAST_MODIFIED};
+    private static final Class<?>[] SUPPORTED_TYPES = new Class<?>[]{File.class, StreamedFile.class, NettyFileCustomizableResponseType.class, SystemFile.class};
     private final NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration;
 
     /**
@@ -63,7 +61,7 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
 
     @SuppressWarnings("MagicNumber")
     @Override
-    public ChannelFuture handle(Object obj, HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
+    public NettyCustomizableResponseType.CustomResponse handle(Object obj, HttpRequest<?> request, MutableHttpResponse<?> response) {
         NettyFileCustomizableResponseType type;
         if (obj instanceof File) {
             type = new NettySystemFileCustomizableResponseType((File) obj);
@@ -89,10 +87,7 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
             long fileLastModifiedSeconds = lastModified / 1000;
             if (ifModifiedSinceDateSeconds == fileLastModifiedSeconds) {
                 FullHttpResponse nettyResponse = notModified(response);
-                if (request instanceof NettyHttpRequest) {
-                    ((NettyHttpRequest<?>) request).prepareHttp2ResponseIfNecessary(nettyResponse);
-                }
-                return context.writeAndFlush(nettyResponse);
+                return new NettyCustomizableResponseType.CustomResponse(nettyResponse, null, false);
             }
         }
 
@@ -102,7 +97,7 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
         setDateAndCacheHeaders(response, lastModified);
 
         type.process(response);
-        return type.write(request, response, context);
+        return type.write(request, response);
     }
 
     @Override
@@ -119,7 +114,9 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
         // Date header
         MutableHttpHeaders headers = response.getHeaders();
         LocalDateTime now = LocalDateTime.now();
-        headers.date(now);
+        if (!headers.contains(HttpHeaders.DATE)) {
+            headers.date(now);
+        }
 
         // Add cache headers
         LocalDateTime cacheSeconds = now.plus(configuration.getCacheSeconds(), ChronoUnit.SECONDS);

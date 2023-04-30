@@ -2,7 +2,7 @@ In distributed systems, failure happens and it is best to be prepared for it and
 
 In addition, when developing Microservices it is quite common to work on a single Microservice without other Microservices the project requires being available.
 
-With that in mind, Micronaut features a native fallback mechanism that is integrated into <<retry, Retry Advice>> that allows falling back to another implementation in the case of failure.
+With that in mind, the Micronaut framework features a native fallback mechanism that is integrated into <<retry, Retry Advice>> that allows falling back to another implementation in the case of failure.
 
 Using the ann:retry.annotation.Fallback[] annotation, you can declare a fallback implementation of a client to be used when all possible retries have been exhausted.
 

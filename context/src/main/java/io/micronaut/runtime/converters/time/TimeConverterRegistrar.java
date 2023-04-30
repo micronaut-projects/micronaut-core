@@ -18,7 +18,7 @@ package io.micronaut.runtime.converters.time;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.convert.format.Format;
@@ -81,7 +81,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
     private static final int MILLIS = 3;
 
     @Override
-    public void register(ConversionService<?> conversionService) {
+    public void register(MutableConversionService conversionService) {
         final BiFunction<CharSequence, ConversionContext, Optional<Duration>> durationConverter = (object, context) -> {
             String value = object.toString().trim();
             if (value.startsWith("P")) {
@@ -179,7 +179,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
         addTemporalToDateConverter(conversionService, LocalDateTime.class, ldt -> ldt.toInstant(ZoneOffset.UTC));
     }
 
-    private <T extends TemporalAccessor> void addTemporalStringConverter(ConversionService<?> conversionService, Class<T> temporalType, DateTimeFormatter isoFormatter, TemporalQuery<T> query) {
+    private <T extends TemporalAccessor> void addTemporalStringConverter(MutableConversionService conversionService, Class<T> temporalType, DateTimeFormatter isoFormatter, TemporalQuery<T> query) {
         conversionService.addConverter(CharSequence.class, temporalType, (CharSequence object, Class<T> targetType, ConversionContext context) -> {
             if (StringUtils.isEmpty(object)) {
                 return Optional.empty();
@@ -213,7 +213,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
         });
     }
 
-    private <T extends TemporalAccessor> void addTemporalToDateConverter(ConversionService<?> conversionService, Class<T> temporalType, Function<T, Instant> toInstant) {
+    private <T extends TemporalAccessor> void addTemporalToDateConverter(MutableConversionService conversionService, Class<T> temporalType, Function<T, Instant> toInstant) {
         conversionService.addConverter(temporalType, Date.class, (T object, Class<Date> targetType, ConversionContext context) -> Optional.of(Date.from(toInstant.apply(object))));
     }
 

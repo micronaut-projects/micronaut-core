@@ -37,10 +37,28 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 class PropertySourcePropertyResolverSpec extends Specification {
 
+    @Unroll
+    void "test resolve property #property matches for pattern #pattern"() {
+        given:
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", [(property): "whatever"], PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE)
+        )
+
+        expect:
+        resolver.getPropertyPathMatches(pattern) == expected
+
+        where:
+        property                            | pattern                     | expected
+        'twitter.oauth2.access.token'       | "twitter.*.access.token"    | [['oauth2']] as Set
+        'twitter.oauth2.access.token.stuff' | "twitter.*.access.*.stuff"  | [['oauth2', 'token']] as Set
+        'twitter.oauth2.access.token.stuff' | "twitter.*.access.*"        | [['oauth2']] as Set
+        'twitter.oauth2.access[0].stuff'    | "twitter.*.access[*].stuff" | [['oauth2', '0']] as Set
+    }
+
     void "test resolve property entries"() {
         given:
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
-                PropertySource.of("test", [DATASOURCE_DEFAULT_URL: 'xxx', DATASOURCE_OTHER_URL:'xxx'], PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE),
+                PropertySource.of("test", [DATASOURCE_DEFAULT_URL: 'xxx', DATASOURCE_OTHER_URL: 'xxx'], PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE),
                 PropertySource.of("test",
                         ['datasource.third.url': 'xxx'],
                         PropertySource.PropertyConvention.JAVA_PROPERTIES
@@ -70,7 +88,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.containsProperties("camel-case")
         resolver.containsProperties("camelCase")
         resolver.getProperties("camelCase", StringConvention.RAW) == ['fooBar': 'xxx',
-                                                                            'URL'   : "http://localhost"]
+                                                                      'URL'   : "http://localhost"]
         resolver.getProperty("camelCase.URL", URL).get() == new URL("http://localhost")
     }
 
@@ -148,8 +166,8 @@ class PropertySourcePropertyResolverSpec extends Specification {
                 .and("FOO_BAR_1", "foo bar 1")
                 .execute(() -> {
                     resolver.getProperty(key, Object).isPresent() &&
-                    resolver.getProperty(key, type).get() == expected &&
-                    resolver.containsProperty(key)
+                            resolver.getProperty(key, type).get() == expected &&
+                            resolver.containsProperty(key)
                 })
 
         where:
@@ -300,11 +318,11 @@ class PropertySourcePropertyResolverSpec extends Specification {
     void "test random integer placeholders in range for properties"() {
         given:
         def values = [
-                'random.integer_lower'  : '${random.integer(10)}',
-                'random.integer_lower-negative'  : '${random.integer(-10)}',
-                'random.integer_lower_upper'  : '${random.integer[5,10]}',
-                'random.integer_lower-negative_upper'  : '${random.integer[-5,10]}',
-                'random.integer_lower-negative_upper-negative'  : '${random.integer[-10,-5]}',
+                'random.integer_lower'                        : '${random.integer(10)}',
+                'random.integer_lower-negative'               : '${random.integer(-10)}',
+                'random.integer_lower_upper'                  : '${random.integer[5,10]}',
+                'random.integer_lower-negative_upper'         : '${random.integer[-5,10]}',
+                'random.integer_lower-negative_upper-negative': '${random.integer[-10,-5]}',
         ]
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
                 PropertySource.of("test", values)
@@ -339,11 +357,11 @@ class PropertySourcePropertyResolverSpec extends Specification {
     void "test random long placeholders in range for properties"() {
         given:
         def values = [
-                'random.long_lower'  : '${random.long(10)}',
-                'random.long_lower-negative'  : '${random.long(-10)}',
-                'random.long_lower_upper'  : '${random.long[5,10]}',
-                'random.long_lower-negative_upper'  : '${random.long[-5,10]}',
-                'random.long_lower-negative_upper-negative'  : '${random.long[-10,-5]}',
+                'random.long_lower'                        : '${random.long(10)}',
+                'random.long_lower-negative'               : '${random.long(-10)}',
+                'random.long_lower_upper'                  : '${random.long[5,10]}',
+                'random.long_lower-negative_upper'         : '${random.long[-5,10]}',
+                'random.long_lower-negative_upper-negative': '${random.long[-10,-5]}',
         ]
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
                 PropertySource.of("test", values)
@@ -378,11 +396,11 @@ class PropertySourcePropertyResolverSpec extends Specification {
     void "test random float placeholders in range for properties"() {
         given:
         def values = [
-                'random.float_lower'  : '${random.float(10.5)}',
-                'random.float_lower-negative'  : '${random.float(-10.5)}',
-                'random.float_lower_upper'  : '${random.float[5.5,10.5]}',
-                'random.float_lower-negative_upper'  : '${random.float[-5.5,10.5]}',
-                'random.float_lower-negative_upper-negative'  : '${random.float[-10.5,-5.5]}',
+                'random.float_lower'                        : '${random.float(10.5)}',
+                'random.float_lower-negative'               : '${random.float(-10.5)}',
+                'random.float_lower_upper'                  : '${random.float[5.5,10.5]}',
+                'random.float_lower-negative_upper'         : '${random.float[-5.5,10.5]}',
+                'random.float_lower-negative_upper-negative': '${random.float[-10.5,-5.5]}',
         ]
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
                 PropertySource.of("test", values)
@@ -417,15 +435,15 @@ class PropertySourcePropertyResolverSpec extends Specification {
     void "test invalid random Integer range"() {
         when:
         def values = [
-            'random.integer' : '${random.integer(9999999999)}'
+                'random.integer': '${random.integer(9999999999)}'
         ]
         new PropertySourcePropertyResolver(
                 PropertySource.of("test", values)
-        )
+        ).getProperty('random.integer', String).isPresent()
 
         then:
-        def ex= thrown(ValueException)
-        ex.message == 'Invalid range: `9999999999` found for type Integer while parsing property: random.integer'
+        def ex = thrown(ValueException)
+        ex.message == 'Invalid range: `9999999999` found for type Integer for expression: random.integer(9999999999)'
         ex.cause != null
         ex.cause instanceof NumberFormatException
     }
@@ -433,15 +451,15 @@ class PropertySourcePropertyResolverSpec extends Specification {
     void "test invalid random Long range"() {
         when:
         def values = [
-                'random.long' : '${random.long(9999999999999999999)}'
+                'random.long': '${random.long(9999999999999999999)}'
         ]
         new PropertySourcePropertyResolver(
                 PropertySource.of("test", values)
-        )
+        ).getProperty('random.long', String).isPresent()
 
         then:
-        def ex= thrown(ValueException)
-        ex.message == 'Invalid range: `9999999999999999999` found for type Long while parsing property: random.long'
+        def ex = thrown(ValueException)
+        ex.message == 'Invalid range: `9999999999999999999` found for type Long for expression: random.long(9999999999999999999)'
         ex.cause != null
         ex.cause instanceof NumberFormatException
     }
@@ -453,7 +471,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
         ]
         new PropertySourcePropertyResolver(
                 PropertySource.of("test", values)
-        )
+        ).getProperty('random.invalid', String).isPresent()
 
         then:
         thrown(ConfigurationException)
@@ -526,10 +544,10 @@ class PropertySourcePropertyResolverSpec extends Specification {
     void "test getProperties"() {
         given:
         def values = [
-                'foo.bar'          : 'two',
-                'my.property.one'  : 'one',
-                'my.property.two'  : '${foo.bar}',
-                'my.property.three': 'three',
+                'foo.bar'                 : 'two',
+                'my.property.one'         : 'one',
+                'my.property.two'         : '${foo.bar}',
+                'my.property.three'       : 'three',
                 'test-key.convention-test': 'key',
                 'FranKen_Ste-in.property' : 'Victor'
         ]
@@ -553,42 +571,42 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
     void "test inner properties"() {
         given:
-            def values = new HashMap()
-            values.put('foo[0].bar[0]', 'foo0Bar0')
-            values.put('foo[0].bar[1]', 'foo0Bar1')
-            values.put('foo[0].bar[3]', 'foo0Bar2')
-            values.put('foo[1].bar[abx]', 'foo1Bar0')
-            values.put('foo[1].bar[xyz]', 'foo1Bar1')
-            values.put('custom[0][0][key][4]', 'ohh')
-            values.put('custom[0][0][key][5]', 'ehh')
-            values.put('custom[0][0][key2]', 'xyz')
-            values.put('micronaut.security.intercept-url-map[0].access[0]', '/some-path')
-            values.put('micronaut.security.interceptUrlMap[0].access[1]', '/some-path-x')
+        def values = new HashMap()
+        values.put('foo[0].bar[0]', 'foo0Bar0')
+        values.put('foo[0].bar[1]', 'foo0Bar1')
+        values.put('foo[0].bar[3]', 'foo0Bar2')
+        values.put('foo[1].bar[abx]', 'foo1Bar0')
+        values.put('foo[1].bar[xyz]', 'foo1Bar1')
+        values.put('custom[0][0][key][4]', 'ohh')
+        values.put('custom[0][0][key][5]', 'ehh')
+        values.put('custom[0][0][key2]', 'xyz')
+        values.put('micronaut.security.intercept-url-map[0].access[0]', '/some-path')
+        values.put('micronaut.security.interceptUrlMap[0].access[1]', '/some-path-x')
 
-            PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
-                    PropertySource.of("test", values)
-            )
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
         when:
-            def foos = resolver.getProperty("foo", List).get()
-            def custom = resolver.getProperty("custom", List).get()
-            def micronaut = resolver.getProperty("micronaut", Map).get()
+        def foos = resolver.getProperty("foo", List).get()
+        def custom = resolver.getProperty("custom", List).get()
+        def micronaut = resolver.getProperty("micronaut", Map).get()
         then:
-            foos.size() == 2
-            foos[0].bar.size() == 4
-            foos[0].bar[0] == 'foo0Bar0'
-            foos[0].bar[2] == null
-            foos[1].bar.size() == 2
-            foos[1].bar['abx'] == 'foo1Bar0'
-            foos[1].bar['xyz'] == 'foo1Bar1'
-            custom.size() == 1
-            custom[0].size() == 1
-            custom[0][0].size() == 2
-            custom[0][0]['key'].size() == 6
-            custom[0][0]['key'][4] == 'ohh'
-            custom[0][0]['key'][5] == 'ehh'
-            custom[0][0]['key2'] == 'xyz'
-            micronaut['security']['intercept-url-map'][0]['access'][0] == '/some-path'
-            micronaut['security']['intercept-url-map'][0]['access'][1] == '/some-path-x'
+        foos.size() == 2
+        foos[0].bar.size() == 4
+        foos[0].bar[0] == 'foo0Bar0'
+        foos[0].bar[2] == null
+        foos[1].bar.size() == 2
+        foos[1].bar['abx'] == 'foo1Bar0'
+        foos[1].bar['xyz'] == 'foo1Bar1'
+        custom.size() == 1
+        custom[0].size() == 1
+        custom[0][0].size() == 2
+        custom[0][0]['key'].size() == 6
+        custom[0][0]['key'][4] == 'ohh'
+        custom[0][0]['key'][5] == 'ehh'
+        custom[0][0]['key2'] == 'xyz'
+        micronaut['security']['intercept-url-map'][0]['access'][0] == '/some-path'
+        micronaut['security']['intercept-url-map'][0]['access'][1] == '/some-path-x'
     }
 
     void "test map and list values are collapsed"() {
@@ -596,8 +614,8 @@ class PropertySourcePropertyResolverSpec extends Specification {
         def values = new HashMap()
         values.put("foo", [[bar: ['foo0Bar0', 'foo0Bar1', null, 'foo0Bar2']], [bar: [abx: 'foo1Bar0', xyz: 'foo1Bar1']]])
         values.put("custom", [[[key: [null, null, null, null, 'ohh', 'ehh'], key2: 'xyz']]])
-        values.put("micronaut.security.intercept-url-map", [[access:['/some-path']]])
-        values.put("micronaut.security.interceptUrlMap", [[access:[null, '/some-path-x']]])
+        values.put("micronaut.security.intercept-url-map", [[access: ['/some-path']]])
+        values.put("micronaut.security.interceptUrlMap", [[access: [null, '/some-path-x']]])
 
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
                 PropertySource.of("test", values)
@@ -645,7 +663,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
         when:
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
-               external
+                external
         )
 
         then:
@@ -654,74 +672,74 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
     void "test expression resolver"() {
         given:
-            Map<String, Object> parameters = [foo: "bar"]
-            PropertyResolver mapPropertyResolver = new MapPropertyResolver(parameters)
-            DefaultPropertyPlaceholderResolver propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(mapPropertyResolver, ConversionService.SHARED);
-            propertyPlaceholderResolver.@expressionResolvers = [new PropertyExpressionResolver() {
-                @Override
-                @NonNull
-                <T> Optional<T> resolve(@NonNull PropertyResolver propertyResolver,
-                                        @NonNull ConversionService<? extends ConversionService> conversionService,
-                                        @NonNull String expression,
-                                        @NonNull Class<T> requiredType) {
-                    assert requiredType == String.class
-                    assert conversionService
-                    if ("foobar" == expression) {
-                        return Optional.of("ABC")
-                    }
-                    if ("xyz" == expression) {
-                        return Optional.of("123")
-                    }
-                    if ("external" == expression) {
-                        return propertyResolver.get("foo", requiredType)
-                    }
-                    return Optional.empty()
+        Map<String, Object> parameters = [foo: "bar"]
+        PropertyResolver mapPropertyResolver = new MapPropertyResolver(parameters)
+        DefaultPropertyPlaceholderResolver propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(mapPropertyResolver, ConversionService.SHARED);
+        propertyPlaceholderResolver.@expressionResolvers = [new PropertyExpressionResolver() {
+            @Override
+            @NonNull
+            <T> Optional<T> resolve(@NonNull PropertyResolver propertyResolver,
+                                    @NonNull ConversionService conversionService,
+                                    @NonNull String expression,
+                                    @NonNull Class<T> requiredType) {
+                assert requiredType == String.class
+                assert conversionService
+                if ("foobar" == expression) {
+                    return Optional.of("ABC")
                 }
-            }]
+                if ("xyz" == expression) {
+                    return Optional.of("123")
+                }
+                if ("external" == expression) {
+                    return propertyResolver.get("foo", requiredType)
+                }
+                return Optional.empty()
+            }
+        }]
 
         expect:
-            Optional<String> resolved = propertyPlaceholderResolver.resolvePlaceholders(template)
-            if (result) {
-                assert resolved.isPresent()
-                assert resolved.get() == result
-            } else {
-                assert !resolved.isPresent()
-            }
+        Optional<String> resolved = propertyPlaceholderResolver.resolvePlaceholders(template)
+        if (result) {
+            assert resolved.isPresent()
+            assert resolved.get() == result
+        } else {
+            assert !resolved.isPresent()
+        }
         where:
-            template              | result
-            'Hello ${foo}!'      | "Hello bar!"
-            'Hello ${foobar}!'   | "Hello ABC!"
-            'Hello ${xyz}!'      | "Hello 123!"
-            'Hello ${external}!' | "Hello bar!"
-            'Hello ${lol}!'      | null
+        template             | result
+        'Hello ${foo}!'      | "Hello bar!"
+        'Hello ${foobar}!'   | "Hello ABC!"
+        'Hello ${xyz}!'      | "Hello 123!"
+        'Hello ${external}!' | "Hello bar!"
+        'Hello ${lol}!'      | null
     }
 
     void "test expression resolver is closed"() {
         given:
-            AtomicBoolean closed = new AtomicBoolean()
-            Map<String, Object> parameters = [foo: "bar"]
-            PropertyResolver mapPropertyResolver = new MapPropertyResolver(parameters)
-            DefaultPropertyPlaceholderResolver propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(mapPropertyResolver, ConversionService.SHARED);
-            propertyPlaceholderResolver.@expressionResolvers = [new PropertyExpressionResolverAutoCloseable() {
-                @Override
-                @NonNull
-                <T> Optional<T> resolve(@NonNull PropertyResolver propertyResolver,
-                                        @NonNull ConversionService<? extends ConversionService> conversionService,
-                                        @NonNull String expression,
-                                        @NonNull Class<T> requiredType) {
-                    Optional.empty()
-                }
+        AtomicBoolean closed = new AtomicBoolean()
+        Map<String, Object> parameters = [foo: "bar"]
+        PropertyResolver mapPropertyResolver = new MapPropertyResolver(parameters)
+        DefaultPropertyPlaceholderResolver propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(mapPropertyResolver, ConversionService.SHARED);
+        propertyPlaceholderResolver.@expressionResolvers = [new PropertyExpressionResolverAutoCloseable() {
+            @Override
+            @NonNull
+            <T> Optional<T> resolve(@NonNull PropertyResolver propertyResolver,
+                                    @NonNull ConversionService conversionService,
+                                    @NonNull String expression,
+                                    @NonNull Class<T> requiredType) {
+                Optional.empty()
+            }
 
-                @Override
-                void close() throws Exception {
-                    closed.set(true)
-                }
-            }]
+            @Override
+            void close() throws Exception {
+                closed.set(true)
+            }
+        }]
         when:
-            !closed.get()
-            propertyPlaceholderResolver.close()
+        !closed.get()
+        propertyPlaceholderResolver.close()
         then:
-            closed.get()
+        closed.get()
     }
 
     interface PropertyExpressionResolverAutoCloseable extends PropertyExpressionResolver, AutoCloseable {

@@ -37,7 +37,7 @@ class AnnotationMetadataSpec extends Specification {
 
     void "test empty values then append"() {
         given:
-        DefaultAnnotationMetadata metadata = new DefaultAnnotationMetadata([:], null, null, [:], null)
+        MutableAnnotationMetadata metadata = new MutableAnnotationMetadata([:], null, null, [:], null, false)
         metadata.addAnnotation("foo.Bar", [:])
 
         when:
@@ -56,8 +56,8 @@ class AnnotationMetadataSpec extends Specification {
             annotations.put(av.annotationName, av.values)
         }
 
-        return new DefaultAnnotationMetadata(
-                annotations, null, null, annotations, null
+        return new MutableAnnotationMetadata(
+                annotations, null, null, annotations, null, false
         )
     }
 }

@@ -1,4 +1,4 @@
-Since 1.1.x, Micronaut supports API versioning via a dedicated ann:core.version.annotation.Version[] annotation.
+Since 1.1.x, the Micronaut framework supports API versioning via a dedicated ann:core.version.annotation.Version[] annotation.
 
 The following example demonstrates how to version an API:
 
@@ -7,10 +7,10 @@ snippet::io.micronaut.docs.web.router.version.VersionedController[tags="imports,
 <1> The `helloV1` method is declared as version `1`
 <2> The `helloV2` method is declared as version `2`
 
-Then enable versioning by setting `micronaut.router.versioning.enabled` to `true` in `application.yml`:
+Then enable versioning by setting `micronaut.router.versioning.enabled` to `true` in your configuration file (e.g `application.yml`):
 
 .Enabling Versioning
-[source,yaml]
+[configuration]
 ----
 micronaut:
   router:
@@ -18,30 +18,30 @@ micronaut:
       enabled: true
 ----
 
-By default Micronaut has two strategies for resolving the version based on an HTTP header named `X-API-VERSION` or a request parameter named `api-version`, however this is configurable. A full configuration example can be seen below:
+By default, the Micronaut framework has two strategies for resolving the version based on an HTTP header named `X-API-VERSION` or a request parameter named `api-version`, however this is configurable. A full configuration example can be seen below:
 
 .Configuring Versioning
-[source,yaml]
+[configuration]
 ----
 micronaut:
   router:
     versioning:
-      enabled: true <1>
+      enabled: true
       parameter:
-        enabled: false # <2>
-        names: 'v,api-version' # <3>
+        enabled: false
+        names: 'v,api-version'
       header:
-        enabled: true # <4>
-        names: # <5>
+        enabled: true
+        names:
           - 'X-API-VERSION'
           - 'Accept-Version'
 ----
 
-<1> Enables versioning
-<2> Enables or disables parameter-based versioning
-<3> Specify the parameter names as a comma-separated list
-<4> Enables or disables header-based versioning
-<5> Specify the header names as a list
+- This example enables versioning
+- `parameter.enabled` enables or disables parameter-based versioning
+- `parameter.names` specifies the parameter names as a comma-separated list
+- `header.enabled` enables or disables header-based versioning
+- `header.names` specifies the header names as a list
 
 If this is not enough you can also implement the api:web.router.version.resolution.RequestVersionResolver[] interface which receives the api:http.HttpRequest[] and can implement any strategy you choose.
 
@@ -50,16 +50,16 @@ If this is not enough you can also implement the api:web.router.version.resoluti
 It is possible to supply a default version through configuration.
 
 .Configuring Default Version
-[source,yaml]
+[configuration]
 ----
 micronaut:
   router:
     versioning:
       enabled: true
-      default-version: 3 <1>
+      default-version: 3
 ----
 
-<1> Sets the default version
+- This example enables versioning and sets the default version
 
 A route is *not* matched if the following conditions are met:
 
@@ -90,7 +90,7 @@ include::{includedir}configurationProperties/io.micronaut.http.client.intercepto
 For example to use `Accept-Version` as the header name:
 
 .Configuring Client Versioning
-[source,yaml]
+[configuration]
 ----
 micronaut:
   http:
@@ -105,7 +105,7 @@ micronaut:
 The `default` key refers to the default configuration. You can specify client-specific configuration by using the value passed to `@Client` (typically the service ID). For example:
 
 .Configuring Versioning
-[source,yaml]
+[configuration]
 ----
 micronaut:
   http:

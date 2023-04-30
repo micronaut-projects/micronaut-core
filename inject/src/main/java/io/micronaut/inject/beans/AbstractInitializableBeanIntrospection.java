@@ -31,7 +31,9 @@ import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.StringIntMap;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -61,38 +63,46 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
     private final AnnotationMetadata annotationMetadata;
     private final AnnotationMetadata constructorAnnotationMetadata;
     private final Argument<?>[] constructorArguments;
-    private final List<BeanProperty<B, Object>> beanProperties;
-    private final List<BeanMethod<B, Object>> beanMethods;
+    private final BeanProperty<B, Object>[] beanProperties;
+    private final List<BeanProperty<B, Object>> beanPropertiesList;
+    private final List<BeanMethod<B, Object>> beanMethodsList;
+    private final StringIntMap beanPropertyIndex;
 
     private BeanConstructor<B> beanConstructor;
 
-    public AbstractInitializableBeanIntrospection(Class<B> beanType,
+    protected AbstractInitializableBeanIntrospection(Class<B> beanType,
                                                   AnnotationMetadata annotationMetadata,
                                                   AnnotationMetadata constructorAnnotationMetadata,
                                                   Argument<?>[] constructorArguments,
                                                   BeanPropertyRef<Object>[] propertiesRefs,
                                                   BeanMethodRef<Object>[] methodsRefs) {
         this.beanType = beanType;
-        this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata;
-        this.constructorAnnotationMetadata = constructorAnnotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : constructorAnnotationMetadata;
+        this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
+        this.constructorAnnotationMetadata = constructorAnnotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : EvaluatedAnnotationMetadata.wrapIfNecessary(constructorAnnotationMetadata);
         this.constructorArguments = constructorArguments == null ? Argument.ZERO_ARGUMENTS : constructorArguments;
         if (propertiesRefs != null) {
             List<BeanProperty<B, Object>> beanProperties = new ArrayList<>(propertiesRefs.length);
             for (BeanPropertyRef beanPropertyRef : propertiesRefs) {
                 beanProperties.add(new BeanPropertyImpl<>(beanPropertyRef));
             }
-            this.beanProperties = Collections.unmodifiableList(beanProperties);
+            this.beanProperties = beanProperties.toArray(BeanProperty[]::new);
+            this.beanPropertiesList = Collections.unmodifiableList(beanProperties);
         } else {
-            this.beanProperties = Collections.emptyList();
+            this.beanProperties = new BeanProperty[0];
+            this.beanPropertiesList = Collections.emptyList();
+        }
+        this.beanPropertyIndex = new StringIntMap(beanProperties.length);
+        for (int i = 0; i < beanProperties.length; i++) {
+            beanPropertyIndex.put(beanProperties[i].getName(), i);
         }
         if (methodsRefs != null) {
             List<BeanMethod<B, Object>> beanMethods = new ArrayList<>(methodsRefs.length);
             for (BeanMethodRef beanMethodRef : methodsRefs) {
                 beanMethods.add(new BeanMethodImpl<>(beanMethodRef));
             }
-            this.beanMethods = Collections.unmodifiableList(beanMethods);
+            this.beanMethodsList = Collections.unmodifiableList(beanMethods);
         } else {
-            this.beanMethods = Collections.emptyList();
+            this.beanMethodsList = Collections.emptyList();
         }
     }
 
@@ -116,7 +126,41 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
     @Internal
     @UsedByGeneratedCode
     protected BeanProperty<B, Object> getPropertyByIndex(int index) {
-        return beanProperties.get(index);
+        return beanProperties[index];
+    }
+
+    @Override
+    public int propertyIndexOf(String name) {
+        return beanPropertyIndex.get(name, -1);
+    }
+
+    /**
+     * Find {@link Method} representation at the method by index. Used by {@link ExecutableMethod#getTargetMethod()}.
+     *
+     * @param index The index
+     * @return The method
+     */
+    @UsedByGeneratedCode
+    @Internal
+    protected abstract Method getTargetMethodByIndex(int index);
+
+    /**
+     * Find {@link Method} representation at the method by index. Used by {@link ExecutableMethod#getTargetMethod()}.
+     *
+     * @param index The index
+     * @return The method
+     * @since 3.8.5
+     */
+    @UsedByGeneratedCode
+    // this logic must allow reflection
+    @SuppressWarnings("java:S3011")
+    protected final Method getAccessibleTargetMethodByIndex(int index) {
+        Method method = getTargetMethodByIndex(index);
+        if (ClassUtils.REFLECTION_LOGGER.isDebugEnabled()) {
+            ClassUtils.REFLECTION_LOGGER.debug("Reflectively accessing method {} of type {}", method, method.getDeclaringClass());
+        }
+        method.setAccessible(true);
+        return method;
     }
 
     /**
@@ -237,7 +281,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
     @Override
     public BeanConstructor<B> getConstructor() {
         if (beanConstructor == null) {
-            beanConstructor = new BeanConstructor<B>() {
+            beanConstructor = new BeanConstructor<>() {
                 @Override
                 public Class<B> getDeclaringBeanType() {
                     return beanType;
@@ -278,7 +322,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
     public Optional<BeanProperty<B, Object>> getProperty(@NonNull String name) {
         ArgumentUtils.requireNonNull("name", name);
         int index = propertyIndexOf(name);
-        return index == -1 ? Optional.empty() : Optional.of(beanProperties.get(index));
+        return index == -1 ? Optional.empty() : Optional.of(beanProperties[index]);
     }
 
     @Override
@@ -289,7 +333,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
     @NonNull
     @Override
     public Collection<BeanProperty<B, Object>> getBeanProperties() {
-        return beanProperties;
+        return beanPropertiesList;
     }
 
     @NonNull
@@ -301,7 +345,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
     @NonNull
     @Override
     public Collection<BeanMethod<B, Object>> getBeanMethods() {
-        return beanMethods;
+        return beanMethodsList;
     }
 
     @Override
@@ -318,7 +362,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
 
     @Override
     public int hashCode() {
-        return Objects.hash(beanType);
+        return beanType.hashCode();
     }
 
     @Override
@@ -334,16 +378,16 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
     private static final class IndexedCollections<T> extends AbstractCollection<T> {
 
         private final int[] indexed;
-        private final List<T> list;
+        private final T[] array;
 
-        private IndexedCollections(int[] indexed, List<T> list) {
+        private IndexedCollections(int[] indexed, T[] array) {
             this.indexed = indexed;
-            this.list = list;
+            this.array = array;
         }
 
         @Override
         public Iterator<T> iterator() {
-            return new Iterator<T>() {
+            return new Iterator<>() {
 
                 int i = -1;
 
@@ -358,7 +402,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
                         throw new NoSuchElementException();
                     }
                     int index = indexed[++i];
-                    return list.get(index);
+                    return array[index];
                 }
             };
         }
@@ -379,10 +423,12 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
 
         private final BeanPropertyRef<P> ref;
         private final Class<?> typeOrWrapperType;
+        private final AnnotationMetadata annotationMetadata;
 
         private BeanPropertyImpl(BeanPropertyRef<P> ref) {
             this.ref = ref;
             this.typeOrWrapperType = ReflectionUtils.getWrapperType(getType());
+            this.annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(ref.argument.getAnnotationMetadata());
         }
 
         @NonNull
@@ -411,7 +457,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
 
         @Override
         public AnnotationMetadata getAnnotationMetadata() {
-            return ref.argument.getAnnotationMetadata();
+            return annotationMetadata;
         }
 
         @Nullable
@@ -422,7 +468,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
                 throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + beanType);
             }
             if (isWriteOnly()) {
-                throw new UnsupportedOperationException("Cannot read from a write-only property");
+                throw new UnsupportedOperationException("Cannot read from a write-only property: " + getName());
             }
             return dispatchOne(ref.getMethodIndex, bean, null);
         }
@@ -545,7 +591,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
                 @NonNull
                 @Override
                 public AnnotationMetadata getAnnotationMetadata() {
-                    return ref.returnType.getAnnotationMetadata();
+                    return EvaluatedAnnotationMetadata.wrapIfNecessary(ref.returnType.getAnnotationMetadata());
                 }
             };
         }
@@ -577,7 +623,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
             if (ClassUtils.REFLECTION_LOGGER.isWarnEnabled()) {
                 ClassUtils.REFLECTION_LOGGER.warn("Using getTargetMethod for method {} on type {} requires the use of reflection. GraalVM configuration necessary", getName(), getDeclaringType());
             }
-            return ReflectionUtils.getRequiredMethod(getDeclaringType(), getMethodName(), getArgumentTypes());
+            return getTargetMethodByIndex(ref.methodIndex);
         }
 
         @Override
@@ -649,7 +695,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
                              int methodIndex) {
             this.returnType = returnType;
             this.name = name;
-            this.annotationMetadata = annotationMetadata;
+            this.annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
             this.arguments = arguments;
             this.methodIndex = methodIndex;
         }

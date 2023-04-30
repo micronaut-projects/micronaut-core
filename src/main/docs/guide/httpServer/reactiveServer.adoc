@@ -1,11 +1,11 @@
-As mentioned previously, Micronaut is built on Netty which is designed around an Event loop model and non-blocking I/O. Micronaut executes code defined in ann:http.annotation.Controller[] beans in the same thread as the request thread (an Event Loop thread).
+As mentioned previously, Micronaut framework is built on Netty which is designed around an Event loop model and non-blocking I/O. Micronaut executes code defined in ann:http.annotation.Controller[] beans in the same thread as the request thread (an Event Loop thread).
 
 This makes it critical that if you do any blocking I/O operations (for example interactions with Hibernate/JPA or JDBC) that you offload those tasks to a separate thread pool that does not block the Event loop.
 
 For example the following configuration configures the I/O thread pool as a fixed thread pool with 75 threads (similar to what a traditional blocking server such as Tomcat uses in the thread-per-request model):
 
 .Configuring the IO thread pool
-[source,yaml]
+[configuration]
 ----
 micronaut:
   executors:

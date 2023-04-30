@@ -19,87 +19,89 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: ['8', '11', '17']
+        graalvm: [ 'latest']
+        java: ['17']
+    env:
+      GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
+      GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
+      GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
+      GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
+      GH_USERNAME: ${{ secrets.GH_USERNAME }}
+      TESTCONTAINERS_RYUK_DISABLED: true
+      PREDICTIVE_TEST_SELECTION: "${{ github.event_name == 'pull_request' && 'true' || 'false' }}"
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      # https://github.com/actions/virtual-environments/issues/709
-      - name: Free disk space
+       # https://github.com/actions/virtual-environments/issues/709
+      - name: "🗑 Free disk space"
         run: |
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo apt-get clean
-          df -h
-      - uses: actions/checkout@v3
-      - name: Set up JDK
-        uses: actions/setup-java@v3
+         sudo rm -rf "/usr/local/share/boost"
+         sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+         sudo apt-get clean
+         df -h
+
+      - name: "📥 Checkout repository"
+        uses: actions/checkout@v3
         with:
-          distribution: 'temurin'
+          fetch-depth: 0
+
+      - name: "🔧 Setup GraalVM CE"
+        uses: graalvm/setup-graalvm@v1
+        with:
+          version: ${{ matrix.graalvm }}
           java-version: ${{ matrix.java }}
-      - name: Setup Gradle
-        uses: gradle/gradle-build-action@v2.3.3
-      - name: Optional setup step
-        env:
-          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-          GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
-          GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
+          components: 'native-image'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "🔧 Setup Gradle"
+        uses: gradle/gradle-build-action@v2
+
+      - name: "❓ Optional setup step"
         run: |
-          [ -f ./setup.sh ] && ./setup.sh || true
-      - name: Build with Gradle
+          [ -f ./setup.sh ] && ./setup.sh || [ ! -f ./setup.sh ]
+
+      - name: "🛠 Build with Gradle"
         id: gradle
         run: |
-          ./gradlew check --no-daemon --parallel --continue
-        env:
-          GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
-          GH_USERNAME: ${{ secrets.GH_USERNAME }}
-          TESTCONTAINERS_RYUK_DISABLED: true
-          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-          GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
-          GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
-          PREDICTIVE_TEST_SELECTION: "${{ github.event_name == 'pull_request' && 'true' || 'false' }}"
-      - name: Add build scan URL as PR comment
-        uses: actions/github-script@v5
-        if: github.event_name == 'pull_request' && failure()
-        with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '❌ ${{ github.workflow }} failed: ${{ steps.gradle.outputs.build-scan-url }}'
-            })
-      - name: Publish Test Report
+          ./gradlew check --no-daemon --continue
+
+      - name: "🔎 Run static analysis"
+        if: env.SONAR_TOKEN != ''
+        run: |
+          ./gradlew sonar
+
+      - name: "📊 Publish Test Report"
         if: always()
-        uses: mikepenz/action-junit-report@v3.7.1
+        uses: mikepenz/action-junit-report@v3
         with:
           check_name: Java CI / Test Report (${{ matrix.java }})
           report_paths: '**/build/test-results/test/TEST-*.xml'
           check_retries: 'true'
+
       - name: "📜 Upload binary compatibility check results"
         if: always()
         uses: actions/upload-artifact@v3
         with:
           name: binary-compatibility-reports
           path: "**/build/reports/binary-compatibility-*.html"
-      - name: Publish to Sonatype Snapshots
-        if: success() && github.event_name == 'push' && matrix.java == '11'
+
+      - name: "📦 Publish to Sonatype Snapshots"
+        if: success() && github.event_name == 'push' && matrix.java == '17'
         env:
-          GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
-          GH_USERNAME: ${{ secrets.GH_USERNAME }}
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           SONATYPE_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
-          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-          GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
-          GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
         run: ./gradlew publishToSonatype docs --no-daemon
-      - name: Determine docs target repository
+
+      - name: "❓ Determine docs target repository"
         uses: haya14busa/action-cond@v1
         id: docs_target
         with:
           cond: ${{ github.repository == 'micronaut-projects/micronaut-core' }}
           if_true: "micronaut-projects/micronaut-docs"
           if_false: ${{ github.repository }}
-      - name: Publish to Github Pages
-        if: success() && github.event_name == 'push' && matrix.java == '11'
+
+      - name: "📑 Publish to Github Pages"
+        if: success() && github.event_name == 'push' && matrix.java == '17'
         uses: micronaut-projects/github-pages-deploy-action@master
         env:
           TARGET_REPOSITORY: ${{ steps.docs_target.outputs.value }}

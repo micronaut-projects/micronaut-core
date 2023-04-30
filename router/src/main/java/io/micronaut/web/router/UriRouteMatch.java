@@ -20,8 +20,10 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.uri.UriMatchInfo;
 
-import java.util.*;
-import java.util.function.Function;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 /**
  * A {@link RouteMatch} that matches a URI and {@link HttpMethod}.
@@ -34,9 +36,9 @@ import java.util.function.Function;
 public interface UriRouteMatch<T, R> extends UriMatchInfo, MethodBasedRouteMatch<T, R> {
 
     /**
-     * @return The backing {@link UriRoute}
+     * @return The backing {@link UriRouteInfo}
      */
-    UriRoute getRoute();
+    UriRouteInfo<T, R> getRouteInfo();
 
     /**
      * <p>Returns the required arguments for this RouteMatch.</p>
@@ -47,12 +49,12 @@ public interface UriRouteMatch<T, R> extends UriMatchInfo, MethodBasedRouteMatch
      * @return The required arguments in order to invoke this route
      */
     @Override
-    default List<Argument> getRequiredArguments() {
-        Argument[] arguments = getArguments();
+    default List<Argument<?>> getRequiredArguments() {
+        Argument<?>[] arguments = getArguments();
         if (ArrayUtils.isNotEmpty(arguments)) {
             Map<String, Object> matchVariables = getVariableValues();
-            List<Argument> actualArguments = new ArrayList<>(arguments.length);
-            for (Argument argument : arguments) {
+            List<Argument<?>> actualArguments = new ArrayList<>(arguments.length);
+            for (Argument<?> argument : arguments) {
                 if (!matchVariables.containsKey(argument.getName())) {
                     actualArguments.add(argument);
                 }
@@ -68,9 +70,4 @@ public interface UriRouteMatch<T, R> extends UriMatchInfo, MethodBasedRouteMatch
      */
     HttpMethod getHttpMethod();
 
-    @Override
-    UriRouteMatch<T, R> fulfill(Map<String, Object> argumentValues);
-
-    @Override
-    UriRouteMatch<T, R> decorate(Function<RouteMatch<R>, R> executor);
 }

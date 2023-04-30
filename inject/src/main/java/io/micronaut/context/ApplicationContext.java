@@ -19,13 +19,12 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.SystemPropertiesPropertySource;
-import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import java.util.Collections;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -58,11 +57,6 @@ import java.util.function.Consumer;
  * @since 1.0
  */
 public interface ApplicationContext extends BeanContext, PropertyResolver, PropertyPlaceholderResolver {
-
-    /**
-     * @return The default conversion service
-     */
-    @NonNull ConversionService<?> getConversionService();
 
     /**
      * @return The application environment
@@ -256,7 +250,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      */
     static @NonNull ApplicationContextBuilder builder(@NonNull String... environments) {
         ArgumentUtils.requireNonNull("environments", environments);
-        return new DefaultApplicationContextBuilder()
+        return builder()
                 .environments(environments);
     }
 
@@ -270,7 +264,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
     static @NonNull ApplicationContextBuilder builder(@NonNull Map<String, Object> properties, @NonNull String... environments) {
         ArgumentUtils.requireNonNull("environments", environments);
         ArgumentUtils.requireNonNull("properties", properties);
-        return new DefaultApplicationContextBuilder()
+        return builder()
                 .properties(properties)
                 .environments(environments);
     }
@@ -282,6 +276,14 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      */
     static @NonNull ApplicationContextBuilder builder() {
         return new DefaultApplicationContextBuilder();
+    }
+
+    /**
+     * @param classLoader The class loader to use
+     * @return The application context builder
+     */
+    static @NonNull ApplicationContextBuilder builder(ClassLoader classLoader) {
+        return new DefaultApplicationContextBuilder(classLoader);
     }
 
     /**
@@ -308,8 +310,8 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
         ArgumentUtils.requireNonNull("environments", environments);
         ArgumentUtils.requireNonNull("classLoader", classLoader);
 
-        return builder(environments)
-                .classLoader(classLoader);
+        return builder(classLoader)
+            .environments(environments);
     }
 
     /**
@@ -319,7 +321,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      * @param environments The environment to use
      * @return The application context builder
      */
-    static @NonNull ApplicationContextBuilder builder(@NonNull Class mainClass, @NonNull String... environments) {
+    static @NonNull ApplicationContextBuilder builder(@NonNull Class<?> mainClass, @NonNull String... environments) {
         ArgumentUtils.requireNonNull("environments", environments);
         ArgumentUtils.requireNonNull("mainClass", mainClass);
 

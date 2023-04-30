@@ -4,14 +4,14 @@ The Netty worker event loop uses the "default" named event loop group. This can 
 
 IMPORTANT: The event loop configuration under `micronaut.server.netty.worker` is only used if the `event-loop-group` is set to a name which doesn't correspond to any `micronaut.netty.event-loops` configuration. This behavior is deprecated and will be removed in a future version. Use `micronaut.netty.event-loops.*` for any event loop group configuration beyond setting the name through `event-loop-group`. This does not apply to the parent event loop configuration (`micronaut.server.netty.parent`).
 
-include::{includedir}configurationProperties/io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration.Worker.adoc[]
+include::{includedir}configurationProperties/io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration$Worker.adoc[]
 
 TIP: The parent event loop can be configured with `micronaut.server.netty.parent` with the same configuration options.
 
 The server can also be configured to use a different named worker event loop:
 
 .Using a different event loop for the server
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:

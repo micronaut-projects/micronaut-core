@@ -47,7 +47,7 @@ class OutgoingHttpRequestProcessorImplSpec extends Specification {
     }
 }
 
-class MockOutgoingRequestProcessorMatcher implements OutgointRequestProcessorMatcher {
+class MockOutgoingRequestProcessorMatcher implements OutgoingRequestProcessorMatcher {
     Pattern serviceIdPattern
     Pattern uriPattern
 

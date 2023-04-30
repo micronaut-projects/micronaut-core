@@ -22,15 +22,15 @@ import jakarta.inject.Inject;
 public class WildCardInject {
     // tests injecting field
     @Inject
-    protected ConversionService<?> conversionService;
+    protected ConversionService conversionService;
 
     // tests injecting constructor
-    public WildCardInject(ConversionService<?> conversionService) {
+    public WildCardInject(ConversionService conversionService) {
     }
 
     // tests injection method
     @Inject
-    public void setConversionService(ConversionService<?> conversionService) {
+    public void setConversionService(ConversionService conversionService) {
         this.conversionService = conversionService;
     }
 }

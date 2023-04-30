@@ -19,6 +19,7 @@ import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.InterceptorKind;
+import io.micronaut.aop.Introduction;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -26,6 +27,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.ReturnType;
 
 import java.util.List;
@@ -48,12 +50,15 @@ public final class InterceptedMethodUtil {
     /**
      * Find possible {@link InterceptedMethod} implementation.
      *
-     * @param context The {@link MethodInvocationContext}
+     * @param context           The {@link MethodInvocationContext}
+     * @param conversionService The {@link ConversionService}
      * @return The {@link InterceptedMethod}
+     * @since 4.0.0
      */
-    public static InterceptedMethod of(MethodInvocationContext<?, ?> context) {
+    @NonNull
+    public static InterceptedMethod of(@NonNull MethodInvocationContext<?, ?> context, @NonNull ConversionService conversionService) {
         if (context.isSuspend()) {
-            KotlinInterceptedMethod kotlinInterceptedMethod = KotlinInterceptedMethod.of(context);
+            KotlinInterceptedMethodImpl kotlinInterceptedMethod = KotlinInterceptedMethodImpl.of(context);
             if (kotlinInterceptedMethod != null) {
                 return kotlinInterceptedMethod;
             }
@@ -65,9 +70,9 @@ public final class InterceptedMethodUtil {
                 // Micro Optimization
                 return new SynchronousInterceptedMethod(context);
             } else if (CompletionStage.class.isAssignableFrom(returnTypeClass) || Future.class.isAssignableFrom(returnTypeClass)) {
-                return new CompletionStageInterceptedMethod(context);
+                return new CompletionStageInterceptedMethod(context, conversionService);
             } else if (PublisherInterceptedMethod.isConvertibleToPublisher(returnTypeClass)) {
-                return new PublisherInterceptedMethod(context);
+                return new PublisherInterceptedMethod(context, conversionService);
             } else {
                 return new SynchronousInterceptedMethod(context);
             }
@@ -110,6 +115,17 @@ public final class InterceptedMethodUtil {
     }
 
     /**
+     * Does the given metadata have introduction declared.
+     * @param annotationMetadata The annotation metadata
+     * @return True if it does
+     */
+    public static boolean hasIntroductionStereotype(@Nullable AnnotationMetadata annotationMetadata) {
+        return hasIntroduction(annotationMetadata,
+                annMetadata -> annMetadata.hasStereotype(Introduction.class),
+                annMetdata -> annMetdata.getAnnotationValuesByType(InterceptorBinding.class));
+    }
+
+    /**
      * Does the given metadata have declared AOP advice.
      * @param annotationMetadata The annotation metadata
      * @return True if it does
@@ -132,6 +148,24 @@ public final class InterceptedMethodUtil {
             return interceptorBindingsFunction.apply(annotationMetadata)
                     .stream().anyMatch(av ->
                             av.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND) == InterceptorKind.AROUND
+                    );
+        }
+
+        return false;
+    }
+
+    private static boolean hasIntroduction(@Nullable AnnotationMetadata annotationMetadata,
+                                           @NonNull Predicate<AnnotationMetadata> hasFunction,
+                                           @NonNull Function<AnnotationMetadata, List<AnnotationValue<InterceptorBinding>>> interceptorBindingsFunction) {
+        if (annotationMetadata == null) {
+            return false;
+        }
+        if (hasFunction.test(annotationMetadata)) {
+            return true;
+        } else if (annotationMetadata.hasDeclaredStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
+            return interceptorBindingsFunction.apply(annotationMetadata)
+                    .stream().anyMatch(av ->
+                            av.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND) == InterceptorKind.INTRODUCTION
                     );
         }
 

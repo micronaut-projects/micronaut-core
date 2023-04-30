@@ -121,6 +121,12 @@ public class SemanticVersion implements Comparable<SemanticVersion> {
     }
 
     private static boolean isAtLeastMajorMinorImpl(SemanticVersion version, int majorVersion, int minorVersion) {
-        return version != null && version.major >= majorVersion && version.minor >= minorVersion;
+        if (version != null) {
+            if (version.major == majorVersion) {
+                return version.minor >= minorVersion;
+            }
+            return version.major > majorVersion;
+        }
+        return false;
     }
 }

@@ -180,6 +180,7 @@ public class NettyWebSocketSession implements WebSocketSession {
                     }
                     channel.writeAndFlush(frame).sync().get();
                 } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                     throw new WebSocketSessionException("Send interrupt: " + e.getMessage(), e);
                 } catch (ExecutionException e) {
                     throw new WebSocketSessionException("Send Failure: " + e.getMessage(), e);

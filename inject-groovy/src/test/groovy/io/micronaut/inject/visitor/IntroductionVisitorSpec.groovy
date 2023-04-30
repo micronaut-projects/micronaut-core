@@ -36,13 +36,15 @@ class Foo {}
         visitedElements.find { it.name == 'deleteAll'}.parameters[0].genericType.getFirstTypeArgument().get().name == 'introv1.Foo'
         IntroductionVisitor.VISITED_CLASS_ELEMENTS.size() == 1
         visitedElements.size() == 5
-        visitedElements[1].name == 'save'
-        visitedElements[1].genericReturnType.name == 'introv1.Foo'
-        visitedElements[1].parameters[0].genericType.name == 'introv1.Foo'
-        visitedElements[2].parameters[0].genericType.name == Iterable.name
-        visitedElements[2].parameters[0].genericType.getFirstTypeArgument().isPresent()
-        visitedElements[2].parameters[0].genericType.getFirstTypeArgument().get().name == 'introv1.Foo'
-        visitedElements[2].genericReturnType.getFirstTypeArgument().get().name == 'introv1.Foo'
+        def saveElement = visitedElements.find { it.name == 'save'}
+        saveElement.name == 'save'
+        saveElement.genericReturnType.name == 'introv1.Foo'
+        saveElement.parameters[0].genericType.name == 'introv1.Foo'
+        def saveAllElement = visitedElements.find { it.name == 'saveAll'}
+        saveAllElement.parameters[0].genericType.name == Iterable.name
+        saveAllElement.parameters[0].genericType.getFirstTypeArgument().isPresent()
+        saveAllElement.parameters[0].genericType.getFirstTypeArgument().get().name == 'introv1.Foo'
+        saveAllElement.genericReturnType.getFirstTypeArgument().get().name == 'introv1.Foo'
 
         and:
         ClassElement classElement = IntroductionVisitor.VISITED_CLASS_ELEMENTS[0]
@@ -88,13 +90,14 @@ class Foo {}
         expect:
         IntroductionVisitor.VISITED_CLASS_ELEMENTS.size() == 1
         IntroductionVisitor.VISITED_METHOD_ELEMENTS.size() == 5
-        IntroductionVisitor.VISITED_METHOD_ELEMENTS[1].name == 'save'
-        IntroductionVisitor.VISITED_METHOD_ELEMENTS[1].genericReturnType.name == 'introv2.Foo'
-        IntroductionVisitor.VISITED_METHOD_ELEMENTS[1].parameters[0].genericType.name == 'introv2.Foo'
-        IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].parameters[0].genericType.name == Iterable.name
-        IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].parameters[0].genericType.getFirstTypeArgument().isPresent()
-        IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].parameters[0].genericType.getFirstTypeArgument().get().name == 'introv2.Foo'
-        IntroductionVisitor.VISITED_METHOD_ELEMENTS[2].genericReturnType.getFirstTypeArgument().get().name == 'introv2.Foo'
+        def saveElement = IntroductionVisitor.VISITED_METHOD_ELEMENTS.find { it.name == 'save'}
+        saveElement.genericReturnType.name == 'introv2.Foo'
+        saveElement.parameters[0].genericType.name == 'introv2.Foo'
+        def saveElementAll = IntroductionVisitor.VISITED_METHOD_ELEMENTS.find { it.name == 'saveAll'}
+        saveElementAll.parameters[0].genericType.name == Iterable.name
+        saveElementAll.parameters[0].genericType.getFirstTypeArgument().isPresent()
+        saveElementAll.parameters[0].genericType.getFirstTypeArgument().get().name == 'introv2.Foo'
+        saveElementAll.genericReturnType.getFirstTypeArgument().get().name == 'introv2.Foo'
 
         and:
         ClassElement classElement = IntroductionVisitor.VISITED_CLASS_ELEMENTS[0]

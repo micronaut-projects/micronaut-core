@@ -1,6 +1,18 @@
 Applications built for the Cloud often need to adapt to running in a Cloud environment, read and share configuration in a distributed manner, and externalize configuration to the environment where necessary.
 
-Micronaut's <<environments, Environment>> concept is by default Cloud platform-aware and makes a best effort to detect the underlying active environment.
+Micronaut's <<environments, Environment>> concept can be configured to be Cloud platform-aware and makes a best effort to detect the underlying active Cloud environment.
+
+To enable this feature you can call `deduceCloudEnvironment(true)` on the api:context.ApplicationContextBuilder[] interface when starting Micronaut. For example:
+
+.Enabling Cloud Environment Detection
+[source,java]
+----
+public static void main(String...args) {
+    Micronaut.build(args)
+             .deduceCloudEnvironment(true)
+             .start();
+}
+----
 
 You can then use the api:context.annotation.Requires[] annotation to <<conditionalBeans,conditionally load bean definitions>>.
 
@@ -80,12 +92,11 @@ TIP: Any configuration property in the api:context.env.Environment[] can also be
 
 == Using Cloud Instance Metadata
 
-When Micronaut detects it is running on a supported cloud platform, on startup it populates the interface api:discovery.cloud.ComputeInstanceMetadata[].
+When the Micronaut framework detects it is running on a supported cloud platform, on startup it populates the interface api:discovery.cloud.ComputeInstanceMetadata[].
 
-TIP: As of Micronaut 2.1.x this logic depends on the presence of the appropriate core Cloud module for Oracle Cloud, AWS, or GCP.
+TIP: As of Micronaut framework 2.1.x this logic depends on the presence of the appropriate core Cloud module for Oracle Cloud, AWS, or GCP.
 
 All this data is merged together into the `metadata` property for the running api:discovery.ServiceInstance[].
-
 
 To access the metadata for your application instance you can use the interface api:discovery.EmbeddedServerInstance[], and call `getMetadata()` which returns a Map of the metadata.
 

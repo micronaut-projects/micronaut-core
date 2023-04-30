@@ -4,7 +4,7 @@ snippet::io.micronaut.docs.context.env.EnvironmentSpec[tags="env",indent=0,title
 
 The active environment names allow loading different configuration files depending on the environment, and also using the ann:context.annotation.Requires[] annotation to conditionally load beans or bean ann:context.annotation.Configuration[] packages.
 
-In addition, Micronaut attempts to detect the current environments. For example within a Spock or JUnit test the api:context.env.Environment#TEST[] environment is automatically active.
+In addition, the Micronaut framework attempts to detect the current environments. For example within a Spock or JUnit test the api:context.env.Environment#TEST[] environment is automatically active.
 
 Additional active environments can be specified using the `micronaut.environments` system property or the `MICRONAUT_ENVIRONMENTS` environment variable. These are specified as a comma-separated list. For example:
 
@@ -16,13 +16,13 @@ $ java -Dmicronaut.environments=foo,bar -jar myapp.jar
 
 The above activates environments called `foo` and `bar`.
 
-Finally, Cloud environment names are also detected. See the section on <<cloudConfiguration,Cloud Configuration>> for more information.
+It is also possible to enable the detection of the Cloud environment the application is deployed to (this feature is disabled by default since Micronaut framework 4). See the section on <<cloudConfiguration,Cloud Configuration>> for more information.
 
 == Environment Priority
 
-Micronaut loads property sources based on the environments specified, and if the same property key exists in multiple property sources specific to an environment, the environment order determines which value to use.
+The Micronaut framework loads property sources based on the environments specified, and if the same property key exists in multiple property sources specific to an environment, the environment order determines which value to use.
 
-Micronaut uses the following hierarchy for environment processing (lowest to highest priority):
+The Micronaut framework uses the following hierarchy for environment processing (lowest to highest priority):
 
 * Deduced environments
 * Environments from the `micronaut.environments` system property
@@ -35,7 +35,7 @@ NOTE: This also applies to `@MicronautTest(environments = ...)`
 
 == Disabling Environment Detection
 
-Automatic detection of environments can be disabled by setting the `micronaut.env.deduction` system property or the `MICRONAUT_ENV_DEDUCTION` environment variable to `false`. This prevents Micronaut from detecting current environments, while still using any environments that are specifically provided as shown above.
+Automatic detection of environments can be disabled by setting the `micronaut.env.deduction` system property or the `MICRONAUT_ENV_DEDUCTION` environment variable to `false`. This prevents the Micronaut framework from detecting current environments, while still using any environments that are specifically provided as shown above.
 
 .Disabling environment detection via system property
 [source,bash]
@@ -49,7 +49,7 @@ snippet::io.micronaut.docs.context.env.DefaultEnvironmentSpec[tags="disableEnvDe
 
 == Default Environment
 
-Micronaut supports the concept of one or many default environments.
+The Micronaut framework supports the concept of one or many default environments.
 A default environment is one that is only applied if no other environments are explicitly specified or deduced.
 Environments can be explicitly specified either through the application context builder `Micronaut.build().environments(...)`, through the `micronaut.environments` system property, or the `MICRONAUT_ENVIRONMENTS` environment variable.
 Environments can be deduced to automatically apply the environment appropriate for cloud deployments.
@@ -79,7 +79,7 @@ NOTE: Previously, we recommended using `Micronaut.defaultEnvironments("dev")` ho
 
 == Micronaut Banner
 
-Since Micronaut 2.3 a banner is shown when the application starts. It is enabled by default and it also shows the Micronaut version.
+Since Micronaut framework 2.3 a banner is shown when the application starts. It is enabled by default and it also shows the Micronaut version.
 
 [source,shell,subs="attributes"]
 ----

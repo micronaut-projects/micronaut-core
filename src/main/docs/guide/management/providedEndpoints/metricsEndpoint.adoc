@@ -1,4 +1,4 @@
-Micronaut can expose application metrics via integration with https://micrometer.io[Micrometer].
+The Micronaut framework can expose application metrics via integration with https://micrometer.io[Micrometer].
 
 [TIP]
 .Using the CLI

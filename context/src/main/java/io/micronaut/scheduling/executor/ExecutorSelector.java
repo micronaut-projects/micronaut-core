@@ -36,7 +36,7 @@ public interface ExecutorSelector {
      * @return An optional {@link ExecutorService}. If an {@link ExecutorService} cannot be established
      * {@link Optional#empty()} is returned
      */
-    Optional<ExecutorService> select(MethodReference method, ThreadSelection threadSelection);
+    Optional<ExecutorService> select(MethodReference<?, ?> method, ThreadSelection threadSelection);
 
     /**
      * Obtain executor for the given name.
