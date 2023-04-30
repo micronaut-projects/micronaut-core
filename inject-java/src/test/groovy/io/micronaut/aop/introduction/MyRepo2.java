@@ -15,7 +15,7 @@
  */
 package io.micronaut.aop.introduction;
 
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 
 @RepoDef
 public interface MyRepo2 extends DeleteByIdCrudRepo<Integer> {

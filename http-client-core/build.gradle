@@ -7,9 +7,13 @@ dependencies {
 
     implementation libs.managed.reactor
 
-    api project(":runtime")
+    api project(":http")
+    api project(":json-core")
+    api project(":discovery-core")
 
-    compileOnly libs.kotlin.stdlib
+    compileOnly libs.managed.kotlin.stdlib
+
+    testImplementation project(":jackson-databind")
 }
 
 //tasks.withType(Test).configureEach {

@@ -16,10 +16,11 @@
 package io.micronaut.http.server.netty.types;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.server.types.CustomizableResponseType;
-import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.HttpResponse;
 
 /**
  * A special type that allows writing data in Netty.
@@ -35,7 +36,20 @@ public interface NettyCustomizableResponseType extends CustomizableResponseType 
      *
      * @param request  The request
      * @param response The response
-     * @param context  The Netty {@link ChannelHandlerContext}
+     * @return The netty response
      */
-    void write(HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context);
+    CustomResponse write(HttpRequest<?> request, MutableHttpResponse<?> response);
+
+    /**
+     * Wrapper class for a netty response with a special body type, like
+     * {@link io.netty.handler.codec.http.HttpChunkedInput} or
+     * {@link io.netty.channel.FileRegion}.
+     *
+     * @param response The response
+     * @param body     The body, or {@code null} if there is no body
+     * @param needLast Whether to finish the response with a
+     *                 {@link io.netty.handler.codec.http.LastHttpContent}
+     */
+    record CustomResponse(HttpResponse response, @Nullable Object body, boolean needLast) {
+    }
 }

@@ -1,0 +1,17 @@
+To allow any request method for a given configuration, don't include the `allowed-methods` key in your configuration.
+
+For multiple allowed methods, set the `allowed-methods` key of the configuration to a list of strings.
+
+.Example CORS Configuration
+[configuration]
+----
+micronaut:
+  server:
+    cors:
+      enabled: true
+      configurations:
+        web:
+          allowed-methods:
+            - POST
+            - PUT
+----

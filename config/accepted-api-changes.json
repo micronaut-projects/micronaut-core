@@ -1,8 +1,43 @@
 [
   {
+    "type": "io.micronaut.http.client.netty.DefaultHttpClient$HttpClientInitializer",
+    "member": "Constructor io.micronaut.http.client.netty.DefaultHttpClient$HttpClientInitializer(io.micronaut.http.client.netty.DefaultHttpClient,io.netty.handler.ssl.SslContext,java.lang.String,int,boolean,boolean,boolean,java.util.function.Consumer)",
+    "reason": "4.0.0 Release.  All bets are off"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.visitor.AbstractGroovyElement",
+    "member": "Class io.micronaut.ast.groovy.visitor.AbstractGroovyElement",
+    "reason": "Add support getDocumentation (groovydoc) for groovy"
+  },
+  {
+    "type": "io.micronaut.ast.groovy.visitor.AbstractGroovyElement",
+    "member": "Constructor io.micronaut.ast.groovy.visitor.AbstractGroovyElement(io.micronaut.ast.groovy.visitor.GroovyVisitorContext,org.codehaus.groovy.ast.AnnotatedNode,io.micronaut.core.annotation.AnnotationMetadata)",
+    "reason": "Add support getDocumentation (groovydoc) for groovy"
+  },
+  {
     "type": "io.micronaut.scheduling.TaskScheduler",
     "member": "Class io.micronaut.scheduling.TaskScheduler",
     "reason": "Added default methods"
+  },
+  {
+      "type": "io.micronaut.inject.ast.EnumElement",
+      "member": "Class io.micronaut.inject.ast.EnumElement",
+      "reason": "Added EnumConstantElement. Added EnumElement.elements() method to collect enum constant elements"
+  },
+  {
+      "type": "io.micronaut.inject.ast.EnumElement",
+      "member": "Method io.micronaut.inject.ast.EnumElement.elements()",
+      "reason": "Added EnumConstantElement. Added EnumElement.elements() method to collect enum constant elements"
+  },
+  {
+      "type": "io.micronaut.inject.visitor.TypeElementVisitor",
+      "member": "Class io.micronaut.inject.visitor.TypeElementVisitor",
+      "reason": "Added EnumConstantElement. Added EnumElement.elements() method to collect enum constant elements"
+  },
+  {
+      "type": "io.micronaut.inject.visitor.TypeElementVisitor",
+      "member": "Method io.micronaut.inject.visitor.TypeElementVisitor.visitEnumConstant(io.micronaut.inject.ast.EnumConstantElement,io.micronaut.inject.visitor.VisitorContext)",
+      "reason": "Added EnumConstantElement. Added EnumElement.elements() method to collect enum constant elements"
   },
   {
     "type": "io.micronaut.scheduling.TaskScheduler",
@@ -189,9 +224,124 @@
     "member": "Method io.micronaut.core.type.TypeInformation.asType()",
     "reason": "Added a default method"
   },
-  {  
+  {
     "type": "io.micronaut.core.annotation.AnnotationMetadata",
     "member": "Method io.micronaut.core.annotation.AnnotationMetadata.getAnnotationValuesByStereotype(java.lang.String)",
     "reason": "New default method"
+  },
+  {
+    "type": "io.micronaut.core.io.service.SoftServiceLoader$ServiceCollector",
+    "member": "Class io.micronaut.core.io.service.SoftServiceLoader$ServiceCollector",
+    "reason": "New default method"
+  },
+  {
+    "type": "io.micronaut.core.io.service.SoftServiceLoader$ServiceCollector",
+    "member": "Method io.micronaut.core.io.service.SoftServiceLoader$ServiceCollector.collect(java.util.Collection,boolean)",
+    "reason": "New default method"
+  },
+  {
+    "type": "io.micronaut.context.BeanDefinitionRegistry",
+    "member": "Method io.micronaut.context.BeanDefinitionRegistry.registerBeanDefinition(io.micronaut.context.RuntimeBeanDefinition)",
+    "reason": "new internal default method"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.NettyEmbeddedServer",
+    "member": "Class io.micronaut.http.server.netty.NettyEmbeddedServer",
+    "reason": "New default method"
+  },
+  {
+    "type": "io.micronaut.http.server.netty.NettyEmbeddedServer",
+    "member": "Method io.micronaut.http.server.netty.NettyEmbeddedServer.register(io.micronaut.http.server.netty.NettyServerCustomizer)",
+    "reason": "New default method"
+  },
+  {
+    "type": "io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
+    "member": "Class io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
+    "reason": "Not a bean anymore"
+  },
+  {
+    "type": "io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
+    "member": "Field $ANNOTATION_METADATA",
+    "reason": "Not a bean anymore"
+  },
+  {
+    "type": "io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
+    "member": "Method io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference.getBeanDefinitionType()",
+    "reason": "Not a bean anymore"
+  },
+  {
+    "type": "io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
+    "member": "Method io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference.getBeanType()",
+    "reason": "Not a bean anymore"
+  },
+  {
+    "type": "io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
+    "member": "Method io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference.load()",
+    "reason": "Not a bean anymore"
+  },
+  {
+    "type": "io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
+    "member": "Constructor io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference()",
+    "reason": "Not a bean anymore"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.ServiceDescriptionProcessor",
+    "member": "Constructor io.micronaut.annotation.processing.ServiceDescriptionProcessor()",
+    "reason": "Deprecated and removed for Micronaut 4. No longer needed."
+  },
+  {
+    "type": "io.micronaut.annotation.processing.ServiceDescriptionProcessor",
+    "member": "Implemented interface javax.annotation.processing.Processor",
+    "reason": "Deprecated and removed for Micronaut 4. No longer needed"
+  },
+  {
+    "type": "io.micronaut.runtime.context.scope.refresh.RefreshScope",
+    "member": "Constructor io.micronaut.runtime.context.scope.refresh.RefreshScope(io.micronaut.context.BeanContext,java.util.concurrent.Executor)",
+    "reason": "Deprecated and removed for Micronaut 4"
+  },
+  {
+    "type": "io.micronaut.runtime.server.watch.event.FileWatchRestartListener",
+    "member": "Constructor io.micronaut.runtime.server.watch.event.FileWatchRestartListener(io.micronaut.runtime.server.EmbeddedServer)",
+    "reason": "Deprecated and removed for Micronaut 4. Use FileWatchRestartListener(EmbeddedApplication) instead."
+  },
+  {
+    "type": "io.micronaut.inject.processing.ProcessedTypes",
+    "member": "Field PRE_DESTROY",
+    "reason": "Deprecated and removed for Micronaut 4. Use io.micronaut.core.annotation.AnnotationUtil instead."
+  },
+  {
+    "type": "io.micronaut.inject.processing.ProcessedTypes",
+    "member": "Field POST_CONSTRUCT",
+    "reason": "Deprecated and removed for Micronaut 4. Use io.micronaut.core.annotation.AnnotationUtil instead."
+  },
+  {
+    "type": "io.micronaut.http.filter.OncePerRequestHttpServerFilter",
+    "member": "Constructor io.micronaut.http.filter.OncePerRequestHttpServerFilter()",
+    "reason": "Deprecated and removed for Micronaut 4. All filters are executed once per request starting in Micronaut 3.0."
+  },
+  {
+    "type": "io.micronaut.http.filter.OncePerRequestHttpServerFilter",
+    "member": "Implemented interface io.micronaut.http.filter.HttpServerFilter",
+    "reason": "Deprecated and removed for Micronaut 4. All filters are executed once per request starting in Micronaut 3.0."
+  },
+  {
+    "type": "io.micronaut.http.filter.OncePerRequestHttpServerFilter",
+    "member": "Implemented interface io.micronaut.http.filter.HttpFilter",
+    "reason": "Deprecated and removed for Micronaut 4. All filters are executed once per request starting in Micronaut 3.0."
+  },
+  {
+    "type": "io.micronaut.http.client.loadbalance.FixedLoadBalancer",
+    "member": "Constructor io.micronaut.http.client.loadbalance.FixedLoadBalancer(java.net.URL)",
+    "reason": "Deprecated and removed for Micronaut 4. Use FixedLoadBalancer(java.net.URI) instead"
+  },
+  {
+    "type": "io.micronaut.core.io.service.StreamSoftServiceLoader",
+    "member": "Constructor io.micronaut.core.io.service.StreamSoftServiceLoader()",
+    "reason": "Deprecated and removed for Micronaut 4. Use io.micronaut.core.io.service.SoftServiceLoader#collectAll(java.util.Collection)."
+  },
+  {
+    "type": "io.micronaut.http.server.exceptions.response.HateoasErrorResponseProcessor",
+    "member": "Constructor io.micronaut.http.server.exceptions.response.HateoasErrorResponseProcessor(io.micronaut.jackson.JacksonConfiguration)",
+    "reason": "Removed as was deprecated in 3.8.x"
   }
 ]

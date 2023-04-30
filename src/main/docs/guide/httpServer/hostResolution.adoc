@@ -1,4 +1,4 @@
-You may need to resolve the host name of the current server. Micronaut includes an implementation of the api:http.server.util.HttpHostResolver[] interface.
+You may need to resolve the host name of the current server. The Micronaut framework includes an implementation of the api:http.server.util.HttpHostResolver[] interface.
 
 The default implementation looks for host information in the following places in order:
 
@@ -11,6 +11,6 @@ The default implementation looks for host information in the following places in
 
 The behavior of which headers to pull the relevant data can be changed with the following configuration:
 
-include::{includedir}configurationProperties/io.micronaut.http.server.HttpServerConfiguration.HostResolutionConfiguration.adoc[]
+include::{includedir}configurationProperties/io.micronaut.http.server.HttpServerConfiguration$HostResolutionConfiguration.adoc[]
 
 The above configuration also supports an allowed host list. Configuring this list ensures any resolved host matches one of the supplied regular expression patterns. That is useful to prevent host cache poisoning attacks and is recommended to be configured.

@@ -1,6 +1,6 @@
 When <<serviceDiscovery, discovering services>> from Consul, Eureka, or other Service Discovery servers, the api:discovery.DiscoveryClient[] emits a list of available api:discovery.ServiceInstance[].
 
-Micronaut by default automatically performs Round Robin client-side load balancing using the servers in this list. This combined with <<retry, Retry Advice>> adds extra resiliency to your Microservice infrastructure.
+The Micronaut framework by default automatically performs Round Robin client-side load balancing using the servers in this list. This combined with <<retry, Retry Advice>> adds extra resiliency to your Microservice infrastructure.
 
 The load balancing is handled by the api:http.client.LoadBalancer[] interface, which has a api:http.client.LoadBalancer.select()[] method that returns a `Publisher` which emits a api:discovery.ServiceInstance[].
 

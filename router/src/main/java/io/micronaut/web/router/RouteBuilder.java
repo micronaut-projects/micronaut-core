@@ -17,6 +17,8 @@ package io.micronaut.web.router;
 
 import io.micronaut.context.BeanLocator;
 import io.micronaut.core.annotation.Indexed;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.MethodConvention;
 import io.micronaut.core.naming.conventions.PropertyConvention;
@@ -31,11 +33,8 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ProxyBeanDefinition;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import java.util.List;
 import java.util.Set;
-import java.util.function.Supplier;
 
 /**
  * <p>An interface for classes capable of building HTTP routing information.</p>
@@ -86,15 +85,6 @@ public interface RouteBuilder {
      * Add a filter.
      *
      * @param pathPattern The path pattern for the filter
-     * @param filter      The filter itself
-     * @return The {@link FilterRoute}
-     */
-    FilterRoute addFilter(String pathPattern, Supplier<HttpFilter> filter);
-
-    /**
-     * Add a filter.
-     *
-     * @param pathPattern The path pattern for the filter
      * @param beanLocator The bean locator
      * @param beanDefinition The bean definition
      * @return The {@link FilterRoute}
@@ -104,9 +94,9 @@ public interface RouteBuilder {
 
     /**
      * <p>Builds the necessary mappings to treat the given class as a REST endpoint.</p>
-     * <p>
+     *
      * <p>For example given a class called BookController the following routes will be produced:</p>
-     * <p>
+     *
      * <pre>{@code
      *     GET "/book"
      *     GET "/book{/id}"
@@ -115,14 +105,14 @@ public interface RouteBuilder {
      *     PATCH "/book{/id}"
      *     DELETE "/book{/id}"
      * }</pre>
-     * <p>
+     *
      * <p>By default it is assumed the accepted and returned content type is
      * {@link io.micronaut.http.MediaType#APPLICATION_JSON_TYPE}.</p>
      *
      * @param cls The class
      * @return The {@link ResourceRoute}
      */
-    ResourceRoute resources(Class cls);
+    ResourceRoute resources(Class<?> cls);
 
     /**
      * <p>Builds the necessary mappings to treat the given instance as a REST endpoint.</p>
@@ -137,9 +127,9 @@ public interface RouteBuilder {
 
     /**
      * <p>Builds the necessary mappings to treat the given class as a singular REST endpoint.</p>
-     * <p>
+     *
      * <p>For example given a class called BookController the following routes will be produced:</p>
-     * <p>
+     *
      * <pre>{@code
      *     GET "/book"
      *     POST "/book"
@@ -147,14 +137,14 @@ public interface RouteBuilder {
      *     PATCH "/book"
      *     DELETE "/book"
      * }</pre>
-     * <p>
+     *
      * <p>By default it is assumed the accepted and returned content type is
      * {@link io.micronaut.http.MediaType#APPLICATION_JSON_TYPE}.</p>
      *
      * @param cls The class
      * @return The {@link ResourceRoute}
      */
-    ResourceRoute single(Class cls);
+    ResourceRoute single(Class<?> cls);
 
     /**
      * <p>Builds the necessary mappings to treat the given instance as a singular REST endpoint.</p>
@@ -188,7 +178,7 @@ public interface RouteBuilder {
      * @param parameterTypes The parameter types for the target method
      * @return The route
      */
-    StatusRoute status(HttpStatus status, Class type, String method, Class... parameterTypes);
+    StatusRoute status(HttpStatus status, Class<?> type, String method, Class<?>... parameterTypes);
 
     /**
      * Register a route to handle the returned status code. This implementation considers the originatingClass for matching.
@@ -200,7 +190,7 @@ public interface RouteBuilder {
      * @param parameterTypes   The parameter types for the target method
      * @return The route
      */
-    StatusRoute status(Class originatingClass, HttpStatus status, Class type, String method, Class... parameterTypes);
+    StatusRoute status(Class<?> originatingClass, HttpStatus status, Class<?> type, String method, Class<?>... parameterTypes);
 
     /**
      * Register a route to handle the error.
@@ -211,7 +201,7 @@ public interface RouteBuilder {
      * @param parameterTypes The parameter types for the target method
      * @return The route
      */
-    ErrorRoute error(Class<? extends Throwable> error, Class type, String method, Class... parameterTypes);
+    ErrorRoute error(Class<? extends Throwable> error, Class<?> type, String method, Class<?>... parameterTypes);
 
     /**
      * Register a route to handle the error.
@@ -223,7 +213,7 @@ public interface RouteBuilder {
      * @param parameterTypes   The parameter types for the target method
      * @return The route
      */
-    ErrorRoute error(Class originatingClass, Class<? extends Throwable> error, Class type, String method, Class... parameterTypes);
+    ErrorRoute error(Class<?> originatingClass, Class<? extends Throwable> error, Class<?> type, String method, Class<?>... parameterTypes);
 
     /**
      * Register a route to handle the error.
@@ -232,7 +222,7 @@ public interface RouteBuilder {
      * @param type  The type
      * @return The route
      */
-    default ErrorRoute error(Class<? extends Throwable> error, Class type) {
+    default ErrorRoute error(Class<? extends Throwable> error, Class<?> type) {
         return error(error, type, NameUtils.decapitalize(NameUtils.trimSuffix(type.getSimpleName(), "Exception", "Error")), ReflectionUtils.EMPTY_CLASS_ARRAY);
     }
 
@@ -272,7 +262,7 @@ public interface RouteBuilder {
      * @param parameterTypes The parameter types
      * @return The route
      */
-    default ErrorRoute error(Class<? extends Throwable> error, Object instance, String method, Class... parameterTypes) {
+    default ErrorRoute error(Class<? extends Throwable> error, Object instance, String method, Class<?>... parameterTypes) {
         return error(error, instance.getClass(), method, parameterTypes);
     }
 
@@ -317,7 +307,7 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default UriRoute GET(Class type) {
+    default UriRoute GET(Class<?> type) {
         return GET(getUriNamingStrategy().resolveUri(type), type, MethodConvention.INDEX.methodName());
     }
 
@@ -328,13 +318,13 @@ public interface RouteBuilder {
      * @param id   The route id
      * @return The route
      */
-    default UriRoute GET(Class type, PropertyConvention id) {
+    default UriRoute GET(Class<?> type, PropertyConvention id) {
         return GET(getUriNamingStrategy().resolveUri(type, id), type, MethodConvention.SHOW.methodName(), Object.class);
     }
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri    The URI
@@ -347,7 +337,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
@@ -361,7 +351,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -370,11 +360,11 @@ public interface RouteBuilder {
      * @param parameterTypes The parameter types for the target method
      * @return The route
      */
-    UriRoute GET(String uri, Object target, String method, Class... parameterTypes);
+    UriRoute GET(String uri, Object target, String method, Class<?>... parameterTypes);
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -383,7 +373,7 @@ public interface RouteBuilder {
      * @param parameterTypes The parameter types for the target method
      * @return The route
      */
-    UriRoute GET(String uri, Class<?> type, String method, Class... parameterTypes);
+    UriRoute GET(String uri, Class<?> type, String method, Class<?>... parameterTypes);
 
     /**
      * Route the specified URI to the specified target for an HTTP POST. Since the method to execute is not
@@ -394,7 +384,7 @@ public interface RouteBuilder {
      * @param parameterTypes The parameter types for the target method
      * @return The route
      */
-    default UriRoute POST(String uri, Object target, Class... parameterTypes) {
+    default UriRoute POST(String uri, Object target, Class<?>... parameterTypes) {
         return POST(uri, target, MethodConvention.SAVE.methodName(), parameterTypes);
     }
 
@@ -427,7 +417,7 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default UriRoute POST(Class type) {
+    default UriRoute POST(Class<?> type) {
         return POST(getUriNamingStrategy().resolveUri(type), type, MethodConvention.SAVE.methodName());
     }
 
@@ -438,13 +428,13 @@ public interface RouteBuilder {
      * @param id   The route id
      * @return The route
      */
-    default UriRoute POST(Class type, PropertyConvention id) {
+    default UriRoute POST(Class<?> type, PropertyConvention id) {
         return POST(getUriNamingStrategy().resolveUri(type, id), type, MethodConvention.UPDATE.methodName());
     }
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri    The URI
@@ -457,7 +447,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
@@ -471,7 +461,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -480,11 +470,11 @@ public interface RouteBuilder {
      * @param parameterTypes The parameter types for the target method
      * @return The route
      */
-    UriRoute POST(String uri, Object target, String method, Class... parameterTypes);
+    UriRoute POST(String uri, Object target, String method, Class<?>... parameterTypes);
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -493,7 +483,7 @@ public interface RouteBuilder {
      * @param parameterTypes The parameter types for the target method
      * @return The route
      */
-    UriRoute POST(String uri, Class type, String method, Class... parameterTypes);
+    UriRoute POST(String uri, Class<?> type, String method, Class<?>... parameterTypes);
 
     /**
      * Route the specified URI to the specified target for an HTTP PUT. Since the method to execute is not
@@ -536,7 +526,7 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default UriRoute PUT(Class type) {
+    default UriRoute PUT(Class<?> type) {
         return PUT(getUriNamingStrategy().resolveUri(type), type, MethodConvention.UPDATE.methodName(), Object.class);
     }
 
@@ -547,13 +537,13 @@ public interface RouteBuilder {
      * @param id   The route id
      * @return The route
      */
-    default UriRoute PUT(Class type, PropertyConvention id) {
+    default UriRoute PUT(Class<?> type, PropertyConvention id) {
         return PUT(getUriNamingStrategy().resolveUri(type, id), type, MethodConvention.UPDATE.methodName(), Object.class);
     }
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri    The URI
@@ -566,7 +556,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
@@ -580,7 +570,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -589,11 +579,11 @@ public interface RouteBuilder {
      * @param parameterTypes The parameter types for the target method
      * @return The route
      */
-    UriRoute PUT(String uri, Object target, String method, Class... parameterTypes);
+    UriRoute PUT(String uri, Object target, String method, Class<?>... parameterTypes);
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -602,7 +592,7 @@ public interface RouteBuilder {
      * @param parameterTypes The parameter types for the target method
      * @return The route
      */
-    UriRoute PUT(String uri, Class type, String method, Class... parameterTypes);
+    UriRoute PUT(String uri, Class<?> type, String method, Class<?>... parameterTypes);
 
     /**
      * Route the specified URI to the specified target for an HTTP PATCH. Since the method to execute is not
@@ -645,7 +635,7 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default UriRoute PATCH(Class type) {
+    default UriRoute PATCH(Class<?> type) {
         return PATCH(getUriNamingStrategy().resolveUri(type), type, MethodConvention.UPDATE.methodName(), Object.class);
     }
 
@@ -656,13 +646,13 @@ public interface RouteBuilder {
      * @param id   The route id
      * @return The route
      */
-    default UriRoute PATCH(Class type, PropertyConvention id) {
+    default UriRoute PATCH(Class<?> type, PropertyConvention id) {
         return PATCH(getUriNamingStrategy().resolveUri(type, id), type, MethodConvention.UPDATE.methodName(), Object.class);
     }
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri    The URI
@@ -675,7 +665,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
@@ -689,7 +679,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -698,11 +688,11 @@ public interface RouteBuilder {
      * @param parameterTypes The parameter types for the target method
      * @return The route
      */
-    UriRoute PATCH(String uri, Object target, String method, Class... parameterTypes);
+    UriRoute PATCH(String uri, Object target, String method, Class<?>... parameterTypes);
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -711,7 +701,7 @@ public interface RouteBuilder {
      * @param parameterTypes The parameter types for the target method
      * @return The route
      */
-    UriRoute PATCH(String uri, Class type, String method, Class... parameterTypes);
+    UriRoute PATCH(String uri, Class<?> type, String method, Class<?>... parameterTypes);
 
     /**
      * Route the specified URI to the specified target for an HTTP DELETE. Since the method to execute is not
@@ -754,7 +744,7 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default UriRoute DELETE(Class type) {
+    default UriRoute DELETE(Class<?> type) {
         return DELETE(getUriNamingStrategy().resolveUri(type), type, MethodConvention.DELETE.methodName(), Object.class);
     }
 
@@ -765,13 +755,13 @@ public interface RouteBuilder {
      * @param id   The route id
      * @return The route
      */
-    default UriRoute DELETE(Class type, PropertyConvention id) {
+    default UriRoute DELETE(Class<?> type, PropertyConvention id) {
         return DELETE(getUriNamingStrategy().resolveUri(type, id), type, MethodConvention.DELETE.methodName(), Object.class);
     }
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri    The URI
@@ -784,7 +774,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
@@ -798,7 +788,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -807,11 +797,11 @@ public interface RouteBuilder {
      * @param parameterTypes The parameter types for the target method
      * @return The route
      */
-    UriRoute DELETE(String uri, Object target, String method, Class... parameterTypes);
+    UriRoute DELETE(String uri, Object target, String method, Class<?>... parameterTypes);
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -820,7 +810,7 @@ public interface RouteBuilder {
      * @param parameterTypes The parameter types for the target method
      * @return The route
      */
-    UriRoute DELETE(String uri, Class type, String method, Class... parameterTypes);
+    UriRoute DELETE(String uri, Class<?> type, String method, Class<?>... parameterTypes);
 
     /**
      * Route the specified URI to the specified target for an HTTP OPTIONS. Since the method to execute is not
@@ -863,7 +853,7 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default UriRoute OPTIONS(Class type) {
+    default UriRoute OPTIONS(Class<?> type) {
         return OPTIONS(getUriNamingStrategy().resolveUri(type), type, MethodConvention.OPTIONS.methodName());
     }
 
@@ -874,13 +864,13 @@ public interface RouteBuilder {
      * @param id   The route id
      * @return The route
      */
-    default UriRoute OPTIONS(Class type, PropertyConvention id) {
+    default UriRoute OPTIONS(Class<?> type, PropertyConvention id) {
         return OPTIONS(getUriNamingStrategy().resolveUri(type, id), type, MethodConvention.OPTIONS.methodName());
     }
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri    The URI
@@ -893,7 +883,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
@@ -907,7 +897,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -916,11 +906,11 @@ public interface RouteBuilder {
      * @param parameterTypes The parameter types for the target method
      * @return The route
      */
-    UriRoute OPTIONS(String uri, Object target, String method, Class... parameterTypes);
+    UriRoute OPTIONS(String uri, Object target, String method, Class<?>... parameterTypes);
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -929,7 +919,7 @@ public interface RouteBuilder {
      * @param parameterTypes The parameter types for the target method
      * @return The route
      */
-    UriRoute OPTIONS(String uri, Class type, String method, Class... parameterTypes);
+    UriRoute OPTIONS(String uri, Class<?> type, String method, Class<?>... parameterTypes);
 
     /**
      * Route the specified URI to the specified target for an HTTP GET. Since the method to execute is not
@@ -972,7 +962,7 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default UriRoute HEAD(Class type) {
+    default UriRoute HEAD(Class<?> type) {
         return HEAD(getUriNamingStrategy().resolveUri(type), type, MethodConvention.HEAD.methodName());
     }
 
@@ -983,13 +973,13 @@ public interface RouteBuilder {
      * @param id   The route id
      * @return The route
      */
-    default UriRoute HEAD(Class type, PropertyConvention id) {
+    default UriRoute HEAD(Class<?> type, PropertyConvention id) {
         return HEAD(getUriNamingStrategy().resolveUri(type, id), type, MethodConvention.HEAD.methodName());
     }
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri    The URI
@@ -1002,7 +992,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
@@ -1016,7 +1006,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -1025,11 +1015,11 @@ public interface RouteBuilder {
      * @param parameterTypes The parameter types for the target method
      * @return The route
      */
-    UriRoute HEAD(String uri, Object target, String method, Class... parameterTypes);
+    UriRoute HEAD(String uri, Object target, String method, Class<?>... parameterTypes);
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -1038,7 +1028,7 @@ public interface RouteBuilder {
      * @param parameterTypes The parameter types for the target method
      * @return The route
      */
-    UriRoute HEAD(String uri, Class type, String method, Class... parameterTypes);
+    UriRoute HEAD(String uri, Class<?> type, String method, Class<?>... parameterTypes);
 
     /**
      * Route the specified URI to the specified target for an HTTP GET. Since the method to execute is not
@@ -1081,7 +1071,7 @@ public interface RouteBuilder {
      * @param type The class
      * @return The route
      */
-    default UriRoute TRACE(Class type) {
+    default UriRoute TRACE(Class<?> type) {
         return TRACE(getUriNamingStrategy().resolveUri(type), type, MethodConvention.TRACE.methodName());
     }
 
@@ -1092,13 +1082,13 @@ public interface RouteBuilder {
      * @param id   The route id
      * @return The route
      */
-    default UriRoute TRACE(Class type, PropertyConvention id) {
+    default UriRoute TRACE(Class<?> type, PropertyConvention id) {
         return HEAD(getUriNamingStrategy().resolveUri(type, id), type, MethodConvention.TRACE.methodName());
     }
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments.</p>
      *
      * @param uri    The URI
@@ -1111,7 +1101,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
@@ -1125,7 +1115,7 @@ public interface RouteBuilder {
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -1134,11 +1124,11 @@ public interface RouteBuilder {
      * @param parameterTypes The parameter types for the target method
      * @return The route
      */
-    UriRoute TRACE(String uri, Object target, String method, Class... parameterTypes);
+    UriRoute TRACE(String uri, Object target, String method, Class<?>... parameterTypes);
 
     /**
      * <p>Route the specified URI template to the specified target.</p>
-     * <p>
+     *
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param uri            The URI
@@ -1147,18 +1137,18 @@ public interface RouteBuilder {
      * @param parameterTypes The parameter types for the target method
      * @return The route
      */
-    UriRoute TRACE(String uri, Class type, String method, Class... parameterTypes);
+    UriRoute TRACE(String uri, Class<?> type, String method, Class<?>... parameterTypes);
 
     /**
      * <p>A URI naming strategy is used to dictate the default name to use when building a URI for a class.</p>
-     * <p>
+     *
      * <p>The default strategy is as follows:</p>
-     * <p>
+     *
      * <ul>
-     * <li>{@link #resolveUri(Class)} - Where type is <code>example.BookController</code> value is <code>/book</code></li>
-     * <li>{@link #resolveUri(Class, PropertyConvention)} - Where type is <code>example.BookController</code> value is <code>/book{/id}</code></li>
+     * <li>{@link #resolveUri(Class)} - Where type is {@code example.BookController} value is {@code /book}</li>
+     * <li>{@link #resolveUri(Class, PropertyConvention)} - Where type is {@code example.BookController} value is {@code /book{/id}}</li>
      * </ul>
-     * <p>
+     *
      * <p>Implementers can override to provide other strategies such as pluralization etc.</p>
      */
     interface UriNamingStrategy {
@@ -1193,8 +1183,7 @@ public interface RouteBuilder {
                 return uri;
             }
             Class<?> beanType;
-            if (beanDefinition instanceof ProxyBeanDefinition) {
-                ProxyBeanDefinition pbd = (ProxyBeanDefinition) beanDefinition;
+            if (beanDefinition instanceof ProxyBeanDefinition pbd) {
                 beanType = pbd.getTargetType();
             } else {
                 beanType = beanDefinition.getBeanType();
@@ -1226,13 +1215,13 @@ public interface RouteBuilder {
          * @param id   the route id
          * @return The URI to use
          */
-        default @NonNull String resolveUri(Class type, PropertyConvention id) {
+        default @NonNull String resolveUri(Class<?> type, PropertyConvention id) {
             return resolveUri(type) + "/{" + id.lowerCaseName() + "}";
         }
 
         /**
          * Normalizes a URI.
-         *
+         * <p>
          * Ensures the string:
          * 1) Does not end with a /
          * 2) Starts with a /

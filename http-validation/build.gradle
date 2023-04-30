@@ -4,7 +4,7 @@ plugins {
 
 dependencies {
     annotationProcessor project(":inject-java")
-    implementation project(":inject")
+    implementation project(":core-processor")
     implementation project(":http-server")
     implementation project(":websocket")
 

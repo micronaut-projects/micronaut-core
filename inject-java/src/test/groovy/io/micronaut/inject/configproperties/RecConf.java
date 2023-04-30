@@ -1,6 +1,7 @@
 package io.micronaut.inject.configproperties;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.util.ObjectUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -48,6 +49,6 @@ public class RecConf {
 
     @Override
     public int hashCode() {
-        return Objects.hash(namesListOf, mapChildren, listChildren);
+        return ObjectUtils.hash(namesListOf, mapChildren, listChildren);
     }
 }

@@ -1,10 +1,16 @@
 In distributed systems and microservice environments, failure is something you have to plan for, and it is common to want to attempt to retry an operation if it fails. If first you don't succeed try again!
 
-With this in mind, Micronaut includes a api:retry.annotation.Retryable[] annotation.
+With this in mind, the Micronaut framework includes a api:retry.annotation.Retryable[] annotation.
+
+== Retry Dependency
+
+NOTE: Since Micronaut Framework 4.0 to use the Retry functionality you need to add the following dependency:
+
+dependency::micronaut-retry[]
 
 == Simple Retry
 
-The simplest form of retry is just to add the `@Retryable` annotation to a type or method. The default behaviour of `@Retryable` is to retry three times with an exponential delay of one second between each retry. (first attempt with 1s delay, second attempt with 2s delay, third attempt with 3s delay).
+The simplest form of retry is just to add the `@Retryable` annotation to a type or method. The default behaviour of `@Retryable` is to retry three times with a linear delay of one second between each retry. (first attempt with 1s delay, second attempt with 2s delay, third attempt with 3s delay).
 
 For example:
 

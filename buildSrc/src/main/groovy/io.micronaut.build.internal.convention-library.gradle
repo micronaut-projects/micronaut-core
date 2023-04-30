@@ -1,11 +1,9 @@
 plugins {
     id "io.micronaut.build.internal.base-module"
     id "io.micronaut.build.internal.convention-base"
-    id "com.github.johnrengelman.shadow"
 }
 
 configurations {
-    shadowCompile
     all {
         resolutionStrategy.eachDependency { DependencyResolveDetails details ->
             String group = details.requested.group
@@ -16,8 +14,17 @@ configurations {
     }
 }
 
-tasks.named("shadowJar") {
-    configurations = [project.configurations.shadowCompile]
-    relocate "com.github.benmanes.caffeine", "io.micronaut.caffeine"
-    relocate "org.objectweb.asm", "io.micronaut.asm"
+micronautBuild {
+    binaryCompatibility {
+        // Enable before Micronaut 4 release
+        enabled.set(false)
+    }
+}
+
+// Workaround for javadoc not finding java source
+// files for classes written in an alternate language (Kotlin, Groovy)
+configurations {
+    internalJavadocClasspathElements {
+        outgoing.artifact(tasks.named("jar"))
+    }
 }

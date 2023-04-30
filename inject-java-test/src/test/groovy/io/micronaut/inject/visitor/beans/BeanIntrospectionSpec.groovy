@@ -5,12 +5,15 @@ import com.fasterxml.jackson.annotation.JsonClassDescription
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.ObjectMapper
+import groovy.transform.PackageScope
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.annotation.processing.test.JavaParser
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Replaces
+import io.micronaut.context.annotation.Value
+import io.micronaut.context.visitor.ConfigurationReaderVisitor
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
@@ -22,28 +25,223 @@ import io.micronaut.core.convert.TypeConverter
 import io.micronaut.core.reflect.InstantiationUtils
 import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
+import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.inject.ExecutableMethod
+import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.jackson.modules.BeanIntrospectionModule
+import io.micronaut.validation.visitor.ValidationVisitor
+import jakarta.inject.Singleton
 import spock.lang.IgnoreIf
-
 import spock.lang.Issue
 import spock.lang.Requires
 
 import javax.annotation.processing.SupportedAnnotationTypes
-import jakarta.inject.Singleton
 import javax.persistence.Column
 import javax.persistence.Entity
 import javax.persistence.Id
 import javax.persistence.Version
-import javax.validation.Constraint
-import javax.validation.constraints.Min
-import javax.validation.constraints.NotBlank
-import javax.validation.constraints.Size
+import jakarta.validation.Constraint
+import jakarta.validation.constraints.DecimalMin
+import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Size
 import java.lang.reflect.Field
+import java.time.Instant
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+
+    void "test expressions in introspection properties"() {
+        given:
+        def introspection = buildBeanIntrospection('mixed.Test', '''
+package mixed;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Value;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+import java.lang.annotation.*;
+
+@Introspected
+class Test {
+    @Nullable
+    @Ann("#{'test'}")
+    private String foo;
+    public String getFoo() {
+        return foo;
+    }
+    public void setFoo(@Nullable String foo) {
+        this.foo = foo;
+    }
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface Ann {
+    String value();
+}
+''')
+        when:
+        def test = introspection.instantiate()
+        def prop = introspection.getRequiredProperty("foo", String)
+        test.foo = 'value'
+
+        then: 'expressions can be retrieved'
+        prop.get(test) == 'value'
+        prop.getAnnotationMetadata() instanceof EvaluatedAnnotationMetadata
+        prop.stringValue("mixed.Ann").get() == 'test'
+    }
+
+    void "test mix getter and setter with interface type"() {
+        def introspection = buildBeanIntrospection('mixed.Pet', '''
+package mixed;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+@Introspected
+class Owner implements IOwner {
+    @Nullable
+    private String name;
+    public String getName() {
+        return name;
+    }
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+interface IOwner {
+    String getName();
+}
+
+@Introspected
+class Pet {
+    private Owner owner;
+    public Owner getOwner() {
+        return owner;
+    }
+    public void setOwner(IOwner owner) {
+        this.owner = (Owner) owner;
+    }
+}
+''')
+        when:
+        def owner = introspection.beanType.classLoader.loadClass('mixed.Owner').newInstance(name:"Fred")
+        def prop = introspection.getRequiredProperty("owner", Object)
+        def pet = introspection.instantiate()
+        prop.set(pet, owner)
+
+        then:'the write method is not considered to match the getter/setter pair'
+        prop.isReadWrite()
+        prop.get(pet).is(owner)
+    }
+
+    void "test mix optional getter with setter"() {
+        given:
+        def introspection = buildBeanIntrospection('mixed.Test', '''
+package mixed;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+@Introspected
+class Test {
+    @Nullable
+    private String foo;
+    public Optional<String> getFoo() {
+        return Optional.ofNullable(foo);
+    }
+    public void setFoo(@Nullable String foo) {
+        this.foo = foo;
+    }
+}
+''')
+        when:
+        def test = introspection.instantiate()
+        def prop = introspection.getRequiredProperty("foo", Optional)
+        test.foo = 'value'
+
+        then: 'the write method is not considered to match the getter/setter pair'
+        prop.get(test).get() == 'value'
+        prop.type == Optional
+        prop.isReadOnly()
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/8657")
+    void "test executable method on abstract class with introspection"() {
+        when:
+        def introspection = buildBeanIntrospection('issue8657.Test', '''
+package issue8657;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.inject.visitor.beans.Auditable;
+
+@Introspected
+class Test extends Auditable {
+    private String name;
+    public void setName(String name) {
+        this.name = name;
+    }
+    public String getName() {
+        return name;
+    }
+}
+
+''')
+
+        then:
+        introspection.beanMethods.size() == 1
+
+        when:
+        def bean = introspection.instantiate()
+        def method = introspection.beanMethods.first()
+        method.invoke(bean)
+
+        then:
+        bean.updatedAt != null
+    }
+
+    void "test introspection can written to different package"() {
+        when:
+        def classLoader = buildClassLoader("test.Test", '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(targetPackage = "test.introspections")
+public class Test {
+    private String name;
+    public Test(String name) {
+        this.name = name;
+    }
+    public String getName() {
+        return name;
+    }
+}
+
+''')
+        def introspectionName = 'test.introspections.$Test$Introspection'
+        def introspection = classLoader.loadClass(introspectionName).newInstance() as BeanIntrospection
+
+        then:
+        introspection != null
+        introspection.getProperty("name").isPresent()
+
+        when:
+        def introspectionRefName = 'test.introspections.$Test$IntrospectionRef'
+        def introspectionRef = classLoader.loadClass(introspectionRefName).newInstance() as BeanIntrospectionReference
+
+        then:
+        introspectionRef != null
+        introspectionRef.load() != null
+    }
 
     void "test generics in arrays don't stack overflow"() {
         given:
@@ -62,7 +260,7 @@ class Test<T extends CharSequence> {
     public void setArray(T[] array) {
         this.array = array;
     }
-    
+
     @Executable
     T[] myMethod() {
         return array;
@@ -73,6 +271,124 @@ class Test<T extends CharSequence> {
         introspection.getRequiredProperty("array", CharSequence[].class)
             .type == CharSequence[].class
         introspection.beanMethods.first().returnType.type == CharSequence[].class
+    }
+
+    void "test property type is defined by its writer field"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+@Introspected(accessKind = {Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD})
+class Test {
+    @Nullable
+    String foo;
+
+    public Optional<String> getFoo() {
+        return Optional.ofNullable(foo);
+    }
+
+}
+''')
+        expect:
+        introspection.getProperty("foo").get().type == String.class
+    }
+
+    void "test optional property type is defined by its setter"() {
+        given:
+            def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.*;
+
+@Introspected
+class Test {
+    @Nullable
+    private String foo;
+    @Nullable
+    private Long lng;
+    @Nullable
+    private Double dbl;
+    @Nullable
+    private Integer ingr;
+
+    public Optional<String> getFoo() {
+        return Optional.ofNullable(foo);
+    }
+
+    public OptionalDouble getDbl() {
+        return OptionalDouble.of(dbl);
+    }
+
+    public OptionalLong getLng() {
+        return OptionalLong.of(lng);
+    }
+
+    public OptionalInt getIngr() {
+        return OptionalInt.of(ingr);
+    }
+
+    public void setFoo(@Nullable String foo) {
+        this.foo = foo;
+    }
+
+    public void setLng(@Nullable Long lng) {
+        this.lng = lng;
+    }
+
+    public void setDbl(@Nullable Double dbl) {
+        this.dbl = dbl;
+    }
+
+    public void setIngr(@Nullable Integer ingr) {
+        this.ingr = ingr;
+    }
+
+}
+''')
+        expect:
+            introspection.getPropertyNames().length == 4
+            introspection.getProperty("foo").get().type == Optional.class
+            introspection.getProperty("lng").get().type == OptionalLong.class
+            introspection.getProperty("dbl").get().type == OptionalDouble.class
+            introspection.getProperty("ingr").get().type == OptionalInt.class
+
+            introspection.getProperty("foo").get().isReadOnly()
+            introspection.getProperty("lng").get().isReadOnly()
+            introspection.getProperty("dbl").get().isReadOnly()
+            introspection.getProperty("ingr").get().isReadOnly()
+    }
+
+    void "test property type is not defined by its not accessible field"() {
+        given:
+        def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+
+@Introspected(accessKind = {Introspected.AccessKind.METHOD, Introspected.AccessKind.FIELD})
+class Test {
+    @Nullable
+    private String foo;
+
+    public Optional<String> getFoo() {
+        return Optional.ofNullable(foo);
+    }
+
+}
+''')
+        expect:
+        introspection.getProperty("foo").get().type == Optional.class
     }
 
     void 'test favor method access'() {
@@ -90,7 +406,7 @@ class Test {
     public String getOne() {
         this.invoked = true;
         return one;
-    } 
+    }
 }
 ''');
 
@@ -143,13 +459,12 @@ class Test {
         instance.invoked
     }
 
-    void 'test favor field access'() {
+    void 'test use getter to read and field to write'() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
 package fieldaccess;
 
 import io.micronaut.core.annotation.*;
-
 
 @Introspected(accessKind={Introspected.AccessKind.FIELD, Introspected.AccessKind.METHOD})
 class Test {
@@ -158,7 +473,7 @@ class Test {
     public String getOne() {
         this.invoked = true;
         return one;
-    } 
+    }
 }
 ''');
 
@@ -174,10 +489,10 @@ class Test {
 
         then:'the new value is reflected'
         one.get(instance) == 'test'
-        !instance.invoked
+        instance.invoked // The property was accessed with getter
     }
 
-    void 'test favor field access with custom getter'() {
+    void 'test use filed to read and setter to write'() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('fieldaccess.Test','''\
 package fieldaccess;
@@ -209,7 +524,7 @@ class Test {
 
         then:'the new value is reflected'
         one.get(instance) == 'test'
-        !instance.invoked
+        instance.invoked // Setter invoked
     }
 
     void 'test field access only'() {
@@ -225,9 +540,9 @@ class Test {
     public String one; // read/write
     public final int two; // read-only
     String three; // package protected
-    protected String four; // not included since protected
+    protected String four; // protected can be accessed from the same package
     private String five; // not included since private
-    
+
     Test(int two) {
         this.two = two;
     }
@@ -237,7 +552,7 @@ class Test {
         def properties = introspection.getBeanProperties()
 
         then:
-        properties.size() == 3
+        properties.size() == 4
 
         def one = introspection.getRequiredProperty("one", String)
         one.isReadWrite()
@@ -247,6 +562,9 @@ class Test {
 
         def three = introspection.getRequiredProperty("three", String)
         three.isReadWrite()
+
+        def four = introspection.getRequiredProperty("four", String)
+        four.isReadWrite()
 
         when:'a field is set'
         def instance = introspection.instantiate(10)
@@ -260,6 +578,18 @@ class Test {
 
         then:'the new value is reflected'
         two.get(instance) == 20
+
+        when:
+        four.set(instance, "test")
+
+        then:
+        four.get(instance) == "test"
+
+        when:
+        instance = four.withValue(instance, "test2")
+
+        then:
+        four.get(instance) == "test2"
     }
 
     void 'test field access only - public only'() {
@@ -280,7 +610,7 @@ class Test {
     String three; // package protected
     protected String four; // not included since protected
     private String five; // not included since private
-    
+
     Test(int two) {
         this.two = two;
     }
@@ -309,7 +639,7 @@ package beanctor;
 public class Test {
 
     private final String another;
-    
+
     @com.fasterxml.jackson.annotation.JsonCreator
     Test(String another) {
         this.another = another;
@@ -356,7 +686,7 @@ public class MethodTest extends SuperType implements SomeInt {
     public String invokeMe(String str) {
         return str;
     }
-    
+
     @Executable
     int invokePrim(int i) {
         return i;
@@ -368,7 +698,7 @@ class SuperType {
     String superMethod(String str) {
         return str;
     }
-    
+
     @Executable
     public String invokeMe(String str) {
         return str;
@@ -380,7 +710,7 @@ interface SomeInt {
     default boolean ok() {
         return true;
     }
-    
+
     default String getName() {
         return "ok";
     }
@@ -494,7 +824,7 @@ import java.net.URL;
 public class CopyMe {
 
     private final String another;
-    
+
     CopyMe(String another) {
         this.another = another;
     }
@@ -502,7 +832,7 @@ public class CopyMe {
     public String getAnother() {
         return another;
     }
-    
+
     public CopyMe alterAnother(String a) {
         return this.another == a ? this : new CopyMe(a.toUpperCase());
     }
@@ -538,7 +868,7 @@ public class CopyMe {
     private URL url;
     private final String name;
     private final String another;
-    
+
     CopyMe(String name, String another) {
         this.name = name;
         this.another = another;
@@ -551,15 +881,15 @@ public class CopyMe {
     public void setUrl(URL url) {
         this.url = url;
     }
-    
+
     public String getName() {
         return name;
     }
-    
+
     public String getAnother() {
         return another;
     }
-    
+
     public CopyMe withAnother(String a) {
         return this.another == a ? this : new CopyMe(this.name, a.toUpperCase());
     }
@@ -609,7 +939,7 @@ package test;
 
 import io.micronaut.core.annotation.Creator;
 import java.util.List;
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 
 @io.micronaut.core.annotation.Introspected
 public record Foo(int x, int y){
@@ -630,6 +960,40 @@ public record Foo(int x, int y){
     }
 
     @Requires({ jvm.isJava14Compatible() })
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/8187')
+    void "test secondary constructor for Java 14+ records with initializer"() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Foo', '''
+package test;
+
+import io.micronaut.core.annotation.Creator;
+import java.util.List;
+import jakarta.validation.constraints.Min;
+
+@io.micronaut.core.annotation.Introspected
+public record Foo(int x, int y){
+    public Foo {
+        if (x < 0) {
+            throw new IllegalArgumentException("Invalid argument");
+        }
+    }
+    public Foo(int x) {
+        this(x, 20);
+    }
+    public Foo() {
+        this(20, 20);
+    }
+}
+''')
+        when:
+        def obj = introspection.instantiate(5, 10)
+
+        then:
+        introspection.getConstructorArguments().length == 2
+        obj.x() == 5
+        obj.y() == 10
+    }
+
     void "test serializing records respects json annotations"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('json.test.Foo', '''
@@ -637,7 +1001,7 @@ package json.test;
 
 import io.micronaut.core.annotation.Creator;
 import java.util.List;
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -663,7 +1027,7 @@ package test;
 
 import io.micronaut.core.annotation.Creator;
 import java.util.List;
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 
 @io.micronaut.core.annotation.Introspected
 public record Foo(int x, int y){
@@ -692,7 +1056,7 @@ package test;
 
 import io.micronaut.core.annotation.Creator;
 import java.util.List;
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 
 @io.micronaut.core.annotation.Introspected
 public record Foo(List<@Min(10) Long> value){
@@ -717,7 +1081,7 @@ package test;
 
 import io.micronaut.core.annotation.Creator;
 import java.util.List;
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 import java.lang.annotation.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static java.lang.annotation.ElementType.*;
@@ -729,7 +1093,7 @@ public class Foo {
     public List<Long> getValue() {
         return value;
     }
-    
+
     public void setValue(List<Long> value) {
         this.value = value;
     }
@@ -761,7 +1125,7 @@ package test;
 import io.micronaut.core.annotation.Creator;
 
 @io.micronaut.core.annotation.Introspected
-public record Foo(@javax.validation.constraints.NotBlank String name, int age){
+public record Foo(@jakarta.validation.constraints.NotBlank String name, int age){
 }
 ''')
         when:
@@ -798,7 +1162,7 @@ public record Foo(@javax.validation.constraints.NotBlank String name, int age){
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 import io.micronaut.inject.visitor.beans.*;
 
@@ -832,6 +1196,37 @@ class Test {}
         applicationContext.close()
     }
 
+    void "test create bean introspection for external class with custom package"() {
+        given:
+        def classLoader = buildClassLoader('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.inject.visitor.beans.OuterBean;
+
+@Introspected(classes=OuterBean.InnerBean.class, targetPackage="test.micronaut.intro")
+class Test {}
+''')
+
+        when:"the reference is loaded"
+        def reference = classLoader.loadClass('test.micronaut.intro.$Test$IntrospectionRef0').newInstance() as BeanIntrospectionReference
+
+        then:"the reference is valid"
+        notThrown(ClassNotFoundException)
+        reference.getBeanType() == OuterBean.InnerBean.class
+        reference.load() != null
+
+        print(classLoader)
+
+        when:"the introspection is loaded"
+        def introspectionName = 'test.micronaut.intro.$io_micronaut_inject_visitor_beans_OuterBean$InnerBean$Introspection'
+        def introspection = classLoader.loadClass(introspectionName).newInstance() as BeanIntrospection
+
+        then:"the introspection is valid"
+        notThrown(ClassNotFoundException)
+        introspection.getProperty("name").isPresent()
+    }
+
     void "test create bean introspection for interface"() {
         given:
         def context = buildContext('itfcetest.MyInterface','''
@@ -850,7 +1245,7 @@ public interface MyInterface {
     @Executable
     default String name() {
         return getName();
-    }    
+    }
 }
 
 class MyImpl implements MyInterface {
@@ -884,7 +1279,7 @@ class Test {}
 
 public interface MyInterface {
     @Executable
-    String name();    
+    String name();
 }
 
 class MyImpl implements MyInterface {
@@ -910,7 +1305,7 @@ class MyImpl implements MyInterface {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 import io.micronaut.inject.visitor.beans.*;
 
@@ -983,7 +1378,7 @@ interface GenBase<T> {
 
         then:
         def e = thrown(UnsupportedOperationException)
-        e.message =='Cannot mutate property [name] that is not mutable via a setter method or constructor argument for type: test.Foo'
+        e.message =='Cannot mutate property [name] that is not mutable via a setter method, field or constructor argument for type: test.Foo'
     }
 
     void "test bean introspection with property of generic superclass"() {
@@ -1000,7 +1395,7 @@ class Foo extends GenBase<String> {
 
 abstract class GenBase<T> {
     abstract T getName();
-    
+
     public T getOther() {
         return (T) "other";
     }
@@ -1032,7 +1427,7 @@ class Foo implements GenBase<Long> {
     public Long getValue() {
         return value;
     }
-    
+
     public void setValue(Long value) {
         this.value = value;
     }
@@ -1040,7 +1435,7 @@ class Foo implements GenBase<Long> {
 
 interface GenBase<T> {
     T getValue();
-    
+
     void setValue(T t);
 }
 ''')
@@ -1070,7 +1465,7 @@ import io.micronaut.core.annotation.Creator;
 @io.micronaut.core.annotation.Introspected
 interface Foo {
     String getName();
-    
+
     @Creator
     static Foo create(String name) {
         return () -> name;
@@ -1097,7 +1492,7 @@ import io.micronaut.core.annotation.Creator;
 @io.micronaut.core.annotation.Introspected
 interface Foo<T> {
     String getName();
-    
+
     @Creator
     static <T1> Foo<T1> create(String name) {
         return () -> name;
@@ -1145,8 +1540,8 @@ package test;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
@@ -1170,8 +1565,8 @@ package test;
 
 import io.micronaut.context.annotation.ConfigurationProperties;import io.micronaut.core.annotation.AccessorsStyle;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
@@ -1243,8 +1638,8 @@ package test;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
@@ -1287,8 +1682,8 @@ package test;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.annotation.AccessorsStyle;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
@@ -1329,8 +1724,8 @@ package test;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
@@ -1371,8 +1766,8 @@ package test;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
@@ -1388,11 +1783,11 @@ public class ValidatedConfig {
     public void setUrl(URL url) {
         this.url = url;
     }
-    
+
     public static class Inner {
-    
+
     }
-    
+
 }
 ''')
         expect:
@@ -1405,8 +1800,8 @@ package test;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
@@ -1438,8 +1833,8 @@ package test;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
@@ -1455,21 +1850,21 @@ class ValidatedConfig {
     public void setUrl(URL url) {
         this.url = url;
     }
-    
+
     public static class Inner {
-    
+
     }
-    
+
     @ConfigurationProperties("another")
     static class Another {
-    
+
         private URL url;
 
         @NotNull
         public URL getUrl() {
             return url;
         }
-    
+
         public void setUrl(URL url) {
             this.url = url;
         }
@@ -1488,8 +1883,8 @@ package test;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.annotation.AccessorsStyle;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
@@ -1538,8 +1933,8 @@ package test;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
@@ -1582,8 +1977,8 @@ package test;
 
 import io.micronaut.context.annotation.ConfigurationProperties;import io.micronaut.core.annotation.AccessorsStyle;
 
-import javax.validation.constraints.NotNull;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
@@ -1633,17 +2028,17 @@ import java.time.Duration;
 class MyConfig {
     private String host;
     private int serverPort;
-    
+
     @ConfigurationInject
-    MyConfig(@javax.validation.constraints.NotBlank String host, int serverPort) {
+    MyConfig(@jakarta.validation.constraints.NotBlank String host, int serverPort) {
         this.host = host;
         this.serverPort = serverPort;
     }
-    
+
     public String getHost() {
         return host;
     }
-    
+
     public int getServerPort() {
         return serverPort;
     }
@@ -1668,7 +2063,7 @@ class MyConfig {
     private int serverPort;
 
     @ConfigurationInject
-    MyConfig(@javax.validation.constraints.NotBlank String host, int serverPort) {
+    MyConfig(@jakarta.validation.constraints.NotBlank String host, int serverPort) {
         this.host = host;
         this.serverPort = serverPort;
     }
@@ -1702,11 +2097,11 @@ public class Test {
     int num;
     String str;
 
+    @Creator
     public <T extends Enum<T>> Test(int num, String str, Class<T> enumClass) {
         this(num, str + enumClass.getName());
     }
-    
-    @Creator
+
     public <T extends Enum<T>> Test(int num, String str) {
         this.num = num;
         this.str = str;
@@ -1719,14 +2114,42 @@ public class Test {
         introspection != null
     }
 
+    void "test annotation metadata present on deep type parameters"() {
+        BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
+package test;
+import io.micronaut.core.annotation.*;
+import jakarta.validation.constraints.*;
+import java.util.List;
+import java.util.Set;
+
+@Introspected
+public class Test {
+    List<@Size(min=1, max=2) List<@NotEmpty List<@NotNull String>>> deepList;
+    List<List<List<List<List<List<String>>>>>> deepList2;
+
+    Test(List<List<List<String>>> deepList) { this.deepList = deepList; }
+    List<List<List<String>>> getDeepList() { return deepList; }
+    List<List<List<List<List<List<String>>>>>> getDeepList2() { return deepList2; }
+}
+''')
+        expect:
+        introspection != null
+        def property = introspection.getProperty("deepList").get().asArgument()
+        property.getTypeParameters().length == 1
+        def param1 = property.getTypeParameters()[0]
+        param1.getTypeParameters().length == 1
+        def param2 = param1.getTypeParameters()[0]
+        param2.getTypeParameters().length == 1
+        def param3 = param2.getTypeParameters()[0]
+
+        param1.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.Size$List')
+        param2.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotEmpty$List')
+        param3.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotNull$List')
+    }
+
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2083')
     void "test class references in constructor arguments"() {
         given:
-//        TraceClassVisitor traceClassVisitor =
-//                new TraceClassVisitor(null, new ASMifier(), new PrintWriter(System.out));
-//        new ClassReader('io.micronaut.inject.visitor.beans.TestConstructorIntrospection')
-//                .accept(traceClassVisitor, ClassReader.EXPAND_FRAMES)
-
         BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
 package test;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
@@ -1740,7 +2163,7 @@ class Test {
     }
     public String getTest() {
         return test;
-    } 
+    }
 }
 
 
@@ -1750,7 +2173,7 @@ class Test {
     }
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/1645")
-    void "test recusive generics 2"() {
+    void "test recursive generics 2"() {
         given:
         BeanIntrospection introspection = buildBeanIntrospection('test.Test','''\
 package test;
@@ -1760,7 +2183,7 @@ class Test<T extends B> {
     private T child;
     public T getChild() {
         return child;
-    } 
+    }
 }
 class B<T extends Test> {}
 
@@ -1791,7 +2214,7 @@ class Test extends RecursiveGenerics<Test> {
         def context = buildContext('test.Address', '''
 package test;
 
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 
 
 @io.micronaut.core.annotation.Introspected
@@ -1800,7 +2223,7 @@ class Address {
     @NotBlank(groups = GroupThree.class, message = "different message")
     @Size(min = 5, max = 20, groups = GroupTwo.class)
     private String street;
-    
+
     public String getStreet() {
         return this.street;
     }
@@ -1834,7 +2257,7 @@ class Book {
         this.title = title;
         this.author = author;
     }
-    
+
     @io.micronaut.core.annotation.Creator
     public Book(String title) {
         this.title = title;
@@ -1843,7 +2266,7 @@ class Book {
     public String getTitle() {
         return title;
     }
-    
+
     void setTitle(String title) {
         this.title = title;
     }
@@ -1857,7 +2280,7 @@ class Book {
     }
 }
 ''')
-        Class clazz = context.classLoader.loadClass('test.$Book$IntrospectionRef')
+        Class<?> clazz = context.classLoader.loadClass('test.$Book$IntrospectionRef')
         BeanIntrospectionReference reference = (BeanIntrospectionReference) clazz.newInstance()
 
         expect:
@@ -1869,7 +2292,7 @@ class Book {
         then:
         introspection != null
         introspection.hasAnnotation(Introspected)
-        introspection.propertyNames.length == 1
+        introspection.propertyNames.length == 2 // Author also passes the rules to be a property, but only write only
 
         when:
         introspection.instantiate()
@@ -1908,18 +2331,18 @@ class Book {
     private String title;
 
     public Book() {
-    }   
+    }
 
     public String getTitle() {
         return title;
     }
-    
+
     public void setTitle(String title) {
         this.title = title;
     }
 }
 ''')
-        Class clazz = context.classLoader.loadClass('test.$Book$IntrospectionRef')
+        Class<?> clazz = context.classLoader.loadClass('test.$Book$IntrospectionRef')
         BeanIntrospectionReference reference = (BeanIntrospectionReference) clazz.newInstance()
 
         expect:
@@ -1959,7 +2382,7 @@ class Book {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 import com.fasterxml.jackson.annotation.*;
 
@@ -1967,23 +2390,23 @@ import com.fasterxml.jackson.annotation.*;
 class Test {
     private String name;
     private int age;
-    
+
     @JsonCreator
     Test(@JsonProperty("name") String name) {
         this.name = name;
     }
-    
+
     Test(int age) {
         this.age = age;
     }
-    
+
     public int getAge() {
         return age;
     }
     public void setAge(int age) {
         this.age = age;
     }
-    
+
     public String getName() {
         return this.name;
     }
@@ -2030,7 +2453,7 @@ class Test {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 
 @Introspected
@@ -2134,17 +2557,17 @@ class Test {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 
 @Introspected
 class Test {
     private Status status;
-    
+
     public void setStatus(Status status) {
         this.status = status;
     }
-    
+
     public Status getStatus() {
         return this.status;
     }
@@ -2184,7 +2607,7 @@ class Test {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import javax.persistence.*;
 import java.util.*;
 
@@ -2200,9 +2623,9 @@ class Test {
     @Size(max=100)
     private int age;
     private int[] primitiveArray;
-    
+
     private long v;
-    
+
     public Test(String name, @Size(max=100) int age, int[] primitiveArray) {
         this.name = name;
         this.age = age;
@@ -2219,28 +2642,28 @@ class Test {
     public void setAge(int age) {
         this.age = age;
     }
-    
+
     public void setId(Long id) {
         this.id = id;
     }
-    
+
     public Long getId() {
         return this.id;
     }
-    
+
     public void setVersion(Long version) {
         this.version = version;
     }
-    
+
     public Long getVersion() {
         return this.version;
     }
-    
+
     @Version
     public long getAnotherVersion() {
         return v;
     }
-    
+
     public void setAnotherVersion(long v) {
         this.v = v;
     }
@@ -2300,7 +2723,7 @@ class Test {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import javax.persistence.*;
 import java.util.*;
 
@@ -2314,8 +2737,8 @@ class Test {
     private String name;
     @Size(max=100)
     private int age;
-    
-    
+
+
     public String getName() {
         return this.name;
     }
@@ -2328,19 +2751,19 @@ class Test {
     public void setAge(int age) {
         this.age = age;
     }
-    
+
     public void setId(Long id) {
         this.id = id;
     }
-    
+
     public Long getId() {
         return this.id;
     }
-    
+
     public void setVersion(Long version) {
         this.version = version;
     }
-    
+
     public Long getVersion() {
         return this.version;
     }
@@ -2372,7 +2795,7 @@ class Test {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 import io.micronaut.inject.visitor.beans.*;
 
@@ -2406,7 +2829,7 @@ class Test {}
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 import io.micronaut.inject.visitor.beans.*;
 
@@ -2430,7 +2853,7 @@ class Test {}
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 import io.micronaut.inject.visitor.beans.*;
 
@@ -2449,39 +2872,13 @@ class Test {}
         context?.close()
     }
 
-    void "test write bean introspection data for package with compiled classes"() {
-        given:
-        ApplicationContext context = buildContext('test.Test', '''
-package test;
-
-import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
-import java.util.*;
-
-@Introspected(packages="io.micronaut.inject.beans.visitor", includedAnnotations=Internal.class)
-class Test {}
-''')
-
-        when:"the reference is loaded"
-        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef0')
-        BeanIntrospectionReference reference = clazz.newInstance()
-
-        then:"The reference is valid"
-        reference != null
-        reference.getBeanType() == IntrospectedTypeElementVisitor
-
-
-        cleanup:
-        context?.close()
-    }
-
     void "test write bean introspection data"() {
         given:
         ApplicationContext context = buildContext('test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 import io.micronaut.core.convert.TypeConverter;
 
@@ -2491,33 +2888,33 @@ class Test extends ParentBean {
     private String name;
     @Size(max=100)
     private int age;
-    
+
     private List<Number> list;
     private String[] stringArray;
     private int[] primitiveArray;
     private boolean flag;
     private TypeConverter<String, Collection> genericsTest;
     private TypeConverter<String, Object[]> genericsArrayTest;
-    
+
     public TypeConverter<String, Collection> getGenericsTest() {
         return genericsTest;
     }
-    
+
     public TypeConverter<String, Object[]> getGenericsArrayTest() {
         return genericsArrayTest;
     }
-    
+
     public String getReadOnly() {
         return readOnly;
     }
     public boolean isFlag() {
         return flag;
     }
-    
+
     public void setFlag(boolean flag) {
         this.flag = flag;
     }
-    
+
     public String getName() {
         return this.name;
     }
@@ -2530,11 +2927,11 @@ class Test extends ParentBean {
     public void setAge(int age) {
         this.age = age;
     }
-    
+
     public List<Number> getList() {
         return this.list;
     }
-    
+
     public void setList(List<Number> l) {
         this.list = l;
     }
@@ -2558,11 +2955,11 @@ class Test extends ParentBean {
 
 class ParentBean {
     private List<byte[]> listOfBytes;
-    
+
     public List<byte[]> getListOfBytes() {
         return this.listOfBytes;
     }
-    
+
     public void setListOfBytes(List<byte[]> list) {
         this.listOfBytes = list;
     }
@@ -2671,7 +3068,7 @@ class ParentBean {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 import io.micronaut.core.convert.TypeConverter;
 
@@ -2860,19 +3257,19 @@ class ParentBean {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.*;
 import com.fasterxml.jackson.annotation.*;
 
 @Introspected
 class Test {
     private Map<String, String> properties;
-    
+
     @Creator
     Test(Map<String, String> properties) {
         this.properties = properties;
     }
-    
+
     public Map<String, String> getProperties() {
         return properties;
     }
@@ -2895,16 +3292,16 @@ import io.micronaut.core.annotation.*;
 @Introspected
 class Test {
     private String name;
-    
+
     private Test(String name) {
         this.name = name;
     }
-    
+
     @Creator
     public static Test forName(String name) {
         return new Test(name);
     }
-    
+
     public String getName() {
         return name;
     }
@@ -2990,16 +3387,16 @@ import io.micronaut.core.annotation.*;
 @Introspected
 class Test {
     private String name;
-    
+
     private Test(String name) {
         this.name = name;
     }
-    
+
     @Creator
     public static Test forName() {
         return new Test("default");
     }
-    
+
     public String getName() {
         return name;
     }
@@ -3037,21 +3434,21 @@ import io.micronaut.core.annotation.*;
 @Introspected
 class Test {
     private String name;
-    
+
     private Test(String name) {
         this.name = name;
     }
-    
+
     @Creator
     public static Test forName() {
         return new Test("default");
     }
-    
+
     @Creator
     public static Test forName(String name) {
         return new Test(name);
     }
-    
+
     public String getName() {
         return name;
     }
@@ -3091,22 +3488,22 @@ class Test {
 
     private final String name;
     public static final Companion Companion = new Companion();
-    
+
     public final String getName() {
         return name;
     }
-    
+
     private Test(String name) {
         this.name = name;
     }
-    
+
     public static final class Companion {
-        
+
         @Creator
         public final Test forName(String name) {
             return new Test(name);
         }
-        
+
         private Companion() {
         }
     }
@@ -3165,7 +3562,7 @@ public enum Test {
     Test(int number) {
         this.number = number;
     }
-    
+
     public int getNumber() {
         return number;
     }
@@ -3286,7 +3683,7 @@ import java.util.Map;
 class Test {
 
     public Test(Map<String, List<Action>> map) {
-    
+
     }
 }
 
@@ -3320,7 +3717,7 @@ class Test {
 
     public Test() {
     }
-    
+
     public int[] getOneDimension() {
         return oneDimension;
     }
@@ -3336,7 +3733,7 @@ class Test {
     public void setTwoDimensions(int[][] twoDimensions) {
         this.twoDimensions = twoDimensions;
     }
-    
+
     public int[][][] getThreeDimensions() {
         return threeDimensions;
     }
@@ -3394,13 +3791,13 @@ class Test {
 
     public Test() {
     }
-    
+
     public String[] getOneDimension() {
         return oneDimension;
     }
 
     public void setOneDimension(String[] oneDimension) {
-        this.oneDimension = oneDimension;     
+        this.oneDimension = oneDimension;
     }
 
     public String[][] getTwoDimensions() {
@@ -3410,7 +3807,7 @@ class Test {
     public void setTwoDimensions(String[][] twoDimensions) {
         this.twoDimensions = twoDimensions;
     }
-    
+
     public String[][][] getThreeDimensions() {
         return threeDimensions;
     }
@@ -3469,13 +3866,13 @@ class Test {
 
     public Test() {
     }
-    
+
     public SomeEnum[] getOneDimension() {
         return oneDimension;
     }
 
     public void setOneDimension(SomeEnum[] oneDimension) {
-        this.oneDimension = oneDimension;     
+        this.oneDimension = oneDimension;
     }
 
     public SomeEnum[][] getTwoDimensions() {
@@ -3485,7 +3882,7 @@ class Test {
     public void setTwoDimensions(SomeEnum[][] twoDimensions) {
         this.twoDimensions = twoDimensions;
     }
-    
+
     public SomeEnum[][][] getThreeDimensions() {
         return threeDimensions;
     }
@@ -3532,7 +3929,7 @@ class Test {
 package test;
 
 import io.micronaut.core.annotation.Introspected;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 
 interface IEmail {
 String getEmail();
@@ -3563,7 +3960,7 @@ class Test extends SuperClass implements IEmail {
 package test;
 
 import io.micronaut.core.annotation.*;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 
 interface IEmail {
 String readEmail();
@@ -3600,11 +3997,11 @@ import io.micronaut.core.annotation.Introspected;
 class Test {
 
     private final String xForwardedFor;
-    
+
     Test(String xForwardedFor) {
         this.xForwardedFor = xForwardedFor;
     }
-    
+
     public String getXForwardedFor() {
         return xForwardedFor;
     }
@@ -3665,19 +4062,19 @@ import io.micronaut.core.annotation.Introspected;
 abstract class Test {
     private String name;
     private String author;
-    
+
     public String getName() {
         return name;
     }
-    
+
     public void setName(String name) {
         this.name = name;
     }
-    
+
     public String getAuthor() {
         return author;
     }
-    
+
     public void setAuthor(String author) {
         this.author = author;
     }
@@ -3771,23 +4168,23 @@ import io.micronaut.core.annotation.Introspected;
 abstract class Test {
     private String name;
     private String author;
-    
+
     public String getName() {
         return name;
     }
-    
+
     public void setName(String name) {
         this.name = name;
     }
-    
+
     public String getAuthor() {
         return author;
     }
-    
+
     public void setAuthor(String author) {
         this.author = author;
     }
-    
+
     public int getAge() {
         return 0;
     }
@@ -3851,7 +4248,7 @@ import java.util.Set;
 public class Test {
 
     private Set<Author> authors;
-    
+
     public Set<Author> getAuthors() {
         return authors;
     }
@@ -3893,7 +4290,7 @@ public class Test {
     public String getFoo() {
         return "bar";
     }
-    
+
     @JsonProperty
     public void setFoo(String s) {
     }
@@ -3947,11 +4344,11 @@ import io.micronaut.core.annotation.Introspected;
 public class Test {
     @JsonProperty
     String foo;
-    
+
     public String getFoo() {
         return foo;
     }
-    
+
     public void setFoo(String s) {
         this.foo = s;
     }
@@ -4008,12 +4405,12 @@ import io.micronaut.core.annotation.Introspected;
 public class Test {
     @JsonProperty("field")
     String foo;
-    
+
     @JsonProperty("getter")
     public String getFoo() {
         return foo;
     }
-    
+
     @JsonProperty("setter")
     public void setFoo(String s) {
         this.foo = s;
@@ -4073,11 +4470,11 @@ import io.micronaut.core.annotation.Introspected;
 public class Test {
     @JsonProperty("field")
     String foo;
-    
+
     public String getFoo() {
         return foo;
     }
-    
+
     @JsonProperty("setter")
     public void setFoo(String s) {
         this.foo = s;
@@ -4102,15 +4499,15 @@ import io.micronaut.core.annotation.Introspected;
 @Introspected
 public class Test {
     private final java.util.ArrayList<String> foo;
-    
+
     public Test(java.util.List<String> foo) {
         this.foo = null;
     }
-    
+
     public java.util.List<String> getFoo() {
         return null;
     }
-    
+
 }
 ''')
 
@@ -4213,7 +4610,7 @@ package test;
 
 import io.micronaut.core.annotation.Creator;
 import java.util.List;
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -4222,6 +4619,191 @@ public record Foo(String name, String isSurname, boolean contains, Boolean purge
 }''')
         expect:
         introspection.propertyNames as List<String> == ["name", "isSurname", "contains", "purged", "isUpdated", "isDeleted"]
+    }
+
+    void 'test annotation on a generic field argument'() {
+        when:
+        BeanIntrospection beanIntrospection = buildBeanIntrospection('test.Book', '''
+package test;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
+import java.util.List;
+import io.micronaut.core.annotation.Introspected;
+
+class Author {
+}
+
+@Introspected
+class Book {
+
+    @Size(min=2)
+    private String name;
+
+    private List<@Valid Author> authors;
+
+    public Book(String name) {
+        this.name = name;
+        this.authors = null;
+    }
+
+    public Book(String name, List<Author> authors) {
+        this.name = name;
+        this.authors = authors;
+    }
+
+    public List<Author> getAuthors() {
+        return authors;
+    }
+
+    public String getName() {
+        return name;
+    }
+}
+''')
+        def property =  beanIntrospection.getBeanProperties().first()
+
+        then:
+        property.name == "authors"
+        property.asArgument().getTypeParameters()[0].annotationMetadata.hasStereotype("jakarta.validation.Valid")
+    }
+
+    void "test type_use annotations"() {
+        given:
+            def introspection = buildBeanIntrospection('test.Test', '''
+package test;
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.*;
+import io.micronaut.inject.visitor.*;
+@Introspected
+class Test {
+    @io.micronaut.inject.visitor.beans.TypeUseRuntimeAnn
+    private String name;
+    @io.micronaut.inject.visitor.beans.TypeUseClassAnn
+    private String secondName;
+    public String getName() {
+        return name;
+    }
+    public void setName(String name) {
+        this.name = name;
+    }
+    public String getSecondName() {
+        return name;
+    }
+    public void setSecondName(String secondName) {
+        this.secondName = secondName;
+    }
+}
+''')
+            def nameField = introspection.getProperty("name").orElse(null)
+            def secondNameField = introspection.getProperty("secondName").orElse(null)
+
+        expect:
+            nameField
+            secondNameField
+
+            nameField.hasStereotype(TypeUseRuntimeAnn)
+            nameField.hasStereotype("io.micronaut.inject.visitor.beans.TypeUseRuntimeAnn")
+            !secondNameField.hasStereotype(TypeUseClassAnn)
+            !secondNameField.hasStereotype("io.micronaut.inject.visitor.beans.TypeUseClassAnn")
+    }
+
+    void "test subtypes"() {
+        given:
+            BeanIntrospection introspection = buildBeanIntrospection('test.Holder', '''
+package test;
+import io.micronaut.core.annotation.Introspected;
+import java.util.List;
+import java.util.Collections;
+
+@Introspected
+class Animal {
+}
+
+@Introspected
+class Cat extends Animal {
+    final public int lives;
+    Cat(int lives) {
+        this.lives = lives;
+    }
+}
+
+@Introspected(accessKind = Introspected.AccessKind.FIELD)
+class Holder<A extends Animal> {
+    public final Animal animalNonGeneric;
+    public final List<Animal> animalsNonGeneric;
+    public final A animal;
+    public final List<A> animals;
+    Holder(A animal) {
+        this.animal = animal;
+        this.animals = Collections.singletonList(animal);
+        this.animalNonGeneric = animal;
+        this.animalsNonGeneric = Collections.singletonList(animal);
+    }
+}
+
+
+        ''')
+
+        expect:
+            def animalListArgument = introspection.getProperty("animals").get().asArgument().getTypeParameters()[0]
+            animalListArgument instanceof GenericPlaceholder
+            animalListArgument.isTypeVariable()
+
+            def animal = introspection.getProperty("animal").get().asArgument()
+            animal instanceof GenericPlaceholder
+            animal.isTypeVariable()
+    }
+
+    void "test private property 1"() {
+        given:
+            BeanIntrospection introspection = buildBeanIntrospection('test.OptionalDoubleHolder', '''
+package test;
+import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.constraints.DecimalMin;
+import java.util.List;
+import java.util.Collections;
+import java.util.OptionalDouble;
+
+@Introspected(accessKind = Introspected.AccessKind.FIELD, visibility = Introspected.Visibility.ANY)
+class OptionalDoubleHolder {
+    @DecimalMin("5")
+    private final OptionalDouble optionalDouble;
+
+    private OptionalDoubleHolder(OptionalDouble optionalDouble) {
+        this.optionalDouble = optionalDouble;
+    }
+}
+        ''')
+
+        expect:
+            introspection.getProperty("optionalDouble").get().getType() == OptionalDouble.class
+            introspection.getProperty("optionalDouble").get().hasAnnotation(DecimalMin)
+    }
+    void "test private property 2"() {
+        given:
+            BeanIntrospection introspection = buildBeanIntrospection('test.OptionalStringHolder', '''
+package test;
+import io.micronaut.core.annotation.Introspected;
+import jakarta.validation.constraints.NotBlank;
+import java.util.List;
+import java.util.Collections;
+import java.util.Optional;
+
+@Introspected(accessKind = Introspected.AccessKind.FIELD, visibility = Introspected.Visibility.ANY)
+class OptionalStringHolder {
+    private final Optional<@NotBlank String> optionalString;
+
+    private OptionalStringHolder(Optional<String> optionalString) {
+        this.optionalString = optionalString;
+    }
+}
+        ''')
+
+        expect:
+            introspection.getProperty("optionalString").get().getType() == Optional.class
+            introspection.getProperty("optionalString").get().asArgument().getFirstTypeVariable().get().getAnnotationMetadata().hasAnnotation(NotBlank)
+
     }
 
     @Override
@@ -4238,7 +4820,7 @@ public record Foo(String name, String isSurname, boolean contains, Boolean purge
     static class MyTypeElementVisitorProcessor extends TypeElementVisitorProcessor {
         @Override
         protected Collection<TypeElementVisitor> findTypeElementVisitors() {
-            return [new IntrospectedTypeElementVisitor()]
+            return [new ValidationVisitor(), new ConfigurationReaderVisitor(), new io.micronaut.validation.visitor.IntrospectedValidationIndexesVisitor(), new IntrospectedTypeElementVisitor()]
         }
     }
 
@@ -4246,10 +4828,12 @@ public record Foo(String name, String isSurname, boolean contains, Boolean purge
     @Replaces(BeanIntrospectionModule)
     @io.micronaut.context.annotation.Requires(property = "bean.introspection.test")
     static class StaticBeanIntrospectionModule extends BeanIntrospectionModule {
-        Map<Class, BeanIntrospection> introspectionMap = [:]
+        Map<Class<?>, BeanIntrospection> introspectionMap = [:]
         @Override
         protected BeanIntrospection<Object> findIntrospection(Class<?> beanClass) {
             return introspectionMap.get(beanClass)
         }
     }
 }
+
+

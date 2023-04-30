@@ -5,6 +5,6 @@ plugins {
 dependencies {
     annotationProcessor project(":inject-java")
 
-    api project(":runtime")
+    api project(":context")
     implementation libs.managed.methvin.directoryWatcher
 }

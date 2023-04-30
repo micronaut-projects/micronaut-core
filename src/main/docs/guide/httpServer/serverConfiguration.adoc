@@ -1,25 +1,25 @@
 The HTTP server features a number of configuration options. They are defined in the api:http.server.netty.configuration.NettyHttpServerConfiguration[] configuration class, which extends api:http.server.HttpServerConfiguration[].
 
-The following example shows how to tweak configuration options for the server via `application.yml`:
+The following example shows how to tweak configuration options for the server via your configuration file (e.g `application.yml`):
 
 .Configuring HTTP server settings
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:
     maxRequestSize: 1MB
-    host: localhost # <1>
+    host: localhost
     netty:
-      maxHeaderSize: 500KB # <2>
+      maxHeaderSize: 500KB
       worker:
-        threads: 8 # <3>
+        threads: 8
       childOptions:
-        autoRead: true # <4>
+        autoRead: true
 ----
-<1> By default Micronaut binds to all network interfaces. Use `localhost` to bind only to loopback network interface
-<2> Maximum size for headers
-<3> Number of Netty worker threads
-<4> Auto read request body
+- By default, Micronaut framework binds to all network interfaces. Use `localhost` to bind only to loopback network interface
+- `maxHeaderSize` sets the maximum size for headers
+- `worker.threads` specifies the number of Netty worker threads
+- `autoRead` enables request body auto read
 
 include::{includedir}configurationProperties/io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration.adoc[]
 
@@ -48,7 +48,7 @@ dependency:netty-transport-native-epoll[groupId="io.netty",scope="runtimeOnly",c
 Then configure the default event loop group to prefer native transports:
 
 .Configuring The Default Event Loop to Prefer Native Transports
-[source,yaml]
+[configuration]
 ----
 micronaut:
   netty:
@@ -57,4 +57,12 @@ micronaut:
         prefer-native-transport: true
 ----
 
-NOTE: Netty enables simplistic sampling resource leak detection which reports there is a leak or not, at the cost of small overhead. You can disable it or enable more advanced detection by setting property `netty.resource-leak-detector-level` to one of: `SIMPLE` (default), `DISABLED`, `PARANOID` or `ADVANCED`.
+On Linux, Netty also offers an io_uring-based transport in incubator status. On x86_64:
+
+dependency:netty-incubator-transport-native-io_uring[groupId="io.netty.incubator",scope="runtimeOnly",classifier="linux-x86_64"]
+
+On ARM64:
+
+dependency:netty-incubator-transport-native-io_uring[groupId="io.netty.incubator",scope="runtimeOnly",classifier="linux-aarch_64"]
+
+NOTE: Netty enables simplistic sampling resource leak detection which reports there is a leak or not, at the cost of small overhead. You can enable it by setting property `netty.resource-leak-detector-level` to one of: `DISABLED` (default), `SIMPLE`, `PARANOID` or `ADVANCED`.

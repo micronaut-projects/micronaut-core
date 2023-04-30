@@ -298,11 +298,10 @@ class ReadTimeoutSpec extends Specification {
                 .filter { it.clientId == "http://localhost:${embeddedServer.getPort()}" }
                 .findFirst()
                 .get()
-        def pool = getPool(clients.get(clientKey))
 
         then:"Connections are not leaked"
         conditions.eventually {
-            pool.acquiredChannelCount() == 0
+            clients.get(clientKey).connectionManager.liveRequestCount() == 0
         }
 
         cleanup:
@@ -310,7 +309,7 @@ class ReadTimeoutSpec extends Specification {
     }
 
     FixedChannelPool getPool(HttpClient client) {
-        AbstractChannelPoolMap poolMap = client.poolMap
+        AbstractChannelPoolMap poolMap = client.connectionManager.poolMap
         Field mapField = AbstractChannelPoolMap.getDeclaredField("map")
         mapField.setAccessible(true)
         Map innerMap = mapField.get(poolMap)

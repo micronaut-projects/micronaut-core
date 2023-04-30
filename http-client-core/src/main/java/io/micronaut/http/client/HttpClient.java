@@ -53,10 +53,10 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
     /**
      * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned
      * {@link Publisher} and converting the response body to the specified type.</p>
-     * <p>
+     *
      * <p>This method will send a {@code Content-Length} header and except a content length header the response and is
      * designed for simple non-streaming exchanges of data</p>
-     * <p>
+     *
      * <p>By default the exchange {@code Content-Type} is application/json, unless otherwise specified in the passed
      * {@link HttpRequest}</p>
      *
@@ -73,10 +73,10 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
     /**
      * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned
      * {@link Publisher} and converting the response body to the specified type.</p>
-     * <p>
+     *
      * <p>This method will send a {@code Content-Length} header and except a content length header the response and is
      * designed for simple non-streaming exchanges of data</p>
-     * <p>
+     *
      * <p>By default the exchange {@code Content-Type} is application/json, unless otherwise specified in the passed
      * {@link HttpRequest}</p>
      *
@@ -152,8 +152,15 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      * @param <E>      The error type
      * @return A {@link Publisher} that emits a result of the given type
      */
+    @SuppressWarnings("unchecked")
     default <I, O, E> Publisher<O> retrieve(@NonNull HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType) {
-        return Flux.from(exchange(request, bodyType, errorType)).map(response -> {
+        // note: this default impl isn't used by us anymore, it's overridden by DefaultHttpClient
+        Flux<HttpResponse<O>> exchange = Flux.from(exchange(request, bodyType, errorType));
+        if (bodyType.getType() == void.class) {
+            // exchange() returns a HttpResponse<Void>, we can't map the Void body properly, so just drop it and complete
+            return (Publisher<O>) exchange.ignoreElements();
+        }
+        return exchange.map(response -> {
             if (bodyType.getType() == HttpStatus.class) {
                 return (O) response.getStatus();
             } else {

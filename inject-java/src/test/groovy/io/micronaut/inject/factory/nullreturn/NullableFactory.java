@@ -15,14 +15,12 @@
  */
 package io.micronaut.inject.factory.nullreturn;
 
-import io.micronaut.context.annotation.*;
-
-import io.micronaut.core.annotation.Nullable;
-import io.micronaut.context.condition.Condition;
-import io.micronaut.context.condition.ConditionContext;
+import io.micronaut.context.annotation.EachBean;
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Parameter;
+import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.exceptions.DisabledBeanException;
-import io.micronaut.core.annotation.AnnotationMetadataProvider;
-
+import io.micronaut.core.annotation.Nullable;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
@@ -34,6 +32,7 @@ public class NullableFactory {
     public int dCalls = 0;
     public int d2Calls = 0;
     public int d3Calls = 0;
+    public int d4Calls = 0;
 
     @Prototype
     A getA(@Parameter String name) {
@@ -111,6 +110,12 @@ public class NullableFactory {
         }
     }
 
+    @EachBean(C.class)
+    D4 getD4(@Nullable C c, @Nullable @Parameter B b) {
+        d4Calls++;
+        return new D4();
+    }
+
     @EachBean(D.class)
     E getE(D d, F f) {
         return new E();
@@ -142,6 +147,7 @@ class C {
 class D {}
 class D2 {}
 class D3 {}
+class D4 {}
 class E {}
 class F {}
 

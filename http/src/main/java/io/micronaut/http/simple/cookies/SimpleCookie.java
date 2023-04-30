@@ -15,11 +15,11 @@
  */
 package io.micronaut.http.simple.cookies;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.SameSite;
 
-import io.micronaut.core.annotation.NonNull;
-import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -201,7 +201,7 @@ public class SimpleCookie implements Cookie {
 
     @Override
     public int hashCode() {
-        return Objects.hash(name, domain, path);
+        return ObjectUtils.hash(name, domain, path);
     }
 
     @Override
@@ -229,8 +229,9 @@ public class SimpleCookie implements Cookie {
         if (isHttpOnly()) {
             buf.append(", HTTPOnly");
         }
-        if (getSameSite().isPresent()) {
-            buf.append(", SameSite=").append(getSameSite().get());
+        Optional<SameSite> ss = getSameSite();
+        if (ss.isPresent()) {
+            buf.append(", SameSite=").append(ss.get());
         }
         return buf.toString();
     }

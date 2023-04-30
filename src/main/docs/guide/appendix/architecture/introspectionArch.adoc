@@ -8,7 +8,7 @@ The api:inject.beans.visitor.IntrospectedTypeElementVisitor[] visits declaration
 
 image::arch/introspections.png[]
 
-This generation happens via the api:inject.beans.visitor.BeanIntrospectionWriter[] class which uses the ASM bytecode generation library to generate two additional classes.
+This generation happens via the `io.micronaut.inject.beans.visitor.BeanIntrospectionWriter`, an internal class that uses the ASM bytecode generation library to generate two additional classes.
 
 For example, given a class called `example.Person` the classes generated are:
 
@@ -57,13 +57,13 @@ protected final Object dispatchOne(int propertyIndex, Object bean, Object value
 
 NOTE: The approach to use a dispatch method with an index was used to avoid the need to generate a class per method (which would consume more memory) or introduce the overhead of lambdas.
 
-In order to enable type instantiation the api:inject.beans.visitor.BeanIntrospectionWriter[] will also generate an implementation of the `instantiateInternal` method which contains the reflection-free code to instantiate a given type based on known valid argument types:
+In order to enable type instantiation the `io.micronaut.inject.beans.visitor.BeanIntrospectionWriter` will also generate an implementation of the `instantiateInternal` method which contains the reflection-free code to instantiate a given type based on known valid argument types:
 
 [source,java]
 ----
 public Object instantiateInternal(Object[] args) {
     return new Person(
-        (String)args[0], 
+        (String)args[0],
         (Integer)args[1]
     );
 }

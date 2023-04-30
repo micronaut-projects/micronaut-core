@@ -79,11 +79,6 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
     }
 
     @Override
-    default boolean isProvided() {
-        return getTarget().isProvided();
-    }
-
-    @Override
     default boolean isIterable() {
         return getTarget().isIterable();
     }
@@ -137,16 +132,6 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
     @Override
     default <R> Stream<ExecutableMethod<T, R>> findPossibleMethods(String name) {
         return getTarget().findPossibleMethods(name);
-    }
-
-    @Override
-    default T inject(BeanContext context, T bean) {
-        return getTarget().inject(context, bean);
-    }
-
-    @Override
-    default T inject(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
-        return getTarget().inject(resolutionContext, context, bean);
     }
 
     @Override

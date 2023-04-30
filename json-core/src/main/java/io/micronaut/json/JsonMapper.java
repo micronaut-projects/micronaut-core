@@ -19,6 +19,8 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.json.tree.JsonNode;
 import org.reactivestreams.Processor;
@@ -28,7 +30,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
+import java.util.ServiceLoader;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 /**
  * Common abstraction for mapping json to data structures.
@@ -45,6 +49,7 @@ public interface JsonMapper {
      * @param type The type to deserialize.
      * @param <T>  Type variable of the return type.
      * @return The deserialized value.
+     * @throws IOException IOException
      */
     <T> T readValueFromTree(@NonNull JsonNode tree, @NonNull Argument<T> type) throws IOException;
 
@@ -55,6 +60,7 @@ public interface JsonMapper {
      * @param type The type to deserialize.
      * @param <T>  Type variable of the return type.
      * @return The deserialized value.
+     * @throws IOException IOException
      */
     default <T> T readValueFromTree(@NonNull JsonNode tree, @NonNull Class<T> type) throws IOException {
         return readValueFromTree(tree, Argument.of(type));
@@ -67,6 +73,7 @@ public interface JsonMapper {
      * @param type        The type to deserialize to.
      * @param <T>         Type variable of the return type.
      * @return The deserialized object.
+     * @throws IOException IOException
      */
     <T> T readValue(@NonNull InputStream inputStream, @NonNull Argument<T> type) throws IOException;
 
@@ -77,8 +84,22 @@ public interface JsonMapper {
      * @param type      The type to deserialize to.
      * @param <T>       Type variable of the return type.
      * @return The deserialized object.
+     * @throws IOException IOException
      */
     <T> T readValue(@NonNull byte[] byteArray, @NonNull Argument<T> type) throws IOException;
+
+    /**
+     * Parse and map json from the given byte buffer.
+     *
+     * @param byteBuffer The input data.
+     * @param type       The type to deserialize to.
+     * @param <T>        Type variable of the return type.
+     * @return The deserialized object.
+     * @throws IOException IOException
+     */
+    default <T> T readValue(@NonNull ByteBuffer<?> byteBuffer, @NonNull Argument<T> type) throws IOException {
+        return readValue(byteBuffer.toByteArray(), type);
+    }
 
     /**
      * Parse and map json from the given string.
@@ -87,6 +108,7 @@ public interface JsonMapper {
      * @param type   The type to deserialize to.
      * @param <T>    Type variable of the return type.
      * @return The deserialized object.
+     * @throws IOException IOException
      */
     default <T> T readValue(@NonNull String string, @NonNull Argument<T> type) throws IOException {
         return readValue(string.getBytes(StandardCharsets.UTF_8), type);
@@ -100,7 +122,10 @@ public interface JsonMapper {
      * @return The reactive processor.
      */
     @NonNull
-    Processor<byte[], JsonNode> createReactiveParser(@NonNull Consumer<Processor<byte[], JsonNode>> onSubscribe, boolean streamArray);
+    @Deprecated
+    default Processor<byte[], JsonNode> createReactiveParser(@NonNull Consumer<Processor<byte[], JsonNode>> onSubscribe, boolean streamArray) {
+        throw new UnsupportedOperationException("Reactive parser not supported");
+    }
 
     /**
      * Transform an object value to a json tree.
@@ -129,6 +154,7 @@ public interface JsonMapper {
      *
      * @param outputStream The stream to write to.
      * @param object       The object to serialize.
+     * @throws IOException IOException
      */
     void writeValue(@NonNull OutputStream outputStream, @Nullable Object object) throws IOException;
 
@@ -139,6 +165,7 @@ public interface JsonMapper {
      * @param type         The object type
      * @param object       The object to serialize.
      * @param <T>  The generic type
+     * @throws IOException IOException
      */
     <T> void writeValue(@NonNull OutputStream outputStream, @NonNull Argument<T> type, @Nullable T object) throws IOException;
 
@@ -147,6 +174,7 @@ public interface JsonMapper {
      *
      * @param object The object to serialize.
      * @return The serialized encoded json.
+     * @throws IOException IOException
      */
     byte[] writeValueAsBytes(@Nullable Object object) throws IOException;
 
@@ -157,6 +185,7 @@ public interface JsonMapper {
      * @param object The object to serialize.
      * @return The serialized encoded json.
      * @param <T> The generidc type
+     * @throws IOException IOException
      */
     <T> byte[] writeValueAsBytes(@NonNull Argument<T> type, @Nullable T object) throws IOException;
 
@@ -213,4 +242,25 @@ public interface JsonMapper {
      */
     @NonNull
     JsonStreamConfig getStreamConfig();
+
+    /**
+     * Resolves the default {@link JsonMapper}.
+     * @return The default {@link JsonMapper}
+     * @throws IllegalStateException If no {@link JsonMapper} implementation exists on the classpath.
+     * @since 4.0.0
+     */
+    static @NonNull JsonMapper createDefault() {
+        return ServiceLoader.load(JsonMapperSupplier.class).stream()
+            .flatMap(p -> {
+                try {
+                    JsonMapperSupplier supplier = p.get();
+                    return Stream.ofNullable(supplier);
+                } catch (Exception e) {
+                    return Stream.empty();
+                }
+            })
+            .min(OrderUtil.COMPARATOR)
+            .orElseThrow(() -> new IllegalStateException("No JsonMapper implementation found"))
+            .get();
+    }
 }

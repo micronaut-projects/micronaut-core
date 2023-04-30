@@ -19,12 +19,11 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.management.endpoint.routes.RouteData;
 import io.micronaut.management.endpoint.routes.RoutesEndpoint;
-import io.micronaut.web.router.MethodBasedRoute;
-import io.micronaut.web.router.UriRoute;
+import io.micronaut.web.router.UriRouteInfo;
 import jakarta.inject.Singleton;
 
 import java.util.Arrays;
-import java.util.LinkedHashMap;
+import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -39,21 +38,15 @@ import java.util.stream.Collectors;
 public class DefaultRouteData implements RouteData<Map<String, String>> {
 
     @Override
-    public Map<String, String> getData(UriRoute route) {
-        Map<String, String> values = new LinkedHashMap<>(1);
-
-        if (route instanceof MethodBasedRoute) {
-            values.put("method", getMethodString(((MethodBasedRoute) route).getTargetMethod()));
-        }
-
-        return values;
+    public Map<String, String> getData(UriRouteInfo<?, ?> routeInfo) {
+        return Collections.singletonMap("method", getMethodString(routeInfo.getTargetMethod()));
     }
 
     /**
      * @param targetMethod The {@link MethodExecutionHandle}
      * @return A String with the target method
      */
-    protected String getMethodString(MethodExecutionHandle targetMethod) {
+    protected String getMethodString(MethodExecutionHandle<?, ?> targetMethod) {
         return new StringBuilder()
             .append(targetMethod.getReturnType().asArgument().getTypeString(false))
             .append(" ")

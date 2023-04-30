@@ -21,9 +21,11 @@ import io.micronaut.core.annotation.Introspected
 import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.ServiceInstanceList
 import io.micronaut.http.BasicAuth
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.*
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
 
@@ -36,6 +38,24 @@ class ClientIntroductionAdviceSpec extends Specification {
 
         expect:
         myService.index() == 'success'
+
+        cleanup:
+        embeddedServer.close()
+    }
+
+    void "service id appears in exceptions"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientIntroductionAdviceSpec'])
+        embeddedServer.applicationContext.registerSingleton(new TestServiceInstanceList(embeddedServer.getURI()))
+
+        PolicyClient myService = embeddedServer.applicationContext.getBean(PolicyClient)
+
+        when:
+        myService.failure()
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.serviceId == 'test-service'
+        e.message == "Client 'test-service': Bad Request"
 
         cleanup:
         embeddedServer.close()
@@ -170,6 +190,11 @@ class ClientIntroductionAdviceSpec extends Specification {
         String index() {
             "policy"
         }
+
+        @Get('/failure')
+        HttpResponse<?> failure() {
+            return HttpResponse.badRequest()
+        }
     }
 
     @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')
@@ -225,6 +250,9 @@ class ClientIntroductionAdviceSpec extends Specification {
     static interface PolicyClient {
         @Get
         String index()
+
+        @Get('/failure')
+        String failure()
     }
 
     @Requires(property = 'spec.name', value = 'ClientIntroductionAdviceSpec')

@@ -56,15 +56,25 @@ public interface ChannelPipelineCustomizer {
     String HANDLER_WEBSOCKET_UPGRADE = "websocket-upgrade-handler";
     String HANDLER_MICRONAUT_INBOUND = "micronaut-inbound-handler";
     String HANDLER_ACCESS_LOGGER = "http-access-logger";
+    String HANDLER_INITIAL_ERROR = "initial-error";
+    /**
+     * Handler that listens for channelActive to trigger, which will finish up the connection
+     * setup.
+     */
+    String HANDLER_ACTIVITY_LISTENER = "activity-listener";
 
     /**
      * @return Is this customizer the client.
+     * @deprecated Use NettyClientCustomizer or NettyServerCustomizer instead.
      */
+    @Deprecated
     boolean isClientChannel();
 
     /**
      * @return Is this customizer the server.
+     * @deprecated Use NettyClientCustomizer or NettyServerCustomizer instead.
      */
+    @Deprecated
     default boolean isServerChannel() {
         return !isClientChannel();
     }
@@ -73,6 +83,8 @@ public interface ChannelPipelineCustomizer {
      * A hook to customize the pipeline upon establishing a connection.
      *
      * @param listener The listener The listener.
+     * @deprecated Use NettyClientCustomizer or NettyServerCustomizer instead.
      */
+    @Deprecated
     void doOnConnect(@NonNull ChannelPipelineListener listener);
 }

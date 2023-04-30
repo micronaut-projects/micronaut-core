@@ -229,7 +229,7 @@ public class InstantiationUtils {
      * @throws InstantiationException When an error occurs
      * @since 3.0.0
      */
-    public static <T> T instantiate(Class<T> type, Class<?>[] argTypes, Object...args) {
+    public static <T> T instantiate(Class<T> type, Class<?>[] argTypes, Object... args) {
         try {
             return BeanIntrospector.SHARED.findIntrospection(type).map(bi -> bi.instantiate(args)).orElseGet(() -> {
                 try {

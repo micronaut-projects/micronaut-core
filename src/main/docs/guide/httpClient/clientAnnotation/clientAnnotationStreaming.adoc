@@ -49,10 +49,10 @@ When streaming responses from servers, the underlying HTTP client will not apply
 
 Instead, the `read-idle-timeout` setting (which defaults to 5 minutes) dictates when to close a connection after it becomes idle.
 
-If you stream data from a server that defines a longer delay than 5 minutes between items, you should adjust `readIdleTimeout`. The following configuration in `application.yml` demonstrates how:
+If you stream data from a server that defines a longer delay than 5 minutes between items, you should adjust `readIdleTimeout`. The following configuration in your configuration file (e.g `application.yml`) demonstrates how:
 
 .Adjusting the readIdleTimeout
-[source,yaml]
+[configuration]
 ----
 micronaut:
   http:
@@ -64,7 +64,7 @@ The above example sets the `readIdleTimeout` to ten minutes.
 
 === Streaming Server Sent Events
 
-Micronaut features a native client for Server Sent Events (SSE) defined by the interface api:http.client.sse.SseClient[].
+The Micronaut framework features a native client for Server Sent Events (SSE) defined by the interface api:http.client.sse.SseClient[].
 
 You can use this client to stream SSE events from any server that emits them.
 

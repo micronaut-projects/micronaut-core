@@ -40,13 +40,13 @@ import java.util.concurrent.ExecutorService;
 @Experimental
 class PublisherInterceptedMethod implements InterceptedMethod {
     private static final boolean AVAILABLE = ClassUtils.isPresent("io.micronaut.core.async.publisher.Publishers", PublisherInterceptedMethod.class.getClassLoader());
-    private final ConversionService<?> conversionService = ConversionService.SHARED;
-
     private final MethodInvocationContext<?, ?> context;
+    private final ConversionService conversionService;
     private final Argument<?> returnTypeValue;
 
-    PublisherInterceptedMethod(MethodInvocationContext<?, ?> context) {
+    PublisherInterceptedMethod(MethodInvocationContext<?, ?> context, ConversionService conversionService) {
         this.context = context;
+        this.conversionService = conversionService;
         this.returnTypeValue = context.getReturnType().asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
     }
 

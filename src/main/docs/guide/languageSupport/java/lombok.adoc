@@ -1,14 +1,14 @@
 https://projectlombok.org[Project Lombok] is a popular java library that adds a number of useful AST transformations to the Java language via annotation processors.
 
-Since both Micronaut and Lombok use annotation processors, special care must be taken when configuring Lombok to ensure that the Lombok processor runs *before* Micronaut's processor.
+Since both the Micronaut framework and Lombok use annotation processors, special care must be taken when configuring Lombok to ensure that the Lombok processor runs *before* Micronaut's processor.
 
 If you use Gradle, add the following dependencies:
 
 .Configuring Lombok in Gradle
 [source,groovy]
 ----
-compileOnly 'org.projectlombok:lombok:1.18.12'
-annotationProcessor "org.projectlombok:lombok:1.18.12"
+compileOnly 'org.projectlombok:lombok:1.18.24'
+annotationProcessor "org.projectlombok:lombok:1.18.24"
 ...
 // Micronaut processor defined after Lombok
 annotationProcessor "io.micronaut:micronaut-inject-java"
@@ -23,7 +23,7 @@ Or if using Maven:
   <dependency>
     <groupId>org.projectlombok</groupId>
     <artifactId>lombok</artifactId>
-    <version>1.18.12</version>
+    <version>1.18.24</version>
     <scope>provided</scope>
   </dependency>
 </dependencies>
@@ -33,16 +33,16 @@ Or if using Maven:
     <!-- must precede micronaut-inject-java -->
     <groupId>org.projectlombok</groupId>
     <artifactId>lombok</artifactId>
-    <version>1.18.12</version>
+    <version>1.18.24</version>
   </path>
   <path>
     <groupId>io.micronaut</groupId>
     <artifactId>micronaut-inject-java</artifactId>
     <version>${micronaut.version}</version>
   </path>
-    <path>
-    <groupId>io.micronaut</groupId>
-    <artifactId>micronaut-validation</artifactId>
+  <path>
+    <groupId>io.micronaut.validation</groupId>
+    <artifactId>micronaut-validation-processor</artifactId>
     <version>${micronaut.version}</version>
   </path>
 </annotationProcessorPaths>

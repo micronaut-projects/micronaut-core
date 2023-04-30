@@ -17,12 +17,10 @@ package io.micronaut.http.client.docs.annotation;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.runtime.server.EmbeddedServer;
-import org.junit.Rule;
+import jakarta.validation.ConstraintViolationException;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.junit.rules.ExpectedException;
 import reactor.core.publisher.Mono;
-
-import javax.validation.ConstraintViolationException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -31,9 +29,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * @since 1.0
  */
 public class PetControllerTest {
-
-    @Rule
-    public ExpectedException thrown = ExpectedException.none();
 
     @Test
     public void testPostPet() {
@@ -53,10 +48,16 @@ public class PetControllerTest {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class);
         PetClient client = embeddedServer.getApplicationContext().getBean(PetClient.class);
 
-        thrown.expect(ConstraintViolationException.class);
-        thrown.expectMessage("save.age: must be greater than or equal to 1");
-        Mono.from(client.save("Fred", -1)).block();
+        try {
+            Mono.from(client.save("Fred", -1)).block();
+        } catch (ConstraintViolationException e) {
+            Assertions.assertEquals("save.age: must be greater than or equal to 1", e.getMessage());
+            embeddedServer.stop();
+            return;
+        }
 
         embeddedServer.stop();
+
+        Assertions.fail();
     }
 }

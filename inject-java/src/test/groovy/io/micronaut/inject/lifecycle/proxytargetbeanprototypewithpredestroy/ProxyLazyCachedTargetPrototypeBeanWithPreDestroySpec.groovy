@@ -15,8 +15,8 @@
  */
 package io.micronaut.inject.lifecycle.proxytargetbeanprototypewithpredestroy
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification
 
 class ProxyLazyCachedTargetPrototypeBeanWithPreDestroySpec extends Specification {
@@ -41,7 +41,7 @@ class ProxyLazyCachedTargetPrototypeBeanWithPreDestroySpec extends Specification
 
     void "test that a lazy target bean with a pre-destroy hook works"() {
         given:
-            BeanContext context = new DefaultBeanContext()
+            BeanContext context = ApplicationContext.builder().properties("spec": getClass().getSimpleName()).build()
             context.start()
 
         when:
@@ -71,7 +71,7 @@ class ProxyLazyCachedTargetPrototypeBeanWithPreDestroySpec extends Specification
 
     void "test that a proxy pre-destroy is not called on not-initialized target"() {
         given:
-            BeanContext context = new DefaultBeanContext()
+            BeanContext context = ApplicationContext.builder().properties("spec": getClass().getSimpleName()).build()
             context.start()
 
         when:
@@ -100,7 +100,7 @@ class ProxyLazyCachedTargetPrototypeBeanWithPreDestroySpec extends Specification
 
     void "test that a lazy proxy bean with a pre-destroy hook works when destroyed by registration"() {
         given:
-            BeanContext context = new DefaultBeanContext()
+            BeanContext context = ApplicationContext.builder().properties("spec": getClass().getSimpleName()).build()
             context.start()
 
         when:
@@ -133,7 +133,7 @@ class ProxyLazyCachedTargetPrototypeBeanWithPreDestroySpec extends Specification
 
     void "test that a lazy proxy bean with a pre-destroy hook is not called on not-initialized target"() {
         given:
-            BeanContext context = new DefaultBeanContext()
+            BeanContext context = ApplicationContext.builder().properties("spec": getClass().getSimpleName()).build()
             context.start()
 
         when:
@@ -164,7 +164,7 @@ class ProxyLazyCachedTargetPrototypeBeanWithPreDestroySpec extends Specification
 
     void "test that a bean with a pre-destroy hook works closed on close"() {
         given:
-            BeanContext context = new DefaultBeanContext()
+            BeanContext context = ApplicationContext.builder().properties("spec": getClass().getSimpleName()).build()
             context.start()
 
         when:
@@ -192,7 +192,7 @@ class ProxyLazyCachedTargetPrototypeBeanWithPreDestroySpec extends Specification
 
     void "test proxies are prototypes and dependent beans not destroyed when created by `getBean(<ProxyClass>)`"() {
         given:
-            BeanContext context = new DefaultBeanContext()
+            BeanContext context = ApplicationContext.builder().properties("spec": getClass().getSimpleName()).build()
             context.start()
 
         when:
@@ -221,9 +221,8 @@ class ProxyLazyCachedTargetPrototypeBeanWithPreDestroySpec extends Specification
 
     void "test that destroy events run in the right phase"() {
         given:
-            BeanContext context = new DefaultBeanContext()
+            BeanContext context = ApplicationContext.builder().properties("spec": getClass().getSimpleName()).build()
             context.start()
-
 
         when:
             def pre = context.getBean(CPreDestroyEventListener)

@@ -18,8 +18,8 @@ package io.micronaut.docs.config.properties;
 // tag::imports[]
 import io.micronaut.context.annotation.ConfigurationProperties;
 
-import javax.validation.constraints.Min;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
 import java.util.Optional;
 // end::imports[]
 

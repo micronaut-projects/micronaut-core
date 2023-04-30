@@ -27,11 +27,13 @@ import com.fasterxml.jackson.databind.node.ContainerNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.micronaut.context.BeanProvider;
+import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -40,7 +42,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.jackson.JacksonConfiguration;
 import jakarta.inject.Inject;
-import jakarta.inject.Singleton;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -54,12 +55,12 @@ import java.util.Optional;
  * @author graemerocher
  * @since 2.0
  */
-@Singleton
+@Prototype
 @Internal
 public class JacksonConverterRegistrar implements TypeConverterRegistrar {
 
     private final BeanProvider<ObjectMapper> objectMapper;
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
 
     /**
      * Default constructor.
@@ -69,13 +70,13 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
     @Inject
     protected JacksonConverterRegistrar(
             BeanProvider<ObjectMapper> objectMapper,
-            ConversionService<?> conversionService) {
+            ConversionService conversionService) {
         this.objectMapper = objectMapper;
         this.conversionService = conversionService;
     }
 
     @Override
-    public void register(ConversionService<?> conversionService) {
+    public void register(MutableConversionService conversionService) {
         conversionService.addConverter(
                 ArrayNode.class,
                 Object[].class,
@@ -177,7 +178,7 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
     protected TypeConverter<ArrayNode, Iterable> arrayNodeToIterableConverter() {
         return (node, targetType, context) -> {
             Map<String, Argument<?>> typeVariables = context.getTypeVariables();
-            Class elementType = typeVariables.isEmpty() ? Map.class : typeVariables.values().iterator().next().getType();
+            Class<?> elementType = typeVariables.isEmpty() ? Map.class : typeVariables.values().iterator().next().getType();
             List results = new ArrayList();
             node.elements().forEachRemaining(jsonNode -> {
                 Optional converted = conversionService.convert(jsonNode, elementType, context);

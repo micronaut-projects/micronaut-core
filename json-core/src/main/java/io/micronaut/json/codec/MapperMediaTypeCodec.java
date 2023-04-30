@@ -19,6 +19,7 @@ import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.MediaType;
@@ -253,8 +254,15 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
             return allocator.copiedBuffer((byte[]) object);
         }
         ByteBuffer<B> buffer = allocator.buffer();
-        OutputStream outputStream = buffer.toOutputStream();
-        encode(object, outputStream);
+        try {
+            OutputStream outputStream = buffer.toOutputStream();
+            encode(object, outputStream);
+        } catch (Throwable t) {
+            if (buffer instanceof ReferenceCounted) {
+                ((ReferenceCounted) buffer).release();
+            }
+            throw t;
+        }
         return buffer;
     }
 
@@ -264,8 +272,15 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
             return allocator.copiedBuffer((byte[]) object);
         }
         ByteBuffer<B> buffer = allocator.buffer();
-        OutputStream outputStream = buffer.toOutputStream();
-        encode(type, object, outputStream);
-        return buffer;
+        try {
+            OutputStream outputStream = buffer.toOutputStream();
+            encode(type, object, outputStream);
+            return buffer;
+        } catch (Throwable t) {
+            if (buffer instanceof ReferenceCounted) {
+                ((ReferenceCounted) buffer).release();
+            }
+            throw t;
+        }
     }
 }

@@ -28,6 +28,7 @@ import jakarta.inject.Provider;
 public final class ProviderTypeInformationProvider implements TypeInformationProvider {
 
     @Override
+    @SuppressWarnings("java:S1872") // required by impl
     public boolean isWrapperType(Class<?> type) {
         return BeanProvider.class == type ||
                 Provider.class == type ||

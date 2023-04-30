@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.json.JsonFeatures;
 
 import java.util.ArrayList;
@@ -57,31 +58,31 @@ public final class JacksonFeatures implements JsonFeatures {
         JacksonFeatures jacksonFeatures = new JacksonFeatures();
 
 
-        SerializationFeature[] enabledSerializationFeatures = jacksonFeaturesAnn.get("enabledSerializationFeatures", SerializationFeature[].class).orElse(null);
-        if (enabledSerializationFeatures != null) {
+        SerializationFeature[] enabledSerializationFeatures = jacksonFeaturesAnn.enumValues("enabledSerializationFeatures", SerializationFeature.class);
+        if (ArrayUtils.isNotEmpty(enabledSerializationFeatures)) {
             for (SerializationFeature serializationFeature : enabledSerializationFeatures) {
                 jacksonFeatures.addFeature(serializationFeature, true);
             }
         }
 
-        DeserializationFeature[] enabledDeserializationFeatures = jacksonFeaturesAnn.get("enabledDeserializationFeatures", DeserializationFeature[].class).orElse(null);
+        DeserializationFeature[] enabledDeserializationFeatures = jacksonFeaturesAnn.enumValues("enabledDeserializationFeatures", DeserializationFeature.class);
 
-        if (enabledDeserializationFeatures != null) {
+        if (ArrayUtils.isNotEmpty(enabledDeserializationFeatures)) {
             for (DeserializationFeature deserializationFeature : enabledDeserializationFeatures) {
                 jacksonFeatures.addFeature(deserializationFeature, true);
             }
         }
 
-        SerializationFeature[] disabledSerializationFeatures = jacksonFeaturesAnn.get("disabledSerializationFeatures", SerializationFeature[].class).orElse(null);
-        if (disabledSerializationFeatures != null) {
+        SerializationFeature[] disabledSerializationFeatures = jacksonFeaturesAnn.enumValues("disabledSerializationFeatures", SerializationFeature.class);
+        if (ArrayUtils.isNotEmpty(disabledSerializationFeatures)) {
             for (SerializationFeature serializationFeature : disabledSerializationFeatures) {
                 jacksonFeatures.addFeature(serializationFeature, false);
             }
         }
 
-        DeserializationFeature[] disabledDeserializationFeatures = jacksonFeaturesAnn.get("disabledDeserializationFeatures", DeserializationFeature[].class).orElse(null);
+        DeserializationFeature[] disabledDeserializationFeatures = jacksonFeaturesAnn.enumValues("disabledDeserializationFeatures", DeserializationFeature.class);
 
-        if (disabledDeserializationFeatures != null) {
+        if (ArrayUtils.isNotEmpty(disabledDeserializationFeatures)) {
             for (DeserializationFeature feature : disabledDeserializationFeatures) {
                 jacksonFeatures.addFeature(feature, false);
             }
@@ -179,6 +180,6 @@ public final class JacksonFeatures implements JsonFeatures {
 
     @Override
     public int hashCode() {
-        return Objects.hash(serializationFeatures, deserializationFeatures);
+        return ObjectUtils.hash(serializationFeatures, deserializationFeatures);
     }
 }

@@ -17,18 +17,23 @@ package io.micronaut.aop.introduction;
 
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.MutableArgumentValue;
 
 import jakarta.inject.Singleton;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
-public class StubIntroducer implements MethodInterceptor<Object,Object> {
+public class StubIntroducer implements MethodInterceptor<Object, Object> {
+
+    public Map<String, AnnotationMetadata> visitedMethods = new LinkedHashMap<>();
 
     public static final int POSITION = 0;
 
@@ -40,6 +45,7 @@ public class StubIntroducer implements MethodInterceptor<Object,Object> {
     @Nullable
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
+        visitedMethods.put(context.getMethodName(), context.getAnnotationMetadata());
         Iterator<MutableArgumentValue<?>> iterator = context.getParameters().values().iterator();
         if(iterator.hasNext())
             return iterator.next().getValue();

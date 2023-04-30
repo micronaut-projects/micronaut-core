@@ -29,7 +29,7 @@ import org.reactivestreams.Subscriber;
  * @since 1.0
  */
 @Internal
-final class DelegateStreamedHttpResponse extends DelegateHttpResponse implements StreamedHttpResponse {
+public final class DelegateStreamedHttpResponse extends DelegateHttpResponse implements StreamedHttpResponse {
 
     private final Publisher<HttpContent> stream;
 
@@ -37,7 +37,7 @@ final class DelegateStreamedHttpResponse extends DelegateHttpResponse implements
      * @param response The {@link HttpResponse}
      * @param stream The {@link Publisher} for {@link HttpContent}
      */
-    DelegateStreamedHttpResponse(HttpResponse response,
+    public DelegateStreamedHttpResponse(HttpResponse response,
                                  Publisher<HttpContent> stream) {
         super(response);
         this.stream = stream;

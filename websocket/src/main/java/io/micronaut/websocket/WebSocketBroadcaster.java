@@ -157,6 +157,7 @@ public interface WebSocketBroadcaster {
         try {
             broadcastAsync(message, mediaType, filter).get();
         } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             throw new WebSocketSessionException("Broadcast Interrupted");
         } catch (ExecutionException e) {
             throw new WebSocketSessionException("Broadcast Failure: " + e.getMessage(), e);

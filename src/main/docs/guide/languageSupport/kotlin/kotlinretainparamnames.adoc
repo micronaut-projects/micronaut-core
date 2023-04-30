@@ -1,4 +1,4 @@
-Like with Java, the parameter name data for method parameters is not retained at compile time when using Kotlin. This can be a problem for Micronaut if you do not define parameter names explicitly and depend on an external JAR that is already compiled.
+Like with Java, the parameter name data for method parameters is not retained at compile time when using Kotlin. This can be a problem for the Micronaut framework if you do not define parameter names explicitly and depend on an external JAR that is already compiled.
 
 To enable retention of parameter name data with Kotlin, set the `javaParameters` option to `true` in your `build.gradle`:
 
@@ -7,13 +7,13 @@ To enable retention of parameter name data with Kotlin, set the `javaParameters`
 ----
 compileTestKotlin {
     kotlinOptions {
-        jvmTarget = '1.8'
+        jvmTarget = '17'
         javaParameters = true
     }
 }
 ----
 
-NOTE: If you use interfaces with default methods add `freeCompilerArgs = ["-Xjvm-default=all"]` for Micronaut to recognize them.
+NOTE: If you use interfaces with default methods add `freeCompilerArgs = ["-Xjvm-default=all"]` for the Micronaut framework to recognize them.
 
 Or if using Maven configure the Micronaut Maven Plugin accordingly:
 
@@ -29,7 +29,7 @@ Or if using Maven configure the Micronaut Maven Plugin accordingly:
       <plugin>
         <artifactId>kotlin-maven-plugin</artifactId>
         <groupId>org.jetbrains.kotlin</groupId>
-        <configuration>            
+        <configuration>
             <javaParameters>true</javaParameters>
             <!-- ... -->
         </configuration>

@@ -81,4 +81,10 @@ public interface InterfaceTypeLevel<A> {
 
 
     A testGenericsFromType(A name, int age);
+
+
+    static String getFoo() {
+        return null;
+    }
+
 }

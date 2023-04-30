@@ -41,12 +41,12 @@ import java.util.stream.Stream;
 public class TypeArgumentQualifier<T> implements Qualifier<T> {
 
     private static final Logger LOG = ClassUtils.getLogger(TypeArgumentQualifier.class);
-    private final Class[] typeArguments;
+    private final Class<?>[] typeArguments;
 
     /**
      * @param typeArguments The type arguments
      */
-    TypeArgumentQualifier(Class... typeArguments) {
+    TypeArgumentQualifier(Class<?>... typeArguments) {
         this.typeArguments = typeArguments;
     }
 
@@ -55,7 +55,7 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
         return candidates.filter(candidate -> beanType.isAssignableFrom(candidate.getBeanType()))
                 .filter(candidate -> {
 
-            List<Class> typeArguments = getTypeArguments(beanType, candidate);
+            List<Class<?>> typeArguments = getTypeArguments(beanType, candidate);
 
             boolean result = areTypesCompatible(typeArguments);
             if (LOG.isTraceEnabled() && !result) {
@@ -68,7 +68,7 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
     /**
      * @return The type arguments
      */
-    public Class[] getTypeArguments() {
+    public Class<?>[] getTypeArguments() {
         return typeArguments;
     }
 
@@ -76,8 +76,8 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
      * @param classes An array of classes
      * @return Whether the types are compatible
      */
-    protected boolean areTypesCompatible(List<Class> classes) {
-        final Class[] typeArguments = this.typeArguments;
+    protected boolean areTypesCompatible(List<Class<?>> classes) {
+        final Class<?>[] typeArguments = this.typeArguments;
         return areTypesCompatible(typeArguments, classes);
     }
 
@@ -87,7 +87,7 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
      * @param <BT>       The bean type subclass
      * @return The list of type arguments
      */
-    protected <BT extends BeanType<T>> List<Class> getTypeArguments(Class<T> beanType, BT candidate) {
+    protected <BT extends BeanType<T>> List<Class<?>> getTypeArguments(Class<T> beanType, BT candidate) {
         if (candidate instanceof BeanDefinition) {
             BeanDefinition<BT> definition = (BeanDefinition<BT>) candidate;
             return definition.getTypeArguments(beanType).stream().map(Argument::getType).collect(Collectors.toList());
@@ -107,7 +107,7 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
      * @param classes       The classes to check for alignments
      * @return True if they are
      */
-    public static boolean areTypesCompatible(Class[] typeArguments, List<Class> classes) {
+    public static boolean areTypesCompatible(Class<?>[] typeArguments, List<Class<?>> classes) {
         if (classes.isEmpty()) {
             // in this case the type doesn't specify type arguments, so this is the equivalent of using Object
             return true;
@@ -116,8 +116,8 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
                 return false;
             } else {
                 for (int i = 0; i < classes.size(); i++) {
-                    Class left = classes.get(i);
-                    Class right = typeArguments[i];
+                    Class<?> left = classes.get(i);
+                    Class<?> right = typeArguments[i];
                     if (right == Object.class) {
                         continue;
                     }

@@ -23,6 +23,7 @@ import java.util.Optional;
  * @author James Kleeh
  * @since 1.2.8
  */
+@FunctionalInterface
 public interface ClientContextPathProvider {
 
     /**

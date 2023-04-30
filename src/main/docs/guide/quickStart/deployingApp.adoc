@@ -4,7 +4,7 @@ The constructed JAR file can then be executed with `java -jar`. For example:
 
 [source,bash]
 ----
-$ java -jar build/libs/hello-world-all.jar
+$ java -jar build/libs/hello-world-0.1-all.jar
 ----
 
 if building with Gradle, or

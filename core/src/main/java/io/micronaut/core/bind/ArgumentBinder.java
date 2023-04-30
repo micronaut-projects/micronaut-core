@@ -24,13 +24,13 @@ import java.util.Optional;
 
 /**
  * <p>An interface capable of binding the value of an {@link io.micronaut.core.type.Argument} from a source</p>.
- * <p>
+ *
  * <p>The selection of an {@link ArgumentBinder} is done by the {@link ArgumentBinderRegistry}. Selection could
  * be based on type, annotation or other factors such as the request media type</p>
- * <p>
+ *
  * <p>Unlike {@link io.micronaut.core.convert.TypeConverter} instances binders can potentially handle complex
  * objects and typically work on conjunction with a {@link io.micronaut.core.convert.value.ConvertibleValues} instance</p>
- * <p>
+ *
  * <p>An {@link ArgumentBinder} can either be registered as a bean or by META-INF/services. In the case of the latter
  * it will be globally available at all times, whilst the former is only present when a {@code io.micronaut.context.BeanContext} is initialized</p>
  *
@@ -59,6 +59,7 @@ public interface ArgumentBinder<T, S> {
      * @param <T>
      */
     interface BindingResult<T> {
+
         /**
          * An empty but satisfied result.
          */
@@ -95,7 +96,7 @@ public interface ArgumentBinder<T, S> {
          * @return Was the binding requirement satisfied
          */
         default boolean isSatisfied() {
-            return getConversionErrors() == Collections.EMPTY_LIST;
+            return getConversionErrors().isEmpty();
         }
 
         /**
@@ -110,8 +111,27 @@ public interface ArgumentBinder<T, S> {
          *
          * @return The value
          */
+        @SuppressWarnings({"java:S3655", "OptionalGetWithoutIsPresent"})
         default T get() {
             return getValue().get();
+        }
+
+        /**
+         * @param <R> The result type
+         * @return An empty but satisfied result.
+         * @since 4.0.0
+         */
+        static <R> BindingResult<R> empty() {
+            return BindingResult.EMPTY;
+        }
+
+        /**
+         * @param <R> The result type
+         * @return An empty but unsatisfied result.
+         * @since 4.0.0
+         */
+        static <R> BindingResult<R> unsatisfied() {
+            return UNSATISFIED;
         }
     }
 }

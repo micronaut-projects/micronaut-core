@@ -15,12 +15,20 @@
  */
 package io.micronaut.core.annotation;
 
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 
-import java.lang.annotation.*;
+import java.lang.annotation.Annotation;
+import java.lang.annotation.Documented;
+import java.lang.annotation.Inherited;
+import java.lang.annotation.Repeatable;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 import java.lang.reflect.AnnotatedElement;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -42,7 +50,7 @@ public class AnnotationUtil {
             "javax.annotation.meta.TypeQualifier",
             "javax.annotation.meta.TypeQualifierNickname",
             "kotlin.annotation.Retention",
-            Inherited.class.getName(),
+            "kotlin.Annotation",
             SuppressWarnings.class.getName(),
             Override.class.getName(),
             Repeatable.class.getName(),
@@ -50,7 +58,9 @@ public class AnnotationUtil {
             "kotlin.annotation.MustBeDocumented",
             Target.class.getName(),
             "kotlin.annotation.Target",
-            KOTLIN_METADATA
+            Experimental.class.getName(),
+            KOTLIN_METADATA,
+            "jdk.internal.ValueBased"
     );
 
     /**
@@ -60,7 +70,8 @@ public class AnnotationUtil {
             "javax.annotation",
             "java.lang.annotation",
             "io.micronaut.core.annotation",
-            "edu.umd.cs.findbugs.annotations"
+            "edu.umd.cs.findbugs.annotations",
+            "jdk.internal"
     );
 
     /**
@@ -134,15 +145,6 @@ public class AnnotationUtil {
     public static final String ANN_INTERCEPTOR_BINDING_QUALIFIER = "io.micronaut.inject.qualifiers.InterceptorBindingQualifier";
 
     /**
-     * The advice stereotypes.
-     */
-    public static final Set<String> ADVICE_STEREOTYPES = CollectionUtils.setOf(
-            ANN_AROUND,
-            ANN_AROUND_CONSTRUCT,
-            ANN_INTRODUCTION
-    );
-
-    /**
      * Name of the repeatable interceptor bindings type.
      */
     public static final String ANN_INTERCEPTOR_BINDINGS = "io.micronaut.aop.InterceptorBindingDefinitions";
@@ -181,6 +183,16 @@ public class AnnotationUtil {
      * The meta annotation used for post-construct declarations.
      */
     public static final String POST_CONSTRUCT = "javax.annotation.PostConstruct";
+
+    /**
+     * The annotation attribute containing all the attributes marked as non binding.
+     */
+    public static final String NON_BINDING_ATTRIBUTE = "$nonBinding";
+
+    /**
+     * The inherited annotation.
+     */
+    public static final String ANN_INHERITED = Inherited.class.getName();
 
     private static final Map<Integer, List<String>> INTERN_LIST_POOL = new ConcurrentHashMap<>();
     private static final Map<String, Map<String, Object>> INTERN_MAP_POOL = new ConcurrentHashMap<>();
@@ -257,7 +269,7 @@ public class AnnotationUtil {
      * Create a new immutable {@link Map} from an array of values.
      * String values must be sorted!
      *
-     * @param array The key,value array
+     * @param array The key, value array
      * @return The created map
      */
     @UsedByGeneratedCode
@@ -613,7 +625,9 @@ public class AnnotationUtil {
     public static int calculateHashCode(Map<? extends CharSequence, Object> values) {
         int hashCode = 0;
 
-        for (Map.Entry<? extends CharSequence, Object> member : values.entrySet()) {
+        // Performance optimization to use the Object as the type otherwise
+        // the bytecode will produce the type-check introducing type-check pollution
+        for (Map.Entry<? extends Object, Object> member : values.entrySet()) {
             Object value = member.getValue();
 
             int nameHashCode = member.getKey().hashCode();

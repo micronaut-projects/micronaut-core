@@ -1,10 +1,10 @@
-Micronaut supports several strategies for resolving locales for a given request. The api:http.HttpRequest#getLocale--[] method is available on the request, however it only supports parsing the `Accept-Language` header. For other use cases where the locale can be in a cookie, the user's session, or should be set to a fixed value, api:http.server.util.locale.HttpLocaleResolver[] can be used to determine the current locale.
+The Micronaut framework supports several strategies for resolving locales for a given request. The api:http.HttpRequest#getLocale--[] method is available on the request, however it only supports parsing the `Accept-Language` header. For other use cases where the locale can be in a cookie, the user's session, or should be set to a fixed value, api:http.server.util.locale.HttpLocaleResolver[] can be used to determine the current locale.
 
 The api:core.util.LocaleResolver[] API does not need to be used directly. Simply define a parameter to a controller method of type `java.util.Locale` and the locale will be resolved and injected automatically.
 
 There are several configuration options to control how to resolve the locale:
 
-include::{includedir}configurationProperties/io.micronaut.http.server.HttpServerConfiguration.HttpLocaleResolutionConfigurationProperties.adoc[]
+include::{includedir}configurationProperties/io.micronaut.http.server.HttpServerConfiguration$HttpLocaleResolutionConfigurationProperties.adoc[]
 
 Locales can be configured in the "en_GB" format, or in the BCP 47 (Language tag) format. If multiple methods are configured, the fixed locale takes precedence, followed by session/cookie, then header.
 

@@ -20,6 +20,7 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
@@ -32,6 +33,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanConfiguration;
 import org.slf4j.Logger;
@@ -101,15 +103,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final List<String> DEFAULT_CONFIG_LOCATIONS = Arrays.asList("classpath:/", "file:config/");
     protected final ClassPathResourceLoader resourceLoader;
     protected final List<PropertySource> refreshablePropertySources = new ArrayList<>(10);
-
+    protected final MutableConversionService mutableConversionService;
     private EnvironmentsAndPackage environmentsAndPackage;
-
     private final Set<String> names;
     private final ClassLoader classLoader;
     private final Collection<String> packages = new ConcurrentLinkedQueue<>();
     private final BeanIntrospectionScanner annotationScanner;
-    private Collection<String> configurationIncludes = new HashSet<>(3);
-    private Collection<String> configurationExcludes = new HashSet<>(3);
+    private final Collection<String> configurationIncludes = new HashSet<>(3);
+    private final Collection<String> configurationExcludes = new HashSet<>(3);
     private final AtomicBoolean running = new AtomicBoolean(false);
     private Collection<PropertySourceLoader> propertySourceLoaderList;
     private final Map<String, PropertySourceLoader> loaderByFormatMap = new ConcurrentHashMap<>();
@@ -125,7 +126,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @param configuration The configuration
      */
     public DefaultEnvironment(@NonNull ApplicationContextConfiguration configuration) {
-        super(configuration.getConversionService());
+        super(configuration.getConversionService().orElseGet(MutableConversionService::create));
+        this.mutableConversionService = (MutableConversionService) conversionService;
         this.configuration = configuration;
         this.resourceLoader = configuration.getResourceLoader();
 
@@ -150,12 +152,12 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             packages.add(aPackage);
         }
 
-        environments.removeAll(specifiedNames);
+        specifiedNames.forEach(environments::remove);
         environments.addAll(specifiedNames);
         this.classLoader = configuration.getClassLoader();
         this.annotationScanner = createAnnotationScanner(classLoader);
         this.names = environments;
-        if (LOG.isInfoEnabled() && !environments.isEmpty()) {
+        if (logEnabled && !environments.isEmpty()) {
             LOG.info("Established active environments: {}", environments);
         }
         List<String> configLocations = configuration.getOverrideConfigLocations() == null ?
@@ -262,7 +264,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @Override
     public Environment start() {
         if (running.compareAndSet(false, true)) {
-            if (LOG.isDebugEnabled()) {
+            if (logEnabled) {
                 LOG.debug("Starting environment {} for active names {}", this, getActiveNames());
             }
             if (reading.compareAndSet(false, true)) {
@@ -302,24 +304,22 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public <T> Optional<T> convert(Object object, Class<T> targetType, ConversionContext context) {
-        return conversionService.convert(object, targetType, context);
+        return mutableConversionService.convert(object, targetType, context);
     }
 
     @Override
     public <S, T> boolean canConvert(Class<S> sourceType, Class<T> targetType) {
-        return conversionService.canConvert(sourceType, targetType);
+        return mutableConversionService.canConvert(sourceType, targetType);
     }
 
     @Override
-    public <S, T> Environment addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
-        conversionService.addConverter(sourceType, targetType, typeConverter);
-        return this;
+    public <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
+        mutableConversionService.addConverter(sourceType, targetType, typeConverter);
     }
 
     @Override
-    public <S, T> Environment addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> typeConverter) {
-        conversionService.addConverter(sourceType, targetType, typeConverter);
-        return this;
+    public <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> typeConverter) {
+        mutableConversionService.addConverter(sourceType, targetType, typeConverter);
     }
 
     @Override
@@ -352,34 +352,36 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     protected boolean shouldDeduceEnvironments() {
         if (deduceEnvironments != null) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Environment deduction was set explicitly via builder to: " + deduceEnvironments);
+            if (logEnabled) {
+                LOG.debug("Environment deduction was set explicitly via builder to: {}", deduceEnvironments);
             }
 
             return deduceEnvironments;
-        } else {
+        } else if (configuration.isEnableDefaultPropertySources()) {
             String deduceProperty = CachedEnvironment.getProperty(Environment.DEDUCE_ENVIRONMENT_PROPERTY);
             String deduceEnv = CachedEnvironment.getenv(Environment.DEDUCE_ENVIRONMENT_ENV);
 
             if (StringUtils.isNotEmpty(deduceEnv)) {
                 boolean deduce = Boolean.parseBoolean(deduceEnv);
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Environment deduction was set via environment variable to: " + deduce);
+                if (logEnabled) {
+                    LOG.debug("Environment deduction was set via environment variable to: {}", deduce);
                 }
                 return deduce;
             } else if (StringUtils.isNotEmpty(deduceProperty)) {
                 boolean deduce = Boolean.parseBoolean(deduceProperty);
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Environment deduction was set via system property to: " + deduce);
+                if (logEnabled) {
+                    LOG.debug("Environment deduction was set via system property to: {}", deduce);
                 }
                 return deduce;
             } else {
                 boolean deduceDefault = DEDUCE_ENVIRONMENT_DEFAULT;
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Environment deduction is using the default of: " + deduceDefault);
+                if (logEnabled) {
+                    LOG.debug("Environment deduction is using the default of: {}", deduceDefault);
                 }
                 return deduceDefault;
             }
+        } else {
+            return false;
         }
     }
 
@@ -405,23 +407,28 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     protected void readPropertySources(String name) {
         refreshablePropertySources.clear();
-        List<PropertySource> propertySources = readPropertySourceList(name);
-        addDefaultPropertySources(propertySources);
-        String propertySourcesSystemProperty = CachedEnvironment.getProperty(Environment.PROPERTY_SOURCES_KEY);
-        if (propertySourcesSystemProperty != null) {
-            propertySources.addAll(readPropertySourceListFromFiles(propertySourcesSystemProperty));
+        List<PropertySource> propertySources;
+        if (configuration.isEnableDefaultPropertySources()) {
+            propertySources = readPropertySourceList(name);
+            addDefaultPropertySources(propertySources);
+            String propertySourcesSystemProperty = CachedEnvironment.getProperty(Environment.PROPERTY_SOURCES_KEY);
+            if (propertySourcesSystemProperty != null) {
+                propertySources.addAll(readPropertySourceListFromFiles(propertySourcesSystemProperty));
+            }
+            String propertySourcesEnv = readPropertySourceListKeyFromEnvironment();
+            if (propertySourcesEnv != null) {
+                propertySources.addAll(readPropertySourceListFromFiles(propertySourcesEnv));
+            }
+            refreshablePropertySources.addAll(propertySources);
+            readConstantPropertySources(name, propertySources);
+        } else {
+            propertySources = new ArrayList<>(this.propertySources.size());
         }
-        String propertySourcesEnv = readPropertySourceListKeyFromEnvironment();
-        if (propertySourcesEnv != null) {
-            propertySources.addAll(readPropertySourceListFromFiles(propertySourcesEnv));
-        }
-        refreshablePropertySources.addAll(propertySources);
-        readConstantPropertySources(name, propertySources);
 
         propertySources.addAll(this.propertySources.values());
         OrderUtil.sort(propertySources);
         for (PropertySource propertySource : propertySources) {
-            if (LOG.isDebugEnabled()) {
+            if (logEnabled) {
                 LOG.debug("Processing property source: {}", propertySource.getName());
             }
             processPropertySource(propertySource, propertySource.getConvention());
@@ -429,11 +436,17 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     private void readConstantPropertySources(String name, List<PropertySource> propertySources) {
-        Set<String> propertySourceNames = Stream.concat(Stream.of(name), getActiveNames().stream().map(env -> name + "-" + env))
-                .collect(Collectors.toSet());
-        getConstantPropertySources().stream()
-                .filter(p -> propertySourceNames.contains(p.getName()))
-                .forEach(propertySources::add);
+        Set<String> activeNames = getActiveNames();
+        Set<String> propertySourceNames = CollectionUtils.newHashSet(activeNames.size() + 1);
+        propertySourceNames.add(name);
+        for (String env : activeNames) {
+            propertySourceNames.add(name + "-" + env);
+        }
+        for (PropertySource p : getConstantPropertySources()) {
+            if (propertySourceNames.contains(p.getName())) {
+                propertySources.add(p);
+            }
+        }
     }
 
     /**
@@ -476,7 +489,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                         String fileName = NameUtils.filename(filePath);
                         Optional<PropertySourceLoader> propertySourceLoader = Optional.ofNullable(loaderByFormatMap.get(extension));
                         if (propertySourceLoader.isPresent()) {
-                            if (LOG.isDebugEnabled()) {
+                            if (logEnabled) {
                                 LOG.debug("Reading property sources from loader: {}", propertySourceLoader);
                             }
                             Optional<Map<String, Object>> properties = readPropertiesFromLoader(fileName, filePath, propertySourceLoader.get());
@@ -528,7 +541,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             loadPropertySourceFromLoader(name, new PropertiesPropertySourceLoader(), propertySources, resourceLoader);
         } else {
             for (PropertySourceLoader propertySourceLoader : propertySourceLoaders) {
-                if (LOG.isDebugEnabled()) {
+                if (logEnabled) {
                     LOG.debug("Reading property sources from loader: {}", propertySourceLoader);
                 }
                 loadPropertySourceFromLoader(name, propertySourceLoader, propertySources, resourceLoader);
@@ -586,8 +599,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @SuppressWarnings("MagicNumber")
     private Collection<PropertySourceLoader> evaluatePropertySourceLoaders() {
         SoftServiceLoader<PropertySourceLoader> definitions = readPropertySourceLoaders();
-        Collection<PropertySourceLoader> allLoaders = new ArrayList<>(10);
-        definitions.collectAll(allLoaders);
+        Collection<PropertySourceLoader> allLoaders = definitions.collectAll();
         for (PropertySourceLoader propertySourceLoader : allLoaders) {
             Set<String> extensions = propertySourceLoader.getExtensions();
             for (String extension : extensions) {
@@ -634,16 +646,18 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     private EnvironmentsAndPackage getEnvironmentsAndPackage(List<String> specifiedNames) {
         EnvironmentsAndPackage environmentsAndPackage = this.environmentsAndPackage;
-        final boolean extendedDeduction = !specifiedNames.contains(Environment.FUNCTION);
+        boolean isNotFunction = !specifiedNames.contains(Environment.FUNCTION);
+        final boolean deduceEnvironment = shouldDeduceEnvironments();
+        final boolean deduceCloudEnvironmentUsingProbes = isNotFunction && configuration.isDeduceCloudEnvironment();
         if (environmentsAndPackage == null) {
             synchronized (EnvironmentsAndPackage.class) { // double check
                 environmentsAndPackage = this.environmentsAndPackage;
                 if (environmentsAndPackage == null) {
                     environmentsAndPackage = deduceEnvironmentsAndPackage(
-                            shouldDeduceEnvironments(),
-                            extendedDeduction,
-                            extendedDeduction,
-                            !extendedDeduction
+                            deduceEnvironment,
+                            deduceCloudEnvironmentUsingProbes,
+                            isNotFunction,
+                            !deduceCloudEnvironmentUsingProbes
                     );
                     this.environmentsAndPackage = environmentsAndPackage;
                 }
@@ -948,6 +962,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             }
         } catch (InterruptedException e) {
             // test negative
+            Thread.currentThread().interrupt();
         }
         return false;
     }
@@ -989,6 +1004,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             }
         } catch (InterruptedException e) {
             // test negative
+            Thread.currentThread().interrupt();
         }
         return false;
     }

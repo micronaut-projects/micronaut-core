@@ -15,9 +15,8 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.core.annotation.NonNull;
 import jakarta.inject.Provider;
-
-import javax.validation.constraints.NotNull;
 
 /**
  * Helper methods for dealing with {@link javax.inject.Provider}.
@@ -52,7 +51,7 @@ public class ProviderUtils {
         private Provider<T> delegate = this::initialize;
         private boolean initialized;
 
-        MemoizingProvider(@NotNull Provider<T> actual) {
+        MemoizingProvider(@NonNull Provider<T> actual) {
             this.actual = actual;
         }
 

@@ -7,13 +7,16 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.runtime.server.EmbeddedServer
+import org.testcontainers.DockerClientFactory
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.wait.strategy.HostPortWaitStrategy
 import org.testcontainers.utility.MountableFile
 import spock.lang.AutoCleanup
+import spock.lang.Requires
 import spock.lang.Retry
 import spock.lang.Specification
 
+@Requires({ DockerClientFactory.instance().isDockerAvailable() })
 @Retry
 class ClientProxySpec extends Specification {
 

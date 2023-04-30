@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.exceptions.NoSuchBeanException;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.BeanConfiguration;
@@ -27,6 +28,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ProxyBeanDefinition;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -80,12 +82,29 @@ public interface BeanDefinitionRegistry {
     }
 
     /**
+     * Registers a new reference at runtime. Not that registering beans can impact
+     * the object graph therefore should this should be done as soon as possible prior to
+     * the creation of other beans preferably with a high priority {@link io.micronaut.context.annotation.Context} scope bean.
+     *
+     * @param definition The reference.
+     * @return The registry
+     * @param <B> The bean type
+     * @since 3.6.0
+     */
+    @NonNull
+    @Experimental
+    default <B> BeanDefinitionRegistry registerBeanDefinition(@NonNull RuntimeBeanDefinition<B> definition) {
+        throw new UnsupportedOperationException("This implementation of BeanDefinitionRegistry doesn't support runtime registration of bean definitions");
+    }
+
+
+    /**
      * <p>Registers a new singleton bean at runtime. This method expects that the bean definition data will have been
      * compiled ahead of time.</p>
-     * <p>
+     *
      * <p>If bean definition data is found the method will perform dependency injection on the instance followed by
      * invoking any {@link jakarta.annotation.PostConstruct} hooks.</p>
-     * <p>
+     *
      * <p>If no bean definition data is found the bean is registered as is.</p>
      *
      * @param type      The bean type
@@ -245,6 +264,16 @@ public interface BeanDefinitionRegistry {
      * @return The bean definitions
      */
     @NonNull Collection<BeanDefinitionReference<?>> getBeanDefinitionReferences();
+
+    /**
+     * Get all of the disabled {@link DisabledBean}.
+     *
+     * @return The disabled bean definitions
+     * @since 4.0.0
+     */
+    default @NonNull Collection<DisabledBean<?>> getDisabledBeans() {
+        return Collections.emptyList();
+    }
 
     /**
      * Find active {@link javax.inject.Singleton} beans for the given qualifier. Note that
@@ -421,10 +450,10 @@ public interface BeanDefinitionRegistry {
     /**
      * <p>Registers a new singleton bean at runtime. This method expects that the bean definition data will have been
      * compiled ahead of time.</p>
-     * <p>
+     *
      * <p>If bean definition data is found the method will perform dependency injection on the instance followed by
      * invoking any {@link jakarta.annotation.PostConstruct} hooks.</p>
-     * <p>
+     *
      * <p>If no bean definition data is found the bean is registered as is.</p>
      *
      * @param type      The bean type
@@ -444,10 +473,10 @@ public interface BeanDefinitionRegistry {
     /**
      * <p>Registers a new singleton bean at runtime. This method expects that the bean definition data will have been
      * compiled ahead of time.</p>
-     * <p>
+     *
      * <p>If bean definition data is found the method will perform dependency injection on the instance followed by
      * invoking any {@link jakarta.annotation.PostConstruct} hooks.</p>
-     * <p>
+     *
      * <p>If no bean definition data is found the bean is registered as is.</p>
      *
      * @param type      the bean type
@@ -569,10 +598,10 @@ public interface BeanDefinitionRegistry {
     /**
      * <p>Registers a new singleton bean at runtime. This method expects that the bean definition data will have been
      * compiled ahead of time.</p>
-     * <p>
+     *
      * <p>If bean definition data is found the method will perform dependency injection on the instance followed by
      * invoking any {@link jakarta.annotation.PostConstruct} hooks.</p>
-     * <p>
+     *
      * <p>If no bean definition data is found the bean is registered as is.</p>
      *
      * @param singleton The singleton bean
@@ -587,10 +616,10 @@ public interface BeanDefinitionRegistry {
     /**
      * <p>Registers a new singleton bean at runtime. This method expects that the bean definition data will have been
      * compiled ahead of time.</p>
-     * <p>
+     *
      * <p>If bean definition data is found the method will perform dependency injection on the instance followed by
      * invoking any {@link jakarta.annotation.PostConstruct} hooks.</p>
-     * <p>
+     *
      * <p>If no bean definition data is found the bean is registered as is.</p>
      *
      * @param singleton The singleton bean

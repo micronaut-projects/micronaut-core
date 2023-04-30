@@ -22,7 +22,7 @@ import io.micronaut.http.annotation.PathVariable
 import io.micronaut.http.annotation.QueryValue
 
 import javax.annotation.Nullable
-import javax.validation.constraints.PositiveOrZero
+import jakarta.validation.constraints.PositiveOrZero
 // end::imports[]
 
 // tag::class[]

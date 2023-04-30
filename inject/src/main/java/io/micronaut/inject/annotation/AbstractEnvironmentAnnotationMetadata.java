@@ -78,6 +78,11 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
     }
 
     @Override
+    public boolean hasEvaluatedExpressions() {
+        return environmentAnnotationMetadata.hasEvaluatedExpressions();
+    }
+
+    @Override
     public <T> Optional<T> getValue(@NonNull String annotation, @NonNull String member, @NonNull Argument<T> requiredType) {
         Environment environment = getEnvironment();
         if (environment != null) {
@@ -177,19 +182,19 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
     }
 
     @Override
-    public <E extends Enum> Optional<E> enumValue(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
+    public <E extends Enum<E>> Optional<E> enumValue(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
         return environmentAnnotationMetadata.enumValue(annotation, member, enumType, valueMapper);
     }
 
     @Override
-    public <E extends Enum> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
+    public <E extends Enum<E>> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
         return environmentAnnotationMetadata.enumValue(annotation, member, enumType, valueMapper);
     }
 
     @Override
-    public <E extends Enum> E[] enumValues(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
+    public <E extends Enum<E>> E[] enumValues(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
         Function<Object, Object> valueMapper = getEnvironmentValueMapper();
         return environmentAnnotationMetadata.enumValues(annotation, member, enumType, valueMapper);
     }
@@ -490,6 +495,16 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
     @Override
     public @NonNull <T> Optional<T> getDefaultValue(@NonNull String annotation, @NonNull String member, @NonNull Argument<T> requiredType) {
         return environmentAnnotationMetadata.getDefaultValue(annotation, member, requiredType);
+    }
+
+    @Override
+    public AnnotationMetadata copyAnnotationMetadata() {
+        return environmentAnnotationMetadata.copyAnnotationMetadata();
+    }
+
+    @Override
+    public AnnotationMetadata getTargetAnnotationMetadata() {
+        return environmentAnnotationMetadata.getTargetAnnotationMetadata();
     }
 
     /**

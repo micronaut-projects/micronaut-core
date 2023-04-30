@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.Nullable;
  * @author James Kleeh
  * @since 1.2.8
  */
+@FunctionalInterface
 public interface ServerContextPathProvider {
 
     /**

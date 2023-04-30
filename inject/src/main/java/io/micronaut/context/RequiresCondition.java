@@ -92,26 +92,32 @@ public class RequiresCondition implements Condition {
 
     @Override
     public boolean matches(ConditionContext context) {
+        List<AnnotationValue<Requires>> requirements = annotationMetadata.getAnnotationValuesByType(Requires.class);
+        if (requirements.isEmpty()) {
+            return true;
+        }
         AnnotationMetadataProvider component = context.getComponent();
         boolean isBeanReference = component instanceof BeanDefinitionReference;
 
-        List<AnnotationValue<Requires>> requirements = annotationMetadata.getAnnotationValuesByType(Requires.class);
-
-        if (!requirements.isEmpty()) {
-            // here we use AnnotationMetadata to avoid loading the classes referenced in the annotations directly
-            if (isBeanReference) {
-                for (AnnotationValue<Requires> requirement : requirements) {
-                    processPreStartRequirements(context, requirement);
-                    if (context.isFailing()) {
-                        return false;
-                    }
+        // here we use AnnotationMetadata to avoid loading the classes referenced in the annotations directly
+        if (isBeanReference) {
+            for (AnnotationValue<Requires> requirement : requirements) {
+                // if annotation value has evaluated expressions, postpone
+                // decision until the bean is loaded
+                if (requirement.hasEvaluatedExpressions()) {
+                    continue;
                 }
-            } else {
-                for (AnnotationValue<Requires> requires : requirements) {
-                    processPostStartRequirements(context, requires);
-                    if (context.isFailing()) {
-                        return false;
-                    }
+
+                processPreStartRequirements(context, requirement);
+                if (context.isFailing()) {
+                    return false;
+                }
+            }
+        } else {
+            for (AnnotationValue<Requires> requires : requirements) {
+                processPostStartRequirements(context, requires);
+                if (context.isFailing()) {
+                    return false;
                 }
             }
         }
@@ -133,7 +139,7 @@ public class RequiresCondition implements Condition {
             BeanContext beanContext = context.getBeanContext();
             String minimumVersion = requirements.stringValue(MEMBER_VERSION).orElse(null);
             Optional<BeanConfiguration> beanConfiguration = beanContext.findBeanConfiguration(configurationName);
-            if (!beanConfiguration.isPresent()) {
+            if (beanConfiguration.isEmpty()) {
                 context.fail("Required configuration [" + configurationName + "] is not active");
                 return false;
             } else {
@@ -172,11 +178,10 @@ public class RequiresCondition implements Condition {
             return;
         }
 
-        if (!matchesProperty(context, requirements)) {
+        if (!matchesProperty(context,  requirements)) {
             return;
         }
-
-        if (!matchesMissingProperty(context, requirements)) {
+        if (!matchesMissingProperty(context,  requirements)) {
             return;
         }
 
@@ -302,8 +307,7 @@ public class RequiresCondition implements Condition {
             String[] env = requirements.stringValues(MEMBER_ENV);
             if (ArrayUtils.isNotEmpty(env)) {
                 BeanContext beanContext = context.getBeanContext();
-                if (beanContext instanceof ApplicationContext) {
-                    ApplicationContext applicationContext = (ApplicationContext) beanContext;
+                if (beanContext instanceof ApplicationContext applicationContext) {
                     Environment environment = applicationContext.getEnvironment();
                     Set<String> activeNames = environment.getActiveNames();
                     boolean result = Arrays.stream(env).anyMatch(activeNames::contains);
@@ -317,8 +321,7 @@ public class RequiresCondition implements Condition {
             String[] env = requirements.stringValues(MEMBER_NOT_ENV);
             if (ArrayUtils.isNotEmpty(env)) {
                 BeanContext beanContext = context.getBeanContext();
-                if (beanContext instanceof ApplicationContext) {
-                    ApplicationContext applicationContext = (ApplicationContext) beanContext;
+                if (beanContext instanceof ApplicationContext applicationContext) {
                     Environment environment = applicationContext.getEnvironment();
                     Set<String> activeNames = environment.getActiveNames();
                     boolean result = Arrays.stream(env).noneMatch(activeNames::contains);
@@ -340,51 +343,47 @@ public class RequiresCondition implements Condition {
             final AnnotationClassValue<?> annotationClassValue = requirements.annotationClassValue(MEMBER_CONDITION).orElse(null);
             if (annotationClassValue == null) {
                 return true;
-            } else {
-                final Object instance = annotationClassValue.getInstance().orElse(null);
-                if (instance instanceof Condition) {
-                    final boolean conditionResult = ((Condition) instance).matches(context);
-                    if (!conditionResult) {
-                        context.fail("Custom condition [" + instance.getClass() + "] failed evaluation");
-                    }
-                    return conditionResult;
-                } else {
-
-                    final Class<?> conditionClass = annotationClassValue.getType().orElse(null);
-                    if (conditionClass == null || conditionClass == TrueCondition.class || !Condition.class.isAssignableFrom(conditionClass)) {
-                        return true;
-                    }
-                    // try first via instantiated metadata
-                    Optional<? extends Condition> condition = InstantiationUtils.tryInstantiate((Class<? extends Condition>) conditionClass);
-                    if (condition.isPresent()) {
-                        boolean conditionResult = condition.get().matches(context);
-                        if (!conditionResult) {
-                            context.fail("Custom condition [" + conditionClass + "] failed evaluation");
-                        }
-                        return conditionResult;
-                    } else {
-                        // maybe a Groovy closure
-                        Optional<Constructor<?>> constructor = ReflectionUtils.findConstructor((Class) conditionClass, Object.class, Object.class);
-                        boolean conditionResult = constructor.flatMap(ctor ->
-                                InstantiationUtils.tryInstantiate(ctor, null, null)
-                        ).flatMap(obj -> {
-                            Optional<Method> method = ReflectionUtils.findMethod(obj.getClass(), "call", ConditionContext.class);
-                            if (method.isPresent()) {
-                                Object result = ReflectionUtils.invokeMethod(obj, method.get(), context);
-                                if (result instanceof Boolean) {
-                                    return Optional.of((Boolean) result);
-                                }
-                            }
-                            return Optional.empty();
-                        }).orElse(false);
-                        if (!conditionResult) {
-                            context.fail("Custom condition [" + conditionClass + "] failed evaluation");
-                        }
-                        return conditionResult;
-
+            }
+            final Object instance = annotationClassValue.getInstance().orElse(null);
+            if (instance instanceof Condition condition) {
+                final boolean conditionResult = condition.matches(context);
+                if (!conditionResult) {
+                    context.fail("Custom condition [" + instance.getClass() + "] failed evaluation");
+                }
+                return conditionResult;
+            }
+            final Class<?> conditionClass = annotationClassValue.getType().orElse(null);
+            if (conditionClass == null || conditionClass == TrueCondition.class || !Condition.class.isAssignableFrom(conditionClass)) {
+                return true;
+            }
+            // try first via instantiated metadata
+            Optional<? extends Condition> condition = InstantiationUtils.tryInstantiate((Class<? extends Condition>) conditionClass);
+            if (condition.isPresent()) {
+                boolean conditionResult = condition.get().matches(context);
+                if (!conditionResult) {
+                    context.fail("Custom condition [" + conditionClass + "] failed evaluation");
+                }
+                return conditionResult;
+            }
+            // maybe a Groovy closure
+            Optional<Constructor<?>> constructor = ReflectionUtils.findConstructor((Class) conditionClass, Object.class, Object.class);
+            boolean conditionResult = constructor.flatMap(ctor ->
+                    InstantiationUtils.tryInstantiate(ctor, null, null)
+            ).flatMap(obj -> {
+                Optional<Method> method = ReflectionUtils.findMethod(obj.getClass(), "call", ConditionContext.class);
+                if (method.isPresent()) {
+                    Object result = ReflectionUtils.invokeMethod(obj, method.get(), context);
+                    if (result instanceof Boolean) {
+                        return Optional.of((Boolean) result);
                     }
                 }
+                return Optional.empty();
+            }).orElse(false);
+            if (!conditionResult) {
+                context.fail("Custom condition [" + conditionClass + "] failed evaluation");
             }
+            return conditionResult;
+
         }
         return !context.isFailing();
     }
@@ -423,6 +422,7 @@ public class RequiresCondition implements Condition {
 
                                 // non-semantic versioning in play
                                 int majorVersion = resolveJavaMajorVersion(javaVersion);
+                                @SuppressWarnings("java:S2259") // false positive
                                 int requiredVersion = resolveJavaMajorVersion(version);
 
                                 if (majorVersion >= requiredVersion) {
@@ -524,7 +524,7 @@ public class RequiresCondition implements Condition {
         if (requirements.contains(attr)) {
             AnnotationClassValue[] classValues = requirements.annotationClassValues(attr);
             for (AnnotationClassValue classValue : classValues) {
-                if (!classValue.getType().isPresent()) {
+                if (classValue.getType().isEmpty()) {
                     context.fail("Class [" + classValue.getName() + "] is not present");
                     return false;
                 }
@@ -535,21 +535,20 @@ public class RequiresCondition implements Condition {
 
     private boolean matchesPresenceOfEntities(ConditionContext context, AnnotationValue<Requires> annotationValue) {
         if (annotationValue.contains(MEMBER_ENTITIES)) {
-            Optional<AnnotationClassValue[]> classNames = annotationValue.get(MEMBER_ENTITIES, AnnotationClassValue[].class);
-            if (classNames.isPresent()) {
+            AnnotationClassValue<?>[] classNames = annotationValue.annotationClassValues(MEMBER_ENTITIES);
+            if (ArrayUtils.isNotEmpty(classNames)) {
                 BeanContext beanContext = context.getBeanContext();
                 if (beanContext instanceof ApplicationContext) {
                     ApplicationContext applicationContext = (ApplicationContext) beanContext;
-                    final AnnotationClassValue[] classValues = classNames.get();
-                    for (AnnotationClassValue<?> classValue : classValues) {
+                    for (AnnotationClassValue<?> classValue : classNames) {
                         final Optional<? extends Class<?>> entityType = classValue.getType();
-                        if (!entityType.isPresent()) {
+                        if (entityType.isEmpty()) {
                             context.fail("Annotation type [" + classValue.getName() + "] not present on classpath");
                             return false;
                         } else {
                             Environment environment = applicationContext.getEnvironment();
                             Class annotationType = entityType.get();
-                            if (!environment.scan(annotationType).findFirst().isPresent()) {
+                            if (environment.scan(annotationType).findFirst().isEmpty()) {
                                 context.fail("No entities found in packages [" + String.join(", ", environment.getPackages()) + "] for annotation: " + annotationType);
                                 return false;
                             }
@@ -563,7 +562,7 @@ public class RequiresCondition implements Condition {
 
     private boolean matchesPresenceOfBeans(ConditionContext context, AnnotationValue<Requires> requirements) {
         if (requirements.contains(MEMBER_BEANS) || requirements.contains(MEMBER_BEAN)) {
-            Class[] beans = requirements.classValues(MEMBER_BEANS);
+            Class<?>[] beans = requirements.classValues(MEMBER_BEANS);
             if (requirements.contains(MEMBER_BEAN)) {
                 Class<?> memberBean = requirements.classValue(MEMBER_BEAN).orElse(null);
                 if (memberBean != null) {
@@ -572,7 +571,7 @@ public class RequiresCondition implements Condition {
             }
             if (ArrayUtils.isNotEmpty(beans)) {
                 BeanContext beanContext = context.getBeanContext();
-                for (Class type : beans) {
+                for (Class<?> type : beans) {
                     if (!beanContext.containsBean(type)) {
                         context.fail("No bean of type [" + type + "] present within context");
                         return false;
@@ -585,11 +584,10 @@ public class RequiresCondition implements Condition {
 
     private boolean matchesAbsenceOfBeans(ConditionContext context, AnnotationValue<Requires> requirements) {
         if (requirements.contains(MEMBER_MISSING_BEANS)) {
-            Class[] missingBeans = requirements.classValues(MEMBER_MISSING_BEANS);
+            Class<?>[] missingBeans = requirements.classValues(MEMBER_MISSING_BEANS);
             AnnotationMetadataProvider component = context.getComponent();
             if (ArrayUtils.isNotEmpty(missingBeans) && component instanceof BeanDefinition) {
                 BeanDefinition bd = (BeanDefinition) component;
-
                 DefaultBeanContext beanContext = (DefaultBeanContext) context.getBeanContext();
 
                 for (Class<?> type : missingBeans) {
@@ -597,8 +595,7 @@ public class RequiresCondition implements Condition {
                     final Collection<? extends BeanDefinition<?>> beanDefinitions = beanContext.findBeanCandidates(
                             context.getBeanResolutionContext(),
                             Argument.of(type),
-                            bd,
-                            true
+                            bd
                     );
                     for (BeanDefinition<?> beanDefinition : beanDefinitions) {
                         if (!beanDefinition.isAbstract()) {
@@ -630,7 +627,7 @@ public class RequiresCondition implements Condition {
                 }
                 resolver = new ResourceResolver(resourceLoaders);
                 for (String resourcePath : resourcePaths) {
-                    if (!resolver.getResource(resourcePath).isPresent()) {
+                    if (resolver.getResource(resourcePath).isEmpty()) {
                         context.fail("Resource [" + resourcePath + "] does not exist");
                         return false;
                     }
@@ -642,22 +639,18 @@ public class RequiresCondition implements Condition {
 
     private boolean matchesCurrentOs(ConditionContext context, AnnotationValue<Requires> requirements) {
         if (requirements.contains(MEMBER_OS)) {
-            final List<Requires.Family> os = Arrays.asList(requirements.enumValues(MEMBER_OS, Requires.Family.class));
+            final Set<Requires.Family> os = requirements.enumValuesSet(MEMBER_OS, Requires.Family.class);
             Requires.Family currentOs = OperatingSystem.getCurrent().getFamily();
-            if (!os.isEmpty()) {
-                if (!os.contains(currentOs)) {
-                    context.fail("The current operating system [" + currentOs.name() + "] is not one of the required systems [" + os + "]");
-                    return false;
-                }
+            if (!os.contains(currentOs)) {
+                context.fail("The current operating system [" + currentOs.name() + "] is not one of the required systems [" + os + "]");
+                return false;
             }
         } else if (requirements.contains(MEMBER_NOT_OS)) {
             Requires.Family currentOs = OperatingSystem.getCurrent().getFamily();
-            final List<Requires.Family> notOs = Arrays.asList(requirements.enumValues(MEMBER_NOT_OS, Requires.Family.class));
-            if (!notOs.isEmpty()) {
-                if (notOs.contains(currentOs)) {
-                    context.fail("The current operating system [" + currentOs.name() + "] is one of the disallowed systems [" + notOs + "]");
-                    return false;
-                }
+            final Set<Requires.Family> notOs = requirements.enumValuesSet(MEMBER_NOT_OS, Requires.Family.class);
+            if (notOs.contains(currentOs)) {
+                context.fail("The current operating system [" + currentOs.name() + "] is one of the disallowed systems [" + notOs + "]");
+                return false;
             }
         }
         return true;

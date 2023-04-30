@@ -15,8 +15,8 @@
  */
 package io.micronaut.docs.server.json;
 
-import com.fasterxml.jackson.core.JsonParseException;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -27,14 +27,15 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
+import io.micronaut.json.JsonSyntaxException;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
+
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import io.micronaut.core.async.annotation.SingleResult;
 
 @Requires(property = "spec.name", value = "PersonControllerSpec")
 // tag::class[]
@@ -101,7 +102,7 @@ public class PersonController {
 
     // tag::localError[]
     @Error
-    public HttpResponse<JsonError> jsonError(HttpRequest request, JsonParseException e) { // <1>
+    public HttpResponse<JsonError> jsonError(HttpRequest request, JsonSyntaxException e) { // <1>
         JsonError error = new JsonError("Invalid JSON: " + e.getMessage()) // <2>
                 .link(Link.SELF, Link.of(request.getUri()));
 

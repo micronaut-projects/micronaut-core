@@ -60,10 +60,11 @@ public class MultiValuesConverterFactory {
      * Values separated with commas ",". In case of iterables, the values are converted to {@link String} and joined
      * with comma delimiter. In case of {@link Map} or a POJO {@link Object} the keys and values are alternating and all
      * delimited with commas.
-     * <table borer="0">
+     * <table border="1">
+     *     <caption>Examples</caption>
      *     <tr> <th><b> Type </b></th>      <th><b> Example value </b></th>                     <th><b> Example representation </b></th> </tr>
-     *     <tr> <td> Iterable &emsp </td>   <td> param=["Mike", "Adam", "Kate"] </td>           <td> "param=Mike,Adam,Kate" </td></tr>
-     *     <tr> <td> Map </td>              <td> param=["name": "Mike", "age": "30"] &emsp</td> <td> "param=name,Mike,age,30" </td> </tr>
+     *     <tr> <td> Iterable &emsp; </td>   <td> param=["Mike", "Adam", "Kate"] </td>           <td> "param=Mike,Adam,Kate" </td></tr>
+     *     <tr> <td> Map </td>              <td> param=["name": "Mike", "age": "30"] &emsp;</td> <td> "param=name,Mike,age,30" </td> </tr>
      *     <tr> <td> Object </td>           <td> param={name: "Mike", age: 30} </td>            <td> "param=name,Mike,age,30" </td> </tr>
      * </table>
      * Note that ambiguity may arise when the values contain commas themselves after being converted to String.
@@ -84,10 +85,11 @@ public class MultiValuesConverterFactory {
      * Values are repeated with the same parameter name for {@link Iterable}, while {@link Map} and POJO {@link Object}
      * would be expanded with its property names.
      * <table border="1">
+     *     <caption>Examples</caption>
      *     <tr> <th><b> Type </b></th>      <th><b> Example value </b></th>                        <th><b> Example representation </b></th> </tr>
-     *     <tr> <td> Iterable &emsp </td>   <td> param=["Mike", "Adam", "Kate"] </td>              <td> "param=Mike&param=Adam&param=Kate </td></tr>
-     *     <tr> <td> Map </td>              <td> param=["name": "Mike", "age": "30"] &emsp </td>   <td> "name=Mike&age=30" </td> </tr>
-     *     <tr> <td> Object </td>           <td> param={name: "Mike", age: 30} </td>               <td> "name=Mike&age=30" </td> </tr>
+     *     <tr> <td> Iterable &emsp; </td>   <td> param=["Mike", "Adam", "Kate"] </td>              <td> "param=Mike&amp;param=Adam&amp;param=Kate </td></tr>
+     *     <tr> <td> Map </td>              <td> param=["name": "Mike", "age": "30"] &emsp; </td>   <td> "name=Mike&amp;age=30" </td> </tr>
+     *     <tr> <td> Object </td>           <td> param={name: "Mike", age: 30} </td>               <td> "name=Mike&amp;age=30" </td> </tr>
      * </table>
      */
     public static final String FORMAT_MULTI = "multi";
@@ -96,10 +98,11 @@ public class MultiValuesConverterFactory {
      * Values are put in the representation with property name for {@link Map} and POJO {@link Object} in square
      * after the original parameter name.
      * <table border="1">
+     *     <caption>Examples</caption>
      *     <tr> <th><b> Type </b></th>      <th><b> Example value </b></th>                        <th><b> Example representation </b></th> </tr>
-     *     <tr> <td> Iterable &emsp </td>   <td> param=["Mike", "Adam", "Kate"] </td>              <td> "param[0]=Mike&param[1]=Adam&param[2]=Kate </td></tr>
-     *     <tr> <td> Map </td>              <td> param=["name": "Mike", "age": "30"] &emsp </td>   <td> "param[name]=Mike&param[age]=30" </td> </tr>
-     *     <tr> <td> Object </td>           <td> param={name: "Mike", age: 30} </td>               <td> "param[name]=Mike&param[age]=30" </td> </tr>
+     *     <tr> <td> Iterable &emsp; </td>   <td> param=["Mike", "Adam", "Kate"] </td>              <td> "param[0]=Mike&amp;param[1]=Adam&amp;param[2]=Kate </td></tr>
+     *     <tr> <td> Map </td>              <td> param=["name": "Mike", "age": "30"] &emsp; </td>   <td> "param[name]=Mike&amp;param[age]=30" </td> </tr>
+     *     <tr> <td> Object </td>           <td> param={name: "Mike", age: 30} </td>               <td> "param[name]=Mike&amp;param[age]=30" </td> </tr>
      * </table>
      */
     public static final String FORMAT_DEEP_OBJECT = "deepobject";
@@ -233,9 +236,9 @@ public class MultiValuesConverterFactory {
      */
     private abstract static class AbstractConverterFromMultiValues<T>
             implements FormattingTypeConverter<ConvertibleMultiValues, T, Format> {
-        protected ConversionService<?> conversionService;
+        protected ConversionService conversionService;
 
-        AbstractConverterFromMultiValues(ConversionService<?> conversionService) {
+        AbstractConverterFromMultiValues(ConversionService conversionService) {
             this.conversionService = conversionService;
         }
 
@@ -254,15 +257,15 @@ public class MultiValuesConverterFactory {
             ArgumentConversionContext<T> context = (ArgumentConversionContext<T>) conversionContext;
 
             String format = conversionContext.getAnnotationMetadata()
-                    .getValue(Format.class, String.class).orElse(null);
+                    .stringValue(Format.class).orElse(null);
             if (format == null) {
                 return Optional.empty();
             }
 
-            String name = conversionContext.getAnnotationMetadata().getValue(Bindable.class, String.class)
+            String name = conversionContext.getAnnotationMetadata().stringValue(Bindable.class)
                     .orElse(context.getArgument().getName());
             String defaultValue = conversionContext.getAnnotationMetadata()
-                    .getValue(Bindable.class, "defaultValue", String.class)
+                    .stringValue(Bindable.class, "defaultValue")
                     .orElse(null);
 
             switch (normalizeFormatName(format)) {
@@ -305,7 +308,6 @@ public class MultiValuesConverterFactory {
          *                          (including type and annotations)
          * @param name the name of the parameter
          * @param parameters all the parameters from which the parameter of given name needs to be retrieved
-         * @param defaultValue default value
          * @return the converted value if conversion was successful
          */
         protected abstract Optional<T> retrieveMultiValue(ArgumentConversionContext<T> conversionContext,
@@ -334,7 +336,7 @@ public class MultiValuesConverterFactory {
      * A converter to convert from {@link ConvertibleMultiValues} to an {@link Iterable}.
      */
     public static class MultiValuesToIterableConverter extends AbstractConverterFromMultiValues<Iterable> {
-        public MultiValuesToIterableConverter(ConversionService<?> conversionService) {
+        public MultiValuesToIterableConverter(ConversionService conversionService) {
             super(conversionService);
         }
 
@@ -405,7 +407,7 @@ public class MultiValuesConverterFactory {
      * A converter to convert from {@link ConvertibleMultiValues} to an {@link Map}.
      */
     public static class MultiValuesToMapConverter extends AbstractConverterFromMultiValues<Map> {
-        public MultiValuesToMapConverter(ConversionService<?> conversionService) {
+        public MultiValuesToMapConverter(ConversionService conversionService) {
             super(conversionService);
         }
 
@@ -482,7 +484,7 @@ public class MultiValuesConverterFactory {
      */
     public static class MultiValuesToObjectConverter extends AbstractConverterFromMultiValues<Object> {
 
-        public MultiValuesToObjectConverter(ConversionService<?> conversionService) {
+        public MultiValuesToObjectConverter(ConversionService conversionService) {
             super(conversionService);
         }
 
@@ -522,7 +524,7 @@ public class MultiValuesConverterFactory {
                 Object[] constructorParameters = new Object[constructorArguments.length];
                 for (int i = 0; i < constructorArguments.length; ++i) {
                     Argument<?> argument = constructorArguments[i];
-                    String name = argument.getAnnotationMetadata().getValue(Bindable.class, String.class)
+                    String name = argument.getAnnotationMetadata().stringValue(Bindable.class)
                             .orElse(argument.getName());
                     constructorParameters[i] = conversionService.convert(values.get(name), ConversionContext.of(argument))
                             .orElse(null);
@@ -554,9 +556,9 @@ public class MultiValuesConverterFactory {
      */
     public abstract static class AbstractConverterToMultiValues<T>
             implements FormattingTypeConverter<T, ConvertibleMultiValues, Format> {
-        protected ConversionService<?> conversionService;
+        protected ConversionService conversionService;
 
-        public AbstractConverterToMultiValues(ConversionService<?> conversionService) {
+        public AbstractConverterToMultiValues(ConversionService conversionService) {
             this.conversionService = conversionService;
         }
 
@@ -573,12 +575,12 @@ public class MultiValuesConverterFactory {
             // noinspection unchecked
             ArgumentConversionContext<Object> context = (ArgumentConversionContext<Object>) conversionContext;
 
-            String format = conversionContext.getAnnotationMetadata().getValue(Format.class, String.class).orElse(null);
+            String format = conversionContext.getAnnotationMetadata().stringValue(Format.class).orElse(null);
             if (format == null) {
                 return Optional.empty();
             }
 
-            String name = conversionContext.getAnnotationMetadata().getValue(Bindable.class, String.class)
+            String name = conversionContext.getAnnotationMetadata().stringValue(Bindable.class)
                     .orElse(context.getArgument().getName());
 
             MutableConvertibleMultiValuesMap<String> parameters = new MutableConvertibleMultiValuesMap<>();
@@ -653,7 +655,7 @@ public class MultiValuesConverterFactory {
      * A converter from {@link Iterable} to {@link ConvertibleMultiValues}.
      */
     public static class IterableToMultiValuesConverter extends AbstractConverterToMultiValues<Iterable> {
-        public IterableToMultiValuesConverter(ConversionService<?> conversionService) {
+        public IterableToMultiValuesConverter(ConversionService conversionService) {
             super(conversionService);
         }
 
@@ -702,7 +704,7 @@ public class MultiValuesConverterFactory {
      * A converter from {@link Map} to {@link ConvertibleMultiValues}.
      */
     public static class MapToMultiValuesConverter extends AbstractConverterToMultiValues<Map> {
-        public MapToMultiValuesConverter(ConversionService<?> conversionService) {
+        public MapToMultiValuesConverter(ConversionService conversionService) {
             super(conversionService);
         }
 
@@ -757,7 +759,7 @@ public class MultiValuesConverterFactory {
      * A converter from generic {@link Object} to {@link ConvertibleMultiValues}.
      */
     public static class ObjectToMultiValuesConverter extends AbstractConverterToMultiValues<Object> {
-        public ObjectToMultiValuesConverter(ConversionService<?> conversionService) {
+        public ObjectToMultiValuesConverter(ConversionService conversionService) {
             super(conversionService);
         }
 
@@ -773,7 +775,7 @@ public class MultiValuesConverterFactory {
             }
 
             for (BeanProperty<Object, Object> property: beanWrapper.getBeanProperties()) {
-                String key = property.getValue(Bindable.class, String.class).orElse(property.getName());
+                String key = property.stringValue(Bindable.class).orElse(property.getName());
                 ArgumentConversionContext<String> conversionContext =
                         ConversionContext.STRING.with(property.getAnnotationMetadata());
                 conversionService.convert(property.get(object), conversionContext).ifPresent(value -> {

@@ -1,3 +1,3 @@
-For Java, Micronaut uses a Java api:annotation.processing.BeanDefinitionInjectProcessor[] annotation processor to process classes at compile time and produce api:inject.BeanDefinition[] classes.
+For Java, Micronaut framework uses a Java api:annotation.processing.BeanDefinitionInjectProcessor[] annotation processor to process classes at compile time and produce api:inject.BeanDefinition[] classes.
 
-The major advantage here is that you pay a slight cost at compile time, but at runtime Micronaut is largely reflection-free, fast, and consumes very little memory.
+The major advantage here is that you pay a slight cost at compile time, but at runtime Micronaut framework is largely reflection-free, fast, and consumes very little memory.

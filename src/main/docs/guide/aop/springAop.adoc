@@ -1,10 +1,10 @@
-Although Micronaut's design is based on a compile-time approach and does not rely on Spring dependency injection, there is still a lot of value in the Spring ecosystem that does not depend directly on the Spring container.
+Although the Micronaut framework's design is based on a compile-time approach and does not rely on Spring dependency injection, there is still a lot of value in the Spring ecosystem that does not depend directly on the Spring container.
 
-You may wish to use existing Spring projects within Micronaut and configure beans to be used within Micronaut.
+You may wish to use existing Spring projects within the Micronaut framework and configure beans to be used within the Micronaut framework.
 
 You may also wish to leverage existing AOP advice from Spring. One example of this is Spring's support for declarative transactions with `@Transactional`.
 
-Micronaut provides support for Spring-based transaction management without requiring Spring itself. Simply add the `spring` module to your application dependencies:
+The Micronaut framework provides support for Spring-based transaction management without requiring Spring itself. Simply add the `spring` module to your application dependencies:
 
 dependency:io.micronaut.spring:micronaut-spring[gradleScope="implementation"]
 

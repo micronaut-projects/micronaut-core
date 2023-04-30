@@ -15,13 +15,12 @@
  */
 package io.micronaut.core.graal;
 
-import com.oracle.svm.core.configure.ResourcesRegistry;
-import com.oracle.svm.core.jdk.proxy.DynamicProxyRegistry;
 import io.micronaut.core.util.ArrayUtils;
-import org.graalvm.nativeimage.ImageSingletons;
 import org.graalvm.nativeimage.hosted.Feature.BeforeAnalysisAccess;
 import org.graalvm.nativeimage.hosted.RuntimeClassInitialization;
+import org.graalvm.nativeimage.hosted.RuntimeProxyCreation;
 import org.graalvm.nativeimage.hosted.RuntimeReflection;
+import org.graalvm.nativeimage.hosted.RuntimeResourceAccess;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -31,12 +30,14 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Utility methods for implementing Graal's {@link com.oracle.svm.core.annotate.AutomaticFeature}.
+ * Utility methods for implementing GraalVM.
  *
  * @author Álvaro Sánchez-Mariscal
  * @author graemerocher
  * @since 2.0.0
+ * @deprecated Use GraalVM's own public API under {@code org.graalvm} or conditional metadata in JSON format instead
  */
+@Deprecated
 public final class AutomaticFeatureUtils {
 
     /**
@@ -176,7 +177,7 @@ public final class AutomaticFeatureUtils {
             }
         }
         if (classList.size() == interfaces.length) {
-            ImageSingletons.lookup(DynamicProxyRegistry.class).addProxyClass(classList.toArray(new Class<?>[interfaces.length]));
+            RuntimeProxyCreation.register(classList.toArray(new Class<?>[interfaces.length]));
         }
     }
 
@@ -187,12 +188,12 @@ public final class AutomaticFeatureUtils {
      */
     public static void addResourcePatterns(String... patterns) {
         if (ArrayUtils.isNotEmpty(patterns)) {
-            ResourcesRegistry resourcesRegistry = ImageSingletons.lookup(ResourcesRegistry.class);
-            if (resourcesRegistry != null) {
                 for (String resource : patterns) {
-                    resourcesRegistry.addResources(resource);
+                    RuntimeResourceAccess.addResource(
+                        AutomaticFeatureUtils.class.getClassLoader().getUnnamedModule(),
+                        resource
+                    );
                 }
-            }
         }
     }
 
@@ -203,11 +204,11 @@ public final class AutomaticFeatureUtils {
      */
     public static void addResourceBundles(String... bundles) {
         if (ArrayUtils.isNotEmpty(bundles)) {
-            ResourcesRegistry resourcesRegistry = ImageSingletons.lookup(ResourcesRegistry.class);
-            if (resourcesRegistry != null) {
-                for (String resource : bundles) {
-                    resourcesRegistry.addResourceBundles(resource);
-                }
+            for (String resource : bundles) {
+                RuntimeResourceAccess.addResourceBundle(
+                    AutomaticFeatureUtils.class.getClassLoader().getUnnamedModule(),
+                    resource
+                );
             }
         }
     }

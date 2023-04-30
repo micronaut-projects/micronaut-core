@@ -40,7 +40,7 @@ public class GenericTypeUtils {
      * @param field The field
      * @return The type argument or {@link Optional#empty()}
      */
-    public static Optional<Class> resolveGenericTypeArgument(Field field) {
+    public static Optional<Class<?>> resolveGenericTypeArgument(Field field) {
         Type genericType = field != null ? field.getGenericType() : null;
         if (genericType instanceof ParameterizedType) {
             Type[] typeArguments = ((ParameterizedType) genericType).getActualTypeArguments();
@@ -60,7 +60,7 @@ public class GenericTypeUtils {
      * @param interfaceType The interface to resolve from
      * @return The type arguments to the interface
      */
-    public static Class[] resolveInterfaceTypeArguments(Class<?> type, Class<?> interfaceType) {
+    public static Class<?>[] resolveInterfaceTypeArguments(Class<?> type, Class<?> interfaceType) {
         Optional<Type> resolvedType = getAllGenericInterfaces(type)
                 .stream()
                 .filter(t -> {
@@ -83,7 +83,7 @@ public class GenericTypeUtils {
      * @param superTypeToResolve The suepr type to resolve from
      * @return The type arguments to the interface
      */
-    public static Class[] resolveSuperTypeGenericArguments(Class<?> type, Class<?> superTypeToResolve) {
+    public static Class<?>[] resolveSuperTypeGenericArguments(Class<?> type, Class<?> superTypeToResolve) {
         Type supertype = type.getGenericSuperclass();
         Class<?> superclass = type.getSuperclass();
         while (superclass != null && superclass != Object.class) {
@@ -106,7 +106,7 @@ public class GenericTypeUtils {
      * @param type The type to resolve from
      * @return A single Class or null
      */
-    public static Optional<Class> resolveSuperGenericTypeArgument(Class type) {
+    public static Optional<Class<?>> resolveSuperGenericTypeArgument(Class<?> type) {
         try {
             Type genericSuperclass = type.getGenericSuperclass();
             if (genericSuperclass instanceof ParameterizedType) {
@@ -124,8 +124,8 @@ public class GenericTypeUtils {
      * @param genericType The generic type
      * @return The type arguments
      */
-    public static Class[] resolveTypeArguments(Type genericType) {
-        Class[] typeArguments = ReflectionUtils.EMPTY_CLASS_ARRAY;
+    public static Class<?>[] resolveTypeArguments(Type genericType) {
+        Class<?>[] typeArguments = ReflectionUtils.EMPTY_CLASS_ARRAY;
         if (genericType instanceof ParameterizedType) {
             ParameterizedType pt = (ParameterizedType) genericType;
             typeArguments = resolveParameterizedType(pt);
@@ -141,7 +141,7 @@ public class GenericTypeUtils {
      * @param interfaceType The interface to resolve for
      * @return The class or null
      */
-    public static Optional<Class> resolveInterfaceTypeArgument(Class type, Class interfaceType) {
+    public static Optional<Class<?>> resolveInterfaceTypeArgument(Class<?> type, Class<?> interfaceType) {
         Type[] genericInterfaces = type.getGenericInterfaces();
         for (Type genericInterface : genericInterfaces) {
             if (genericInterface instanceof ParameterizedType) {
@@ -151,7 +151,7 @@ public class GenericTypeUtils {
                 }
             }
         }
-        Class superClass = type.getSuperclass();
+        Class<?> superClass = type.getSuperclass();
         if (superClass != null && superClass != Object.class) {
             return resolveInterfaceTypeArgument(superClass, interfaceType);
         }
@@ -164,7 +164,7 @@ public class GenericTypeUtils {
      * @param genericType The generic type
      * @return An {@link Optional} of the type
      */
-        private static Optional<Class> resolveSingleTypeArgument(Type genericType) {
+        private static Optional<Class<?>> resolveSingleTypeArgument(Type genericType) {
         if (genericType instanceof ParameterizedType) {
             ParameterizedType pt = (ParameterizedType) genericType;
             Type[] actualTypeArguments = pt.getActualTypeArguments();
@@ -180,15 +180,14 @@ public class GenericTypeUtils {
      * @param actualTypeArgument The actual type argument
      * @return An optional with the resolved parameterized class
      */
-    private static Optional<Class> resolveParameterizedTypeArgument(Type actualTypeArgument) {
+    private static Optional<Class<?>> resolveParameterizedTypeArgument(Type actualTypeArgument) {
         if (actualTypeArgument instanceof Class) {
-            return Optional.of((Class) actualTypeArgument);
+            return Optional.of((Class<?>) actualTypeArgument);
         }
-        if (actualTypeArgument instanceof ParameterizedType) {
-            ParameterizedType pt = (ParameterizedType) actualTypeArgument;
+        if (actualTypeArgument instanceof ParameterizedType pt) {
             Type rawType = pt.getRawType();
             if (rawType instanceof Class) {
-                return Optional.of((Class) rawType);
+                return Optional.of((Class<?>) rawType);
             }
         }
         return Optional.empty();
@@ -230,14 +229,14 @@ public class GenericTypeUtils {
         return interfaces;
     }
 
-    private static Class[] resolveParameterizedType(ParameterizedType pt) {
-        Class[] typeArguments = ReflectionUtils.EMPTY_CLASS_ARRAY;
+    private static Class<?>[] resolveParameterizedType(ParameterizedType pt) {
+        Class<?>[] typeArguments = ReflectionUtils.EMPTY_CLASS_ARRAY;
         Type[] actualTypeArguments = pt.getActualTypeArguments();
         if (actualTypeArguments != null && actualTypeArguments.length > 0) {
-            typeArguments = new Class[actualTypeArguments.length];
+            typeArguments = new Class<?>[actualTypeArguments.length];
             for (int i = 0; i < actualTypeArguments.length; i++) {
                 Type actualTypeArgument = actualTypeArguments[i];
-                Optional<Class> opt = resolveParameterizedTypeArgument(actualTypeArgument);
+                Optional<Class<?>> opt = resolveParameterizedTypeArgument(actualTypeArgument);
                 if (opt.isPresent()) {
                     typeArguments[i] = opt.get();
                 } else {

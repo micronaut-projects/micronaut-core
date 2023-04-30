@@ -19,10 +19,10 @@ import com.fasterxml.jackson.annotation.JsonAnyGetter;
 import com.fasterxml.jackson.annotation.JsonAnySetter;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.util.ObjectUtils;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Objects;
 
 /**
  * {@link Resource} with indeterminate structure. This is used as the deserialization target of
@@ -75,7 +75,7 @@ public final class GenericResource extends AbstractResource<GenericResource> {
 
     @Override
     public int hashCode() {
-        return Objects.hash(getLinks(), getEmbedded(), getAdditionalProperties());
+        return ObjectUtils.hash(getLinks(), getEmbedded(), getAdditionalProperties());
     }
 
     @Override

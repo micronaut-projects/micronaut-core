@@ -22,7 +22,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.function.client.FunctionDefinition;
 import io.micronaut.function.client.FunctionInvoker;
 import io.micronaut.function.client.FunctionInvokerChooser;
-import io.micronaut.function.client.exceptions.FunctionExecutionException;
 import io.micronaut.function.client.exceptions.FunctionNotFoundException;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
@@ -48,14 +47,18 @@ import java.util.Optional;
 @Singleton
 public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closeable, FunctionInvokerChooser {
 
+    private final ConversionService conversionService;
     private final HttpClient httpClient;
 
     /**
      * Constructor.
-     * @param httpClient  The HTTP client
+     *
+     * @param conversionService The conversion service
+     * @param httpClient        The HTTP client
      */
-    public HttpFunctionExecutor(HttpClient httpClient) {
+    public HttpFunctionExecutor(ConversionService conversionService, HttpClient httpClient) {
         super();
+        this.conversionService = conversionService;
         this.httpClient = httpClient;
     }
 
@@ -85,9 +88,7 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
 
             if (Publishers.isConvertibleToPublisher(outputJavaType)) {
                 Publisher publisher = httpClient.retrieve(request, outputType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT));
-                return ConversionService.SHARED.convert(publisher, outputType).orElseThrow(() ->
-                    new FunctionExecutionException("Unsupported Reactive type: " + outputJavaType)
-                );
+                return Publishers.convertPublisher(conversionService, publisher, outputJavaType);
             } else if (outputType.isVoid()) {
                 httpClient.toBlocking().exchange(request);
                 return null;
