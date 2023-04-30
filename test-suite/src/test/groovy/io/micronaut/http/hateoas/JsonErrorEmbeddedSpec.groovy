@@ -17,7 +17,7 @@ import jakarta.inject.Inject
 import spock.lang.Issue
 import spock.lang.Specification
 
-import javax.validation.constraints.Pattern
+import jakarta.validation.constraints.Pattern
 
 @Issue("https://github.com/micronaut-projects/micronaut-core/issues/2863")
 @Property(name = "spec.name", value = "JsonErrorEmbeddedSpec")

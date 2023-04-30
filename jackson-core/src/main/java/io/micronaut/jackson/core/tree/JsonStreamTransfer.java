@@ -39,6 +39,7 @@ public final class JsonStreamTransfer {
      * @param from   Parser to transfer data from.
      * @param to     Generator to transfer data to.
      * @param config Configuration to use for copying.
+     * @throws IOException IOException
      */
     public static void transferNext(JsonParser from, JsonGenerator to, JsonStreamConfig config) throws IOException {
         from.nextToken();
@@ -51,6 +52,7 @@ public final class JsonStreamTransfer {
      * @param from   Parser to transfer data from.
      * @param to     Generator to transfer data to.
      * @param config Configuration to use for copying.
+     * @throws IOException IOException
      */
     public static void transfer(JsonParser from, JsonGenerator to, JsonStreamConfig config) throws IOException {
         if (!from.hasCurrentToken()) {
@@ -67,6 +69,7 @@ public final class JsonStreamTransfer {
      * @param from   Parser to transfer data from.
      * @param to     Generator to transfer data to.
      * @param config Configuration to use for copying.
+     * @throws IOException IOException
      */
     public static void transferCurrentToken(
             JsonParser from,

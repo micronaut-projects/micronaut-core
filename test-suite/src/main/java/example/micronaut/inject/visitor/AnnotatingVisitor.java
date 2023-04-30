@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.version.annotation.Version;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
@@ -58,5 +59,12 @@ public class AnnotatingVisitor implements TypeElementVisitor<Version, Version> {
         context.info("Annotating field", element);
         // test using name
         element.annotate(TestAnn.class.getName(), (builder) -> builder.value("field"));
+    }
+
+    @Override
+    public void visitEnumConstant(EnumConstantElement element, VisitorContext context) {
+        context.info("Annotating enum constant", element);
+        // test using name
+        element.annotate(TestAnn.class.getName(), (builder) -> builder.value("enumConstant"));
     }
 }

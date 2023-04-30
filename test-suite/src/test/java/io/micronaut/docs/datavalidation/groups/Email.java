@@ -18,7 +18,7 @@ package io.micronaut.docs.datavalidation.groups;
 //tag::clazz[]
 import io.micronaut.core.annotation.Introspected;
 
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotBlank;
 
 @Introspected
 public class Email {

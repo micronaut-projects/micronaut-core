@@ -1,14 +1,14 @@
 You can create type-safe configuration by creating classes that are annotated with
  ann:io.micronaut.context.annotation.ConfigurationProperties[].
 
-Micronaut will produce a reflection-free `@ConfigurationProperties` bean and will also at compile time calculate the property paths to evaluate, greatly improving the speed and efficiency of loading `@ConfigurationProperties`.
+The Micronaut framework will produce a reflection-free `@ConfigurationProperties` bean and will also at compile time calculate the property paths to evaluate, greatly improving the speed and efficiency of loading `@ConfigurationProperties`.
 
 For example:
 
 snippet::io.micronaut.docs.config.properties.EngineConfig[tags="imports,class",indent=0,title="@ConfigurationProperties Example"]
 
 <1> The `@ConfigurationProperties` annotation takes the configuration prefix
-<2> You can use `javax.validation` annotations to validate the configuration
+<2> You can use `jakarta.validation` annotations to validate the configuration
 <3> Default values can be assigned to the property
 <4> Static inner classes can provide nested configuration
 <5> Optional configuration values can be wrapped in `java.util.Optional`
@@ -41,7 +41,7 @@ The names supplied to the includes/excludes list must be the "property" name. Fo
 [[configurationPropertiesAccessorsStyle]]
 == Change accessors style
 
-Since 3.3, Micronaut supports defining different accessors prefixes for getters and setter other than the default `get` and `set` defined for Java Beans. Annotate your POJO or `@ConfigurationProperties` class with the link:{api}/io/micronaut/core/annotation/AccessorsStyle.html[@AccessorsStyle] annotation.
+Since 3.3, the Micronaut framework supports defining different accessors prefixes for getters and setter other than the default `get` and `set` defined for Java Beans. Annotate your POJO or `@ConfigurationProperties` class with the link:{api}/io/micronaut/core/annotation/AccessorsStyle.html[@AccessorsStyle] annotation.
 
 This is useful when you write the getters and setters in a fluent way. For example:
 
@@ -81,16 +81,16 @@ public class EngineConfig {
 
 }
 ----
-<1> Micronaut will use an empty prefix for getters and setters.
+<1> The Micronaut framework will use an empty prefix for getters and setters.
 <2> Define the getters and setters with an empty prefix.
 
-Now you can inject `EngineConfig` and use it with `engineConfig.manufacturer()` and `engineConfig.cylinders() to retrieve the values from configuration.
+Now you can inject `EngineConfig` and use it with `engineConfig.manufacturer()` and `engineConfig.cylinders()` to retrieve the values from configuration.
 
 == Property Type Conversion
 
-Micronaut uses the api:io.micronaut.core.convert.ConversionService[] bean to convert values when resolving properties. You can register additional converters for types not supported by Micronaut by defining beans that implement the api:io.micronaut.core.convert.TypeConverter[] interface.
+The Micronaut framework uses the api:io.micronaut.core.convert.ConversionService[] bean to convert values when resolving properties. You can register additional converters for types not supported by Micronaut by defining beans that implement the api:io.micronaut.core.convert.TypeConverter[] interface.
 
-Micronaut features some built-in conversions that are useful, which are detailed below.
+The Micronaut framework features some built-in conversions that are useful, which are detailed below.
 
 === Duration Conversion
 
@@ -118,8 +118,7 @@ Durations can be specified by appending the unit with a number. Supported units 
 
 For example to configure the default HTTP client read timeout:
 
-.Using Duration Values
-[source,yaml]
+[configuration,title="Using Duration Values"]
 ----
 micronaut:
   http:
@@ -131,8 +130,7 @@ micronaut:
 
 Lists and arrays can be specified in Java properties files as comma-separated values, or in YAML using native YAML lists. The generic types are used to convert the values. For example in YAML:
 
-.Specifying lists or arrays in YAML
-[source,yaml]
+[configuration,title="Specifying lists or arrays in YAML"]
 ----
 my:
   app:
@@ -142,24 +140,6 @@ my:
     urls:
       - http://foo.com
       - http://bar.com
-----
-
-Or in Java properties file format:
-
-.Specifying lists or arrays in Java properties comma-separated
-[source,properties]
-----
-my.app.integers=1,2
-my.app.urls=http://foo.com,http://bar.com
-----
-
-Alternatively you can use an index:
-
-.Specifying lists or arrays in Java properties using index
-[source,properties]
-----
-my.app.integers[0]=1
-my.app.integers[1]=2
 ----
 
 For the above example configurations you can define properties to bind to with the target type supplied via generics:
@@ -216,7 +196,7 @@ You can use the link:{api}/io/micronaut/context/annotation/ConfigurationBuilder.
 
 Since there is no consistent way to define builders in the Java world, one or more method prefixes can be specified in the annotation to support builder methods like `withXxx` or `setXxx`. If the builder methods have no prefix, assign an empty string to the parameter.
 
-A configuration prefix can also be specified to tell Micronaut where to look for configuration values. By default, builder methods use the configuration prefix specified in a class-level link:{api}/io/micronaut/context/annotation/ConfigurationProperties.html[@ConfigurationProperties] annotation.
+A configuration prefix can also be specified to tell the Micronaut framework where to look for configuration values. By default, builder methods use the configuration prefix specified in a class-level link:{api}/io/micronaut/context/annotation/ConfigurationProperties.html[@ConfigurationProperties] annotation.
 
 For example:
 

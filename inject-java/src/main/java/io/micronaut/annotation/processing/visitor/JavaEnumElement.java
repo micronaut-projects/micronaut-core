@@ -15,16 +15,19 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.EnumElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
+import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Implements the {@link EnumElement} interface for Java.
@@ -34,38 +37,80 @@ import java.util.stream.Collectors;
  */
 @Internal
 class JavaEnumElement extends JavaClassElement implements EnumElement {
+
+    protected List<EnumConstantElement> enumConstants;
+    protected List<String> values;
+
     /**
-     * @param classElement       The {@link TypeElement}
-     * @param annotationMetadata The annotation metadata
-     * @param visitorContext The visitor context
+     * @param nativeElement              The native element
+     * @param annotationMetadataFactory The annotation metadata factory
+     * @param visitorContext            The visitor context
      */
-    JavaEnumElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
-        this(classElement, annotationMetadata, visitorContext, 0);
+    JavaEnumElement(JavaNativeElement.Class nativeElement,
+                    ElementAnnotationMetadataFactory annotationMetadataFactory,
+                    JavaVisitorContext visitorContext) {
+        this(nativeElement, annotationMetadataFactory, visitorContext, 0);
     }
 
     /**
-     * @param classElement       The {@link TypeElement}
-     * @param annotationMetadata The annotation metadata
-     * @param visitorContext     The visitor context
-     * @param arrayDimensions    The number of array dimensions
+     * @param nativeElement              The native element
+     * @param annotationMetadataFactory The annotation metadata factory
+     * @param visitorContext            The visitor context
+     * @param arrayDimensions           The number of array dimensions
      */
-    JavaEnumElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext, int arrayDimensions) {
-        super(classElement, annotationMetadata, visitorContext, Collections.emptyList(), Collections.emptyMap(), arrayDimensions, false);
+    JavaEnumElement(JavaNativeElement.Class nativeElement,
+                    ElementAnnotationMetadataFactory annotationMetadataFactory,
+                    JavaVisitorContext visitorContext,
+                    int arrayDimensions) {
+        super(nativeElement, annotationMetadataFactory, visitorContext, Collections.emptyList(), Collections.emptyMap(), arrayDimensions, false);
+    }
+
+    @Override
+    protected JavaClassElement copyThis() {
+        return new JavaEnumElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, arrayDimensions);
     }
 
     @Override
     public List<String> values() {
-        TypeElement te = (TypeElement) getNativeType();
-        List<String> results = te.getEnclosedElements()
-                                    .stream()
-                                    .filter(e -> e.getKind() == ElementKind.ENUM_CONSTANT)
-                                    .map(e -> e.getSimpleName().toString())
-                                    .collect(Collectors.toList());
-        return Collections.unmodifiableList(results);
+        if (values != null) {
+            return values;
+        }
+        initEnum();
+        return values;
+    }
+
+    @Override
+    public List<EnumConstantElement> elements() {
+        if (enumConstants != null) {
+            return enumConstants;
+        }
+        initEnum();
+        return enumConstants;
+    }
+
+    private void initEnum() {
+        values = new ArrayList<>();
+        enumConstants = new ArrayList<>();
+        TypeElement nativeType = getNativeType().element();
+        for (Element element : nativeType.getEnclosedElements()) {
+            if (element.getKind() == ElementKind.ENUM_CONSTANT) {
+                values.add(element.getSimpleName().toString());
+                enumConstants.add(
+                    new JavaEnumConstantElement(
+                        this,
+                        new JavaNativeElement.Variable((VariableElement) element),
+                        elementAnnotationMetadataFactory,
+                        visitorContext)
+                );
+            }
+        }
+        values = Collections.unmodifiableList(values);
+        enumConstants = Collections.unmodifiableList(enumConstants);
     }
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new JavaEnumElement(classElement, getAnnotationMetadata(), visitorContext, arrayDimensions);
+        return new JavaEnumElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, arrayDimensions);
     }
+
 }

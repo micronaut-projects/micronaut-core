@@ -13,6 +13,14 @@ import io.micronaut.json.tree.JsonNode
 import spock.lang.Specification
 
 class JacksonDatabindMapperSpec extends Specification {
+    def "test default parsing to JsonNode"() {
+        given:
+        def mapper = JsonMapper.createDefault()
+
+        expect:
+        mapper.readValue('{}', Argument.of(JsonNode)) == JsonNode.createObjectNode([:])
+    }
+
     def 'parsing to JsonNode'() {
         given:
         def ctx = ApplicationContext.run()

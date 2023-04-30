@@ -25,6 +25,7 @@ import io.micronaut.core.annotation.Nullable;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -38,10 +39,10 @@ public interface PropertyResolver extends ValueResolver<String> {
 
     /**
      * <p>Whether the given property is contained within this resolver.</p>
-     * <p>
-     * <p>Note that this method will return false for nested properties. In other words given a key of <tt>foo.bar</tt> this method will
-     * return <tt>false</tt> for: <code>resolver.containsProperty("foo")</code></p>
-     * <p>
+     *
+     * <p>Note that this method will return false for nested properties. In other words given a key of {@code foo.bar} this method will
+     * return {@code false} for: {@code resolver.containsProperty("foo")}</p>
+     *
      * <p>To check for nested properties using {@link #containsProperties(String)} instead.</p>
      *
      * @param name The name of the property
@@ -59,7 +60,7 @@ public interface PropertyResolver extends ValueResolver<String> {
 
     /**
      * <p>Resolve the given property for the given name, type and generic type arguments.</p>
-     * <p>
+     *
      * <p>Implementers can choose to implement more intelligent type conversion by analyzing the typeArgument.</p>
      *
      * @param name              The name
@@ -90,7 +91,7 @@ public interface PropertyResolver extends ValueResolver<String> {
 
     /**
      * <p>Resolve the given property for the given name, type and generic type arguments.</p>
-     * <p>
+     *
      * <p>Implementers can choose to implement more intelligent type conversion by analyzing the typeArgument.</p>
      *
      * @param name     The name
@@ -126,7 +127,7 @@ public interface PropertyResolver extends ValueResolver<String> {
 
     /**
      * <p>Resolve the given property for the given name, type and generic type arguments.</p>
-     * <p>
+     *
      * <p>Implementers can choose to implement more intelligent type conversion by analyzing the typeArgument.</p>
      *
      * @param name         The name
@@ -193,4 +194,13 @@ public interface PropertyResolver extends ValueResolver<String> {
     static String nameOf(String... path) {
         return String.join(".", path);
     }
+
+    /**
+     * Will return for a given pattern such as {@code foo.*.bar.*} and array of arrays containing the variable names that match the pattern.
+     * @param pathPattern The path pattern
+     * @return An array of arrays.
+     * @since 4.0.0
+     */
+    @NonNull
+    Collection<List<String>> getPropertyPathMatches(@NonNull String pathPattern);
 }

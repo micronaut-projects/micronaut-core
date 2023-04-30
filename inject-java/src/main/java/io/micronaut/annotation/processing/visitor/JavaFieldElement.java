@@ -17,14 +17,18 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MemberElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
-import io.micronaut.core.annotation.NonNull;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
+import java.util.Collections;
+import java.util.Map;
 
 /**
  * A field element returning data from a {@link VariableElement}.
@@ -35,51 +39,66 @@ import javax.lang.model.type.TypeMirror;
 @Internal
 class JavaFieldElement extends AbstractJavaElement implements FieldElement {
 
-    private final JavaVisitorContext visitorContext;
     private final VariableElement variableElement;
-    private JavaClassElement declaringElement;
-    private ClassElement typeElement;
+    private JavaClassElement owningType;
+    private ClassElement type;
     private ClassElement genericType;
     private ClassElement resolvedDeclaringClass;
 
     /**
-     * @param variableElement    The {@link VariableElement}
-     * @param annotationMetadata The annotation metadata
-     * @param visitorContext     The visitor context
+     * @param nativeElement             The native element
+     * @param annotationMetadataFactory The annotation metadata factory
+     * @param visitorContext            The visitor context
      */
-    JavaFieldElement(VariableElement variableElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
-        super(variableElement, annotationMetadata, visitorContext);
-        this.variableElement = variableElement;
-        this.visitorContext = visitorContext;
+    JavaFieldElement(JavaNativeElement.Variable nativeElement,
+                     ElementAnnotationMetadataFactory annotationMetadataFactory,
+                     JavaVisitorContext visitorContext) {
+        super(nativeElement, annotationMetadataFactory, visitorContext);
+        this.variableElement = nativeElement.element();
     }
 
     /**
-     * @param declaringElement  The declaring element
-     * @param variableElement    The {@link VariableElement}
-     * @param annotationMetadata The annotation metadata
-     * @param visitorContext     The visitor context
+     * @param owningType                The declaring element
+     * @param nativeElement             The native element
+     * @param annotationMetadataFactory The annotation metadata factory
+     * @param visitorContext            The visitor context
      */
-    JavaFieldElement(JavaClassElement declaringElement,
-                     VariableElement variableElement,
-                     AnnotationMetadata annotationMetadata,
+    JavaFieldElement(JavaClassElement owningType,
+                     JavaNativeElement.Variable nativeElement,
+                     ElementAnnotationMetadataFactory annotationMetadataFactory,
                      JavaVisitorContext visitorContext) {
-        this(variableElement, annotationMetadata, visitorContext);
-        this.declaringElement = declaringElement;
+        this(nativeElement, annotationMetadataFactory, visitorContext);
+        this.owningType = owningType;
+    }
+
+    @Override
+    public JavaNativeElement.Variable getNativeType() {
+        return (JavaNativeElement.Variable) super.getNativeType();
+    }
+
+    @Override
+    protected AbstractJavaElement copyThis() {
+        return new JavaFieldElement(owningType, getNativeType(), elementAnnotationMetadataFactory, visitorContext);
+    }
+
+    @Override
+    public FieldElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return (FieldElement) super.withAnnotationMetadata(annotationMetadata);
+    }
+
+    @NonNull
+    @Override
+    public ClassElement getType() {
+        if (type == null) {
+            type = newClassElement(getNativeType(), variableElement.asType(), Collections.emptyMap());
+        }
+        return type;
     }
 
     @Override
     public ClassElement getGenericType() {
-        if (this.genericType == null) {
-            if (declaringElement == null) {
-                this.genericType = getType();
-            } else {
-                this.genericType = mirrorToClassElement(
-                        variableElement.asType(),
-                        visitorContext,
-                        declaringElement.getGenericTypeInfo(),
-                        false
-                );
-            }
+        if (genericType == null) {
+            genericType = newClassElement(getNativeType(), variableElement.asType(), getDeclaringType().getTypeArguments());
         }
         return this.genericType;
     }
@@ -99,32 +118,36 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
         return getType().getArrayDimensions();
     }
 
-    @NonNull
-    @Override
-    public ClassElement getType() {
-        if (this.typeElement == null) {
-            TypeMirror returnType = variableElement.asType();
-            this.typeElement = mirrorToClassElement(returnType, visitorContext);
-        }
-        return this.typeElement;
-    }
-
     @Override
     public ClassElement getDeclaringType() {
         if (resolvedDeclaringClass == null) {
-
             Element enclosingElement = variableElement.getEnclosingElement();
-            if (enclosingElement instanceof TypeElement) {
-                TypeElement te = (TypeElement) enclosingElement;
-                if (declaringElement.getName().equals(te.getQualifiedName().toString())) {
-                    resolvedDeclaringClass = declaringElement;
+            if (enclosingElement instanceof TypeElement te) {
+                String typeName = te.getQualifiedName().toString();
+                if (owningType.getName().equals(typeName)) {
+                    resolvedDeclaringClass = owningType;
                 } else {
-                    resolvedDeclaringClass = mirrorToClassElement(te.asType(), visitorContext, declaringElement.getGenericTypeInfo());
+                    TypeMirror returnType = te.asType();
+                    Map<String, ClassElement> genericsInfo = owningType.getTypeArguments(typeName);
+                    resolvedDeclaringClass = newClassElement(returnType, genericsInfo);
                 }
             } else {
-                return declaringElement;
+                return owningType;
             }
         }
         return resolvedDeclaringClass;
+    }
+
+    @Override
+    public boolean hides(MemberElement hidden) {
+        if (isStatic() && getDeclaringType().isInterface()) {
+            return false;
+        }
+        return visitorContext.getElements().hides(getNativeType().element(), ((JavaNativeElement.Variable) hidden.getNativeType()).element());
+    }
+
+    @Override
+    public ClassElement getOwningType() {
+        return owningType;
     }
 }

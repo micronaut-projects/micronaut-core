@@ -1,23 +1,23 @@
-Since Micronaut 2.x, Micronaut's Netty-based HTTP server can be configured to support HTTP/2.
+Since Micronaut framework 2.x, Micronaut Netty-based HTTP server can be configured to support HTTP/2.
 
 ==== Configuring the Server for HTTP/2
 
 The first step is to set the supported HTTP version in the server configuration:
 
 .Enabling HTTP/2 Support
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:
     http-version: 2.0
 ----
 
-With this configuration, Micronaut enables support for the `h2c` protocol (see https://httpwg.org/specs/rfc7540.html#discover-http[HTTP/2 over cleartext]) which is fine for development.
+With this configuration, the Micronaut framework enables support for the `h2c` protocol (see https://httpwg.org/specs/rfc7540.html#discover-http[HTTP/2 over cleartext]) which is fine for development.
 
 Since browsers don't support `h2c` and in general https://httpwg.org/specs/rfc7540.html#discover-https[HTTP/2 over TLS] (the `h2` protocol), it is recommended for production that you enable <<https, HTTPS support>>. For development this can be done with:
 
 .Enabling `h2` Protocol Support
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:
@@ -31,16 +31,16 @@ For production, see the <<https, configuring HTTPS>> section of the documentatio
 
 Note that if your deployment environment uses JDK 8, or for improved support for OpenSSL, define the following dependencies on Netty Tomcat Native:
 
-dependency:io.netty:netty-tcnative:2.0.46.Final[scope="runtimeOnly"]
+dependency:io.netty:netty-tcnative:2.0.58.Final[scope="runtimeOnly"]
 
-dependency:io.netty:netty-tcnative-boringssl-static:2.0.46.Final[scope="runtimeOnly"]
+dependency:io.netty:netty-tcnative-boringssl-static:2.0.58.Final[scope="runtimeOnly"]
 
 In addition to a dependency on the appropriate native library for your architecture. For example:
 
 .Configuring Tomcat Native
 [source,groovy]
 ----
-runtimeOnly "io.netty:netty-tcnative-boringssl-static:2.0.46.Final:${Os.isFamily(Os.FAMILY_MAC) ? (Os.isArch("aarch64") ? "osx-aarch_64" : "osx-x86_64") : 'linux-x86_64'}"
+runtimeOnly "io.netty:netty-tcnative-boringssl-static:2.0.58.Final:${Os.isFamily(Os.FAMILY_MAC) ? (Os.isArch("aarch64") ? "osx-aarch_64" : "osx-x86_64") : 'linux-x86_64'}"
 ----
 
 See the documentation on https://netty.io/wiki/forked-tomcat-native.html[Tomcat Native] for more information.

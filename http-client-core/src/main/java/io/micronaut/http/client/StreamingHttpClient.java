@@ -79,7 +79,7 @@ public interface StreamingHttpClient extends HttpClient {
 
     /**
      * <p>Perform an HTTP request and receive data as a stream of JSON objects as they become available without blocking.</p>
-     * <p>
+     *
      * <p>The downstream {@link org.reactivestreams.Subscriber} can regulate demand via the subscription</p>
      *
      * @param <I>     The request body type
@@ -90,7 +90,7 @@ public interface StreamingHttpClient extends HttpClient {
 
     /**
      * <p>Perform an HTTP request and receive data as a stream of JSON objects as they become available without blocking.</p>
-     * <p>
+     *
      * <p>The downstream {@link org.reactivestreams.Subscriber} can regulate demand via the subscription. Incoming data
      * is buffered.</p>
      *
@@ -105,7 +105,7 @@ public interface StreamingHttpClient extends HttpClient {
 
     /**
      * <p>Perform an HTTP request and receive data as a stream of JSON objects as they become available without blocking.</p>
-     * <p>
+     *
      * <p>The downstream {@link org.reactivestreams.Subscriber} can regulate demand via the subscription. Incoming data
      * is buffered.</p>
      *
@@ -121,7 +121,7 @@ public interface StreamingHttpClient extends HttpClient {
 
     /**
      * <p>Perform an HTTP request and receive data as a stream of JSON objects as they become available without blocking.</p>
-     * <p>
+     *
      * <p>The downstream {@link org.reactivestreams.Subscriber} can regulate demand via the subscription</p>
      *
      * @param request The {@link HttpRequest} to execute

@@ -1,9 +1,8 @@
 package io.micronaut.ast.groovy.visitor
 
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
-import io.micronaut.inject.ast.ClassElement
 
-import javax.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotBlank
 
 class GroovyBeanPropertiesSpec extends AbstractBeanDefinitionSpec {
 
@@ -11,15 +10,15 @@ class GroovyBeanPropertiesSpec extends AbstractBeanDefinitionSpec {
         def classElement = buildClassElement("""
 package test
 
-import javax.validation.constraints.NotBlank
-import javax.validation.constraints.NotNull
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
 import io.micronaut.ast.groovy.visitor.SuperClass
 
 class Test extends SuperClass {
     @NotBlank
     @NotNull
     private String tenant
-    
+
     String getTenant() {
         return tenant
     }

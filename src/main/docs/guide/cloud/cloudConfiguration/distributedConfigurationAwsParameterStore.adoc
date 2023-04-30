@@ -1,11 +1,10 @@
-Micronaut supports configuration sharing via AWS System Manager Parameter Store. You need the following dependencies configured:
+The Micronaut framework supports configuration sharing via AWS System Manager Parameter Store. You need the following dependencies configured:
 
 dependency:io.micronaut.aws:micronaut-aws-parameter-store[]
 
-To enable distributed configuration, create a `src/main/resources/bootstrap.yml` configuration file and add Parameter Store configuration:
+To enable distributed configuration, make sure <<bootstrap>> is enabled and create a `src/main/resources/bootstrap.yml` file with the following configuration:
 
-.bootstrap.yml
-[source,yaml]
+[configuration]
 ----
 micronaut:
   application:
@@ -23,7 +22,7 @@ See the https://micronaut-projects.github.io/micronaut-aws/latest/guide/configur
 
 You can configure shared properties from the AWS Console -> System Manager -> Parameter Store.
 
-Micronaut uses a hierarchy to read configuration values, and supports `String`, `StringList`, and `SecureString` types.
+The Micronaut framework uses a hierarchy to read configuration values, and supports `String`, `StringList`, and `SecureString` types.
 
 You can create environment-specific configurations as well by including the environment name after an underscore `_`. For example if `micronaut.application.name` is set to `helloworld`, specifying configuration values under `helloworld_test` will be applied only to the `test` environment.
 

@@ -7,25 +7,25 @@ To execute the health endpoint, send a GET request to /health. Additionally the 
 To configure the health endpoint, supply configuration through `endpoints.health`.
 
 .Health Endpoint Configuration Example
-[source,yaml]
+[configuration]
 ----
 endpoints:
   health:
     enabled: Boolean
     sensitive: Boolean
-    details-visible: String <1>
+    details-visible: String
     status:
       http-mapping: Map<String, HttpStatus>
 ----
 
-<1> One of api:management.endpoint.health.DetailsVisibility[]
+- `details-visible` is one of api:management.endpoint.health.DetailsVisibility[]
 
 The `details-visible` setting controls whether health detail will be exposed to users who are not authenticated.
 
 For example, setting:
 
 .Using `details-visible`
-[source,yaml]
+[configuration]
 ----
 endpoints:
   health:
@@ -50,10 +50,10 @@ The `endpoints.health.status.http-mapping` setting controls which status codes t
 
 |===
 
-You can provide custom mappings in `application.yml`:
+You can provide custom mappings in your configuration file (e.g `application.yml`):
 
 .Custom Health Status Codes
-[source,yaml]
+[configuration]
 ----
 endpoints:
   health:
@@ -83,22 +83,25 @@ The "worst" status is returned as the overall status. A non-operational status i
 
 == Provided Indicators
 
-All Micronaut provided health indicators are exposed on /health and /health/readiness endpoints.
+All the Micronaut framework provided health indicators are exposed on /health and /health/readiness endpoints.
 
 === Disk Space
 
 A health indicator is provided that determines the health of the application based on the amount of free disk space. Configuration for the disk space health indicator can be provided under the `endpoints.health.disk-space` key.
 
 .Disk Space Indicator Configuration Example
-[source,yaml]
+[configuration]
 ----
 endpoints:
   health:
     disk-space:
       enabled: Boolean
-      path: String #The file path used to determine the disk space
-      threshold: String | Long #The minimum amount of free space
+      path: String
+      threshold: String | Long
 ----
+
+- `path` specifies the path used to determine the disk space
+- `threshold` specifies the minimum amount of free space
 
 The threshold can be provided as a string like "10MB" or "200KB", or the number of bytes.
 

@@ -61,7 +61,6 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
 
-    private final HttpStatus status;
     private final NettyHttpHeaders headers;
     private final NettyCookies nettyCookies;
     private final MutableConvertibleValues<Object> attributes;
@@ -72,30 +71,30 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
     private final B body;
     private boolean complete;
     private byte[] bodyBytes;
+    private final ConversionService conversionService;
 
     /**
      * @param fullHttpResponse       The full Http response
-     * @param httpStatus             The Http status
      * @param mediaTypeCodecRegistry The media type codec registry
      * @param byteBufferFactory      The byte buffer factory
      * @param bodyType               The body type
      * @param convertBody            Whether to auto convert the body to bodyType
+     * @param conversionService      The conversion service
      */
     FullNettyClientHttpResponse(
             FullHttpResponse fullHttpResponse,
-            HttpStatus httpStatus,
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
             ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory,
             Argument<B> bodyType,
-            boolean convertBody) {
-
-        this.status = httpStatus;
-        this.headers = new NettyHttpHeaders(fullHttpResponse.headers(), ConversionService.SHARED);
+            boolean convertBody,
+            ConversionService conversionService) {
+        this.conversionService = conversionService;
+        this.headers = new NettyHttpHeaders(fullHttpResponse.headers(), conversionService);
         this.attributes = new MutableConvertibleValuesMap<>();
         this.nettyHttpResponse = fullHttpResponse;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.byteBufferFactory = byteBufferFactory;
-        this.nettyCookies = new NettyCookies(fullHttpResponse.headers(), ConversionService.SHARED);
+        this.nettyCookies = new NettyCookies(fullHttpResponse.headers(), conversionService);
         Class<?> rawBodyType = bodyType != null ? bodyType.getType() : null;
         if (rawBodyType != null && !HttpStatus.class.isAssignableFrom(rawBodyType)) {
             if (HttpResponse.class.isAssignableFrom(bodyType.getType())) {
@@ -120,8 +119,8 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
     }
 
     @Override
-    public HttpStatus getStatus() {
-        return status;
+    public int code() {
+        return this.nettyHttpResponse.status().code();
     }
 
     @Override
@@ -204,7 +203,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
                             ByteBuf bytebuf = (ByteBuf) ((ByteBuffer) b).asNativeBuffer();
                             return convertByteBuf(bytebuf, finalArgument);
                         } else {
-                            final Optional opt = ConversionService.SHARED.convert(b, ConversionContext.of(finalArgument));
+                            final Optional opt = conversionService.convert(b, ConversionContext.of(finalArgument));
                             if (!opt.isPresent()) {
                                 ByteBuf content = nettyHttpResponse.content();
                                 return convertByteBuf(content, finalArgument);
@@ -217,7 +216,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
                     converted = convertByteBuf(content, finalArgument);
                 }
             } catch (RuntimeException e) {
-                if (status.getCode() < 400) {
+                if (code() < 400) {
                     throw e;
                 } else {
                     if (LOG.isDebugEnabled()) {
@@ -284,7 +283,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
             LOG.trace("Missing or unknown Content-Type received from server.");
         }
         // last chance, try type conversion
-        return ConversionService.SHARED.convert(content, ConversionContext.of(type));
+        return conversionService.convert(content, ConversionContext.of(type));
     }
 
     private <T> Optional convertBytes(byte[] bytes, Argument<T> type) {
@@ -305,7 +304,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
             }
         }
         // last chance, try type conversion
-        return ConversionService.SHARED.convert(bytes, ConversionContext.of(type));
+        return conversionService.convert(bytes, ConversionContext.of(type));
     }
 
     @Override

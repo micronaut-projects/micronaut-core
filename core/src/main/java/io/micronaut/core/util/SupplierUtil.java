@@ -29,28 +29,31 @@ public class SupplierUtil {
     /**
      * Caches the result of supplier in a thread safe manner.
      *
-     * @param actual The supplier providing the result
+     * @param valueSupplier The supplier providing the result
      * @param <T> The type of result
      * @return A new supplier that will cache the result
      */
-    public static <T> Supplier<T> memoized(Supplier<T> actual) {
-        return new Supplier<T>() {
-            Supplier<T> delegate = this::initialize;
-            boolean initialized;
+    public static <T> Supplier<T> memoized(Supplier<T> valueSupplier) {
+        return new Supplier<>() {
+            private volatile boolean initialized;
+            private T value; // Doesn't need to be volatile
 
             @Override
             public T get() {
-                return delegate.get();
+                // Double check locking
+                if (!initialized) {
+                    synchronized (this) {
+                        if (!initialized) {
+                            T t = valueSupplier.get();
+                            value = t;
+                            initialized = true;
+                            return t;
+                        }
+                    }
+                }
+                return value;
             }
 
-            private synchronized T initialize() {
-                if (!initialized) {
-                    T value = actual.get();
-                    delegate = () -> value;
-                    initialized = true;
-                }
-                return delegate.get();
-            }
         };
     }
 
@@ -58,34 +61,37 @@ public class SupplierUtil {
      * Caches the result of supplier in a thread safe manner. The result
      * is only cached if it is non null or non empty if an optional.
      *
-     * @param actual The supplier providing the result
+     * @param valueSupplier The supplier providing the result
      * @param <T> The type of result
      * @return A new supplier that will cache the result
      */
-    public static <T> Supplier<T> memoizedNonEmpty(Supplier<T> actual) {
-        return new Supplier<T>() {
-            Supplier<T> delegate = this::initialize;
-            boolean initialized;
+    public static <T> Supplier<T> memoizedNonEmpty(Supplier<T> valueSupplier) {
+        return new Supplier<>() {
+            private volatile boolean initialized;
+            private T value; // Doesn't need to be volatile
 
             @Override
             public T get() {
-                return delegate.get();
+                // Double check locking
+                if (!initialized) {
+                    synchronized (this) {
+                        if (!initialized) {
+                            T t = valueSupplier.get();
+                            if (t == null) {
+                                return null;
+                            }
+                            if (t instanceof Optional<?> optional && optional.isEmpty()) {
+                                return t;
+                            }
+                            value = t;
+                            initialized = true;
+                            return t;
+                        }
+                    }
+                }
+                return value;
             }
 
-            private synchronized T initialize() {
-                if (!initialized) {
-                    T value = actual.get();
-                    if (value == null) {
-                        return null;
-                    }
-                    if (value instanceof Optional && !((Optional) value).isPresent()) {
-                        return value;
-                    }
-                    delegate = () -> value;
-                    initialized = true;
-                }
-                return delegate.get();
-            }
         };
     }
 }

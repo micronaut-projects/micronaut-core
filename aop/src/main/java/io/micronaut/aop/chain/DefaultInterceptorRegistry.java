@@ -15,11 +15,6 @@
  */
 package io.micronaut.aop.chain;
 
-import java.lang.annotation.Annotation;
-import java.util.Collection;
-import java.util.List;
-import java.util.stream.Stream;
-
 import io.micronaut.aop.Adapter;
 import io.micronaut.aop.ConstructorInterceptor;
 import io.micronaut.aop.Interceptor;
@@ -39,10 +34,15 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.context.BeanContextConfigurable;
+import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import static io.micronaut.inject.qualifiers.InterceptorBindingQualifier.META_MEMBER_MEMBERS;
+import java.lang.annotation.Annotation;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
 /**
  * Default implementation of the interceptor registry interface.
@@ -62,42 +62,38 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
     @Override
     @NonNull
     public <T> Interceptor<T, ?>[] resolveInterceptors(
-            @NonNull Executable<T, ?> method,
-            @NonNull Collection<BeanRegistration<Interceptor<T, ?>>> interceptors,
-            @NonNull InterceptorKind interceptorKind) {
+        @NonNull Executable<T, ?> method,
+        @NonNull Collection<BeanRegistration<Interceptor<T, ?>>> interceptors,
+        @NonNull InterceptorKind interceptorKind) {
         final AnnotationMetadata annotationMetadata = method.getAnnotationMetadata();
         if (interceptors.isEmpty()) {
             return resolveToNone((ExecutableMethod<?, ?>) method, interceptorKind, annotationMetadata);
-        } else {
-            instrumentAnnotationMetadata(beanContext, method);
-            final Collection<AnnotationValue<?>> applicableBindings
-                    = AbstractInterceptorChain.resolveInterceptorValues(
-                    annotationMetadata,
-                    interceptorKind
-            );
-            if (applicableBindings.isEmpty()) {
-                return resolveToNone((ExecutableMethod<?, ?>) method, interceptorKind, annotationMetadata);
-            } else {
-                @SuppressWarnings({"unchecked",
-                        "rawtypes"}) final Interceptor[] resolvedInterceptors =
-                        (Interceptor[]) interceptorStream(
-                                method.getDeclaringType(),
-                                (Collection) interceptors,
-                                interceptorKind,
-                                applicableBindings
-                        ).filter(bean -> (bean instanceof MethodInterceptor) || !(bean instanceof ConstructorInterceptor))
-                                .toArray(Interceptor[]::new);
-                if (LOG.isTraceEnabled()) {
-                    LOG.trace("Resolved {} {} interceptors out of a possible {} for method: {} - {}", resolvedInterceptors.length, interceptorKind, interceptors.size(), method.getDeclaringType(), method instanceof Described ? ((Described) method).getDescription(true) : method.toString());
-                    for (int i = 0; i < resolvedInterceptors.length; i++) {
-                        Interceptor<?, ?> resolvedInterceptor = resolvedInterceptors[i];
-                        LOG.trace("Interceptor {} - {}", i, resolvedInterceptor);
-                    }
-                }
-                //noinspection unchecked
-                return resolvedInterceptors;
+        }
+        instrumentAnnotationMetadata(beanContext, method);
+        final Collection<AnnotationValue<?>> applicableBindings
+            = AbstractInterceptorChain.resolveInterceptorValues(
+            annotationMetadata,
+            interceptorKind
+        );
+        if (applicableBindings.isEmpty()) {
+            return resolveToNone((ExecutableMethod<?, ?>) method, interceptorKind, annotationMetadata);
+        }
+        final Interceptor<T, ?>[] resolvedInterceptors = findInterceptors(
+                method.getDeclaringType(),
+                interceptors,
+                interceptorKind,
+                applicableBindings,
+                true,
+                false
+        );
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("Resolved {} {} interceptors out of a possible {} for method: {} - {}", resolvedInterceptors.length, interceptorKind, interceptors.size(), method.getDeclaringType(), method instanceof Described ? ((Described) method).getDescription(true) : method.toString());
+            for (int i = 0; i < resolvedInterceptors.length; i++) {
+                Interceptor<?, ?> resolvedInterceptor = resolvedInterceptors[i];
+                LOG.trace("Interceptor {} - {}", i, resolvedInterceptor);
             }
         }
+        return resolvedInterceptors;
     }
 
     @SuppressWarnings("rawtypes")
@@ -106,7 +102,7 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
                                         AnnotationMetadata annotationMetadata) {
         if (interceptorKind == InterceptorKind.INTRODUCTION) {
             if (annotationMetadata.hasStereotype(Adapter.class)) {
-                return new MethodInterceptor[] { new AdapterIntroduction(beanContext, method) };
+                return new MethodInterceptor[]{new AdapterIntroduction(beanContext, method)};
             } else {
                 throw new IllegalStateException("At least one @Introduction method interceptor required, but missing for method: " + method.getDescription(true) + ". Check if your @Introduction stereotype annotation is marked with @Retention(RUNTIME) and @InterceptorBean(..) with the interceptor type. Otherwise do not load @Introduction beans if their interceptor definitions are missing!");
 
@@ -116,141 +112,122 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
         }
     }
 
-    private <T, R> Stream<? extends Interceptor<T, R>> interceptorStream(Class<?> declaringType,
-                                                                         Collection<BeanRegistration<Interceptor<T, R>>> interceptors,
-                                                                         InterceptorKind interceptorKind,
-                                                                         Collection<AnnotationValue<?>> applicableBindings) {
-        return interceptors.stream()
-                .filter(beanRegistration -> {
-                    final List<Argument<?>> typeArgs = beanRegistration.getBeanDefinition().getTypeArguments(ConstructorInterceptor.class);
-                    if (typeArgs.isEmpty()) {
-                        return true;
-                    } else {
-                        final Class<?> applicableType = typeArgs.iterator().next().getType();
-                        return applicableType.isAssignableFrom(declaringType);
-                    }
-                })
-                .filter(beanRegistration -> {
-                    // these are the binding declared on the interceptor itself
-                    // an interceptor can declare one or more bindings
-                    final Collection<AnnotationValue<?>> interceptorValues = AbstractInterceptorChain
-                            .resolveInterceptorValues(
-                                    beanRegistration.getBeanDefinition().getAnnotationMetadata(), interceptorKind
-                            );
-                    // if there are no binding try simply match by interceptor type
-                    if (interceptorValues.isEmpty()) {
-                        // does the annotation metadata contain @InterceptorBinding(interceptorType=SomeInterceptor.class)
-                        // that matches the list of interceptors ?
-                        // this behaviour is in place for backwards compatible for the old @Type(SomeInterceptor.class) approach
-                        for (AnnotationValue<?> applicableValue : applicableBindings) {
-                            if (isApplicableByType(beanRegistration, applicableValue)) {
-                                return true;
-                            }
-                        }
-                        return false;
-                    } else {
-                        if (interceptorValues.size() == 1) {
-                            // single interceptor binding, fast path
-                            final AnnotationValue<?> interceptorBinding = interceptorValues.iterator().next();
-                            final AnnotationValue<Annotation> memberBinding = interceptorBinding
-                                    .getAnnotation(META_MEMBER_MEMBERS).orElse(null);
-                            final String annotationName = interceptorBinding.stringValue().orElse(null);
-                            if (annotationName != null) {
-                                // any match
-                                for (AnnotationValue<?> applicableBinding : applicableBindings) {
-                                    if (isApplicableByType(beanRegistration,
-                                                           applicableBinding)) {
-                                        return true;
-                                    } else if (annotationName.equals(applicableBinding.stringValue().orElse(null))) {
-                                        if (memberBinding != null) {
-                                            final AnnotationValue<Annotation> otherMembers =
-                                                    applicableBinding.getAnnotation(META_MEMBER_MEMBERS).orElse(null);
-                                            if (memberBinding.equals(otherMembers)) {
-                                                return true;
-                                            }
-                                        } else {
-                                           return true;
-                                        }
-                                    }
-                                }
-                            }
-                            return false;
-                        } else {
-                            // multiple binding case.
-                            boolean isApplicationByBinding = true;
-                            // loop through the bindings on the interceptor and make sure that
-                            // the binding on the injection point matches up
-                            for (AnnotationValue<?> annotationValue : applicableBindings) {
-                                final AnnotationValue<Annotation> memberBinding = annotationValue
-                                        .getAnnotation(META_MEMBER_MEMBERS).orElse(null);
-                                final String annotationName = annotationValue.stringValue().orElse(null);
+    private <T> Interceptor<T, ?>[] findInterceptors(Class<?> declaringType,
+                                                     Collection<BeanRegistration<Interceptor<T, ?>>> interceptors,
+                                                     InterceptorKind interceptorKind,
+                                                     Collection<AnnotationValue<?>> interceptPointBindings,
+                                                     boolean selectMethodInterceptor,
+                                                     boolean selectConstructorInterceptor) {
+        List<BeanRegistration<Interceptor<T, ?>>> selectedInterceptorRegistrations = new ArrayList<>(interceptors.size());
+        for (BeanRegistration<Interceptor<T, ?>> beanRegistration : interceptors) {
+            if (selectInterceptor(declaringType, interceptorKind, interceptPointBindings, beanRegistration)) {
+                selectedInterceptorRegistrations.add(beanRegistration);
+            }
+        }
+        selectedInterceptorRegistrations.sort(OrderUtil.COMPARATOR);
 
-                                if (annotationName != null) {
-                                    boolean interceptorApplicable = true;
-                                    for (AnnotationValue<?> applicableValue : interceptorValues) {
-                                        if (isApplicableByType(beanRegistration,
-                                                               applicableValue)) {
-                                            return true;
-                                        }
-
-                                        // does the annotation metadata of the interceptor definition contain
-                                        // @InterceptorBinding(SomeAnnotation.class) ?
-                                        if (annotationName.equals(applicableValue.stringValue().orElse(null))) {
-                                            // if it does do we need to bind the members
-                                            if (memberBinding != null) {
-                                                final AnnotationValue<Annotation> otherMembers =
-                                                        applicableValue.getAnnotation(META_MEMBER_MEMBERS).orElse(null);
-                                                interceptorApplicable = memberBinding.equals(otherMembers);
-                                                if (interceptorApplicable) {
-                                                    break;
-                                                }
-                                            } else {
-                                                interceptorApplicable = true;
-                                                break;
-                                            }
-                                        } else {
-                                            interceptorApplicable = false;
-                                        }
-                                    }
-                                    isApplicationByBinding = interceptorApplicable;
-                                    if (!isApplicationByBinding) {
-                                        break;
-                                    }
-                                }
-                            }
-                            return isApplicationByBinding;
-                        }
-
-                    }
-                }).sorted(OrderUtil.COMPARATOR)
-                .map(BeanRegistration::getBean);
+        List<Interceptor<T, ?>> selectedInterceptors = new ArrayList<>(selectedInterceptorRegistrations.size());
+        for (BeanRegistration<Interceptor<T, ?>> beanRegistration : selectedInterceptorRegistrations) {
+            Interceptor<T, ?> bean = beanRegistration.getBean();
+            if (selectMethodInterceptor && (bean instanceof MethodInterceptor || !(bean instanceof ConstructorInterceptor))
+                    || selectConstructorInterceptor && (bean instanceof ConstructorInterceptor || !(bean instanceof MethodInterceptor))) {
+                selectedInterceptors.add(bean);
+            }
+        }
+        return selectedInterceptors.toArray(new Interceptor[0]);
     }
 
-    private <T, R> boolean isApplicableByType(BeanRegistration<Interceptor<T, R>> beanRegistration,
+    private <T> boolean selectInterceptor(Class<?> declaringType,
+                                          InterceptorKind interceptorKind,
+                                          Collection<AnnotationValue<?>> interceptPointBindings,
+                                          BeanRegistration<Interceptor<T, ?>> beanRegistration) {
+        final List<Argument<?>> typeArgs = beanRegistration.getBeanDefinition().getTypeArguments(ConstructorInterceptor.class);
+        if (!typeArgs.isEmpty()) {
+            final Class<?> applicableType = typeArgs.iterator().next().getType();
+            if (!applicableType.isAssignableFrom(declaringType)) {
+                return false;
+            }
+        }
+
+        // does the annotation metadata contain @InterceptorBinding(interceptorType=SomeInterceptor.class)
+        // this behaviour is in place for backwards compatible for the old @Type(SomeInterceptor.class) approach
+        // In this case we don't care about any qualifiers
+        for (AnnotationValue<?> applicableValue : interceptPointBindings) {
+            if (isApplicableByType(beanRegistration, applicableValue)) {
+                return true;
+            }
+        }
+        // these are the binding declared on the interceptor itself
+        // an interceptor can declare one or more bindings
+        final Collection<AnnotationValue<?>> interceptorValues = AbstractInterceptorChain
+                .resolveInterceptorValues(
+                        beanRegistration.getBeanDefinition().getAnnotationMetadata(), interceptorKind
+                );
+        if (interceptorValues.isEmpty()) {
+            // Bean is an interceptor but no bindings???
+            return false;
+        }
+        // loop through the bindings on the interceptor and make sure that
+        // the intercept point has the same once
+        for (AnnotationValue<?> interceptorAnnotationValue : interceptorValues) {
+            if (!matches(interceptorAnnotationValue, interceptPointBindings)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean matches(AnnotationValue<?> interceptorAnnotationValue, Collection<AnnotationValue<?>> interceptPointBindings) {
+        final AnnotationValue<Annotation> memberBinding = interceptorAnnotationValue
+            .getAnnotation(InterceptorBindingQualifier.META_BINDING_VALUES).orElse(null);
+        final String annotationName = interceptorAnnotationValue.stringValue().orElse(null);
+        if (annotationName == null) {
+            // This shouldn't happen
+            return false;
+        }
+        for (AnnotationValue<?> applicableValue : interceptPointBindings) {
+            String interceptPointAnnotation = applicableValue.stringValue().orElse(null);
+            if (!annotationName.equals(interceptPointAnnotation)) {
+                continue;
+            }
+            if (memberBinding == null) {
+                return true;
+            }
+            AnnotationValue<Annotation> otherMembers =
+                applicableValue.getAnnotation(InterceptorBindingQualifier.META_BINDING_VALUES).orElse(null);
+            if (!memberBinding.equals(otherMembers)) {
+                continue;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    private <T> boolean isApplicableByType(BeanRegistration<Interceptor<T, ?>> beanRegistration,
                                               AnnotationValue<?> applicableValue) {
         return applicableValue.classValue("interceptorType")
-                .map(t -> t.isInstance(beanRegistration.getBean())).orElse(false);
+            .map(t -> t.isInstance(beanRegistration.getBean())).orElse(false);
     }
 
     @Override
     @NonNull
-    public <T> Interceptor<T, T>[]  resolveConstructorInterceptors(
-            @NonNull BeanConstructor<T> constructor,
-            @NonNull Collection<BeanRegistration<Interceptor<T, T>>> interceptors) {
+    public <T> Interceptor<T, T>[] resolveConstructorInterceptors(
+        @NonNull BeanConstructor<T> constructor,
+        @NonNull Collection<BeanRegistration<Interceptor<T, T>>> interceptors) {
         instrumentAnnotationMetadata(beanContext, constructor);
         final Collection<AnnotationValue<?>> applicableBindings
-                = AbstractInterceptorChain.resolveInterceptorValues(
-                constructor.getAnnotationMetadata(),
-                InterceptorKind.AROUND_CONSTRUCT
+            = AbstractInterceptorChain.resolveInterceptorValues(
+            constructor.getAnnotationMetadata(),
+            InterceptorKind.AROUND_CONSTRUCT
         );
-        final Interceptor[] resolvedInterceptors = interceptorStream(
+        final Interceptor<T, T>[] resolvedInterceptors = findInterceptors(
                 constructor.getDeclaringBeanType(),
-                interceptors,
+                (Collection) interceptors,
                 InterceptorKind.AROUND_CONSTRUCT,
-                applicableBindings
-        )
-                .filter(bean -> (bean instanceof ConstructorInterceptor) || !(bean instanceof MethodInterceptor))
-                .toArray(Interceptor[]::new);
+                applicableBindings,
+                false,
+                true
+        );
         if (LOG.isTraceEnabled()) {
             LOG.trace("Resolved {} {} interceptors out of a possible {} for constructor: {} - {}", resolvedInterceptors.length, InterceptorKind.AROUND_CONSTRUCT, interceptors.size(), constructor.getDeclaringBeanType(), constructor.getDescription(true));
             for (int i = 0; i < resolvedInterceptors.length; i++) {
@@ -258,16 +235,17 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
                 LOG.trace("Interceptor {} - {}", i, resolvedInterceptor);
             }
         }
-        //noinspection unchecked
         return resolvedInterceptors;
     }
 
     private static void instrumentAnnotationMetadata(BeanContext beanContext, Object method) {
-        if (beanContext instanceof ApplicationContext && method instanceof EnvironmentConfigurable) {
+        if (method instanceof BeanContextConfigurable ctxConfigurable) {
+            ctxConfigurable.configure(beanContext);
+        }
+        if (beanContext instanceof ApplicationContext applicationContext && method instanceof EnvironmentConfigurable environmentConfigurable) {
             // ensure metadata is environment aware
-            final EnvironmentConfigurable m = (EnvironmentConfigurable) method;
-            if (m.hasPropertyExpressions()) {
-                m.configure(((ApplicationContext) beanContext).getEnvironment());
+            if (environmentConfigurable.hasPropertyExpressions()) {
+                environmentConfigurable.configure(applicationContext.getEnvironment());
             }
         }
     }

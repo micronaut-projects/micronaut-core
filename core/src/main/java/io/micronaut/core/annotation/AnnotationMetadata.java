@@ -28,7 +28,9 @@ import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,15 +42,15 @@ import java.util.Set;
 /**
  * <p>An interface implemented at compile time by Micronaut that allows the inspection of annotation metadata and
  * stereotypes (meta-annotations)</p>.
- * <p>
+ *
  * <p>This interface exposes fast and efficient means to expose annotation data at runtime without requiring reflective
  * tricks to read the annotation metadata</p>
- * <p>
+ *
  * <p>Users of Micronaut should in general avoid the methods of the {@link java.lang.reflect.AnnotatedElement}
  * interface and use this interface instead to obtain maximum efficiency</p>
- * <p>
- * <p>Core framework types such as <tt>io.micronaut.inject.BeanDefinition</tt> and
- * <tt>io.micronaut.inject.ExecutableMethod</tt> implement this interface</p>
+ *
+ * <p>Core framework types such as {@code io.micronaut.inject.BeanDefinition} and
+ * {@code io.micronaut.inject.ExecutableMethod} implement this interface</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -60,7 +62,7 @@ public interface AnnotationMetadata extends AnnotationSource {
     AnnotationMetadata EMPTY_METADATA = new EmptyAnnotationMetadata();
 
     /**
-     * The default <tt>value()</tt> member.
+     * The default {@code value()} member.
      */
     String VALUE_MEMBER = "value";
 
@@ -91,6 +93,16 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
+     * Does the metadata contain any evaluated expressions like {@code #{ T(java.lang.Math).random() }}.
+     *
+     * @return True if evaluated expressions are present
+     * @since 4.0.0
+     */
+    default boolean hasEvaluatedExpressions() {
+        return false;
+    }
+
+    /**
      * Resolve all of the annotation names that feature the given stereotype.
      *
      * @param stereotype The annotation names
@@ -105,6 +117,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * Resolve all of the annotation values that feature the given stereotype.
      *
      * @param stereotype The annotation names
+     * @param <T> The annotation type
      * @return A set of annotation names
      * @since 3.5.2
      */
@@ -312,7 +325,7 @@ public interface AnnotationMetadata extends AnnotationSource {
 
     /**
      * <p>Checks whether this object has the given annotation stereotype on the object itself or inherited from a parent</p>.
-     * <p>
+     *
      * <p>An annotation stereotype is a meta annotation potentially applied to another annotation</p>
      *
      * @param annotation The annotation
@@ -324,7 +337,7 @@ public interface AnnotationMetadata extends AnnotationSource {
 
     /**
      * <p>Checks whether this object has the given annotation stereotype on the object itself and not inherited from a parent</p>.
-     * <p>
+     *
      * <p>An annotation stereotype is a meta annotation potentially applied to another annotation</p>
      *
      * @param annotation The annotation
@@ -359,7 +372,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param annotation The annotation name
      * @return The default values
      */
-    default @NonNull Map<String, Object> getDefaultValues(@NonNull String annotation) {
+    default @NonNull Map<CharSequence, Object> getDefaultValues(@NonNull String annotation) {
         return Collections.emptyMap();
     }
 
@@ -401,6 +414,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @see AnnotationSource#isAnnotationPresent(Class)
      */
     @Override
+    @SuppressWarnings("java:S2583")
     default boolean isAnnotationPresent(@NonNull Class<? extends Annotation> annotationClass) {
         //noinspection ConstantConditions
         if (annotationClass == null) {
@@ -413,6 +427,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @see AnnotationSource#isAnnotationPresent(Class)
      */
     @Override
+    @SuppressWarnings("java:S2583")
     default boolean isDeclaredAnnotationPresent(@NonNull Class<? extends Annotation> annotationClass) {
         //noinspection ConstantConditions
         if (annotationClass == null) {
@@ -426,6 +441,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @see AnnotationSource#isAnnotationPresent(String)
      */
     @Override
+    @SuppressWarnings("java:S2583")
     default boolean isAnnotationPresent(@NonNull String annotationName) {
         //noinspection ConstantConditions
         if (annotationName == null) {
@@ -438,6 +454,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @see AnnotationSource#isAnnotationPresent(String)
      */
     @Override
+    @SuppressWarnings("java:S2583")
     default boolean isDeclaredAnnotationPresent(@NonNull String annotationName) {
         //noinspection ConstantConditions
         if (annotationName == null) {
@@ -575,8 +592,8 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name, @NonNull ClassLoader classLoader) {
         ArgumentUtils.requireNonNull("name", name);
-        final Optional<Class> aClass = ClassUtils.forName(name, classLoader);
-        Class clazz = aClass.orElse(null);
+        final Optional<Class<?>> aClass = ClassUtils.forName(name, classLoader);
+        Class<?> clazz = aClass.orElse(null);
         if (clazz != null && Annotation.class.isAssignableFrom(clazz)) {
             //noinspection unchecked
             return (Optional) aClass;
@@ -806,7 +823,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <E> The enum type
      * @return An {@link Optional} enum value
      */
-    default <E extends Enum> Optional<E> enumValue(@NonNull String annotation, Class<E> enumType) {
+    default <E extends Enum<E>> Optional<E> enumValue(@NonNull String annotation, Class<E> enumType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return enumValue(annotation, VALUE_MEMBER, enumType);
     }
@@ -820,7 +837,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <E> The enum type
      * @return An {@link Optional} class
      */
-    default <E extends Enum> Optional<E> enumValue(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
+    default <E extends Enum<E>> Optional<E> enumValue(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -835,7 +852,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <E> The enum type
      * @return An {@link Optional} class
      */
-    default <E extends Enum> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
+    default <E extends Enum<E>> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
 
         return enumValue(annotation, VALUE_MEMBER, enumType);
@@ -850,7 +867,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <E> The enum type
      * @return An {@link Optional} class
      */
-    default <E extends Enum> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
+    default <E extends Enum<E>> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -865,7 +882,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <E> The enum type
      * @return An array of enum values
      */
-    default <E extends Enum> E[] enumValues(@NonNull String annotation, Class<E> enumType) {
+    default <E extends Enum<E>> E[] enumValues(@NonNull String annotation, Class<E> enumType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         return enumValues(annotation, VALUE_MEMBER, enumType);
     }
@@ -879,7 +896,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <E> The enum type
      * @return An array of enum values
      */
-    default <E extends Enum> E[] enumValues(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
+    default <E extends Enum<E>> E[] enumValues(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
@@ -890,11 +907,26 @@ public interface AnnotationMetadata extends AnnotationSource {
      * The enum values for the given annotation.
      *
      * @param annotation The annotation
+     * @param member     The annotation member
+     * @param enumType The enum type
+     * @param <E> The enum type
+     * @return An enum set of enum values
+     * @since 4.0.0
+     */
+    default <E extends Enum<E>> EnumSet<E> enumValuesSet(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
+        E[] values = enumValues(annotation, member, enumType);
+        return values.length == 0 ? EnumSet.noneOf(enumType) : EnumSet.copyOf(Arrays.asList(values));
+    }
+
+    /**
+     * The enum values for the given annotation.
+     *
+     * @param annotation The annotation
      * @param enumType The enum type
      * @param <E> The enum type
      * @return An array of enum values
      */
-    default <E extends Enum> E[] enumValues(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
+    default <E extends Enum<E>> E[] enumValues(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
 
         return enumValues(annotation, VALUE_MEMBER, enumType);
@@ -909,11 +941,25 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <E> The enum type
      * @return An array of enum values
      */
-    default <E extends Enum> E[] enumValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
+    default <E extends Enum<E>> E[] enumValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
         ArgumentUtils.requireNonNull("annotation", annotation);
         ArgumentUtils.requireNonNull("member", member);
 
         return enumValues(annotation.getName(), member, enumType);
+    }
+
+    /**
+     * The enum values for the given annotation.
+     *
+     * @param annotation The annotation
+     * @param member     The annotation member
+     * @param enumType The enum type
+     * @param <E> The enum type
+     * @return An enum set of enum values
+     * @since 4.0.0
+     */
+    default <E extends Enum<E>> EnumSet<E> enumValuesSet(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
+       return enumValuesSet(annotation.getName(), member, enumType);
     }
 
     /**
@@ -1443,7 +1489,7 @@ public interface AnnotationMetadata extends AnnotationSource {
 
     /**
      * <p>Checks whether this object has the given annotation stereotype on the object itself or inherited from a parent</p>.
-     * <p>
+     *
      * <p>An annotation stereotype is a meta annotation potentially applied to another annotation</p>
      *
      * @param annotation The annotation
@@ -1456,6 +1502,18 @@ public interface AnnotationMetadata extends AnnotationSource {
                     .orElseGet(() -> hasStereotype(annotation.getName()));
         }
         return false;
+    }
+
+    /**
+     * Faster version of {@link #hasStereotype(Class)} that does not support repeatable
+     * annotations.
+     *
+     * @param annotation The annotation type
+     * @return Whether this metadata has the given stereotype
+     */
+    @Internal
+    default boolean hasStereotypeNonRepeating(@NonNull Class<? extends Annotation> annotation) {
+        return hasStereotype(annotation.getName());
     }
 
     /**
@@ -1592,6 +1650,31 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     default boolean isEmpty() {
         return this == AnnotationMetadata.EMPTY_METADATA;
+    }
+
+    /**
+     * Makes a copy of the annotation or returns this.
+     *
+     * @return the copy
+     * @since 4.0.0
+     */
+    @NonNull
+    default AnnotationMetadata copyAnnotationMetadata() {
+        return this;
+    }
+
+    /**
+     * Unwraps possible a possible delegate or a provider, returns this otherwise.
+     *
+     * @return unwrapped
+     * @see AnnotationMetadataDelegate
+     * @see AnnotationMetadataProvider
+     * @since 4.0.0
+     */
+    @Override
+    @NonNull
+    default AnnotationMetadata getTargetAnnotationMetadata() {
+        return this;
     }
 
 }

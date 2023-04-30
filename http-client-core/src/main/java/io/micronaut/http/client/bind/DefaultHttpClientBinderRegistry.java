@@ -80,7 +80,7 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
      * @param binders           The request binders
      * @param beanContext       The context to resolve beans
      */
-    protected DefaultHttpClientBinderRegistry(ConversionService<?> conversionService,
+    protected DefaultHttpClientBinderRegistry(ConversionService conversionService,
                                               List<ClientRequestBinder> binders,
                                               BeanContext beanContext) {
         byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (ClientArgumentRequestBinder<HttpHeaders>) (context, uriContext, value, request) -> value.forEachValue(request::header));
@@ -152,7 +152,7 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
 
         if (KOTLIN_COROUTINES_SUPPORTED) {
             //Clients should do nothing with the continuation
-            byType.put(Argument.of(Continuation.class).typeHashCode(),  (context, uriContext, value, request) -> { });
+            byType.put(Argument.of(Continuation.class).typeHashCode(), (context, uriContext, value, request) -> { });
         }
 
         if (CollectionUtils.isNotEmpty(binders)) {

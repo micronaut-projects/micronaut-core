@@ -2,15 +2,9 @@ package io.micronaut.inject.beanbuilder
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.Intercepted
-import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.NoSuchBeanException
-import io.micronaut.core.annotation.NonNull
-import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.annotation.AnnotationTransformer
-import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.inject.visitor.TypeElementVisitor
 
-import java.lang.annotation.Annotation
 import java.util.function.Supplier
 
 class BeanElementBuilderSpec extends AbstractTypeElementSpec {
@@ -30,7 +24,7 @@ class Test {
     Object invoke(CustomInvocationContext context) {
         invoked = true;
         return context.proceed();
-    }    
+    }
 }
 
 @jakarta.inject.Singleton
@@ -97,7 +91,7 @@ class Test {
     Object invoke(CustomInvocationContext context) {
         invoked = true;
         return context.proceed();
-    }    
+    }
 }
 
 @jakarta.inject.Singleton
@@ -164,7 +158,7 @@ class Test {
     Object invoke(CustomInvocationContext context) {
         invoked = true;
         return context.proceed();
-    }    
+    }
 }
 
 @jakarta.inject.Singleton
@@ -231,7 +225,7 @@ class Test {
     Object invoke(CustomInvocationContext context) {
         invoked = true;
         return context.proceed();
-    }    
+    }
 }
 
 @jakarta.inject.Singleton

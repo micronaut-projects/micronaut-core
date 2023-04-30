@@ -15,7 +15,6 @@
  */
 package io.micronaut.ast.groovy.annotation
 
-import io.micronaut.context.annotation.AliasFor
 import io.micronaut.aop.Around;
 import io.micronaut.context.annotation.AliasFor;
 
@@ -42,7 +41,7 @@ public @interface Trace {
     @AliasFor(annotation = Around.class, member = "hotswap")
     boolean something() default false;
 
-    Class type();
+    Class<?> type();
 
-    Class[] types();
+    Class<?>[] types();
 }

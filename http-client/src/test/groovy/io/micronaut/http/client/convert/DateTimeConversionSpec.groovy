@@ -26,7 +26,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-import javax.validation.constraints.NotNull
+import jakarta.validation.constraints.NotNull
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 

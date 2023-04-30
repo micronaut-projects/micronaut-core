@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 // tag::class[]
 @MicronautTest
 public class VehicleMockSpec {
-    @Requires(beans=VehicleMockSpec.class)
+    @Requires(beans = VehicleMockSpec.class)
     @Bean @Replaces(Engine.class)
     Engine mockEngine = () -> "Mock Started"; // <1>
 

@@ -1,7 +1,30 @@
-Configuration in Micronaut takes inspiration from both Spring Boot and Grails, integrating configuration properties from multiple sources directly into the core IoC container.
+Micronaut features a flexible configuration mechanism that allows reading configuration from a variety of sources into a unified model that can be bound to Java types annotated with <<configurationProperties, @ConfigurationProperties>>.
 
-Configuration can by default be provided in Java properties, YAML, JSON, or Groovy files. The convention is to search for a file named `application.yml`, `application.properties`, `application.json` or `application.groovy`.
+Configuration can by default be provided in Java properties files or https://www.json.org/json-en.html[JSON] with the ability to add support for more formats (such as YAML or Groovy configuration) by adding addition third-party libraries to your classpath. The convention is to search for a file named `application.properties` or `application.json` with support for other formats requiring additional dependencies as described by the following table:
 
-In addition, like Spring and Grails, Micronaut allows overriding any property via system properties or environment variables.
+.Supported Configuration Formats
+|===
+|Format|File|Dependency Required
+
+| https://yaml.org[YAML]
+|`application.yml`
+|`org.yaml:snakeyaml`
+
+| https://micronaut-projects.github.io/micronaut-groovy/latest/guide/#config[Groovy Config]
+|`application.groovy`
+|`io.micronaut.groovy:micronaut-runtime-groovy`
+
+|https://github.com/lightbend/config/blob/main/HOCON.md[HOCON]
+|`application.conf`
+|`io.micronaut.kotlin:micronaut-kotlin-runtime`
+
+|https://toml.io/en/[TOML]
+|`application.toml`
+|`io.micronaut.toml:micronaut-toml`
+
+|===
+
+
+In addition, Micronaut framework allows overriding any property via system properties or environment variables.
 
 Each source of configuration is modeled with the link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource] interface and the mechanism is extensible, allowing the implementation of additional link:{api}/io/micronaut/context/env/PropertySourceLoader.html[PropertySourceLoader] implementations.

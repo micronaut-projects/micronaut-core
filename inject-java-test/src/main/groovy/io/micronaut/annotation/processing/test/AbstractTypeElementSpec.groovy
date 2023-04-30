@@ -17,11 +17,21 @@ package io.micronaut.annotation.processing.test
 
 import com.sun.source.util.JavacTask
 import groovy.transform.CompileStatic
-import io.micronaut.annotation.processing.*
+import io.micronaut.annotation.processing.AggregatingTypeElementVisitorProcessor
+import io.micronaut.annotation.processing.AnnotationUtils
+import io.micronaut.annotation.processing.GenericUtils
+import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
+import io.micronaut.annotation.processing.ModelUtils
+import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.visitor.JavaElementFactory
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext
 import io.micronaut.aop.internal.InterceptorRegistryBean
-import io.micronaut.context.*
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.ApplicationContextBuilder
+import io.micronaut.context.ApplicationContextConfiguration
+import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.context.Qualifier
+import io.micronaut.context.env.Environment
 import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Experimental
@@ -30,6 +40,7 @@ import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
 import io.micronaut.core.graal.GraalReflectionConfigurer
+import io.micronaut.core.io.IOUtils
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanConfiguration
 import io.micronaut.inject.BeanDefinition
@@ -59,6 +70,7 @@ import javax.tools.JavaFileObject
 import java.lang.annotation.Annotation
 import java.util.stream.Collectors
 import java.util.stream.StreamSupport
+
 /**
  * Base class to extend from to allow compilation of Java sources
  * at runtime to allow testing of compile time behavior.
@@ -85,7 +97,6 @@ abstract class AbstractTypeElementSpec extends Specification {
         GenericUtils genericUtils = new GenericUtils(elements, types, modelUtils) {}
         AnnotationUtils annotationUtils = new AnnotationUtils(processingEnv, elements, messager, types, modelUtils, genericUtils, processingEnv.filer) {
         }
-        AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(typeElement)
 
         JavaVisitorContext visitorContext = new JavaVisitorContext(
                 processingEnv,
@@ -100,7 +111,7 @@ abstract class AbstractTypeElementSpec extends Specification {
                 TypeElementVisitor.VisitorKind.ISOLATING
         )
 
-        return new JavaElementFactory(visitorContext).newClassElement(typeElement, annotationMetadata)
+        return new JavaElementFactory(visitorContext).newClassElement(typeElement, visitorContext.getElementAnnotationMetadataFactory())
     }
 
     /**
@@ -109,28 +120,21 @@ abstract class AbstractTypeElementSpec extends Specification {
      */
     @CompileStatic
     AnnotationMetadata buildTypeAnnotationMetadata(@Language("java") String cls) {
+        AbstractAnnotationMetadataBuilder.clearMutated()
         Element element = buildTypeElement(cls)
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
-        AnnotationMetadata metadata = element != null ? builder.build(element) : null
-        AbstractAnnotationMetadataBuilder.copyToRuntime()
-        return metadata
-    }
-
-    AnnotationMetadata buildDeclaredMethodAnnotationMetadata(@Language("java") String cls, String methodName) {
-        TypeElement element = buildTypeElement(cls)
-        Element method = element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
-        JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
-        AnnotationMetadata metadata = method != null ? builder.buildDeclared(method) : null
+        AnnotationMetadata metadata = element != null ? builder.lookupOrBuildForType(element) : null
         AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
 
     AnnotationMetadata buildMethodArgumentAnnotationMetadata(@Language("java") String cls, String methodName, String argumentName) {
+        AbstractAnnotationMetadataBuilder.clearMutated()
         TypeElement element = buildTypeElement(cls)
         ExecutableElement method = (ExecutableElement)element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
         VariableElement argument = method.parameters.find() { it.simpleName.toString() == argumentName }
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
-        AnnotationMetadata metadata = argument != null ? builder.build(argument) : null
+        AnnotationMetadata metadata = argument != null ? builder.lookupOrBuildForMethod(element, argument) : null
         AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
@@ -141,7 +145,8 @@ abstract class AbstractTypeElementSpec extends Specification {
     * @return the introspection if it is correct
     **/
     protected BeanIntrospection buildBeanIntrospection(String className, @Language("java") String cls) {
-        def beanDefName= (className.startsWith('$') ? '' : '$') + NameUtils.getSimpleName(className) + '$Introspection'
+        def simpleName = NameUtils.getSimpleName(className)
+        def beanDefName = (simpleName.startsWith('$') ? '' : '$') + simpleName + '$Introspection'
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
@@ -235,15 +240,17 @@ class Test {
      * @param cls The class data
      * @return The context. Should be shutdown after use
      */
-    ApplicationContext buildContext(String className, @Language("java") String cls, boolean includeAllBeans = false) {
+    ApplicationContext buildContext(String className, @Language("java") String cls, boolean includeAllBeans = false, Map properties = [:]) {
         def files = newJavaParser().generate(className, cls)
         ClassLoader classLoader = new JavaFileObjectClassLoader(files)
 
         def builder = ApplicationContext.builder()
         builder.classLoader(classLoader)
         builder.environments("test")
+        builder.properties(properties)
         configureContext(builder)
-        return new DefaultApplicationContext((ApplicationContextConfiguration) builder) {
+        def env = builder.build().environment
+        def context = new DefaultApplicationContext((ApplicationContextConfiguration) builder) {
             @Override
             protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
                 def references = StreamSupport.stream(files.spliterator(), false)
@@ -259,7 +266,13 @@ class Test {
 
                 return references + (includeAllBeans ? super.resolveBeanDefinitionReferences() : getBuiltInBeanReferences())
             }
-        }.start()
+
+            @Override
+            protected Environment createEnvironment(@NonNull ApplicationContextConfiguration configuration) {
+                return env
+            }
+        }
+        return context.start()
     }
 
     /**
@@ -318,27 +331,11 @@ class Test {
         TypeElement element = buildTypeElement(cls)
         Element method = element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
-        AnnotationMetadata metadata = method != null ? builder.build(method) : null
+        AnnotationMetadata metadata = method != null ? builder.lookupOrBuildForMethod(element, method) : null
         return metadata
     }
 
-    /**
-     * @param cls   The class string
-     * @param methodName The method name
-     * @param fieldName The field name
-     * @return The annotation metadata for the field
-     */
-    @CompileStatic
-    AnnotationMetadata buildFieldAnnotationMetadata(@Language("java") String cls, String methodName, String fieldName) {
-        TypeElement element = buildTypeElement(cls)
-        ExecutableElement method = (ExecutableElement)element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
-        VariableElement argument = method.parameters.find() { it.simpleName.toString() == fieldName }
-        JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
-        AnnotationMetadata metadata = argument != null ? builder.build(argument) : null
-        return metadata
-    }
-
-    protected TypeElement buildTypeElement(String cls) {
+    protected TypeElement buildTypeElement(@Language('java') String cls) {
         List<Element> elements = []
 
         newJavaParser().parseLines("",
@@ -363,6 +360,11 @@ class Test {
                 typeElement: element,
                 javaParser: parser
         )
+    }
+
+    protected String buildAndReadResourceAsString(String resourceName, @Language("java") String cls) {
+        ClassLoader classLoader = buildClassLoader("test.Test", cls)
+        return IOUtils.readText(new BufferedReader(new InputStreamReader(classLoader.getResources(resourceName).toList().last().openStream())))
     }
 
     protected BeanDefinition buildBeanDefinition(String className, @Language("java") String cls) {
@@ -466,12 +468,14 @@ class Test {
 
     @CompileStatic
     protected ClassLoader buildClassLoader(String className, @Language("java") String cls) {
+        AbstractAnnotationMetadataBuilder.clearMutated()
         Iterable<? extends JavaFileObject> files = newJavaParser().generate(className, cls)
         return new JavaFileObjectClassLoader(files)
     }
 
+    @CompileStatic
     protected AnnotationMetadata writeAndLoadMetadata(String className, AnnotationMetadata toWrite) {
-        def stream = new ByteArrayOutputStream()
+        ByteArrayOutputStream stream = new ByteArrayOutputStream()
         new AnnotationMetadataWriter(className, null, toWrite, true)
                 .writeTo(stream)
         className = className + AnnotationMetadata.CLASS_NAME_SUFFIX
@@ -479,7 +483,7 @@ class Test {
             @Override
             protected Class<?> findClass(String name) throws ClassNotFoundException {
                 if (name == className) {
-                    def bytes = stream.toByteArray()
+                    byte[] bytes = stream.toByteArray()
                     return defineClass(name, bytes, 0, bytes.length)
                 }
                 return super.findClass(name)
@@ -566,13 +570,15 @@ class Test {
         if (classElement.isArray()) {
             return reconstructTypeSignature(classElement.fromArray()) + "[]"
         } else if (classElement.isGenericPlaceholder()) {
-            def freeVar = (GenericPlaceholderElement) classElement
-            def name = freeVar.variableName
+            def genericPlaceholderElement = (GenericPlaceholderElement) classElement
+            def name = genericPlaceholderElement.variableName
             if (typeVarsAsDeclarations) {
-                def bounds = freeVar.bounds
+                def bounds = genericPlaceholderElement.bounds
                 if (reconstructTypeSignature(bounds[0]) != 'Object') {
                     name += bounds.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", " extends ", ""))
                 }
+            } else if (genericPlaceholderElement.resolved) {
+                return reconstructTypeSignature(genericPlaceholderElement.resolved.get())
             }
             return name
         } else if (classElement.isWildcard()) {
@@ -585,12 +591,13 @@ class Test {
                 return we.upperBounds.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(" & ", "? extends ", ""))
             }
         } else {
-            def boundTypeArguments = classElement.getBoundGenericTypes()
-            if (boundTypeArguments.isEmpty()) {
+            def typeArguments = classElement.getTypeArguments().values()
+            if (typeArguments.isEmpty()) {
+                return classElement.getSimpleName()
+            } else if (typeArguments.stream().allMatch { it.isRawType() }) {
                 return classElement.getSimpleName()
             } else {
-                return classElement.getSimpleName() +
-                        boundTypeArguments.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(", ", "<", ">"))
+                return classElement.getSimpleName() + typeArguments.stream().map(AbstractTypeElementSpec::reconstructTypeSignature).collect(Collectors.joining(", ", "<", ">"))
             }
         }
     }

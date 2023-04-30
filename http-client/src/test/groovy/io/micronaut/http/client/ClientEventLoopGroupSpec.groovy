@@ -34,7 +34,7 @@ class ClientEventLoopGroupSpec extends Specification {
         HttpClient client = context.getBean(HttpClient)
 
         then:
-        client.group == context.getBean(EventLoopGroup, Qualifiers.byName("other"))
+        client.connectionManager.group == context.getBean(EventLoopGroup, Qualifiers.byName("other"))
 
         cleanup:
         context.close()

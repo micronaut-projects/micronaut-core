@@ -15,13 +15,8 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.util.Optional;
-
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
@@ -29,6 +24,13 @@ import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
 import org.codehaus.groovy.control.CompilationUnit;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.Optional;
+
+@Internal
 class GroovyClassWriterOutputVisitor implements ClassWriterOutputVisitor {
 
     private final CompilationUnit compilationUnit;

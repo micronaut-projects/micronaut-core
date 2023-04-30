@@ -18,18 +18,16 @@ package io.micronaut.ast.transform.test
 import groovy.transform.CompileStatic
 import io.micronaut.aop.internal.InterceptorRegistryBean
 import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
-import io.micronaut.ast.groovy.utils.AstAnnotationUtils
-import io.micronaut.ast.groovy.utils.ExtendedParameter
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
 import io.micronaut.ast.groovy.visitor.GroovyElementFactory
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.ApplicationContextConfiguration
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.Qualifier
 import io.micronaut.context.event.ApplicationEventPublisherFactory
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.beans.BeanIntrospection
-import io.micronaut.core.io.scan.ClassPathResourceLoader
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
@@ -71,9 +69,9 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
             def cc = new CompilerConfiguration()
             def sourceUnit = new SourceUnit("test", source, cc, new GroovyClassLoader(), new ErrorCollector(cc))
             def compilationUnit = new CompilationUnit()
-            def metadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, cn)
-            def elementFactory = new GroovyElementFactory(new GroovyVisitorContext(sourceUnit, compilationUnit))
-            return elementFactory.newClassElement(cn, metadata)
+            def visitorContext = new GroovyVisitorContext(sourceUnit, compilationUnit)
+            def elementFactory = new GroovyElementFactory(visitorContext)
+            return elementFactory.newClassElement(cn, visitorContext.getElementAnnotationMetadataFactory())
         } else {
             throw new IllegalArgumentException("No class found in passed source code")
         }
@@ -87,9 +85,9 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
                     def cc = new CompilerConfiguration()
                     def sourceUnit = new SourceUnit("test", source, cc, new GroovyClassLoader(), new ErrorCollector(cc))
                     def compilationUnit = new CompilationUnit()
-                    def metadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, compilationUnit, node)
-                    def elementFactory = new GroovyElementFactory(new GroovyVisitorContext(sourceUnit, compilationUnit))
-                    return elementFactory.newClassElement(node, metadata)
+                    def visitorContext = new GroovyVisitorContext(sourceUnit, compilationUnit)
+                    def elementFactory = new GroovyElementFactory(visitorContext)
+                    return elementFactory.newClassElement(node, visitorContext.getElementAnnotationMetadataFactory())
                 }
             }
         }
@@ -133,7 +131,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         def beanDefName= (className.startsWith('$') ? '' : '$') + className + BeanDefinitionWriter.CLASS_SUFFIX
         String beanFullName = "${packageName}.${beanDefName}"
 
-        def classLoader = new InMemoryByteCodeGroovyClassLoader()
+        def classLoader = new InMemoryByteCodeGroovyClassLoader() {}
         classLoader.parseClass(classStr)
         try {
             return (BeanDefinition) classLoader.loadClass(beanFullName).newInstance()
@@ -187,7 +185,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         def sourceUnit = Mock(SourceUnit)
         sourceUnit.getErrorCollector() >> new ErrorCollector(new CompilerConfiguration())
         GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(sourceUnit, null)
-        AnnotationMetadata metadata = element != null ? builder.build(element) : null
+        AnnotationMetadata metadata = element != null ? builder.lookupOrBuildForType(element) : null
         AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
@@ -198,17 +196,17 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(Stub(SourceUnit) {
             getErrorCollector() >> null
         }, null)
-        AnnotationMetadata metadata = method != null ? builder.build(method) : null
+        AnnotationMetadata metadata = method != null ? builder.lookupOrBuildForMethod(element,  method) : null
         AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
 
-    AnnotationMetadata buildFieldAnnotationMetadata(String cls, @Language("groovy") String source, String methodName, String fieldName) {
+    AnnotationMetadata buildParameterAnnotationMetadata(String cls, @Language("groovy") String source, String methodName, String fieldName) {
         ClassNode element = buildClassNode(source, cls)
         MethodNode method = element.getMethods(methodName)[0]
         Parameter parameter = Arrays.asList(method.getParameters()).find { it.name == fieldName }
         GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder(null, null)
-        AnnotationMetadata metadata = method != null ? builder.build(new ExtendedParameter(method, parameter)) : null
+        AnnotationMetadata metadata = method != null ? builder.lookupOrBuildForParameter(element, method, parameter) : null
         AbstractAnnotationMetadataBuilder.copyToRuntime()
         return metadata
     }
@@ -220,9 +218,9 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         return element
     }
 
-
+    @CompileStatic
     protected AnnotationMetadata writeAndLoadMetadata(String className, AnnotationMetadata toWrite) {
-        def stream = new ByteArrayOutputStream()
+        ByteArrayOutputStream stream = new ByteArrayOutputStream()
         new AnnotationMetadataWriter(className, null, toWrite, true)
                 .writeTo(stream)
         className = className + AnnotationMetadata.CLASS_NAME_SUFFIX
@@ -230,8 +228,8 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
             @Override
             protected Class<?> findClass(String name) throws ClassNotFoundException {
                 if (name == className) {
-                    def bytes = stream.toByteArray()
-                    return defineClass(name, bytes, 0, bytes.length)
+                    byte[] bytes = stream.toByteArray()
+                    return super.defineClass(name, bytes, 0, bytes.length)
                 }
                 return super.findClass(name)
             }
@@ -265,11 +263,14 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         context.getBean(context.classLoader.loadClass(className), qualifier)
     }
 
-    protected ApplicationContext buildContext(@Language("groovy") String cls, boolean includeAllBeans = false) {
+    protected ApplicationContext buildContext(@Language("groovy") String cls, boolean includeAllBeans = false, Map properties = [:]) {
         InMemoryByteCodeGroovyClassLoader classLoader = buildClassLoader(cls)
-
-        return new DefaultApplicationContext(
-                ClassPathResourceLoader.defaultLoader(classLoader),"test") {
+        def builder = ApplicationContext.builder()
+        builder.classLoader(classLoader)
+        builder.environments("test")
+        builder.properties(properties)
+        def env = builder.build().environment
+        return new DefaultApplicationContext((ApplicationContextConfiguration) builder) {
             @Override
             protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
                 def references =  classLoader.generatedClasses.keySet()

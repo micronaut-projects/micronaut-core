@@ -50,6 +50,7 @@ public class DefaultCustomizableResponseTypeHandlerRegistry implements NettyCust
     }
 
     @Override
+    @SuppressWarnings("java:S2789") // performance optimization
     public Optional<NettyCustomizableResponseTypeHandler> findTypeHandler(Class<?> type) {
         Optional<NettyCustomizableResponseTypeHandler> foundHandler = handlerCache.get(type);
         if (foundHandler != null) {

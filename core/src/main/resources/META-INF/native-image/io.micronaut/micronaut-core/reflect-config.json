@@ -1,7 +1,30 @@
-[ {
-  "name" : "io.micronaut.caffeine.cache.PSW",
-  "allDeclaredConstructors" : true
-}, {
-  "name" : "io.micronaut.caffeine.cache.SSLA",
-  "allDeclaredConstructors" : true
-} ]
+[
+  {
+    "name": "ch.qos.logback.core.ConsoleAppender",
+    "condition": {
+      "typeReachable": "ch.qos.logback.core.ConsoleAppender"
+    },
+    "methods": [
+      {
+        "name": "setWithJansi",
+        "parameterTypes": [
+          "boolean"
+        ]
+      }
+    ]
+  },
+  {
+    "name": "ch.qos.logback.core.encoder.LayoutWrappingEncoder",
+    "condition": {
+      "typeReachable": "ch.qos.logback.core.ConsoleAppender"
+    },
+    "methods": [
+      {
+        "name": "setParent",
+        "parameterTypes": [
+          "ch.qos.logback.core.spi.ContextAware"
+        ]
+      }
+    ]
+  }
+]

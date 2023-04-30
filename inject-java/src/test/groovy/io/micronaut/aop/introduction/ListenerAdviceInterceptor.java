@@ -28,7 +28,7 @@ import java.util.Set;
  * @since 1.0
  */
 @Singleton
-public class ListenerAdviceInterceptor implements MethodInterceptor<Object,Object> {
+public class ListenerAdviceInterceptor implements MethodInterceptor<Object, Object> {
 
     private Set<Object> recievedMessages = new HashSet<>();
 

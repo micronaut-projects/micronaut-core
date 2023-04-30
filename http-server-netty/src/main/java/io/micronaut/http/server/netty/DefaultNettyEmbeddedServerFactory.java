@@ -15,15 +15,6 @@
  */
 package io.micronaut.http.server.netty;
 
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.ThreadFactory;
-
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
@@ -39,6 +30,7 @@ import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupFactory;
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
+import io.micronaut.http.netty.channel.NettyChannelType;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
 import io.micronaut.http.netty.channel.converters.DefaultChannelOptionFactory;
@@ -51,10 +43,12 @@ import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.netty.types.DefaultCustomizableResponseTypeHandlerRegistry;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
 import io.micronaut.http.server.netty.types.files.FileTypeHandler;
+import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
+import io.micronaut.http.server.netty.websocket.WebSocketUpgradeHandlerFactory;
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.web.router.resource.StaticResourceResolver;
-import io.micronaut.websocket.context.WebSocketBeanRegistry;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.ServerChannel;
@@ -62,6 +56,16 @@ import io.netty.channel.socket.ServerSocketChannel;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ThreadFactory;
 
 /**
  * Default implementation of {@link io.micronaut.http.server.netty.NettyEmbeddedServerFactory}.
@@ -84,10 +88,10 @@ public class DefaultNettyEmbeddedServerFactory
     private final ExecutorSelector executorSelector;
     private final ThreadFactory nettyThreadFactory;
     private final HttpCompressionStrategy httpCompressionStrategy;
-    private final WebSocketBeanRegistry websocketBeanRegistry;
     private final EventLoopGroupFactory eventLoopGroupFactory;
     private final EventLoopGroupRegistry eventLoopGroupRegistry;
     private final Map<Class<?>, ApplicationEventPublisher<?>> cachedEventPublishers = new ConcurrentHashMap<>(5);
+    private final WebSocketUpgradeHandlerFactory webSocketUpgradeHandlerFactory;
     private @Nullable ServerSslBuilder serverSslBuilder;
     private @Nullable ChannelOptionFactory channelOptionFactory;
     private List<ChannelOutboundHandler> outboundHandlers = Collections.emptyList();
@@ -102,6 +106,7 @@ public class DefaultNettyEmbeddedServerFactory
      * @param httpCompressionStrategy The http compression strategy
      * @param eventLoopGroupFactory The event loop group factory
      * @param eventLoopGroupRegistry The event loop group registry
+     * @param webSocketUpgradeHandlerFactory An optional websocket integration
      */
     protected DefaultNettyEmbeddedServerFactory(ApplicationContext applicationContext,
                                                 RouteExecutor routeExecutor,
@@ -110,7 +115,8 @@ public class DefaultNettyEmbeddedServerFactory
                                                 @Named(NettyThreadFactory.NAME) ThreadFactory nettyThreadFactory,
                                                 HttpCompressionStrategy httpCompressionStrategy,
                                                 EventLoopGroupFactory eventLoopGroupFactory,
-                                                EventLoopGroupRegistry eventLoopGroupRegistry) {
+                                                EventLoopGroupRegistry eventLoopGroupRegistry,
+                                                @Nullable WebSocketUpgradeHandlerFactory webSocketUpgradeHandlerFactory) {
         this.applicationContext = applicationContext;
         this.requestArgumentSatisfier = routeExecutor.getRequestArgumentSatisfier();
         this.routeExecutor = routeExecutor;
@@ -119,9 +125,9 @@ public class DefaultNettyEmbeddedServerFactory
         this.executorSelector = routeExecutor.getExecutorSelector();
         this.nettyThreadFactory = nettyThreadFactory;
         this.httpCompressionStrategy = httpCompressionStrategy;
-        this.websocketBeanRegistry = WebSocketBeanRegistry.forServer(applicationContext);
         this.eventLoopGroupFactory = eventLoopGroupFactory;
         this.eventLoopGroupRegistry = eventLoopGroupRegistry;
+        this.webSocketUpgradeHandlerFactory = webSocketUpgradeHandlerFactory;
     }
 
     @Override
@@ -179,16 +185,16 @@ public class DefaultNettyEmbeddedServerFactory
     private NettyEmbeddedServices resolveNettyEmbeddedServices(@NonNull NettyHttpServerConfiguration configuration,
                                                                @Nullable ServerSslConfiguration sslConfiguration) {
         if (sslConfiguration != null && sslConfiguration.isEnabled()) {
-            ServerSslBuilder serverSslBuilder;
+            ServerSslBuilder resolvedSslBuilder;
             final ResourceResolver resourceResolver = applicationContext.getBean(ResourceResolver.class);
             if (sslConfiguration.buildSelfSigned()) {
-                serverSslBuilder = new SelfSignedSslBuilder(
+                resolvedSslBuilder = new SelfSignedSslBuilder(
                       configuration,
                       sslConfiguration,
                       resourceResolver
                 );
             } else {
-                serverSslBuilder = new CertificateProvidedSslBuilder(
+                resolvedSslBuilder = new CertificateProvidedSslBuilder(
                     configuration,
                     sslConfiguration,
                     resourceResolver
@@ -202,7 +208,7 @@ public class DefaultNettyEmbeddedServerFactory
 
                 @Override
                 public ServerSslBuilder getServerSslBuilder() {
-                    return serverSslBuilder;
+                    return resolvedSslBuilder;
                 }
             };
         }
@@ -263,8 +269,9 @@ public class DefaultNettyEmbeddedServerFactory
     }
 
     @Override
-    public WebSocketBeanRegistry getWebSocketBeanRegistry() {
-        return this.websocketBeanRegistry;
+    public Optional<NettyServerWebSocketUpgradeHandler> getWebSocketUpgradeHandler(NettyEmbeddedServer server) {
+        return Optional.ofNullable(webSocketUpgradeHandlerFactory)
+                        .map(factory -> factory.create(server, this));
     }
 
     @Override
@@ -288,6 +295,11 @@ public class DefaultNettyEmbeddedServerFactory
     @Override
     public ServerChannel getDomainServerChannelInstance(EventLoopGroupConfiguration workerConfig) {
         return eventLoopGroupFactory.domainServerSocketChannelInstance(workerConfig);
+    }
+
+    @Override
+    public Channel getChannelInstance(NettyChannelType type, EventLoopGroupConfiguration workerConfig) {
+        return eventLoopGroupFactory.channelInstance(type, workerConfig);
     }
 
     @SuppressWarnings("unchecked")

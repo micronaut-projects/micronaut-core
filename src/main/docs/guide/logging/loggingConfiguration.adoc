@@ -1,6 +1,6 @@
-Log levels can be configured via properties defined in `application.yml` (and environment variables) with the `logger.levels` prefix:
+Log levels can be configured via properties defined in your configuration file (e.g `application.yml`) (and environment variables) with the `logger.levels` prefix:
 
-[source,yaml]
+[configuration]
 ----
 logger:
   levels:
@@ -9,17 +9,27 @@ logger:
 
 The same configuration can be achieved by setting the environment variable `LOGGER_LEVELS_FOO_BAR`. Note that there is currently no way to set log levels for unconventional prefixes such as `foo.barBaz`.
 
+==== Custom Logback XML Configuration
+
+[configuration]
+----
+logger:
+  config: custom-logback.xml
+----
+
+You can also set a custom Logback XML configuration file to be used via `logger.config`. Be aware that **the referenced file should be an accessible resource on your classpath**!
+
 ==== Disabling a Logger with Properties
 
 To disable a logger, you need to set the logger level to `OFF`:
 
-[source,yaml]
+[configuration]
 ----
 logger:
   levels:
-    io.verbose.logger.who.CriedWolf: OFF <1>
+    io.verbose.logger.who.CriedWolf: OFF
 ----
-1. This will disable ALL logging for the class `io.verbose.logger.who.CriedWolf`
+- This will disable ALL logging for the class `io.verbose.logger.who.CriedWolf`
 
 
-Note that the ability to control log levels via config is controlled via the api:logging.LoggingSystem[] interface. Currently, Micronaut includes a single implementation that allows setting log levels for the Logback library. If you use another library, you should provide a bean that implements this interface.
+Note that the ability to control log levels via config is controlled via the api:logging.LoggingSystem[] interface. Currently, the Micronaut framework includes a single implementation that allows setting log levels for the Logback library. If you use another library, you should provide a bean that implements this interface.

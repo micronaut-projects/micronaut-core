@@ -22,8 +22,8 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v3
         with:
-          distribution: 'adopt'
-          java-version: '11'
+          distribution: 'temurin'
+          java-version: '17'
       - name: Publish to Sonatype OSSRH
         env:
           SONATYPE_USERNAME: ${{ secrets.SONATYPE_USERNAME }}

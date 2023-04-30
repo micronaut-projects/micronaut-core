@@ -20,8 +20,6 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.visitor.TypeElementVisitor;
-import io.micronaut.inject.visitor.VisitorContext;
 
 import java.util.ArrayList;
 import java.util.List;

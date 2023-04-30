@@ -77,7 +77,7 @@ class HttpHeadSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Not Found"
+        e.message == "Client '/': Not Found"
         e.status == HttpStatus.NOT_FOUND
     }
 
@@ -91,7 +91,7 @@ class HttpHeadSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error"
+        e.message == "Client '/': Internal Server Error"
         e.status == HttpStatus.INTERNAL_SERVER_ERROR
         !e.response.getBody(String).isPresent()
     }
@@ -106,7 +106,7 @@ class HttpHeadSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Internal Server Error"
+        e.message == "Client '/': Internal Server Error"
         e.status == HttpStatus.INTERNAL_SERVER_ERROR
     }
 
@@ -184,13 +184,13 @@ class HttpHeadSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == "Empty body"
+        ex.message == "Client '/': Empty body"
     }
 
     void "test simple get request with POJO list"() {
         when:
         Flux<HttpResponse<List<Book>>> flowable = Flux.from(client.exchange(
-                HttpRequest.HEAD("/head/pojoList"), Argument.of(List, Book)
+                HttpRequest.HEAD("/head/pojoList"), Argument.listOf(Book)
         ))
 
         HttpResponse<List<Book>> response = flowable.blockFirst()
@@ -224,21 +224,21 @@ class HttpHeadSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == "Empty body"
+        ex.message == "Client '/head': Empty body"
 
         when:
         client.queryParam('foo', 'bar')
 
         then:
         ex = thrown(HttpClientResponseException)
-        ex.message == "Empty body"
+        ex.message == "Client '/head': Empty body"
 
         when:
         client.queryParam('foo%', 'bar')
 
         then:
         ex = thrown(HttpClientResponseException)
-        ex.message == "Empty body"
+        ex.message == "Client '/head': Empty body"
     }
 
     void "test body availability"() {
@@ -269,7 +269,7 @@ class HttpHeadSpec extends Specification {
 
         then:
         def e = thrown(HttpClientResponseException)
-        e.message == "Not Found"
+        e.message == "Client '/': Not Found"
         e.status == HttpStatus.NOT_FOUND
     }
 
@@ -281,7 +281,7 @@ class HttpHeadSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == "Empty body"
+        ex.message == "Client '/': Empty body"
     }
 
     void 'test format dates with @Format'() {
@@ -295,28 +295,28 @@ class HttpHeadSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == "Empty body"
+        ex.message == "Client '/head': Empty body"
 
         when:
         client.formatDateQuery(d)
 
         then:
         ex = thrown(HttpClientResponseException)
-        ex.message == "Empty body"
+        ex.message == "Client '/head': Empty body"
 
         when:
         client.formatDateTime(dt)
 
         then:
         ex = thrown(HttpClientResponseException)
-        ex.message == "Empty body"
+        ex.message == "Client '/head': Empty body"
 
         when:
         client.formatDateTimeQuery(dt)
 
         then:
         ex = thrown(HttpClientResponseException)
-        ex.message == "Empty body"
+        ex.message == "Client '/head': Empty body"
     }
 
     void "test no body returned"() {
@@ -325,7 +325,7 @@ class HttpHeadSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == "Empty body"
+        ex.message == "Client '/head': Empty body"
     }
 
     void "test a request with a custom host header"() {
@@ -336,7 +336,7 @@ class HttpHeadSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == "Empty body"
+        ex.message == "Client '/': Empty body"
 
     }
 
@@ -349,7 +349,7 @@ class HttpHeadSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.message == "Method Not Allowed"
+        ex.message == "Client '/head': Method Not Allowed"
 
         when:
         String body = client.toBlocking().retrieve(HttpRequest.GET("/head/no-head"), String)

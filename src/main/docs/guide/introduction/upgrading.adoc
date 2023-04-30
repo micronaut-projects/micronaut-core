@@ -1,4 +1,4 @@
-This section covers the steps required to upgrade a Micronaut 2.x application to Micronaut 3.0.0.
+This section covers the steps required to upgrade a Micronaut framework 2.x application to Micronaut framework 3.0.0.
 
 The sections below go into more detail, but at a high level the process generally involves:
 
@@ -109,15 +109,13 @@ If you use Maven, update the parent POM version and `micronaut.version` property
 
 === Build Plugin Update
 
-If you use the Micronaut Gradle plugin, update the version to `2.0.3`
-
-`id("io.micronaut.application") version "2.0.3"`
+If you use the https://micronaut-projects.github.io/micronaut-gradle-plugin/latest/[Micronaut Gradle plugin] update to the https://github.com/micronaut-projects/micronaut-gradle-plugin/releases/latest[latest version].
 
 For Maven users the plugin version is updated automatically when you update the Micronaut version.
 
 === Inject Annotations
 
-The `javax.inject` annotations are no longer a transitive dependency. Micronaut now ships with the Jakarta inject annotations. Either replace all `javax.inject` imports with `jakarta.inject`, or add a dependency on `javax-inject` to continue using the older annotations:
+The `javax.inject` annotations are no longer a transitive dependency. The Micronaut framework now ships with the Jakarta inject annotations. Either replace all `javax.inject` imports with `jakarta.inject`, or add a dependency on `javax-inject` to continue using the older annotations:
 
 dependency:javax.inject:javax.inject:1[]
 
@@ -125,13 +123,13 @@ Any code that relied on the `javax.inject` annotations being present in the anno
 
 === Nullability Annotations
 
-Micronaut now only comes with its own set of annotations to declare nullability. The findbugs, javax, and jetbrains annotations are all still supported, however you must add a dependency to use them. Either switch to the Micronaut ann:core.annotation.Nullable[] / ann:core.annotation.NonNull[] annotations or add a dependency for the annotation library you wish to use.
+The Micronaut framework now only comes with its own set of annotations to declare nullability. The findbugs, javax, and jetbrains annotations are all still supported, however you must add a dependency to use them. Either switch to the Micronaut ann:core.annotation.Nullable[] / ann:core.annotation.NonNull[] annotations or add a dependency for the annotation library you wish to use.
 
 === RxJava2
 
-Micronaut no longer ships any reactive implementation as a default in any of our modules or core libraries. Upgrading to Micronaut 3 requires choosing which reactive streams implementation to use, and then adding the relevant dependency.
+The Micronaut framework no longer ships any reactive implementation as a default in any of our modules or core libraries. Upgrading to Micronaut 3 requires choosing which reactive streams implementation to use, and then adding the relevant dependency.
 
-For those already using RxJava3 or Project Reactor, there should be no changes required to upgrade to Micronaut 3. If you use RxJava2 and wish to continue using it, you must add a dependency:
+For those already using RxJava3 or Project Reactor, there should be no changes required to upgrade to the Micronaut framework 3. If you use RxJava2 and wish to continue using it, you must add a dependency:
 
 dependency:io.micronaut.rxjava2:micronaut-rxjava2[gradleScope="implementation"]
 

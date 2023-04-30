@@ -39,7 +39,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target(ElementType.TYPE)
 @Singleton
-@ConfigurationReader(prefix = EndpointConfiguration.PREFIX)
+@ConfigurationReader(basePrefix = EndpointConfiguration.PREFIX)
 @Requires(condition = EndpointEnabledCondition.class)
 public @interface Endpoint {
 
@@ -66,7 +66,7 @@ public @interface Endpoint {
     /**
      * @return The ID of the endpoint
      */
-    @AliasFor(annotation = ConfigurationReader.class, member = "value")
+    @AliasFor(annotation = ConfigurationReader.class, member = ConfigurationReader.PREFIX)
     @AliasFor(member = "id")
     String value() default "";
 
@@ -74,13 +74,13 @@ public @interface Endpoint {
      * @return The ID of the endpoint
      */
     @AliasFor(member = "value")
-    @AliasFor(annotation = ConfigurationReader.class, member = "value")
+    @AliasFor(annotation = ConfigurationReader.class, member = ConfigurationReader.PREFIX)
     String id() default "";
 
     /**
      * @return The default prefix to use
      */
-    @AliasFor(annotation = ConfigurationReader.class, member = "prefix")
+    @AliasFor(annotation = ConfigurationReader.class, member = ConfigurationReader.BASE_PREFIX)
     String prefix() default DEFAULT_PREFIX;
 
     /**

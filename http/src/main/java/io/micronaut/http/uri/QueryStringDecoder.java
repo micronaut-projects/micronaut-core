@@ -40,7 +40,7 @@ import static io.micronaut.core.util.StringUtils.SPACE;
  * </pre>
  *
  * This decoder can also decode the content of an HTTP POST request whose
- * content type is <tt>application/x-www-form-urlencoded</tt>:
+ * content type is {@code application/x-www-form-urlencoded}:
  * <pre>
  * {@link QueryStringDecoder} decoder = new {@link QueryStringDecoder}("recipient=world&x=1;y=2", false);
  * ...

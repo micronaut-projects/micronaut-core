@@ -19,11 +19,21 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.ConversionServiceProvider;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.ValueResolver;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Properties;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
@@ -34,7 +44,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Iterable<Map.Entry<String, V>> {
+public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Iterable<Map.Entry<String, V>>, ConversionServiceProvider {
 
     ConvertibleValues EMPTY = new ConvertibleValuesMap<>(Collections.emptyMap());
 
@@ -60,8 +70,8 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
      */
     @SuppressWarnings("unchecked")
     default Class<V> getValueType() {
-        Optional<Class> type = GenericTypeUtils.resolveInterfaceTypeArgument(getClass(), ConvertibleValues.class);
-        return type.orElse(Object.class);
+        Optional<Class<?>> type = GenericTypeUtils.resolveInterfaceTypeArgument(getClass(), ConvertibleValues.class);
+        return (Class<V>) type.orElse(Object.class);
     }
 
     /**
@@ -133,9 +143,9 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
         Map<KT, VT> newMap = new LinkedHashMap<>();
         for (Map.Entry<String, V> entry : this) {
             String key = entry.getKey();
-            Optional<KT> convertedKey = ConversionService.SHARED.convert(key, keyType);
+            Optional<KT> convertedKey = getConversionService().convert(key, keyType);
             if (convertedKey.isPresent()) {
-                Optional<VT> convertedValue = ConversionService.SHARED.convert(entry.getValue(), valueType);
+                Optional<VT> convertedValue = getConversionService().convert(entry.getValue(), valueType);
                 convertedValue.ifPresent(vt -> newMap.put(convertedKey.get(), vt));
             }
         }
@@ -247,10 +257,23 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
      * @return The values
      */
     static <T> ConvertibleValues<T> of(Map<? extends CharSequence, T> values) {
+        return of(values, ConversionService.SHARED);
+    }
+
+    /**
+     * Creates a new {@link ConvertibleValues} for the values.
+     *
+     * @param values A map of values
+     * @param conversionService The conversion service
+     * @param <T>    The target generic type
+     * @return The values
+     * @since 4.0.0
+     */
+    static <T> ConvertibleValues<T> of(Map<? extends CharSequence, T> values, ConversionService conversionService) {
         if (values == null) {
             return ConvertibleValuesMap.empty();
         } else {
-            return new ConvertibleValuesMap<>(values);
+            return new ConvertibleValuesMap<>(values, conversionService);
         }
     }
 
@@ -263,5 +286,10 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
     @SuppressWarnings("unchecked")
     static <V> ConvertibleValues<V> empty() {
         return ConvertibleValues.EMPTY;
+    }
+
+    @Override
+    default ConversionService getConversionService() {
+        return ConversionService.SHARED;
     }
 }

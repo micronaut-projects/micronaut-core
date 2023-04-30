@@ -36,12 +36,12 @@ import io.netty.util.ReferenceCounted;
  * @since 1.0
  */
 @Internal
-class EmptyHttpRequest extends DelegateHttpRequest implements FullHttpRequest {
+public class EmptyHttpRequest extends DelegateHttpRequest implements FullHttpRequest {
 
     /**
      * @param request The Http request
      */
-    EmptyHttpRequest(HttpRequest request) {
+    public EmptyHttpRequest(HttpRequest request) {
         super(request);
     }
 

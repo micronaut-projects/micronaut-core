@@ -63,6 +63,6 @@ final class NamedAnnotationStereotypeQualifier<T> implements Qualifier<T> {
 
     @Override
     public int hashCode() {
-        return Objects.hash(stereotype);
+        return stereotype.hashCode();
     }
 }

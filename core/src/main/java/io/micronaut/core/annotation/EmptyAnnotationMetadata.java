@@ -38,22 +38,22 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public <E extends Enum> E[] enumValues(@NonNull String annotation, Class<E> enumType) {
+    public <E extends Enum<E>> E[] enumValues(@NonNull String annotation, Class<E> enumType) {
         return (E[]) Array.newInstance(enumType, 0);
     }
 
     @Override
-    public <E extends Enum> E[] enumValues(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
+    public <E extends Enum<E>> E[] enumValues(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
         return (E[]) Array.newInstance(enumType, 0);
     }
 
     @Override
-    public <E extends Enum> E[] enumValues(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
+    public <E extends Enum<E>> E[] enumValues(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
         return (E[]) Array.newInstance(enumType, 0);
     }
 
     @Override
-    public <E extends Enum> E[] enumValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
+    public <E extends Enum<E>> E[] enumValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
         return (E[]) Array.newInstance(enumType, 0);
     }
 
@@ -137,7 +137,7 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
 
     @NonNull
     @Override
-    public Map<String, Object> getDefaultValues(@NonNull String annotation) {
+    public Map<CharSequence, Object> getDefaultValues(@NonNull String annotation) {
         return Collections.emptyMap();
     }
 
@@ -277,47 +277,47 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public <E extends Enum> Optional<E> enumValue(@NonNull String annotation, Class<E> enumType) {
+    public <E extends Enum<E>> Optional<E> enumValue(@NonNull String annotation, Class<E> enumType) {
         return Optional.empty();
     }
 
     @Override
-    public <E extends Enum> Optional<E> enumValue(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
+    public <E extends Enum<E>> Optional<E> enumValue(@NonNull String annotation, @NonNull String member, Class<E> enumType) {
         return Optional.empty();
     }
 
     @Override
-    public <E extends Enum> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
+    public <E extends Enum<E>> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, Class<E> enumType) {
         return Optional.empty();
     }
 
     @Override
-    public <E extends Enum> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
+    public <E extends Enum<E>> Optional<E> enumValue(@NonNull Class<? extends Annotation> annotation, @NonNull String member, Class<E> enumType) {
         return Optional.empty();
     }
 
     @NonNull
     @Override
     public <T> Class<T>[] classValues(@NonNull String annotation) {
-        return ReflectionUtils.EMPTY_CLASS_ARRAY;
+        return (Class<T>[]) ReflectionUtils.EMPTY_CLASS_ARRAY;
     }
 
     @NonNull
     @Override
     public <T> Class<T>[] classValues(@NonNull String annotation, @NonNull String member) {
-        return ReflectionUtils.EMPTY_CLASS_ARRAY;
+        return (Class<T>[]) ReflectionUtils.EMPTY_CLASS_ARRAY;
     }
 
     @NonNull
     @Override
     public <T> Class<T>[] classValues(@NonNull Class<? extends Annotation> annotation) {
-        return ReflectionUtils.EMPTY_CLASS_ARRAY;
+        return (Class<T>[]) ReflectionUtils.EMPTY_CLASS_ARRAY;
     }
 
     @NonNull
     @Override
     public <T> Class<T>[] classValues(@NonNull Class<? extends Annotation> annotation, @NonNull String member) {
-        return ReflectionUtils.EMPTY_CLASS_ARRAY;
+        return (Class<T>[]) ReflectionUtils.EMPTY_CLASS_ARRAY;
     }
 
     @Override
@@ -557,5 +557,10 @@ final class EmptyAnnotationMetadata implements AnnotationMetadata {
     @Override
     public boolean isEmpty() {
         return true;
+    }
+
+    @Override
+    public AnnotationMetadata copyAnnotationMetadata() {
+        return this;
     }
 }

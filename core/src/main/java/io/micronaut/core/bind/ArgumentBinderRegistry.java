@@ -33,8 +33,20 @@ public interface ArgumentBinderRegistry<S> {
      * @param <T> The argument type
      * @param <ST> The source type
      * @since 2.0
+     * @deprecated replaced with {@link #addArgumentBinder(ArgumentBinder)}
      */
+    @Deprecated(since = "4", forRemoval = true)
     default <T, ST> void addRequestArgumentBinder(ArgumentBinder<T, ST> binder) {
+        addArgumentBinder((ArgumentBinder) binder);
+    }
+
+    /**
+     * Adds a request argument binder to the registry.
+     * @param binder The binder
+     * @param <T> The argument type
+     * @since 4.0.0
+     */
+    default <T> void addArgumentBinder(ArgumentBinder<T, S> binder) {
         throw new UnsupportedOperationException("Binder registry is not mutable");
     }
 
@@ -45,6 +57,20 @@ public interface ArgumentBinderRegistry<S> {
      * @param source   The source
      * @param <T>      The argument type
      * @return An {@link Optional} of {@link ArgumentBinder}
+     * @deprecated replaced with {@link #findArgumentBinder(Argument)}
      */
-    <T> Optional<ArgumentBinder<T, S>> findArgumentBinder(Argument<T> argument, S source);
+    @Deprecated(since = "4", forRemoval = true)
+    default <T> Optional<ArgumentBinder<T, S>> findArgumentBinder(Argument<T> argument, S source) {
+        return findArgumentBinder(argument);
+    }
+
+    /**
+     * Locate an {@link ArgumentBinder} for the given argument.
+     *
+     * @param argument The argument
+     * @param <T>      The argument type
+     * @return An {@link Optional} of {@link ArgumentBinder}
+     * @since 4.0.0
+     */
+    <T> Optional<ArgumentBinder<T, S>> findArgumentBinder(Argument<T> argument);
 }

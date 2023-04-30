@@ -17,13 +17,16 @@ package io.micronaut.buffer.netty;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
+import jakarta.annotation.PostConstruct;
 import jakarta.inject.Singleton;
+
+import java.util.function.Supplier;
 
 /**
  * A {@link ByteBufferFactory} implementation for Netty.
@@ -41,11 +44,36 @@ public class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocato
      */
     public static final NettyByteBufferFactory DEFAULT = new NettyByteBufferFactory();
 
-    private final ByteBufAllocator allocator;
+    private final Supplier<ByteBufAllocator> allocatorSupplier;
 
-    static {
-        ConversionService.SHARED.addConverter(ByteBuf.class, ByteBuffer.class, DEFAULT::wrap);
-        ConversionService.SHARED.addConverter(ByteBuffer.class, ByteBuf.class, byteBuffer -> {
+    /**
+     * Default constructor.
+     */
+    public NettyByteBufferFactory() {
+        this.allocatorSupplier = new Supplier<ByteBufAllocator>() {
+            @Override
+            public ByteBufAllocator get() {
+                return ByteBufAllocator.DEFAULT;
+            }
+        };
+    }
+
+    /**
+     * @param allocator The {@link ByteBufAllocator}
+     */
+    public NettyByteBufferFactory(ByteBufAllocator allocator) {
+        this.allocatorSupplier = new Supplier<ByteBufAllocator>() {
+            @Override
+            public ByteBufAllocator get() {
+                return allocator;
+            }
+        };
+    }
+
+    @PostConstruct
+    final void register(MutableConversionService conversionService) {
+        conversionService.addConverter(ByteBuf.class, ByteBuffer.class, DEFAULT::wrap);
+        conversionService.addConverter(ByteBuffer.class, ByteBuf.class, byteBuffer -> {
             if (byteBuffer instanceof NettyByteBuffer) {
                 return (ByteBuf) byteBuffer.asNativeBuffer();
             }
@@ -53,38 +81,24 @@ public class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocato
         });
     }
 
-    /**
-     * Default constructor.
-     */
-    public NettyByteBufferFactory() {
-        this.allocator = ByteBufAllocator.DEFAULT;
-    }
-
-    /**
-     * @param allocator The {@link ByteBufAllocator}
-     */
-    public NettyByteBufferFactory(ByteBufAllocator allocator) {
-        this.allocator = allocator;
-    }
-
     @Override
     public ByteBufAllocator getNativeAllocator() {
-        return allocator;
+        return allocatorSupplier.get();
     }
 
     @Override
     public ByteBuffer<ByteBuf> buffer() {
-        return new NettyByteBuffer(allocator.buffer());
+        return new NettyByteBuffer(allocatorSupplier.get().buffer());
     }
 
     @Override
     public ByteBuffer<ByteBuf> buffer(int initialCapacity) {
-        return new NettyByteBuffer(allocator.buffer(initialCapacity));
+        return new NettyByteBuffer(allocatorSupplier.get().buffer(initialCapacity));
     }
 
     @Override
     public ByteBuffer<ByteBuf> buffer(int initialCapacity, int maxCapacity) {
-        return new NettyByteBuffer(allocator.buffer(initialCapacity, maxCapacity));
+        return new NettyByteBuffer(allocatorSupplier.get().buffer(initialCapacity, maxCapacity));
     }
 
     @Override

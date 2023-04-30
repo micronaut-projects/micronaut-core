@@ -17,6 +17,7 @@ package io.micronaut.messaging;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.Described;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -76,25 +77,29 @@ public class MessagingApplication implements EmbeddedApplication<MessagingApplic
     }
 
     @Override
+    @NonNull
     public MessagingApplication start() {
         ApplicationContext applicationContext = getApplicationContext();
-        if (applicationContext != null && !applicationContext.isRunning()) {
-            try {
-                applicationContext.start();
-                applicationContext.publishEvent(new ApplicationStartupEvent(this));
-            } catch (Throwable e) {
-                throw new ApplicationStartupException("Error starting messaging server: " + e.getMessage(), e);
+        if (applicationContext != null) {
+            if (!applicationContext.isRunning()) {
+                try {
+                    applicationContext.start();
+                } catch (Throwable e) {
+                    throw new ApplicationStartupException("Error starting messaging server: " + e.getMessage(), e);
+                }
             }
+            applicationContext.publishEvent(new ApplicationStartupEvent(this));
         }
         return this;
     }
 
     @Override
+    @NonNull
     public MessagingApplication stop() {
         ApplicationContext applicationContext = getApplicationContext();
         if (applicationContext != null && applicationContext.isRunning()) {
-            applicationContext.stop();
             applicationContext.publishEvent(new ApplicationShutdownEvent(this));
+            applicationContext.stop();
         }
         return this;
     }

@@ -57,7 +57,7 @@ public interface DelegatingExecutableMethod<T, R> extends ExecutableMethod<T, R>
     }
 
     @Override
-    default Class[] getArgumentTypes() {
+    default Class<?>[] getArgumentTypes() {
         return getTarget().getArgumentTypes();
     }
 

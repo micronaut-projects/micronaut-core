@@ -22,11 +22,11 @@ import java.util.function.Function;
 
 /**
  * <p>A type converter for converting from one type to another.</p>
- * <p>
+ *
  * <p>Implementations should be stateless, simple and thread safe. Type converters are often best defined as Java lambdas.
  * You should NOT perform any overly complex, blocking or slow conversions in implementations of this interface.
  * </p>
- * <p>
+ *
  * <p>If dependency injection is required, carefully consider what you inject. Databases and I/O bound interfaces are not good candidates.
  * In addition, injecting dependencies that may trigger the evaluation of beans that depend on configuration will cause problems because
  * all type converters have not been registered yet.</p>
@@ -72,6 +72,12 @@ public interface TypeConverter<S, T> {
      * @return The converter instance
      */
     static <ST, TT> TypeConverter<ST, TT> of(Class<ST> sourceType, Class<TT> targetType, Function<ST, TT> converter) {
-        return (object, targetType1, context) -> Optional.ofNullable(converter.apply(object));
+        // Keep the anonymous class instead of Lambda to reduce the Lambda invocation overhead during the startup
+        return new TypeConverter<ST, TT>() {
+            @Override
+            public Optional<TT> convert(ST object, Class<TT> targetType1, ConversionContext context) {
+                return Optional.ofNullable(converter.apply(object));
+            }
+        };
     }
 }

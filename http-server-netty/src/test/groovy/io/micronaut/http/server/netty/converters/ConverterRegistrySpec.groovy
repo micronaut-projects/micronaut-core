@@ -17,8 +17,10 @@ package io.micronaut.http.server.netty.converters
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.ConversionService
+import io.netty.buffer.ByteBuf
 import io.netty.buffer.CompositeByteBuf
 import io.netty.buffer.Unpooled
+import io.netty.channel.ChannelOption
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
@@ -41,5 +43,46 @@ class ConverterRegistrySpec extends Specification {
         cleanup:
         compositeByteBuf.release()
         ctx.close()
+    }
+
+    def "test convert bytebuf to string after context reset"() {
+        given:
+        ApplicationContext ctx1 = ApplicationContext.run()
+        ApplicationContext ctx2 = ApplicationContext.run()
+        ByteBuf buf = Unpooled.wrappedBuffer("foo".bytes)
+
+        expect:
+        ctx1.getBean(ConversionService).convert(buf, String).get() == 'foo'
+        ctx2.getBean(ConversionService).convert(buf, String).get() == 'foo'
+
+        when:
+        ctx2.stop()
+
+        then:
+        ctx1.getBean(ConversionService).convert(buf, String).get() == 'foo'
+
+        cleanup:
+        buf.release()
+        ctx1.close()
+    }
+
+    def "test convert string to channel option after context reset"() {
+        given:
+        ApplicationContext ctx1 = ApplicationContext.run()
+        ApplicationContext ctx2 = ApplicationContext.run()
+
+        expect:
+        // works as expected
+        ctx1.getBean(ConversionService).convert("AUTO_READ", ChannelOption).get() == ChannelOption.AUTO_READ
+        ctx2.getBean(ConversionService).convert("AUTO_READ", ChannelOption).get() == ChannelOption.AUTO_READ
+
+        when:
+        ctx2.stop()
+
+        then:
+        ctx1.getBean(ConversionService).convert("AUTO_READ", ChannelOption).get() == ChannelOption.AUTO_READ
+
+        cleanup:
+        ctx1.close()
     }
 }

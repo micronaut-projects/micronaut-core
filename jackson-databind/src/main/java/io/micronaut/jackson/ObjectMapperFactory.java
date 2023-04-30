@@ -100,6 +100,24 @@ public class ObjectMapperFactory {
     }
 
     /**
+     * Set additional serializers.
+     * @param serializers The serializers
+     * @since 4.0
+     */
+    public void setSerializers(JsonSerializer... serializers) {
+        this.serializers = serializers;
+    }
+
+    /**
+     * Set additional deserializers.
+     * @param deserializers The deserializers
+     * @since 4.0
+     */
+    public void setDeserializers(JsonDeserializer... deserializers) {
+        this.deserializers = deserializers;
+    }
+
+    /**
      * Builds the core Jackson {@link ObjectMapper} from the optional configuration and {@link JsonFactory}.
      *
      * @param jacksonConfiguration The configuration
@@ -125,12 +143,12 @@ public class ObjectMapperFactory {
             Class<? extends JsonSerializer> type = serializer.getClass();
             Type annotation = type.getAnnotation(Type.class);
             if (annotation != null) {
-                Class[] value = annotation.value();
-                for (Class aClass : value) {
+                Class<?>[] value = annotation.value();
+                for (Class<?> aClass : value) {
                     module.addSerializer(aClass, serializer);
                 }
             } else {
-                Optional<Class> targetType = GenericTypeUtils.resolveSuperGenericTypeArgument(type);
+                Optional<Class<?>> targetType = GenericTypeUtils.resolveSuperGenericTypeArgument(type);
                 if (targetType.isPresent()) {
                     module.addSerializer(targetType.get(), serializer);
                 } else {
@@ -143,12 +161,12 @@ public class ObjectMapperFactory {
             Class<? extends JsonDeserializer> type = deserializer.getClass();
             Type annotation = type.getAnnotation(Type.class);
             if (annotation != null) {
-                Class[] value = annotation.value();
-                for (Class aClass : value) {
+                Class<?>[] value = annotation.value();
+                for (Class<?> aClass : value) {
                     module.addDeserializer(aClass, deserializer);
                 }
             } else {
-                Optional<Class> targetType = GenericTypeUtils.resolveSuperGenericTypeArgument(type);
+                Optional<Class<?>> targetType = GenericTypeUtils.resolveSuperGenericTypeArgument(type);
                 targetType.ifPresent(aClass -> module.addDeserializer(aClass, deserializer));
             }
         }
@@ -167,8 +185,8 @@ public class ObjectMapperFactory {
             Class<? extends KeyDeserializer> type = keyDeserializer.getClass();
             Type annotation = type.getAnnotation(Type.class);
             if (annotation != null) {
-                Class[] value = annotation.value();
-                for (Class clazz : value) {
+                Class<?>[] value = annotation.value();
+                for (Class<?> clazz : value) {
                     module.addKeyDeserializer(clazz, keyDeserializer);
                 }
             }

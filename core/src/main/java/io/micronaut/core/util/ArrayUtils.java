@@ -20,7 +20,13 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.ReflectionUtils;
 
 import java.lang.reflect.Array;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.function.IntFunction;
 
 /**
@@ -29,7 +35,7 @@ import java.util.function.IntFunction;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class ArrayUtils {
+public final class ArrayUtils {
 
     /**
      * An empty object array.
@@ -76,6 +82,9 @@ public class ArrayUtils {
      * An empty short array.
      */
     public static final short[] EMPTY_SHORT_ARRAY = new short[0];
+
+    private ArrayUtils() {
+    }
 
     /**
      * Concatenate two arrays.
@@ -181,7 +190,7 @@ public class ArrayUtils {
      * @param <T> The array type
      * @return The iterator
      */
-    public static <T> Iterator<T> iterator(T...array) {
+    public static <T> Iterator<T> iterator(T... array) {
         if (isNotEmpty(array)) {
             return new ArrayIterator<>(array);
         } else {
@@ -195,7 +204,7 @@ public class ArrayUtils {
      * @param <T> The array type
      * @return The iterator
      */
-    public static <T> Iterator<T> reverseIterator(T...array) {
+    public static <T> Iterator<T> reverseIterator(T... array) {
         if (isNotEmpty(array)) {
             return new ReverseArrayIterator<>(array);
         } else {
@@ -280,6 +289,25 @@ public class ArrayUtils {
     }
 
     /**
+     * Mutates the passed array by reversing the order of the items in it.
+     *
+     * @param input The array
+     * @param <T>   The array type
+     * @since 4.0.0
+     */
+    public static <T> void reverse(T[] input) {
+        final int len = input.length;
+        if (len > 1) {
+            for (int i = 0; i < len / 2; i++) {
+                T temp = input[i];
+                final int pos = len - i - 1;
+                input[i] = input[pos];
+                input[pos] = temp;
+            }
+        }
+    }
+
+    /**
      * Iterator implementation used to efficiently expose contents of an
      * Array as read-only iterator.
      *
@@ -287,25 +315,25 @@ public class ArrayUtils {
      */
     private static final class ArrayIterator<T> implements Iterator<T>, Iterable<T> {
 
-        private final T[] _a;
-        private int _index;
+        private final T[] array;
+        private int index;
 
         private ArrayIterator(T[] a) {
-            _a = a;
-            _index = 0;
+            array = a;
+            index = 0;
         }
 
         @Override
         public boolean hasNext() {
-            return _index < _a.length;
+            return index < array.length;
         }
 
         @Override
         public T next() {
-            if (_index >= _a.length) {
+            if (index >= array.length) {
                 throw new NoSuchElementException();
             }
-            return _a[_index++];
+            return array[index++];
         }
 
         @Override public void remove() {
@@ -313,7 +341,7 @@ public class ArrayUtils {
         }
 
         @Override public Iterator<T> iterator() {
-            return this;
+            return new ArrayIterator<>(array);
         }
     }
 
@@ -325,25 +353,25 @@ public class ArrayUtils {
      */
     private static final class ReverseArrayIterator<T> implements Iterator<T>, Iterable<T> {
 
-        private final T[] _a;
-        private int _index;
+        private final T[] array;
+        private int index;
 
         private ReverseArrayIterator(T[] a) {
-            _a = a;
-            _index = a.length > 0 ? a.length - 1 : -1;
+            array = a;
+            index = a.length > 0 ? a.length - 1 : -1;
         }
 
         @Override
         public boolean hasNext() {
-            return _index > -1;
+            return index > -1;
         }
 
         @Override
         public T next() {
-            if (_index <= -1) {
+            if (index <= -1) {
                 throw new NoSuchElementException();
             }
-            return _a[_index--];
+            return array[index--];
         }
 
         @Override public void remove() {
@@ -351,7 +379,7 @@ public class ArrayUtils {
         }
 
         @Override public Iterator<T> iterator() {
-            return this;
+            return new ReverseArrayIterator<>(array);
         }
     }
 }

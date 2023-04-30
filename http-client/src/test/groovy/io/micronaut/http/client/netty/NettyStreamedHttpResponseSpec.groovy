@@ -1,11 +1,15 @@
 package io.micronaut.http.client.netty
 
-import io.micronaut.http.HttpStatus
+import io.micronaut.core.convert.ConversionService
 import io.micronaut.http.cookie.Cookie
 import io.micronaut.http.cookie.Cookies
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse
 import io.micronaut.http.netty.stream.StreamedHttpResponse
-import io.netty.handler.codec.http.*
+import io.netty.handler.codec.http.DefaultHttpHeaders
+import io.netty.handler.codec.http.HttpHeaderNames
+import io.netty.handler.codec.http.HttpHeaders
+import io.netty.handler.codec.http.HttpResponseStatus
+import io.netty.handler.codec.http.HttpVersion
 import spock.lang.Specification
 
 class NettyStreamedHttpResponseSpec extends Specification {
@@ -18,7 +22,7 @@ class NettyStreamedHttpResponseSpec extends Specification {
         streamedHttpResponse.headers().set(httpHeaders)
 
         when:
-        NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(streamedHttpResponse, HttpStatus.OK)
+        NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(streamedHttpResponse, ConversionService.SHARED)
 
         then:
         Cookies cookies = response.getCookies()
@@ -41,7 +45,7 @@ class NettyStreamedHttpResponseSpec extends Specification {
         streamedHttpResponse.headers().set(httpHeaders)
 
         when:
-        NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(streamedHttpResponse, HttpStatus.OK)
+        NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(streamedHttpResponse, ConversionService.SHARED)
 
         then:
         Cookies cookies = response.getCookies()
@@ -56,5 +60,30 @@ class NettyStreamedHttpResponseSpec extends Specification {
         cookies.get("SES").path == "/"
         cookies.get("JKL").secure
         cookies.get("JKL").domain == ".xxx.com"
+    }
+
+    void "test adding new cookies"() {
+        HttpHeaders httpHeaders = new DefaultHttpHeaders(false)
+        httpHeaders.add(HttpHeaderNames.SET_COOKIE, "INIT=abcdaaaa=; path=/; domain=.xxx.com; Secure;")
+        StreamedHttpResponse streamedHttpResponse = new DefaultStreamedHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, null)
+        streamedHttpResponse.headers().set(httpHeaders)
+
+        when:
+        NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(streamedHttpResponse, ConversionService.SHARED)
+        response.cookie(Cookie.of("ADDED", "xyz").httpOnly(true).domain(".foo.com"))
+
+        then:
+        Cookies cookies = response.getCookies()
+        cookies != null
+        cookies.size() == 2
+        cookies.get("INIT").secure
+        cookies.get("INIT").domain == ".xxx.com"
+        cookies.get("ADDED").httpOnly
+        cookies.get("ADDED").domain == ".foo.com"
+
+        response.getHeaders().getAll("Set-Cookie") == [
+                'INIT=abcdaaaa=; path=/; domain=.xxx.com; Secure;',
+                'ADDED=xyz; Domain=.foo.com; HTTPOnly',
+        ]
     }
 }

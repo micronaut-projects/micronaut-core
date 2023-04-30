@@ -29,8 +29,10 @@ import java.util.stream.Stream;
  * @since 3.5.0
  */
 @Internal
+@SuppressWarnings("java:S1845")
 public final class PrimaryQualifier<T> implements Qualifier<T> {
-    @SuppressWarnings("rawtypes")
+
+    @SuppressWarnings({"rawtypes", "java:S1845"})
     public static final PrimaryQualifier INSTANCE = new PrimaryQualifier();
 
     private PrimaryQualifier() {
@@ -52,5 +54,16 @@ public final class PrimaryQualifier<T> implements Qualifier<T> {
     @Override
     public String toString() {
         return "@Primary";
+    }
+
+    /**
+     * Generified way to get the a primary instance.
+     * @return The instance
+     * @param <T1> The generic type
+     * @since 3.6.0
+     */
+    @SuppressWarnings("unchecked")
+    public static <T1> PrimaryQualifier<T1> instance() {
+        return PrimaryQualifier.INSTANCE;
     }
 }

@@ -28,8 +28,8 @@ import java.lang.annotation.Target;
  *
  * <pre><code>
  *{@literal @}MessageHeaders({
- *     {@literal @}Header(name="Content-type",value="application/octet-stream"),
- *     {@literal @}Header(name="Content-length",value="2048")
+ *     {@literal @}Header(name = "Content-type", value = "application/octet-stream"),
+ *     {@literal @}Header(name = "Content-length", value = "2048")
  * })
  * </code></pre>
  *

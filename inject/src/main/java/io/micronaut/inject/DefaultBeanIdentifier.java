@@ -26,7 +26,7 @@ import java.util.Objects;
  * @since 1.0
  */
 @Internal
-class DefaultBeanIdentifier implements BeanIdentifier {
+final class DefaultBeanIdentifier implements BeanIdentifier {
 
     private final String id;
 
@@ -78,7 +78,6 @@ class DefaultBeanIdentifier implements BeanIdentifier {
 
     @Override
     public int hashCode() {
-
-        return Objects.hash(id);
+        return id.hashCode();
     }
 }

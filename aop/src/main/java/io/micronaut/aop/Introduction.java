@@ -56,5 +56,5 @@ public @interface Introduction {
      *
      * @return The additional interfaces to implement
      */
-    Class[] interfaces() default {};
+    Class<?>[] interfaces() default {};
 }

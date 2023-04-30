@@ -15,15 +15,16 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.EnumElement;
-import org.codehaus.groovy.ast.ClassNode;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import org.codehaus.groovy.ast.FieldNode;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Implementation of {@link EnumElement} for Groovy.
@@ -31,40 +32,74 @@ import java.util.stream.Collectors;
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 class GroovyEnumElement extends GroovyClassElement implements EnumElement {
 
+    protected List<EnumConstantElement> enumConstants;
+    protected List<String> values;
+
     /**
-     * @param visitorContext     The visitor context
-     * @param classNode          The {@link ClassNode}
-     * @param annotationMetadata The annotation metadata
+     * @param visitorContext            The visitor context
+     * @param nativeElement             The native element
+     * @param annotationMetadataFactory The annotation metadata factory
      */
-    GroovyEnumElement(GroovyVisitorContext visitorContext, ClassNode classNode, AnnotationMetadata annotationMetadata) {
-        this(visitorContext, classNode, annotationMetadata, 0);
+    GroovyEnumElement(GroovyVisitorContext visitorContext,
+                      GroovyNativeElement nativeElement,
+                      ElementAnnotationMetadataFactory annotationMetadataFactory) {
+        this(visitorContext, nativeElement, annotationMetadataFactory, 0);
     }
 
     /**
-     * @param visitorContext     The visitor context
-     * @param classNode          The {@link ClassNode}
-     * @param annotationMetadata The annotation metadata
-     * @param arrayDimensions    The number of array dimensions
+     * @param visitorContext            The visitor context
+     * @param nativeElement             The native element
+     * @param annotationMetadataFactory The annotation metadata
+     * @param arrayDimensions           The number of array dimensions factory
      */
-    GroovyEnumElement(GroovyVisitorContext visitorContext, ClassNode classNode, AnnotationMetadata annotationMetadata, int arrayDimensions) {
-        super(visitorContext, classNode, annotationMetadata, null, arrayDimensions);
+    GroovyEnumElement(GroovyVisitorContext visitorContext,
+                      GroovyNativeElement nativeElement,
+                      ElementAnnotationMetadataFactory annotationMetadataFactory,
+                      int arrayDimensions) {
+        super(visitorContext, nativeElement, annotationMetadataFactory, null, arrayDimensions);
     }
 
     @Override
     public List<String> values() {
-        ClassNode cn = (ClassNode) getNativeType();
-        List<String> values = cn.getFields().stream()
-                .filter((fn -> !fn.getName().equals("MAX_VALUE") && !fn.getName().equals("MIN_VALUE")))
-                .filter(fn -> fn.getType().equals(cn))
-                .map(FieldNode::getName)
-                .collect(Collectors.toList());
-        return Collections.unmodifiableList(values);
+        if (values != null) {
+            return values;
+        }
+        initEnum();
+        return values;
+    }
+
+    @Override
+    public List<EnumConstantElement> elements() {
+        if (enumConstants != null) {
+            return enumConstants;
+        }
+        initEnum();
+        return enumConstants;
+    }
+
+    private void initEnum() {
+        values = new ArrayList<>();
+        enumConstants = new ArrayList<>();
+        for (FieldNode field : classNode.getFields()) {
+            if (field.getName().equals("MAX_VALUE") || field.getName().equals("MIN_VALUE")) {
+                continue;
+            }
+            if (field.isEnum()) {
+                values.add(field.getName());
+                enumConstants.add(new GroovyEnumConstantElement(this, visitorContext, field, elementAnnotationMetadataFactory));
+            }
+        }
+
+        values = Collections.unmodifiableList(values);
+        enumConstants = Collections.unmodifiableList(enumConstants);
     }
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new GroovyEnumElement(visitorContext, classNode, getAnnotationMetadata(), arrayDimensions);
+        return new GroovyEnumElement(visitorContext, getNativeType(), elementAnnotationMetadataFactory, arrayDimensions);
     }
+
 }

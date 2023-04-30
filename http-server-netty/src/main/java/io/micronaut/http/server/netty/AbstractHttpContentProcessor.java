@@ -16,25 +16,22 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.async.processor.SingleSubscriberProcessor;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
-import io.micronaut.http.netty.stream.StreamedHttpMessage;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.util.ReferenceCountUtil;
-import org.reactivestreams.Subscriber;
 
+import java.util.Collection;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Abstract implementation of the {@link HttpContentProcessor} interface that deals with limiting file upload sizes.
  *
- * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
  */
 @Internal
-public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberProcessor<ByteBufHolder, T> implements HttpContentProcessor<T> {
+public abstract class AbstractHttpContentProcessor implements HttpContentProcessor {
 
     protected final NettyHttpRequest<?> nettyHttpRequest;
     protected final long advertisedLength;
@@ -57,17 +54,12 @@ public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberPr
      * Called after verifying the data of the message.
      *
      * @param message The message
+     * @param out The collection to add any produced messages to
      */
-    protected abstract void onData(ByteBufHolder message);
+    protected abstract void onData(ByteBufHolder message, Collection<Object> out) throws Throwable;
 
     @Override
-    protected final void doSubscribe(Subscriber<? super T> subscriber) {
-        StreamedHttpMessage message = (StreamedHttpMessage) nettyHttpRequest.getNativeRequest();
-        message.subscribe(this);
-    }
-
-    @Override
-    protected final void doOnNext(ByteBufHolder message) {
+    public void add(ByteBufHolder message, Collection<Object> out) throws Throwable {
         long receivedLength = this.receivedLength.addAndGet(message.content().readableBytes());
 
         ReferenceCountUtil.touch(message);
@@ -76,7 +68,7 @@ public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberPr
         } else if (receivedLength > requestMaxSize) {
             fireExceedsLength(receivedLength, requestMaxSize, message);
         } else {
-            onData(message);
+            onData(message, out);
         }
     }
 
@@ -86,11 +78,7 @@ public abstract class AbstractHttpContentProcessor<T> extends SingleSubscriberPr
      * @param message The message to release
      */
     protected void fireExceedsLength(long receivedLength, long expected, ByteBufHolder message) {
-        try {
-            onError(new ContentLengthExceededException(expected, receivedLength));
-        } finally {
-            ReferenceCountUtil.safeRelease(message);
-            parentSubscription.cancel();
-        }
+        message.release();
+        throw new ContentLengthExceededException(expected, receivedLength);
     }
 }

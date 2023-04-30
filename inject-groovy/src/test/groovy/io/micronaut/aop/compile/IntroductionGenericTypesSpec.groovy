@@ -19,9 +19,8 @@ import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.core.type.ReturnType
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
-
 /**
  * @author graemerocher
  * @since 1.0
@@ -41,7 +40,7 @@ interface MyInterface<T extends URL> {
 
     @Executable
     T getURL();
-    
+
     @Executable
     java.util.List<T> getURLs();
 }
@@ -58,11 +57,13 @@ interface MyBean extends MyInterface<URL> {
         beanDefinition != null
         beanDefinition.injectedFields.size() == 0
         beanDefinition.executableMethods.size() == 2
-        beanDefinition.executableMethods[0].methodName == 'getURL'
-        beanDefinition.executableMethods[0].returnType.type == URL
-        beanDefinition.executableMethods[1].returnType.type == List
-        beanDefinition.executableMethods[1].returnType.asArgument().hasTypeVariables()
-        beanDefinition.executableMethods[1].returnType.asArgument().typeVariables['E'].type == URL
+        def getUrlMethod = beanDefinition.executableMethods.find { it.name == "getURL" }
+        getUrlMethod.methodName == 'getURL'
+        getUrlMethod.returnType.type == URL
+        def getUrlsMethod = beanDefinition.executableMethods.find { it.name == "getURLs" }
+        getUrlsMethod.returnType.type == List
+        getUrlsMethod.returnType.asArgument().hasTypeVariables()
+        getUrlsMethod.returnType.asArgument().typeVariables['E'].type == URL
     }
 
 
@@ -78,7 +79,7 @@ import java.net.*;
 interface MyInterface<T extends Person> {
     @Executable
     reactor.core.publisher.Mono<java.util.List<T>> getPeopleSingle();
-    
+
     @Executable
     T[] getPeopleArray();
 
@@ -87,21 +88,21 @@ interface MyInterface<T extends Person> {
 
     @Executable
     T getPerson();
-    
+
     @Executable
     java.util.List<T> getPeople();
-    
+
     @Executable
     void save(T person);
-    
+
     @Executable
     void saveAll(java.util.List<T> person);
-    
+
     @Executable
     java.util.List<T[]> getPeopleListArray();
-    
-    
-    
+
+
+
 }
 
 
@@ -137,7 +138,7 @@ class SubPerson extends Person {}
         when:
         def context = new DefaultBeanContext()
         context.start()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
 
         then:"the methods are invocable"
@@ -169,24 +170,24 @@ interface MyInterface<T extends Person> {
 
     @Executable
     reactor.core.publisher.Mono<java.util.List<T>> getPeopleSingle();
-    
+
     @Executable
     T getPerson();
-    
+
     @Executable
     java.util.List<T> getPeople();
-    
+
     @Executable
     void save(T person);
-    
+
     @Executable
     void saveAll(java.util.List<T> person);
-    
+
     @Executable
     java.util.List<T[]> getPeopleListArray();
-    
-    
-    
+
+
+
 }
 
 
@@ -219,7 +220,7 @@ class SubPerson extends Person {}
         when:
         def context = new DefaultBeanContext()
         context.start()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
 
         then:"the methods are invocable"
@@ -277,7 +278,7 @@ class SubPerson extends Person {}
         when:
         def context = new DefaultBeanContext()
         context.start()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
 
         then:"the methods are invocable"
@@ -333,7 +334,7 @@ class SubPerson extends Person {}
         when:
         def context = new DefaultBeanContext()
         context.start()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
 
         then:"the methods are invocable"

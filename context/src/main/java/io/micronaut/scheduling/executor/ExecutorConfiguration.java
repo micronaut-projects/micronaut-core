@@ -17,7 +17,7 @@ package io.micronaut.scheduling.executor;
 
 import io.micronaut.core.annotation.Nullable;
 
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 import java.util.Optional;
 import java.util.concurrent.ThreadFactory;
 
@@ -74,6 +74,11 @@ public interface ExecutorConfiguration {
      * @return The core pool size for {@link io.micronaut.scheduling.executor.ExecutorType#SCHEDULED}
      */
     @Min(1L) Integer getCorePoolSize();
+
+    /**
+     * @return Whether the pool should use virtual threads.
+     */
+    boolean isVirtual();
 
     /**
      * @return The class to use as the {@link ThreadFactory}

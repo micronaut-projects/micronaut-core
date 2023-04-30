@@ -25,7 +25,7 @@ public interface ReferenceCounted {
      *
      * @return this
      */
-    ByteBuffer retain();
+    ReferenceCounted retain();
 
     /**
      * Release a reference to this object.

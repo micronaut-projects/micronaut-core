@@ -17,14 +17,18 @@ package io.micronaut.scheduling.processor;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.Qualifier;
+import io.micronaut.context.bind.DefaultExecutableBeanContextBinder;
+import io.micronaut.context.bind.ExecutableBeanContextBinder;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.bind.BoundExecutable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.annotation.EvaluatedAnnotationValue;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.scheduling.ScheduledExecutorTaskScheduler;
 import io.micronaut.scheduling.TaskExceptionHandler;
@@ -64,9 +68,10 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     private static final String MEMBER_ZONE_ID = "zoneId";
     private static final String MEMBER_FIXED_DELAY = "fixedDelay";
     private static final String MEMBER_SCHEDULER = "scheduler";
+    private static final String MEMBER_CONDITION = "condition";
 
     private final BeanContext beanContext;
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
     private final Queue<ScheduledFuture<?>> scheduledTasks = new ConcurrentLinkedDeque<>();
     private final TaskExceptionHandler<?, ?> taskExceptionHandler;
 
@@ -76,7 +81,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
      * @param taskExceptionHandler The default task exception handler
      */
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
-    public ScheduledMethodProcessor(BeanContext beanContext, Optional<ConversionService<?>> conversionService, TaskExceptionHandler<?, ?> taskExceptionHandler) {
+    public ScheduledMethodProcessor(BeanContext beanContext, Optional<ConversionService> conversionService, TaskExceptionHandler<?, ?> taskExceptionHandler) {
         this.beanContext = beanContext;
         this.conversionService = conversionService.orElse(ConversionService.SHARED);
         this.taskExceptionHandler = taskExceptionHandler;
@@ -91,9 +96,9 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
 
         List<AnnotationValue<Scheduled>> scheduledAnnotations = method.getAnnotationValuesByType(Scheduled.class);
         for (AnnotationValue<Scheduled> scheduledAnnotation : scheduledAnnotations) {
-            String fixedRate = scheduledAnnotation.get(MEMBER_FIXED_RATE, String.class).orElse(null);
+            String fixedRate = scheduledAnnotation.stringValue(MEMBER_FIXED_RATE).orElse(null);
 
-            String initialDelayStr = scheduledAnnotation.get(MEMBER_INITIAL_DELAY, String.class).orElse(null);
+            String initialDelayStr = scheduledAnnotation.stringValue(MEMBER_INITIAL_DELAY).orElse(null);
             Duration initialDelay = null;
             if (StringUtils.hasText(initialDelayStr)) {
                 initialDelay = conversionService.convert(initialDelayStr, Duration.class).orElseThrow(() ->
@@ -101,50 +106,45 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                 );
             }
 
-            String scheduler = scheduledAnnotation.get(MEMBER_SCHEDULER, String.class).orElse(TaskExecutors.SCHEDULED);
+            String scheduler = scheduledAnnotation.stringValue(MEMBER_SCHEDULER).orElse(TaskExecutors.SCHEDULED);
             Optional<TaskScheduler> optionalTaskScheduler = beanContext
                     .findBean(TaskScheduler.class, Qualifiers.byName(scheduler));
 
-            if (!optionalTaskScheduler.isPresent()) {
+            if (optionalTaskScheduler.isEmpty()) {
                 optionalTaskScheduler = beanContext.findBean(ExecutorService.class, Qualifiers.byName(scheduler))
                         .filter(ScheduledExecutorService.class::isInstance)
                         .map(ScheduledExecutorTaskScheduler::new);
             }
 
             TaskScheduler taskScheduler = optionalTaskScheduler.orElseThrow(() -> new SchedulerConfigurationException(method, "No scheduler of type TaskScheduler configured for name: " + scheduler));
-
+            Argument<Object> beanType = (Argument<Object>) beanDefinition.asArgument();
+            Qualifier<Object> declaredQualifier = (Qualifier<Object>) beanDefinition.getDeclaredQualifier();
             Runnable task = () -> {
-                io.micronaut.context.Qualifier<Object> qualifer = beanDefinition
-                    .getAnnotationTypeByStereotype(AnnotationUtil.QUALIFIER)
-                    .map(type -> Qualifiers.byAnnotation(beanDefinition, type))
-                    .orElse(null);
-
-                Class<Object> beanType = (Class<Object>) beanDefinition.getBeanType();
-                Object bean = null;
                 try {
-                    bean = beanContext.getBean(beanType, qualifer);
-                    if (method.getArguments().length == 0) {
-                        ((ExecutableMethod) method).invoke(bean);
+                    ExecutableBeanContextBinder binder = new DefaultExecutableBeanContextBinder();
+                    BoundExecutable<?, ?> boundExecutable = binder.bind(method, beanContext);
+                    Object bean = beanContext.getBean(beanType, declaredQualifier);
+                    AnnotationValue<Scheduled> finalAnnotationValue = scheduledAnnotation;
+                    if (finalAnnotationValue instanceof EvaluatedAnnotationValue<Scheduled> evaluated) {
+                        finalAnnotationValue = evaluated.withArguments(bean, boundExecutable.getBoundArguments());
                     }
-                } catch (Throwable e) {
-                    io.micronaut.context.Qualifier<TaskExceptionHandler> qualifier = Qualifiers.byTypeArguments(beanType, e.getClass());
-                    Collection<BeanDefinition<TaskExceptionHandler>> definitions = beanContext.getBeanDefinitions(TaskExceptionHandler.class, qualifier);
-                    Optional<BeanDefinition<TaskExceptionHandler>> mostSpecific = definitions.stream().filter(def -> {
-                        List<Argument<?>> typeArguments = def.getTypeArguments(TaskExceptionHandler.class);
-                        if (typeArguments.size() == 2) {
-                            return typeArguments.get(0).getType() == beanType && typeArguments.get(1).getType() == e.getClass();
+                    boolean shouldRun = finalAnnotationValue.booleanValue(MEMBER_CONDITION).orElse(true);
+                    if (shouldRun) {
+                        try {
+                            ((BoundExecutable<Object, Object>) boundExecutable).invoke(bean);
+                        } catch (Throwable e) {
+                            handleException(beanType.getType(), bean, e);
                         }
-                        return false;
-                    }).findFirst();
-
-                    TaskExceptionHandler finalHandler = mostSpecific.map(bd -> beanContext.getBean(bd.getBeanType(), qualifier)).orElse(this.taskExceptionHandler);
-                    finalHandler.handle(bean, e);
+                    }
+                } catch (Exception e) {
+                    TaskExceptionHandler finalHandler = findHandler(beanDefinition.getBeanType(), e);
+                    finalHandler.handleCreationFailure(beanDefinition, e);
                 }
             };
 
-            String cronExpr = scheduledAnnotation.get(MEMBER_CRON, String.class, null);
-            String zoneIdStr = scheduledAnnotation.get(MEMBER_ZONE_ID, String.class, null);
-            String fixedDelay = scheduledAnnotation.get(MEMBER_FIXED_DELAY, String.class).orElse(null);
+            String cronExpr = scheduledAnnotation.stringValue(MEMBER_CRON).orElse(null);
+            String zoneIdStr = scheduledAnnotation.stringValue(MEMBER_ZONE_ID).orElse(null);
+            String fixedDelay = scheduledAnnotation.stringValue(MEMBER_FIXED_DELAY).orElse(null);
 
             if (StringUtils.isNotEmpty(cronExpr)) {
                 if (LOG.isDebugEnabled()) {
@@ -186,6 +186,26 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                 throw new SchedulerConfigurationException(method, "Failed to schedule task. Invalid definition");
             }
         }
+    }
+
+    private void handleException(Class<Object> beanType, Object bean, Throwable e) {
+        TaskExceptionHandler finalHandler = findHandler(beanType, e);
+        finalHandler.handle(bean, e);
+    }
+
+    private TaskExceptionHandler findHandler(Class<?> beanType, Throwable e) {
+        io.micronaut.context.Qualifier<TaskExceptionHandler> qualifier = Qualifiers.byTypeArguments(beanType, e.getClass());
+        Collection<BeanDefinition<TaskExceptionHandler>> definitions = beanContext.getBeanDefinitions(TaskExceptionHandler.class, qualifier);
+        Optional<BeanDefinition<TaskExceptionHandler>> mostSpecific = definitions.stream().filter(def -> {
+            List<Argument<?>> typeArguments = def.getTypeArguments(TaskExceptionHandler.class);
+            if (typeArguments.size() == 2) {
+                return typeArguments.get(0).getType() == beanType && typeArguments.get(1).getType() == e.getClass();
+            }
+            return false;
+        }).findFirst();
+
+        TaskExceptionHandler finalHandler = mostSpecific.map(bd -> beanContext.getBean(bd.getBeanType(), qualifier)).orElse(this.taskExceptionHandler);
+        return finalHandler;
     }
 
     @Override
