@@ -44,7 +44,7 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
      */
     public static final int DEFAULT_POSITION = EnvironmentPropertySource.POSITION - 100;
 
-    protected final Logger log;
+    protected Logger log;
 
     protected AbstractPropertySourceLoader() {
         this(true);
@@ -157,4 +157,36 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
             }
         }
     }
+
+    /**
+     * Return logEnabled value.
+     *
+     * @return is log enabled
+     * @deprecated don't need to have this method
+     *
+     * @since 3.9.0
+     */
+    @Deprecated
+    public boolean isLogEnabled() {
+        return !(log instanceof NOPLogger);
+    }
+
+    /**
+     * Setter for logEnabled.
+     *
+     * @param logEnabled is log enabled
+     *
+     * @deprecated set logEnabled value by constructor
+     *
+     * @since 3.9.0
+     */
+    @Deprecated
+    public void setLogEnabled(boolean logEnabled) {
+        if (logEnabled) {
+            log = LoggerFactory.getLogger(getClass());
+        } else {
+            log = NOPLogger.NOP_LOGGER;
+        }
+    }
+
 }

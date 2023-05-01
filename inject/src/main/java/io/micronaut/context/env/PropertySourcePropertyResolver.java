@@ -88,7 +88,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     protected final Map<String, Object>[] rawCatalog = new Map[58];
     protected final Map<String, Object>[] nonGenerated = new Map[58];
 
-    protected final Logger log;
+    protected Logger log;
 
     private final SecureRandom random = new SecureRandom();
     private final Map<String, Boolean> containsCache = new ConcurrentHashMap<>(20);
@@ -110,10 +110,19 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     /**
+     * Creates a new, initially empty, {@link PropertySourcePropertyResolver} for the given {@link ConversionService}.
+     *
+     * @param conversionService The {@link ConversionService}
+     */
+    public PropertySourcePropertyResolver(ConversionService<?> conversionService) {
+        this(conversionService, true);
+    }
+
+    /**
      * Creates a new, initially empty, {@link PropertySourcePropertyResolver}.
      */
     public PropertySourcePropertyResolver() {
-        this(ConversionService.SHARED, true);
+        this(ConversionService.SHARED);
     }
 
     /**
@@ -122,7 +131,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * @param propertySources The {@link PropertySource} instances
      */
     public PropertySourcePropertyResolver(PropertySource... propertySources) {
-        this(ConversionService.SHARED, true);
+        this(ConversionService.SHARED);
         if (propertySources != null) {
             for (PropertySource propertySource : propertySources) {
                 addPropertySource(propertySource);
@@ -904,6 +913,37 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     public void close() throws Exception {
         if (propertyPlaceholderResolver instanceof AutoCloseable) {
             ((AutoCloseable) propertyPlaceholderResolver).close();
+        }
+    }
+
+    /**
+     * Return logEnabled value.
+     *
+     * @return is log enabled
+     * @deprecated don't need to have this method
+     *
+     * @since 3.9.0
+     */
+    @Deprecated
+    public boolean isLogEnabled() {
+        return !(log instanceof NOPLogger);
+    }
+
+    /**
+     * Setter for logEnabled.
+     *
+     * @param logEnabled is log enabled
+     *
+     * @deprecated set logEnabled value by constructor
+     *
+     * @since 3.9.0
+     */
+    @Deprecated
+    public void setLogEnabled(boolean logEnabled) {
+        if (logEnabled) {
+            log = LoggerFactory.getLogger(getClass());
+        } else {
+            log = NOPLogger.NOP_LOGGER;
         }
     }
 

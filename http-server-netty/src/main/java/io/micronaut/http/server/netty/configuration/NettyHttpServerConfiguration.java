@@ -823,7 +823,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      *
      * @author James Kleeh
      * @author graemerocher
-     * @since @since 3.1.0
+     * @since 3.1.0
      */
     @ConfigurationProperties("responses.file")
     public static class FileTypeHandlerConfiguration {

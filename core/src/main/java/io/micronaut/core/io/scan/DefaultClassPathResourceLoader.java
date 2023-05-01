@@ -89,7 +89,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      * @param checkBase   If set to {@code true} an extended check for the base path is performed otherwise paths with relative URLs like {@code ../} are prohibited.
      */
     public DefaultClassPathResourceLoader(ClassLoader classLoader, String basePath, boolean checkBase) {
-        this(classLoader, basePath, false, true);
+        this(classLoader, basePath, checkBase, true);
     }
 
     /**
