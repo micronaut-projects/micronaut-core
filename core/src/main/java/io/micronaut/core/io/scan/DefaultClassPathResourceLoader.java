@@ -52,7 +52,7 @@ import org.slf4j.helpers.NOPLogger;
  */
 public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
 
-    private Logger log;
+    private final Logger log;
 
     private final ClassLoader classLoader;
     private final String basePath;
@@ -78,6 +78,17 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      * @param basePath    The path to look for resources under
      */
     public DefaultClassPathResourceLoader(ClassLoader classLoader, String basePath) {
+        this(classLoader, basePath, false);
+    }
+
+    /**
+     * Use when resources should have a standard base path.
+     *
+     * @param classLoader The class loader for loading resources
+     * @param basePath    The path to look for resources under
+     * @param checkBase   If set to {@code true} an extended check for the base path is performed otherwise paths with relative URLs like {@code ../} are prohibited.
+     */
+    public DefaultClassPathResourceLoader(ClassLoader classLoader, String basePath, boolean checkBase) {
         this(classLoader, basePath, false, true);
     }
 

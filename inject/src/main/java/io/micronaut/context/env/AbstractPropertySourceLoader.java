@@ -44,7 +44,7 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
      */
     public static final int DEFAULT_POSITION = EnvironmentPropertySource.POSITION - 100;
 
-    protected Logger log;
+    protected final Logger log;
 
     protected AbstractPropertySourceLoader() {
         this(true);

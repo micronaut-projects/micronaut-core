@@ -88,7 +88,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     protected final Map<String, Object>[] rawCatalog = new Map[58];
     protected final Map<String, Object>[] nonGenerated = new Map[58];
 
-    protected Logger log;
+    protected final Logger log;
 
     private final SecureRandom random = new SecureRandom();
     private final Map<String, Boolean> containsCache = new ConcurrentHashMap<>(20);
