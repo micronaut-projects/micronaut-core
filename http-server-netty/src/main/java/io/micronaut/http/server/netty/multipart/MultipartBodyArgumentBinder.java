@@ -26,7 +26,6 @@ import io.micronaut.http.multipart.CompletedPart;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
-import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.http.server.netty.body.MultiObjectBody;
@@ -76,7 +75,7 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
     @Override
     public BindingResult<MultipartBody> bind(ArgumentConversionContext<MultipartBody> context, HttpRequest<?> source) {
         if (source instanceof NettyHttpRequest<?> nhr) {
-            HttpContentProcessor processor = new FormDataHttpContentProcessor(nhr, httpServerConfiguration.get());
+            FormDataHttpContentProcessor processor = new FormDataHttpContentProcessor(nhr, httpServerConfiguration.get());
             MultiObjectBody multiObjectBody;
             try {
                 multiObjectBody = nhr.rootBody()

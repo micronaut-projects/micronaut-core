@@ -26,7 +26,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.server.HttpServerConfiguration;
-import io.micronaut.http.server.netty.HttpContentProcessor;
+import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
@@ -59,7 +59,7 @@ public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements Byt
     }
 
     @Override
-    public MultiObjectBody processMulti(HttpContentProcessor processor) throws Throwable {
+    public MultiObjectBody processMulti(FormDataHttpContentProcessor processor) throws Throwable {
         ByteBuf data = prepareClaim();
         Object item = processor.processSingle(data);
         if (item != null) {
@@ -83,7 +83,7 @@ public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements Byt
     }
 
     @NonNull
-    private ImmediateMultiObjectBody processMultiImpl(HttpContentProcessor processor, ByteBuf data) throws Throwable {
+    private ImmediateMultiObjectBody processMultiImpl(FormDataHttpContentProcessor processor, ByteBuf data) throws Throwable {
         List<Object> out = new ArrayList<>(1);
         if (data.isReadable()) {
             data.retain();
@@ -96,7 +96,8 @@ public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements Byt
 
     /**
      * Process this body and then transform it into a single object using
-     * {@link ImmediateMultiObjectBody#single}.
+     * {@link ImmediateMultiObjectBody#single}.<br>
+     * Only used for form processing now.
      *
      * @param processor The processor
      * @param defaultCharset The default charset (see {@link ImmediateMultiObjectBody#single})
@@ -104,7 +105,7 @@ public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements Byt
      * @return The processed object
      * @throws Throwable Any failure
      */
-    public ImmediateSingleObjectBody processSingle(HttpContentProcessor processor, Charset defaultCharset, ByteBufAllocator alloc) throws Throwable {
+    public ImmediateSingleObjectBody processSingle(FormDataHttpContentProcessor processor, Charset defaultCharset, ByteBufAllocator alloc) throws Throwable {
         return next(processMultiImpl(processor, prepareClaim()).single(defaultCharset, alloc));
     }
 

@@ -23,7 +23,7 @@ import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.netty.reactive.HotObservable;
 import io.micronaut.http.netty.stream.DelegateStreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
-import io.micronaut.http.server.netty.HttpContentProcessor;
+import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessorAsReactiveProcessor;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
@@ -54,7 +54,7 @@ public final class StreamingByteBody extends ManagedBody<Publisher<HttpContent>>
     }
 
     @Override
-    public MultiObjectBody processMulti(HttpContentProcessor processor) {
+    public MultiObjectBody processMulti(FormDataHttpContentProcessor processor) {
         return next(new StreamingMultiObjectBody(HttpContentProcessorAsReactiveProcessor.asPublisher(processor, prepareClaim())));
     }
 
