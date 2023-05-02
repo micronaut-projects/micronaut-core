@@ -89,7 +89,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {
     public void writeTo(Argument<T> type, MediaType mediaType, T object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
         outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
         try {
-            jsonMapper.writeValue(outputStream, type);
+            jsonMapper.writeValue(outputStream, type, object);
         } catch (IOException e) {
             throw decorateWrite(object, e);
         }
