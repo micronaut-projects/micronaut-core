@@ -43,6 +43,18 @@ import java.util.stream.Stream;
 @Experimental
 public interface JsonMapper {
     /**
+     * Specialize this mapper for the given type. Read and write operations on the returned mapper
+     * may only be called with that type.
+     *
+     * @param type The type to read or write
+     * @return The specialized {@link JsonMapper}.
+     */
+    @NonNull
+    default JsonMapper createSpecific(@NonNull Argument<?> type) {
+        return this;
+    }
+
+    /**
      * Transform a {@link JsonNode} to a value of the given type.
      *
      * @param tree The input json data.

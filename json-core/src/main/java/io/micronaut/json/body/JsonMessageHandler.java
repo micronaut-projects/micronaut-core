@@ -25,6 +25,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.body.MessageBodyHandler;
+import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.json.JsonMapper;
 import jakarta.inject.Singleton;
@@ -51,6 +52,11 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {
 
     private static CodecException decorateRead(Argument<?> type, IOException e) {
         return new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage(), e);
+    }
+
+    @Override
+    public MessageBodyWriter<T> createSpecific(Argument<T> type) {
+        return new JsonMessageHandler<>(jsonMapper.createSpecific(type));
     }
 
     @Override
