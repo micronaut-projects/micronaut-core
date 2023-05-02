@@ -17,6 +17,7 @@ package io.micronaut.http.body;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.Qualifier;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -67,6 +68,7 @@ public final class DefaultMessageBodyHandlerRegistry implements MessageBodyHandl
 
     private final RawStringHandler rawStringHandler;
     private final RawByteArrayHandler rawByteArrayHandler;
+    @Nullable
     private final RawByteBufferHandler rawByteBufferHandler;
 
     /**
@@ -75,9 +77,9 @@ public final class DefaultMessageBodyHandlerRegistry implements MessageBodyHandl
      * @param beanLocator          The bean locator.
      * @param rawStringHandler     Handler for raw {@link String} values
      * @param rawByteArrayHandler  Handler for raw {@code byte[]} values
-     * @param rawByteBufferHandler Handler for raw {@link ByteBuffer} values
+     * @param rawByteBufferHandler Handler for raw {@link ByteBuffer} values, {@code null} if there's no {@link ByteBufferFactory} available
      */
-    DefaultMessageBodyHandlerRegistry(BeanContext beanLocator, RawStringHandler rawStringHandler, RawByteArrayHandler rawByteArrayHandler, RawByteBufferHandler rawByteBufferHandler) {
+    DefaultMessageBodyHandlerRegistry(BeanContext beanLocator, RawStringHandler rawStringHandler, RawByteArrayHandler rawByteArrayHandler, @Nullable RawByteBufferHandler rawByteBufferHandler) {
         this.beanLocator = beanLocator;
         this.rawStringHandler = rawStringHandler;
         this.rawByteArrayHandler = rawByteArrayHandler;
@@ -91,7 +93,7 @@ public final class DefaultMessageBodyHandlerRegistry implements MessageBodyHandl
             return (MessageBodyHandler<T>) rawStringHandler;
         } else if (type.getType() == byte[].class) {
             return (MessageBodyHandler<T>) rawByteArrayHandler;
-        } else if (type.getType() == ByteBuffer.class) {
+        } else if (type.getType() == ByteBuffer.class && rawByteBufferHandler != null) {
             return (MessageBodyHandler<T>) rawByteBufferHandler;
         } else {
             return null;
@@ -371,6 +373,7 @@ public final class DefaultMessageBodyHandlerRegistry implements MessageBodyHandl
         }
     }
 
+    @Requires(bean = ByteBufferFactory.class)
     @Singleton
     static final class RawByteBufferHandler implements MessageBodyHandler<ByteBuffer<?>>, PiecewiseMessageBodyReader<ByteBuffer<?>> {
         private final ByteBufferFactory<?, ?> byteBufferFactory;
