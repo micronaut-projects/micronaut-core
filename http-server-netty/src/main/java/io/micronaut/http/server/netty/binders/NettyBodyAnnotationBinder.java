@@ -17,7 +17,6 @@ import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.DefaultHttpContentProcessorResolver;
 import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
-import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.body.ImmediateByteBody;
 import jakarta.inject.Singleton;
@@ -30,13 +29,11 @@ import java.util.Optional;
 class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> {
     private static final CharSequence ATTR_CONVERTIBLE_BODY = "NettyBodyAnnotationBinder.convertibleBody";
 
-    private final HttpContentProcessorResolver httpContentProcessorResolver;
-    private final HttpServerConfiguration httpServerConfiguration;
-    private final MessageBodyHandlerRegistry bodyHandlerRegistry;
+    final HttpServerConfiguration httpServerConfiguration;
+    final MessageBodyHandlerRegistry bodyHandlerRegistry;
 
-    public NettyBodyAnnotationBinder(ConversionService conversionService, HttpContentProcessorResolver httpContentProcessorResolver, HttpServerConfiguration httpServerConfiguration, MessageBodyHandlerRegistry bodyHandlerRegistry) {
+    public NettyBodyAnnotationBinder(ConversionService conversionService, HttpServerConfiguration httpServerConfiguration, MessageBodyHandlerRegistry bodyHandlerRegistry) {
         super(conversionService);
-        this.httpContentProcessorResolver = httpContentProcessorResolver;
         this.httpServerConfiguration = httpServerConfiguration;
         this.bodyHandlerRegistry = bodyHandlerRegistry;
     }

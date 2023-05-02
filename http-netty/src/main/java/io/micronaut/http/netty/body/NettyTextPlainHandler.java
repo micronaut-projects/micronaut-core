@@ -49,7 +49,6 @@ import java.io.OutputStream;
 final class NettyTextPlainHandler implements MessageBodyHandler<String>, NettyBodyWriter<String> {
     private final TextPlainHandler defaultHandler = new TextPlainHandler();
 
-
     @Override
     public void writeTo(HttpRequest<?> request, MutableHttpResponse<String> outgoingResponse, Argument<String> type, MediaType mediaType, String object, NettyWriteContext nettyContext) throws CodecException {
         MutableHttpHeaders headers = outgoingResponse.getHeaders();

@@ -1,4 +1,4 @@
-package io.micronaut.http.server.netty.jackson
+package io.micronaut.http.netty.body
 
 import com.fasterxml.jackson.core.JsonFactory
 import com.fasterxml.jackson.core.JsonParser

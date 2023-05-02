@@ -16,7 +16,6 @@
 package io.micronaut.json.body;
 
 import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
@@ -27,30 +26,41 @@ import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.body.MessageBodyHandler;
 import io.micronaut.http.codec.CodecException;
-import io.micronaut.json.codec.JsonMediaTypeCodec;
+import io.micronaut.json.JsonMapper;
 import jakarta.inject.Singleton;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+@SuppressWarnings("DefaultAnnotationParam")
 @Singleton
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {
-    private final JsonMediaTypeCodec jsonMediaTypeCodec;
+    private final JsonMapper jsonMapper;
 
-    public JsonMessageHandler(JsonMediaTypeCodec jsonMediaTypeCodec) {
-        this.jsonMediaTypeCodec = jsonMediaTypeCodec;
+    public JsonMessageHandler(JsonMapper jsonMapper) {
+        this.jsonMapper = jsonMapper;
     }
 
     @Override
     public boolean isReadable(Argument<T> type, MediaType mediaType) {
-        return jsonMediaTypeCodec.supportsType(type.getType()) && mediaType != null && mediaType.getExtension().equals(MediaType.EXTENSION_JSON);
+        return mediaType != null && mediaType.getExtension().equals(MediaType.EXTENSION_JSON);
+    }
+
+    private static CodecException decorateRead(Argument<?> type, IOException e) {
+        return new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage(), e);
     }
 
     @Override
     public T read(Argument<T> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
-        T decoded = jsonMediaTypeCodec.decode(type, byteBuffer);
+        T decoded;
+        try {
+            decoded = jsonMapper.readValue(byteBuffer, type);
+        } catch (IOException e) {
+            throw decorateRead(type, e);
+        }
         if (byteBuffer instanceof ReferenceCounted rc) {
             rc.release();
         }
@@ -59,33 +69,29 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {
 
     @Override
     public T read(Argument<T> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
-        return jsonMediaTypeCodec.decode(
-            type,
-            inputStream
-        );
+        try {
+            return jsonMapper.readValue(inputStream, type);
+        } catch (IOException e) {
+            throw decorateRead(type, e);
+        }
     }
 
     @Override
     public boolean isWriteable(Argument<T> type, MediaType mediaType) {
-        return jsonMediaTypeCodec.supportsType(type.getType()) && mediaType != null && mediaType.getExtension().equals(MediaType.EXTENSION_JSON);
+        return mediaType != null && mediaType.getExtension().equals(MediaType.EXTENSION_JSON);
+    }
+
+    private static CodecException decorateWrite(Object object, IOException e) {
+        return new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);
     }
 
     @Override
     public void writeTo(Argument<T> type, MediaType mediaType, T object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
         outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
-        jsonMediaTypeCodec.encode(
-            type,
-            outputStream
-        );
-    }
-
-    @Override
-    public ByteBuffer<?> writeTo(Argument<T> type, MediaType mediaType, T object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
-        outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
-        return jsonMediaTypeCodec.encode(
-            type,
-            object,
-            bufferFactory
-        );
+        try {
+            jsonMapper.writeValue(outputStream, type);
+        } catch (IOException e) {
+            throw decorateWrite(object, e);
+        }
     }
 }

@@ -91,7 +91,9 @@ public final class DefaultMessageBodyHandlerRegistry implements MessageBodyHandl
                 } else {
                     // pick highest priority
                     reader = (MessageBodyReader<T>) OrderUtil.sort(beanDefinitions.stream())
-                        .findFirst().orElse(null);
+                        .findFirst()
+                        .map(beanLocator::getBean)
+                        .orElse(null);
                 }
             }
             if (reader != null) {
@@ -134,7 +136,9 @@ public final class DefaultMessageBodyHandlerRegistry implements MessageBodyHandl
                 } else {
                     // pick highest priority
                     writer = (MessageBodyWriter<T>) OrderUtil.sort(beanDefinitions.stream())
-                        .findFirst().orElse(null);
+                        .findFirst()
+                        .map(beanLocator::getBean)
+                        .orElse(null);
                 }
             }
             if (writer != null) {

@@ -74,25 +74,21 @@ public class CompletableFutureBodyBinder
 
             Optional<Argument<?>> firstTypeParameter = context.getFirstTypeVariable();
             Argument<?> targetType = firstTypeParameter.orElse(Argument.OBJECT_ARGUMENT);
-            try {
-                CompletableFuture<Object> future = rootBody
-                    .buffer(nhr.getChannelHandlerContext().alloc())
-                    .map(bytes -> {
-                        Optional<Object> value;
-                        try {
-                            //noinspection unchecked
-                            value = nettyBodyAnnotationBinder.transform(nhr, (ArgumentConversionContext<Object>) context.with(targetType), bytes);
-                        } catch (RuntimeException e) {
-                            throw e;
-                        } catch (Throwable e) {
-                            throw new RuntimeException(e);
-                        }
-                        return value.orElseThrow(() -> PublisherBodyBinder.extractError(null, context));
-                    }).toCompletableFuture();
-                return () -> Optional.of(future);
-            } catch (Throwable e) {
-                return () -> Optional.of(CompletableFuture.failedFuture(e));
-            }
+            CompletableFuture<Object> future = rootBody
+                .buffer(nhr.getChannelHandlerContext().alloc())
+                .map(bytes -> {
+                    Optional<Object> value;
+                    try {
+                        //noinspection unchecked
+                        value = nettyBodyAnnotationBinder.transform(nhr, (ArgumentConversionContext<Object>) context.with(targetType), bytes);
+                    } catch (RuntimeException e) {
+                        throw e;
+                    } catch (Throwable e) {
+                        throw new RuntimeException(e);
+                    }
+                    return value.orElseThrow(() -> PublisherBodyBinder.extractError(null, context));
+                }).toCompletableFuture();
+            return () -> Optional.of(future);
         } else {
             return BindingResult.empty();
         }
