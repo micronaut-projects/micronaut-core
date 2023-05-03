@@ -16,6 +16,7 @@
 package io.micronaut.core.bind;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 
@@ -129,9 +130,11 @@ public interface ArgumentBinder<T, S> {
          * @param transform The transformation function
          * @param <R>       The type of the mapped result
          * @return The mapped result
+         * @since 4.0.0
          */
         @Experimental
-        default <R> BindingResult<R> flatMap(Function<T, BindingResult<R>> transform) {
+        @NonNull
+        default <R> BindingResult<R> flatMap(@NonNull Function<T, BindingResult<R>> transform) {
             return new MappedBindingResult<>(this, transform);
         }
 

@@ -285,7 +285,6 @@ public final class RoutingInBoundHandler implements RequestHandler {
             MediaType responseMediaType = response.getContentType().orElse(null);
             Argument<Object> responseBodyType;
             if (routeInfo != null) {
-                // todo: resolve error writer from exception handler
                 responseBodyType = (Argument<Object>) routeInfo.getResponseBodyType();
             } else {
                 responseBodyType = Argument.of((Class<Object>) body.getClass());

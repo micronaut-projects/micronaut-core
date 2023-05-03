@@ -22,8 +22,8 @@ import io.micronaut.core.type.Headers;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.MessageBodyReader;
-import io.micronaut.http.body.PiecewiseMessageBodyReader;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.body.JsonMessageHandler;
@@ -39,10 +39,10 @@ import java.util.List;
 @Singleton
 @Produces(MediaType.APPLICATION_JSON_STREAM)
 @Consumes(MediaType.APPLICATION_JSON_STREAM)
-class NettyJsonStreamHandler<T> implements MessageBodyReader<T>, PiecewiseMessageBodyReader<T> {
+class NettyJsonStreamHandler<T> implements MessageBodyReader<T>, ChunkedMessageBodyReader<T> {
     private final JsonMessageHandler<T> jsonMessageHandler;
 
-    public NettyJsonStreamHandler(JsonMapper jsonMapper) {
+    NettyJsonStreamHandler(JsonMapper jsonMapper) {
         this(new JsonMessageHandler<>(jsonMapper));
     }
 
@@ -58,10 +58,10 @@ class NettyJsonStreamHandler<T> implements MessageBodyReader<T>, PiecewiseMessag
     @Override
     public T read(Argument<T> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
         if (!type.getType().isAssignableFrom(List.class)) {
-            throw new UnsupportedOperationException("Can only read json-stream to a Publisher or list type");
+            throw new IllegalArgumentException("Can only read json-stream to a Publisher or list type");
         }
         //noinspection unchecked
-        return (T) readPiecewise((Argument<T>) type.getFirstTypeVariable().orElse(type), mediaType, httpHeaders, Flux.just(byteBuffer)).collectList().block();
+        return (T) readChunked((Argument<T>) type.getFirstTypeVariable().orElse(type), mediaType, httpHeaders, Flux.just(byteBuffer)).collectList().block();
     }
 
     @Override
@@ -70,8 +70,8 @@ class NettyJsonStreamHandler<T> implements MessageBodyReader<T>, PiecewiseMessag
     }
 
     @Override
-    public Flux<T> readPiecewise(Argument<T> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
-        JsonPiecewiseProcessor processor = new JsonPiecewiseProcessor();
+    public Flux<T> readChunked(Argument<T> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
+        JsonChunkedProcessor processor = new JsonChunkedProcessor();
         return processor.process(Flux.from(input).map(bb -> {
             if (!(bb.asNativeBuffer() instanceof ByteBuf buf)) {
                 throw new IllegalArgumentException("Only netty buffers are supported");

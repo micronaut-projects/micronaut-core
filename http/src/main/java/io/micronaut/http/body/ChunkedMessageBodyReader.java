@@ -31,11 +31,12 @@ import org.reactivestreams.Publisher;
  * @param <T> The type to read
  */
 @Experimental
-public interface PiecewiseMessageBodyReader<T> extends MessageBodyReader<T> {
-    Publisher<T> readPiecewise(
+public interface ChunkedMessageBodyReader<T> extends MessageBodyReader<T> {
+    @NonNull
+    Publisher<T> readChunked(
         @NonNull Argument<T> type,
         @Nullable MediaType mediaType,
         @NonNull Headers httpHeaders,
-        Publisher<ByteBuffer<?>> input
+        @NonNull Publisher<ByteBuffer<?>> input
     );
 }

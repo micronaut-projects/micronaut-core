@@ -33,7 +33,7 @@ import java.io.IOException;
  * @author Jonas Konrad
  */
 @Internal
-final class JsonPiecewiseProcessor {
+final class JsonChunkedProcessor {
     final JsonCounter counter = new JsonCounter();
     private ByteBuf singleBuffer;
     private CompositeByteBuf compositeBuffer;

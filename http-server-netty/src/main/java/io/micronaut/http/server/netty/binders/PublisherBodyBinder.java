@@ -26,8 +26,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
+import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.MessageBodyReader;
-import io.micronaut.http.body.PiecewiseMessageBodyReader;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.NettyHttpRequest;
@@ -94,8 +94,8 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
             MediaType mediaType = nhr.getContentType().orElse(null);
             if (!Publishers.isSingle(context.getArgument().getType()) && !context.getArgument().isSpecifiedSingle() && mediaType != null) {
                 Optional<MessageBodyReader<Object>> reader = nettyBodyAnnotationBinder.bodyHandlerRegistry.findReader(targetType, List.of(mediaType));
-                if (reader.isPresent() && reader.get() instanceof PiecewiseMessageBodyReader<Object> piecewise) {
-                    Publisher<Object> pub = piecewise.readPiecewise(targetType, mediaType, nhr.getHeaders(), Flux.from(rootBody.rawContent(nettyBodyAnnotationBinder.httpServerConfiguration).asPublisher()).map(b -> NettyByteBufferFactory.DEFAULT.wrap((ByteBuf) b)));
+                if (reader.isPresent() && reader.get() instanceof ChunkedMessageBodyReader<Object> piecewise) {
+                    Publisher<Object> pub = piecewise.readChunked(targetType, mediaType, nhr.getHeaders(), Flux.from(rootBody.rawContent(nettyBodyAnnotationBinder.httpServerConfiguration).asPublisher()).map(b -> NettyByteBufferFactory.DEFAULT.wrap((ByteBuf) b)));
                     return () -> Optional.of(pub);
                 }
             }

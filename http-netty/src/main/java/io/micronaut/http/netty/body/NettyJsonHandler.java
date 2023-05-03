@@ -23,9 +23,9 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.MessageBodyHandler;
 import io.micronaut.http.body.MessageBodyWriter;
-import io.micronaut.http.body.PiecewiseMessageBodyReader;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.body.JsonMessageHandler;
@@ -38,17 +38,17 @@ import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
- * Replacement for {@link JsonMessageHandler} with {@link PiecewiseMessageBodyReader} support.
+ * Replacement for {@link JsonMessageHandler} with {@link ChunkedMessageBodyReader} support.
  *
  * @param <T> The type
  */
 @Singleton
 @Internal
 @Replaces(JsonMessageHandler.class)
-final class NettyJsonHandler<T> implements MessageBodyHandler<T>, PiecewiseMessageBodyReader<T> {
+final class NettyJsonHandler<T> implements MessageBodyHandler<T>, ChunkedMessageBodyReader<T> {
     private final JsonMessageHandler<T> jsonMessageHandler;
 
-    public NettyJsonHandler(JsonMapper jsonMapper) {
+    NettyJsonHandler(JsonMapper jsonMapper) {
         this(new JsonMessageHandler<>(jsonMapper));
     }
 
@@ -57,8 +57,8 @@ final class NettyJsonHandler<T> implements MessageBodyHandler<T>, PiecewiseMessa
     }
 
     @Override
-    public Publisher<T> readPiecewise(Argument<T> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
-        JsonPiecewiseProcessor processor = new JsonPiecewiseProcessor();
+    public Publisher<T> readChunked(Argument<T> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
+        JsonChunkedProcessor processor = new JsonChunkedProcessor();
         if (Iterable.class.isAssignableFrom(type.getType())) {
             // Publisher<List<T>> is parsed as a single item of type List
             processor.counter.noTokenization();

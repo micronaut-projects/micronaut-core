@@ -15,6 +15,7 @@
  */
 package io.micronaut.json.body;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
@@ -34,7 +35,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+/**
+ * Body handler for JSON.
+ *
+ * @param <T> The type to read/write
+ * @since 4.0.0
+ * @author Jonas Konrad
+ */
 @SuppressWarnings("DefaultAnnotationParam")
+@Experimental
 @Singleton
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)

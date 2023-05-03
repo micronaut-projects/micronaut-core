@@ -17,6 +17,7 @@ package io.micronaut.http.netty.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -36,6 +37,7 @@ public interface NettyWriteContext {
     /**
      * @return The bytebuf allocator.
      */
+    @NonNull
     ByteBufAllocator alloc();
 
     /**
@@ -43,7 +45,7 @@ public interface NettyWriteContext {
      *
      * @param response The response to write
      */
-    void writeFull(FullHttpResponse response);
+    void writeFull(@NonNull FullHttpResponse response);
 
     /**
      * Write a streamed response. The actual response will only be written when the first item
@@ -51,7 +53,7 @@ public interface NettyWriteContext {
      *
      * @param response The response to write
      */
-    void writeStreamed(StreamedHttpResponse response);
+    void writeStreamed(@NonNull StreamedHttpResponse response);
 
     /**
      * Write a response with a {@link HttpChunkedInput} body.
@@ -59,7 +61,7 @@ public interface NettyWriteContext {
      * @param response     The response. <b>Must not</b> be a {@link FullHttpResponse}
      * @param chunkedInput The response body
      */
-    void writeChunked(HttpResponse response, HttpChunkedInput chunkedInput);
+    void writeChunked(@NonNull HttpResponse response, @NonNull HttpChunkedInput chunkedInput);
 
     /**
      * Write a response with a body that is a section of a {@link RandomAccessFile}.
@@ -69,5 +71,5 @@ public interface NettyWriteContext {
      * @param position         Start position
      * @param contentLength    Length of the section to send
      */
-    void writeFile(HttpResponse response, RandomAccessFile randomAccessFile, long position, long contentLength);
+    void writeFile(@NonNull HttpResponse response, @NonNull RandomAccessFile randomAccessFile, long position, long contentLength);
 }

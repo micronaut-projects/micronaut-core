@@ -284,7 +284,7 @@ public final class DefaultMessageBodyHandlerRegistry implements MessageBodyHandl
     }
 
     @Singleton
-    static final class RawStringHandler implements MessageBodyHandler<String>, PiecewiseMessageBodyReader<String> {
+    static final class RawStringHandler implements MessageBodyHandler<String>, ChunkedMessageBodyReader<String> {
         private final ApplicationConfiguration applicationConfiguration;
 
         RawStringHandler(ApplicationConfiguration applicationConfiguration) {
@@ -330,13 +330,13 @@ public final class DefaultMessageBodyHandlerRegistry implements MessageBodyHandl
         }
 
         @Override
-        public Publisher<String> readPiecewise(Argument<String> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
+        public Publisher<String> readChunked(Argument<String> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
             return Flux.from(input).map(this::read0);
         }
     }
 
     @Singleton
-    static final class RawByteArrayHandler implements MessageBodyHandler<byte[]>, PiecewiseMessageBodyReader<byte[]> {
+    static final class RawByteArrayHandler implements MessageBodyHandler<byte[]>, ChunkedMessageBodyReader<byte[]> {
         @Override
         public byte[] read(Argument<byte[]> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
             return read0(byteBuffer);
@@ -376,14 +376,14 @@ public final class DefaultMessageBodyHandlerRegistry implements MessageBodyHandl
         }
 
         @Override
-        public Publisher<byte[]> readPiecewise(Argument<byte[]> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
+        public Publisher<byte[]> readChunked(Argument<byte[]> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
             return Flux.from(input).map(RawByteArrayHandler::read0);
         }
     }
 
     @Requires(bean = ByteBufferFactory.class)
     @Singleton
-    static final class RawByteBufferHandler implements MessageBodyHandler<ByteBuffer<?>>, PiecewiseMessageBodyReader<ByteBuffer<?>> {
+    static final class RawByteBufferHandler implements MessageBodyHandler<ByteBuffer<?>>, ChunkedMessageBodyReader<ByteBuffer<?>> {
         private final ByteBufferFactory<?, ?> byteBufferFactory;
 
         RawByteBufferHandler(ByteBufferFactory<?, ?> byteBufferFactory) {
@@ -428,7 +428,7 @@ public final class DefaultMessageBodyHandlerRegistry implements MessageBodyHandl
         }
 
         @Override
-        public Publisher<ByteBuffer<?>> readPiecewise(Argument<ByteBuffer<?>> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
+        public Publisher<ByteBuffer<?>> readChunked(Argument<ByteBuffer<?>> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
             return input;
         }
     }
