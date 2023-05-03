@@ -34,6 +34,7 @@ import java.util.Collection;
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Use the {@link io.micronaut.http.body.MessageBodyReader} API instead
  */
 @Deprecated
 public interface HttpContentProcessor extends Toggleable {

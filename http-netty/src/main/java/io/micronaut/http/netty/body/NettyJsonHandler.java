@@ -37,10 +37,15 @@ import reactor.core.publisher.Flux;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+/**
+ * Replacement for {@link JsonMessageHandler} with {@link PiecewiseMessageBodyReader} support.
+ *
+ * @param <T> The type
+ */
 @Singleton
 @Internal
 @Replaces(JsonMessageHandler.class)
-class NettyJsonHandler<T> implements MessageBodyHandler<T>, PiecewiseMessageBodyReader<T> {
+final class NettyJsonHandler<T> implements MessageBodyHandler<T>, PiecewiseMessageBodyReader<T> {
     private final JsonMessageHandler<T> jsonMessageHandler;
 
     public NettyJsonHandler(JsonMapper jsonMapper) {

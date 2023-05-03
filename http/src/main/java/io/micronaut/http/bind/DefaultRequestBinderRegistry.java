@@ -281,7 +281,8 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                 @SuppressWarnings("unchecked")
                 ArgumentConversionContext<Object> unwrappedConversionContext = ConversionContext.of((Argument<Object>) typeVariable.get());
                 ArgumentBinder.BindingResult<Object> bodyBound = bodyAnnotationBinder.bindFullBody(unwrappedConversionContext, source);
-                return new PendingRequestBindingResult<HttpRequest<?>>() {
+                // can't use flatMap here because we return a present optional even when the body conversion failed
+                return new PendingRequestBindingResult<>() {
                     @Override
                     public boolean isPending() {
                         return bodyBound instanceof PendingRequestBindingResult<Object> p && p.isPending();

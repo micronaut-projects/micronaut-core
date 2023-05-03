@@ -15,12 +15,14 @@
  */
 package io.micronaut.core.bind;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionError;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 
+@Internal
 final class MappedBindingResult<T, R> implements ArgumentBinder.BindingResult<R> {
     private final ArgumentBinder.BindingResult<T> source;
     private final Function<T, ArgumentBinder.BindingResult<R>> function;

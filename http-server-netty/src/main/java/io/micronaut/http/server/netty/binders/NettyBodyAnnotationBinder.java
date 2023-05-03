@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.binders;
 
 import io.micronaut.context.annotation.Replaces;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;
@@ -39,9 +40,10 @@ import jakarta.inject.Singleton;
 import java.util.List;
 import java.util.Optional;
 
+@Internal
 @Singleton
 @Replaces(DefaultBodyAnnotationBinder.class)
-class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> {
+final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> {
     private static final CharSequence ATTR_CONVERTIBLE_BODY = "NettyBodyAnnotationBinder.convertibleBody";
 
     final HttpServerConfiguration httpServerConfiguration;

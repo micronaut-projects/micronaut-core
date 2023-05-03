@@ -25,6 +25,11 @@ import io.netty.handler.codec.http.HttpResponse;
 
 import java.io.RandomAccessFile;
 
+/**
+ * This interface is used to write the different kinds of netty responses.
+ *
+ * @since 4.0.0
+ */
 @Internal
 @Experimental
 public interface NettyWriteContext {

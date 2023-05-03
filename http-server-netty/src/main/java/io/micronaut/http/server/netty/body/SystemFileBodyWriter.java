@@ -20,7 +20,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
-import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -32,20 +31,17 @@ import io.micronaut.http.exceptions.MessageBodyException;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.body.NettyBodyWriter;
 import io.micronaut.http.netty.body.NettyWriteContext;
-import io.micronaut.http.server.netty.SmartHttpContentCompressor;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.types.files.SystemFile;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
-import io.netty.util.AttributeKey;
 import jakarta.inject.Singleton;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
-import java.util.function.Supplier;
 
 import static io.micronaut.http.HttpHeaders.CONTENT_RANGE;
 
@@ -59,8 +55,6 @@ import static io.micronaut.http.HttpHeaders.CONTENT_RANGE;
 @Experimental
 @Internal
 public final class SystemFileBodyWriter extends AbstractFileBodyWriter implements NettyBodyWriter<SystemFile> {
-    public static final Supplier<AttributeKey<SmartHttpContentCompressor>> ZERO_COPY_PREDICATE =
-        SupplierUtil.memoized(() -> AttributeKey.newInstance("zero-copy-predicate"));
     private static final String UNIT_BYTES = "bytes";
 
     public SystemFileBodyWriter(NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration) {

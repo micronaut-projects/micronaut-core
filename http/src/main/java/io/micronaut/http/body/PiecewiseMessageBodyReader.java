@@ -26,8 +26,7 @@ import org.reactivestreams.Publisher;
 
 /**
  * Variant of {@link MessageBodyReader} that allows piecewise reading of the input, e.g. for
- * json-stream.<br>
- * todo: what are the semantics of {@code createSpecific}?
+ * json-stream.
  *
  * @param <T> The type to read
  */

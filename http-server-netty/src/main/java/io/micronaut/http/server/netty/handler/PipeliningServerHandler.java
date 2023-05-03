@@ -55,6 +55,7 @@ import io.netty.handler.stream.ChunkedFile;
 import io.netty.handler.stream.ChunkedInput;
 import io.netty.handler.timeout.IdleState;
 import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakDetectorFactory;
@@ -77,8 +78,6 @@ import java.util.Objects;
 import java.util.Queue;
 import java.util.function.Supplier;
 
-import static io.micronaut.http.server.netty.body.SystemFileBodyWriter.ZERO_COPY_PREDICATE;
-
 /**
  * Netty handler that handles incoming {@link HttpRequest}s and forwards them to a
  * {@link RequestHandler}.
@@ -88,6 +87,9 @@ import static io.micronaut.http.server.netty.body.SystemFileBodyWriter.ZERO_COPY
  */
 @Internal
 public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter {
+    public static final Supplier<AttributeKey<SmartHttpContentCompressor>> ZERO_COPY_PREDICATE =
+        SupplierUtil.memoized(() -> AttributeKey.newInstance("zero-copy-predicate"));
+
     private static final int LENGTH_8K = 8192;
     private static final Logger LOG = LoggerFactory.getLogger(PipeliningServerHandler.class);
 
@@ -315,7 +317,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * @param needLast Whether to finish the response with a
      *                 {@link LastHttpContent}
      */
-    public static final record CustomResponse(HttpResponse response, @Nullable Object body, boolean needLast) {
+    private record CustomResponse(HttpResponse response, @Nullable Object body, boolean needLast) {
     }
 
     /**
@@ -326,7 +328,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         void read(Object message) {
             HttpRequest request = (HttpRequest) message;
-            OutboundAccess outboundAccess = new OutboundAccess(ctx);
+            OutboundAccess outboundAccess = new OutboundAccess();
             outboundQueue.add(outboundAccess);
             if (request instanceof FullHttpRequest full) {
                 requestHandler.accept(ctx, full, outboundAccess);
@@ -537,7 +539,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * Class that allows writing the response for the request this object is associated with.
      */
     public final class OutboundAccess implements NettyWriteContext {
-        private final ChannelHandlerContext ctx;
         /**
          * The handler that will perform the actual write operation.
          */
@@ -545,8 +546,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         private Object attachment = null;
         private boolean closeAfterWrite = false;
 
-        private OutboundAccess(ChannelHandlerContext ctx) {
-            this.ctx = ctx;
+        private OutboundAccess() {
         }
 
         @Override

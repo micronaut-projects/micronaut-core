@@ -26,18 +26,20 @@ import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.codec.CodecException;
 
 /**
- * Netty-specific write closure.
+ * Netty-specific writer.
+ *
+ * @param <T> The type to write
  */
 @Internal
 @Experimental
 public interface NettyBodyWriter<T> extends MessageBodyWriter<T> {
 
     /**
-     * Reads an object from the given byte buffer.
+     * Write an object to the given context.
      *
      * @param request          The associated request
      * @param outgoingResponse The outgoing response.
-     * @param type
+     * @param type             The type
      * @param mediaType        The media type
      * @param object           The object to write
      * @param nettyContext     The netty context

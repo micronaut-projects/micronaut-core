@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.body;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -38,6 +39,7 @@ import java.io.InputStream;
  * @param <T> The generic type.
  * @since 4.0.0
  */
+@Experimental
 @Indexed(MessageBodyReader.class)
 public interface MessageBodyReader<T> extends Ordered {
     /**

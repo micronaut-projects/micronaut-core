@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.body;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -42,6 +43,7 @@ import java.nio.charset.StandardCharsets;
  * @see io.micronaut.http.annotation.Produces
  * @since 4.0.0
  */
+@Experimental
 @Indexed(MessageBodyWriter.class)
 public interface MessageBodyWriter<T> extends Ordered {
     /**

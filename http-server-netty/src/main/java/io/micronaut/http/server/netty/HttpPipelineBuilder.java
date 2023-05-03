@@ -21,7 +21,6 @@ import io.micronaut.core.naming.Named;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
-import io.micronaut.http.server.netty.body.SystemFileBodyWriter;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
 import io.micronaut.http.server.netty.handler.RequestHandler;
@@ -545,7 +544,7 @@ final class HttpPipelineBuilder {
 
             SmartHttpContentCompressor contentCompressor = new SmartHttpContentCompressor(embeddedServices.getHttpCompressionStrategy());
             if (zeroCopySupported) {
-                channel.attr(SystemFileBodyWriter.ZERO_COPY_PREDICATE.get()).set(contentCompressor);
+                channel.attr(PipeliningServerHandler.ZERO_COPY_PREDICATE.get()).set(contentCompressor);
             }
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_COMPRESSOR, contentCompressor);
             pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
