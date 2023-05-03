@@ -50,14 +50,17 @@ public interface EmbeddedServer extends EmbeddedApplication<EmbeddedServer> {
     URL getURL();
 
     /**
-     * @return The full URL to the server with the context path
-     */
-    URL getURLWithContextPath();
-
-    /**
      * @return The full URI to the server
      */
     URI getURI();
+
+    /**
+     * @return The full URI to the server with the context path
+     * @since 3.9.1
+     */
+    default URI getContextURI() {
+        return getURI();
+    }
 
     @Override
     default boolean isServer() {
