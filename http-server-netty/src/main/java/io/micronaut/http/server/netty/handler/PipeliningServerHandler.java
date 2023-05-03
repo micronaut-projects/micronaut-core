@@ -318,6 +318,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      *                 {@link LastHttpContent}
      */
     private record CustomResponse(HttpResponse response, @Nullable Object body, boolean needLast) {
+        CustomResponse {
+            if (response instanceof FullHttpResponse) {
+                throw new IllegalArgumentException("Response must not be a FullHttpResponse to send a special body");
+            }
+        }
     }
 
     /**
@@ -667,11 +672,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         public void writeChunked(HttpResponse response, HttpChunkedInput chunkedInput) {
-            writeStreamed(new CustomResponse(
-                response,
-                chunkedInput,
-                true // todo: why needLast true? HttpChunkedInput should include the LastHttpContent
-            ));
+            writeStreamed(new CustomResponse(response, chunkedInput, false));
         }
 
         @Override
@@ -900,7 +901,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     /**
-     * Handler that writes a files etc..
+     * Handler that writes a files etc.
      */
     private final class ChunkedOutboundHandler extends OutboundHandler {
         private final CustomResponse message;
