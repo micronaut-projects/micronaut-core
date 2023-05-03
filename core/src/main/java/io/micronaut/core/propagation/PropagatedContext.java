@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 /**
  * The propagation across different threads using the context which is immutable and can be extended/reduced by different elements.
@@ -119,12 +120,22 @@ public interface PropagatedContext {
 
     /**
      * Finds optional element of type.
+     * In a case of multiple element of the same type the last one will be returned.
      *
      * @param elementType The element type
      * @param <T> The element's type
      * @return optional element
      */
     <T extends PropagatedContextElement> Optional<T> find(@NonNull Class<T> elementType);
+
+    /**
+     * Find all elements of type. The first element processed by stream will be the last one added.
+     *
+     * @param elementType The element type
+     * @param <T> The element's type
+     * @return stream of elements of type
+     */
+    <T extends PropagatedContextElement> Stream<T> findAll(@NonNull Class<T> elementType);
 
     /**
      * Gets element of type.

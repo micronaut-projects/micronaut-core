@@ -26,6 +26,7 @@ import java.util.ListIterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * The implementation of {@link PropagatedContext}.
@@ -115,6 +116,15 @@ final class PropagatedContextImpl implements PropagatedContext {
     @Override
     public <T extends PropagatedContextElement> Optional<T> find(Class<T> elementType) {
         return Optional.ofNullable(findElement(elementType));
+    }
+
+    @Override
+    public <T extends PropagatedContextElement> Stream<T> findAll(Class<T> elementType) {
+        List<PropagatedContextElement> reverseElements = new ArrayList<>(this.elements);
+        Collections.reverse(reverseElements);
+        return reverseElements.stream()
+            .filter(elementType::isInstance)
+            .map(elementType::cast);
     }
 
     @Override

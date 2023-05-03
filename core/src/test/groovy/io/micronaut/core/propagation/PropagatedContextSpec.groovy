@@ -19,6 +19,7 @@ class PropagatedContextSpec extends Specification {
                         assert propagatedContext.getAllElements().contains(e1)
                         assert propagatedContext.getAllElements().contains(e2)
                         assert propagatedContext.getAllElements().contains(e3)
+                        assert propagatedContext.findAll(PropagatedElement).toList() == [e3, e2, e1]
                     }
                 }
             }
