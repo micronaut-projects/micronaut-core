@@ -1,10 +1,9 @@
 package io.micronaut.function.web
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Requires
-import io.micronaut.context.env.Environment
 import io.micronaut.function.FunctionBean
 import io.micronaut.function.client.FunctionClient
+import io.micronaut.http.annotation.Body
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Named
 import spock.lang.Issue
@@ -40,7 +39,7 @@ class NullReturningConsumerFunctionSpec extends Specification {
         static String LAST_VALUE
 
         @Override
-        void accept(String book) {
+        void accept(@Body String book) {
             LAST_VALUE = book
         }
     }

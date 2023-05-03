@@ -18,6 +18,7 @@ package io.micronaut.http.client.tck.tests;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.tck.AssertionUtils;
@@ -60,7 +61,7 @@ class HttpMethodPostTest {
         }
 
         @Post("/object-body")
-        String person(Person person) {
+        String person(@Body Person person) {
             return person.getName() + ":" + person.getAge();
         }
     }

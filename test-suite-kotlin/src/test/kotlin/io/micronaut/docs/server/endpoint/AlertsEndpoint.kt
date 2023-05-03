@@ -1,14 +1,16 @@
 package io.micronaut.docs.server.endpoint
 
-import io.micronaut.context.annotation.Requires
 //tag::imports[]
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Body
 import io.micronaut.management.endpoint.annotation.Delete
 import io.micronaut.management.endpoint.annotation.Endpoint
 import io.micronaut.management.endpoint.annotation.Read
 import io.micronaut.management.endpoint.annotation.Sensitive
 import io.micronaut.management.endpoint.annotation.Write
 import java.util.concurrent.CopyOnWriteArrayList
+
 //end::imports[]
 
 @Requires(property = "spec.name", value = "AlertsEndpointSpec")
@@ -31,7 +33,7 @@ class AlertsEndpoint {
 
     @Write(consumes = [MediaType.TEXT_PLAIN])
     @Sensitive(property = "add.sensitive", defaultValue = true)  // <3>
-    fun addAlert(alert: String) {
+    fun addAlert(@Body alert: String) {
         alerts.add(alert)
     }
 }

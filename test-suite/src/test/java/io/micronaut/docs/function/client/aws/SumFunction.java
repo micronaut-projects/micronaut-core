@@ -16,6 +16,7 @@
 package io.micronaut.docs.function.client.aws;
 
 import io.micronaut.function.FunctionBean;
+import io.micronaut.http.annotation.Body;
 
 import java.util.function.Function;
 
@@ -29,7 +30,7 @@ public class SumFunction implements Function<Sum, Long> {
     }
 
     @Override
-    public Long apply(Sum sum) {
+    public Long apply(@Body Sum sum) {
         return mathService.sum(sum);
     }
 }
