@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.bind;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 
@@ -81,7 +82,7 @@ public interface ArgumentBinder<T, S> {
             }
 
             @Override
-            public BindingResult map(Function transform) {
+            public BindingResult flatMap(Function transform) {
                 return this;
             }
         };
@@ -122,7 +123,15 @@ public interface ArgumentBinder<T, S> {
             return getValue().get();
         }
 
-        default <R> BindingResult<R> map(Function<T, BindingResult<R>> transform) {
+        /**
+         * Transform the result, if present.
+         *
+         * @param transform The transformation function
+         * @param <R>       The type of the mapped result
+         * @return The mapped result
+         */
+        @Experimental
+        default <R> BindingResult<R> flatMap(Function<T, BindingResult<R>> transform) {
             return new MappedBindingResult<>(this, transform);
         }
 

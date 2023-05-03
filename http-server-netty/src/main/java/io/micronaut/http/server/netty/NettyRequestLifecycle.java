@@ -137,7 +137,7 @@ final class NettyRequestLifecycle extends RequestLifecycle {
             FormRouteCompleter formRouteCompleter = nettyRequest.formRouteCompleter();
             try {
                 rootBody.processMulti(processor).handleForm(formRouteCompleter);
-                nettyRequest.addRouteWaitsFor(formRouteCompleter.execute);
+                nettyRequest.addRouteWaitsFor(formRouteCompleter.getExecute());
             } catch (Throwable e) {
                 return ExecutionFlow.error(e);
             }

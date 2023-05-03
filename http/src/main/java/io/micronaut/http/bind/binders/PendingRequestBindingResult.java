@@ -51,7 +51,7 @@ public interface PendingRequestBindingResult<T> extends ArgumentBinder.BindingRe
     }
 
     @Override
-    default <R> ArgumentBinder.BindingResult<R> map(Function<T, ArgumentBinder.BindingResult<R>> transform) {
+    default <R> ArgumentBinder.BindingResult<R> flatMap(Function<T, ArgumentBinder.BindingResult<R>> transform) {
         return new MappedPendingRequestBindingResult<>(this, transform);
     }
 }

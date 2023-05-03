@@ -71,10 +71,26 @@ public class DefaultBodyAnnotationBinder<T> extends AbstractArgumentBinder<T> im
         }
     }
 
+    /**
+     * Bind a <i>part</i> of the body, for argument spreading. By default, this gets the argument
+     * from {@link #bindFullBodyConvertibleValues(HttpRequest)}.
+     *
+     * @param context       The context to convert with
+     * @param source        The request
+     * @param bodyComponent The name of the component to bind to
+     * @return The binding result
+     */
     protected BindingResult<T> bindBodyPart(ArgumentConversionContext<T> context, HttpRequest<?> source, String bodyComponent) {
-        return bindFullBodyConvertibleValues(source).map(cv -> doBind(context, cv, bodyComponent));
+        return bindFullBodyConvertibleValues(source).flatMap(cv -> doBind(context, cv, bodyComponent));
     }
 
+    /**
+     * Try to bind from the <i>full</i> body of the request to a {@link ConvertibleValues} for
+     * argument spreading.
+     *
+     * @param source The request
+     * @return The body as a {@link ConvertibleValues} instance
+     */
     @SuppressWarnings({"unchecked", "rawtypes"})
     protected BindingResult<ConvertibleValues<?>> bindFullBodyConvertibleValues(HttpRequest<?> source) {
         Optional<ConvertibleValues> convertibleValuesBody = source.getBody(ConvertibleValues.class);

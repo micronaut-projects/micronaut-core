@@ -49,6 +49,12 @@ import java.util.function.Supplier;
 
 import static io.micronaut.http.HttpHeaders.CONTENT_RANGE;
 
+/**
+ * Body writer for {@link SystemFile}s.
+ *
+ * @author Graeme Rocher
+ * @since 4.0.0
+ */
 @Singleton
 @Experimental
 @Internal
@@ -110,7 +116,6 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
                 } else {
                     response.header(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
                 }
-
 
                 // Write the request data
                 final DefaultHttpResponse finalResponse = new DefaultHttpResponse(nettyResponse.getNettyHttpVersion(), nettyResponse.getNettyHttpStatus(), nettyResponse.getNettyHeaders());

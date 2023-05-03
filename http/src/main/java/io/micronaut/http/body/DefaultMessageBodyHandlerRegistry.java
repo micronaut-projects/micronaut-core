@@ -203,10 +203,14 @@ public final class DefaultMessageBodyHandlerRegistry implements MessageBodyHandl
     record HandlerKey<T>(Argument<T> type, List<MediaType> mediaTypes) {
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
             HandlerKey<?> that = (HandlerKey<?>) o;
-            return type.equals(that.type) && mediaTypes.equals(that.mediaTypes);
+            return type.equalsType(that.type) && mediaTypes.equals(that.mediaTypes);
         }
 
         @Override
@@ -234,8 +238,12 @@ public final class DefaultMessageBodyHandlerRegistry implements MessageBodyHandl
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
             MediaTypeQualifier<?> that = (MediaTypeQualifier<?>) o;
             return type.equalsType(that.type) && mediaTypes.equals(that.mediaTypes);
         }

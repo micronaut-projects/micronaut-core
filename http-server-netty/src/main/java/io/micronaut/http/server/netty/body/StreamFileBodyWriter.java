@@ -41,6 +41,12 @@ import org.slf4j.LoggerFactory;
 import java.io.InputStream;
 import java.io.OutputStream;
 
+/**
+ * Body writer for {@link StreamedFile}s.
+ *
+ * @since 4.0.0
+ * @author Graeme Rocher
+ */
 @Singleton
 @Experimental
 @Internal

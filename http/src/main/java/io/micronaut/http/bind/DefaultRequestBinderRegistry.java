@@ -94,8 +94,9 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
     }
 
     /**
-     * @param conversionService      The conversion service
-     * @param binders                The request argument binders
+     * @param conversionService    The conversion service
+     * @param binders              The request argument binders
+     * @param bodyAnnotationBinder The body annotation binder
      */
     @Inject
     public DefaultRequestBinderRegistry(

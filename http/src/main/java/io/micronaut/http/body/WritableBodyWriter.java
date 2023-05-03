@@ -27,6 +27,12 @@ import jakarta.inject.Singleton;
 import java.io.IOException;
 import java.io.OutputStream;
 
+/**
+ * Body writer for {@link Writable}s.
+ *
+ * @since 4.0.0
+ * @author Graeme Rocher
+ */
 @Singleton
 @Experimental
 public final class WritableBodyWriter implements MessageBodyWriter<Writable> {

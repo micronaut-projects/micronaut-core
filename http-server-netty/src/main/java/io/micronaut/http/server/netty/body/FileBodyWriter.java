@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.server.netty.body;
 
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpRequest;
@@ -29,6 +31,14 @@ import jakarta.inject.Singleton;
 import java.io.File;
 import java.io.OutputStream;
 
+/**
+ * Body writer for {@link File}s.
+ *
+ * @since 4.0.0
+ * @author Graeme Rocher
+ */
+@Internal
+@Experimental
 @Singleton
 public final class FileBodyWriter implements NettyBodyWriter<File> {
     private final SystemFileBodyWriter systemFileBodyWriter;

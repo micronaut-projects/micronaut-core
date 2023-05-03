@@ -115,7 +115,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
     final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     final Supplier<ExecutorService> ioExecutorSupplier;
     final boolean multipartEnabled;
-    private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
+    final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     ExecutorService ioExecutor;
     final ApplicationEventPublisher<HttpRequestTerminatedEvent> terminateEventPublisher;
     final RouteExecutor routeExecutor;
@@ -511,7 +511,6 @@ public final class RoutingInBoundHandler implements RequestHandler {
         if (request.getNativeRequest() instanceof StreamedHttpRequest streamed && !streamed.isConsumed()) {
             // consume incoming data
             Flux.from(streamed).subscribe(HttpContent::release);
-        } else {
         }
         if (nettyResponse instanceof StreamedHttpResponse streamed) {
             nettyResponse.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);

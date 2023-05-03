@@ -82,6 +82,8 @@ public final class StreamingMultiObjectBody extends ManagedBody<Publisher<?>> im
 
     /**
      * A subscriber that allows blocking reads from a publisher. Handles resource cleanup properly.
+     *
+     * @param <T> Stream type
      */
     private static final class PublisherAsBlocking<T> implements Subscriber<T>, Closeable {
         private final Lock lock = new ReentrantLock();

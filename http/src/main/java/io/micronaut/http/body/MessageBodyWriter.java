@@ -73,6 +73,8 @@ public interface MessageBodyWriter<T> extends Ordered {
      * Note that even when this is {@code false},
      * {@link #writeTo(Argument, MediaType, Object, MutableHeaders, OutputStream)} may still block because the
      * {@link OutputStream} that is passed as the write destination may still block.
+     *
+     * @return Whether this writer may block
      */
     default boolean isBlocking() {
         return false;
@@ -120,6 +122,7 @@ public interface MessageBodyWriter<T> extends Ordered {
      * @param outgoingHeaders The HTTP headers
      * @param bufferFactory   A byte buffer factory
      * @throws CodecException If an error occurs decoding
+     * @return The encoded byte buffer
      */
     @NonNull
     default ByteBuffer<?> writeTo(

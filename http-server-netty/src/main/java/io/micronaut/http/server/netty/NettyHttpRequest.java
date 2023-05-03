@@ -229,7 +229,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         return body;
     }
 
-    public HttpBody lastBody() {
+    public final HttpBody lastBody() {
         HttpBody body = rootBody();
         while (true) {
             HttpBody next = body.next();
@@ -241,11 +241,11 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         return body;
     }
 
-    public void addRouteWaitsFor(ExecutionFlow<?> executionFlow) {
+    public final void addRouteWaitsFor(ExecutionFlow<?> executionFlow) {
         routeWaitsFor = routeWaitsFor.then(() -> executionFlow);
     }
 
-    public ExecutionFlow<?> getRouteWaitsFor() {
+    public final ExecutionFlow<?> getRouteWaitsFor() {
         return routeWaitsFor;
     }
 

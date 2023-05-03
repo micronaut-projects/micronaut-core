@@ -116,7 +116,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private final ServerSslConfiguration sslConfiguration;
     private final Environment environment;
     private final RoutingInBoundHandler routingHandler;
-    private final HttpContentProcessorResolver httpContentProcessorResolver;
     private final boolean isDefault;
     private final ApplicationContext applicationContext;
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -135,7 +134,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     /**
      * @param serverConfiguration                     The Netty HTTP server configuration
      * @param nettyEmbeddedServices                   The embedded server context
-     * @param handlerRegistry                         The handler registry
      * @param isDefault                               Is this the default server
      */
     @SuppressWarnings("ParameterNumber")
@@ -158,22 +156,22 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             this.sslConfiguration = null;
         }
         ApplicationEventPublisher<HttpRequestTerminatedEvent> httpRequestTerminatedEventPublisher = nettyEmbeddedServices
-                .getEventPublisher(HttpRequestTerminatedEvent.class);
+            .getEventPublisher(HttpRequestTerminatedEvent.class);
         final Supplier<ExecutorService> ioExecutor = SupplierUtil.memoized(() ->
-                nettyEmbeddedServices.getExecutorSelector()
-                        .select(TaskExecutors.BLOCKING).orElse(null)
+            nettyEmbeddedServices.getExecutorSelector()
+                .select(TaskExecutors.BLOCKING).orElse(null)
         );
-        this.httpContentProcessorResolver = new DefaultHttpContentProcessorResolver(
-                nettyEmbeddedServices.getApplicationContext(),
-                () -> serverConfiguration
+        HttpContentProcessorResolver httpContentProcessorResolver = new DefaultHttpContentProcessorResolver(
+            nettyEmbeddedServices.getApplicationContext(),
+            () -> serverConfiguration
         );
         this.routingHandler = new RoutingInBoundHandler(
-                serverConfiguration,
-                nettyEmbeddedServices,
-                ioExecutor,
-                httpContentProcessorResolver,
-                httpRequestTerminatedEventPublisher,
-                applicationContext.getConversionService()
+            serverConfiguration,
+            nettyEmbeddedServices,
+            ioExecutor,
+            httpContentProcessorResolver,
+            httpRequestTerminatedEventPublisher,
+            applicationContext.getConversionService()
         );
         this.hostResolver = new DefaultHttpHostResolver(serverConfiguration, () -> NettyHttpServer.this);
 

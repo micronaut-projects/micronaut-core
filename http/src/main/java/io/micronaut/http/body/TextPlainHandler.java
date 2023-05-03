@@ -34,6 +34,12 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 
+/**
+ * Body handler for content type {@value MediaType#TEXT_PLAIN}.
+ *
+ * @since 4.0.0
+ * @author Graeme Rocher
+ */
 @Produces(MediaType.TEXT_PLAIN)
 @Consumes(MediaType.TEXT_PLAIN)
 @Singleton
