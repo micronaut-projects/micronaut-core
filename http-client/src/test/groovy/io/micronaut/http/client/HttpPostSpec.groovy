@@ -431,8 +431,7 @@ class HttpPostSpec extends Specification {
         }
 
         @Post(uri = '/query/url-encoded', consumes = MediaType.APPLICATION_FORM_URLENCODED)
-        Book simpleUrlEncoded(@Body Book book, String title) {
-            assert title == book.title
+        Book simpleUrlEncoded(@Body Book book) {
             return book
         }
 

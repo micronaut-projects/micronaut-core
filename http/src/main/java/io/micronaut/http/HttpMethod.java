@@ -76,9 +76,9 @@ public enum HttpMethod implements CharSequence {
     private final boolean requiresRequestBody;
     private final boolean permitsRequestBody;
 
-    HttpMethod(boolean requiresRequestBody, boolean permisRequestBody) {
+    HttpMethod(boolean requiresRequestBody, boolean permitsRequestBody) {
         this.requiresRequestBody = requiresRequestBody;
-        this.permitsRequestBody = permisRequestBody;
+        this.permitsRequestBody = permitsRequestBody;
     }
 
     @Override
@@ -113,6 +113,16 @@ public enum HttpMethod implements CharSequence {
      * @since 4.0.0
      */
     public boolean permitsRequestBody() {
+        return permitsRequestBody;
+    }
+
+    /**
+     * Whether the given method allows a request body.
+     *
+     * @return Does the method allows a request body.
+     * @since 4.0.0
+     */
+    public boolean permitsResponseBody() {
         return permitsRequestBody;
     }
 

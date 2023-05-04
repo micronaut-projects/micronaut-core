@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.http.body;
+
 /**
- * Netty file type and response handling.
+ * A handler combines a reader and a writer.
  *
- * @author Graeme Rocher
- * @since 1.0
+ * @param <T> The tye
+ * @see MessageBodyReader
+ * @see MessageBodyWriter
+ * @since 4.0.0
  */
-package io.micronaut.http.server.netty.types.files;
+public interface MessageBodyHandler<T> extends MessageBodyReader<T>, MessageBodyWriter<T> {
+}

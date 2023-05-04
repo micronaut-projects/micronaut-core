@@ -93,12 +93,12 @@ public class JsonViewServerFilter implements HttpServerFilter {
                         if (Publishers.isConvertibleToPublisher(body)) {
                             Publisher<?> pub = Publishers.convertPublisher(conversionService, body, Publisher.class);
                             response.body(Flux.from(pub)
-                                                  .map(o -> codec.encode((Argument) routeInfo.getBodyType(), o))
+                                                  .map(o -> codec.encode((Argument) routeInfo.getResponseBodyType(), o))
                                                   .subscribeOn(Schedulers.fromExecutorService(executorService)));
                         } else {
                             return Mono.fromCallable(() -> {
                                 @SuppressWarnings({"unchecked", "rawtypes"})
-                                final byte[] encoded = codec.encode((Argument) routeInfo.getBodyType(), body);
+                                final byte[] encoded = codec.encode((Argument) routeInfo.getResponseBodyType(), body);
                                 response.body(encoded);
                                 return response;
                             }).subscribeOn(Schedulers.fromExecutorService(executorService));

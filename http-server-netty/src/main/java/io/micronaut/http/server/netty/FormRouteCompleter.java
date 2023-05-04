@@ -55,7 +55,7 @@ import java.util.function.BiFunction;
 public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
     private static final Logger LOG = LoggerFactory.getLogger(FormRouteCompleter.class);
 
-    final DelayedExecutionFlow<RouteMatch<?>> execute = DelayedExecutionFlow.create();
+    private final DelayedExecutionFlow<RouteMatch<?>> execute = DelayedExecutionFlow.create();
     private final EventLoop eventLoop;
     private boolean executed;
     private final RouteMatch<?> routeMatch;
@@ -67,6 +67,10 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
     FormRouteCompleter(RouteMatch<?> routeMatch, EventLoop eventLoop) {
         this.eventLoop = eventLoop;
         this.routeMatch = routeMatch;
+    }
+
+    public DelayedExecutionFlow<RouteMatch<?>> getExecute() {
+        return execute;
     }
 
     @Override
@@ -197,6 +201,10 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
         Claimant claimant = createClaimant(name);
         claimant.skipUnfinished = true;
         return claimant.flux();
+    }
+
+    public boolean isClaimed(String name) {
+        return claimants.containsKey(name);
     }
 
     @Override

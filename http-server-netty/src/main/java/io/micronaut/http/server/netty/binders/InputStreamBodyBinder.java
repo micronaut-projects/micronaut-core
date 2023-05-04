@@ -20,7 +20,8 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
-import io.micronaut.http.server.netty.HttpContentProcessorResolver;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.http.server.netty.body.ImmediateByteBody;
@@ -42,13 +43,13 @@ public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<Inpu
     public static final Argument<InputStream> TYPE = Argument.of(InputStream.class);
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
 
-    private final HttpContentProcessorResolver processorResolver;
+    private final HttpServerConfiguration httpServerConfiguration;
 
     /**
-     * @param processorResolver The http content processor resolver
+     * @param httpServerConfiguration The server config
      */
-    public InputStreamBodyBinder(HttpContentProcessorResolver processorResolver) {
-        this.processorResolver = processorResolver;
+    public InputStreamBodyBinder(HttpServerConfiguration httpServerConfiguration) {
+        this.httpServerConfiguration = httpServerConfiguration;
     }
 
     @Override
@@ -63,9 +64,9 @@ public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<Inpu
                 return BindingResult.empty();
             }
             try {
-                InputStream s = nhr.rootBody().processMulti(processorResolver.resolve(nhr, context.getArgument())).coerceToInputStream(nhr.getChannelHandlerContext().alloc());
+                InputStream s = nhr.rootBody().rawContent(httpServerConfiguration).coerceToInputStream(nhr.getChannelHandlerContext().alloc());
                 return () -> Optional.of(s);
-            } catch (Throwable t) {
+            } catch (ContentLengthExceededException t) {
                 if (LOG.isTraceEnabled()) {
                     LOG.trace("Server received error for argument [" + context.getArgument() + "]: " + t.getMessage(), t);
                 }

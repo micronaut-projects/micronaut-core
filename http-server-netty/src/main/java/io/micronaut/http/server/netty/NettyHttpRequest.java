@@ -23,6 +23,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
@@ -155,6 +156,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private final ByteBody body;
     @Nullable
     private FormRouteCompleter formRouteCompleter;
+    private ExecutionFlow<?> routeWaitsFor = ExecutionFlow.just(null);
 
     /**
      * Set to {@code true} when the {@link #headers} may have been mutated. If this is not the case,
@@ -227,7 +229,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         return body;
     }
 
-    private HttpBody lastBody() {
+    public final HttpBody lastBody() {
         HttpBody body = rootBody();
         while (true) {
             HttpBody next = body.next();
@@ -239,11 +241,24 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         return body;
     }
 
+    public final void addRouteWaitsFor(ExecutionFlow<?> executionFlow) {
+        routeWaitsFor = routeWaitsFor.then(() -> executionFlow);
+    }
+
+    public final ExecutionFlow<?> getRouteWaitsFor() {
+        return routeWaitsFor;
+    }
+
     public final FormRouteCompleter formRouteCompleter() {
+        assert isFormOrMultipartData();
         if (formRouteCompleter == null) {
             formRouteCompleter = new FormRouteCompleter((RouteMatch<?>) getAttribute(HttpAttributes.ROUTE_MATCH).get(), getChannelHandlerContext().channel().eventLoop());
         }
         return formRouteCompleter;
+    }
+
+    public final boolean hasFormRouteCompleter() {
+        return formRouteCompleter != null;
     }
 
     @Override
@@ -652,7 +667,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     /**
      * Mutable version of the request.
      */
-    private class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder {
+    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder {
 
         private URI uri = NettyHttpRequest.this.uri;
         @Nullable

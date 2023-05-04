@@ -17,11 +17,14 @@ package io.micronaut.http.server.netty.body;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
-import io.micronaut.http.server.netty.HttpContentProcessor;
+import io.micronaut.http.server.HttpServerConfiguration;
+import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpUtil;
 
 /**
  * Base class for a raw {@link HttpBody} with just bytes.
@@ -32,14 +35,28 @@ import io.netty.handler.codec.http.HttpRequest;
 @Internal
 public sealed interface ByteBody extends HttpBody permits ImmediateByteBody, StreamingByteBody {
     /**
-     * Process this body using the given processor.
+     * Process this body using the given processor.<br>
+     * Only used for form processing now.
      *
      * @param processor The processor to apply
      * @return The new processed body
      * @throws Throwable Any exception thrown by the processor. Not all processing failures may
-     * throw immediately, however
+     *                   throw immediately, however
      */
-    MultiObjectBody processMulti(HttpContentProcessor processor) throws Throwable;
+    MultiObjectBody processMulti(FormDataHttpContentProcessor processor) throws Throwable;
+
+    /**
+     * Transform this body to a {@link MultiObjectBody} containing {@link io.netty.buffer.ByteBuf}s
+     * with the raw body. There is a check against
+     * {@link HttpServerConfiguration#getMaxRequestSize()}.
+     *
+     * @param configuration The configuration for request size limits
+     * @return The body containing {@link io.netty.buffer.ByteBuf}s
+     * @throws ContentLengthExceededException If the content length exceeds the configured request
+     *                                        size. May also appear delayed for
+     *                                        {@link StreamingMultiObjectBody}
+     */
+    MultiObjectBody rawContent(HttpServerConfiguration configuration) throws ContentLengthExceededException;
 
     /**
      * Fully buffer this body.
@@ -70,7 +87,7 @@ public sealed interface ByteBody extends HttpBody permits ImmediateByteBody, Str
         if (request instanceof FullHttpRequest full) {
             return new ImmediateByteBody(full.content());
         } else {
-            return new StreamingByteBody((StreamedHttpRequest) request);
+            return new StreamingByteBody((StreamedHttpRequest) request, HttpUtil.getContentLength(request, -1L));
         }
     }
 }

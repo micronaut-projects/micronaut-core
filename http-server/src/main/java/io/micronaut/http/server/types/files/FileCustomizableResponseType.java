@@ -15,7 +15,7 @@
  */
 package io.micronaut.http.server.types.files;
 
-import io.micronaut.http.MediaType;
+import io.micronaut.http.body.MediaTypeProvider;
 import io.micronaut.http.server.types.CustomizableResponseType;
 
 /**
@@ -24,7 +24,7 @@ import io.micronaut.http.server.types.CustomizableResponseType;
  * @author James Kleeh
  * @since 1.0
  */
-public interface FileCustomizableResponseType extends CustomizableResponseType {
+public interface FileCustomizableResponseType extends CustomizableResponseType, MediaTypeProvider {
 
     /**
      * @deprecated Unused now, please follow <a href="https://httpwg.org/specs/rfc6266.html">RFC 6266</a>
@@ -42,8 +42,4 @@ public interface FileCustomizableResponseType extends CustomizableResponseType {
      */
     long getLength();
 
-    /**
-     * @return The media type of the file
-     */
-    MediaType getMediaType();
 }

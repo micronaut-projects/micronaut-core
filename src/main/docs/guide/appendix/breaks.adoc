@@ -160,3 +160,24 @@ public class MyExceptionHandler implements ExceptionHandler<MyException, HttpRes
     }
 }
 ----
+
+==== `HttpContentProcessor` superseded by `MessageBodyHandler` API
+
+The netty-specific `HttpContentProcessor` API has been replaced by a new, experimental `MessageBodyHandler` API that
+does not rely on netty and is more powerful. There is no compatibility layer, so old `HttpContentProcessor` will stop
+working and need to be rewritten.
+
+==== `@Body` annotation on controller parameters
+
+Before 4.0, the binding logic for controller parameters was more lax. A bare parameter, e.g. `void test(String title)`,
+could either match a part of the request body (`foo` if the request body is `{"title":"foo"}`), come from a query
+parameter, or could bind to the full request body (`{"x":"y"}` if the request body is `{"x":"y"}`).
+
+Binding from the full body to these bare parameters is no longer supported. If you wish to bind the full body, the
+parameter _must_ be annotated with `@Body`.
+
+Additionally, it is no longer permitted to mix body component binding with full body binding. For example,
+`void test(@Body Bean bean, String title)` will not work anymore if the `title` if the title needs to come from the
+body that is already bound to `bean`.
+
+These changes also apply to functions that are exposed using `micronaut-function-web`.

@@ -15,16 +15,24 @@
  */
 package io.micronaut.http.server.netty.binders;
 
+import io.micronaut.buffer.netty.NettyByteBufferFactory;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
-import io.micronaut.http.server.netty.HttpContentProcessorResolver;
+import io.micronaut.http.body.ChunkedMessageBodyReader;
+import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
+import io.micronaut.http.server.netty.body.ByteBody;
 import io.micronaut.http.server.netty.body.ImmediateByteBody;
 import io.micronaut.http.server.netty.converters.NettyConverters;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
@@ -34,8 +42,9 @@ import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.publisher.Mono;
+import reactor.core.publisher.Flux;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -44,6 +53,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 @Singleton
 public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publisher<?>> {
 
@@ -51,17 +61,13 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
     private static final Argument<Publisher<?>> TYPE = (Argument) Argument.of(Publisher.class);
 
-    private final HttpContentProcessorResolver httpContentProcessorResolver;
-    private final ConversionService conversionService;
+    private final NettyBodyAnnotationBinder<Object> nettyBodyAnnotationBinder;
 
     /**
-     * @param conversionService            The conversion service
-     * @param httpContentProcessorResolver The http content processor resolver
+     * @param nettyBodyAnnotationBinder Body annotation binder
      */
-    public PublisherBodyBinder(ConversionService conversionService,
-                               HttpContentProcessorResolver httpContentProcessorResolver) {
-        this.httpContentProcessorResolver = httpContentProcessorResolver;
-        this.conversionService = conversionService;
+    public PublisherBodyBinder(NettyBodyAnnotationBinder<Object> nettyBodyAnnotationBinder) {
+        this.nettyBodyAnnotationBinder = nettyBodyAnnotationBinder;
     }
 
     @Override
@@ -72,30 +78,41 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
     @Override
     public BindingResult<Publisher<?>> bind(ArgumentConversionContext<Publisher<?>> context, HttpRequest<?> source) {
         if (source instanceof NettyHttpRequest<?> nhr) {
-            if (nhr.rootBody() instanceof ImmediateByteBody imm && imm.empty()) {
+            ByteBody rootBody = nhr.rootBody();
+            if (rootBody instanceof ImmediateByteBody imm && imm.empty()) {
                 return BindingResult.empty();
             }
-            Argument<?> targetType = context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-            try {
-                Publisher<?> publisher = nhr.rootBody()
-                    .processMulti(httpContentProcessorResolver.resolve(nhr, targetType).resultType(context.getArgument()))
-                    .mapNotNull(o -> {
-                        ArgumentConversionContext<?> conversionContext = context.with(targetType);
-                        return convertAndRelease(conversionService, conversionContext, o);
-                    })
-                    .asPublisher();
-                return () -> Optional.of(publisher);
-            } catch (Throwable t) {
-                if (LOG.isTraceEnabled()) {
-                    LOG.trace("Server received error for argument [" + context.getArgument() + "]: " + t.getMessage(), t);
+            @SuppressWarnings("unchecked")
+            Argument<Object> targetType = (Argument<Object>) context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+            MediaType mediaType = nhr.getContentType().orElse(null);
+            if (!Publishers.isSingle(context.getArgument().getType()) && !context.getArgument().isSpecifiedSingle() && mediaType != null) {
+                Optional<MessageBodyReader<Object>> reader = nettyBodyAnnotationBinder.bodyHandlerRegistry.findReader(targetType, List.of(mediaType));
+                if (reader.isPresent() && reader.get() instanceof ChunkedMessageBodyReader<Object> piecewise) {
+                    Publisher<Object> pub = piecewise.readChunked(targetType, mediaType, nhr.getHeaders(), Flux.from(rootBody.rawContent(nettyBodyAnnotationBinder.httpServerConfiguration).asPublisher()).map(b -> NettyByteBufferFactory.DEFAULT.wrap((ByteBuf) b)));
+                    return () -> Optional.of(pub);
                 }
-                return () -> Optional.of(Mono.error(t));
             }
+            // bind a single result
+            ExecutionFlow<Object> flow = rootBody
+                .buffer(nhr.getChannelHandlerContext().alloc())
+                .map(bytes -> {
+                    Optional<Object> value;
+                    try {
+                        value = nettyBodyAnnotationBinder.transform(nhr, context.with(targetType), bytes);
+                    } catch (RuntimeException e) {
+                        throw e;
+                    } catch (Throwable e) {
+                        throw new RuntimeException(e);
+                    }
+                    return value.orElseThrow(() -> PublisherBodyBinder.extractError(null, context));
+                });
+            Publisher<Object> future = ReactiveExecutionFlow.toPublisher(() -> flow);
+            return () -> Optional.of(future);
         }
         return BindingResult.empty();
     }
 
-    private static RuntimeException extractError(Object message, ArgumentConversionContext<?> conversionContext) {
+    static RuntimeException extractError(Object message, ArgumentConversionContext<?> conversionContext) {
         Optional<ConversionError> lastError = conversionContext.getLastError();
         if (lastError.isPresent()) {
             if (LOG.isDebugEnabled()) {

@@ -28,6 +28,8 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Status;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.sse.Event;
 import io.micronaut.scheduling.executor.ThreadSelection;
 
@@ -67,12 +69,13 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     private final Argument<?> bodyType;
     private final boolean isErrorRoute;
     private final boolean isPermitsBody;
+    private final MessageBodyWriter<R> messageBodyWriter;
 
     public DefaultRouteInfo(ReturnType<? extends R> returnType,
                             Class<?> declaringType,
                             boolean isErrorRoute,
                             boolean isPermitsBody) {
-        this(AnnotationMetadata.EMPTY_METADATA, returnType, List.of(), List.of(), declaringType, isErrorRoute, isPermitsBody);
+        this(AnnotationMetadata.EMPTY_METADATA, returnType, List.of(), List.of(), declaringType, isErrorRoute, isPermitsBody, MessageBodyHandlerRegistry.EMPTY);
     }
 
     public DefaultRouteInfo(AnnotationMetadata annotationMetadata,
@@ -81,10 +84,14 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
                             List<MediaType> producesMediaTypes,
                             Class<?> declaringType,
                             boolean isErrorRoute,
-                            boolean isPermitsBody) {
+                            boolean isPermitsBody,
+                            MessageBodyHandlerRegistry messageBodyHandlerRegistry) {
         this.annotationMetadata = annotationMetadata;
         this.returnType = returnType;
-        bodyType = resolveBodyType(returnType);
+        this.bodyType = resolveBodyType(returnType);
+        this.messageBodyWriter = messageBodyHandlerRegistry.findWriter((Argument<R>) bodyType, producesMediaTypes)
+            .map(w -> w.createSpecific((Argument<R>) bodyType))
+            .orElse(null);
         single = returnType.isSingleResult() ||
             (isReactive() && returnType.getFirstTypeVariable()
                 .filter(t -> HttpResponse.class.isAssignableFrom(t.getType())).isPresent()) ||
@@ -136,6 +143,11 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
         }
     }
 
+    @Override
+    public MessageBodyWriter<R> getMessageBodyWriter() {
+        return messageBodyWriter;
+    }
+
     private static Argument<?> resolveBodyType(ReturnType<?> returnType) {
         if (returnType.isAsyncOrReactive()) {
             Argument<?> reactiveType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
@@ -154,7 +166,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
-    public Optional<Argument<?>> getBodyArgument() {
+    public Optional<Argument<?>> getRequestBodyType() {
         return Optional.empty();
     }
 
@@ -164,7 +176,7 @@ public class DefaultRouteInfo<R> implements RouteInfo<R> {
     }
 
     @Override
-    public Argument<?> getBodyType() {
+    public Argument<?> getResponseBodyType() {
         return bodyType;
     }
 

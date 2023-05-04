@@ -15,6 +15,7 @@
  */
 package io.micronaut.http;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.attr.MutableAttributeHolder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -22,9 +23,9 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.util.HttpUtil;
 
-import io.micronaut.core.annotation.NonNull;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
@@ -60,6 +61,15 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
      * @return The request body
      */
     @NonNull Optional<B> getBody();
+
+    /**
+     * @return The body writer.
+     * @since 4.0.0
+     */
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    default Optional<MessageBodyWriter<B>> getBodyWriter() {
+        return (Optional) getAttribute(HttpAttributes.MESSAGE_BODY_WRITER, MessageBodyWriter.class);
+    }
 
     /**
      * @return The request character encoding. Defaults to {@link StandardCharsets#UTF_8}

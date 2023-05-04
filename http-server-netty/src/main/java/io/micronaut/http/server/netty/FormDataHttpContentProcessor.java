@@ -68,7 +68,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor {
      * @param nettyHttpRequest The {@link NettyHttpRequest}
      * @param configuration    The {@link NettyHttpServerConfiguration}
      */
-    FormDataHttpContentProcessor(NettyHttpRequest<?> nettyHttpRequest, NettyHttpServerConfiguration configuration) {
+    public FormDataHttpContentProcessor(NettyHttpRequest<?> nettyHttpRequest, HttpServerConfiguration configuration) {
         super(nettyHttpRequest, configuration);
         Charset characterEncoding = nettyHttpRequest.getCharacterEncoding();
         HttpServerConfiguration.MultipartConfiguration multipart = configuration.getMultipart();

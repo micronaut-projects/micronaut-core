@@ -23,7 +23,12 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.*
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Head
+import io.micronaut.http.annotation.Header
+import io.micronaut.http.annotation.QueryValue
+import io.micronaut.http.annotation.Status
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
@@ -33,6 +38,7 @@ import reactor.core.publisher.Mono
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
+
 import java.time.LocalDate
 import java.util.function.Consumer
 

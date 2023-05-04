@@ -14,11 +14,11 @@ import java.util.List;
 @Requires(property = "spec.name", value = "FullHttpStackBenchmark")
 public class SearchController {
     @Post("find")
-    public HttpResponse<?> find(@Body Input input) {
+    public HttpResponse<Result> find(@Body Input input) {
         return find(input.haystack, input.needle);
     }
 
-    private static MutableHttpResponse<?> find(List<String> haystack, String needle) {
+    private static MutableHttpResponse<Result> find(List<String> haystack, String needle) {
         for (int listIndex = 0; listIndex < haystack.size(); listIndex++) {
             String s = haystack.get(listIndex);
             int stringIndex = s.indexOf(needle);

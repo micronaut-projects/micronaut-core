@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,28 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.types;
+package io.micronaut.http.exceptions;
+
+import io.micronaut.http.codec.CodecException;
 
 /**
- * Used when a special type handler encounters an error.
+ * Exception that occurs when reading or writing a message body.
  *
- * @author James Kleeh
- * @since 1.0
+ * @since 4.0.0
  */
-public class CustomizableResponseTypeException extends RuntimeException {
-
-    /**
-     * @param msg The message
-     */
-    public CustomizableResponseTypeException(String msg) {
-        super(msg);
+public class MessageBodyException extends CodecException {
+    public MessageBodyException(String message) {
+        super(message);
     }
 
-    /**
-     * @param msg   The message
-     * @param cause The throwable
-     */
-    public CustomizableResponseTypeException(String msg, Throwable cause) {
-        super(msg, cause);
+    public MessageBodyException(String message, Throwable cause) {
+        super(message, cause);
     }
 }

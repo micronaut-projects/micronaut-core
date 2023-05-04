@@ -192,7 +192,7 @@ class NettyHttpServerSpec extends Specification {
         HttpResponse response = client.toBlocking().exchange(request, String)
         then:
         response.body() == "Person Named Fred"
-        response.header(HttpHeaders.CONNECTION) == 'keep-alive'
+        response.header(HttpHeaders.CONNECTION) == null // HTTP/1.1 is keep-alive by default
 
         cleanup:
         client.stop()

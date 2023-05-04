@@ -71,7 +71,12 @@ public final class ImmediateMultiObjectBody extends ManagedBody<List<?>> impleme
         }
         if (allFormData) {
             //noinspection unchecked
-            return next(new ImmediateSingleObjectBody(toMap(defaultCharset, (List<? extends MicronautHttpData<?>>) objects)));
+            List<? extends MicronautHttpData<?>> data = (List<? extends MicronautHttpData<?>>) objects;
+            Map<String, Object> map = toMap(defaultCharset, data);
+            for (MicronautHttpData<?> datum : data) {
+                datum.release();
+            }
+            return next(new ImmediateSingleObjectBody(map));
         }
         if (objects.size() == 1) {
             Object o = objects.get(0);
@@ -83,7 +88,7 @@ public final class ImmediateMultiObjectBody extends ManagedBody<List<?>> impleme
     private static CompositeByteBuf coerceToComposite(List<?> objects, ByteBufAllocator alloc) {
         CompositeByteBuf composite = alloc.compositeBuffer();
         for (Object object : objects) {
-            composite.addComponent(true, ((ByteBufHolder) object).content());
+            composite.addComponent(true, (ByteBuf) object);
         }
         return composite;
     }
@@ -121,7 +126,7 @@ public final class ImmediateMultiObjectBody extends ManagedBody<List<?>> impleme
         List<?> objects = claim();
         ByteBuf buf = switch (objects.size()) {
             case 0 -> Unpooled.EMPTY_BUFFER;
-            case 1 -> ((ByteBufHolder) objects.get(0)).content();
+            case 1 -> (ByteBuf) objects.get(0);
             default -> coerceToComposite(objects, alloc);
         };
         return new ByteBufInputStream(buf, true);

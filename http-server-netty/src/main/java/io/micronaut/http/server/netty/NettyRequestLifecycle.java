@@ -27,9 +27,9 @@ import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.server.RequestLifecycle;
 import io.micronaut.http.server.netty.body.ByteBody;
 import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
-import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType;
-import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
+import io.micronaut.http.server.types.files.StreamedFile;
+import io.micronaut.http.server.types.files.SystemFile;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
@@ -102,10 +102,10 @@ final class NettyRequestLifecycle extends RequestLifecycle {
                 if (url.getProtocol().equals("file")) {
                     File file = Paths.get(url.toURI()).toFile();
                     if (file.exists() && !file.isDirectory() && file.canRead()) {
-                        return new NettySystemFileCustomizableResponseType(file);
+                        return new SystemFile(file);
                     }
                 }
-                return new NettyStreamedFileCustomizableResponseType(url);
+                return new StreamedFile(url);
             } catch (URISyntaxException e) {
                 //no-op
             }
@@ -128,44 +128,25 @@ final class NettyRequestLifecycle extends RequestLifecycle {
      * This method also sometimes fulfills more controller parameters with form data.
      */
     private ExecutionFlow<RouteMatch<?>> waitForBody(RouteMatch<?> routeMatch) {
-        // note: shouldReadBody only works when fulfill has been called at least once
-        if (nettyRequest.rootBody().next() != null) {
-            return ExecutionFlow.just(routeMatch);
-        }
-        HttpContentProcessor processor = rib.httpContentProcessorResolver.resolve(nettyRequest, routeMatch);
-        ByteBody rootBody = nettyRequest.rootBody();
-        if (processor instanceof FormDataHttpContentProcessor && nettyRequest.isFormOrMultipartData()) {
-            FormRouteCompleter frc = nettyRequest.formRouteCompleter();
+        // if there is a binder that needs form content, actually process the body now. We need to
+        // do this after all binders are done because all createClaimant calls must be done before
+        // the FormRouteCompleter can process data.
+        if (nettyRequest.hasFormRouteCompleter()) {
+            FormDataHttpContentProcessor processor = new FormDataHttpContentProcessor(nettyRequest, rib.serverConfiguration);
+            ByteBody rootBody = nettyRequest.rootBody();
+            FormRouteCompleter formRouteCompleter = nettyRequest.formRouteCompleter();
             try {
-                rootBody.processMulti(processor).handleForm(frc);
+                rootBody.processMulti(processor).handleForm(formRouteCompleter);
+                nettyRequest.addRouteWaitsFor(formRouteCompleter.getExecute());
             } catch (Throwable e) {
                 return ExecutionFlow.error(e);
             }
-            return frc.execute;
-        } else if (needsBody(routeMatch)) {
-            return rootBody.buffer(nettyRequest.getChannelHandlerContext().alloc())
-                .map(ibb -> {
-                    try {
-                        ibb.processMulti(processor);
-                    } catch (RuntimeException e) {
-                        throw e;
-                    } catch (Throwable e) {
-                        throw new RuntimeException(e);
-                    }
-                    return routeMatch;
-                });
-        } else {
-            return ExecutionFlow.just(routeMatch);
         }
+        return nettyRequest.getRouteWaitsFor().map(v -> routeMatch);
     }
 
     void handleException(Throwable cause) {
         onError(cause).onComplete((response, throwable) -> rib.writeResponse(outboundAccess, nettyRequest, response, throwable));
-    }
-
-    private boolean needsBody(RouteMatch<?> routeMatch) {
-        // Not annotated body argument
-        return routeMatch.getRouteInfo().needsRequestBody() || !routeMatch.isFulfilled();
     }
 
 }

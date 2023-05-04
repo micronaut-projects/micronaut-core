@@ -15,8 +15,8 @@
  */
 package io.micronaut.http.server.netty.binding
 
-import io.micronaut.core.async.annotation.SingleResult
 import groovy.transform.EqualsAndHashCode
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -213,7 +213,7 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         }
 
         @Post(uri = "/small-form/pogo", consumes = MediaType.APPLICATION_FORM_URLENCODED)
-        String processTempFormData(UrlEncodedPogo pogo) {
+        String processTempFormData(@Body UrlEncodedPogo pogo) {
             return pogo.aaa0123456789 + pogo.bbb0123456789
         }
     }

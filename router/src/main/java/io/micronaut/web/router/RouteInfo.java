@@ -20,11 +20,14 @@ import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
+import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.scheduling.executor.ThreadSelection;
 
 import java.util.Collection;
@@ -48,6 +51,24 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
     List<MediaType> DEFAULT_PRODUCES = Collections.singletonList(MediaType.APPLICATION_JSON_TYPE);
 
     /**
+     * @return The message body writer, if any.
+     * @since 4.0.0
+     */
+    @Nullable
+    default MessageBodyWriter<R> getMessageBodyWriter() {
+        return null;
+    }
+
+    /**
+     * @return The message body reader. if any.
+     * @since 4.0.0
+     */
+    @Nullable
+    default MessageBodyReader<?> getMessageBodyReader() {
+        return null;
+    }
+
+    /**
      * @return The return type
      */
     ReturnType<? extends R> getReturnType();
@@ -55,23 +76,53 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
     /**
      * @return The argument representing the data type being produced.
      */
-    Argument<?> getBodyType();
+    @NonNull
+    Argument<?> getResponseBodyType();
 
     /**
-     * @return The argument that represents the body
+     * Is the response body json formattable.
+     * @return The response body.
      */
-    Optional<Argument<?>> getBodyArgument();
+    default boolean isResponseBodyJsonFormattable() {
+        Argument<?> argument = getResponseBodyType();
+        // it would be nice to support netty ByteBuf here, but it's not clear how.
+        return !(argument.getType() == byte[].class
+            || ByteBuffer.class.isAssignableFrom(argument.getType()));
+    }
 
     /**
-     * Like {@link #getBodyArgument()}, but excludes body arguments that may match only a part of
+     * @return The response body type
+     * @deprecated Use {@link #getResponseBodyType()} instead
+     */
+    @Deprecated(since = "4.0", forRemoval = true)
+    default Argument<?> getBodyType() {
+        return getResponseBodyType();
+    }
+
+    /**
+     * @return The argument that represents the body of the request
+     */
+    Optional<Argument<?>> getRequestBodyType();
+
+    /**
+     * @return The argument that represents the body of the request
+     * @deprecated UYse {@link #getRequestBodyType()} instead
+     */
+    @Deprecated(since = "4.0", forRemoval = true)
+    default Optional<Argument<?>> getBodyArgument() {
+        return getRequestBodyType();
+    }
+
+    /**
+     * Like {@link #getRequestBodyType()}, but excludes body arguments that may match only a part of
      * the body (i.e. that have no {@code @Body} annotation, or where the {@code @Body} has a value
      * set).
      *
      * @return The argument that represents the body
      */
     @Internal
-    default Optional<Argument<?>> getFullBodyArgument() {
-        return getBodyArgument()
+    default Optional<Argument<?>> getFullRequestBodyType() {
+        return getRequestBodyType()
             /*
             The getBodyArgument() method returns arguments for functions where it is
             not possible to dictate whether the argument is supposed to bind the entire

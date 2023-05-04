@@ -27,6 +27,7 @@ import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.converters.NettyConverters;
+import org.jetbrains.annotations.NotNull;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -56,10 +57,7 @@ public class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgumentBi
 
     @Override
     public BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> request) {
-        if (!(request instanceof NettyHttpRequest<?> nettyRequest)) {
-            return BindingResult.unsatisfied();
-        }
-        if (request.getContentType().isEmpty() || !nettyRequest.isFormOrMultipartData()) {
+        if (!(request instanceof NettyHttpRequest<?> nettyRequest) || !nettyRequest.isFormOrMultipartData()) {
             return BindingResult.unsatisfied();
         }
         if (completedFileUploadBinder.matches(context.getArgument().getType())) {
@@ -72,8 +70,16 @@ public class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgumentBi
         Argument<T> argument = context.getArgument();
         String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(argument.getName());
 
+        return bindPart(conversionService, context, nettyRequest, inputName, false);
+    }
+
+    @NotNull
+    static <T> BindingResult<T> bindPart(ConversionService conversionService, ArgumentConversionContext<T> context, NettyHttpRequest<?> nettyRequest, String inputName, boolean skipClaimed) {
+        if (skipClaimed && nettyRequest.formRouteCompleter().isClaimed(inputName)) {
+            return BindingResult.unsatisfied();
+        }
         CompletableFuture<T> completableFuture = Mono.from(nettyRequest.formRouteCompleter().claimFieldsComplete(inputName))
-            .map(d -> NettyConverters.refCountAwareConvert(conversionService, d, argument.getType(), context).orElse(null))
+            .map(d -> NettyConverters.refCountAwareConvert(conversionService, d, context).orElse(null))
             .toFuture();
 
         return new PendingRequestBindingResult<>() {

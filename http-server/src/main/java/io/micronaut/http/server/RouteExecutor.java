@@ -36,6 +36,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
+import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.exceptions.HttpStatusException;
@@ -283,9 +284,9 @@ public final class RouteExecutor {
                                          Class<?> declaringType,
                                          HttpRequest<?> httpRequest) {
         RouteMatch<?> errorRoute = null;
-        if (cause instanceof BeanCreationException && declaringType != null) {
+        if (cause instanceof BeanCreationException beanCreationException && declaringType != null) {
             // If the controller could not be instantiated, don't look for a local error route
-            Optional<Class<?>> rootBeanType = ((BeanCreationException) cause).getRootBeanType().map(BeanType::getBeanType);
+            Optional<Class<?>> rootBeanType = beanCreationException.getRootBeanType().map(BeanType::getBeanType);
             if (rootBeanType.isPresent() && declaringType == rootBeanType.get()) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Failed to instantiate [{}]. Skipping lookup of a local error route", declaringType.getName());
@@ -311,8 +312,8 @@ public final class RouteExecutor {
                 // when arguments do not match, then there is UnsatisfiedRouteException, we can handle this with a routed bad request
                 // or when incoming request body is not in the expected format
                 errorStatus = HttpStatus.BAD_REQUEST;
-            } else if (cause instanceof HttpStatusException) {
-                errorStatus = ((HttpStatusException) cause).getStatus();
+            } else if (cause instanceof HttpStatusException statusException) {
+                errorStatus = statusException.getStatus();
             }
 
             if (errorStatus != null) {
@@ -490,6 +491,7 @@ public final class RouteExecutor {
                 response.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
             }
             response.setAttribute(HttpAttributes.ROUTE_INFO, routeInfo);
+            response.bodyWriter((MessageBodyWriter) routeInfo.getMessageBodyWriter());
             return response;
         });
         return outgoingResponse;
@@ -568,8 +570,8 @@ public final class RouteExecutor {
                         if (bodyArgument.isAsyncOrReactive()) {
                             return processPublisherBody(request, singleResponse, routeInfo);
                         }
-                    } else if (o instanceof HttpStatus) {
-                        singleResponse = forStatus(routeInfo, (HttpStatus) o);
+                    } else if (o instanceof HttpStatus status) {
+                        singleResponse = forStatus(routeInfo, status);
                     } else {
                         singleResponse = forStatus(routeInfo, null)
                             .body(o);
@@ -587,7 +589,7 @@ public final class RouteExecutor {
                 .map(HttpResponse::toMutableResponse);
             Argument<?> bodyArgument = typeArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             if (bodyArgument.isAsyncOrReactive()) {
-                return response.flatMap((resp) ->
+                return response.flatMap(resp ->
                     processPublisherBody(request, resp, routeInfo));
             }
             return response;

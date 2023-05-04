@@ -21,6 +21,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.Body;
+import jakarta.inject.Singleton;
 
 import java.util.Optional;
 
@@ -31,7 +32,8 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class DefaultBodyAnnotationBinder<T> extends AbstractArgumentBinder<T> implements BodyArgumentBinder<T>, PostponedRequestArgumentBinder<T> {
+@Singleton
+public class DefaultBodyAnnotationBinder<T> extends AbstractArgumentBinder<T> implements BodyArgumentBinder<T> {
 
     protected final ConversionService conversionService;
 
@@ -44,20 +46,16 @@ public class DefaultBodyAnnotationBinder<T> extends AbstractArgumentBinder<T> im
     }
 
     @Override
-    public Class<Body> getAnnotationType() {
+    public final Class<Body> getAnnotationType() {
         return Body.class;
     }
 
     @Override
-    public BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {
+    public final BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {
         if (!source.getMethod().permitsRequestBody()) {
             return BindingResult.unsatisfied();
         }
 
-        Optional<?> body = source.getBody();
-        if (body.isEmpty()) {
-            return BindingResult.empty();
-        }
         boolean annotatedAsBody = context.getAnnotationMetadata().hasAnnotation(Body.class);
         Optional<String> optionalBodyComponent = context.getAnnotationMetadata().stringValue(Body.class);
         String bodyComponent = optionalBodyComponent.orElseGet(() -> {
@@ -67,19 +65,47 @@ public class DefaultBodyAnnotationBinder<T> extends AbstractArgumentBinder<T> im
             return context.getArgument().getName();
         });
         if (bodyComponent != null) {
-            Optional<ConvertibleValues> convertibleValuesBody = source.getBody(ConvertibleValues.class);
-            if (convertibleValuesBody.isPresent()) {
-                BindingResult<T> convertibleValuesBindingResult = doBind(context, convertibleValuesBody.get(), bodyComponent);
-                if (convertibleValuesBindingResult.getValue().isPresent() || !convertibleValuesBindingResult.getConversionErrors().isEmpty()) {
-                    return convertibleValuesBindingResult;
-                }
-            }
+            return bindBodyPart(context, source, bodyComponent);
+        } else {
+            return bindFullBody(context, source);
         }
-        BindingResult<T> bindingResult = doConvert(body.get(), context);
-        if (!annotatedAsBody && bindingResult.getValue().isEmpty()) {
-            return BindingResult.empty();
-        }
-        return bindingResult;
     }
 
+    /**
+     * Bind a <i>part</i> of the body, for argument spreading. By default, this gets the argument
+     * from {@link #bindFullBodyConvertibleValues(HttpRequest)}.
+     *
+     * @param context       The context to convert with
+     * @param source        The request
+     * @param bodyComponent The name of the component to bind to
+     * @return The binding result
+     */
+    protected BindingResult<T> bindBodyPart(ArgumentConversionContext<T> context, HttpRequest<?> source, String bodyComponent) {
+        return bindFullBodyConvertibleValues(source).flatMap(cv -> doBind(context, cv, bodyComponent));
+    }
+
+    /**
+     * Try to bind from the <i>full</i> body of the request to a {@link ConvertibleValues} for
+     * argument spreading.
+     *
+     * @param source The request
+     * @return The body as a {@link ConvertibleValues} instance
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    protected BindingResult<ConvertibleValues<?>> bindFullBodyConvertibleValues(HttpRequest<?> source) {
+        Optional<ConvertibleValues> convertibleValuesBody = source.getBody(ConvertibleValues.class);
+        return () -> (Optional) convertibleValuesBody;
+    }
+
+    /**
+     * Try to bind from the <i>full</i> body of the request, i.e. no argument spreading.
+     *
+     * @param context The conversion context
+     * @param source  The request
+     * @return The binding result
+     */
+    public BindingResult<T> bindFullBody(ArgumentConversionContext<T> context, HttpRequest<?> source) {
+        Optional<?> body = source.getBody();
+        return body.isPresent() ? doConvert(body.get(), context) : BindingResult.empty();
+    }
 }

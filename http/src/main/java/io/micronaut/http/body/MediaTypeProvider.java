@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.http.body;
+
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.http.MediaType;
+
 /**
- * Netty response types.
+ * Interface for bodies that provide their own media type.
  *
- * @author Graeme Rocher
- * @since 1.0
+ * @since 4.0.0
  */
-package io.micronaut.http.server.netty.types;
+public interface MediaTypeProvider {
+    /**
+     * @return The media type of the object.
+     */
+    @NonNull
+    MediaType getMediaType();
+}
