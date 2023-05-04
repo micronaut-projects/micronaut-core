@@ -108,26 +108,39 @@ public interface PropagatedContext {
     }
 
     /**
-     * Creates a new context with added element.
+     * Creates a new element with added element.
      * <p>
-     * NOTE: The new context needs to be propagated.
+     * NOTE: The new element needs to be propagated.
      *
-     * @param context The context element to be added
-     * @return new context
+     * @param element The element element to be added
+     * @return new element
      */
     @NonNull
-    PropagatedContext plus(@NonNull PropagatedContextElement context);
+    PropagatedContext plus(@NonNull PropagatedContextElement element);
 
     /**
      * Creates a new context without the provided element.
      * <p>
      * NOTE: The new context needs to be propagated.
      *
-     * @param context The context element to be removed
+     * @param element The context element to be removed
      * @return new context
      */
     @NonNull
-    PropagatedContext minus(@NonNull PropagatedContextElement context);
+    PropagatedContext minus(@NonNull PropagatedContextElement element);
+
+    /**
+     * Creates a new context with replaced the provided element.
+     * <p>
+     * NOTE: The new context needs to be propagated.
+     *
+     * @param oldElement The context element to be replaced
+     * @param newElement The context element to be replaced with
+     * @return new context
+     */
+    @NonNull
+    PropagatedContext replace(@NonNull PropagatedContextElement oldElement,
+                              @NonNull PropagatedContextElement newElement);
 
     /**
      * Finds optional element of type.

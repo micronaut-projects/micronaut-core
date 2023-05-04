@@ -53,11 +53,48 @@ class PropagatedContextSpec extends Specification {
             assert PropagatedContext.getOrEmpty().findAll(PropagatedElement).toList() == []
     }
 
+    def "test replacing element"() {
+        given:
+            PropagatedElement e1 = new PropagatedElement()
+            PropagatedElement e2 = new PropagatedElement()
+            PropagatedElement e3 = new PropagatedElement()
+            PropagatedElement e4 = new PropagatedElement()
+        expect:
+            assert PropagatedContext.getOrEmpty().findAll(PropagatedElement).toList() == []
+            try (PropagatedContext.InContext ignore1 = PropagatedContext.getOrEmpty().plus(e1).propagate()) {
+                assert PropagatedContext.get().findAll(PropagatedElement).toList() == [e1]
+                try (PropagatedContext.InContext ignore2 = PropagatedContext.getOrEmpty().plus(e2).propagate()) {
+                    assert PropagatedContext.get().findAll(PropagatedElement).toList() == [e2, e1]
+                    try (PropagatedContext.InContext ignore3 = PropagatedContext.getOrEmpty().plus(e3).propagate()) {
+                        assert PropagatedContext.get().findAll(PropagatedElement).toList() == [e3, e2, e1]
+                        try (PropagatedContext.InContext ignore4 = PropagatedContext.getOrEmpty().replace(e2, e4).propagate()) {
+                            assert PropagatedContext.get().findAll(PropagatedElement).toList() == [e3, e4, e1]
+                        }
+                        assert PropagatedContext.get().findAll(PropagatedElement).toList() == [e3, e2, e1]
+                    }
+                    assert PropagatedContext.get().findAll(PropagatedElement).toList() == [e2, e1]
+                }
+                assert PropagatedContext.get().findAll(PropagatedElement).toList() == [e1]
+            }
+            assert PropagatedContext.getOrEmpty().findAll(PropagatedElement).toList() == []
+    }
+
     def "test removing missing element"() {
         given:
             PropagatedElement e1 = new PropagatedElement()
         when:
             try (PropagatedContext.InContext ignore4 = PropagatedContext.getOrEmpty().minus(e1).propagate()) {
+            }
+        then:
+            thrown(NoSuchElementException)
+    }
+
+    def "test replacing missing element"() {
+        given:
+            PropagatedElement e1 = new PropagatedElement()
+            PropagatedElement e2 = new PropagatedElement()
+        when:
+            try (PropagatedContext.InContext ignore4 = PropagatedContext.getOrEmpty().replace(e1, e2).propagate()) {
             }
         then:
             thrown(NoSuchElementException)
