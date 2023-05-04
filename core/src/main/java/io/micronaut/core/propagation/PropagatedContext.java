@@ -119,6 +119,17 @@ public interface PropagatedContext {
     PropagatedContext plus(@NonNull PropagatedContextElement context);
 
     /**
+     * Creates a new context without the provided element.
+     * <p>
+     * NOTE: The new context needs to be propagated.
+     *
+     * @param context The context element to be removed
+     * @return new context
+     */
+    @NonNull
+    PropagatedContext minus(@NonNull PropagatedContextElement context);
+
+    /**
      * Finds optional element of type.
      * In a case of multiple element of the same type the last one will be returned.
      *

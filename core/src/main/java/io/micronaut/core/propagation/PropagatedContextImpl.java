@@ -114,6 +114,15 @@ final class PropagatedContextImpl implements PropagatedContext {
     }
 
     @Override
+    public PropagatedContextImpl minus(PropagatedContextElement element) {
+        ArrayList<PropagatedContextElement> newElements = new ArrayList<>(elements);
+        if (!newElements.remove(element)) {
+            throw new NoSuchElementException("Element is not contained in the current context!");
+        }
+        return new PropagatedContextImpl(Collections.unmodifiableList(newElements));
+    }
+
+    @Override
     public <T extends PropagatedContextElement> Optional<T> find(Class<T> elementType) {
         return Optional.ofNullable(findElement(elementType));
     }
