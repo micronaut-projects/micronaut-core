@@ -34,8 +34,6 @@ import java.util.Optional;
 @Internal
 class DefaultHttpFactories {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpFactories.class);
-
     /**
      * Resolves the default request factory.
      *
@@ -50,7 +48,9 @@ class DefaultHttpFactories {
             try {
                 return sd.load();
             } catch (Throwable e) {
-                LOG.warn("Unable to load default request factory for definition [" + definition + "]: " + e.getMessage(), e);
+                // I get the logger here intionally to avoid getting io.micronaut.http.DefaultHttpFactories unintentionally initialized at build time
+                Logger logger = LoggerFactory.getLogger(DefaultHttpFactories.class);
+                logger.warn("Unable to load default request factory for definition [" + definition + "]: " + e.getMessage(), e);
             }
         }
         return new SimpleHttpRequestFactory();
@@ -70,10 +70,11 @@ class DefaultHttpFactories {
             try {
                 return sd.load();
             } catch (Throwable e) {
-                LOG.warn("Unable to load default response factory for definition [" + definition + "]: " + e.getMessage(), e);
+                // I get the logger here intionally to avoid getting io.micronaut.http.DefaultHttpFactories unintentionally initialized at build time
+                Logger logger = LoggerFactory.getLogger(DefaultHttpFactories.class);
+                logger.warn("Unable to load default response factory for definition [" + definition + "]: " + e.getMessage(), e);
             }
         }
         return new SimpleHttpResponseFactory();
     }
-
 }
