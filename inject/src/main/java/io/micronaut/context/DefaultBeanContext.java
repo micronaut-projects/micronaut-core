@@ -4209,7 +4209,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         }
     }
 
-    private sealed class BeanContextExecutionHandle implements MethodExecutionHandle<Object, Object> permits BeanContextUnsafeExecutionHandle {
+    private sealed class BeanContextExecutionHandle implements MethodExecutionHandle<Object, Object> {
 
         private final ExecutableMethod<Object, ?> method;
         private final BeanDefinition<?> beanDefinition;

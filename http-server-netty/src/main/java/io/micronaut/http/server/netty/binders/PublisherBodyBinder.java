@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.binders;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
@@ -29,7 +30,6 @@ import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
-import io.micronaut.http.server.netty.HttpContentProcessorResolver;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.http.server.netty.body.ByteBody;
@@ -53,6 +53,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 @Singleton
 public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publisher<?>> {
 
@@ -60,20 +61,12 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
     private static final Argument<Publisher<?>> TYPE = (Argument) Argument.of(Publisher.class);
 
-    private final HttpContentProcessorResolver httpContentProcessorResolver;
-    private final ConversionService conversionService;
     private final NettyBodyAnnotationBinder<Object> nettyBodyAnnotationBinder;
 
     /**
-     * @param conversionService            The conversion service
-     * @param httpContentProcessorResolver The http content processor resolver
-     * @param nettyBodyAnnotationBinder
+     * @param nettyBodyAnnotationBinder Body annotation binder
      */
-    public PublisherBodyBinder(ConversionService conversionService,
-                               HttpContentProcessorResolver httpContentProcessorResolver,
-                               NettyBodyAnnotationBinder<Object> nettyBodyAnnotationBinder) {
-        this.httpContentProcessorResolver = httpContentProcessorResolver;
-        this.conversionService = conversionService;
+    public PublisherBodyBinder(NettyBodyAnnotationBinder<Object> nettyBodyAnnotationBinder) {
         this.nettyBodyAnnotationBinder = nettyBodyAnnotationBinder;
     }
 

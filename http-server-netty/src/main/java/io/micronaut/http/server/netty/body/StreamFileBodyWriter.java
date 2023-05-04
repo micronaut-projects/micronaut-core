@@ -35,8 +35,6 @@ import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.stream.ChunkedStream;
 import jakarta.inject.Singleton;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -51,8 +49,6 @@ import java.io.OutputStream;
 @Experimental
 @Internal
 public final class StreamFileBodyWriter extends AbstractFileBodyWriter implements NettyBodyWriter<StreamedFile> {
-    private final Logger LOG = LoggerFactory.getLogger(StreamFileBodyWriter.class);
-
     StreamFileBodyWriter(NettyHttpServerConfiguration.FileTypeHandlerConfiguration configuration) {
         super(configuration);
     }

@@ -27,15 +27,12 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.multipart.MultipartBody;
 import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
-import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.http.server.netty.body.MultiObjectBody;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.util.ReferenceCounted;
 import org.reactivestreams.Publisher;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
 import java.util.HashSet;
@@ -50,10 +47,6 @@ import java.util.Set;
  */
 @Internal
 public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinder<MultipartBody> {
-
-    private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
-
-    private final BeanLocator beanLocator;
     private final BeanProvider<HttpServerConfiguration> httpServerConfiguration;
 
     /**
@@ -63,7 +56,6 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
      * @param httpServerConfiguration The server configuration
      */
     public MultipartBodyArgumentBinder(BeanLocator beanLocator, BeanProvider<HttpServerConfiguration> httpServerConfiguration) {
-        this.beanLocator = beanLocator;
         this.httpServerConfiguration = httpServerConfiguration;
     }
 

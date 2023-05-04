@@ -57,7 +57,7 @@ final class JsonChunkedProcessor {
                     s.error(e);
                 }
             }))
-            .doOnTerminate(() -> releaseBuffers());
+            .doOnTerminate(this::releaseBuffers);
     }
 
     private void releaseBuffers() {

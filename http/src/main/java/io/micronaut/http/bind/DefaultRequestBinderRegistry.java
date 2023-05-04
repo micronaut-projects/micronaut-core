@@ -117,7 +117,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (RequestArgumentBinder<HttpHeaders>) (argument, source) -> () -> Optional.of(source.getHeaders()));
         byType.put(Argument.of(HttpRequest.class).typeHashCode(), (RequestArgumentBinder<HttpRequest<?>>) (argument, source) -> convertBodyIfNecessary(bodyAnnotationBinder, argument, source, false));
         byType.put(Argument.of(PushCapableHttpRequest.class).typeHashCode(), (RequestArgumentBinder<PushCapableHttpRequest<?>>) (argument, source) -> {
-            if (source instanceof PushCapableHttpRequest<?> pushCapable) {
+            if (source instanceof PushCapableHttpRequest<?>) {
                 return convertBodyIfNecessary(bodyAnnotationBinder, argument, source, true);
             } else {
                 return ArgumentBinder.BindingResult.unsatisfied();

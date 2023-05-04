@@ -125,7 +125,7 @@ public final class DefaultMessageBodyHandlerRegistry implements MessageBodyHandl
                         reader = beanLocator.getBean(exactMatch.iterator().next());
                     } else {
                         // pick highest priority
-                        reader = (MessageBodyReader<T>) OrderUtil.sort(beanDefinitions.stream())
+                        reader = OrderUtil.sort(beanDefinitions.stream())
                             .findFirst()
                             .map(beanLocator::getBean)
                             .orElse(null);
@@ -172,7 +172,7 @@ public final class DefaultMessageBodyHandlerRegistry implements MessageBodyHandl
                         writer = beanLocator.getBean(exactMatch.iterator().next());
                     } else {
                         // pick highest priority
-                        writer = (MessageBodyWriter<T>) OrderUtil.sort(beanDefinitions.stream())
+                        writer = OrderUtil.sort(beanDefinitions.stream())
                             .findFirst()
                             .map(beanLocator::getBean)
                             .orElse(null);
