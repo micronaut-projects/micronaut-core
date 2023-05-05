@@ -22,7 +22,7 @@ class FullNettyClientHttpResponseSpec extends Specification {
           fullHttpResponse.headers().set(httpHeaders)
 
         when:
-          FullNettyClientHttpResponse response = new FullNettyClientHttpResponse(fullHttpResponse, null, null, null, false, ConversionService.SHARED)
+          FullNettyClientHttpResponse response = new FullNettyClientHttpResponse(fullHttpResponse, null, null, false, ConversionService.SHARED)
 
         then:
             Cookies cookies = response.getCookies()
@@ -45,7 +45,7 @@ class FullNettyClientHttpResponseSpec extends Specification {
         fullHttpResponse.headers().set(httpHeaders)
 
         when:
-        FullNettyClientHttpResponse response = new FullNettyClientHttpResponse(fullHttpResponse, null, null, null, false, ConversionService.SHARED)
+        FullNettyClientHttpResponse response = new FullNettyClientHttpResponse(fullHttpResponse, null, null, false, ConversionService.SHARED)
 
         then:
         Cookies cookies = response.getCookies()

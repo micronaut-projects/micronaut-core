@@ -17,14 +17,17 @@ package io.micronaut.http.netty.body;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
+import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
-import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.body.MessageBodyHandler;
 import io.micronaut.http.codec.CodecException;
+import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.body.JsonMessageHandler;
 import io.netty.buffer.ByteBuf;
@@ -33,21 +36,27 @@ import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.List;
 
 @Internal
 @Singleton
 @Produces(MediaType.APPLICATION_JSON_STREAM)
 @Consumes(MediaType.APPLICATION_JSON_STREAM)
-class NettyJsonStreamHandler<T> implements MessageBodyReader<T>, ChunkedMessageBodyReader<T> {
+public class NettyJsonStreamHandler<T> implements MessageBodyHandler<T>, ChunkedMessageBodyReader<T>, CustomizableNettyJsonHandler {
     private final JsonMessageHandler<T> jsonMessageHandler;
 
-    NettyJsonStreamHandler(JsonMapper jsonMapper) {
+    public NettyJsonStreamHandler(JsonMapper jsonMapper) {
         this(new JsonMessageHandler<>(jsonMapper));
     }
 
     private NettyJsonStreamHandler(JsonMessageHandler<T> jsonMessageHandler) {
         this.jsonMessageHandler = jsonMessageHandler;
+    }
+
+    @Override
+    public CustomizableNettyJsonHandler customize(JsonFeatures jsonFeatures) {
+        return new NettyJsonStreamHandler<>(jsonMessageHandler.getJsonMapper().cloneWithFeatures(jsonFeatures));
     }
 
     @Override
@@ -78,5 +87,15 @@ class NettyJsonStreamHandler<T> implements MessageBodyReader<T>, ChunkedMessageB
             }
             return buf;
         })).map(bb -> jsonMessageHandler.read(type, mediaType, httpHeaders, bb));
+    }
+
+    @Override
+    public void writeTo(Argument<T> type, MediaType mediaType, T object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+        jsonMessageHandler.writeTo(type, mediaType, object, outgoingHeaders, outputStream);
+    }
+
+    @Override
+    public ByteBuffer<?> writeTo(Argument<T> type, MediaType mediaType, T object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
+        return jsonMessageHandler.writeTo(type, mediaType, object, outgoingHeaders, bufferFactory);
     }
 }

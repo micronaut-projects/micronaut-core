@@ -54,6 +54,10 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {
         this.jsonMapper = jsonMapper;
     }
 
+    public JsonMapper getJsonMapper() {
+        return jsonMapper;
+    }
+
     @Override
     public boolean isReadable(Argument<T> type, MediaType mediaType) {
         return mediaType != null && mediaType.getExtension().equals(MediaType.EXTENSION_JSON);

@@ -47,6 +47,8 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.body.ContextlessMessageBodyHandlerRegistry;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
@@ -86,6 +88,9 @@ import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
+import io.micronaut.http.netty.body.ByteBufRawHandler;
+import io.micronaut.http.netty.body.NettyJsonHandler;
+import io.micronaut.http.netty.body.NettyJsonStreamHandler;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
 import io.micronaut.http.netty.stream.DelegateStreamedHttpRequest;
@@ -248,6 +253,7 @@ public class DefaultHttpClient implements
 
     ConnectionManager connectionManager;
 
+    private MessageBodyHandlerRegistry handlerRegistry;
     private final List<HttpFilterResolver.FilterEntry> clientFilterEntries;
     private final LoadBalancer loadBalancer;
     private final HttpClientConfiguration configuration;
@@ -276,15 +282,16 @@ public class DefaultHttpClient implements
      * @param filters                         The filters to use
      */
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
-            @NonNull HttpClientConfiguration configuration,
-            @Nullable String contextPath,
-            @Nullable ThreadFactory threadFactory,
-            NettyClientSslBuilder nettyClientSslBuilder,
-            MediaTypeCodecRegistry codecRegistry,
-            @Nullable AnnotationMetadataResolver annotationMetadataResolver,
-            List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
-            ConversionService conversionService,
-            HttpClientFilter... filters) {
+                             @NonNull HttpClientConfiguration configuration,
+                             @Nullable String contextPath,
+                             @Nullable ThreadFactory threadFactory,
+                             NettyClientSslBuilder nettyClientSslBuilder,
+                             @NonNull MediaTypeCodecRegistry codecRegistry,
+                             @NonNull MessageBodyHandlerRegistry handlerRegistry,
+                             @Nullable AnnotationMetadataResolver annotationMetadataResolver,
+                             List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
+                             ConversionService conversionService,
+                             HttpClientFilter... filters) {
         this(loadBalancer,
             null,
             configuration,
@@ -294,6 +301,7 @@ public class DefaultHttpClient implements
             threadFactory,
             nettyClientSslBuilder,
             codecRegistry,
+            handlerRegistry,
             WebSocketBeanRegistry.EMPTY,
             new DefaultRequestBinderRegistry(conversionService),
             null,
@@ -331,10 +339,11 @@ public class DefaultHttpClient implements
                              @NonNull HttpClientConfiguration configuration,
                              @Nullable String contextPath,
                              @NonNull HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
-                             List<HttpFilterResolver.FilterEntry> clientFilterEntries,
+                             @NonNull List<HttpFilterResolver.FilterEntry> clientFilterEntries,
                              @Nullable ThreadFactory threadFactory,
                              @NonNull NettyClientSslBuilder nettyClientSslBuilder,
                              @NonNull MediaTypeCodecRegistry codecRegistry,
+                             @NonNull MessageBodyHandlerRegistry handlerRegistry,
                              @NonNull WebSocketBeanRegistry webSocketBeanRegistry,
                              @NonNull RequestBinderRegistry requestBinderRegistry,
                              @Nullable EventLoopGroup eventLoopGroup,
@@ -368,6 +377,7 @@ public class DefaultHttpClient implements
                 invocationInstrumenterFactories == null ? Collections.emptyList() : invocationInstrumenterFactories;
 
         this.mediaTypeCodecRegistry = codecRegistry;
+        this.handlerRegistry = handlerRegistry;
         this.log = configuration.getLoggerName().map(LoggerFactory::getLogger).orElse(DEFAULT_LOG);
         this.filterResolver = filterResolver;
         if (clientFilterEntries != null) {
@@ -416,11 +426,12 @@ public class DefaultHttpClient implements
      */
     public DefaultHttpClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration) {
         this(
-                uri == null ? null : LoadBalancer.fixed(uri), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                new NettyClientSslBuilder(new ResourceResolver()),
-                createDefaultMediaTypeRegistry(),
-                AnnotationMetadataResolver.DEFAULT,
-                Collections.emptyList(), ConversionService.SHARED);
+            uri == null ? null : LoadBalancer.fixed(uri), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
+            new NettyClientSslBuilder(new ResourceResolver()),
+            createDefaultMediaTypeRegistry(),
+            createDefaultMessageBodyHandlerRegistry(),
+            AnnotationMetadataResolver.DEFAULT,
+            Collections.emptyList(), ConversionService.SHARED);
     }
 
     /**
@@ -430,11 +441,12 @@ public class DefaultHttpClient implements
      */
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer, HttpClientConfiguration configuration, List<InvocationInstrumenterFactory> invocationInstrumenterFactories) {
         this(loadBalancer,
-                configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                new NettyClientSslBuilder(new ResourceResolver()),
-                createDefaultMediaTypeRegistry(),
-                AnnotationMetadataResolver.DEFAULT,
-                invocationInstrumenterFactories, ConversionService.SHARED);
+            configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
+            new NettyClientSslBuilder(new ResourceResolver()),
+            createDefaultMediaTypeRegistry(),
+            createDefaultMessageBodyHandlerRegistry(),
+            AnnotationMetadataResolver.DEFAULT,
+            invocationInstrumenterFactories, ConversionService.SHARED);
     }
 
     static boolean isAcceptEvents(io.micronaut.http.HttpRequest<?> request) {
@@ -498,10 +510,19 @@ public class DefaultHttpClient implements
      *
      * @param mediaTypeCodecRegistry The registry to use. Should not be null
      */
+    @Deprecated
     public void setMediaTypeCodecRegistry(MediaTypeCodecRegistry mediaTypeCodecRegistry) {
         if (mediaTypeCodecRegistry != null) {
             this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         }
+    }
+
+    public MessageBodyHandlerRegistry getHandlerRegistry() {
+        return handlerRegistry;
+    }
+
+    public void setHandlerRegistry(MessageBodyHandlerRegistry handlerRegistry) {
+        this.handlerRegistry = handlerRegistry;
     }
 
     @Override
@@ -1480,7 +1501,7 @@ public class DefaultHttpClient implements
                                 public void onComplete() {
                                     try {
                                         FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), buffer, nettyResponse.headers(), new DefaultHttpHeaders(true));
-                                        final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, mediaTypeCodecRegistry, byteBufferFactory, (Argument<Object>) errorType, true, conversionService);
+                                        final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, handlerRegistry, (Argument<Object>) errorType, true, conversionService);
                                         fullNettyClientHttpResponse.onComplete();
                                         emitter.error(decorate(new HttpClientResponseException(
                                             fullHttpResponse.status().reasonPhrase(),
@@ -1844,9 +1865,17 @@ public class DefaultHttpClient implements
         JsonMapper mapper = JsonMapper.createDefault();
         ApplicationConfiguration configuration = new ApplicationConfiguration();
         return MediaTypeCodecRegistry.of(
-                new JsonMediaTypeCodec(mapper, configuration, null),
-                new JsonStreamMediaTypeCodec(mapper, configuration, null)
+            new JsonMediaTypeCodec(mapper, configuration, null),
+            new JsonStreamMediaTypeCodec(mapper, configuration, null)
         );
+    }
+
+    private static MessageBodyHandlerRegistry createDefaultMessageBodyHandlerRegistry() {
+        ContextlessMessageBodyHandlerRegistry registry = new ContextlessMessageBodyHandlerRegistry(new ApplicationConfiguration(), NettyByteBufferFactory.DEFAULT, new ByteBufRawHandler());
+        JsonMapper mapper = JsonMapper.createDefault();
+        registry.add(MediaType.APPLICATION_JSON_TYPE, new NettyJsonHandler<>(mapper));
+        registry.add(MediaType.APPLICATION_JSON_STREAM_TYPE, new NettyJsonStreamHandler<>(mapper));
+        return registry;
     }
 
     private @NonNull InvocationInstrumenter combineFactories() {
@@ -1854,9 +1883,9 @@ public class DefaultHttpClient implements
             return NOOP;
         }
         return InvocationInstrumenter.combine(invocationInstrumenterFactories.stream()
-                .map(InvocationInstrumenterFactory::newInvocationInstrumenter)
-                .filter(Objects::nonNull)
-                .toList());
+            .map(InvocationInstrumenterFactory::newInvocationInstrumenter)
+            .filter(Objects::nonNull)
+            .toList());
     }
 
     static boolean isSecureScheme(String scheme) {
@@ -2208,7 +2237,7 @@ public class DefaultHttpClient implements
 
                 boolean convertBodyWithBodyType = shouldConvertWithBodyType(msg, DefaultHttpClient.this.configuration, bodyType, errorType);
                 FullNettyClientHttpResponse<O> response
-                        = new FullNettyClientHttpResponse<>(msg, mediaTypeCodecRegistry, byteBufferFactory, bodyType, convertBodyWithBodyType, conversionService);
+                        = new FullNettyClientHttpResponse<>(msg, handlerRegistry, bodyType, convertBodyWithBodyType, conversionService);
 
                 if (convertBodyWithBodyType) {
                     promise.trySuccess(response);
@@ -2274,9 +2303,8 @@ public class DefaultHttpClient implements
         private HttpClientResponseException makeErrorBodyParseError(FullHttpResponse fullResponse, Throwable t) {
             FullNettyClientHttpResponse<Object> errorResponse = new FullNettyClientHttpResponse<>(
                     fullResponse,
-                    mediaTypeCodecRegistry,
-                    byteBufferFactory,
-                    null,
+                handlerRegistry,
+                null,
                     false,
                     conversionService
             );
@@ -2293,9 +2321,8 @@ public class DefaultHttpClient implements
         private void makeNormalBodyParseError(FullHttpResponse fullResponse, Throwable t, Consumer<HttpClientResponseException> forward) {
             FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(
                     fullResponse,
-                    mediaTypeCodecRegistry,
-                    byteBufferFactory,
-                    null,
+                handlerRegistry,
+                null,
                     false,
                     conversionService
             );

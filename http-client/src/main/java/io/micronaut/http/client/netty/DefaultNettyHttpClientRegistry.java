@@ -26,11 +26,15 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpClientRegistry;
@@ -50,6 +54,7 @@ import io.micronaut.http.client.sse.SseClientRegistry;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.filter.HttpClientFilterResolver;
+import io.micronaut.http.netty.body.CustomizableNettyJsonHandler;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
@@ -81,6 +86,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ThreadFactory;
@@ -109,6 +115,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     private final NettyClientSslBuilder nettyClientSslBuilder;
     private final ThreadFactory threadFactory;
     private final MediaTypeCodecRegistry codecRegistry;
+    private final MessageBodyHandlerRegistry handlerRegistry;
     private final BeanContext beanContext;
     private final HttpClientConfiguration defaultHttpClientConfiguration;
     private final EventLoopGroupRegistry eventLoopGroupRegistry;
@@ -141,6 +148,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             NettyClientSslBuilder nettyClientSslBuilder,
             ThreadFactory threadFactory,
             MediaTypeCodecRegistry codecRegistry,
+            MessageBodyHandlerRegistry handlerRegistry,
             EventLoopGroupRegistry eventLoopGroupRegistry,
             EventLoopGroupFactory eventLoopGroupFactory,
             BeanContext beanContext,
@@ -152,6 +160,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         this.nettyClientSslBuilder = nettyClientSslBuilder;
         this.threadFactory = threadFactory;
         this.codecRegistry = codecRegistry;
+        this.handlerRegistry = handlerRegistry;
         this.beanContext = beanContext;
         this.eventLoopGroupFactory = eventLoopGroupFactory;
         this.eventLoopGroupRegistry = eventLoopGroupRegistry;
@@ -388,6 +397,28 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                     codecs.add(createNewJsonCodec(this.beanContext, jsonFeatures));
                 }
                 client.setMediaTypeCodecRegistry(MediaTypeCodecRegistry.of(codecs));
+
+                client.setHandlerRegistry(new MessageBodyHandlerRegistry() {
+                    final MessageBodyHandlerRegistry delegate = client.getHandlerRegistry();
+
+                    @SuppressWarnings("unchecked")
+                    private <T> T customize(T handler) {
+                        if (handler instanceof CustomizableNettyJsonHandler cnjh) {
+                            return (T) cnjh.customize(jsonFeatures);
+                        }
+                        return handler;
+                    }
+
+                    @Override
+                    public <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type, List<MediaType> mediaType) {
+                        return delegate.findReader(type, mediaType).map(this::customize);
+                    }
+
+                    @Override
+                    public <T> Optional<MessageBodyWriter<T>> findWriter(Argument<T> type, List<MediaType> mediaType) {
+                        return delegate.findWriter(type, mediaType).map(this::customize);
+                    }
+                });
             }
             return client;
         });
@@ -417,6 +448,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 threadFactory,
                 nettyClientSslBuilder,
                 codecRegistry,
+                handlerRegistry,
                 WebSocketBeanRegistry.forClient(beanContext),
                 beanContext.findBean(RequestBinderRegistry.class).orElseGet(() ->
                         new DefaultRequestBinderRegistry(conversionService)

@@ -311,7 +311,7 @@ class HttpGetSpec extends Specification {
         String body = res.getBody(String).orElse(null)
 
         then:
-        body == null
+        body == "success"
     }
 
     void "test that Optional.empty() should return 404"() {

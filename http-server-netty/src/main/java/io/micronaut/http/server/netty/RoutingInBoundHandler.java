@@ -35,6 +35,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.DynamicWriter;
 import io.micronaut.http.body.MediaTypeProvider;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
@@ -489,6 +490,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         } else if (body instanceof ByteBuf bb) {
             setResponseBody(message, bb);
         } else {
+            // todo: remove
             Argument<Object> bodyType = routeInfo != null ? (Argument<Object>) routeInfo.getResponseBodyType() : null;
             Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(mediaType, body.getClass());
             if (registeredCodec.isPresent()) {
@@ -578,18 +580,11 @@ public final class RoutingInBoundHandler implements RequestHandler {
         }
     }
 
-    private void setResponseBody(MutableHttpResponse<?> response, ByteBuf byteBuf) {
+    private static void setResponseBody(MutableHttpResponse<?> response, ByteBuf byteBuf) {
         int len = byteBuf.readableBytes();
         MutableHttpHeaders headers = response.getHeaders();
         headers.set(HttpHeaderNames.CONTENT_LENGTH, String.valueOf(len));
-
-        setBodyContent(response, byteBuf);
-    }
-
-    private MutableHttpResponse<?> setBodyContent(MutableHttpResponse<?> response, Object bodyContent) {
-        @SuppressWarnings("unchecked")
-        MutableHttpResponse<?> res = response.body(bodyContent);
-        return res;
+        response.body((Object) byteBuf);
     }
 
     private ByteBuf encodeBodyAsByteBuf(
@@ -677,8 +672,19 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
         @Override
         public void writeTo(HttpRequest<?> request, MutableHttpResponse<T> outgoingResponse, Argument<T> type, MediaType mediaType, T object, NettyWriteContext nettyContext) throws CodecException {
+            MessageBodyWriter<T> actual = delegate;
+            // special case DynamicWriter: if the actual writer is a NettyBodyWriter, delegate to it
+            if (delegate instanceof DynamicWriter dyn) {
+                //noinspection unchecked
+                actual = (MessageBodyWriter<T>) dyn.find((Argument<Object>) type, mediaType, object);
+                if (actual instanceof NettyBodyWriter<T> nbw) {
+                    nbw.writeTo(request, outgoingResponse, type, mediaType, object, nettyContext);
+                    return;
+                }
+            }
+
             NettyByteBufferFactory bufferFactory = new NettyByteBufferFactory(nettyContext.alloc());
-            ByteBuffer<?> byteBuffer = delegate.writeTo(
+            ByteBuffer<?> byteBuffer = actual.writeTo(
                 type,
                 mediaType,
                 object,
