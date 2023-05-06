@@ -67,7 +67,7 @@ managed-kotlin-coroutines = "1.6.4"
 managed-maven-native-plugin = "0.9.13"
 managed-methvin-directory-watcher = "0.16.1"
 managed-netty = "4.1.91.Final"
-managed-netty-iouring = "0.0.20.Final"
+managed-netty-iouring = "0.0.21.Final"
 managed-netty-http3 = "0.0.16.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
