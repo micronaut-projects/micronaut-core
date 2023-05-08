@@ -431,6 +431,19 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     @Override
+    public URI getContextURI() {
+        try {
+            String contextPath = serverConfiguration.getContextPath();
+            if (contextPath == null) {
+                return getURI();
+            }
+            return new URI(getScheme() + "://" + getHost() + ':' + getPort() + contextPath);
+        } catch (URISyntaxException e) {
+            throw new ConfigurationException("Invalid server URL: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
     public ApplicationContext getApplicationContext() {
         return applicationContext;
     }
