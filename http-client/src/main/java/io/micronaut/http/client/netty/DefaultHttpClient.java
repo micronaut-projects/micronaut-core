@@ -48,6 +48,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.ContextlessMessageBodyHandlerRegistry;
+import io.micronaut.http.body.DynamicWriter;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
@@ -1364,54 +1365,10 @@ public class DefaultHttpClient implements
                                 new IllegalArgumentException("Unconvertible reactive type: " + bodyValue)
                         );
 
+                        DynamicWriter dynamicWriter = new DynamicWriter(handlerRegistry, List.of(requestContentType));
                         Flux<HttpContent> requestBodyPublisher = Flux.from(publisher).map(o -> {
-                            if (o instanceof CharSequence) {
-                                ByteBuf textChunk = Unpooled.copiedBuffer(((CharSequence) o), requestContentType.getCharset().orElse(StandardCharsets.UTF_8));
-                                if (log.isTraceEnabled()) {
-                                    traceChunk(textChunk);
-                                }
-                                return new DefaultHttpContent(textChunk);
-                            } else if (o instanceof ByteBuf) {
-                                ByteBuf byteBuf = (ByteBuf) o;
-                                if (log.isTraceEnabled()) {
-                                    log.trace("Sending Bytes Chunk. Length: {}", byteBuf.readableBytes());
-                                }
-                                return new DefaultHttpContent(byteBuf);
-                            } else if (o instanceof byte[]) {
-                                byte[] bodyBytes = (byte[]) o;
-                                if (log.isTraceEnabled()) {
-                                    log.trace("Sending Bytes Chunk. Length: {}", bodyBytes.length);
-                                }
-                                return new DefaultHttpContent(Unpooled.wrappedBuffer(bodyBytes));
-                            } else if (o instanceof ByteBuffer) {
-                                ByteBuffer<?> byteBuffer = (ByteBuffer<?>) o;
-                                Object nativeBuffer = byteBuffer.asNativeBuffer();
-                                if (log.isTraceEnabled()) {
-                                    log.trace("Sending Bytes Chunk. Length: {}", byteBuffer.readableBytes());
-                                }
-                                if (nativeBuffer instanceof ByteBuf) {
-                                    return new DefaultHttpContent((ByteBuf) nativeBuffer);
-                                } else {
-                                    return new DefaultHttpContent(Unpooled.wrappedBuffer(byteBuffer.toByteArray()));
-                                }
-                            } else if (mediaTypeCodecRegistry != null) {
-                                Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
-                                ByteBuf encoded = registeredCodec.map(codec -> {
-                                            if (bodyType != null && bodyType.isInstance(o)) {
-                                                return codec.encode((Argument<Object>) bodyType, o, byteBufferFactory).asNativeBuffer();
-                                            } else {
-                                                return codec.encode(o, byteBufferFactory).asNativeBuffer();
-                                            }
-                                        })
-                                        .orElse(null);
-                                if (encoded != null) {
-                                    if (log.isTraceEnabled()) {
-                                        traceChunk(encoded);
-                                    }
-                                    return new DefaultHttpContent(encoded);
-                                }
-                            }
-                            throw new CodecException("Cannot encode value [" + o + "]. No possible encoders found");
+                            ByteBuffer<?> buffer = dynamicWriter.writeTo(Argument.OBJECT_ARGUMENT, requestContentType, o, request.getHeaders(), NettyByteBufferFactory.DEFAULT);
+                            return new DefaultHttpContent(((ByteBuf) buffer.asNativeBuffer()));
                         });
 
                         if (!isSingle && MediaType.APPLICATION_JSON_TYPE.equals(requestContentType)) {

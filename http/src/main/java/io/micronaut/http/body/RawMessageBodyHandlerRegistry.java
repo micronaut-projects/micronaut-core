@@ -23,13 +23,12 @@ import reactor.core.publisher.Flux;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * Base class for {@link MessageBodyHandlerRegistry} that handles caching and exposes the raw
@@ -46,7 +45,7 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
     private final Map<HandlerKey<?>, MessageBodyReader<?>> readers = new ConcurrentHashMap<>(10);
     private final Map<HandlerKey<?>, MessageBodyWriter<?>> writers = new ConcurrentHashMap<>(10);
 
-    private final Map<Class<?>, RawMessageBodyHandler<?>> rawHandlers;
+    private final List<RawEntry> rawHandlers;
 
     /**
      * Default constructor.
@@ -54,13 +53,18 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
      * @param rawHandlers Handlers for raw values
      */
     RawMessageBodyHandlerRegistry(List<RawMessageBodyHandler<?>> rawHandlers) {
-        this.rawHandlers = rawHandlers.stream().collect(Collectors.toMap(RawMessageBodyHandler::getType, Function.identity()));
+        this.rawHandlers = rawHandlers.stream().flatMap(h -> h.getTypes().stream().map(t -> new RawEntry(t, h))).toList();
     }
 
     @SuppressWarnings("unchecked")
     @Nullable
-    private <T> MessageBodyHandler<T> rawHandler(Argument<T> type) {
-        return (MessageBodyHandler<T>) rawHandlers.get(type.getType());
+    private <T> MessageBodyHandler<T> rawHandler(Argument<T> type, boolean covariant) {
+        for (RawEntry entry : rawHandlers) {
+            if (covariant ? entry.type.isAssignableFrom(type.getType()) : entry.type == type.getType()) {
+                return (MessageBodyHandler<T>) entry.handler;
+            }
+        }
+        return null;
     }
 
     protected abstract <T> MessageBodyReader<T> findReaderImpl(Argument<T> type, List<MediaType> mediaTypes);
@@ -71,7 +75,7 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
         HandlerKey<T> key = new HandlerKey<>(type, mediaTypes);
         MessageBodyReader<?> messageBodyReader = readers.get(key);
         if (messageBodyReader == null) {
-            MessageBodyReader<T> reader = rawHandler(type);
+            MessageBodyReader<T> reader = rawHandler(type, false);
             if (reader == null) {
                 reader = findReaderImpl(type, mediaTypes);
             }
@@ -98,12 +102,8 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
         HandlerKey<T> key = new HandlerKey<>(type, mediaType);
         MessageBodyWriter<?> messageBodyWriter = writers.get(key);
         if (messageBodyWriter == null) {
-            MessageBodyWriter<T> writer = rawHandler(type);
-            if (writer == null && type.getType() == Object.class) {
-                //writer = (MessageBodyWriter<T>) new DynamicWriter(this, mediaType);
-                writer = (MessageBodyWriter<T>) NO_WRITER; // todo
-            }
-            if (writer == null) {
+            MessageBodyWriter<T> writer = rawHandler(type, true);
+            if (writer == null && type.getType() != Object.class) {
                 writer = findWriterImpl(type, mediaType);
             }
             if (writer != null) {
@@ -125,6 +125,9 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
         if (mediaType != null && !outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
             outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType);
         }
+    }
+
+    private record RawEntry(Class<?> type, MessageBodyHandler<?> handler) {
     }
 
     record HandlerKey<T>(Argument<T> type, List<MediaType> mediaTypes) {
@@ -178,7 +181,7 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
     @Singleton
     @BootstrapContextCompatible
     @Bean(typed = RawMessageBodyHandler.class)
-    static final class RawStringHandler implements RawMessageBodyHandler<String> {
+    static final class RawStringHandler implements RawMessageBodyHandler<CharSequence> {
         private final ApplicationConfiguration applicationConfiguration;
 
         RawStringHandler(ApplicationConfiguration applicationConfiguration) {
@@ -186,12 +189,12 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
         }
 
         @Override
-        public Class<String> getType() {
-            return String.class;
+        public Collection<Class<?>> getTypes() {
+            return List.of(String.class, CharSequence.class);
         }
 
         @Override
-        public String read(Argument<String> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
+        public String read(Argument<CharSequence> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
             return read0(byteBuffer);
         }
 
@@ -204,7 +207,7 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
         }
 
         @Override
-        public String read(Argument<String> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
+        public String read(Argument<CharSequence> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
             try {
                 return new String(inputStream.readAllBytes(), applicationConfiguration.getDefaultCharset());
             } catch (IOException e) {
@@ -213,23 +216,23 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
         }
 
         @Override
-        public void writeTo(Argument<String> type, MediaType mediaType, String object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+        public void writeTo(Argument<CharSequence> type, MediaType mediaType, CharSequence object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
             addContentType(outgoingHeaders, mediaType);
             try {
-                outputStream.write(object.getBytes(applicationConfiguration.getDefaultCharset()));
+                outputStream.write(object.toString().getBytes(applicationConfiguration.getDefaultCharset()));
             } catch (IOException e) {
                 throw new CodecException("Failed to write OutputStream", e);
             }
         }
 
         @Override
-        public ByteBuffer<?> writeTo(Argument<String> type, MediaType mediaType, String object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
+        public ByteBuffer<?> writeTo(Argument<CharSequence> type, MediaType mediaType, CharSequence object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
             addContentType(outgoingHeaders, mediaType);
-            return bufferFactory.wrap(object.getBytes(applicationConfiguration.getDefaultCharset()));
+            return bufferFactory.wrap(object.toString().getBytes(applicationConfiguration.getDefaultCharset()));
         }
 
         @Override
-        public Publisher<String> readChunked(Argument<String> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
+        public Publisher<CharSequence> readChunked(Argument<CharSequence> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
             return Flux.from(input).map(this::read0);
         }
     }
@@ -282,8 +285,8 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
         }
 
         @Override
-        public Class<byte[]> getType() {
-            return byte[].class;
+        public Collection<Class<byte[]>> getTypes() {
+            return List.of(byte[].class);
         }
     }
 
@@ -340,10 +343,10 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
             return input;
         }
 
-        @SuppressWarnings("unchecked")
+        @SuppressWarnings({"unchecked", "rawtypes"})
         @Override
-        public Class<ByteBuffer<?>> getType() {
-            return (Class) ByteBuffer.class;
+        public Collection<Class<ByteBuffer<?>>> getTypes() {
+            return List.of((Class) ByteBuffer.class);
         }
     }
 }

@@ -23,6 +23,8 @@ import reactor.core.publisher.Flux;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Collection;
+import java.util.List;
 
 @Internal
 @Singleton
@@ -65,7 +67,7 @@ public class ByteBufRawHandler implements RawMessageBodyHandler<ByteBuf> {
     }
 
     @Override
-    public Class<ByteBuf> getType() {
-        return ByteBuf.class;
+    public Collection<Class<ByteBuf>> getTypes() {
+        return List.of(ByteBuf.class);
     }
 }

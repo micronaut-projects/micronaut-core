@@ -17,7 +17,7 @@ public final class DynamicWriter implements MessageBodyWriter<Object> {
     private final MessageBodyHandlerRegistry registry;
     private final List<MediaType> mediaTypes;
 
-    DynamicWriter(MessageBodyHandlerRegistry registry, List<MediaType> mediaTypes) {
+    public DynamicWriter(MessageBodyHandlerRegistry registry, List<MediaType> mediaTypes) {
         this.registry = registry;
         this.mediaTypes = mediaTypes;
     }
@@ -38,7 +38,7 @@ public final class DynamicWriter implements MessageBodyWriter<Object> {
             //noinspection unchecked
             return (MessageBodyWriter<Object>) dynamicWriter.get();
         }
-        throw new UnsupportedOperationException("No writer found for type " + specific + " (dynamic type " + dynamicType + ")");
+        throw new CodecException("Cannot encode value [" + object + "]. No possible encoders found");
     }
 
     @Override
