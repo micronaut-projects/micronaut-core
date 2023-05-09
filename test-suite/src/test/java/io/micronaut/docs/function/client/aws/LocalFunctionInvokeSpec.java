@@ -16,19 +16,18 @@
 package io.micronaut.docs.function.client.aws;
 
 import io.micronaut.context.ApplicationContext;
-
-//tag::import[]
-import io.micronaut.runtime.server.EmbeddedServer;
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.function.client.FunctionClient;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Produces;
+import io.micronaut.runtime.server.EmbeddedServer;
 import jakarta.inject.Named;
 import org.junit.Test;
-import io.micronaut.core.async.annotation.SingleResult;
-import static org.junit.Assert.assertEquals;
-//end::import[]
-
-//tag::rxImport[]
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Mono;
+
+import static org.junit.Assert.assertEquals;
 //end::rxImport[]
 
 public class LocalFunctionInvokeSpec {
@@ -80,10 +79,11 @@ public class LocalFunctionInvokeSpec {
 
         //tag::functionRnd[]
         @Named("round")
-        int rnd(float value);
+        @Produces(MediaType.APPLICATION_JSON)
+        int rnd(@Body float value);
         //end::functionRnd[]
 
-        long sum(Sum sum);
+        long sum(@Body Sum sum);
         //tag::endFunctionClient[]
     }
     //end::endFunctionClient[]
@@ -97,10 +97,11 @@ public class LocalFunctionInvokeSpec {
 
         @Named("round")
         @SingleResult
-        Publisher<Integer> rnd(float value);
+        @Produces(MediaType.APPLICATION_JSON)
+        Publisher<Integer> rnd(@Body float value);
 
         @SingleResult
-        Publisher<Long> sum(Sum sum);
+        Publisher<Long> sum(@Body Sum sum);
     }
     //end::rxFunctionClient[]
 }

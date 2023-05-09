@@ -1358,6 +1358,7 @@ public class DefaultHttpClient implements
                 ByteBuf bodyContent = null;
                 if (hasBody) {
                     Object bodyValue = body.get();
+                    DynamicWriter dynamicWriter = new DynamicWriter(handlerRegistry, List.of(requestContentType));
                     if (Publishers.isConvertibleToPublisher(bodyValue)) {
                         boolean isSingle = Publishers.isSingle(bodyValue.getClass());
 
@@ -1365,9 +1366,8 @@ public class DefaultHttpClient implements
                                 new IllegalArgumentException("Unconvertible reactive type: " + bodyValue)
                         );
 
-                        DynamicWriter dynamicWriter = new DynamicWriter(handlerRegistry, List.of(requestContentType));
                         Flux<HttpContent> requestBodyPublisher = Flux.from(publisher).map(o -> {
-                            ByteBuffer<?> buffer = dynamicWriter.writeTo(Argument.OBJECT_ARGUMENT, requestContentType, o, request.getHeaders(), NettyByteBufferFactory.DEFAULT);
+                            ByteBuffer<?> buffer = dynamicWriter.writeTo(Argument.OBJECT_ARGUMENT, requestContentType, o, request.getHeaders(), byteBufferFactory);
                             return new DefaultHttpContent(((ByteBuf) buffer.asNativeBuffer()));
                         });
 
@@ -1383,15 +1383,8 @@ public class DefaultHttpClient implements
                     } else if (bodyValue instanceof CharSequence) {
                         bodyContent = charSequenceToByteBuf((CharSequence) bodyValue, requestContentType);
                     } else if (mediaTypeCodecRegistry != null) {
-                        Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
-                        bodyContent = registeredCodec.map(codec -> {
-                                    if (bodyType != null && bodyType.isInstance(bodyValue)) {
-                                        return codec.encode((Argument<Object>) bodyType, bodyValue, byteBufferFactory).asNativeBuffer();
-                                    } else {
-                                        return codec.encode(bodyValue, byteBufferFactory).asNativeBuffer();
-                                    }
-                                })
-                                .orElse(null);
+                        ByteBuffer<?> buffer = dynamicWriter.writeTo(Argument.OBJECT_ARGUMENT, requestContentType, bodyValue, request.getHeaders(), byteBufferFactory);
+                        bodyContent = (ByteBuf) buffer.asNativeBuffer();
                     }
                     if (bodyContent == null) {
                         bodyContent = conversionService.convert(bodyValue, ByteBuf.class).orElseThrow(() ->

@@ -22,9 +22,9 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import jakarta.inject.Inject
 import spock.lang.Specification
 
-import jakarta.inject.Inject
 import java.time.Duration
 
 @MicronautTest
@@ -102,7 +102,7 @@ class ProxyRequestSpec extends Specification {
         response.body().text == 'Hello John XXX'
 
         when:"A POST request is sent with an invalid content type"
-        response = client.exchange(HttpRequest.POST("/proxy/post/json", new Message(text: "John")).contentType(MediaType.TEXT_PLAIN), Message).blockFirst()
+        response = client.exchange(HttpRequest.POST("/proxy/post/json", '{"text":"John"}').contentType(MediaType.TEXT_PLAIN), Message).blockFirst()
 
         then:
         def e = thrown(HttpClientResponseException)
