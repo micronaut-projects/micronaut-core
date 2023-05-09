@@ -12,15 +12,32 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 
+/**
+ * {@link MessageBodyHandlerRegistry} implementation that does not need an application context.
+ *
+ * @author Jonas Konrad
+ * @since 4.0.0
+ */
 @Internal
 @Experimental
 public final class ContextlessMessageBodyHandlerRegistry extends RawMessageBodyHandlerRegistry {
     private final List<Entry> entries = new ArrayList<>();
 
+    /**
+     * @param applicationConfiguration The configuration
+     * @param byteBufferFactory        The buffer factory
+     * @param otherRawHandlers         Raw handlers to add on top of the default ones
+     */
     public ContextlessMessageBodyHandlerRegistry(ApplicationConfiguration applicationConfiguration, ByteBufferFactory<?, ?> byteBufferFactory, RawMessageBodyHandler<?>... otherRawHandlers) {
         super(Stream.concat(Stream.of(new RawStringHandler(applicationConfiguration), new RawByteArrayHandler(), new RawByteBufferHandler(byteBufferFactory)), Stream.of(otherRawHandlers)).toList());
     }
 
+    /**
+     * Add a {@link MessageBodyHandler} for the given media type.
+     *
+     * @param mediaType The media type the handler applies to
+     * @param handler   The handler
+     */
     public void add(MediaType mediaType, MessageBodyHandler<?> handler) {
         entries.add(new Entry(handler, mediaType));
     }

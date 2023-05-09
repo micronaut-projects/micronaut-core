@@ -13,6 +13,13 @@ import java.io.OutputStream;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Placeholder {@link MessageBodyWriter} implementation that decides which writer to use based on
+ * the dynamic (runtime) type of the body. Used as fallback where the type is not known statically.
+ *
+ * @author Jonas Konrad
+ * @since 4.0.0
+ */
 @Internal
 public final class DynamicWriter implements MessageBodyWriter<Object> {
     private final MessageBodyHandlerRegistry registry;

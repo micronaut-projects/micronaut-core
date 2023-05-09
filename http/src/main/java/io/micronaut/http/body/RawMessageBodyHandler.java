@@ -5,6 +5,13 @@ import io.micronaut.core.annotation.Internal;
 
 import java.util.Collection;
 
+/**
+ * A body handler that is responsible for "raw" writing/reading, i.e. without a format like JSON.
+ * These handlers do not care about the media type, they assume the user is passing in pre-formatted
+ * data.
+ *
+ * @param <T> The raw message type
+ */
 @Internal
 @Experimental
 public interface RawMessageBodyHandler<T> extends MessageBodyHandler<T>, ChunkedMessageBodyReader<T> {

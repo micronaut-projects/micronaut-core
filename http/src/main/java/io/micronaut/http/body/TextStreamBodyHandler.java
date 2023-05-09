@@ -21,6 +21,11 @@ import java.time.Duration;
 import java.util.List;
 import java.util.function.Supplier;
 
+/**
+ * Handler for SSE events.
+ *
+ * @param <T> The type to write, may be {@link Event}
+ */
 @Internal
 @Singleton
 @Produces(MediaType.TEXT_EVENT_STREAM)

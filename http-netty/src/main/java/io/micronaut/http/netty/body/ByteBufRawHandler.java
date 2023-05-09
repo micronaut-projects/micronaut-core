@@ -26,6 +26,12 @@ import java.io.OutputStream;
 import java.util.Collection;
 import java.util.List;
 
+/**
+ * Handler for netty {@link ByteBuf}.
+ *
+ * @since 4.0.0
+ * @author Jonas Konrad
+ */
 @Internal
 @Singleton
 @Experimental
