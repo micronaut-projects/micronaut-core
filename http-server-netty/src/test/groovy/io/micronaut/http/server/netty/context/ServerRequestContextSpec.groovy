@@ -167,7 +167,7 @@ class ServerRequestContextSpec extends Specification {
             CompletableFuture future = new CompletableFuture()
             executorService.submit({ ->
                 def request = ServerRequestContext.currentRequest().orElseThrow { -> new RuntimeException("no request") }
-                future.complete HttpResponse.ok(request.uri)
+                future.complete HttpResponse.ok(request.uri.toString())
             })
 
             future.get()

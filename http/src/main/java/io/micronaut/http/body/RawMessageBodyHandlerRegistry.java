@@ -181,7 +181,7 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
     @Singleton
     @BootstrapContextCompatible
     @Bean(typed = RawMessageBodyHandler.class)
-    static final class RawStringHandler implements RawMessageBodyHandler<CharSequence> {
+    static final class RawStringHandler implements RawMessageBodyHandler<Object> {
         private final ApplicationConfiguration applicationConfiguration;
 
         RawStringHandler(ApplicationConfiguration applicationConfiguration) {
@@ -194,7 +194,7 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
         }
 
         @Override
-        public String read(Argument<CharSequence> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
+        public String read(Argument<Object> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
             return read0(byteBuffer);
         }
 
@@ -207,7 +207,7 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
         }
 
         @Override
-        public String read(Argument<CharSequence> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
+        public String read(Argument<Object> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
             try {
                 return new String(inputStream.readAllBytes(), applicationConfiguration.getDefaultCharset());
             } catch (IOException e) {
@@ -216,7 +216,7 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
         }
 
         @Override
-        public void writeTo(Argument<CharSequence> type, MediaType mediaType, CharSequence object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+        public void writeTo(Argument<Object> type, MediaType mediaType, Object object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
             addContentType(outgoingHeaders, mediaType);
             try {
                 outputStream.write(object.toString().getBytes(applicationConfiguration.getDefaultCharset()));
@@ -226,13 +226,13 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
         }
 
         @Override
-        public ByteBuffer<?> writeTo(Argument<CharSequence> type, MediaType mediaType, CharSequence object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
+        public ByteBuffer<?> writeTo(Argument<Object> type, MediaType mediaType, Object object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
             addContentType(outgoingHeaders, mediaType);
             return bufferFactory.wrap(object.toString().getBytes(applicationConfiguration.getDefaultCharset()));
         }
 
         @Override
-        public Publisher<CharSequence> readChunked(Argument<CharSequence> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
+        public Publisher<Object> readChunked(Argument<Object> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
             return Flux.from(input).map(this::read0);
         }
     }

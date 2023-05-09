@@ -3,6 +3,7 @@ package io.micronaut.http.body;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.MediaType;
@@ -37,6 +38,12 @@ public final class DynamicWriter implements MessageBodyWriter<Object> {
         if (dynamicWriter.isPresent() && !(dynamicWriter.get() instanceof DynamicWriter)) {
             //noinspection unchecked
             return (MessageBodyWriter<Object>) dynamicWriter.get();
+        }
+        if (mediaType.equals(MediaType.TEXT_PLAIN_TYPE) && ClassUtils.isJavaLangType(object.getClass())) {
+            // compatibility...
+            // this will fall back to RawStringHandler, which can handle Object.
+            //noinspection unchecked,OptionalGetWithoutIsPresent,rawtypes
+            return (MessageBodyWriter) registry.findWriter(Argument.STRING, List.of(MediaType.TEXT_PLAIN_TYPE)).get();
         }
         throw new CodecException("Cannot encode value [" + object + "]. No possible encoders found");
     }
