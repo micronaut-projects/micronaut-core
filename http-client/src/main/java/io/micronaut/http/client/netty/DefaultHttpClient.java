@@ -47,9 +47,11 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.ContextlessMessageBodyHandlerRegistry;
 import io.micronaut.http.body.DynamicWriter;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
@@ -75,7 +77,6 @@ import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
 import io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.codec.CodecException;
-import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ContextPathUtils;
 import io.micronaut.http.context.ServerRequestContext;
@@ -106,8 +107,6 @@ import io.micronaut.http.util.HttpHeadersUtil;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.codec.JsonMediaTypeCodec;
 import io.micronaut.json.codec.JsonStreamMediaTypeCodec;
-import io.micronaut.json.codec.MapperMediaTypeCodec;
-import io.micronaut.json.tree.JsonNode;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
@@ -118,7 +117,6 @@ import io.micronaut.websocket.context.WebSocketBean;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.EmptyByteBuf;
 import io.netty.buffer.Unpooled;
@@ -167,7 +165,6 @@ import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.Promise;
-import org.reactivestreams.Processor;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -725,22 +722,12 @@ public class DefaultHttpClient implements
     @Override
     public <I, B> Publisher<Event<B>> eventStream(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<B> eventType, @NonNull Argument<?> errorType) {
         setupConversionService(request);
+        MessageBodyReader<B> reader = handlerRegistry.findReader(eventType, List.of(MediaType.APPLICATION_JSON_TYPE)).orElseThrow(() -> new CodecException("JSON codec not present"));
         return Flux.from(eventStreamOrError(request, errorType)).map(byteBufferEvent -> {
             ByteBuffer<?> data = byteBufferEvent.getData();
-            Optional<MediaTypeCodec> registeredCodec;
 
-            if (mediaTypeCodecRegistry != null) {
-                registeredCodec = mediaTypeCodecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE);
-            } else {
-                registeredCodec = Optional.empty();
-            }
-
-            if (registeredCodec.isPresent()) {
-                B decoded = registeredCodec.get().decode(eventType, data);
-                return Event.of(byteBufferEvent, decoded);
-            } else {
-                throw new CodecException("JSON codec not present");
-            }
+            B decoded = reader.read(eventType, MediaType.APPLICATION_JSON_TYPE, request.getHeaders(), data);
+            return Event.of(byteBufferEvent, decoded);
         });
     }
 
@@ -957,31 +944,12 @@ public class DefaultHttpClient implements
                 throw new IllegalStateException("Response has been wrapped in non streaming type. Do not wrap the response in client filters for stream requests");
             }
 
-            MapperMediaTypeCodec mediaTypeCodec = (MapperMediaTypeCodec) mediaTypeCodecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE)
-                    .orElseThrow(() -> new IllegalStateException("No JSON codec found"));
-
             StreamedHttpResponse streamResponse = NettyHttpResponseBuilder.toStreamResponse(response);
-            Flux<HttpContent> httpContentReactiveSequence = Flux.from(streamResponse);
 
-            boolean isJsonStream = response.getContentType().map(mediaType -> mediaType.equals(MediaType.APPLICATION_JSON_STREAM_TYPE)).orElse(false);
-            boolean streamArray = !Iterable.class.isAssignableFrom(type.getType()) && !isJsonStream;
-            Processor<byte[], JsonNode> jsonProcessor = mediaTypeCodec.getJsonMapper().createReactiveParser(p -> {
-                httpContentReactiveSequence.map(content -> {
-                    ByteBuf chunk = content.content();
-                    if (log.isTraceEnabled()) {
-                        log.trace("HTTP Client Streaming Response Received Chunk (length: {}) for Request: {} {}",
-                                chunk.readableBytes(), request.getMethodName(), request.getUri());
-                        traceBody("Chunk", chunk);
-                    }
-                    try {
-                        return ByteBufUtil.getBytes(chunk);
-                    } finally {
-                        chunk.release();
-                    }
-                }).subscribe(p);
-            }, streamArray);
-            return Flux.from(jsonProcessor)
-                    .map(jsonNode -> mediaTypeCodec.decode(type, jsonNode));
+            // could also be application/json, in which case we will stream an array
+            MediaType mediaType = response.getContentType().orElse(MediaType.APPLICATION_JSON_STREAM_TYPE);
+            ChunkedMessageBodyReader<O> reader = (ChunkedMessageBodyReader<O>) handlerRegistry.findReader(type, List.of(mediaType)).orElseThrow(() -> new CodecException("Codec missing for media type " + mediaType));
+            return reader.readChunked(type, mediaType, response.getHeaders(), Flux.from(streamResponse).map(c -> NettyByteBufferFactory.DEFAULT.wrap(c.content())));
         });
     }
 
