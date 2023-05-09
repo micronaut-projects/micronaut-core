@@ -51,6 +51,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
     private lateinit var loadedVisitors: MutableList<LoadedVisitor>
     private lateinit var typeElementVisitors: Collection<TypeElementVisitor<*, *>>
     private lateinit var visitorContext: KotlinVisitorContext
+    private val processed: MutableSet<String> = mutableSetOf()
 
     companion object {
         private val SERVICE_LOADER =
@@ -114,16 +115,19 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
                         }
                         if (typeElement.classKind != ClassKind.ANNOTATION_CLASS) {
                             val className = typeElement.qualifiedName.toString()
-                            try {
-                                typeElement.accept(
-                                    ElementVisitor(
-                                        loadedVisitor,
-                                        typeElement,
-                                        classElementsCache
-                                    ), className
-                                )
-                            } catch (e: ProcessingException) {
-                                BeanDefinitionProcessor.handleProcessingException(environment, e)
+                            if (!processed.contains(className)) {
+                                processed.add(className)
+                                try {
+                                    typeElement.accept(
+                                        ElementVisitor(
+                                            loadedVisitor,
+                                            typeElement,
+                                            classElementsCache
+                                        ), className
+                                    )
+                                } catch (e: ProcessingException) {
+                                    BeanDefinitionProcessor.handleProcessingException(environment, e)
+                                }
                             }
                         }
                     }
@@ -143,6 +147,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
                 environment.logger.error("Error finalizing type visitor  [${loadedVisitor.visitor}]: ${e.message}")
             }
         }
+        processed.clear()
         visitorContext.finish()
     }
 
