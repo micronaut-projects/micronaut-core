@@ -75,7 +75,7 @@ managed-reactor = "3.5.5"
 managed-slf4j = "2.0.7"
 managed-snakeyaml = "2.0"
 managed-java-parser-core = "3.24.9"
-managed-ksp = "1.8.20-1.0.10"
+managed-ksp = "1.8.21-1.0.11"
 micronaut-docs = "2.0.0"
 
 [libraries]
