@@ -36,11 +36,11 @@ import java.util.Optional;
  * @since 4.0.0
  */
 @Internal
-public final class DynamicWriter implements MessageBodyWriter<Object> {
+public final class DynamicMessageBodyWriter implements MessageBodyWriter<Object> {
     private final MessageBodyHandlerRegistry registry;
     private final List<MediaType> mediaTypes;
 
-    public DynamicWriter(MessageBodyHandlerRegistry registry, List<MediaType> mediaTypes) {
+    public DynamicMessageBodyWriter(MessageBodyHandlerRegistry registry, List<MediaType> mediaTypes) {
         this.registry = registry;
         this.mediaTypes = mediaTypes;
     }
@@ -52,12 +52,12 @@ public final class DynamicWriter implements MessageBodyWriter<Object> {
 
     public MessageBodyWriter<Object> find(Argument<Object> type, MediaType mediaType, Object object) {
         Optional<MessageBodyWriter<Object>> specific = registry.findWriter(type, List.of(mediaType));
-        if (specific.isPresent() && !(specific.get() instanceof DynamicWriter)) {
+        if (specific.isPresent() && !(specific.get() instanceof DynamicMessageBodyWriter)) {
             return specific.get();
         }
         Argument<?> dynamicType = Argument.of(object.getClass());
         Optional<? extends MessageBodyWriter<?>> dynamicWriter = registry.findWriter(dynamicType, List.of(mediaType));
-        if (dynamicWriter.isPresent() && !(dynamicWriter.get() instanceof DynamicWriter)) {
+        if (dynamicWriter.isPresent() && !(dynamicWriter.get() instanceof DynamicMessageBodyWriter)) {
             //noinspection unchecked
             return (MessageBodyWriter<Object>) dynamicWriter.get();
         }

@@ -45,7 +45,7 @@ import java.util.function.Supplier;
 @Singleton
 @Produces(MediaType.TEXT_EVENT_STREAM)
 @Consumes(MediaType.TEXT_EVENT_STREAM)
-public class TextStreamBodyHandler<T> implements MessageBodyWriter<T> {
+public final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
 
     private static final byte[] DATA_PREFIX = "data: ".getBytes(StandardCharsets.UTF_8);
     private static final byte[] EVENT_PREFIX = "event: ".getBytes(StandardCharsets.UTF_8);
@@ -57,17 +57,17 @@ public class TextStreamBodyHandler<T> implements MessageBodyWriter<T> {
 
     private final Supplier<MessageBodyWriter<Object>> jsonWriter;
 
-    TextStreamBodyHandler(MessageBodyHandlerRegistry registry) {
-        this(SupplierUtil.memoized(() -> registry.findWriter(Argument.OBJECT_ARGUMENT, JSON_TYPE_LIST).orElse(new DynamicWriter(registry, JSON_TYPE_LIST))));
+    TextStreamBodyWriter(MessageBodyHandlerRegistry registry) {
+        this(SupplierUtil.memoized(() -> registry.findWriter(Argument.OBJECT_ARGUMENT, JSON_TYPE_LIST).orElse(new DynamicMessageBodyWriter(registry, JSON_TYPE_LIST))));
     }
 
-    private TextStreamBodyHandler(Supplier<MessageBodyWriter<Object>> jsonWriter) {
+    private TextStreamBodyWriter(Supplier<MessageBodyWriter<Object>> jsonWriter) {
         this.jsonWriter = jsonWriter;
     }
 
     @Override
     public MessageBodyWriter<T> createSpecific(Argument<T> type) {
-        return new TextStreamBodyHandler<>(SupplierUtil.memoized(() -> jsonWriter.get().createSpecific(getBodyType(type))));
+        return new TextStreamBodyWriter<>(SupplierUtil.memoized(() -> jsonWriter.get().createSpecific(getBodyType(type))));
     }
 
     @SuppressWarnings("unchecked")

@@ -52,7 +52,7 @@ import java.util.List;
 @Experimental
 @BootstrapContextCompatible
 @Bean(typed = RawMessageBodyHandler.class)
-public class ByteBufRawHandler implements RawMessageBodyHandler<ByteBuf> {
+public final class ByteBufRawMessageBodyHandler implements RawMessageBodyHandler<ByteBuf> {
     @Override
     public Publisher<ByteBuf> readChunked(Argument<ByteBuf> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
         return Flux.from(input).map(bb -> (ByteBuf) bb.asNativeBuffer());

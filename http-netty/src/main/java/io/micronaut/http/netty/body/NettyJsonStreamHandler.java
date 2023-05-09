@@ -43,7 +43,7 @@ import java.util.List;
 @Singleton
 @Produces(MediaType.APPLICATION_JSON_STREAM)
 @Consumes(MediaType.APPLICATION_JSON_STREAM)
-public class NettyJsonStreamHandler<T> implements MessageBodyHandler<T>, ChunkedMessageBodyReader<T>, CustomizableNettyJsonHandler {
+public final class NettyJsonStreamHandler<T> implements MessageBodyHandler<T>, ChunkedMessageBodyReader<T>, CustomizableNettyJsonHandler {
     private final JsonMessageHandler<T> jsonMessageHandler;
 
     public NettyJsonStreamHandler(JsonMapper jsonMapper) {

@@ -17,6 +17,7 @@ package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 
 import java.util.Collection;
 
@@ -39,5 +40,6 @@ public interface RawMessageBodyHandler<T> extends MessageBodyHandler<T>, Chunked
      *
      * @return The supported types
      */
+    @NonNull
     Collection<? extends Class<?>> getTypes();
 }

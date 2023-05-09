@@ -49,7 +49,7 @@ import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.ContextlessMessageBodyHandlerRegistry;
-import io.micronaut.http.body.DynamicWriter;
+import io.micronaut.http.body.DynamicMessageBodyWriter;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.client.BlockingHttpClient;
@@ -90,7 +90,7 @@ import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
-import io.micronaut.http.netty.body.ByteBufRawHandler;
+import io.micronaut.http.netty.body.ByteBufRawMessageBodyHandler;
 import io.micronaut.http.netty.body.NettyJsonHandler;
 import io.micronaut.http.netty.body.NettyJsonStreamHandler;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
@@ -517,11 +517,22 @@ public class DefaultHttpClient implements
         }
     }
 
+    /**
+     * Get the handler registry for this client.
+     *
+     * @return The handler registry
+     */
+    @NonNull
     public final MessageBodyHandlerRegistry getHandlerRegistry() {
         return handlerRegistry;
     }
 
-    public final void setHandlerRegistry(MessageBodyHandlerRegistry handlerRegistry) {
+    /**
+     * Set the handler registry for this client.
+     *
+     * @param handlerRegistry The handler registry
+     */
+    public final void setHandlerRegistry(@NonNull MessageBodyHandlerRegistry handlerRegistry) {
         this.handlerRegistry = handlerRegistry;
     }
 
@@ -1328,7 +1339,7 @@ public class DefaultHttpClient implements
                 ByteBuf bodyContent = null;
                 if (hasBody) {
                     Object bodyValue = body.get();
-                    DynamicWriter dynamicWriter = new DynamicWriter(handlerRegistry, List.of(requestContentType));
+                    DynamicMessageBodyWriter dynamicWriter = new DynamicMessageBodyWriter(handlerRegistry, List.of(requestContentType));
                     if (Publishers.isConvertibleToPublisher(bodyValue)) {
                         boolean isSingle = Publishers.isSingle(bodyValue.getClass());
 
@@ -1791,7 +1802,7 @@ public class DefaultHttpClient implements
     }
 
     private static MessageBodyHandlerRegistry createDefaultMessageBodyHandlerRegistry() {
-        ContextlessMessageBodyHandlerRegistry registry = new ContextlessMessageBodyHandlerRegistry(new ApplicationConfiguration(), NettyByteBufferFactory.DEFAULT, new ByteBufRawHandler());
+        ContextlessMessageBodyHandlerRegistry registry = new ContextlessMessageBodyHandlerRegistry(new ApplicationConfiguration(), NettyByteBufferFactory.DEFAULT, new ByteBufRawMessageBodyHandler());
         JsonMapper mapper = JsonMapper.createDefault();
         registry.add(MediaType.APPLICATION_JSON_TYPE, new NettyJsonHandler<>(mapper));
         registry.add(MediaType.APPLICATION_JSON_STREAM_TYPE, new NettyJsonStreamHandler<>(mapper));

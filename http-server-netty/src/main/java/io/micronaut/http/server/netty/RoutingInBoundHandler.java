@@ -32,7 +32,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.body.DynamicWriter;
+import io.micronaut.http.body.DynamicMessageBodyWriter;
 import io.micronaut.http.body.MediaTypeProvider;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
@@ -300,7 +300,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
             Argument<Object> actualResponseType;
             if (messageBodyWriter == null || !responseBodyType.isInstance(body) || !messageBodyWriter.isWriteable(responseBodyType, responseMediaType)) {
-                messageBodyWriter = new DynamicWriter(messageBodyHandlerRegistry, List.of(responseMediaType));
+                messageBodyWriter = new DynamicMessageBodyWriter(messageBodyHandlerRegistry, List.of(responseMediaType));
                 actualResponseType = Argument.OBJECT_ARGUMENT;
             } else {
                 actualResponseType = responseBodyType;
@@ -343,7 +343,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             final MutableHttpResponse<?> errorResponse = routeExecutor.createDefaultErrorResponse(nettyRequest, e);
             MediaType t = errorResponse.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
             //noinspection unchecked
-            wrap(new DynamicWriter(messageBodyHandlerRegistry, List.of(t)))
+            wrap(new DynamicMessageBodyWriter(messageBodyHandlerRegistry, List.of(t)))
                 .writeTo(nettyRequest, (MutableHttpResponse<Object>) errorResponse, Argument.OBJECT_ARGUMENT, t, errorResponse.body(), outboundAccess);
         }
     }
@@ -370,7 +370,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 MessageBodyWriter<Object> messageBodyWriter = routeInfo.getMessageBodyWriter();
 
                 if (messageBodyWriter == null || !responseBodyType.isInstance(message) || !messageBodyWriter.isWriteable(responseBodyType, finalMediaType)) {
-                    messageBodyWriter = new DynamicWriter(messageBodyHandlerRegistry, List.of(finalMediaType));
+                    messageBodyWriter = new DynamicMessageBodyWriter(messageBodyHandlerRegistry, List.of(finalMediaType));
                 }
                 ByteBuffer<?> byteBuffer = messageBodyWriter.writeTo(
                     responseBodyType.isInstance(message) ? responseBodyType : (Argument<Object>) Argument.of(message.getClass()),
@@ -381,7 +381,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             });
         } else {
             MediaType finalMediaType = mediaType;
-            DynamicWriter dynamicWriter = new DynamicWriter(messageBodyHandlerRegistry, mediaType == null ? List.of() : List.of(mediaType));
+            DynamicMessageBodyWriter dynamicWriter = new DynamicMessageBodyWriter(messageBodyHandlerRegistry, mediaType == null ? List.of() : List.of(mediaType));
             httpContentPublisher = bodyPublisher.map(message -> new DefaultHttpContent((ByteBuf) dynamicWriter.writeTo(Argument.OBJECT_ARGUMENT, finalMediaType, message, response.getHeaders(), byteBufferFactory).asNativeBuffer()));
         }
 
@@ -502,7 +502,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         public void writeTo(HttpRequest<?> request, MutableHttpResponse<T> outgoingResponse, Argument<T> type, MediaType mediaType, T object, NettyWriteContext nettyContext) throws CodecException {
             MessageBodyWriter<T> actual = delegate;
             // special case DynamicWriter: if the actual writer is a NettyBodyWriter, delegate to it
-            if (delegate instanceof DynamicWriter dyn) {
+            if (delegate instanceof DynamicMessageBodyWriter dyn) {
                 //noinspection unchecked
                 actual = (MessageBodyWriter<T>) dyn.find((Argument<Object>) type, mediaType, object);
                 if (actual instanceof NettyBodyWriter<T> nbw) {

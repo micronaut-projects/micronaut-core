@@ -17,11 +17,12 @@ package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.runtime.ApplicationConfiguration;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -53,7 +54,7 @@ public final class ContextlessMessageBodyHandlerRegistry extends RawMessageBodyH
      * @param mediaType The media type the handler applies to
      * @param handler   The handler
      */
-    public void add(MediaType mediaType, MessageBodyHandler<?> handler) {
+    public void add(@NonNull MediaType mediaType, @NonNull MessageBodyHandler<?> handler) {
         entries.add(new Entry(handler, mediaType));
     }
 

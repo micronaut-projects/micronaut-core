@@ -218,8 +218,12 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
         Optional<MediaType> contentType = getContentType();
         if (contentType.isPresent()) {
             Optional<MessageBodyReader<T>> reader = handlerRegistry.findReader(type, List.of(contentType.get()));
-            if (reader.isPresent() && reader.get().isReadable(type, contentType.get())) {
-                return Optional.of(reader.get().read(type, contentType.get(), headers, NettyByteBufferFactory.DEFAULT.wrap(content.retainedSlice())));
+            if (reader.isPresent()) {
+                MessageBodyReader<T> r = reader.get();
+                MediaType ct = contentType.get();
+                if (r.isReadable(type, ct)) {
+                    return Optional.of(r.read(type, ct, headers, NettyByteBufferFactory.DEFAULT.wrap(content.retainedSlice())));
+                }
             }
         } else if (LOG.isTraceEnabled()) {
             LOG.trace("Missing or unknown Content-Type received from server.");
