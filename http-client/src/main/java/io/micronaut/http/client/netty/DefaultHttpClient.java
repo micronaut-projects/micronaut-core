@@ -274,6 +274,7 @@ public class DefaultHttpClient implements
      * @param threadFactory                   The thread factory to use for client threads
      * @param nettyClientSslBuilder           The SSL builder
      * @param codecRegistry                   The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
+     * @param handlerRegistry                 The handler registry for encoding and decoding
      * @param annotationMetadataResolver      The annotation metadata resolver
      * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument netty handlers execution with
      * @param conversionService               The conversion service
@@ -322,6 +323,7 @@ public class DefaultHttpClient implements
      * @param threadFactory                   The thread factory to use for client threads
      * @param nettyClientSslBuilder           The SSL builder
      * @param codecRegistry                   The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
+     * @param handlerRegistry                 The handler registry for encoding and decoding
      * @param webSocketBeanRegistry           The websocket bean registry
      * @param requestBinderRegistry           The request binder registry
      * @param eventLoopGroup                  The event loop group to use
@@ -515,11 +517,11 @@ public class DefaultHttpClient implements
         }
     }
 
-    public MessageBodyHandlerRegistry getHandlerRegistry() {
+    public final MessageBodyHandlerRegistry getHandlerRegistry() {
         return handlerRegistry;
     }
 
-    public void setHandlerRegistry(MessageBodyHandlerRegistry handlerRegistry) {
+    public final void setHandlerRegistry(MessageBodyHandlerRegistry handlerRegistry) {
         this.handlerRegistry = handlerRegistry;
     }
 

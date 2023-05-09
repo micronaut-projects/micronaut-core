@@ -135,6 +135,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
      * @param nettyClientSslBuilder           The client SSL builder
      * @param threadFactory                   The thread factory
      * @param codecRegistry                   The codec registry
+     * @param handlerRegistry                 The handler registry
      * @param eventLoopGroupRegistry          The event loop group registry
      * @param eventLoopGroupFactory           The event loop group factory
      * @param beanContext                     The bean context
