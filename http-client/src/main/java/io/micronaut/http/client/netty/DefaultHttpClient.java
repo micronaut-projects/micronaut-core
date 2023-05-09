@@ -1350,7 +1350,7 @@ public class DefaultHttpClient implements
                         return new NettyRequestWriter(nettyRequest, null);
                     } else if (bodyValue instanceof CharSequence) {
                         bodyContent = charSequenceToByteBuf((CharSequence) bodyValue, requestContentType);
-                    } else if (mediaTypeCodecRegistry != null) {
+                    } else {
                         ByteBuffer<?> buffer = dynamicWriter.writeTo(Argument.OBJECT_ARGUMENT, requestContentType, bodyValue, request.getHeaders(), byteBufferFactory);
                         bodyContent = (ByteBuf) buffer.asNativeBuffer();
                     }

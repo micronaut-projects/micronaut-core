@@ -390,20 +390,21 @@ public final class RoutingInBoundHandler implements RequestHandler {
             @SuppressWarnings("unchecked") Argument<Object> responseBodyType = (Argument<Object>) routeInfo.getResponseBodyType();
             httpContentPublisher = bodyPublisher.map(message -> {
                 MessageBodyWriter<Object> messageBodyWriter = routeInfo.getMessageBodyWriter();
-                if (messageBodyWriter != null && responseBodyType.isInstance(message) && messageBodyWriter.isWriteable(responseBodyType, finalMediaType)) {
-                    ByteBuffer<?> byteBuffer = messageBodyWriter.writeTo(
-                        responseBodyType,
-                        finalMediaType,
-                        message,
-                        response.getHeaders(), byteBufferFactory);
-                    return new DefaultHttpContent((ByteBuf) byteBuffer.asNativeBuffer());
-                } else {
-                    return handleArbitraryHttpContent(byteBufferFactory, finalMediaType, message, responseBodyType);
+
+                if (messageBodyWriter == null || !responseBodyType.isInstance(message) || !messageBodyWriter.isWriteable(responseBodyType, finalMediaType)) {
+                    messageBodyWriter = new DynamicWriter(messageBodyHandlerRegistry, List.of(finalMediaType));
                 }
+                ByteBuffer<?> byteBuffer = messageBodyWriter.writeTo(
+                    responseBodyType.isInstance(message) ? responseBodyType : (Argument<Object>) Argument.of(message.getClass()),
+                    finalMediaType,
+                    message,
+                    response.getHeaders(), byteBufferFactory);
+                return new DefaultHttpContent((ByteBuf) byteBuffer.asNativeBuffer());
             });
         } else {
             MediaType finalMediaType = mediaType;
-            httpContentPublisher = bodyPublisher.map(message -> handleArbitraryHttpContent(byteBufferFactory, finalMediaType, message, null));
+            DynamicWriter dynamicWriter = new DynamicWriter(messageBodyHandlerRegistry, mediaType == null ? List.of() : List.of(mediaType));
+            httpContentPublisher = bodyPublisher.map(message -> new DefaultHttpContent((ByteBuf) dynamicWriter.writeTo(Argument.OBJECT_ARGUMENT, finalMediaType, message, response.getHeaders(), byteBufferFactory).asNativeBuffer()));
         }
 
         if (isJson) {
@@ -417,48 +418,6 @@ public final class RoutingInBoundHandler implements RequestHandler {
             .contextWrite(reactorContext -> reactorContext.put(ServerRequestContext.KEY, request));
 
         return httpContentPublisher;
-    }
-
-    @NonNull
-    private HttpContent handleArbitraryHttpContent(
-        NettyByteBufferFactory byteBufferFactory,
-        MediaType mediaType,
-        Object message,
-        @Nullable Argument<Object> responseBodyType) {
-        HttpContent httpContent;
-        if (message instanceof ByteBuf bb) {
-            httpContent = new DefaultHttpContent(bb);
-        } else if (message instanceof ByteBuffer<?> byteBuffer) {
-            Object nativeBuffer = byteBuffer.asNativeBuffer();
-            if (nativeBuffer instanceof ByteBuf bb) {
-                httpContent = new DefaultHttpContent(bb);
-            } else {
-                httpContent = new DefaultHttpContent(Unpooled.copiedBuffer(byteBuffer.asNioBuffer()));
-            }
-        } else if (message instanceof byte[] bytes) {
-            httpContent = new DefaultHttpContent(Unpooled.copiedBuffer(bytes));
-        } else if (message instanceof HttpContent hc) {
-            httpContent = hc;
-        } else {
-            MediaTypeCodec codec = mediaTypeCodecRegistry.findCodec(mediaType, message.getClass()).orElse(
-                new TextPlainCodec(serverConfiguration.getDefaultCharset(), conversionService));
-
-            if (LOG.isTraceEnabled()) {
-                LOG.trace("Encoding emitted response object [{}] using codec: {}", message, codec);
-            }
-            ByteBuffer<ByteBuf> encoded;
-            if (responseBodyType != null) {
-                if (responseBodyType.isInstance(message)) {
-                    encoded = codec.encode(responseBodyType, message, byteBufferFactory);
-                } else {
-                    encoded = codec.encode(message, byteBufferFactory);
-                }
-            } else {
-                encoded = codec.encode(message, byteBufferFactory);
-            }
-            httpContent = new DefaultHttpContent(encoded.asNativeBuffer());
-        }
-        return httpContent;
     }
 
     private void encodeResponseBody(
