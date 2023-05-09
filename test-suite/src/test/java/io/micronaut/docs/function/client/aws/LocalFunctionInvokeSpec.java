@@ -18,9 +18,7 @@ package io.micronaut.docs.function.client.aws;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.function.client.FunctionClient;
-import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.Produces;
 import io.micronaut.runtime.server.EmbeddedServer;
 import jakarta.inject.Named;
 import org.junit.Test;
@@ -79,7 +77,6 @@ public class LocalFunctionInvokeSpec {
 
         //tag::functionRnd[]
         @Named("round")
-        @Produces(MediaType.APPLICATION_JSON)
         int rnd(@Body float value);
         //end::functionRnd[]
 
@@ -97,7 +94,6 @@ public class LocalFunctionInvokeSpec {
 
         @Named("round")
         @SingleResult
-        @Produces(MediaType.APPLICATION_JSON)
         Publisher<Integer> rnd(@Body float value);
 
         @SingleResult
