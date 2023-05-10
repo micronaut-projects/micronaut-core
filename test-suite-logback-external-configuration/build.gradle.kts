@@ -7,7 +7,7 @@ dependencies {
     testImplementation(libs.spock)
     testImplementation(projects.context)
     testImplementation(projects.injectGroovy)
-    testImplementation(libs.managed.logback.classic)
+    testImplementation(libs.logback.classic)
     testImplementation(projects.management)
     testImplementation(projects.httpClient)
     testImplementation(projects.jacksonDatabind)
