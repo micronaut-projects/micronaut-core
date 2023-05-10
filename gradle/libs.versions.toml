@@ -32,7 +32,7 @@ jcache = "1.1.1"
 junit5 = "5.9.2"
 junit-platform="1.9.2"
 ktor = "1.6.8"
-managed-logback = "1.4.7"
+logback = "1.4.7"
 logbook-netty = "2.14.0"
 log4j = "2.19.0"
 micronaut-aws = "3.9.2"
@@ -46,6 +46,7 @@ micronaut-validation = "4.0.0-M3"
 micrometer = "1.10.2"
 neo4j-java-driver = "1.4.5"
 selenium = "4.7.2"
+slf4j = "2.0.7"
 smallrye = "5.5.0"
 spock = "2.3-groovy-4.0"
 spotbugs = "4.7.1"
@@ -72,7 +73,6 @@ managed-netty-http3 = "0.0.16.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
 managed-reactor = "3.5.5"
-managed-slf4j = "2.0.7"
 managed-snakeyaml = "2.0"
 managed-java-parser-core = "3.24.9"
 managed-ksp = "1.8.20-1.0.10"
@@ -147,10 +147,6 @@ managed-reactive-streams = { module = "org.reactivestreams:reactive-streams", ve
 managed-reactor = { module = "io.projectreactor:reactor-core", version.ref = "managed-reactor" }
 managed-reactor-test = { module = "io.projectreactor:reactor-test", version.ref = "managed-reactor" }
 
-managed-slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "managed-slf4j" }
-managed-slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "managed-slf4j" }
-managed-logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "managed-logback" }
-
 managed-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "managed-snakeyaml" }
 
 #
@@ -215,6 +211,8 @@ kotlin-kotest-junit5 = { module = "io.kotest:kotest-runner-junit5-jvm" }
 
 log4j = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" }
 
+logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
+
 logbook-netty = { module = "org.zalando:logbook-netty", version.ref = "logbook-netty" }
 
 micronaut-docs = { module = "io.micronaut.docs:micronaut-docs-asciidoc-config-props", version.ref = "micronaut-docs" }
@@ -246,6 +244,8 @@ selenium-support = { module = "org.seleniumhq.selenium:selenium-support", versio
 selenium-driver-chrome = { module = "org.seleniumhq.selenium:selenium-chrome-driver", version.ref = "selenium" }
 selenium-driver-firefox = { module = "org.seleniumhq.selenium:selenium-firefox-driver", version.ref = "selenium" }
 selenium-driver-htmlunit = { module = "org.seleniumhq.selenium:htmlunit-driver", version.ref = "selenium" }
+
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 
 smallrye = { module = "io.smallrye:smallrye-fault-tolerance", version.ref = "smallrye" }
 spock = { module = "org.spockframework:spock-core", version.ref = "spock" }
