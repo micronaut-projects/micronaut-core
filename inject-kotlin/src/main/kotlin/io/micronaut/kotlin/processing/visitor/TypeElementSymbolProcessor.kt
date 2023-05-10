@@ -108,15 +108,17 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
 
                 // Micronaut Data use-case: EntityMapper with a higher priority needs to process entities first
                 // before RepositoryMapper is going to process repositories and read entities
-                for (loadedVisitor in loadedVisitors) {
-                    for (typeElement in elements) {
-                        if (!loadedVisitor.matches(typeElement)) {
-                            continue
-                        }
-                        if (typeElement.classKind != ClassKind.ANNOTATION_CLASS) {
-                            val className = typeElement.qualifiedName.toString()
-                            if (!processed.contains(className)) {
-                                processed.add(className)
+
+                for (typeElement in elements) {
+                    if (typeElement.classKind != ClassKind.ANNOTATION_CLASS) {
+                        val className = typeElement.qualifiedName?.asString()
+                        if (className != null && !processed.contains(className)) {
+                            processed.add(className)
+                            
+                            for (loadedVisitor in loadedVisitors) {
+                                if (!loadedVisitor.matches(typeElement)) {
+                                    continue
+                                }
                                 try {
                                     typeElement.accept(
                                         ElementVisitor(
