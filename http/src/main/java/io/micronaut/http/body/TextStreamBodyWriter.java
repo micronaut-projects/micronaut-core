@@ -45,7 +45,7 @@ import java.util.function.Supplier;
 @Singleton
 @Produces(MediaType.TEXT_EVENT_STREAM)
 @Consumes(MediaType.TEXT_EVENT_STREAM)
-public final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
+final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
 
     private static final byte[] DATA_PREFIX = "data: ".getBytes(StandardCharsets.UTF_8);
     private static final byte[] EVENT_PREFIX = "event: ".getBytes(StandardCharsets.UTF_8);

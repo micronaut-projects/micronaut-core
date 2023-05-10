@@ -27,6 +27,7 @@ import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecException;
@@ -41,7 +42,6 @@ import java.io.OutputStream;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -160,7 +160,7 @@ abstract class RawMessageBodyHandlerRegistry implements MessageBodyHandlerRegist
 
         @Override
         public int hashCode() {
-            return Objects.hash(type.typeHashCode(), mediaTypes);
+            return ObjectUtils.hash(type.typeHashCode(), mediaTypes);
         }
     }
 
