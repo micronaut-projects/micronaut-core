@@ -51,19 +51,17 @@ internal class KotlinOutputVisitor(private val environment: SymbolProcessorEnvir
     override fun visitMetaInfFile(path: String, vararg originatingElements: Element): Optional<GeneratedFile> {
         val elements = path.split(File.separator).toMutableList()
         elements.add(0, "META-INF")
-        val file = elements.removeAt(elements.size - 1)
-
-        val stream = environment.codeGenerator.createNewFile(
-            getNativeElements(originatingElements),
-            elements.joinToString("."),
-            file.substringBeforeLast('.'),
-            file.substringAfterLast('.'))
-
-        return Optional.of(KotlinVisitorContext.KspGeneratedFile(stream, elements.joinToString(File.separator)))
+        return Optional.of(KotlinVisitorContext.KspGeneratedFile(environment, elements, getNativeElements(originatingElements)))
     }
 
-    override fun visitGeneratedFile(path: String?): Optional<GeneratedFile> {
-        TODO("Not yet implemented")
+    override fun visitGeneratedFile(path: String): Optional<GeneratedFile> {
+        val elements = path.split(File.separator).toMutableList()
+        return Optional.of(KotlinVisitorContext.KspGeneratedFile(environment, elements, Dependencies(aggregating = true, sources = emptyArray())))
+    }
+
+    override fun visitGeneratedFile(path: String, vararg originatingElements: Element): Optional<GeneratedFile> {
+        val elements = path.split(File.separator).toMutableList()
+        return Optional.of(KotlinVisitorContext.KspGeneratedFile(environment, elements, getNativeElements(originatingElements)))
     }
 
     private fun getNativeElements(originatingElements: Array<out Element>): Dependencies {
@@ -76,6 +74,6 @@ internal class KotlinOutputVisitor(private val environment: SymbolProcessorEnvir
                 }
             }
         }
-        return Dependencies(aggregating = false, sources = originatingFiles.toTypedArray())
+        return Dependencies(aggregating = originatingElements.size > 1, sources = originatingFiles.toTypedArray())
     }
 }

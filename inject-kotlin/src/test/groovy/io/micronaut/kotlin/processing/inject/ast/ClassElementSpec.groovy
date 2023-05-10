@@ -4,6 +4,7 @@ import io.micronaut.annotation.processing.test.AbstractKotlinCompilerSpec
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.util.CollectionUtils
+import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ConstructorElement
 import io.micronaut.inject.ast.Element
@@ -15,11 +16,41 @@ import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.ast.WildcardElement
+import io.micronaut.kotlin.processing.visitor.AllElementsVisitor
 import io.micronaut.kotlin.processing.visitor.KotlinClassElement
 import jakarta.validation.Valid
 import spock.lang.PendingFeature
 
 class ClassElementSpec extends AbstractKotlinCompilerSpec {
+
+    void "test visitGeneratedFile"() {
+        given:
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS.clear()
+        AllElementsVisitor.VISITED_ELEMENTS.clear()
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS.clear()
+        AllElementsVisitor.WRITE_FILE = true
+
+        when:
+        def definition = buildBeanDefinition('test.visit.Test', '''
+package test.visit
+
+ import jakarta.inject.Singleton
+
+
+@Singleton
+class Test {
+    fun myMethod() {}
+}
+''')
+
+        then:
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 1
+        definition.getClass().getClassLoader().getResource("foo/bar.txt").text == 'All good'
+
+        cleanup:
+        AllElementsVisitor.WRITE_FILE == false
+    }
 
     void "test class element"() {
         expect:

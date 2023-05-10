@@ -23,15 +23,20 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.inject.writer.GeneratedFile;
 
+import java.io.IOException;
+import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 public class AllElementsVisitor implements TypeElementVisitor<Object, Object> {
+    public static boolean WRITE_FILE = false;
     public static List<String> VISITED_ELEMENTS = new ArrayList<>();
     public static List<ClassElement> VISITED_CLASS_ELEMENTS = new ArrayList<>();
     public static List<MethodElement> VISITED_METHOD_ELEMENTS = new ArrayList<>();
@@ -43,6 +48,18 @@ public class AllElementsVisitor implements TypeElementVisitor<Object, Object> {
         VISITED_ELEMENTS.clear();
         VISITED_CLASS_ELEMENTS.clear();
         VISITED_METHOD_ELEMENTS.clear();
+    }
+
+    @Override
+    public void finish(VisitorContext visitorContext) {
+        Optional<GeneratedFile> generatedFile = visitorContext.visitGeneratedFile("foo/bar.txt", VISITED_CLASS_ELEMENTS.toArray(ClassElement.ZERO_CLASS_ELEMENTS));
+        generatedFile.ifPresent(gf -> {
+            try (Writer w = gf.openWriter()) {
+                w.write("All good");
+            } catch (IOException e) {
+                visitorContext.fail(e.getMessage(), null);
+            }
+        });
     }
 
     @Override
