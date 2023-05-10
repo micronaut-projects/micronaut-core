@@ -114,6 +114,10 @@ class GroovyClassWriterOutputVisitor implements ClassWriterOutputVisitor {
 
     @Override
     public Optional<GeneratedFile> visitGeneratedFile(String path) {
+        return getGeneratedFile(path);
+    }
+
+    private Optional<GeneratedFile> getGeneratedFile(String path) {
         File classesDir = compilationUnit.getConfiguration().getTargetDirectory();
         if (classesDir != null) {
 
@@ -124,6 +128,11 @@ class GroovyClassWriterOutputVisitor implements ClassWriterOutputVisitor {
         }
 
         return Optional.empty();
+    }
+
+    @Override
+    public Optional<GeneratedFile> visitGeneratedFile(String path, Element... originatingElements) {
+        return getGeneratedFile(path);
     }
 
     @Override

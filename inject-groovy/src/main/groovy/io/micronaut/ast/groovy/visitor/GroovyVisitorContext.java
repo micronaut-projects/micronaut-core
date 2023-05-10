@@ -262,6 +262,11 @@ public class GroovyVisitorContext implements VisitorContext {
     }
 
     @Override
+    public Optional<GeneratedFile> visitGeneratedFile(String path, Element... originatingElements) {
+        return outputVisitor.visitGeneratedFile(path, originatingElements);
+    }
+
+    @Override
     public void finish() {
         outputVisitor.finish();
     }
