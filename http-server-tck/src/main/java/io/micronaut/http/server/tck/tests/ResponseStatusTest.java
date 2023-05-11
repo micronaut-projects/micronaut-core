@@ -28,9 +28,9 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
+import jakarta.validation.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
 
-import jakarta.validation.ConstraintViolationException;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Optional;
@@ -48,7 +48,7 @@ public class ResponseStatusTest {
     @Test
     void testConstraintViolationCauses400() throws IOException {
         asserts(SPEC_NAME,
-            HttpRequest.POST("/response-status/constraint-violation", Collections.emptyMap()).header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN),
+            HttpRequest.POST("/response-status/constraint-violation", "").header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN),
             (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.BAD_REQUEST)
                 .build()));

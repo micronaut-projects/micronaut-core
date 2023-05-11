@@ -55,7 +55,7 @@ class MutateRequestClientFilterSpec extends Specification {
 
     void "test mutate stream request URI"() {
         expect:
-        myClient.stream().blockFirst() == "xxxxxxxxxxx"
+        myClient.stream().collectList().block().join("") == '["xxxxxxxxxxx"]'
     }
 
     @Requires(property = 'spec.name', value = 'MutateRequestClientFilterSpec')

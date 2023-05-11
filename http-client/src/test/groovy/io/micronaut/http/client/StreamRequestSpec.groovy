@@ -42,6 +42,7 @@ import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
 import java.time.Duration
+
 /**
  * @author graemerocher
  * @since 1.0
@@ -273,7 +274,7 @@ class StreamRequestSpec extends Specification {
 
         @Post("/pojo-flowable-error")
         Publisher<Book> pojoReactiveSequenceError(@Header MediaType contentType, @Body Publisher<Book> books) {
-            return Flux.from(books).flatMap({ Book book ->
+            return Flux.from(books).concatMap ({ Book book ->
                 if(book.title.endsWith("3")) {
                     return Flux.error(new RuntimeException("Can't have books with 3"))
                 }

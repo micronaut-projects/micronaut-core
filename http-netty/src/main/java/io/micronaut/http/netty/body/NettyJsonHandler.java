@@ -23,10 +23,13 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.MessageBodyHandler;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.codec.CodecException;
+import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.body.JsonMessageHandler;
 import io.netty.buffer.ByteBuf;
@@ -42,18 +45,26 @@ import java.io.OutputStream;
  *
  * @param <T> The type
  */
+@SuppressWarnings("DefaultAnnotationParam")
 @Singleton
 @Internal
 @Replaces(JsonMessageHandler.class)
-final class NettyJsonHandler<T> implements MessageBodyHandler<T>, ChunkedMessageBodyReader<T> {
+@Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_HAL_JSON})
+@Consumes({MediaType.APPLICATION_JSON, MediaType.APPLICATION_HAL_JSON})
+public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, ChunkedMessageBodyReader<T>, CustomizableNettyJsonHandler {
     private final JsonMessageHandler<T> jsonMessageHandler;
 
-    NettyJsonHandler(JsonMapper jsonMapper) {
+    public NettyJsonHandler(JsonMapper jsonMapper) {
         this(new JsonMessageHandler<>(jsonMapper));
     }
 
     private NettyJsonHandler(JsonMessageHandler<T> jsonMessageHandler) {
         this.jsonMessageHandler = jsonMessageHandler;
+    }
+
+    @Override
+    public CustomizableNettyJsonHandler customize(JsonFeatures jsonFeatures) {
+        return new NettyJsonHandler<>(jsonMessageHandler.getJsonMapper().cloneWithFeatures(jsonFeatures));
     }
 
     @Override

@@ -88,7 +88,7 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
             if (!Publishers.isSingle(context.getArgument().getType()) && !context.getArgument().isSpecifiedSingle() && mediaType != null) {
                 Optional<MessageBodyReader<Object>> reader = nettyBodyAnnotationBinder.bodyHandlerRegistry.findReader(targetType, List.of(mediaType));
                 if (reader.isPresent() && reader.get() instanceof ChunkedMessageBodyReader<Object> piecewise) {
-                    Publisher<Object> pub = piecewise.readChunked(targetType, mediaType, nhr.getHeaders(), Flux.from(rootBody.rawContent(nettyBodyAnnotationBinder.httpServerConfiguration).asPublisher()).map(b -> NettyByteBufferFactory.DEFAULT.wrap((ByteBuf) b)));
+                    Publisher<?> pub = piecewise.readChunked(targetType, mediaType, nhr.getHeaders(), Flux.from(rootBody.rawContent(nettyBodyAnnotationBinder.httpServerConfiguration).asPublisher()).map(b -> NettyByteBufferFactory.DEFAULT.wrap((ByteBuf) b)));
                     return () -> Optional.of(pub);
                 }
             }

@@ -47,6 +47,11 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.body.ChunkedMessageBodyReader;
+import io.micronaut.http.body.ContextlessMessageBodyHandlerRegistry;
+import io.micronaut.http.body.DynamicMessageBodyWriter;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
@@ -72,7 +77,6 @@ import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
 import io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.codec.CodecException;
-import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ContextPathUtils;
 import io.micronaut.http.context.ServerRequestContext;
@@ -86,6 +90,9 @@ import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
+import io.micronaut.http.netty.body.ByteBufRawMessageBodyHandler;
+import io.micronaut.http.netty.body.NettyJsonHandler;
+import io.micronaut.http.netty.body.NettyJsonStreamHandler;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
 import io.micronaut.http.netty.stream.DelegateStreamedHttpRequest;
@@ -100,8 +107,6 @@ import io.micronaut.http.util.HttpHeadersUtil;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.codec.JsonMediaTypeCodec;
 import io.micronaut.json.codec.JsonStreamMediaTypeCodec;
-import io.micronaut.json.codec.MapperMediaTypeCodec;
-import io.micronaut.json.tree.JsonNode;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
@@ -112,7 +117,6 @@ import io.micronaut.websocket.context.WebSocketBean;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.EmptyByteBuf;
 import io.netty.buffer.Unpooled;
@@ -161,7 +165,6 @@ import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.Promise;
-import org.reactivestreams.Processor;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -248,6 +251,7 @@ public class DefaultHttpClient implements
 
     ConnectionManager connectionManager;
 
+    private MessageBodyHandlerRegistry handlerRegistry;
     private final List<HttpFilterResolver.FilterEntry> clientFilterEntries;
     private final LoadBalancer loadBalancer;
     private final HttpClientConfiguration configuration;
@@ -270,21 +274,23 @@ public class DefaultHttpClient implements
      * @param threadFactory                   The thread factory to use for client threads
      * @param nettyClientSslBuilder           The SSL builder
      * @param codecRegistry                   The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
+     * @param handlerRegistry                 The handler registry for encoding and decoding
      * @param annotationMetadataResolver      The annotation metadata resolver
      * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument netty handlers execution with
      * @param conversionService               The conversion service
      * @param filters                         The filters to use
      */
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer,
-            @NonNull HttpClientConfiguration configuration,
-            @Nullable String contextPath,
-            @Nullable ThreadFactory threadFactory,
-            NettyClientSslBuilder nettyClientSslBuilder,
-            MediaTypeCodecRegistry codecRegistry,
-            @Nullable AnnotationMetadataResolver annotationMetadataResolver,
-            List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
-            ConversionService conversionService,
-            HttpClientFilter... filters) {
+                             @NonNull HttpClientConfiguration configuration,
+                             @Nullable String contextPath,
+                             @Nullable ThreadFactory threadFactory,
+                             NettyClientSslBuilder nettyClientSslBuilder,
+                             @NonNull MediaTypeCodecRegistry codecRegistry,
+                             @NonNull MessageBodyHandlerRegistry handlerRegistry,
+                             @Nullable AnnotationMetadataResolver annotationMetadataResolver,
+                             List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
+                             ConversionService conversionService,
+                             HttpClientFilter... filters) {
         this(loadBalancer,
             null,
             configuration,
@@ -294,6 +300,7 @@ public class DefaultHttpClient implements
             threadFactory,
             nettyClientSslBuilder,
             codecRegistry,
+            handlerRegistry,
             WebSocketBeanRegistry.EMPTY,
             new DefaultRequestBinderRegistry(conversionService),
             null,
@@ -316,6 +323,7 @@ public class DefaultHttpClient implements
      * @param threadFactory                   The thread factory to use for client threads
      * @param nettyClientSslBuilder           The SSL builder
      * @param codecRegistry                   The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
+     * @param handlerRegistry                 The handler registry for encoding and decoding
      * @param webSocketBeanRegistry           The websocket bean registry
      * @param requestBinderRegistry           The request binder registry
      * @param eventLoopGroup                  The event loop group to use
@@ -331,10 +339,11 @@ public class DefaultHttpClient implements
                              @NonNull HttpClientConfiguration configuration,
                              @Nullable String contextPath,
                              @NonNull HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
-                             List<HttpFilterResolver.FilterEntry> clientFilterEntries,
+                             @NonNull List<HttpFilterResolver.FilterEntry> clientFilterEntries,
                              @Nullable ThreadFactory threadFactory,
                              @NonNull NettyClientSslBuilder nettyClientSslBuilder,
                              @NonNull MediaTypeCodecRegistry codecRegistry,
+                             @NonNull MessageBodyHandlerRegistry handlerRegistry,
                              @NonNull WebSocketBeanRegistry webSocketBeanRegistry,
                              @NonNull RequestBinderRegistry requestBinderRegistry,
                              @Nullable EventLoopGroup eventLoopGroup,
@@ -368,6 +377,7 @@ public class DefaultHttpClient implements
                 invocationInstrumenterFactories == null ? Collections.emptyList() : invocationInstrumenterFactories;
 
         this.mediaTypeCodecRegistry = codecRegistry;
+        this.handlerRegistry = handlerRegistry;
         this.log = configuration.getLoggerName().map(LoggerFactory::getLogger).orElse(DEFAULT_LOG);
         this.filterResolver = filterResolver;
         if (clientFilterEntries != null) {
@@ -416,11 +426,12 @@ public class DefaultHttpClient implements
      */
     public DefaultHttpClient(@Nullable URI uri, @NonNull HttpClientConfiguration configuration) {
         this(
-                uri == null ? null : LoadBalancer.fixed(uri), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                new NettyClientSslBuilder(new ResourceResolver()),
-                createDefaultMediaTypeRegistry(),
-                AnnotationMetadataResolver.DEFAULT,
-                Collections.emptyList(), ConversionService.SHARED);
+            uri == null ? null : LoadBalancer.fixed(uri), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
+            new NettyClientSslBuilder(new ResourceResolver()),
+            createDefaultMediaTypeRegistry(),
+            createDefaultMessageBodyHandlerRegistry(),
+            AnnotationMetadataResolver.DEFAULT,
+            Collections.emptyList(), ConversionService.SHARED);
     }
 
     /**
@@ -430,11 +441,12 @@ public class DefaultHttpClient implements
      */
     public DefaultHttpClient(@Nullable LoadBalancer loadBalancer, HttpClientConfiguration configuration, List<InvocationInstrumenterFactory> invocationInstrumenterFactories) {
         this(loadBalancer,
-                configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                new NettyClientSslBuilder(new ResourceResolver()),
-                createDefaultMediaTypeRegistry(),
-                AnnotationMetadataResolver.DEFAULT,
-                invocationInstrumenterFactories, ConversionService.SHARED);
+            configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
+            new NettyClientSslBuilder(new ResourceResolver()),
+            createDefaultMediaTypeRegistry(),
+            createDefaultMessageBodyHandlerRegistry(),
+            AnnotationMetadataResolver.DEFAULT,
+            invocationInstrumenterFactories, ConversionService.SHARED);
     }
 
     static boolean isAcceptEvents(io.micronaut.http.HttpRequest<?> request) {
@@ -498,10 +510,30 @@ public class DefaultHttpClient implements
      *
      * @param mediaTypeCodecRegistry The registry to use. Should not be null
      */
+    @Deprecated
     public void setMediaTypeCodecRegistry(MediaTypeCodecRegistry mediaTypeCodecRegistry) {
         if (mediaTypeCodecRegistry != null) {
             this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         }
+    }
+
+    /**
+     * Get the handler registry for this client.
+     *
+     * @return The handler registry
+     */
+    @NonNull
+    public final MessageBodyHandlerRegistry getHandlerRegistry() {
+        return handlerRegistry;
+    }
+
+    /**
+     * Set the handler registry for this client.
+     *
+     * @param handlerRegistry The handler registry
+     */
+    public final void setHandlerRegistry(@NonNull MessageBodyHandlerRegistry handlerRegistry) {
+        this.handlerRegistry = handlerRegistry;
     }
 
     @Override
@@ -703,22 +735,12 @@ public class DefaultHttpClient implements
     @Override
     public <I, B> Publisher<Event<B>> eventStream(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<B> eventType, @NonNull Argument<?> errorType) {
         setupConversionService(request);
+        MessageBodyReader<B> reader = handlerRegistry.findReader(eventType, List.of(MediaType.APPLICATION_JSON_TYPE)).orElseThrow(() -> new CodecException("JSON codec not present"));
         return Flux.from(eventStreamOrError(request, errorType)).map(byteBufferEvent -> {
             ByteBuffer<?> data = byteBufferEvent.getData();
-            Optional<MediaTypeCodec> registeredCodec;
 
-            if (mediaTypeCodecRegistry != null) {
-                registeredCodec = mediaTypeCodecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE);
-            } else {
-                registeredCodec = Optional.empty();
-            }
-
-            if (registeredCodec.isPresent()) {
-                B decoded = registeredCodec.get().decode(eventType, data);
-                return Event.of(byteBufferEvent, decoded);
-            } else {
-                throw new CodecException("JSON codec not present");
-            }
+            B decoded = reader.read(eventType, MediaType.APPLICATION_JSON_TYPE, request.getHeaders(), data);
+            return Event.of(byteBufferEvent, decoded);
         });
     }
 
@@ -935,31 +957,12 @@ public class DefaultHttpClient implements
                 throw new IllegalStateException("Response has been wrapped in non streaming type. Do not wrap the response in client filters for stream requests");
             }
 
-            MapperMediaTypeCodec mediaTypeCodec = (MapperMediaTypeCodec) mediaTypeCodecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE)
-                    .orElseThrow(() -> new IllegalStateException("No JSON codec found"));
-
             StreamedHttpResponse streamResponse = NettyHttpResponseBuilder.toStreamResponse(response);
-            Flux<HttpContent> httpContentReactiveSequence = Flux.from(streamResponse);
 
-            boolean isJsonStream = response.getContentType().map(mediaType -> mediaType.equals(MediaType.APPLICATION_JSON_STREAM_TYPE)).orElse(false);
-            boolean streamArray = !Iterable.class.isAssignableFrom(type.getType()) && !isJsonStream;
-            Processor<byte[], JsonNode> jsonProcessor = mediaTypeCodec.getJsonMapper().createReactiveParser(p -> {
-                httpContentReactiveSequence.map(content -> {
-                    ByteBuf chunk = content.content();
-                    if (log.isTraceEnabled()) {
-                        log.trace("HTTP Client Streaming Response Received Chunk (length: {}) for Request: {} {}",
-                                chunk.readableBytes(), request.getMethodName(), request.getUri());
-                        traceBody("Chunk", chunk);
-                    }
-                    try {
-                        return ByteBufUtil.getBytes(chunk);
-                    } finally {
-                        chunk.release();
-                    }
-                }).subscribe(p);
-            }, streamArray);
-            return Flux.from(jsonProcessor)
-                    .map(jsonNode -> mediaTypeCodec.decode(type, jsonNode));
+            // could also be application/json, in which case we will stream an array
+            MediaType mediaType = response.getContentType().orElse(MediaType.APPLICATION_JSON_STREAM_TYPE);
+            ChunkedMessageBodyReader<O> reader = (ChunkedMessageBodyReader<O>) handlerRegistry.findReader(type, List.of(mediaType)).orElseThrow(() -> new CodecException("Codec missing for media type " + mediaType));
+            return reader.readChunked(type, mediaType, response.getHeaders(), Flux.from(streamResponse).map(c -> NettyByteBufferFactory.DEFAULT.wrap(c.content())));
         });
     }
 
@@ -1336,6 +1339,7 @@ public class DefaultHttpClient implements
                 ByteBuf bodyContent = null;
                 if (hasBody) {
                     Object bodyValue = body.get();
+                    DynamicMessageBodyWriter dynamicWriter = new DynamicMessageBodyWriter(handlerRegistry, List.of(requestContentType));
                     if (Publishers.isConvertibleToPublisher(bodyValue)) {
                         boolean isSingle = Publishers.isSingle(bodyValue.getClass());
 
@@ -1344,53 +1348,8 @@ public class DefaultHttpClient implements
                         );
 
                         Flux<HttpContent> requestBodyPublisher = Flux.from(publisher).map(o -> {
-                            if (o instanceof CharSequence) {
-                                ByteBuf textChunk = Unpooled.copiedBuffer(((CharSequence) o), requestContentType.getCharset().orElse(StandardCharsets.UTF_8));
-                                if (log.isTraceEnabled()) {
-                                    traceChunk(textChunk);
-                                }
-                                return new DefaultHttpContent(textChunk);
-                            } else if (o instanceof ByteBuf) {
-                                ByteBuf byteBuf = (ByteBuf) o;
-                                if (log.isTraceEnabled()) {
-                                    log.trace("Sending Bytes Chunk. Length: {}", byteBuf.readableBytes());
-                                }
-                                return new DefaultHttpContent(byteBuf);
-                            } else if (o instanceof byte[]) {
-                                byte[] bodyBytes = (byte[]) o;
-                                if (log.isTraceEnabled()) {
-                                    log.trace("Sending Bytes Chunk. Length: {}", bodyBytes.length);
-                                }
-                                return new DefaultHttpContent(Unpooled.wrappedBuffer(bodyBytes));
-                            } else if (o instanceof ByteBuffer) {
-                                ByteBuffer<?> byteBuffer = (ByteBuffer<?>) o;
-                                Object nativeBuffer = byteBuffer.asNativeBuffer();
-                                if (log.isTraceEnabled()) {
-                                    log.trace("Sending Bytes Chunk. Length: {}", byteBuffer.readableBytes());
-                                }
-                                if (nativeBuffer instanceof ByteBuf) {
-                                    return new DefaultHttpContent((ByteBuf) nativeBuffer);
-                                } else {
-                                    return new DefaultHttpContent(Unpooled.wrappedBuffer(byteBuffer.toByteArray()));
-                                }
-                            } else if (mediaTypeCodecRegistry != null) {
-                                Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
-                                ByteBuf encoded = registeredCodec.map(codec -> {
-                                            if (bodyType != null && bodyType.isInstance(o)) {
-                                                return codec.encode((Argument<Object>) bodyType, o, byteBufferFactory).asNativeBuffer();
-                                            } else {
-                                                return codec.encode(o, byteBufferFactory).asNativeBuffer();
-                                            }
-                                        })
-                                        .orElse(null);
-                                if (encoded != null) {
-                                    if (log.isTraceEnabled()) {
-                                        traceChunk(encoded);
-                                    }
-                                    return new DefaultHttpContent(encoded);
-                                }
-                            }
-                            throw new CodecException("Cannot encode value [" + o + "]. No possible encoders found");
+                            ByteBuffer<?> buffer = dynamicWriter.writeTo(Argument.OBJECT_ARGUMENT, requestContentType, o, request.getHeaders(), byteBufferFactory);
+                            return new DefaultHttpContent(((ByteBuf) buffer.asNativeBuffer()));
                         });
 
                         if (!isSingle && MediaType.APPLICATION_JSON_TYPE.equals(requestContentType)) {
@@ -1404,16 +1363,9 @@ public class DefaultHttpClient implements
                         return new NettyRequestWriter(nettyRequest, null);
                     } else if (bodyValue instanceof CharSequence) {
                         bodyContent = charSequenceToByteBuf((CharSequence) bodyValue, requestContentType);
-                    } else if (mediaTypeCodecRegistry != null) {
-                        Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(requestContentType);
-                        bodyContent = registeredCodec.map(codec -> {
-                                    if (bodyType != null && bodyType.isInstance(bodyValue)) {
-                                        return codec.encode((Argument<Object>) bodyType, bodyValue, byteBufferFactory).asNativeBuffer();
-                                    } else {
-                                        return codec.encode(bodyValue, byteBufferFactory).asNativeBuffer();
-                                    }
-                                })
-                                .orElse(null);
+                    } else {
+                        ByteBuffer<?> buffer = dynamicWriter.writeTo(Argument.OBJECT_ARGUMENT, requestContentType, bodyValue, request.getHeaders(), byteBufferFactory);
+                        bodyContent = (ByteBuf) buffer.asNativeBuffer();
                     }
                     if (bodyContent == null) {
                         bodyContent = conversionService.convert(bodyValue, ByteBuf.class).orElseThrow(() ->
@@ -1480,7 +1432,7 @@ public class DefaultHttpClient implements
                                 public void onComplete() {
                                     try {
                                         FullHttpResponse fullHttpResponse = new DefaultFullHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), buffer, nettyResponse.headers(), new DefaultHttpHeaders(true));
-                                        final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, mediaTypeCodecRegistry, byteBufferFactory, (Argument<Object>) errorType, true, conversionService);
+                                        final FullNettyClientHttpResponse<Object> fullNettyClientHttpResponse = new FullNettyClientHttpResponse<>(fullHttpResponse, handlerRegistry, (Argument<Object>) errorType, true, conversionService);
                                         fullNettyClientHttpResponse.onComplete();
                                         emitter.error(decorate(new HttpClientResponseException(
                                             fullHttpResponse.status().reasonPhrase(),
@@ -1844,9 +1796,17 @@ public class DefaultHttpClient implements
         JsonMapper mapper = JsonMapper.createDefault();
         ApplicationConfiguration configuration = new ApplicationConfiguration();
         return MediaTypeCodecRegistry.of(
-                new JsonMediaTypeCodec(mapper, configuration, null),
-                new JsonStreamMediaTypeCodec(mapper, configuration, null)
+            new JsonMediaTypeCodec(mapper, configuration, null),
+            new JsonStreamMediaTypeCodec(mapper, configuration, null)
         );
+    }
+
+    private static MessageBodyHandlerRegistry createDefaultMessageBodyHandlerRegistry() {
+        ContextlessMessageBodyHandlerRegistry registry = new ContextlessMessageBodyHandlerRegistry(new ApplicationConfiguration(), NettyByteBufferFactory.DEFAULT, new ByteBufRawMessageBodyHandler());
+        JsonMapper mapper = JsonMapper.createDefault();
+        registry.add(MediaType.APPLICATION_JSON_TYPE, new NettyJsonHandler<>(mapper));
+        registry.add(MediaType.APPLICATION_JSON_STREAM_TYPE, new NettyJsonStreamHandler<>(mapper));
+        return registry;
     }
 
     private @NonNull InvocationInstrumenter combineFactories() {
@@ -1854,9 +1814,9 @@ public class DefaultHttpClient implements
             return NOOP;
         }
         return InvocationInstrumenter.combine(invocationInstrumenterFactories.stream()
-                .map(InvocationInstrumenterFactory::newInvocationInstrumenter)
-                .filter(Objects::nonNull)
-                .toList());
+            .map(InvocationInstrumenterFactory::newInvocationInstrumenter)
+            .filter(Objects::nonNull)
+            .toList());
     }
 
     static boolean isSecureScheme(String scheme) {
@@ -2208,7 +2168,7 @@ public class DefaultHttpClient implements
 
                 boolean convertBodyWithBodyType = shouldConvertWithBodyType(msg, DefaultHttpClient.this.configuration, bodyType, errorType);
                 FullNettyClientHttpResponse<O> response
-                        = new FullNettyClientHttpResponse<>(msg, mediaTypeCodecRegistry, byteBufferFactory, bodyType, convertBodyWithBodyType, conversionService);
+                        = new FullNettyClientHttpResponse<>(msg, handlerRegistry, bodyType, convertBodyWithBodyType, conversionService);
 
                 if (convertBodyWithBodyType) {
                     promise.trySuccess(response);
@@ -2274,9 +2234,8 @@ public class DefaultHttpClient implements
         private HttpClientResponseException makeErrorBodyParseError(FullHttpResponse fullResponse, Throwable t) {
             FullNettyClientHttpResponse<Object> errorResponse = new FullNettyClientHttpResponse<>(
                     fullResponse,
-                    mediaTypeCodecRegistry,
-                    byteBufferFactory,
-                    null,
+                handlerRegistry,
+                null,
                     false,
                     conversionService
             );
@@ -2293,9 +2252,8 @@ public class DefaultHttpClient implements
         private void makeNormalBodyParseError(FullHttpResponse fullResponse, Throwable t, Consumer<HttpClientResponseException> forward) {
             FullNettyClientHttpResponse<Object> response = new FullNettyClientHttpResponse<>(
                     fullResponse,
-                    mediaTypeCodecRegistry,
-                    byteBufferFactory,
-                    null,
+                handlerRegistry,
+                null,
                     false,
                     conversionService
             );
