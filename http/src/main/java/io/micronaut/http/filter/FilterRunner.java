@@ -244,9 +244,15 @@ public class FilterRunner {
                 null,
                 continuation);
             if (executeOn == null) {
-                filterMethodFlow = context.propagatedContext().propagate(() -> before.filter(context, filterMethodContext));
+                try (PropagatedContext.InContext ignore = context.propagatedContext.propagate()) {
+                    filterMethodFlow = before.filter(context, filterMethodContext);
+                }
             } else {
-                filterMethodFlow = ExecutionFlow.async(executeOn, () -> context.propagatedContext().propagate(() -> before.filter(context, filterMethodContext)));
+                filterMethodFlow = ExecutionFlow.async(executeOn, () -> {
+                    try (PropagatedContext.InContext ignore = context.propagatedContext.propagate()) {
+                        return before.filter(context, filterMethodContext);
+                    }
+                });
             }
             if (before.isSuspended()) {
                 return filterMethodFlow;
@@ -257,18 +263,22 @@ public class FilterRunner {
             // Legacy `Publisher<HttpResponse> proceed(..)` filters are always suspended
             if (executeOn == null) {
                 try {
-                    return chainSuspensionPoint.processResult(
-                        context.propagatedContext().propagate(() -> around.bean().doFilter(context.request, chainSuspensionPoint))
-                    );
+                    try (PropagatedContext.InContext ignore = context.propagatedContext.propagate()) {
+                        return chainSuspensionPoint.processResult(
+                            around.bean().doFilter(context.request, chainSuspensionPoint)
+                        );
+                    }
                 } catch (Exception e) {
                     return ExecutionFlow.error(e);
                 }
             } else {
                 return ExecutionFlow.async(executeOn, () -> {
                     try {
-                        return chainSuspensionPoint.processResult(
-                            context.propagatedContext().propagate(() -> around.bean().doFilter(context.request, chainSuspensionPoint))
-                        );
+                        try (PropagatedContext.InContext ignore = context.propagatedContext.propagate()) {
+                            return chainSuspensionPoint.processResult(
+                                around.bean().doFilter(context.request, chainSuspensionPoint)
+                            );
+                        }
                     } catch (Exception e) {
                         return ExecutionFlow.error(e);
                     }
@@ -316,9 +326,15 @@ public class FilterRunner {
                 exceptionToFilter,
                 null);
             if (executeOn == null) {
-                return filterContext.propagatedContext().propagate(() -> after.filter(filterContext, filterMethodContext));
+                try (PropagatedContext.InContext ignore = filterContext.propagatedContext.propagate()) {
+                    return after.filter(filterContext, filterMethodContext);
+                }
             } else {
-                return ExecutionFlow.async(executeOn, () -> filterContext.propagatedContext().propagate(() -> after.filter(filterContext, filterMethodContext)));
+                return ExecutionFlow.async(executeOn, () -> {
+                    try (PropagatedContext.InContext ignore = filterContext.propagatedContext.propagate()) {
+                        return after.filter(filterContext, filterMethodContext);
+                    }
+                });
             }
         }
         return ExecutionFlow.just(filterContext);

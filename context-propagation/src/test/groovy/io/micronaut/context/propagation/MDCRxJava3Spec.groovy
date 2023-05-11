@@ -173,7 +173,7 @@ class MDCRxJava3Spec extends Specification {
                 String trackingId = request.headers.get("X-TrackingId")
                 MDC.put("trackingId", trackingId)
                 MDC.put("trackingId", trackingId)
-                (PropagatedContext.get() + new MdcPropagationContext()).propagate {
+                try (PropagatedContext.InContext ignore = (PropagatedContext.get() + new MdcPropagationContext()).propagate()) {
                     return Mono.from(chain.proceed(request))
                 }
             } finally {

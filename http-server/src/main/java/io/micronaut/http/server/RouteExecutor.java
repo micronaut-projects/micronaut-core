@@ -434,7 +434,7 @@ public final class RouteExecutor {
     }
 
     private ExecutionFlow<MutableHttpResponse<?>> executeRouteAndConvertBody(PropagatedContext propagatedContext, RouteMatch<?> routeMatch, HttpRequest<?> httpRequest) {
-        return propagatedContext.propagate(() -> {
+        try (PropagatedContext.InContext ignore = propagatedContext.propagate()) {
             try {
                 requestArgumentSatisfier.fulfillArgumentRequirementsAfterFilters(routeMatch, httpRequest);
                 Object body = ServerRequestContext.with(httpRequest, (Supplier<Object>) routeMatch::execute);
@@ -445,7 +445,7 @@ public final class RouteExecutor {
             } catch (Throwable e) {
                 return ExecutionFlow.error(e);
             }
-        });
+        }
     }
 
     ExecutionFlow<MutableHttpResponse<?>> createResponseForBody(PropagatedContext propagatedContext,

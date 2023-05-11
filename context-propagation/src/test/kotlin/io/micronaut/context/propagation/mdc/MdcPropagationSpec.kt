@@ -140,8 +140,8 @@ class HttpApplicationEnterFilter : HttpServerFilter {
             MDC.put(TRACKING_ID, trackingId)
             logger.info("Application enter ($trackingId).")
 
-            return (PropagatedContext.getOrEmpty() + MdcPropagationContext()).propagate {
-                Mono.from(chain.proceed(request)).doOnNext {
+            (PropagatedContext.get() + MdcPropagationContext()).propagate().use {
+                return Mono.from(chain.proceed(request)).doOnNext {
                     logger.info("Application exit ($trackingId).")
                 }
             }
