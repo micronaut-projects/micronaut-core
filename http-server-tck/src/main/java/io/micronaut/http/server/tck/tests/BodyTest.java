@@ -58,6 +58,18 @@ public class BodyTest {
     }
 
     @Test
+    void testCustomBodyPOJOAsPart() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/response-body/part-pojo", "{\"point\":{\"x\":10,\"y\":20},\"foo\":\"bar\"}")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.CREATED)
+                    .body("{\"x\":10,\"y\":20}")
+                    .build()));
+    }
+
+    @Test
     void testCustomBodyPOJODefaultToJSON() throws IOException {
         asserts(SPEC_NAME,
             HttpRequest.POST("/response-body/pojo", "{\"x\":10,\"y\":20}"),
@@ -111,6 +123,12 @@ public class BodyTest {
         @Post(uri = "/pojo")
         @Status(HttpStatus.CREATED)
         Point post(@Body Point data) {
+            return data;
+        }
+
+        @Post(uri = "/part-pojo")
+        @Status(HttpStatus.CREATED)
+        Point postPart(@Body("point") Point data) {
             return data;
         }
 

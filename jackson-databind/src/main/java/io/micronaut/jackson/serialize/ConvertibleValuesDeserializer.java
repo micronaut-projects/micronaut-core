@@ -25,6 +25,8 @@ import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.deser.ContextualDeserializer;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
@@ -37,14 +39,16 @@ import java.io.IOException;
 final class ConvertibleValuesDeserializer<V> extends JsonDeserializer<ConvertibleValues<V>> implements ContextualDeserializer {
     private static final JsonNodeDeserializer JSON_NODE_DESERIALIZER = new JsonNodeDeserializer();
     private final ConversionService conversionService;
+    @Nullable
     private final JavaType valueType;
+    @Nullable
     private final JsonDeserializer<V> valueDeserializer;
 
-    ConvertibleValuesDeserializer(ConversionService conversionService, JavaType valueType) {
+    ConvertibleValuesDeserializer(@NonNull ConversionService conversionService, @Nullable JavaType valueType) {
         this(conversionService, valueType, null);
     }
 
-    ConvertibleValuesDeserializer(ConversionService conversionService, JavaType valueType, JsonDeserializer<V> valueDeserializer) {
+    private ConvertibleValuesDeserializer(@NonNull ConversionService conversionService, @Nullable JavaType valueType, @Nullable JsonDeserializer<V> valueDeserializer) {
         this.conversionService = conversionService;
         this.valueType = valueType;
         this.valueDeserializer = valueDeserializer;
@@ -52,6 +56,10 @@ final class ConvertibleValuesDeserializer<V> extends JsonDeserializer<Convertibl
 
     @Override
     public JsonDeserializer<?> createContextual(DeserializationContext ctxt, BeanProperty property) throws JsonMappingException {
+        if (valueType == null) {
+            // deserialize to JsonNodeConvertibleValues
+            return this;
+        }
         JsonDeserializer<Object> valueDeserializer = ctxt.findContextualValueDeserializer(valueType, property);
         return new ConvertibleValuesDeserializer<>(conversionService, valueType, valueDeserializer);
     }
@@ -59,6 +67,13 @@ final class ConvertibleValuesDeserializer<V> extends JsonDeserializer<Convertibl
     @Override
     public ConvertibleValues<V> deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JacksonException {
         if (valueDeserializer == null) {
+            if (!p.hasCurrentToken()) {
+                p.nextToken();
+            }
+            if (p.getCurrentToken() != JsonToken.START_OBJECT) {
+                //noinspection unchecked
+                return (ConvertibleValues<V>) ctxt.handleUnexpectedToken(handledType(), p);
+            }
             JsonNode node = JSON_NODE_DESERIALIZER.deserialize(p, ctxt);
             return new JsonNodeConvertibleValues<>(node, conversionService);
         } else {
