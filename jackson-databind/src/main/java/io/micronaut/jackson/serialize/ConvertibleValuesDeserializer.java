@@ -67,6 +67,13 @@ final class ConvertibleValuesDeserializer<V> extends JsonDeserializer<Convertibl
     @Override
     public ConvertibleValues<V> deserialize(JsonParser p, DeserializationContext ctxt) throws IOException, JacksonException {
         if (valueDeserializer == null) {
+            if (!p.hasCurrentToken()) {
+                p.nextToken();
+            }
+            if (p.getCurrentToken() != JsonToken.START_OBJECT) {
+                //noinspection unchecked
+                return (ConvertibleValues<V>) ctxt.handleUnexpectedToken(handledType(), p);
+            }
             JsonNode node = JSON_NODE_DESERIALIZER.deserialize(p, ctxt);
             return new JsonNodeConvertibleValues<>(node, conversionService);
         } else {

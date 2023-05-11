@@ -1,5 +1,6 @@
 package io.micronaut.jackson.serialize
 
+import com.fasterxml.jackson.databind.exc.MismatchedInputException
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.value.ConvertibleValues
 import io.micronaut.core.type.Argument
@@ -22,6 +23,7 @@ class ConvertibleValuesDeserializerSpec extends Specification {
         cleanup:
         ctx.close()
     }
+
     def 'test with value type'() {
         given:
         def ctx = ApplicationContext.run()
@@ -34,6 +36,20 @@ class ConvertibleValuesDeserializerSpec extends Specification {
         // values should be int-typed
         values.get("foo", Object).get() == 4
         values.get("fizz", Object).get() == 5
+
+        cleanup:
+        ctx.close()
+    }
+
+    def 'test wrong format'() {
+        given:
+        def ctx = ApplicationContext.run()
+        def mapper = ctx.getBean(JsonMapper)
+
+        when:
+        mapper.readValue('[{"foo":"4","fizz":5},4]', Argument.of(ConvertibleValues))
+        then:
+        thrown MismatchedInputException
 
         cleanup:
         ctx.close()
