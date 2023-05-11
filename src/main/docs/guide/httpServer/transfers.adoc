@@ -42,6 +42,6 @@ TIP: To use a custom data source to send data through an input stream, construct
 
 By default, file responses include caching headers. The following options determine how the `Cache-Control` header is built.
 
-include::{includedir}configurationProperties/io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration.adoc[]
+include::{includedir}configurationProperties/io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration$FileTypeHandlerConfiguration.adoc[]
 
-include::{includedir}configurationProperties/io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration$CacheControlConfiguration.adoc[]
+include::{includedir}configurationProperties/io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration$FileTypeHandlerConfiguration$CacheControlConfiguration.adoc[]
