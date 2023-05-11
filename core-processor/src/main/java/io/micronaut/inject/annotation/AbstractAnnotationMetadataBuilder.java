@@ -577,17 +577,21 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                                        @NonNull String memberName,
                                                        @NonNull Object initialAnnotationValue) {
         String originatingClassName = getOriginatingClassName(originatingElement);
+        if (originatingClassName != null) {
+            String packageName = NameUtils.getPackageName(originatingClassName);
+            String simpleClassName = NameUtils.getSimpleName(originatingClassName);
+            String exprClassName = "%s.$%s%s".formatted(packageName, simpleClassName, EXPR_SUFFIX);
 
-        String packageName = NameUtils.getPackageName(originatingClassName);
-        String simpleClassName = NameUtils.getSimpleName(originatingClassName);
-        String exprClassName = "%s.$%s%s".formatted(packageName, simpleClassName, EXPR_SUFFIX);
+            Integer expressionIndex = EvaluatedExpressionReference.nextIndex(exprClassName);
 
-        Integer expressionIndex = EvaluatedExpressionReference.nextIndex(exprClassName);
+            return new EvaluatedExpressionReference(initialAnnotationValue, annotationName, memberName, exprClassName + expressionIndex);
+        } else {
+            return initialAnnotationValue;
+        }
 
-        return new EvaluatedExpressionReference(initialAnnotationValue, annotationName, memberName, exprClassName + expressionIndex);
     }
 
-    @NonNull
+    @Nullable
     protected abstract String getOriginatingClassName(@NonNull T orginatingElement);
 
     /**
