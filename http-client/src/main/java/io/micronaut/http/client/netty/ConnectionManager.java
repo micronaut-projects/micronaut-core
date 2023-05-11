@@ -134,6 +134,7 @@ public class ConnectionManager {
     private final HttpVersionSelection httpVersion;
     private final Logger log;
     private final Map<DefaultHttpClient.RequestKey, Pool> pools = new ConcurrentHashMap<>();
+    private final NettyClientSslBuilder nettyClientSslBuilder;
     private EventLoopGroup group;
     private final boolean shutdownGroup;
     private final ThreadFactory threadFactory;
@@ -142,8 +143,8 @@ public class ConnectionManager {
     private Bootstrap bootstrap;
     private Bootstrap udpBootstrap;
     private final HttpClientConfiguration configuration;
-    private final SslContext sslContext;
-    private final /* QuicSslContext */ Object http3SslContext;
+    private volatile SslContext sslContext;
+    private volatile /* QuicSslContext */ Object http3SslContext;
     private final NettyClientCustomizer clientCustomizer;
     private final String informationalServiceId;
 
@@ -168,6 +169,7 @@ public class ConnectionManager {
         this.http3SslContext = from.http3SslContext;
         this.clientCustomizer = from.clientCustomizer;
         this.informationalServiceId = from.informationalServiceId;
+        this.nettyClientSslBuilder = from.nettyClientSslBuilder;
     }
 
     ConnectionManager(
@@ -196,13 +198,7 @@ public class ConnectionManager {
         this.instrumenter = instrumenter;
         this.clientCustomizer = clientCustomizer;
         this.informationalServiceId = informationalServiceId;
-
-        this.sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration(), httpVersion);
-        if (httpVersion.isHttp3()) {
-            this.http3SslContext = nettyClientSslBuilder.buildHttp3(configuration.getSslConfiguration());
-        } else {
-            this.http3SslContext = null;
-        }
+        this.nettyClientSslBuilder = nettyClientSslBuilder;
 
         if (eventLoopGroup != null) {
             group = eventLoopGroup;
@@ -212,20 +208,19 @@ public class ConnectionManager {
             shutdownGroup = true;
         }
 
+        refresh();
+    }
+
+    final void refresh() {
+        sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration(), httpVersion);
+        if (httpVersion.isHttp3()) {
+            http3SslContext = nettyClientSslBuilder.buildHttp3(configuration.getSslConfiguration());
+        } else {
+            http3SslContext = null;
+        }
         initBootstrap();
-
-        Optional<Duration> connectTimeout = configuration.getConnectTimeout();
-        connectTimeout.ifPresent(duration -> bootstrap.option(
-            ChannelOption.CONNECT_TIMEOUT_MILLIS,
-            (int) duration.toMillis()
-        ));
-
-        for (Map.Entry<String, Object> entry : configuration.getChannelOptions().entrySet()) {
-            Object v = entry.getValue();
-            if (v != null) {
-                String channelOption = entry.getKey();
-                bootstrap.option(ChannelOption.valueOf(channelOption), v);
-            }
+        for (Pool pool : pools.values()) {
+            pool.forEachConnection(c -> ((Pool.ConnectionHolder) c).windDownConnection());
         }
     }
 
@@ -329,6 +324,20 @@ public class ConnectionManager {
             this.udpBootstrap = new Bootstrap()
                 .group(group)
                 .channelFactory(udpChannelFactory);
+        }
+
+        Optional<Duration> connectTimeout = configuration.getConnectTimeout();
+        connectTimeout.ifPresent(duration -> bootstrap.option(
+            ChannelOption.CONNECT_TIMEOUT_MILLIS,
+            (int) duration.toMillis()
+        ));
+
+        for (Map.Entry<String, Object> entry : configuration.getChannelOptions().entrySet()) {
+            Object v = entry.getValue();
+            if (v != null) {
+                String channelOption = entry.getKey();
+                bootstrap.option(ChannelOption.valueOf(channelOption), v);
+            }
         }
     }
 

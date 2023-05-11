@@ -359,6 +359,25 @@ class ConnectionManagerSpec extends Specification {
         ctx.close()
     }
 
+    def 'http1 not reused after refresh'() {
+        def ctx = ApplicationContext.run()
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn1 = new EmbeddedTestConnectionHttp1()
+        conn1.setupHttp1()
+        def conn2 = new EmbeddedTestConnectionHttp1()
+        conn2.setupHttp1()
+        patch(client, conn1, conn2)
+
+        conn1.testExchangeResponse(conn1.testExchangeRequest(client))
+        client.connectionManager().refresh()
+        conn2.testExchangeResponse(conn2.testExchangeRequest(client))
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
     def 'http1 plain text customization'() {
         given:
         def ctx = ApplicationContext.run()

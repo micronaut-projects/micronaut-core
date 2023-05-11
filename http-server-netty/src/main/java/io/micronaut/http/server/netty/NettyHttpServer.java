@@ -41,6 +41,7 @@ import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.util.DefaultHttpHostResolver;
 import io.micronaut.http.server.util.HttpHostResolver;
+import io.micronaut.http.ssl.DefaultSslConfiguration;
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.ApplicationConfiguration;
@@ -692,7 +693,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     @Override
     public Set<String> getObservedConfigurationPrefixes() {
-        return Collections.singleton(HttpServerConfiguration.PREFIX);
+        return Set.of(HttpServerConfiguration.PREFIX, DefaultSslConfiguration.PREFIX);
     }
 
     @Override
