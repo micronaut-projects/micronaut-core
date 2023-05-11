@@ -16,6 +16,7 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.Element;
 
@@ -86,6 +87,11 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
 
     @Override
     public Optional<GeneratedFile> visitGeneratedFile(String path) {
+        return getGeneratedFile(path);
+    }
+
+    @NonNull
+    private Optional<GeneratedFile> getGeneratedFile(String path) {
         File parentFile = targetDir.getParentFile();
         File generatedDir = new File(parentFile, "generated");
         File f = new File(generatedDir, path);
@@ -93,6 +99,11 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
             return Optional.of(new FileBackedGeneratedFile(f));
         }
         return Optional.empty();
+    }
+
+    @Override
+    public Optional<GeneratedFile> visitGeneratedFile(String path, Element... originatingElements) {
+        return getGeneratedFile(path);
     }
 
     private void makeParent(Path filePath) throws IOException {

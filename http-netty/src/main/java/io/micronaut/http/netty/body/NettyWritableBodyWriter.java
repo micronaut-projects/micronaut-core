@@ -16,6 +16,7 @@
 package io.micronaut.http.netty.body;
 
 import io.micronaut.context.annotation.Replaces;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
@@ -42,6 +43,7 @@ import java.io.OutputStream;
 
 @Replaces(WritableBodyWriter.class)
 @Singleton
+@Internal
 final class NettyWritableBodyWriter implements NettyBodyWriter<Writable> {
     private final WritableBodyWriter defaultWritable = new WritableBodyWriter();
 

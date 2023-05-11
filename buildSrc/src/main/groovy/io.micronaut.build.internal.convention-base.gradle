@@ -89,7 +89,7 @@ dependencies {
         transitive = false
     }
 
-    api libs.managed.slf4j.api
+    api libs.slf4j.api
     compileOnly libs.caffeine
     compileOnly libs.bundles.asm
 

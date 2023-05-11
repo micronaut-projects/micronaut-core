@@ -1,3 +1,4 @@
+
 This section documents breaking changes between Micronaut versions
 
 == 4.0.0
@@ -108,9 +109,9 @@ SnakeYAML is no longer a direct dependency, if you need YAML configuration you s
 
 The `javax.annotation` library is no longer a directory dependency. Any references to types in the `javax.anotation` package should be changed to `jakarta.annotation`
 
-==== Kotlin base version updated to 1.7.20
+==== Kotlin base version updated to 1.8.21
 
-Kotlin has been updated to 1.7.20, which may cause issues when compiling or linking to Kotlin libraries.
+Kotlin has been updated to 1.8.21, which may cause issues when compiling or linking to Kotlin libraries.
 
 ==== Bean Introspection changes
 
@@ -181,3 +182,9 @@ Additionally, it is no longer permitted to mix body component binding with full 
 body that is already bound to `bean`.
 
 These changes also apply to functions that are exposed using `micronaut-function-web`.
+
+==== `text/plain` messages are more restrictive about allowed types
+
+For `text/plain` request and response body writing, in 3.x, any type would be allowed and would be "serialized" using
+`toString()`. This is not permitted anymore. The body must be a `CharSequence` or one of a few standard library types
+(e.g. number types).

@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.client
 
-import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
@@ -38,6 +37,7 @@ import spock.lang.Issue
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
+
 import java.time.Duration
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.Semaphore
@@ -209,7 +209,6 @@ class JsonStreamSpec  extends Specification {
         Publisher<Book> list();
 
         @Post(uri = "/count", processes = MediaType.APPLICATION_JSON_STREAM)
-        @SingleResult
         Publisher<LibraryStats> count(@Body Flux<Book> theBooks)
     }
 

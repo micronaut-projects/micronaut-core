@@ -33,7 +33,7 @@ import org.reactivestreams.Publisher;
 @Experimental
 public interface ChunkedMessageBodyReader<T> extends MessageBodyReader<T> {
     @NonNull
-    Publisher<T> readChunked(
+    Publisher<? extends T> readChunked(
         @NonNull Argument<T> type,
         @Nullable MediaType mediaType,
         @NonNull Headers httpHeaders,

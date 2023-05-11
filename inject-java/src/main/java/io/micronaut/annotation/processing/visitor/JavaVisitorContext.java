@@ -312,6 +312,11 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     }
 
     @Override
+    public Optional<GeneratedFile> visitGeneratedFile(String path, io.micronaut.inject.ast.Element... originatingElements) {
+        return outputVisitor.visitGeneratedFile(path, originatingElements);
+    }
+
+    @Override
     public void finish() {
         outputVisitor.finish();
     }

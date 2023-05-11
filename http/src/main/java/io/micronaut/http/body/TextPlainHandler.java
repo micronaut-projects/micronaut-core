@@ -44,26 +44,26 @@ import java.io.OutputStream;
 @Consumes(MediaType.TEXT_PLAIN)
 @Singleton
 @Experimental
-public final class TextPlainHandler implements MessageBodyHandler<String> {
+public final class TextPlainHandler implements MessageBodyHandler<CharSequence> {
     @Override
-    public boolean isReadable(Argument<String> type, MediaType mediaType) {
+    public boolean isReadable(Argument<CharSequence> type, MediaType mediaType) {
         return true;
     }
 
     @Override
-    public void writeTo(Argument<String> type, MediaType mediaType, String object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+    public void writeTo(Argument<CharSequence> type, MediaType mediaType, CharSequence object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
         if (!outgoingHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
             outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType);
         }
         try {
-            outputStream.write(object.getBytes(MessageBodyWriter.getCharset(outgoingHeaders)));
+            outputStream.write(object.toString().getBytes(MessageBodyWriter.getCharset(outgoingHeaders)));
         } catch (IOException e) {
             throw new CodecException("Error writing body text: " + e.getMessage(), e);
         }
     }
 
     @Override
-    public String read(Argument<String> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
+    public String read(Argument<CharSequence> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
         try {
             return IOUtils.readText(new BufferedReader(new InputStreamReader(inputStream, MessageBodyWriter.getCharset(httpHeaders))));
         } catch (IOException e) {
@@ -72,7 +72,7 @@ public final class TextPlainHandler implements MessageBodyHandler<String> {
     }
 
     @Override
-    public String read(Argument<String> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
+    public String read(Argument<CharSequence> type, MediaType mediaType, Headers httpHeaders, ByteBuffer<?> byteBuffer) throws CodecException {
         return byteBuffer.toString(MessageBodyWriter.getCharset(httpHeaders));
     }
 }

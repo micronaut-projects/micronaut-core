@@ -46,13 +46,13 @@ import java.io.OutputStream;
 @Singleton
 @Replaces(TextPlainHandler.class)
 @Internal
-final class NettyTextPlainHandler implements MessageBodyHandler<String>, NettyBodyWriter<String> {
+final class NettyTextPlainHandler implements MessageBodyHandler<CharSequence>, NettyBodyWriter<CharSequence> {
     private final TextPlainHandler defaultHandler = new TextPlainHandler();
 
     @Override
-    public void writeTo(HttpRequest<?> request, MutableHttpResponse<String> outgoingResponse, Argument<String> type, MediaType mediaType, String object, NettyWriteContext nettyContext) throws CodecException {
+    public void writeTo(HttpRequest<?> request, MutableHttpResponse<CharSequence> outgoingResponse, Argument<CharSequence> type, MediaType mediaType, CharSequence object, NettyWriteContext nettyContext) throws CodecException {
         MutableHttpHeaders headers = outgoingResponse.getHeaders();
-        ByteBuf byteBuf = Unpooled.wrappedBuffer(object.getBytes(MessageBodyWriter.getCharset(headers)));
+        ByteBuf byteBuf = Unpooled.wrappedBuffer(object.toString().getBytes(MessageBodyWriter.getCharset(headers)));
         NettyHttpHeaders nettyHttpHeaders = (NettyHttpHeaders) headers;
         io.netty.handler.codec.http.HttpHeaders nettyHeaders = nettyHttpHeaders.getNettyHeaders();
         if (!nettyHttpHeaders.contains(HttpHeaders.CONTENT_TYPE)) {
@@ -70,12 +70,12 @@ final class NettyTextPlainHandler implements MessageBodyHandler<String>, NettyBo
     }
 
     @Override
-    public void writeTo(Argument<String> type, MediaType mediaType, String object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
+    public void writeTo(Argument<CharSequence> type, MediaType mediaType, CharSequence object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
         defaultHandler.writeTo(type, mediaType, object, outgoingHeaders, outputStream);
     }
 
     @Override
-    public String read(Argument<String> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
+    public String read(Argument<CharSequence> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
         return defaultHandler.read(type, mediaType, httpHeaders, inputStream);
     }
 }

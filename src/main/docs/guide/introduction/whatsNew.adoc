@@ -1,9 +1,9 @@
 //Micronaut {version} includes the following changes:
 == 4.0.0
 
-=== Kotlin 1.8.0
+=== Kotlin 1.8
 
-Micronaut framework 4.0 supports https://kotlinlang.org/docs/whatsnew18.html[Kotlin 1.8.0]
+Micronaut framework 4.0 supports https://kotlinlang.org/docs/whatsnew18.html[Kotlin 1.8]
 
 === Experimental Support for Kotlin Symbol Processing (KSP)
 
@@ -79,9 +79,7 @@ See <<filtermethods, Filter Methods>>
 
 <<javanetClient, Additional implementation of the HTTP Client based on Java HTTP Client>>
 
-=== Other Dependency Upgrades
-
-- Kotlin 1.8.20
+=== Breaking Changes
 
 <<breaks, Breaking changes in Micronaut framework 4.0>>
 
