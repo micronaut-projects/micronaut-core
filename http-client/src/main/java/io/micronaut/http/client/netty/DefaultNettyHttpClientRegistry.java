@@ -547,7 +547,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
 
     @Override
     public Set<String> getObservedConfigurationPrefixes() {
-        return Set.of(DefaultHttpClientConfiguration.PREFIX, ServiceHttpClientConfiguration.PREFIX, DefaultSslConfiguration.PREFIX);
+        return Set.of(DefaultHttpClientConfiguration.PREFIX, ServiceHttpClientConfiguration.PREFIX, SslConfiguration.PREFIX);
     }
 
     @Override

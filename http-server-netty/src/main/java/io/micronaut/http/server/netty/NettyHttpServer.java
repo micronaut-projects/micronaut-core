@@ -693,7 +693,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     @Override
     public Set<String> getObservedConfigurationPrefixes() {
-        return Set.of(HttpServerConfiguration.PREFIX, DefaultSslConfiguration.PREFIX);
+        return Set.of(HttpServerConfiguration.PREFIX, SslConfiguration.PREFIX);
     }
 
     @Override
