@@ -101,6 +101,12 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
 
     @Override
     public CompletableFuture<Object> interceptResultAsCompletionStage() {
+        if (PropagatedContext.exists()) {
+            updateCoroutineContext(getCoroutineContext()
+                .minusKey(MicronautPropagatedContext.Key)
+                .plus(new MicronautPropagatedContext(PropagatedContext.get()))
+            );
+        }
         @SuppressWarnings("unchecked")
         CompletableFutureContinuation completableFutureContinuation = new CompletableFutureContinuation((Continuation<Object>) continuation);
         replaceContinuation.accept(completableFutureContinuation);
@@ -114,6 +120,12 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
 
     @Override
     public CompletableFuture<Object> interceptResultAsCompletionStage(Interceptor<?, ?> from) {
+        if (PropagatedContext.exists()) {
+            updateCoroutineContext(getCoroutineContext()
+                .minusKey(MicronautPropagatedContext.Key)
+                .plus(new MicronautPropagatedContext(PropagatedContext.get()))
+            );
+        }
         @SuppressWarnings("unchecked")
         CompletableFutureContinuation completableFutureContinuation = new CompletableFutureContinuation((Continuation<Object>) continuation);
         replaceContinuation.accept(completableFutureContinuation);

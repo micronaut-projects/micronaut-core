@@ -41,15 +41,16 @@ import java.util.stream.Stream;
 @Internal
 final class PropagatedContextImpl implements PropagatedContext {
 
-    private static final PropagatedContext.InContext NO_OP = () -> {
-    };
-
     private static final ThreadLocal<PropagatedContextImpl> THREAD_CONTEXT = new ThreadLocal<>() {
         @Override
         public String toString() {
             return "Micronaut Propagation Context";
         }
     };
+
+    private static final InContext CLEANUP = THREAD_CONTEXT::remove;
+
+    private final Exception exc = new Exception();
 
     private static final PropagatedContextImpl EMPTY = new PropagatedContextImpl(Collections.emptyList());
 
@@ -175,8 +176,9 @@ final class PropagatedContextImpl implements PropagatedContext {
     @Override
     public PropagatedContext.InContext propagate() {
         PropagatedContextImpl prevCtx = THREAD_CONTEXT.get();
+        InContext restore = prevCtx == null ? CLEANUP : () -> THREAD_CONTEXT.set(prevCtx);
         if (prevCtx == this || elements.isEmpty()) {
-            return NO_OP;
+            return restore;
         }
         PropagatedContextImpl ctx = this;
         THREAD_CONTEXT.set(ctx);
@@ -191,13 +193,7 @@ final class PropagatedContextImpl implements PropagatedContext {
                 }
             };
         }
-        return () -> {
-            if (prevCtx == null) {
-                THREAD_CONTEXT.remove();
-            } else {
-                THREAD_CONTEXT.set(prevCtx);
-            }
-        };
+        return restore;
     }
 
     private List<Map.Entry<ThreadPropagatedContextElement<Object>, Object>> updateThreadState() {

@@ -91,11 +91,24 @@ public interface PropagatedContext {
      * Wrap callable for this context to be propagated in.
      *
      * @param callable The callable
+     * @param <V> The callable type
      * @return new callable or existing if the context is missing
      */
     @NonNull
     static <V> Callable<V> wrapCurrent(Callable<V> callable) {
         return PropagatedContext.find().map(ctx -> ctx.wrap(callable)).orElse(callable);
+    }
+
+    /**
+     * Wrap supplier for this context to be propagated in.
+     *
+     * @param supplier The supplier
+     * @param <V> The supplier type
+     * @return new supplier or existing if the context is missing
+     */
+    @NonNull
+    static <V> Supplier<V> wrapCurrent(Supplier<V> supplier) {
+        return PropagatedContext.find().map(ctx -> ctx.wrap(supplier)).orElse(supplier);
     }
 
     /**
@@ -214,6 +227,23 @@ public interface PropagatedContext {
         return () -> {
             try (InContext ignore = propagatedContext.propagate()) {
                 return callable.call();
+            }
+        };
+    }
+
+    /**
+     * Wrap supplier for this context to be propagated in.
+     *
+     * @param supplier The supplier
+     * @param <V>      The supplier return type
+     * @return new supplier
+     */
+    @NonNull
+    default <V> Supplier<V> wrap(@NonNull Supplier<V> supplier) {
+        PropagatedContext propagatedContext = this;
+        return () -> {
+            try (InContext ignore = propagatedContext.propagate()) {
+                return supplier.get();
             }
         };
     }

@@ -8,6 +8,7 @@ dependencies {
     api project(':aop')
     api project(':discovery-core')
     api project(':context')
+    api project(':context-propagation')
     api project(":core-reactive")
     api project(":http")
     api project(':inject')

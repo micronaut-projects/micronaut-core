@@ -100,6 +100,34 @@ class PropagatedContextSpec extends Specification {
             thrown(NoSuchElementException)
     }
 
+    def "test empty propagated context cleans the context"() {
+        given:
+            PropagatedElement e1 = new PropagatedElement()
+        expect:
+            assert PropagatedContext.getOrEmpty().allElements.size() == 0
+            try (PropagatedContext.InContext ignore = PropagatedContext.getOrEmpty().propagate()) {
+                PropagatedContext.getOrEmpty().plus(e1).propagate()
+                assert PropagatedContext.getOrEmpty().allElements.size() == 1
+            }
+            assert PropagatedContext.getOrEmpty().allElements.size() == 0
+    }
+
+    def "test empty propagated context restores the context"() {
+        given:
+            PropagatedElement e1 = new PropagatedElement()
+            PropagatedElement e = new PropagatedElement()
+        expect:
+            try (PropagatedContext.InContext ignore = PropagatedContext.getOrEmpty().plus(e).propagate()) {
+                assert PropagatedContext.getOrEmpty().allElements.size() == 1
+                try (PropagatedContext.InContext ignore2 = PropagatedContext.getOrEmpty().propagate()) {
+                    PropagatedContext.getOrEmpty().plus(e1).propagate()
+                    assert PropagatedContext.getOrEmpty().allElements.size() == 2
+                }
+                assert PropagatedContext.getOrEmpty().allElements.size() == 1
+            }
+            assert PropagatedContext.getOrEmpty().allElements.size() == 0
+    }
+
     static class PropagatedElement implements PropagatedContextElement {
     }
 }
