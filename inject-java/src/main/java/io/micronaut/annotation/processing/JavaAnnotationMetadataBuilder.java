@@ -300,10 +300,17 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Override
     protected String getOriginatingClassName(Element orginatingElement) {
-        return JavaModelUtils.getClassName(getOriginatingTypeElement(orginatingElement));
+        TypeElement typeElement = getOriginatingTypeElement(orginatingElement);
+        if (typeElement != null) {
+            return JavaModelUtils.getClassName(typeElement);
+        }
+        return null;
     }
 
     private TypeElement getOriginatingTypeElement(Element element) {
+        if (element == null) {
+            return null;
+        }
         if (element instanceof TypeElement typeElement) {
             return typeElement;
         }

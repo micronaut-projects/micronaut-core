@@ -378,12 +378,17 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
         }
     }
 
-    override fun getOriginatingClassName(orginatingElement: KSAnnotated): String {
-        return if (orginatingElement is KSClassDeclaration) {
+    override fun getOriginatingClassName(orginatingElement: KSAnnotated): String? {
+        val binaryName = if (orginatingElement is KSClassDeclaration) {
             orginatingElement.getBinaryName(resolver, visitorContext)
         } else {
             val classDeclaration = orginatingElement.getClassDeclaration(visitorContext)
             classDeclaration.getBinaryName(resolver, visitorContext)
+        }
+        return if (binaryName != Object::javaClass.name) {
+            binaryName
+        } else {
+            null
         }
     }
 

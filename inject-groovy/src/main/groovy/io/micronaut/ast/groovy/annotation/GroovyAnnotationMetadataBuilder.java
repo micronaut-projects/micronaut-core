@@ -159,7 +159,12 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             return methodNode.getDeclaringClass().getName();
         }
 
-        return originatingElement.getDeclaringClass().getName();
+        ClassNode declaringClass = originatingElement.getDeclaringClass();
+        if (declaringClass != null) {
+            return declaringClass.getName();
+        } else {
+            return null;
+        }
     }
 
     @Override

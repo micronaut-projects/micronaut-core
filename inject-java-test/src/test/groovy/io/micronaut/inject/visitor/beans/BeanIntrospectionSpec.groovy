@@ -52,6 +52,50 @@ import java.time.Instant
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
+    void "test expressions in introspection properties with type use"() {
+        given:
+        def introspection = buildBeanIntrospection('mixed.Test', '''
+package mixed;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Value;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+import java.lang.annotation.*;
+import static java.lang.annotation.ElementType.*;
+
+@Introspected
+class Test {
+    @Nullable
+    @Ann("#{'test'}")
+    private String foo;
+    public String getFoo() {
+        return foo;
+    }
+    public void setFoo(@Nullable String foo) {
+        this.foo = foo;
+    }
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@Target({ METHOD, FIELD, ANNOTATION_TYPE, CONSTRUCTOR, PARAMETER, TYPE_USE })
+@interface Ann {
+    String value();
+}
+''')
+        when:
+        def test = introspection.instantiate()
+        def prop = introspection.getRequiredProperty("foo", String)
+        test.foo = 'value'
+
+        then: 'expressions can be retrieved'
+        prop.get(test) == 'value'
+        prop.getAnnotationMetadata() instanceof EvaluatedAnnotationMetadata
+        // TODO: Support expressions in TYPE_USE annotations?
+        prop.stringValue("mixed.Ann").get() == '#{\'test\'}'
+    }
+
     void "test expressions in introspection properties"() {
         given:
         def introspection = buildBeanIntrospection('mixed.Test', '''
