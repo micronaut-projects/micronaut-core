@@ -35,6 +35,7 @@ import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpClientRegistry;
@@ -43,6 +44,7 @@ import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ProxyHttpClientRegistry;
+import io.micronaut.http.client.ServiceHttpClientConfiguration;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.StreamingHttpClientRegistry;
 import io.micronaut.http.client.annotation.Client;
@@ -62,11 +64,14 @@ import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupFactory;
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
 import io.micronaut.http.netty.channel.NettyChannelType;
+import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.codec.MapperMediaTypeCodec;
+import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
+import io.micronaut.runtime.context.scope.refresh.RefreshEventListener;
 import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.websocket.WebSocketClient;
 import io.micronaut.websocket.WebSocketClientRegistry;
@@ -87,6 +92,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ThreadFactory;
@@ -108,9 +114,11 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         WebSocketClientRegistry<WebSocketClient>,
         ProxyHttpClientRegistry<ProxyHttpClient>,
         ChannelPipelineCustomizer,
-        NettyClientCustomizer.Registry {
+        NettyClientCustomizer.Registry,
+        RefreshEventListener {
     private static final Logger LOG = LoggerFactory.getLogger(DefaultNettyHttpClientRegistry.class);
-    private final Map<ClientKey, DefaultHttpClient> clients = new ConcurrentHashMap<>(10);
+    private final Map<ClientKey, DefaultHttpClient> unbalancedClients = new ConcurrentHashMap<>(10);
+    private final List<DefaultHttpClient> balancedClients = Collections.synchronizedList(new ArrayList<>());
     private final LoadBalancerResolver loadBalancerResolver;
     private final NettyClientSslBuilder nettyClientSslBuilder;
     private final ThreadFactory threadFactory;
@@ -217,7 +225,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     @Override
     @PreDestroy
     public void close() {
-        for (HttpClient httpClient : clients.values()) {
+        for (HttpClient httpClient : unbalancedClients.values()) {
             try {
                 httpClient.close();
             } catch (Throwable e) {
@@ -226,16 +234,16 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 }
             }
         }
-        clients.clear();
+        unbalancedClients.clear();
     }
 
     @Override
     public void disposeClient(AnnotationMetadata annotationMetadata) {
         final ClientKey key = getClientKey(annotationMetadata);
-        final StreamingHttpClient streamingHttpClient = clients.get(key);
+        final StreamingHttpClient streamingHttpClient = unbalancedClients.get(key);
         if (streamingHttpClient != null && streamingHttpClient.isRunning()) {
             streamingHttpClient.close();
-            clients.remove(key);
+            unbalancedClients.remove(key);
         }
     }
 
@@ -322,7 +330,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     }
 
     private DefaultHttpClient getClient(ClientKey key, BeanContext beanContext, AnnotationMetadata annotationMetadata) {
-        return clients.computeIfAbsent(key, clientKey -> {
+        return unbalancedClients.computeIfAbsent(key, clientKey -> {
             DefaultHttpClient clientBean = null;
             final String clientId = clientKey.clientId;
             final Class<?> configurationClass = clientKey.configurationClass;
@@ -485,15 +493,17 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             if (configuration == null) {
                 configuration = defaultHttpClientConfiguration;
             }
-            return buildClient(
-                    loadBalancer,
-                    null,
-                    configuration,
-                    null,
-                    loadBalancer.getContextPath().orElse(null),
-                    beanContext,
-                    AnnotationMetadata.EMPTY_METADATA
+            DefaultHttpClient c = buildClient(
+                loadBalancer,
+                null,
+                configuration,
+                null,
+                loadBalancer.getContextPath().orElse(null),
+                beanContext,
+                AnnotationMetadata.EMPTY_METADATA
             );
+            balancedClients.add(c);
+            return c;
         } else {
             return getClient(injectionPoint != null ? injectionPoint.getAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA);
         }
@@ -533,6 +543,21 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
 
     private static MapperMediaTypeCodec getJsonCodec(BeanContext beanContext) {
         return beanContext.getBean(MapperMediaTypeCodec.class, Qualifiers.byName(MapperMediaTypeCodec.REGULAR_JSON_MEDIA_TYPE_CODEC_NAME));
+    }
+
+    @Override
+    public Set<String> getObservedConfigurationPrefixes() {
+        return Set.of(DefaultHttpClientConfiguration.PREFIX, ServiceHttpClientConfiguration.PREFIX, SslConfiguration.PREFIX);
+    }
+
+    @Override
+    public void onApplicationEvent(RefreshEvent event) {
+        for (DefaultHttpClient client : unbalancedClients.values()) {
+            client.connectionManager.refresh();
+        }
+        for (DefaultHttpClient client : balancedClients) {
+            client.connectionManager.refresh();
+        }
     }
 
     /**
