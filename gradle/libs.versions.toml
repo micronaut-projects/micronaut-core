@@ -9,7 +9,7 @@ compile-testing = "0.19"
 geb = "7.0"
 gorm = "7.3.2"
 # be sure to update graal version in gradle.properties as well
-graal-svm = "22.3.1"
+graal-svm = "22.3.2"
 h2 = "2.1.214"
 hibernate = "5.5.9.Final"
 hibernate-validator = "6.1.6.Final"
