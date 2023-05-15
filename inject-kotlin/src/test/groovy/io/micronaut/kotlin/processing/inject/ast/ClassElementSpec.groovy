@@ -4,7 +4,6 @@ import io.micronaut.annotation.processing.test.AbstractKotlinCompilerSpec
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.util.CollectionUtils
-import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.ConstructorElement
 import io.micronaut.inject.ast.Element
@@ -1981,6 +1980,35 @@ class MyBean {
             def type = method.parameters[0].getGenericType()
         then:
             type.hasAnnotation(Valid)
+    }
+
+    void "test element canonicalName"() {
+        def ce = buildClassElement('test.TestNamed', '''
+package test
+import io.micronaut.context.annotation.Executable
+import io.micronaut.context.annotation.Prototype
+import jakarta.inject.Singleton
+import java.util.List
+
+@Prototype
+class TestNamed {
+    @Executable
+    fun method1() : kotlin.Int {
+        return 111
+    }
+
+    @Executable
+    fun method2() : kotlin.Int? {
+        return null
+    }
+
+}
+
+''')
+
+        expect:
+            ce.findMethod("method1").get().getReturnType().canonicalName == "int"
+            ce.findMethod("method2").get().getReturnType().canonicalName == Integer.class.name
     }
 
     private void assertListGenericArgument(ClassElement type, Closure cl) {
