@@ -43,6 +43,7 @@ import io.micronaut.inject.writer.GeneratedFile;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.control.ClassNodeResolver;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.Janitor;
 import org.codehaus.groovy.control.SourceUnit;
@@ -127,10 +128,18 @@ public class GroovyVisitorContext implements VisitorContext {
                 groovyElementFactory.newClassElement(cn, annotationMetadataFactory)
             );
         }
-        ClassNode classNode = Optional.ofNullable(compilationUnit.getClassNode(name))
-            .orElseGet(() -> classNodeFromClassLoader(name));
 
-        return Optional.ofNullable(classNode).map(cn -> groovyElementFactory.newClassElement(cn, annotationMetadataFactory));
+        ClassNodeResolver.LookupResult lookupResult = compilationUnit.getClassNodeResolver().resolveName(name, compilationUnit);
+        Optional<ClassNode> classNode;
+        if (lookupResult != null) {
+            classNode = Optional.ofNullable(lookupResult.getClassNode());
+        } else {
+            classNode = Optional.ofNullable(compilationUnit.getClassNode(name));
+        }
+
+        ClassNode finalClassNode = classNode.orElseGet(() -> classNodeFromClassLoader(name));
+
+        return Optional.ofNullable(finalClassNode).map(cn -> groovyElementFactory.newClassElement(cn, annotationMetadataFactory));
     }
 
     private ClassNode classNodeFromClassLoader(String name) {

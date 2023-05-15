@@ -56,6 +56,7 @@ import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.ast.stmt.ReturnStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
+import org.codehaus.groovy.control.ClassNodeResolver;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 
@@ -253,50 +254,21 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected Optional<AnnotatedNode> getAnnotationMirror(String annotationName) {
-        return getAnnotationMirror(annotationName, false);
-    }
+        if (compilationUnit != null) {
+            ClassNodeResolver.LookupResult lookupResult = compilationUnit.getClassNodeResolver().resolveName(annotationName, compilationUnit);
+            if (lookupResult != null) {
+                return Optional.ofNullable(lookupResult.getClassNode());
+            }
 
-    @Override
-    protected Optional<AnnotatedNode> getAnnotationMirror(String annotationName, boolean filterDefaults) {
-        Optional<AnnotatedNode> classNode = compilationUnit == null ? Optional.empty() : Optional.ofNullable(compilationUnit.getClassNode(annotationName));
-        if (classNode.isPresent()) {
-            return classNode;
+            Optional<AnnotatedNode> classNode = Optional.ofNullable(compilationUnit.getClassNode(annotationName));
+            if (classNode.isPresent()) {
+                return classNode;
+            }
         }
         ClassNode cn = ClassUtils.forName(annotationName, GroovyAnnotationMetadataBuilder.class.getClassLoader())
             .map(ClassHelper::make)
             .orElseGet(() -> ClassHelper.make(annotationName));
         if (!cn.getName().equals(ClassHelper.OBJECT)) {
-            if (filterDefaults) {
-                List<AnnotationNode> annotations = cn.getAnnotations();
-                for (AnnotationNode annotation : annotations) {
-                    Map<String, Expression> members = annotation.getMembers();
-                    Map<String, MethodNode> declaredMethodsMap = new LinkedHashMap<>();
-                    annotation.getClassNode().getDeclaredMethodsMap().values().forEach(methodNode ->
-                        declaredMethodsMap.put(methodNode.getName(), methodNode)
-                    );
-                    if (!members.isEmpty()) {
-                        Map<CharSequence, Object> defaultValues =
-                            getCachedAnnotationDefaults(annotation.getClassNode().getName(), annotation.getClassNode());
-                        members.entrySet().removeIf(entry -> {
-                            String memberName = entry.getKey();
-                            Object defaultValue = defaultValues.get(memberName);
-                            if (defaultValue != null) {
-                                Object v = entry.getValue();
-                                MethodNode methodNode = declaredMethodsMap.get(memberName);
-                                if (methodNode != null) {
-                                    Object rawValue = readAnnotationValue(cn, methodNode, annotationName, memberName, v);
-                                    if (defaultValue.equals(rawValue)) {
-                                        return true;
-                                    } else if (defaultValue instanceof Object[] array1 && rawValue instanceof Object[] array2) {
-                                        return Arrays.equals(array1, array2);
-                                    }
-                                }
-                            }
-                            return false;
-                        });
-                    }
-                }
-            }
             return Optional.of(cn);
         } else {
             return Optional.empty();

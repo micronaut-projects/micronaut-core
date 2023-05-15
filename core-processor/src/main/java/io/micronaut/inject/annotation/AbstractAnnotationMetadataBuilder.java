@@ -551,17 +551,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected abstract Optional<T> getAnnotationMirror(String annotationName);
 
     /**
-     * Return a mirror for the given annotation.
-     *
-     * @param annotationName The annotation name
-     * @param filterDefaults Whether to filter defaults
-     * @return An optional mirror
-     */
-    protected Optional<T> getAnnotationMirror(String annotationName, boolean filterDefaults) {
-        return getAnnotationMirror(annotationName);
-    }
-
-    /**
      * Detect evaluated expression in annotation value.
      *
      * @param value - Annotation value
@@ -1446,7 +1435,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     @NonNull
     private ProcessedAnnotation toProcessedAnnotation(@NonNull AnnotationValue<?> av) {
         return new ProcessedAnnotation(
-                getAnnotationMirror(av.getAnnotationName(), true).orElse(null),
+                getAnnotationMirror(av.getAnnotationName()).orElse(null),
                 av
         );
     }
