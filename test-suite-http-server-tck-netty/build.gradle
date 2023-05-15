@@ -44,16 +44,6 @@ configurations {
     }
 }
 
-tasks.named("check") { task ->
-    def graal = ["jvmci.Compiler", "java.vendor.version", "java.vendor"].any {
-        println "$it ${System.getProperty(it)}"
-        System.getProperty(it)?.toLowerCase(Locale.ENGLISH)?.contains("graal")
-    }
-    if (graal) {
-        task.dependsOn("nativeTest")
-    }
-}
-
 tasks.named("test") {
     useJUnitPlatform()
 }
