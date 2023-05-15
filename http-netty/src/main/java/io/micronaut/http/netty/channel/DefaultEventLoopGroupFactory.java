@@ -82,6 +82,10 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
             // property, via config, or via setLevel
             ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.DISABLED);
         }
+
+        if (System.getProperty("io.netty.allocator.maxOrder") == null) {
+            System.setProperty("io.netty.allocator.maxOrder", "3");
+        }
     }
 
     @Override
