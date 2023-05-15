@@ -6,6 +6,7 @@ import io.micronaut.context.exceptions.BeanCreationException
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+import spock.lang.Stepwise
 
 class CustomScopeSpec extends Specification {
 
@@ -63,5 +64,12 @@ class CustomScopeSpec extends Specification {
         beans.size() == 2
         beans.any( { it instanceof BeanA })
         beans.any( { it instanceof BeanB })
+        beans.contains(context.getBean(BeanA))
+        beans.contains(context.getBean(BeanB))
+    }
+
+    void "test lookup by interface and type works"() {
+        expect:
+        context.getBean(InterfaceA).is(context.getBean(ImplA))
     }
 }
