@@ -87,6 +87,7 @@ final class ConvertibleValuesDeserializer<V> extends JsonDeserializer<Convertibl
             }
 
             MutableConvertibleValuesMap<V> map = new MutableConvertibleValuesMap<>();
+            map.setConversionService(conversionService);
             for (; p.getCurrentToken() == JsonToken.FIELD_NAME; p.nextToken()) {
                 // Must point to field name now
                 String fieldName = p.getCurrentName();
