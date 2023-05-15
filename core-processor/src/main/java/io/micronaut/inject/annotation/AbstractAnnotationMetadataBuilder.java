@@ -551,6 +551,17 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected abstract Optional<T> getAnnotationMirror(String annotationName);
 
     /**
+     * Return a mirror for the given annotation.
+     *
+     * @param annotationName The annotation name
+     * @param filterDefaults Whether to filter defaults
+     * @return An optional mirror
+     */
+    protected Optional<T> getAnnotationMirror(String annotationName, boolean filterDefaults) {
+        return getAnnotationMirror(annotationName);
+    }
+
+    /**
      * Detect evaluated expression in annotation value.
      *
      * @param value - Annotation value
@@ -857,19 +868,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
         Map<CharSequence, Object> defaultValues = getCachedAnnotationDefaults(annotationName, annotationType);
 
-        // prune annotation defaults from resolved values
-        annotationValues.entrySet().removeIf(entry -> {
-            Object defaultValue = defaultValues.get(entry.getKey());
-            if (defaultValue != null) {
-                Object v = entry.getValue();
-                if (defaultValue.equals(v)) {
-                    return true;
-                } else if (defaultValue instanceof Object[] array1 && v instanceof Object[] array2) {
-                    return Arrays.equals(array1, array2);
-                }
-            }
-            return false;
-        });
         return new ProcessedAnnotation(
                 annotationType,
                 new AnnotationValue<>(annotationName, annotationValues, defaultValues, retentionPolicy)
@@ -1448,10 +1446,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     @NonNull
     private ProcessedAnnotation toProcessedAnnotation(@NonNull AnnotationValue<?> av) {
         return new ProcessedAnnotation(
-                getAnnotationMirror(av.getAnnotationName()).orElse(null),
+                getAnnotationMirror(av.getAnnotationName(), true).orElse(null),
                 av
         );
     }
+
 
     /**
      * Used to clear mutated metadata at the end of a compilation cycle.

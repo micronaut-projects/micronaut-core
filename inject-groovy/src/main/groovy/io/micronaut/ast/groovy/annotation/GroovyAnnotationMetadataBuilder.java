@@ -74,6 +74,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Groovy implementation of {@link AbstractAnnotationMetadataBuilder}.
@@ -130,7 +131,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     @Override
     protected boolean isExcludedAnnotation(@NonNull AnnotatedNode element, @NonNull String annotationName) {
         if (element instanceof ClassNode classNode && classNode.isAnnotationDefinition()
-                && (annotationName.startsWith("java.lang.annotation") || annotationName.startsWith("org.codehaus.groovy.transform"))) {
+            && (annotationName.startsWith("java.lang.annotation") || annotationName.startsWith("org.codehaus.groovy.transform"))) {
             return false;
         } else {
             return super.isExcludedAnnotation(element, annotationName);
@@ -149,8 +150,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
-    protected String getOriginatingClassName(AnnotatedNode originatingElement)
-    {
+    protected String getOriginatingClassName(AnnotatedNode originatingElement) {
         if (originatingElement instanceof ClassNode classNode) {
             return classNode.getName();
         } else if (originatingElement instanceof ExtendedParameter extendedParameter) {
@@ -253,14 +253,50 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected Optional<AnnotatedNode> getAnnotationMirror(String annotationName) {
+        return getAnnotationMirror(annotationName, false);
+    }
+
+    @Override
+    protected Optional<AnnotatedNode> getAnnotationMirror(String annotationName, boolean filterDefaults) {
         Optional<AnnotatedNode> classNode = compilationUnit == null ? Optional.empty() : Optional.ofNullable(compilationUnit.getClassNode(annotationName));
         if (classNode.isPresent()) {
             return classNode;
         }
         ClassNode cn = ClassUtils.forName(annotationName, GroovyAnnotationMetadataBuilder.class.getClassLoader())
-                .map(ClassHelper::make)
-                .orElseGet(() -> ClassHelper.make(annotationName));
+            .map(ClassHelper::make)
+            .orElseGet(() -> ClassHelper.make(annotationName));
         if (!cn.getName().equals(ClassHelper.OBJECT)) {
+            if (filterDefaults) {
+                List<AnnotationNode> annotations = cn.getAnnotations();
+                for (AnnotationNode annotation : annotations) {
+                    Map<String, Expression> members = annotation.getMembers();
+                    Map<String, MethodNode> declaredMethodsMap = new LinkedHashMap<>();
+                    annotation.getClassNode().getDeclaredMethodsMap().values().forEach(methodNode ->
+                        declaredMethodsMap.put(methodNode.getName(), methodNode)
+                    );
+                    if (!members.isEmpty()) {
+                        Map<CharSequence, Object> defaultValues =
+                            getCachedAnnotationDefaults(annotation.getClassNode().getName(), annotation.getClassNode());
+                        members.entrySet().removeIf(entry -> {
+                            String memberName = entry.getKey();
+                            Object defaultValue = defaultValues.get(memberName);
+                            if (defaultValue != null) {
+                                Object v = entry.getValue();
+                                MethodNode methodNode = declaredMethodsMap.get(memberName);
+                                if (methodNode != null) {
+                                    Object rawValue = readAnnotationValue(cn, methodNode, annotationName, memberName, v);
+                                    if (defaultValue.equals(rawValue)) {
+                                        return true;
+                                    } else if (defaultValue instanceof Object[] array1 && rawValue instanceof Object[] array2) {
+                                        return Arrays.equals(array1, array2);
+                                    }
+                                }
+                            }
+                            return false;
+                        });
+                    }
+                }
+            }
             return Optional.of(cn);
         } else {
             return Optional.empty();
@@ -364,12 +400,12 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
 
     @Override
     protected void readAnnotationRawValues(
-            AnnotatedNode originatingElement,
-            String annotationName,
-            AnnotatedNode member,
-            String memberName,
-            Object annotationValue,
-            Map<CharSequence, Object> annotationValues) {
+        AnnotatedNode originatingElement,
+        String annotationName,
+        AnnotatedNode member,
+        String memberName,
+        Object annotationValue,
+        Map<CharSequence, Object> annotationValues) {
         if (!annotationValues.containsKey(memberName)) {
             Object v = readAnnotationValue(originatingElement, member, annotationName, memberName, annotationValue);
             if (v != null) {
@@ -531,7 +567,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
             return ConversionService.SHARED.convertRequired(wrapperArray, primitiveArrayType);
         }
         return ConversionService.SHARED.convert(collection, Array.newInstance(arrayType, 0).getClass())
-                .orElse(null);
+            .orElse(null);
     }
 
     private Object readConstantExpression(AnnotatedNode originatingElement, String annotationName, AnnotatedNode member, ConstantExpression constantExpression) {
@@ -595,7 +631,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         Map<MethodNode, Object> values = new LinkedHashMap<>();
         ClassNode annotationClassNode = annotationMirror.getClassNode();
         members.forEach((key, value) ->
-                values.put(annotationClassNode.getMethods(key).get(0), value));
+            values.put(annotationClassNode.getMethods(key).get(0), value));
         return values;
     }
 

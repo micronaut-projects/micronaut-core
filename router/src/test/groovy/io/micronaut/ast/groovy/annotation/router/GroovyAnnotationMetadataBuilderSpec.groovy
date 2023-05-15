@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.ast.groovy.annotation
+package io.micronaut.ast.groovy.annotation.router
 
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.core.annotation.AnnotationMetadata
