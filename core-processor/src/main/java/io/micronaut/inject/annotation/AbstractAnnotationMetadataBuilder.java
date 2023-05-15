@@ -857,6 +857,19 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
         Map<CharSequence, Object> defaultValues = getCachedAnnotationDefaults(annotationName, annotationType);
 
+        // prune annotation defaults from resolved values
+        annotationValues.entrySet().removeIf(entry -> {
+            Object defaultValue = defaultValues.get(entry.getKey());
+            if (defaultValue != null) {
+                Object v = entry.getValue();
+                if (defaultValue.equals(v)) {
+                    return true;
+                } else if (defaultValue instanceof Object[] array1 && v instanceof Object[] array2) {
+                    return Arrays.equals(array1, array2);
+                }
+            }
+            return false;
+        });
         return new ProcessedAnnotation(
                 annotationType,
                 new AnnotationValue<>(annotationName, annotationValues, defaultValues, retentionPolicy)
