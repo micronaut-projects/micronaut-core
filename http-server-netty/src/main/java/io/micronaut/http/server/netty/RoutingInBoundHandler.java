@@ -202,7 +202,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 serverConfiguration
             );
             outboundAccess.attachment(errorRequest);
-            try (PropagatedContext.InContext ignore = PropagatedContext.newContext(new ServerHttpRequestContext(errorRequest)).propagate()) {
+            try (PropagatedContext.Scope ignore = PropagatedContext.newContext(new ServerHttpRequestContext(errorRequest)).propagate()) {
                 new NettyRequestLifecycle(this, outboundAccess, errorRequest).handleException(e.getCause() == null ? e : e.getCause());
             }
             if (request instanceof StreamedHttpRequest streamed) {
@@ -213,7 +213,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             return;
         }
         outboundAccess.attachment(mnRequest);
-        try (PropagatedContext.InContext ignore = PropagatedContext.newContext(new ServerHttpRequestContext(mnRequest)).propagate()) {
+        try (PropagatedContext.Scope ignore = PropagatedContext.newContext(new ServerHttpRequestContext(mnRequest)).propagate()) {
             new NettyRequestLifecycle(this, outboundAccess, mnRequest).handleNormal();
         }
     }

@@ -244,12 +244,12 @@ public class FilterRunner {
                 null,
                 continuation);
             if (executeOn == null) {
-                try (PropagatedContext.InContext ignore = context.propagatedContext.propagate()) {
+                try (PropagatedContext.Scope ignore = context.propagatedContext.propagate()) {
                     filterMethodFlow = before.filter(context, filterMethodContext);
                 }
             } else {
                 filterMethodFlow = ExecutionFlow.async(executeOn, () -> {
-                    try (PropagatedContext.InContext ignore = context.propagatedContext.propagate()) {
+                    try (PropagatedContext.Scope ignore = context.propagatedContext.propagate()) {
                         return before.filter(context, filterMethodContext);
                     }
                 });
@@ -263,7 +263,7 @@ public class FilterRunner {
             // Legacy `Publisher<HttpResponse> proceed(..)` filters are always suspended
             if (executeOn == null) {
                 try {
-                    try (PropagatedContext.InContext ignore = context.propagatedContext.propagate()) {
+                    try (PropagatedContext.Scope ignore = context.propagatedContext.propagate()) {
                         return chainSuspensionPoint.processResult(
                             around.bean().doFilter(context.request, chainSuspensionPoint)
                         );
@@ -274,7 +274,7 @@ public class FilterRunner {
             } else {
                 return ExecutionFlow.async(executeOn, () -> {
                     try {
-                        try (PropagatedContext.InContext ignore = context.propagatedContext.propagate()) {
+                        try (PropagatedContext.Scope ignore = context.propagatedContext.propagate()) {
                             return chainSuspensionPoint.processResult(
                                 around.bean().doFilter(context.request, chainSuspensionPoint)
                             );
@@ -326,12 +326,12 @@ public class FilterRunner {
                 exceptionToFilter,
                 null);
             if (executeOn == null) {
-                try (PropagatedContext.InContext ignore = filterContext.propagatedContext.propagate()) {
+                try (PropagatedContext.Scope ignore = filterContext.propagatedContext.propagate()) {
                     return after.filter(filterContext, filterMethodContext);
                 }
             } else {
                 return ExecutionFlow.async(executeOn, () -> {
-                    try (PropagatedContext.InContext ignore = filterContext.propagatedContext.propagate()) {
+                    try (PropagatedContext.Scope ignore = filterContext.propagatedContext.propagate()) {
                         return after.filter(filterContext, filterMethodContext);
                     }
                 });

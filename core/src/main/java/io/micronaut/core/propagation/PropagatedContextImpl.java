@@ -48,7 +48,7 @@ final class PropagatedContextImpl implements PropagatedContext {
         }
     };
 
-    private static final InContext CLEANUP = THREAD_CONTEXT::remove;
+    private static final Scope CLEANUP = THREAD_CONTEXT::remove;
 
     private final Exception exc = new Exception();
 
@@ -174,9 +174,9 @@ final class PropagatedContextImpl implements PropagatedContext {
     }
 
     @Override
-    public PropagatedContext.InContext propagate() {
+    public Scope propagate() {
         PropagatedContextImpl prevCtx = THREAD_CONTEXT.get();
-        InContext restore = prevCtx == null ? CLEANUP : () -> THREAD_CONTEXT.set(prevCtx);
+        Scope restore = prevCtx == null ? CLEANUP : () -> THREAD_CONTEXT.set(prevCtx);
         if (prevCtx == this || elements.isEmpty()) {
             return restore;
         }

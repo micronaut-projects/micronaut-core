@@ -196,7 +196,7 @@ public interface PropagatedContext {
      * @return auto-closeable block to be used in try-resource block.
      */
     @NonNull
-    InContext propagate();
+    Scope propagate();
 
     /**
      * Wrap runnable for this context to be propagated in.
@@ -208,7 +208,7 @@ public interface PropagatedContext {
     default Runnable wrap(@NonNull Runnable runnable) {
         PropagatedContext propagatedContext = this;
         return () -> {
-            try (InContext ignore = propagatedContext.propagate()) {
+            try (Scope ignore = propagatedContext.propagate()) {
                 runnable.run();
             }
         };
@@ -225,7 +225,7 @@ public interface PropagatedContext {
     default <V> Callable<V> wrap(@NonNull Callable<V> callable) {
         PropagatedContext propagatedContext = this;
         return () -> {
-            try (InContext ignore = propagatedContext.propagate()) {
+            try (Scope ignore = propagatedContext.propagate()) {
                 return callable.call();
             }
         };
@@ -242,7 +242,7 @@ public interface PropagatedContext {
     default <V> Supplier<V> wrap(@NonNull Supplier<V> supplier) {
         PropagatedContext propagatedContext = this;
         return () -> {
-            try (InContext ignore = propagatedContext.propagate()) {
+            try (Scope ignore = propagatedContext.propagate()) {
                 return supplier.get();
             }
         };
@@ -258,7 +258,7 @@ public interface PropagatedContext {
     @NonNull
     default <V> V propagate(@NonNull Supplier<V> supplier) {
         PropagatedContext propagatedContext = this;
-        try (InContext ignore = propagatedContext.propagate()) {
+        try (Scope ignore = propagatedContext.propagate()) {
             return supplier.get();
         }
     }
@@ -269,7 +269,7 @@ public interface PropagatedContext {
      * @author Denis Stepanov
      * @since 4.0.0
      */
-    interface InContext extends AutoCloseable {
+    interface Scope extends AutoCloseable {
         @Override
         void close();
     }

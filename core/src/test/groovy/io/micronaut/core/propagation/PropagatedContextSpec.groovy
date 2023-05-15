@@ -10,9 +10,9 @@ class PropagatedContextSpec extends Specification {
             PropagatedElement e2 = new PropagatedElement()
             PropagatedElement e3 = new PropagatedElement()
         expect:
-            try (PropagatedContext.InContext ignore1 = PropagatedContext.getOrEmpty().plus(e1).propagate()) {
-                try (PropagatedContext.InContext ignore2 = PropagatedContext.getOrEmpty().plus(e2).propagate()) {
-                    try (PropagatedContext.InContext ignore3 = PropagatedContext.getOrEmpty().plus(e3).propagate()) {
+            try (PropagatedContext.Scope ignore1 = PropagatedContext.getOrEmpty().plus(e1).propagate()) {
+                try (PropagatedContext.Scope ignore2 = PropagatedContext.getOrEmpty().plus(e2).propagate()) {
+                    try (PropagatedContext.Scope ignore3 = PropagatedContext.getOrEmpty().plus(e3).propagate()) {
                         PropagatedContext propagatedContext = PropagatedContext.get()
                         assert propagatedContext.get(PropagatedElement) == e3
                         assert propagatedContext.find(PropagatedElement).get() == e3
@@ -32,16 +32,16 @@ class PropagatedContextSpec extends Specification {
             PropagatedElement e3 = new PropagatedElement()
         expect:
             assert PropagatedContext.getOrEmpty().findAll(PropagatedElement).toList() == []
-            try (PropagatedContext.InContext ignore1 = PropagatedContext.getOrEmpty().plus(e1).propagate()) {
+            try (PropagatedContext.Scope ignore1 = PropagatedContext.getOrEmpty().plus(e1).propagate()) {
                 assert PropagatedContext.get().findAll(PropagatedElement).toList() == [e1]
-                try (PropagatedContext.InContext ignore2 = PropagatedContext.getOrEmpty().plus(e2).propagate()) {
+                try (PropagatedContext.Scope ignore2 = PropagatedContext.getOrEmpty().plus(e2).propagate()) {
                     assert PropagatedContext.get().findAll(PropagatedElement).toList() == [e2, e1]
-                    try (PropagatedContext.InContext ignore3 = PropagatedContext.getOrEmpty().plus(e3).propagate()) {
+                    try (PropagatedContext.Scope ignore3 = PropagatedContext.getOrEmpty().plus(e3).propagate()) {
                         assert PropagatedContext.get().findAll(PropagatedElement).toList() == [e3, e2, e1]
-                        try (PropagatedContext.InContext ignore4 = PropagatedContext.getOrEmpty().minus(e2).propagate()) {
+                        try (PropagatedContext.Scope ignore4 = PropagatedContext.getOrEmpty().minus(e2).propagate()) {
                             assert PropagatedContext.get().findAll(PropagatedElement).toList() == [e3, e1]
                         }
-                        try (PropagatedContext.InContext ignore4 = PropagatedContext.getOrEmpty().minus(e2).minus(e1).propagate()) {
+                        try (PropagatedContext.Scope ignore4 = PropagatedContext.getOrEmpty().minus(e2).minus(e1).propagate()) {
                             assert PropagatedContext.get().findAll(PropagatedElement).toList() == [e3]
                         }
                         assert PropagatedContext.get().findAll(PropagatedElement).toList() == [e3, e2, e1]
@@ -61,13 +61,13 @@ class PropagatedContextSpec extends Specification {
             PropagatedElement e4 = new PropagatedElement()
         expect:
             assert PropagatedContext.getOrEmpty().findAll(PropagatedElement).toList() == []
-            try (PropagatedContext.InContext ignore1 = PropagatedContext.getOrEmpty().plus(e1).propagate()) {
+            try (PropagatedContext.Scope ignore1 = PropagatedContext.getOrEmpty().plus(e1).propagate()) {
                 assert PropagatedContext.get().findAll(PropagatedElement).toList() == [e1]
-                try (PropagatedContext.InContext ignore2 = PropagatedContext.getOrEmpty().plus(e2).propagate()) {
+                try (PropagatedContext.Scope ignore2 = PropagatedContext.getOrEmpty().plus(e2).propagate()) {
                     assert PropagatedContext.get().findAll(PropagatedElement).toList() == [e2, e1]
-                    try (PropagatedContext.InContext ignore3 = PropagatedContext.getOrEmpty().plus(e3).propagate()) {
+                    try (PropagatedContext.Scope ignore3 = PropagatedContext.getOrEmpty().plus(e3).propagate()) {
                         assert PropagatedContext.get().findAll(PropagatedElement).toList() == [e3, e2, e1]
-                        try (PropagatedContext.InContext ignore4 = PropagatedContext.getOrEmpty().replace(e2, e4).propagate()) {
+                        try (PropagatedContext.Scope ignore4 = PropagatedContext.getOrEmpty().replace(e2, e4).propagate()) {
                             assert PropagatedContext.get().findAll(PropagatedElement).toList() == [e3, e4, e1]
                         }
                         assert PropagatedContext.get().findAll(PropagatedElement).toList() == [e3, e2, e1]
@@ -83,7 +83,7 @@ class PropagatedContextSpec extends Specification {
         given:
             PropagatedElement e1 = new PropagatedElement()
         when:
-            try (PropagatedContext.InContext ignore4 = PropagatedContext.getOrEmpty().minus(e1).propagate()) {
+            try (PropagatedContext.Scope ignore4 = PropagatedContext.getOrEmpty().minus(e1).propagate()) {
             }
         then:
             thrown(NoSuchElementException)
@@ -94,7 +94,7 @@ class PropagatedContextSpec extends Specification {
             PropagatedElement e1 = new PropagatedElement()
             PropagatedElement e2 = new PropagatedElement()
         when:
-            try (PropagatedContext.InContext ignore4 = PropagatedContext.getOrEmpty().replace(e1, e2).propagate()) {
+            try (PropagatedContext.Scope ignore4 = PropagatedContext.getOrEmpty().replace(e1, e2).propagate()) {
             }
         then:
             thrown(NoSuchElementException)
@@ -105,7 +105,7 @@ class PropagatedContextSpec extends Specification {
             PropagatedElement e1 = new PropagatedElement()
         expect:
             assert PropagatedContext.getOrEmpty().allElements.size() == 0
-            try (PropagatedContext.InContext ignore = PropagatedContext.getOrEmpty().propagate()) {
+            try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().propagate()) {
                 PropagatedContext.getOrEmpty().plus(e1).propagate()
                 assert PropagatedContext.getOrEmpty().allElements.size() == 1
             }
@@ -117,9 +117,9 @@ class PropagatedContextSpec extends Specification {
             PropagatedElement e1 = new PropagatedElement()
             PropagatedElement e = new PropagatedElement()
         expect:
-            try (PropagatedContext.InContext ignore = PropagatedContext.getOrEmpty().plus(e).propagate()) {
+            try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(e).propagate()) {
                 assert PropagatedContext.getOrEmpty().allElements.size() == 1
-                try (PropagatedContext.InContext ignore2 = PropagatedContext.getOrEmpty().propagate()) {
+                try (PropagatedContext.Scope ignore2 = PropagatedContext.getOrEmpty().propagate()) {
                     PropagatedContext.getOrEmpty().plus(e1).propagate()
                     assert PropagatedContext.getOrEmpty().allElements.size() == 2
                 }

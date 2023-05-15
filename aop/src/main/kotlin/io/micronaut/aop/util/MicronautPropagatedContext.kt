@@ -15,22 +15,28 @@
  */
 package io.micronaut.aop.util
 
-import io.micronaut.core.propagation.PropagatedContext.InContext
+import io.micronaut.core.propagation.PropagatedContext.Scope
 import io.micronaut.core.annotation.Internal
 import kotlinx.coroutines.ThreadContextElement
 import kotlin.coroutines.AbstractCoroutineContextElement
 import kotlin.coroutines.CoroutineContext
 
+/**
+ * Kotlin's coroutine context that propagates Micronaut Propagated Context.
+ *
+ * @author Denis Stepanov
+ * @since 4.0.0
+ */
 @Internal
-class MicronautPropagatedContext(var propagatedContext: io.micronaut.core.propagation.PropagatedContext) : ThreadContextElement<InContext>, AbstractCoroutineContextElement(Key) {
+class MicronautPropagatedContext(var propagatedContext: io.micronaut.core.propagation.PropagatedContext) : ThreadContextElement<Scope>, AbstractCoroutineContextElement(Key) {
 
     companion object Key : CoroutineContext.Key<MicronautPropagatedContext>
 
-    override fun updateThreadContext(context: CoroutineContext): InContext {
+    override fun updateThreadContext(context: CoroutineContext): Scope {
         return propagatedContext.propagate()
     }
 
-    override fun restoreThreadContext(context: CoroutineContext, oldState: InContext) {
+    override fun restoreThreadContext(context: CoroutineContext, oldState: Scope) {
         oldState.close()
     }
 

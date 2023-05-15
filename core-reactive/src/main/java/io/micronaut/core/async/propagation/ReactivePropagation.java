@@ -45,7 +45,7 @@ public class ReactivePropagation {
                 @Override
                 public void subscribe(CoreSubscriber<? super T> subscriber) {
                     CorePublisher<T> actualCorePublisher = (CorePublisher<T>) actual;
-                    try (PropagatedContext.InContext ignore = propagatedContext.propagate()) {
+                    try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
                         actualCorePublisher.subscribe(subscriber);
                     }
                 }
@@ -56,14 +56,14 @@ public class ReactivePropagation {
                         subscribe(coreSubscriber);
                         return;
                     }
-                    try (PropagatedContext.InContext ignore = propagatedContext.propagate()) {
+                    try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
                         actual.subscribe(subscriber);
                     }
                 }
             };
         }
         return subscriber -> {
-            try (PropagatedContext.InContext ignore = propagatedContext.propagate()) {
+            try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
                 actual.subscribe(subscriber);
             }
         };
@@ -90,28 +90,28 @@ public class ReactivePropagation {
 
             @Override
             public void onSubscribe(Subscription s) {
-                try (PropagatedContext.InContext ignore = propagatedContext.propagate()) {
+                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
                     actual.onSubscribe(s);
                 }
             }
 
             @Override
             public void onNext(T t) {
-                try (PropagatedContext.InContext ignore = propagatedContext.propagate()) {
+                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
                     actual.onNext(t);
                 }
             }
 
             @Override
             public void onError(Throwable t) {
-                try (PropagatedContext.InContext ignore = propagatedContext.propagate()) {
+                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
                     actual.onError(t);
                 }
             }
 
             @Override
             public void onComplete() {
-                try (PropagatedContext.InContext ignore = propagatedContext.propagate()) {
+                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
                     actual.onComplete();
                 }
             }

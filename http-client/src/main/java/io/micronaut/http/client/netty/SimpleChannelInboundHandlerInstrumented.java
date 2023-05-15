@@ -47,7 +47,7 @@ abstract class SimpleChannelInboundHandlerInstrumented<I> extends SimpleChannelI
 
     @Override
     protected final void channelRead0(ChannelHandlerContext ctx, I msg) throws Exception {
-        try (PropagatedContext.InContext ignore = propagatedContext.propagate()) {
+        try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
             try (Instrumentation ignored = instrumenter.newInstrumentation()) {
                 channelReadInstrumented(ctx, msg);
             }

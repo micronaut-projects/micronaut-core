@@ -97,7 +97,7 @@ class MDCSpec3 extends Specification {
             MDC.put(TRACE_ID_MDC_KEY, traceIdHeader)
             LOG.info 'MDC updated'
 
-            try(PropagatedContext.InContext ignore = PropagatedContext.getOrEmpty().plus(new MdcPropagationContext()).propagate()) {
+            try(PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new MdcPropagationContext()).propagate()) {
                 return chain.proceed(request)
             } finally {
                 MDC.clear()
