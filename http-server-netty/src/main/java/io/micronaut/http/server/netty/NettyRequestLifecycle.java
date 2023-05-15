@@ -23,7 +23,6 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Body;
-import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.server.RequestLifecycle;
 import io.micronaut.http.server.netty.body.ByteBody;
 import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
@@ -67,7 +66,6 @@ final class NettyRequestLifecycle extends RequestLifecycle {
     void handleNormal() {
         if (LOG.isDebugEnabled()) {
             HttpMethod httpMethod = request().getMethod();
-            ServerRequestContext.set(request());
             LOG.debug("Request {} {}", httpMethod, request().getUri());
         }
 

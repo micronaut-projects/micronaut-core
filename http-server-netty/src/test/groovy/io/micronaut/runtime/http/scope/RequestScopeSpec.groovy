@@ -20,7 +20,6 @@ import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import jakarta.annotation.PreDestroy
@@ -28,11 +27,9 @@ import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import spock.lang.Shared
 import spock.util.concurrent.PollingConditions
-import java.util.concurrent.atomic.AtomicInteger
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.atomic.AtomicInteger
-
 /**
  * @author Marcel Overdijk
  * @since 1.2.0
@@ -41,10 +38,6 @@ class RequestScopeSpec extends AbstractMicronautSpec {
 
     @Shared
     PollingConditions conditions = new PollingConditions(delay: 0.5, timeout: 3)
-
-    def setupSpec() {
-        ServerRequestContext.set(null)
-    }
 
     def setup() {
         ReqTerminatedListener listener = applicationContext.getBean(ReqTerminatedListener)

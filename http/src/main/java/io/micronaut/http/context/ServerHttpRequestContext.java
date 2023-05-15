@@ -18,8 +18,10 @@ package io.micronaut.http.context;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.propagation.PropagatedContext;
-import io.micronaut.core.propagation.ThreadPropagatedContextElement;
+import io.micronaut.core.propagation.PropagatedContextElement;
 import io.micronaut.http.HttpRequest;
+
+import java.util.Optional;
 
 /**
  * Http request propagation.
@@ -28,7 +30,7 @@ import io.micronaut.http.HttpRequest;
  * @since 4.0.0
  */
 @Experimental
-public final class ServerHttpRequestContext implements ThreadPropagatedContextElement<HttpRequest<?>> {
+public final class ServerHttpRequestContext implements PropagatedContextElement {
 
     private final HttpRequest<?> httpRequest;
 
@@ -40,23 +42,23 @@ public final class ServerHttpRequestContext implements ThreadPropagatedContextEl
         return httpRequest;
     }
 
+    /**
+     * @param <T> The request body type
+     * @return {@link HttpRequest} or null
+     */
     @Nullable
-    public static HttpRequest<Object> get() {
-        return (HttpRequest<Object>) PropagatedContext.find()
-                .flatMap(ctx -> ctx.find(ServerHttpRequestContext.class))
-                .map(ServerHttpRequestContext::getHttpRequest)
-                .orElse(null);
+    public static <T> HttpRequest<T> get() {
+        return ServerHttpRequestContext.<T>find().orElse(null);
     }
 
-    @Override
-    public HttpRequest<?> updateThreadContext() {
-        HttpRequest<?> prev = ServerRequestContext.currentRequest().orElse(null);
-        ServerRequestContext.set(httpRequest);
-        return prev;
+    /**
+     * @param <T> The request body type
+     * @return an optional {@link HttpRequest}
+     */
+    public static <T> Optional<HttpRequest<T>> find() {
+        return PropagatedContext.find()
+            .flatMap(ctx -> ctx.find(ServerHttpRequestContext.class))
+            .map(e -> (HttpRequest<T>) e.httpRequest);
     }
 
-    @Override
-    public void restoreThreadContext(HttpRequest<?> oldState) {
-        ServerRequestContext.set(httpRequest);
-    }
 }

@@ -30,10 +30,8 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
-import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.http.filter.GenericHttpFilter;
-import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
@@ -102,8 +100,6 @@ public class RequestLifecycle {
      * @return The response to the request.
      */
     protected final ExecutionFlow<MutableHttpResponse<?>> normalFlow() {
-        ServerRequestContext.set(request);
-
         if (!multipartEnabled) {
             MediaType contentType = request.getContentType().orElse(null);
             if (contentType != null &&
@@ -259,7 +255,6 @@ public class RequestLifecycle {
      * @return Execution flow that completes after the all the filters and the downstream flow
      */
     protected final ExecutionFlow<MutableHttpResponse<?>> runWithFilters(Supplier<ExecutionFlow<MutableHttpResponse<?>>> downstream) {
-        ServerRequestContext.set(request);
         List<GenericHttpFilter> httpFilters = routeExecutor.router.findFilters(request);
 
         List<GenericHttpFilter> filters = new ArrayList<>(httpFilters.size() + 1);
