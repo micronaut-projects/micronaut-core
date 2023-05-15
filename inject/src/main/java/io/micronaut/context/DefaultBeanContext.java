@@ -2973,7 +2973,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                                                   @Nullable Qualifier<T> qualifier,
                                                                   @NonNull Argument<T> beanType,
                                                                   @NonNull BeanDefinition<T> definition) {
-        BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
+        BeanKey<T> beanKey = new BeanKey<>(definition.asArgument(), qualifier);
         T bean = registeredScope.getOrCreate(
                 new BeanCreationContext<T>() {
                     @NonNull
@@ -2991,7 +2991,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                     @NonNull
                     @Override
                     public CreatedBean<T> create() throws BeanCreationException {
-                        return createRegistration(resolutionContext == null ? null : resolutionContext.copy(), beanType, qualifier, definition, true);
+                        return createRegistration(resolutionContext == null ? null : resolutionContext.copy(), beanKey.beanType, qualifier, definition, true);
                     }
                 }
         );
