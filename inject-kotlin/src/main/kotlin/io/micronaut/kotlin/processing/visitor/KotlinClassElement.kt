@@ -133,8 +133,10 @@ internal open class KotlinClassElement(
             .toList()
     }
 
+    @OptIn(KspExperimental::class)
     private val internalCanonicalName: String by lazy {
-        declaration.qualifiedName!!.asString()
+        val javaName = visitorContext.resolver.mapKotlinNameToJava(declaration.qualifiedName!!)
+        javaName?.asString() ?: declaration.qualifiedName!!.asString()
     }
 
     private val internalName: String by lazy {
@@ -514,10 +516,7 @@ internal open class KotlinClassElement(
     }
 
     override fun isVoid(): Boolean {
-        if (internalName == "kotlin.Unit") {
-            return true
-        }
-        return false
+        return internalName == "kotlin.Unit"
     }
 
     override fun copyThis() = KotlinClassElement(
