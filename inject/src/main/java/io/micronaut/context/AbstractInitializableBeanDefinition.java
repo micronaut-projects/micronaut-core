@@ -32,7 +32,6 @@ import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
@@ -46,7 +45,6 @@ import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.BeanDefinition;
@@ -63,6 +61,7 @@ import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
 import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.qualifiers.TypeAnnotationQualifier;
+import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -359,7 +358,12 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
 
     @Override
     public final Optional<Class<? extends Annotation>> getScope() {
-        return precalculatedInfo.scope.flatMap(scopeClassName -> (Optional) ClassUtils.forName(scopeClassName, getClass().getClassLoader()));
+        return precalculatedInfo.scope.flatMap(scopeClassName -> {
+            if ("javax.inject.Singleton".equals(scopeClassName) || Singleton.class.getName().equals(scopeClassName)) {
+                return Optional.of(Singleton.class);
+            }
+            return (Optional) ClassUtils.forName(scopeClassName, getClass().getClassLoader());
+        });
     }
 
     @Override

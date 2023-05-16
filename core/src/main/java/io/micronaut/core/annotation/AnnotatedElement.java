@@ -29,27 +29,27 @@ public interface AnnotatedElement extends AnnotationMetadataProvider, Named {
      * @return Whether the element is nullable.
      */
     default boolean isDeclaredNullable() {
-        return getAnnotationMetadata().hasDeclaredStereotype(AnnotationUtil.NULLABLE);
+        return getAnnotationMetadata().hasDeclaredStereotype(AnnotationUtil.NULLABLE) || getAnnotationMetadata().hasDeclaredStereotype(AnnotationUtil.JAVAX_NULLABLE);
     }
 
     /**
      * @return Whether the element is nullable.
      */
     default boolean isNullable() {
-        return getAnnotationMetadata().hasStereotype(AnnotationUtil.NULLABLE);
+        return getAnnotationMetadata().hasStereotype(AnnotationUtil.NULLABLE) || getAnnotationMetadata().hasStereotype(AnnotationUtil.JAVAX_NULLABLE);
     }
 
     /**
      * @return Whether the element is declared as not being null
      */
     default boolean isNonNull() {
-        return getAnnotationMetadata().hasStereotype(AnnotationUtil.NON_NULL);
+        return getAnnotationMetadata().hasStereotype(AnnotationUtil.NON_NULL) || getAnnotationMetadata().hasStereotype(AnnotationUtil.JAVAX_NON_NULL);
     }
 
     /**
      * @return Whether the element is declared as not being null
      */
     default boolean isDeclaredNonNull() {
-        return getAnnotationMetadata().hasDeclaredStereotype(AnnotationUtil.NON_NULL);
+        return getAnnotationMetadata().hasDeclaredStereotype(AnnotationUtil.NON_NULL) || getAnnotationMetadata().hasDeclaredStereotype(AnnotationUtil.JAVAX_NON_NULL);
     }
 }

@@ -120,6 +120,22 @@ public class AnnotationUtil {
     public static final String NON_NULL = "jakarta.annotation.Nonnull";
 
     /**
+     * A legacy NULLABLE annotation name used for nullable.
+     * @deprecated Should be removed after all the modules are recompiled
+     */
+    @Deprecated(forRemoval = true)
+    @NextMajorVersion("Remove after next Milestone of platform")
+    public static final String JAVAX_NULLABLE = "javax.annotation.Nullable";
+
+    /**
+     * A legacy NON_NULL annotation name used for non-null.
+     * @deprecated Should be removed after all the modules are recompiled
+     */
+    @Deprecated(forRemoval = true)
+    @NextMajorVersion("Remove after next Milestone of platform")
+    public static final String JAVAX_NON_NULL = "javax.annotation.Nonnull";
+
+    /**
      * The around annotation type.
      */
     public static final String ANN_AROUND = "io.micronaut.aop.Around";
