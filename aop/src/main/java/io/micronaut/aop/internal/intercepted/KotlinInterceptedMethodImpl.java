@@ -20,12 +20,12 @@ import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.aop.util.CompletableFutureContinuation;
 import io.micronaut.aop.util.DelegatingContextContinuation;
 import io.micronaut.aop.util.KotlinInterceptedMethodHelper;
-import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.async.propagation.KotlinCoroutinePropagation;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.KotlinUtils;
-import io.micronaut.aop.util.MicronautPropagatedContext;
 import kotlin.coroutines.Continuation;
 import kotlin.coroutines.CoroutineContext;
 
@@ -65,7 +65,7 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
      * Checks if the method invocation is a Kotlin coroutine.
      *
      * @param context {@link MethodInvocationContext}
-     * @return true if Kotlin coroutine
+     * @return new intercepted method if Kotlin coroutine or null if it's not
      */
     public static KotlinInterceptedMethodImpl of(MethodInvocationContext<?, ?> context) {
         if (!KotlinUtils.KOTLIN_COROUTINES_SUPPORTED || !context.getExecutableMethod().isSuspend()) {
@@ -102,9 +102,11 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
     @Override
     public CompletableFuture<Object> interceptResultAsCompletionStage() {
         if (PropagatedContext.exists()) {
-            updateCoroutineContext(getCoroutineContext()
-                .minusKey(MicronautPropagatedContext.Key)
-                .plus(new MicronautPropagatedContext(PropagatedContext.get()))
+            updateCoroutineContext(
+                KotlinCoroutinePropagation.Companion.updatePropagatedContext(
+                    getCoroutineContext(),
+                    PropagatedContext.get()
+                )
             );
         }
         @SuppressWarnings("unchecked")
@@ -121,9 +123,11 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
     @Override
     public CompletableFuture<Object> interceptResultAsCompletionStage(Interceptor<?, ?> from) {
         if (PropagatedContext.exists()) {
-            updateCoroutineContext(getCoroutineContext()
-                .minusKey(MicronautPropagatedContext.Key)
-                .plus(new MicronautPropagatedContext(PropagatedContext.get()))
+            updateCoroutineContext(
+                KotlinCoroutinePropagation.Companion.updatePropagatedContext(
+                    getCoroutineContext(),
+                    PropagatedContext.get()
+                )
             );
         }
         @SuppressWarnings("unchecked")
@@ -156,9 +160,11 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
             throw new IllegalStateException("Cannot convert " + result + "  to 'java.util.concurrent.CompletionStage'");
         }
         if (PropagatedContext.exists()) {
-            updateCoroutineContext(getCoroutineContext()
-                    .minusKey(MicronautPropagatedContext.Key)
-                    .plus(new MicronautPropagatedContext(PropagatedContext.get()))
+            updateCoroutineContext(
+                KotlinCoroutinePropagation.Companion.updatePropagatedContext(
+                    getCoroutineContext(),
+                    PropagatedContext.get()
+                )
             );
         }
         return KotlinInterceptedMethodHelper.handleResult(completionStageResult, isUnitValueType, (Continuation<? super Object>) continuation);

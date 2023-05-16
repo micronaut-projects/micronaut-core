@@ -15,8 +15,8 @@
  */
 package io.micronaut.http.bind.binders
 
-import io.micronaut.aop.util.MicronautPropagatedContext
 import io.micronaut.core.annotation.Internal
+import io.micronaut.core.async.propagation.KotlinCoroutinePropagation
 import io.micronaut.core.bind.ArgumentBinder
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.propagation.PropagatedContext
@@ -59,13 +59,10 @@ class ContinuationArgumentBinder : TypedRequestArgumentBinder<Continuation<*>> {
             val customContinuation = source.getAttribute(CONTINUATION_ARGUMENT_ATTRIBUTE_KEY, CustomContinuation::class.java).orElse(null)
             if (customContinuation != null) {
                 var coroutineContext: CoroutineContext = Dispatchers.Default
-                if (PropagatedContext.exists()) {
-                    coroutineContext += MicronautPropagatedContext(PropagatedContext.get())
-                }
                 if (reactorContextPresent) {
                     coroutineContext += propagateReactorContext(contextView)
                 }
-                coroutineContext += MicronautPropagatedContext(propagatedContext)
+                coroutineContext = KotlinCoroutinePropagation.addPropagatedContext(coroutineContext, propagatedContext)
                 continuationArgumentBinderCoroutineContextFactories.forEach {
                     coroutineContext += it.create()
                 }

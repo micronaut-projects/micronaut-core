@@ -16,10 +16,8 @@
 package io.micronaut.docs.aop.around_reactive;
 
 import io.micronaut.context.ApplicationContext;
-import org.junit.Rule;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
-import org.junit.rules.ExpectedException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -27,10 +25,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class TxSpec {
-
-    // tag::test[]
-    @Rule
-    public ExpectedException thrown = ExpectedException.none();
 
     @Test
     public void testReactiveTx() {
