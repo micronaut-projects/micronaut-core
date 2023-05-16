@@ -35,6 +35,7 @@ import java.util.concurrent.ThreadPoolExecutor
  * @since 1.0
  */
 @Ignore("Instrumented Executor services break this test")
+//Cannot cast object 'io.micronaut.context.propagation.instrument.execution.ExecutorServiceInstrumenter$2@67110f71' with class 'io.micronaut.context.propagation.instrument.execution.ExecutorServiceInstrumenter$2' to class 'java.util.concurrent.ThreadPoolExecutor'
 class ExecutorServiceConfigSpec extends Specification {
     static final int expectedExecutorCount = LoomSupport.isSupported() ? 6 : 5
 
