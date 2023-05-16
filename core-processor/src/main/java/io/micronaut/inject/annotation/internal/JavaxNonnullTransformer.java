@@ -27,15 +27,15 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * A transformer that remaps {@link jakarta.annotation.Nonnull} to {@code javax.annotation.Nonnull}.
+ * A transformer that remaps {@code javax.annotation.Nonnull} to {@link io.micronaut.core.annotation.AnnotationUtil#NON_NULL}.
  * @since 4.0
  */
 @Internal
-public class JakartaNonnullTransformer implements NamedAnnotationTransformer {
+public class JavaxNonnullTransformer implements NamedAnnotationTransformer {
 
     @Override
     public @NonNull String getName() {
-        return "jakarta.annotation.Nonnull";
+        return "javax.annotation.Nonnull";
     }
 
     @Override

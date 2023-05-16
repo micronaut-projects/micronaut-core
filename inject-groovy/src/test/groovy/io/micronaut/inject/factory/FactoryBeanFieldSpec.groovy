@@ -109,7 +109,7 @@ import java.lang.annotation.Retention;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.aop.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Factory
 class TestFactory$TestField {
@@ -189,7 +189,7 @@ package invalidmod;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Factory
 class TestFactory {

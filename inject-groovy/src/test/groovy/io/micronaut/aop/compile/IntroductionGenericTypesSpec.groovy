@@ -192,7 +192,7 @@ interface MyInterface<T extends Person> {
 
 
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 interface MyBean extends MyInterface {
 
 }
@@ -246,7 +246,7 @@ import java.net.*;
 
 
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @Executable
 interface MyBean extends MyPrecompiledInterface {
 
@@ -304,7 +304,7 @@ import io.micronaut.aop.compile.*;
 
 
 @Stub
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @Executable
 interface MyBean extends MyPrecompiledInterface<SubPerson> {
 

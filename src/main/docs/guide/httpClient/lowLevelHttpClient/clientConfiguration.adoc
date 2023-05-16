@@ -42,7 +42,7 @@ Then, inject the named client configuration:
 @Client("foo") @Inject ReactorHttpClient httpClient;
 ----
 
-You can also define a bean that extends from api:http.client.HttpClientConfiguration[] and ensure that the `javax.inject.Named` annotation names it appropriately:
+You can also define a bean that extends from api:http.client.HttpClientConfiguration[] and ensure that the `jakarta.inject.Named` annotation names it appropriately:
 
 .Defining an HTTP client configuration bean
 [source,java]

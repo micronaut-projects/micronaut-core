@@ -20,7 +20,7 @@ import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.exceptions.DependencyInjectionException
 import spock.lang.Specification
 
-import javax.annotation.Nullable
+import jakarta.annotation.Nullable
 import jakarta.inject.Inject
 
 /**

@@ -3,8 +3,8 @@ package io.micronaut.core
 import io.micronaut.context.BeanContext
 import spock.lang.Specification
 
-import javax.inject.Provider
-import javax.inject.Singleton
+import jakarta.inject.Provider
+import jakarta.inject.Singleton
 
 class ArgumentSpec extends Specification {
 

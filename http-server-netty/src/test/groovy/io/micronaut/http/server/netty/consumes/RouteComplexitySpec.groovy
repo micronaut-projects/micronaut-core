@@ -8,7 +8,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import reactor.core.publisher.Flux
 
-import javax.annotation.Nullable
+import jakarta.annotation.Nullable
 
 class RouteComplexitySpec extends AbstractMicronautSpec {
 

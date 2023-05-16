@@ -112,12 +112,12 @@ public class AnnotationUtil {
     /**
      * Simple Annotation name used for nullable.
      */
-    public static final String NULLABLE = "javax.annotation.Nullable";
+    public static final String NULLABLE = "jakarta.annotation.Nullable";
 
     /**
      * Simple Annotation name used for non-null.
      */
-    public static final String NON_NULL = "javax.annotation.Nonnull";
+    public static final String NON_NULL = "jakarta.annotation.Nonnull";
 
     /**
      * The around annotation type.
@@ -152,37 +152,37 @@ public class AnnotationUtil {
     /**
      * The meta annotation used for inject declarations.
      */
-    public static final String INJECT = "javax.inject.Inject";
+    public static final String INJECT = "jakarta.inject.Inject";
 
     /**
      * The meta annotation used for scope declarations.
      */
-    public static final String SCOPE = "javax.inject.Scope";
+    public static final String SCOPE = "jakarta.inject.Scope";
 
     /**
      * The meta annotation used for singleton scope.
      */
-    public static final String SINGLETON = "javax.inject.Singleton";
+    public static final String SINGLETON = "jakarta.inject.Singleton";
 
     /**
      * The meta annotation used for qualifier declarations.
      */
-    public static final String QUALIFIER = "javax.inject.Qualifier";
+    public static final String QUALIFIER = "jakarta.inject.Qualifier";
 
     /**
      * The meta annotation used for named qualifiers.
      */
-    public static final String NAMED = "javax.inject.Named";
+    public static final String NAMED = "jakarta.inject.Named";
 
     /**
      * The meta annotation used for pre-destroy declarations.
      */
-    public static final String PRE_DESTROY = "javax.annotation.PreDestroy";
+    public static final String PRE_DESTROY = "jakarta.annotation.PreDestroy";
 
     /**
      * The meta annotation used for post-construct declarations.
      */
-    public static final String POST_CONSTRUCT = "javax.annotation.PostConstruct";
+    public static final String POST_CONSTRUCT = "jakarta.annotation.PostConstruct";
 
     /**
      * The annotation attribute containing all the attributes marked as non binding.

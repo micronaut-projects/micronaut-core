@@ -3,7 +3,7 @@ package io.micronaut.inject.field.simpleinjection;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
 
-import javax.annotation.Nullable;
+import jakarta.annotation.Nullable;
 
 public class E {
     @Nullable

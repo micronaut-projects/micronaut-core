@@ -20,7 +20,7 @@ import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.core.convert.ConversionService
 import spock.lang.Specification
 
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 /**
  * @author Graeme Rocher

@@ -178,7 +178,7 @@ package generictest3;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class GenericsTest3 extends Foo {
 
     public Integer apply(String str) {
@@ -205,7 +205,7 @@ package generictest4;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class GenericsTest4 extends Foo<String, Integer> {
 
     public Integer apply(String str) {

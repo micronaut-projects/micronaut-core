@@ -24,9 +24,9 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.annotation.TypeHint
 
-import javax.inject.Named
-import javax.inject.Qualifier
-import javax.inject.Singleton
+import jakarta.inject.Named
+import jakarta.inject.Qualifier
+import jakarta.inject.Singleton
 import java.lang.annotation.Documented
 import java.lang.annotation.Retention
 
@@ -395,10 +395,10 @@ class Test {
         AnnotationMetadata metadata = buildParameterAnnotationMetadata("annmetawriter12.Test", '''
 package annmetawriter12;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
-    void test(@javax.inject.Named("foo") String id) {
+    void test(@jakarta.inject.Named("foo") String id) {
 
     }
 }
@@ -418,7 +418,7 @@ package annmetawriter13;
 
 import java.lang.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test implements TestApi {
 
     @jakarta.annotation.PostConstruct

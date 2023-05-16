@@ -30,9 +30,9 @@ import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.context.scope.ScopedProxy
 import spock.lang.Ignore
 
-import javax.inject.Qualifier
-import javax.inject.Scope
-import javax.inject.Singleton
+import jakarta.inject.Qualifier
+import jakarta.inject.Scope
+import jakarta.inject.Singleton
 
 /**
  * @author Graeme Rocher
@@ -468,7 +468,7 @@ class Test implements ITest {
 
 interface ITest {
     @MyAnn
-    void testMethod(); 
+    void testMethod();
 }
 
 @io.micronaut.context.annotation.Primary

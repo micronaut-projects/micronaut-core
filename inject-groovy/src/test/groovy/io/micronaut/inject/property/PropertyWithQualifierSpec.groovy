@@ -21,9 +21,9 @@ import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.One
 
-import javax.inject.Inject
-import javax.inject.Named
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Named
+import jakarta.inject.Singleton
 
 /**
  * Created by graemerocher on 15/05/2017.
@@ -37,17 +37,17 @@ package io.micronaut.inject.property;
 
 import io.micronaut.inject.qualifiers.*
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyBean  {
-    @javax.inject.Inject
+    @jakarta.inject.Inject
     @One
     AnotherBean injected
 }
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 @One
 class AnotherBean implements SomeInterface{
-    
+
 }
 interface SomeInterface {
 

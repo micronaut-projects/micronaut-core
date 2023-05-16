@@ -32,7 +32,7 @@ import java.util.List;
  * </ul>
  *
  * <p>Useful for supporting multiple annotation sets that reside in different package namespaces, however are largely
- * similar in function, for example {@code javax.annotation.Nullable} and {@code io.micronaut.core.annotation.Nullable}. One can
+ * similar in function, for example {@code jakarta.annotation.Nullable} and {@code io.micronaut.core.annotation.Nullable}. One can
  * remap these to a single annotation internally at compilation time.</p>
  *
  * NOTE: Remapping all packages is an experimental feature and might be replaced in the future with more efficient way.

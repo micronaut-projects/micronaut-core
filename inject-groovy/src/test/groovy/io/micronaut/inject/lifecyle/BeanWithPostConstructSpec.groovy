@@ -21,7 +21,7 @@ import spock.lang.Specification
 
 import jakarta.annotation.PostConstruct
 import jakarta.inject.Inject
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 /**
  * Created by graemerocher on 17/05/2017.

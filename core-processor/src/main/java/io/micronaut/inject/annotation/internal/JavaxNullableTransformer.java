@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2021 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,10 +15,6 @@
  */
 package io.micronaut.inject.annotation.internal;
 
-import java.lang.annotation.Annotation;
-import java.util.Collections;
-import java.util.List;
-
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
@@ -26,24 +22,27 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.annotation.NamedAnnotationTransformer;
 import io.micronaut.inject.visitor.VisitorContext;
 
+import java.lang.annotation.Annotation;
+import java.util.Collections;
+import java.util.List;
+
 /**
- * Transforms {@link jakarta.annotation.PreDestroy} into the javax meta-annotation {@link io.micronaut.core.annotation.AnnotationUtil#PRE_DESTROY}.
- *
- * @author graemerocher
- * @since 3.0
+ * A transformer that remaps {@code javax.annotation.Nullable} to {@link io.micronaut.core.annotation.AnnotationUtil#NULLABLE}.
+ * @since 4.0
  */
 @Internal
-public final class JakartaPreDestroyTransformer implements NamedAnnotationTransformer {
-    @NonNull
+public class JavaxNullableTransformer implements NamedAnnotationTransformer {
+
     @Override
-    public String getName() {
-        return "jakarta.annotation.PreDestroy";
+    public @NonNull String getName() {
+        return "javax.annotation.Nullable";
     }
 
     @Override
     public List<AnnotationValue<?>> transform(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
         return Collections.singletonList(
-                AnnotationValue.builder(AnnotationUtil.PRE_DESTROY).build()
+                AnnotationValue.builder(AnnotationUtil.NULLABLE).build()
         );
     }
 }
+

@@ -35,7 +35,7 @@ class ValidatedWithJavaxAnnoationNonNullSpec extends Specification {
             'spec.name': 'nonnull'
     ], Environment.TEST)
 
-    void "javax.annotation.NonNull does not fails validation"() {
+    void "jakarta.annotation.Nonnull does not fails validation"() {
         given:
         NonNullService nonNullService = applicationContext.getBean(NonNullService)
 

@@ -7,6 +7,7 @@ import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.util.CollectionUtils
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.qualifiers.Qualifiers
+import jakarta.inject.Singleton
 import spock.lang.Issue
 import spock.lang.Unroll
 
@@ -384,7 +385,7 @@ class Test {}
         modifier << ['private']
     }
 
-    void "if a factory field bean defines Bean and Prototype scopes and the original bean type scope is Singleton BeanDefinition getScope returns Prototype and BeanDefinition getAnnotationNamesByStereotype for javax.inject.Scope returns Prototype The original qualifier is not present if the factory field bean does not define a Qualifier"() {
+    void "if a factory field bean defines Bean and Prototype scopes and the original bean type scope is Singleton BeanDefinition getScope returns Prototype and BeanDefinition getAnnotationNamesByStereotype for jakarta.inject.Scope returns Prototype The original qualifier is not present if the factory field bean does not define a Qualifier"() {
 
         given:
         ApplicationContext context = buildContext('test.TestFactory$TestField', '''\
@@ -444,7 +445,7 @@ class Bar1 {
         context.close()
     }
 
-    void "if a factory field bean defines a @Bean and @Singleton scopes, BeanDefinition::getScope return empty but BeanDefinition::getAnnotationNamesByStereotype for javax.inject.Scope returns javax.inject.Singleton The original qualifier is not present if the factory field bean does not define a Qualifier"() {
+    void "if a factory field bean defines a @Bean and @Singleton scopes, BeanDefinition::getScope return empty but BeanDefinition::getAnnotationNamesByStereotype for jakarta.inject.Scope returns jakarta.inject.Singleton The original qualifier is not present if the factory field bean does not define a Qualifier"() {
         given:
         ApplicationContext context = buildContext('test.TestFactory$TestField', '''\
 package test;
@@ -486,7 +487,7 @@ class Bar2 {
                 .find { it.getDeclaringType().get().simpleName.contains("TestFactory") }
 
         then:
-        !bar2BeanDefinition.getScope().isPresent() // javax.inject.Singleton is not present :-/
+        bar2BeanDefinition.getScope().get() == Singleton.class
         bar2BeanDefinition.singleton
         bar2BeanDefinition.declaredQualifier == null
         bar2BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
@@ -496,7 +497,7 @@ class Bar2 {
         context.close()
     }
 
-    void "if a factory field bean defines a @Bean scope and the original type did not have any scope, BeanDefinition::getScope and BeanDefinition::getAnnotationNamesByStereotype for javax.inject.Scope return empty. if factory field bean defines a qualifier, the original Qualifier is overridden"() {
+    void "if a factory field bean defines a @Bean scope and the original type did not have any scope, BeanDefinition::getScope and BeanDefinition::getAnnotationNamesByStereotype for jakarta.inject.Scope return empty. if factory field bean defines a qualifier, the original Qualifier is overridden"() {
         given:
         ApplicationContext context = buildContext('test.TestFactory$TestField', '''\
 package test;
@@ -597,7 +598,7 @@ class Bar4 {
                 .find { it.getDeclaringType().get().simpleName.contains("TestFactory") }
 
         then:
-        !bar4BeanDefinition.getScope().isPresent()
+        bar4BeanDefinition.getScope().get() == Singleton.class
         bar4BeanDefinition.singleton
         bar4BeanDefinition.declaredQualifier.toString() == "@Abc"
         bar4BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
@@ -607,7 +608,7 @@ class Bar4 {
         context.close()
     }
 
-    void "if factory field bean defines a @Bean scope, BeanDefinition::getScope and BeanDefinition::getAnnotationNamesByStereotype for javax.inject.Scope return empty, even if original bean defines @Singleton If factory field bean defines a qualifier, the original Qualifier is overridden"() {
+    void "if factory field bean defines a @Bean scope, BeanDefinition::getScope and BeanDefinition::getAnnotationNamesByStereotype for jakarta.inject.Scope return empty, even if original bean defines @Singleton If factory field bean defines a qualifier, the original Qualifier is overridden"() {
         given:
         ApplicationContext context = buildContext('test.TestFactory$TestField', '''\
 package test;
@@ -665,7 +666,7 @@ class Bar5 {
     }
 
     @Issue("https://github.com/micronaut-projects/micronaut-core/pull/7165")
-    void "if factory field bean defines a @Bean and @Prototype scopes, BeanDefinition::getScope returns Prototype and BeanDefinition::getAnnotationNamesByStereotype for javax.inject.Scope returns Prototype If factory field bean defines a qualifier, the original Qualifier is overridden"() {
+    void "if factory field bean defines a @Bean and @Prototype scopes, BeanDefinition::getScope returns Prototype and BeanDefinition::getAnnotationNamesByStereotype for jakarta.inject.Scope returns Prototype If factory field bean defines a qualifier, the original Qualifier is overridden"() {
         given:
         ApplicationContext context = buildContext('test.TestFactory$TestField', '''\
 package test;
