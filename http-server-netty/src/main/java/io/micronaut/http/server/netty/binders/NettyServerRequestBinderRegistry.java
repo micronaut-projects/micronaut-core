@@ -25,6 +25,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.multipart.MultipartBodyArgumentBinder;
@@ -51,6 +52,7 @@ public final class NettyServerRequestBinderRegistry implements RequestBinderRegi
     private final DefaultRequestBinderRegistry internalRequestBinderRegistry;
 
     public NettyServerRequestBinderRegistry(ConversionService conversionService,
+                                            List<RequestArgumentBinder> binders,
                                             BeanLocator beanLocator,
                                             BeanProvider<HttpServerConfiguration> httpServerConfiguration,
                                             @Named(TaskExecutors.BLOCKING)
@@ -59,7 +61,7 @@ public final class NettyServerRequestBinderRegistry implements RequestBinderRegi
 
         NettyBodyAnnotationBinder<Object> nettyBodyAnnotationBinder = new NettyBodyAnnotationBinder<>(conversionService, httpServerConfiguration.get(), bodyHandlerRegistry);
 
-        internalRequestBinderRegistry = new DefaultRequestBinderRegistry(conversionService, List.of(), nettyBodyAnnotationBinder);
+        internalRequestBinderRegistry = new DefaultRequestBinderRegistry(conversionService, binders, nettyBodyAnnotationBinder);
 
         internalRequestBinderRegistry.addArgumentBinder(new NettyCompletableFutureBodyBinder(
             nettyBodyAnnotationBinder));
