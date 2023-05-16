@@ -15,8 +15,6 @@
  */
 package io.micronaut.http.server.netty.binders;
 
-import io.micronaut.context.annotation.Replaces;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;
@@ -35,21 +33,19 @@ import io.micronaut.http.server.netty.DefaultHttpContentProcessorResolver;
 import io.micronaut.http.server.netty.FormDataHttpContentProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.body.ImmediateByteBody;
-import jakarta.inject.Singleton;
 
 import java.util.List;
 import java.util.Optional;
 
-@Internal
-@Singleton
-@Replaces(DefaultBodyAnnotationBinder.class)
 final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> {
     private static final CharSequence ATTR_CONVERTIBLE_BODY = "NettyBodyAnnotationBinder.convertibleBody";
 
     final HttpServerConfiguration httpServerConfiguration;
     final MessageBodyHandlerRegistry bodyHandlerRegistry;
 
-    public NettyBodyAnnotationBinder(ConversionService conversionService, HttpServerConfiguration httpServerConfiguration, MessageBodyHandlerRegistry bodyHandlerRegistry) {
+    NettyBodyAnnotationBinder(ConversionService conversionService,
+                                     HttpServerConfiguration httpServerConfiguration,
+                                     MessageBodyHandlerRegistry bodyHandlerRegistry) {
         super(conversionService);
         this.httpServerConfiguration = httpServerConfiguration;
         this.bodyHandlerRegistry = bodyHandlerRegistry;
@@ -59,7 +55,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
     protected BindingResult<T> bindBodyPart(ArgumentConversionContext<T> context, HttpRequest<?> source, String bodyComponent) {
         if (source instanceof NettyHttpRequest<?> nhr && nhr.isFormOrMultipartData()) {
             // skipClaimed=true because for unmatched binding, both this binder and PartUploadAnnotationBinder can be called on the same parameter
-            return PartUploadAnnotationBinder.bindPart(conversionService, context, nhr, bodyComponent, true);
+            return NettyPartUploadAnnotationBinder.bindPart(conversionService, context, nhr, bodyComponent, true);
         } else {
             return super.bindBodyPart(context, source, bodyComponent);
         }

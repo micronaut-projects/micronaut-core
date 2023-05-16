@@ -42,7 +42,7 @@ import java.util.Optional;
  * @since 4.0.0
  */
 @Internal
-final class PublisherPartUploadBinder implements TypedRequestArgumentBinder<Publisher<?>>, NettyRequestArgumentBinder<Publisher<?>> {
+final class NettyPublisherPartUploadBinder implements TypedRequestArgumentBinder<Publisher<?>>, NettyRequestArgumentBinder<Publisher<?>> {
 
     private static final Argument<Publisher<?>> PUBLISHER_ARGUMENT = (Argument) Argument.of(Publisher.class);
     private static final Argument<PartData> PART_DATA_ARGUMENT = Argument.of(PartData.class);
@@ -50,7 +50,7 @@ final class PublisherPartUploadBinder implements TypedRequestArgumentBinder<Publ
     private final ConversionService conversionService;
     private final NettyStreamingFileUpload.Factory fileUploadFactory;
 
-    public PublisherPartUploadBinder(ConversionService conversionService, NettyStreamingFileUpload.Factory fileUploadFactory) {
+    NettyPublisherPartUploadBinder(ConversionService conversionService, NettyStreamingFileUpload.Factory fileUploadFactory) {
         this.conversionService = conversionService;
         this.fileUploadFactory = fileUploadFactory;
     }

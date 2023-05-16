@@ -42,7 +42,7 @@ public interface StreamedNettyRequestArgumentBinder<T> extends RequestArgumentBi
                 return bindForStreamedNettyRequest(context, streamedHttpRequest, nettyHttpRequest);
             }
         }
-        return BindingResult.EMPTY;
+        return BindingResult.empty();
     }
 
     /**

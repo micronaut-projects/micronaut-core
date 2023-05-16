@@ -38,7 +38,6 @@ import io.micronaut.http.server.netty.converters.NettyConverters;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
-import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,8 +53,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-@Singleton
-public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publisher<?>> {
+final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publisher<?>> {
 
     public static final String MSG_CONVERT_DEBUG = "Cannot convert message for argument [{}] and value: {}";
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
@@ -66,7 +64,7 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
     /**
      * @param nettyBodyAnnotationBinder Body annotation binder
      */
-    public PublisherBodyBinder(NettyBodyAnnotationBinder<Object> nettyBodyAnnotationBinder) {
+    NettyPublisherBodyBinder(NettyBodyAnnotationBinder<Object> nettyBodyAnnotationBinder) {
         this.nettyBodyAnnotationBinder = nettyBodyAnnotationBinder;
     }
 
@@ -104,7 +102,7 @@ public class PublisherBodyBinder implements NonBlockingBodyArgumentBinder<Publis
                     } catch (Throwable e) {
                         throw new RuntimeException(e);
                     }
-                    return value.orElseThrow(() -> PublisherBodyBinder.extractError(null, context));
+                    return value.orElseThrow(() -> NettyPublisherBodyBinder.extractError(null, context));
                 });
             Publisher<Object> future = ReactiveExecutionFlow.toPublisher(() -> flow);
             return () -> Optional.of(future);
