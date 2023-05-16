@@ -2351,8 +2351,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
         bean = triggerBeanCreatedEventListener(resolutionContext, beanDefinition, bean, finalQualifier);
 
-        if (beanDefinition instanceof ValidatedBeanDefinition) {
-            bean = ((ValidatedBeanDefinition<T>) beanDefinition).validate(resolutionContext, bean);
+        if (beanDefinition instanceof ValidatedBeanDefinition<T> validatedBeanDefinition) {
+            bean = validatedBeanDefinition.validate(resolutionContext, bean);
         }
         if (LOG_LIFECYCLE.isDebugEnabled()) {
             LOG_LIFECYCLE.debug("Created bean [{}] from definition [{}] with qualifier [{}]", bean, beanDefinition, finalQualifier);
