@@ -32,9 +32,7 @@ import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -46,7 +44,6 @@ import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.inject.BeanDefinition;
@@ -175,59 +172,6 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         this.executableMethodsDefinition = executableMethodsDefinition;
         this.typeArgumentsMap = typeArgumentsMap;
         this.precalculatedInfo = precalculatedInfo;
-    }
-
-    @SuppressWarnings("ParameterNumber")
-    @Internal
-    @UsedByGeneratedCode
-    @Deprecated(since = "4")
-    @NextMajorVersion("Remove after Micronaut 4 Milestone 1")
-    protected AbstractInitializableBeanDefinition(
-        Class<T> beanType,
-        @Nullable MethodOrFieldReference constructor,
-        @Nullable AnnotationMetadata annotationMetadata,
-        @Nullable MethodReference[] methodInjection,
-        @Nullable FieldReference[] fieldInjection,
-        @Nullable ExecutableMethodsDefinition<T> executableMethodsDefinition,
-        @Nullable Map<String, Argument<?>[]> typeArgumentsMap,
-        Optional<String> scope,
-        boolean isAbstract,
-        boolean isProvided,
-        boolean isIterable,
-        boolean isSingleton,
-        boolean isPrimary,
-        boolean isConfigurationProperties,
-        boolean isContainerType,
-        boolean requiresMethodProcessing) {
-        this(beanType, constructor, annotationMetadata, methodInjection, fieldInjection, null, executableMethodsDefinition, typeArgumentsMap,
-            new PrecalculatedInfo(scope, isAbstract, isIterable, isSingleton, isPrimary, isConfigurationProperties, isContainerType, requiresMethodProcessing));
-    }
-
-    @SuppressWarnings("ParameterNumber")
-    @Internal
-    @UsedByGeneratedCode
-    @Deprecated(since = "4")
-    @NextMajorVersion("Remove after Micronaut 4 Milestone 1")
-    protected AbstractInitializableBeanDefinition(
-            Class<T> beanType,
-            @Nullable MethodOrFieldReference constructor,
-            @Nullable AnnotationMetadata annotationMetadata,
-            @Nullable MethodReference[] methodInjection,
-            @Nullable FieldReference[] fieldInjection,
-            @Nullable AnnotationReference[] annotationInjection,
-            @Nullable ExecutableMethodsDefinition<T> executableMethodsDefinition,
-            @Nullable Map<String, Argument<?>[]> typeArgumentsMap,
-            Optional<String> scope,
-            boolean isAbstract,
-            boolean isProvided,
-            boolean isIterable,
-            boolean isSingleton,
-            boolean isPrimary,
-            boolean isConfigurationProperties,
-            boolean isContainerType,
-            boolean requiresMethodProcessing) {
-        this(beanType, constructor, annotationMetadata, methodInjection, fieldInjection, annotationInjection, executableMethodsDefinition, typeArgumentsMap,
-            new PrecalculatedInfo(scope, isAbstract, isIterable, isSingleton, isPrimary, isConfigurationProperties, isContainerType, requiresMethodProcessing));
     }
 
     @Override
@@ -592,17 +536,8 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     @Override
-    @Deprecated(since = "4")
-    @NextMajorVersion("Remove after Micronaut 4 Milestone 1. I think we always implement this method so it's not needed, otherwise un-deprecate")
-    public T inject(BeanContext context, T bean) {
-        return inject(new DefaultBeanResolutionContext(context, this), context, bean);
-    }
-
-    @Override
-    @Deprecated(since = "4")
-    @NextMajorVersion("Remove after Micronaut 4 Milestone 1. I think we always implement this method so it's not needed, otherwise un-deprecate")
     public T inject(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
-        return (T) injectBean(resolutionContext, context, bean);
+        return bean;
     }
 
     @Override
@@ -790,69 +725,6 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     /**
-     * Implementing possible {@link io.micronaut.inject.ParametrizedBeanFactory#build(BeanResolutionContext, BeanContext, BeanDefinition)}.
-     *
-     * @param resolutionContext      The {@link BeanResolutionContext}
-     * @param context                The {@link BeanContext}
-     * @param definition             The {@link BeanDefinition}
-     * @param requiredArgumentValues The required arguments values. The keys should match the names of the arguments
-     *                               returned by {@link #getRequiredArguments()}
-     * @return The instantiated bean
-     * @throws BeanInstantiationException If the bean cannot be instantiated for the arguments supplied
-     */
-    @Deprecated(since = "4")
-    @NextMajorVersion("Should be removed after Micronaut 4 Milestone 1")
-    @SuppressWarnings({"java:S2789", "OptionalAssignedToNull"}) // performance optimization
-    public final T build(BeanResolutionContext resolutionContext,
-                         BeanContext context,
-                         BeanDefinition<T> definition,
-                         Map<String, Object> requiredArgumentValues) throws BeanInstantiationException {
-
-        requiredArgumentValues = requiredArgumentValues != null ? new LinkedHashMap<>(requiredArgumentValues) : Collections.emptyMap();
-        Optional<Class> eachBeanType = null;
-        for (Argument<?> requiredArgument : getRequiredArguments()) {
-            try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(this, requiredArgument)) {
-                String argumentName = requiredArgument.getName();
-                Object value = requiredArgumentValues.get(argumentName);
-                if (value == null && !requiredArgument.isNullable()) {
-                    if (eachBeanType == null) {
-                        eachBeanType = definition.classValue(EachBean.class);
-                    }
-                    if (eachBeanType.filter(type -> type == requiredArgument.getType()).isPresent()) {
-                        throw new DisabledBeanException("@EachBean parameter disabled for argument: " + requiredArgument.getName());
-                    }
-                    throw new BeanInstantiationException(resolutionContext, "Missing bean argument value: " + argumentName);
-                }
-                boolean requiresConversion = value != null && !requiredArgument.getType().isInstance(value);
-                if (requiresConversion) {
-                    Optional<?> converted = context.getConversionService().convert(value, requiredArgument.getType(), ConversionContext.of(requiredArgument));
-                    Object finalValue = value;
-                    value = converted.orElseThrow(() -> new BeanInstantiationException(resolutionContext, "Invalid value [" + finalValue + "] for argument: " + argumentName));
-                    requiredArgumentValues.put(argumentName, value);
-                }
-            }
-        }
-        return doBuild(resolutionContext, context, definition, requiredArgumentValues);
-    }
-
-    /**
-     * Method to be implemented by the generated code if the bean definition is implementing {@link io.micronaut.inject.ParametrizedBeanFactory}.
-     *
-     * @param resolutionContext      The resolution context
-     * @param context                The bean context
-     * @param definition             The bean definition
-     * @param requiredArgumentValues The required arguments
-     * @return The built instance
-     */
-    @Internal
-    @UsedByGeneratedCode
-    @Deprecated(since = "4")
-    @NextMajorVersion("Should be removed after Micronaut 4 Milestone 1")
-    protected T doBuild(BeanResolutionContext resolutionContext, BeanContext context, BeanDefinition<T> definition, Map<String, Object> requiredArgumentValues) {
-        throw new IllegalStateException("Method must be implemented for 'ParametrizedBeanFactory' instance!");
-    }
-
-    /**
      * Implementing possible {@link io.micronaut.inject.ParametrizedInstantiatableBeanDefinition#instantiate(BeanResolutionContext, BeanContext)}.
      *
      * @param resolutionContext      The {@link BeanResolutionContext}
@@ -895,7 +767,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     /**
-     * Method to be implemented by the generated code if the bean definition is implementing {@link io.micronaut.inject.ParametrizedBeanFactory}.
+     * Method to be implemented by the generated code if the bean definition is implementing {@link io.micronaut.inject.ParametrizedInstantiatableBeanDefinition}.
      *
      * @param resolutionContext      The resolution context
      * @param context                The bean context
@@ -906,23 +778,6 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     @UsedByGeneratedCode
     protected T doInstantiate(BeanResolutionContext resolutionContext, BeanContext context, Map<String, Object> requiredArgumentValues) {
         throw new IllegalStateException("Method must be implemented for 'ParametrizedInstantiatableBeanDefinition' instance!");
-    }
-
-    /**
-     * The default implementation which provides no injection. To be overridden by compile time tooling.
-     *
-     * @param resolutionContext The resolution context
-     * @param context           The bean context
-     * @param bean              The bean
-     * @return The injected bean
-     */
-    @Internal
-    @SuppressWarnings({"WeakerAccess", "unused"})
-    @UsedByGeneratedCode
-    @Deprecated(since = "4")
-    @NextMajorVersion("Remove after Micronaut 4 Milestone 1")
-    protected Object injectBean(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
-        return bean;
     }
 
     /**
@@ -2585,33 +2440,11 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         public final boolean isPreDestroyMethod;
         public final boolean isPostConstructMethod;
 
-        @Deprecated(since = "4")
-        @NextMajorVersion("Remove after Micronaut 4 Milestone 1")
-        public MethodReference(Class declaringType,
-                               String methodName,
-                               Argument[] arguments,
-                               @Nullable AnnotationMetadata annotationMetadata,
-                               boolean requiresReflection) {
-            this(declaringType, methodName, arguments, annotationMetadata, requiresReflection, false, false);
-        }
-
         public MethodReference(Class declaringType,
                                String methodName,
                                Argument[] arguments,
                                @Nullable AnnotationMetadata annotationMetadata) {
             this(declaringType, methodName, arguments, annotationMetadata, false, false);
-        }
-
-        @Deprecated(since = "4")
-        @NextMajorVersion("Remove after Micronaut 4 Milestone 1")
-        public MethodReference(Class declaringType,
-                               String methodName,
-                               Argument[] arguments,
-                               @Nullable AnnotationMetadata annotationMetadata,
-                               boolean isPostConstructMethod,
-                               boolean isPreDestroyMethod,
-                               boolean requiresReflection) {
-            this(declaringType, methodName, arguments, annotationMetadata, isPostConstructMethod, isPreDestroyMethod);
         }
 
         public MethodReference(Class declaringType,
@@ -2649,12 +2482,6 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     public static final class FieldReference extends MethodOrFieldReference {
         public final Argument argument;
 
-        @Deprecated(since = "4")
-        @NextMajorVersion("Remove after Micronaut 4 Milestone 1")
-        public FieldReference(Class declaringType, Argument argument, boolean requiresReflection) {
-            this(declaringType, argument);
-        }
-
         public FieldReference(Class declaringType, Argument argument) {
             super(declaringType);
             this.argument = ExpressionsAwareArgument.wrapIfNecessary(argument);
@@ -2668,12 +2495,6 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     @Internal
     public abstract static class MethodOrFieldReference {
         final Class declaringType;
-
-        @Deprecated(since = "4")
-        @NextMajorVersion("Remove after Micronaut 4 Milestone 1")
-        public MethodOrFieldReference(Class<?> declaringType, boolean requiresReflection) {
-            this(declaringType);
-        }
 
         public MethodOrFieldReference(Class<?> declaringType) {
             this.declaringType = declaringType;

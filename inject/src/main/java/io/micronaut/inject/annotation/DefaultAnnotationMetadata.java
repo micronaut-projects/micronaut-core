@@ -21,7 +21,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -157,34 +156,6 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             @Nullable Map<String, List<String>> annotationsByStereotype,
             boolean hasPropertyExpressions,
             boolean hasEvaluatedExpressions) {
-        this(declaredAnnotations, declaredStereotypes, allStereotypes, allAnnotations, annotationsByStereotype, hasPropertyExpressions, hasEvaluatedExpressions, false);
-    }
-
-    /**
-     * This constructor is designed to be used by compile time produced subclasses.
-     *
-     * @param declaredAnnotations     The directly declared annotations
-     * @param declaredStereotypes     The directly declared stereotypes
-     * @param allStereotypes          All of the stereotypes
-     * @param allAnnotations          All of the annotations
-     * @param annotationsByStereotype The annotations by stereotype
-     * @param hasPropertyExpressions  Whether property expressions exist in the metadata
-     * @param useRepeatableDefaults   Use repeatable defaults
-     * @deprecated use the constructor without useRepeatableDefaults
-     */
-    @Internal
-    @UsedByGeneratedCode
-    @NextMajorVersion("Remove after Micronaut 4 Milestone 1")
-    @Deprecated(forRemoval = true, since = "4")
-    public DefaultAnnotationMetadata(
-            @Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
-            @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes,
-            @Nullable Map<String, Map<CharSequence, Object>> allStereotypes,
-            @Nullable Map<String, Map<CharSequence, Object>> allAnnotations,
-            @Nullable Map<String, List<String>> annotationsByStereotype,
-            boolean hasPropertyExpressions,
-            boolean hasEvaluatedExpressions,
-            boolean useRepeatableDefaults) {
         super(declaredAnnotations, allAnnotations);
         this.declaredAnnotations = declaredAnnotations;
         this.declaredStereotypes = declaredStereotypes;

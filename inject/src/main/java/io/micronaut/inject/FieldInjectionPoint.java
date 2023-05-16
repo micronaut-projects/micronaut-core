@@ -17,10 +17,7 @@ package io.micronaut.inject;
 
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.type.ArgumentCoercible;
-
-import java.lang.reflect.Field;
 
 /**
  * Defines an injection point for a field.
@@ -37,16 +34,6 @@ public interface FieldInjectionPoint<B, T> extends InjectionPoint<B>, Annotation
      */
     @Override
     String getName();
-
-    /**
-     * Resolves the underlying field. Note that this method will cause reflection
-     * metadata to be initialized and should be avoided.
-     *
-     * @return The target field
-     */
-    @NextMajorVersion("Adjust Micronaut test to avoid this method")
-    @Deprecated(since = "4")
-    Field getField();
 
     /**
      * @return The required component type

@@ -95,7 +95,6 @@ import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionMethodReference;
 import io.micronaut.inject.BeanDefinitionReference;
-import io.micronaut.inject.BeanFactory;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.DisposableBeanDefinition;
@@ -105,7 +104,6 @@ import io.micronaut.inject.InjectableBeanDefinition;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.MethodExecutionHandle;
-import io.micronaut.inject.ParametrizedBeanFactory;
 import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
 import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.QualifiedBeanType;
@@ -1079,10 +1077,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     @NonNull
     private <T> Map<String, Object> resolveArgumentValues(BeanResolutionContext resolutionContext, BeanDefinition<T> definition, Object[] args) {
         Argument[] requiredArguments;
-        // TODO: remove this after Micronaut 4 Milestone 1
-        if (definition instanceof ParametrizedBeanFactory parametrizedBeanFactory) {
-            requiredArguments = parametrizedBeanFactory.getRequiredArguments();
-        } else if (definition instanceof ParametrizedInstantiatableBeanDefinition<T> parametrizedInstantiatableBeanDefinition) {
+        if (definition instanceof ParametrizedInstantiatableBeanDefinition<T> parametrizedInstantiatableBeanDefinition) {
             requiredArguments = parametrizedInstantiatableBeanDefinition.getRequiredArguments();
         } else {
             return null;
@@ -2278,10 +2273,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                @Nullable Qualifier<T> qualifier,
                                @Nullable Map<String, Object> argumentValues) {
         T bean;
-        // TODO: remove this after Micronaut 4 Milestone 1
-        if (beanDefinition instanceof BeanFactory) {
-            bean = resolveByBeanFactory(resolutionContext, beanDefinition, qualifier, argumentValues);
-        } else if (beanDefinition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
+        if (beanDefinition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
             bean = resolveByBeanFactory(resolutionContext, instantiatableBeanDefinition, qualifier, argumentValues);
         } else {
             throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
@@ -2307,14 +2299,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         try {
             resolutionContext.setCurrentQualifier(declaredQualifier != null && !AnyQualifier.INSTANCE.equals(declaredQualifier) ? declaredQualifier : qualifier);
             T bean;
-            // TODO: remove this after Micronaut 4 Milestone 1
-            if (beanDefinition instanceof ParametrizedBeanFactory parametrizedBeanFactory) {
-                Map<String, Object> convertedValues = getRequiredArgumentValues(resolutionContext, parametrizedBeanFactory.getRequiredArguments(),
-                        argumentValues, beanDefinition);
-                bean = (T) parametrizedBeanFactory.build(resolutionContext, this, beanDefinition, convertedValues);
-            } else if (beanDefinition instanceof BeanFactory beanFactory) {
-                bean = (T) beanFactory.build(resolutionContext, this, beanDefinition);
-            } else if (beanDefinition instanceof ParametrizedInstantiatableBeanDefinition<T> parametrizedInstantiatableBeanDefinition) {
+            if (beanDefinition instanceof ParametrizedInstantiatableBeanDefinition<T> parametrizedInstantiatableBeanDefinition) {
                 Argument<Object>[] requiredArguments = parametrizedInstantiatableBeanDefinition.getRequiredArguments();
                 Map<String, Object> convertedValues = getRequiredArgumentValues(resolutionContext, requiredArguments, argumentValues, beanDefinition);
                 bean = parametrizedInstantiatableBeanDefinition.instantiate(resolutionContext, this, convertedValues);
