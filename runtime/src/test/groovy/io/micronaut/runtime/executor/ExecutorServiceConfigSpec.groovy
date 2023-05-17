@@ -21,6 +21,7 @@ import io.micronaut.scheduling.LoomSupport
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.executor.ExecutorConfiguration
 import io.micronaut.scheduling.executor.UserExecutorConfiguration
+import io.micronaut.scheduling.instrument.InstrumentedExecutor
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -28,7 +29,6 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.ForkJoinPool
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ThreadPoolExecutor
-
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -58,8 +58,12 @@ class ExecutorServiceConfigSpec extends Specification {
         executorServices.size() == expectedExecutorCount
 
         when:
-        ThreadPoolExecutor poolExecutor = (ThreadPoolExecutor) ctx.getBean(ExecutorService, Qualifiers.byName("one"))
-        ExecutorService forkJoinPool = ctx.getBean(ExecutorService, Qualifiers.byName("two"))
+        ThreadPoolExecutor poolExecutor = (ThreadPoolExecutor) InstrumentedExecutor.unwrap(
+                ctx.getBean(ExecutorService, Qualifiers.byName("one"))
+        )
+        ExecutorService forkJoinPool = InstrumentedExecutor.unwrap(
+                ctx.getBean(ExecutorService, Qualifiers.byName("two"))
+        )
 
         then:
         forkJoinPool instanceof ForkJoinPool
@@ -67,8 +71,12 @@ class ExecutorServiceConfigSpec extends Specification {
         poolExecutor.corePoolSize == 5
         ctx.getBean(ExecutorService.class, Qualifiers.byName(TaskExecutors.IO)) // the default IO executor
         ctx.getBean(ExecutorService.class, Qualifiers.byName(TaskExecutors.SCHEDULED)) // the default IO executor
-        forkJoinPool == ctx.getBean(ExecutorService.class, Qualifiers.byName("two"))
-        poolExecutor == ctx.getBean(ExecutorService.class, Qualifiers.byName("one"))
+        forkJoinPool == InstrumentedExecutor.unwrap(
+                ctx.getBean(ExecutorService.class, Qualifiers.byName("two"))
+        )
+        poolExecutor == InstrumentedExecutor.unwrap(
+                ctx.getBean(ExecutorService.class, Qualifiers.byName("one"))
+        )
 
         when:
         if(invalidateCache) {
@@ -111,16 +119,28 @@ class ExecutorServiceConfigSpec extends Specification {
 
         when:
         Collection<ExecutorService> executorServices = ctx.getBeansOfType(ExecutorService.class)
-        ThreadPoolExecutor poolExecutor = (ThreadPoolExecutor) ctx.getBean(ExecutorService, Qualifiers.byName("one"))
-        ExecutorService forkJoinPool = ctx.getBean(ExecutorService, Qualifiers.byName("two"))
+        ThreadPoolExecutor poolExecutor = (ThreadPoolExecutor) InstrumentedExecutor.unwrap(
+                ctx.getBean(ExecutorService, Qualifiers.byName("one"))
+        )
+        ExecutorService forkJoinPool = InstrumentedExecutor.unwrap(
+                ctx.getBean(ExecutorService, Qualifiers.byName("two"))
+        )
 
         then:
         executorServices.size() == expectedExecutorCount
         poolExecutor.corePoolSize == 5
-        ctx.getBean(ExecutorService.class, Qualifiers.byName(TaskExecutors.IO)) instanceof ThreadPoolExecutor
+
+        def ioExecutor = InstrumentedExecutor.unwrap(
+                ctx.getBean(ExecutorService.class, Qualifiers.byName(TaskExecutors.IO))
+        )
+        ioExecutor instanceof ThreadPoolExecutor
         ctx.getBean(ExecutorService.class, Qualifiers.byName(TaskExecutors.SCHEDULED)) instanceof ScheduledExecutorService
-        forkJoinPool == ctx.getBean(ExecutorService.class, Qualifiers.byName("two"))
-        poolExecutor == ctx.getBean(ExecutorService.class, Qualifiers.byName("one"))
+        forkJoinPool == InstrumentedExecutor.unwrap(
+                ctx.getBean(ExecutorService.class, Qualifiers.byName("two"))
+        )
+        poolExecutor == InstrumentedExecutor.unwrap(
+                ctx.getBean(ExecutorService.class, Qualifiers.byName("one"))
+        )
 
         when:
         if(invalidateCache) {
@@ -171,7 +191,9 @@ class ExecutorServiceConfigSpec extends Specification {
 
         then:
         executorServices.size() == expectedExecutorCount - 1
-        ctx.getBean(ExecutorService.class, Qualifiers.byName(TaskExecutors.IO)) instanceof ThreadPoolExecutor
+        InstrumentedExecutor.unwrap(
+            ctx.getBean(ExecutorService.class, Qualifiers.byName(TaskExecutors.IO))
+        ) instanceof ThreadPoolExecutor
 
         when:
         if(invalidateCache) {

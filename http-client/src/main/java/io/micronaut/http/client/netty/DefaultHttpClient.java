@@ -1158,11 +1158,11 @@ public class DefaultHttpClient implements
         });
 
         Publisher<io.micronaut.http.HttpResponse<O>> finalPublisher = applyFilterToResponsePublisher(
-                parentRequest,
-                request,
-                requestURI,
-                requestWrapper,
-                responsePublisher
+            parentRequest,
+            request,
+            requestURI,
+            requestWrapper,
+            responsePublisher
         );
         Flux<io.micronaut.http.HttpResponse<O>> finalReactiveSequence = Flux.from(finalPublisher);
         // apply timeout to flowable too in case a filter applied another policy
@@ -1174,12 +1174,12 @@ public class DefaultHttpClient implements
             if (!rt.isNegative()) {
                 Duration duration = rt.plus(Duration.ofSeconds(1));
                 finalReactiveSequence = finalReactiveSequence.timeout(duration) // todo: move to CM
-                        .onErrorResume(throwable -> {
-                            if (throwable instanceof TimeoutException) {
-                                return Flux.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
-                            }
-                            return Flux.error(throwable);
-                        });
+                    .onErrorResume(throwable -> {
+                        if (throwable instanceof TimeoutException) {
+                            return Flux.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
+                        }
+                        return Flux.error(throwable);
+                    });
             }
         }
         return finalReactiveSequence;

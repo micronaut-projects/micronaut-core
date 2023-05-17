@@ -16,14 +16,14 @@
 package io.micronaut.http.bind.binders
 
 import io.micronaut.core.annotation.Internal
+import io.micronaut.core.async.propagation.KotlinCoroutinePropagation
 import io.micronaut.core.bind.ArgumentBinder
 import io.micronaut.core.convert.ArgumentConversionContext
+import io.micronaut.core.propagation.PropagatedContext
 import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.context.ServerRequestContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ThreadContextElement
 import kotlinx.coroutines.reactor.ReactorContext
 import reactor.util.context.ContextView
 import java.util.*
@@ -52,23 +52,17 @@ class ContinuationArgumentBinder : TypedRequestArgumentBinder<Continuation<*>> {
         private val reactorContextPresent: Boolean = ClassUtils.isPresent("kotlinx.coroutines.reactor.ReactorContext", null);
 
         @JvmStatic
-        @Deprecated("Use the new method that takes a collection of coroutine context factories", ReplaceWith(
-            "setupCoroutineContext(source, contextView, emptyList())",
-            "io.micronaut.http.bind.binders.ContinuationArgumentBinder.Companion.setupCoroutineContext"
-        )
-        )
-        fun setupCoroutineContext(source: HttpRequest<*>, contextView: ContextView) {
-            setupCoroutineContext(source, contextView, emptyList())
-        }
-
-        @JvmStatic
-        fun setupCoroutineContext(source: HttpRequest<*>, contextView: ContextView, continuationArgumentBinderCoroutineContextFactories: Collection<HttpCoroutineContextFactory<*>>) {
+        fun setupCoroutineContext(source: HttpRequest<*>,
+                                  contextView: ContextView,
+                                  propagatedContext: PropagatedContext,
+                                  continuationArgumentBinderCoroutineContextFactories: Collection<HttpCoroutineContextFactory<*>>) {
             val customContinuation = source.getAttribute(CONTINUATION_ARGUMENT_ATTRIBUTE_KEY, CustomContinuation::class.java).orElse(null)
             if (customContinuation != null) {
-                var coroutineContext: CoroutineContext = Dispatchers.Default + ServerRequestScopeHandler(source)
+                var coroutineContext: CoroutineContext = Dispatchers.Default
                 if (reactorContextPresent) {
                     coroutineContext += propagateReactorContext(contextView)
                 }
+                coroutineContext = KotlinCoroutinePropagation.addPropagatedContext(coroutineContext, propagatedContext)
                 continuationArgumentBinderCoroutineContextFactories.forEach {
                     coroutineContext += it.create()
                 }
@@ -131,22 +125,4 @@ private class CustomContinuation: Continuation<Any?>, CoroutineStackFrame, Suppl
 
     override val callerFrame: CoroutineStackFrame? = null
     override fun getStackTraceElement(): StackTraceElement? = null
-}
-
-private class ServerRequestScopeHandler(
-        private val httpRequest: HttpRequest<*>
-) : ThreadContextElement<HttpRequest<*>?> {
-
-    companion object Key : CoroutineContext.Key<ServerRequestScopeHandler>
-
-    override val key: CoroutineContext.Key<ServerRequestScopeHandler>
-        get() = Key
-
-    override fun updateThreadContext(context: CoroutineContext): HttpRequest<*>? {
-        val previous = ServerRequestContext.currentRequest<HttpRequest<*>>().orElse(null)
-        ServerRequestContext.set(httpRequest)
-        return previous
-    }
-
-    override fun restoreThreadContext(context: CoroutineContext, oldState: HttpRequest<*>?) = ServerRequestContext.set(oldState)
 }

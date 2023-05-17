@@ -13,10 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/**
- * Support classes for binding the {@link io.micronaut.http.context.ServerRequestContext}.
- *
- * @author graemerocher
- * @since 1.0
- */
-package io.micronaut.http.server.context;
+package io.micronaut.docs.aop.around_reactive;
+
+// tag::imports[]
+import io.micronaut.aop.Around;
+import java.lang.annotation.*;
+import static java.lang.annotation.ElementType.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+// end::imports[]
+
+// tag::annotation[]
+@Documented
+@Retention(RUNTIME) // <1>
+@Target({TYPE, METHOD}) // <2>
+@Around // <3>
+public @interface Tx {
+}
+// end::annotation[]
