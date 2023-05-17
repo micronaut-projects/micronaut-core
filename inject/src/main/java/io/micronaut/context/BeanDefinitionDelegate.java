@@ -27,14 +27,12 @@ import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.BeanFactory;
 import io.micronaut.inject.DelegatingBeanDefinition;
 import io.micronaut.inject.DisposableBeanDefinition;
 import io.micronaut.inject.InitializingBeanDefinition;
 import io.micronaut.inject.InjectableBeanDefinition;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.InstantiatableBeanDefinition;
-import io.micronaut.inject.ParametrizedBeanFactory;
 import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
 import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.qualifiers.PrimaryQualifier;
@@ -152,16 +150,6 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
             resolutionContext.setConfigurationPath(configurationPath);
         }
         try {
-            // TODO: delete this after Micronaut 4 Milestone 1
-            if (this.definition instanceof ParametrizedBeanFactory) {
-                ParametrizedBeanFactory<T> parametrizedBeanFactory = (ParametrizedBeanFactory<T>) this.definition;
-                Argument[] requiredArguments = parametrizedBeanFactory.getRequiredArguments();
-                Map<String, Object> fulfilled = getParametersValues(resolutionContext, (DefaultBeanContext) context, definition, requiredArguments);
-                return parametrizedBeanFactory.build(resolutionContext, context, definition, fulfilled);
-            }
-            if (this.definition instanceof BeanFactory beanFactory) {
-                return (T) beanFactory.build(resolutionContext, context, definition);
-            }
             if (this.definition instanceof ParametrizedInstantiatableBeanDefinition<T> parametrizedInstantiatableBeanDefinition) {
                 Argument<Object>[] requiredArguments = parametrizedInstantiatableBeanDefinition.getRequiredArguments();
                 Map<String, Object> fulfilled = getParametersValues(resolutionContext, (DefaultBeanContext) context, definition, requiredArguments);
