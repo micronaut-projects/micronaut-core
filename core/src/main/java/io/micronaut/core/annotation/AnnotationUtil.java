@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.annotation;
 
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 
 import java.lang.annotation.Annotation;
@@ -29,6 +30,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -212,6 +214,75 @@ public class AnnotationUtil {
 
     private static final Map<Integer, List<String>> INTERN_LIST_POOL = new ConcurrentHashMap<>();
     private static final Map<String, Map<String, Object>> INTERN_MAP_POOL = new ConcurrentHashMap<>();
+
+    /**
+     * Finds qualifier annotations.
+     * @param annotationMetadata The annotation metadata
+     * @return The qualifier annotations
+     * @since 4.0.0
+     */
+    public static List<AnnotationValue<Annotation>> findQualifierAnnotations(AnnotationMetadata annotationMetadata) {
+        List<AnnotationValue<Annotation>> qualifiers = annotationMetadata.getAnnotationValuesByStereotype(AnnotationUtil.QUALIFIER);
+        List<AnnotationValue<Annotation>> javaxQualifiers = annotationMetadata.getAnnotationValuesByStereotype("javax.inject.Qualifier");
+        if (!javaxQualifiers.isEmpty()) {
+            qualifiers = CollectionUtils.concat(qualifiers, javaxQualifiers);
+        }
+        return qualifiers;
+    }
+
+    /**
+     * Finds qualifier annotations names.
+     * @param annotationMetadata The annotation metadata
+     * @return The qualifier annotations names
+     * @since 4.0.0
+     */
+    public static List<String> findQualifierAnnotationsNames(AnnotationMetadata annotationMetadata) {
+        List<String> qualifiers = annotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER);
+        List<String> javaxQualifiers = annotationMetadata.getAnnotationNamesByStereotype("javax.inject.Qualifier");
+        if (!javaxQualifiers.isEmpty()) {
+            qualifiers = CollectionUtils.concat(qualifiers, javaxQualifiers);
+        }
+        return qualifiers;
+    }
+
+    /**
+     * Has qualifier annotations.
+     * @param annotationMetadata The annotation metadata
+     * @return True if qualifier annotation
+     * @since 4.0.0
+     */
+    public static boolean hasDeclaredQualifierAnnotation(AnnotationMetadata annotationMetadata) {
+        return annotationMetadata.hasDeclaredAnnotation(AnnotationUtil.QUALIFIER)
+            || annotationMetadata.hasDeclaredAnnotation("javax.inject.Qualifier");
+    }
+
+
+    /**
+     * Resolve non-binding members.
+     * @param annotationMetadata The annotation metadata
+     * @return The non-binding members
+     * @since 4.0.0
+     */
+    public static String[] resolveNonBindingMembers(AnnotationMetadata annotationMetadata) {
+        String[] nonBindingArray = annotationMetadata
+            .stringValues(AnnotationUtil.QUALIFIER, AnnotationUtil.NON_BINDING_ATTRIBUTE);
+        if (nonBindingArray.length == 0) {
+            return annotationMetadata
+                .stringValues("javax.inject.Qualifier", AnnotationUtil.NON_BINDING_ATTRIBUTE);
+        }
+        return nonBindingArray;
+    }
+
+    /**
+     * Finds a qualifier annotation.
+     * @param annotationMetadata The annotation metadata
+     * @return A qualifier annotation
+     * @since 4.0.0
+     */
+    public static Optional<String> findQualifierAnnotation(AnnotationMetadata annotationMetadata) {
+        return annotationMetadata.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).or(() ->
+            annotationMetadata.getAnnotationNameByStereotype("javax.inject.Qualifier"));
+    }
 
     /**
      * Converts the given objects into a set of potentially cached and interned strings contained within an internal pool of lists. See {@link String#intern()}.

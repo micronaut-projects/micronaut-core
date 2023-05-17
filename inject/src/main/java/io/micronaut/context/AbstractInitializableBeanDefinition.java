@@ -720,7 +720,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         if (ctor != null) {
             requiredParametrizedArguments = Arrays.stream(ctor.getArguments())
                 .filter(arg -> {
-                    Optional<String> qualifierType = arg.getAnnotationMetadata().getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER);
+                    Optional<String> qualifierType = AnnotationUtil.findQualifierAnnotation(arg.getAnnotationMetadata());
                     return qualifierType.isPresent() && qualifierType.get().equals(Parameter.class.getName());
                 })
                 .toArray(Argument[]::new);
