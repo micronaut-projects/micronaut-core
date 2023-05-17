@@ -31,12 +31,12 @@ import jakarta.annotation.PreDestroy;
  * @author Denis Stepanov
  * @since 4.0.0
  */
-@Requires(classes = {RxJavaPlugins.class})
+@Requires(classes = RxJavaPlugins.class)
 @Context
 @Internal
-class RxJava3Instrumentation {
+final class RxJava3Instrumentation {
 
-    Function<? super Runnable, ? extends Runnable> scheduleHandler;
+    private Function<? super Runnable, ? extends Runnable> scheduleHandler;
 
     @PostConstruct
     void init() {

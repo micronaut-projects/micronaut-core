@@ -26,21 +26,12 @@ import java.util.Optional;
 /**
  * Http request propagation.
  *
+ * @param httpRequest The HTTP request
  * @author Denis Stepanov
  * @since 4.0.0
  */
 @Experimental
-public final class ServerHttpRequestContext implements PropagatedContextElement {
-
-    private final HttpRequest<?> httpRequest;
-
-    public ServerHttpRequestContext(HttpRequest<?> httpRequest) {
-        this.httpRequest = httpRequest;
-    }
-
-    public HttpRequest<?> getHttpRequest() {
-        return httpRequest;
-    }
+public record ServerHttpRequestContext(HttpRequest<?> httpRequest) implements PropagatedContextElement {
 
     /**
      * @param <T> The request body type

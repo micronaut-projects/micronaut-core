@@ -2,7 +2,7 @@ package io.micronaut.context.propagation
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
-import io.micronaut.context.propagation.mdc.MdcPropagationContext
+import io.micronaut.context.propagation.slf4j.MdcPropagationContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.propagation.PropagatedContext
 import io.micronaut.http.HttpRequest

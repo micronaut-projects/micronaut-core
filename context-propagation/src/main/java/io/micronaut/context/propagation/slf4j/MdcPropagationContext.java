@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.context.propagation.mdc;
+package io.micronaut.context.propagation.slf4j;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.propagation.ThreadPropagatedContextElement;
@@ -28,16 +28,10 @@ import java.util.Map;
  * @since 4.0.0
  */
 @Experimental
-public final class MdcPropagationContext implements ThreadPropagatedContextElement<Map<String, String>> {
-
-    private final Map<String, String> state;
+public record MdcPropagationContext(Map<String, String> state) implements ThreadPropagatedContextElement<Map<String, String>> {
 
     public MdcPropagationContext() {
         this(MDC.getCopyOfContextMap());
-    }
-
-    public MdcPropagationContext(Map<String, String> state) {
-        this.state = state;
     }
 
     @Override

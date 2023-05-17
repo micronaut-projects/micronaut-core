@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.async.propagation
 
+import io.micronaut.core.annotation.Experimental
 import io.micronaut.core.propagation.PropagatedContext
 import kotlin.coroutines.CoroutineContext
 
@@ -24,6 +25,7 @@ import kotlin.coroutines.CoroutineContext
  * @author Denis Stepanov
  * @since 4.0.0
  */
+@Experimental
 class KotlinCoroutinePropagation private constructor() {
 
     companion object {

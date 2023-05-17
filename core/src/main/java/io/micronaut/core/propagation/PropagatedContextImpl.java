@@ -50,8 +50,6 @@ final class PropagatedContextImpl implements PropagatedContext {
 
     private static final Scope CLEANUP = THREAD_CONTEXT::remove;
 
-    private final Exception exc = new Exception();
-
     private static final PropagatedContextImpl EMPTY = new PropagatedContextImpl(Collections.emptyList());
 
     private final List<PropagatedContextElement> elements;
@@ -90,11 +88,7 @@ final class PropagatedContextImpl implements PropagatedContext {
     }
 
     public static Optional<PropagatedContext> find() {
-        PropagatedContextImpl propagatedContext = THREAD_CONTEXT.get();
-        if (propagatedContext == null) {
-            return Optional.empty();
-        }
-        return Optional.of(propagatedContext);
+        return Optional.ofNullable(THREAD_CONTEXT.get());
     }
 
     @NonNull

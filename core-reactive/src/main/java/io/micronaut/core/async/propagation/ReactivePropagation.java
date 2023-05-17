@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.async.propagation;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.propagation.PropagatedContext;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -29,7 +30,11 @@ import reactor.util.context.Context;
  * @author Denis Stepanov
  * @since 4.0.0
  */
-public class ReactivePropagation {
+@Experimental
+public final class ReactivePropagation {
+
+    private ReactivePropagation() {
+    }
 
     /**
      * Creates propagation context aware {@link Publisher}.

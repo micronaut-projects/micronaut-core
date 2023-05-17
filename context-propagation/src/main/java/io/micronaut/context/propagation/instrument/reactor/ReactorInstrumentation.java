@@ -19,11 +19,9 @@ import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.propagation.PropagatedContext;
-import reactor.core.publisher.Flux;
-import reactor.core.scheduler.Schedulers;
-
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import reactor.core.scheduler.Schedulers;
 
 /**
  * On scheduler hook for the thread to be aware of {@link PropagatedContext}.
@@ -31,10 +29,10 @@ import jakarta.annotation.PreDestroy;
  * @author Denis Stepanov
  * @since 4.0.0
  */
-@Requires(classes = {Flux.class, Schedulers.Factory.class})
+@Requires(classes = Schedulers.class)
 @Context
 @Internal
-class ReactorInstrumentation {
+final class ReactorInstrumentation {
 
     private static final String KEY = "MICRONAUT_CONTEXT_PROPAGATION";
 
