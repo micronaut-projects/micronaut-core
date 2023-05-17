@@ -21,13 +21,11 @@ import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.naming.NameResolver;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.lang.annotation.Annotation;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * An interface for a {@link BeanType} that allows qualifiers.
@@ -70,6 +68,9 @@ public interface QualifiedBeanType<T> extends BeanType<T>, AnnotationMetadataDel
             Qualifier<T> qualifier = resolveDynamicQualifier();
             if (qualifier == null) {
                 String name = annotationMetadata.stringValue(AnnotationUtil.NAMED).orElse(null);
+                if (name == null) {
+                    name = annotationMetadata.stringValue("javax.inject.Named").orElse(null);
+                }
                 qualifier = name != null ? Qualifiers.byAnnotation(annotationMetadata, name) : null;
             }
             return qualifier;
