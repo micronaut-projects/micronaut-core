@@ -405,7 +405,7 @@ public class Qualifiers {
         } else if (Qualifier.PRIMARY.equals(type)) {
             //noinspection unchecked
             return PrimaryQualifier.INSTANCE;
-        } else if (Named.class.getName().equals(type)) {
+        } else if (Named.class.getName().equals(type) || "javax.inject.Named".equals(type)) {
             String n = metadata.stringValue(type).or(() -> metadata.stringValue("javax.inject.Named")).orElse(null);
             if (n != null) {
                 return byName(n);
