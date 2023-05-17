@@ -31,7 +31,7 @@ import java.util.Optional;
  */
 @Experimental
 public sealed interface NettyRequestArgumentBinder<T> extends RequestArgumentBinder<T>
-    permits CompletedFileUploadBinder, PublisherPartUploadBinder, StreamingFileUploadBinder {
+    permits NettyCompletedFileUploadBinder, NettyPublisherPartUploadBinder, NettyStreamingFileUploadBinder {
 
     @Override
     default BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {

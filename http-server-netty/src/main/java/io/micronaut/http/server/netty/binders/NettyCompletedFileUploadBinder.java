@@ -22,43 +22,50 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
-import io.micronaut.http.multipart.StreamingFileUpload;
+import io.micronaut.http.multipart.CompletedFileUpload;
+import io.micronaut.http.multipart.FileUpload;
 import io.micronaut.http.server.netty.NettyHttpRequest;
-import io.micronaut.http.server.netty.multipart.NettyStreamingFileUpload;
-import io.netty.handler.codec.http.multipart.FileUpload;
 import reactor.core.publisher.Mono;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Binds {@link StreamingFileUpload}.
+ * Binds {@link CompletedFileUpload}.
  *
  * @author Denis Stepanov
  * @since 4.0.0
  */
 @Internal
-final class StreamingFileUploadBinder implements TypedRequestArgumentBinder<StreamingFileUpload>, NettyRequestArgumentBinder<StreamingFileUpload> {
+final class NettyCompletedFileUploadBinder implements TypedRequestArgumentBinder<CompletedFileUpload>, NettyRequestArgumentBinder<CompletedFileUpload> {
 
-    private static final Argument<StreamingFileUpload> STREAMING_FILE_UPLOAD_ARGUMENT = Argument.of(StreamingFileUpload.class);
+    private static final Argument<CompletedFileUpload> STREAMING_FILE_UPLOAD_ARGUMENT = Argument.of(CompletedFileUpload.class);
 
     private final ConversionService conversionService;
-    private final NettyStreamingFileUpload.Factory fileUploadFactory;
 
-    public StreamingFileUploadBinder(ConversionService conversionService, NettyStreamingFileUpload.Factory fileUploadFactory) {
+    NettyCompletedFileUploadBinder(ConversionService conversionService) {
         this.conversionService = conversionService;
-        this.fileUploadFactory = fileUploadFactory;
     }
 
     @Override
-    public BindingResult<StreamingFileUpload> bindForNettyRequest(ArgumentConversionContext<StreamingFileUpload> context,
-                                                                  NettyHttpRequest<?> request) {
+    public List<Class<?>> superTypes() {
+        return List.of(FileUpload.class);
+    }
 
-        Argument<StreamingFileUpload> argument = context.getArgument();
+    @Override
+    public BindingResult<CompletedFileUpload> bindForNettyRequest(ArgumentConversionContext<CompletedFileUpload> context,
+                                                                  NettyHttpRequest<?> request) {
+        if (request.getContentType().isEmpty() || !request.isFormOrMultipartData()) {
+            return BindingResult.unsatisfied();
+        }
+
+        Argument<CompletedFileUpload> argument = context.getArgument();
         String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(argument.getName());
 
-        CompletableFuture<? extends StreamingFileUpload> completableFuture = Mono.from(
-            request.formRouteCompleter().claimFields(inputName, (data, publisher) -> fileUploadFactory.create((FileUpload) data, publisher))).toFuture();
+        CompletableFuture<CompletedFileUpload> completableFuture = Mono.from(request.formRouteCompleter().claimFieldsComplete(inputName))
+            .map(d -> conversionService.convertRequired(d, CompletedFileUpload.class))
+            .toFuture();
 
         return new PendingRequestBindingResult<>() {
 
@@ -68,14 +75,14 @@ final class StreamingFileUploadBinder implements TypedRequestArgumentBinder<Stre
             }
 
             @Override
-            public Optional<StreamingFileUpload> getValue() {
+            public Optional<CompletedFileUpload> getValue() {
                 return Optional.ofNullable(completableFuture.getNow(null));
             }
         };
     }
 
     @Override
-    public Argument<StreamingFileUpload> argumentType() {
+    public Argument<CompletedFileUpload> argumentType() {
         return STREAMING_FILE_UPLOAD_ARGUMENT;
     }
 }

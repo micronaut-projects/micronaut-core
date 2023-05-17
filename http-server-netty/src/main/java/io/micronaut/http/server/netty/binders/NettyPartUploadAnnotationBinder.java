@@ -41,15 +41,15 @@ import java.util.concurrent.CompletableFuture;
  * @author Denis Stepanov
  * @since 4.0.0
  */
-public class PartUploadAnnotationBinder<T> implements AnnotatedRequestArgumentBinder<Part, T>, RequestArgumentBinder<T> {
+final class NettyPartUploadAnnotationBinder<T> implements AnnotatedRequestArgumentBinder<Part, T>, RequestArgumentBinder<T> {
 
     private final ConversionService conversionService;
-    private final CompletedFileUploadBinder completedFileUploadBinder;
-    private final PublisherPartUploadBinder publisherPartUploadBinder;
+    private final NettyCompletedFileUploadBinder completedFileUploadBinder;
+    private final NettyPublisherPartUploadBinder publisherPartUploadBinder;
 
-    public PartUploadAnnotationBinder(ConversionService conversionService,
-                                      CompletedFileUploadBinder completedFileUploadBinder,
-                                      PublisherPartUploadBinder publisherPartUploadBinder) {
+    NettyPartUploadAnnotationBinder(ConversionService conversionService,
+                                           NettyCompletedFileUploadBinder completedFileUploadBinder,
+                                           NettyPublisherPartUploadBinder publisherPartUploadBinder) {
         this.conversionService = conversionService;
         this.completedFileUploadBinder = completedFileUploadBinder;
         this.publisherPartUploadBinder = publisherPartUploadBinder;

@@ -15,55 +15,47 @@
  */
 package io.micronaut.http.server.netty.binders;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
-import io.micronaut.http.multipart.CompletedFileUpload;
-import io.micronaut.http.multipart.FileUpload;
+import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.http.server.netty.multipart.NettyStreamingFileUpload;
+import io.netty.handler.codec.http.multipart.FileUpload;
 import reactor.core.publisher.Mono;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * Binds {@link CompletedFileUpload}.
+ * Binds {@link StreamingFileUpload}.
  *
  * @author Denis Stepanov
  * @since 4.0.0
  */
-public non-sealed class CompletedFileUploadBinder implements TypedRequestArgumentBinder<CompletedFileUpload>, NettyRequestArgumentBinder<CompletedFileUpload> {
+@Internal
+final class NettyStreamingFileUploadBinder implements TypedRequestArgumentBinder<StreamingFileUpload>, NettyRequestArgumentBinder<StreamingFileUpload> {
 
-    private static final Argument<CompletedFileUpload> STREAMING_FILE_UPLOAD_ARGUMENT = Argument.of(CompletedFileUpload.class);
+    private static final Argument<StreamingFileUpload> STREAMING_FILE_UPLOAD_ARGUMENT = Argument.of(StreamingFileUpload.class);
 
-    private final ConversionService conversionService;
+    private final NettyStreamingFileUpload.Factory fileUploadFactory;
 
-    public CompletedFileUploadBinder(ConversionService conversionService) {
-        this.conversionService = conversionService;
+    NettyStreamingFileUploadBinder(NettyStreamingFileUpload.Factory fileUploadFactory) {
+        this.fileUploadFactory = fileUploadFactory;
     }
 
     @Override
-    public List<Class<?>> superTypes() {
-        return List.of(FileUpload.class);
-    }
-
-    @Override
-    public BindingResult<CompletedFileUpload> bindForNettyRequest(ArgumentConversionContext<CompletedFileUpload> context,
+    public BindingResult<StreamingFileUpload> bindForNettyRequest(ArgumentConversionContext<StreamingFileUpload> context,
                                                                   NettyHttpRequest<?> request) {
-        if (request.getContentType().isEmpty() || !request.isFormOrMultipartData()) {
-            return BindingResult.unsatisfied();
-        }
 
-        Argument<CompletedFileUpload> argument = context.getArgument();
+        Argument<StreamingFileUpload> argument = context.getArgument();
         String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(argument.getName());
 
-        CompletableFuture<CompletedFileUpload> completableFuture = Mono.from(request.formRouteCompleter().claimFieldsComplete(inputName))
-            .map(d -> conversionService.convertRequired(d, CompletedFileUpload.class))
-            .toFuture();
+        CompletableFuture<? extends StreamingFileUpload> completableFuture = Mono.from(
+            request.formRouteCompleter().claimFields(inputName, (data, publisher) -> fileUploadFactory.create((FileUpload) data, publisher))).toFuture();
 
         return new PendingRequestBindingResult<>() {
 
@@ -73,14 +65,14 @@ public non-sealed class CompletedFileUploadBinder implements TypedRequestArgumen
             }
 
             @Override
-            public Optional<CompletedFileUpload> getValue() {
+            public Optional<StreamingFileUpload> getValue() {
                 return Optional.ofNullable(completableFuture.getNow(null));
             }
         };
     }
 
     @Override
-    public Argument<CompletedFileUpload> argumentType() {
+    public Argument<StreamingFileUpload> argumentType() {
         return STREAMING_FILE_UPLOAD_ARGUMENT;
     }
 }

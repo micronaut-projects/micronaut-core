@@ -38,7 +38,7 @@ import java.util.Optional;
  * @since 2.5.0
  */
 @Internal
-public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<InputStream> {
+final class NettyInputStreamBodyBinder implements NonBlockingBodyArgumentBinder<InputStream> {
 
     public static final Argument<InputStream> TYPE = Argument.of(InputStream.class);
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
@@ -48,7 +48,7 @@ public class InputStreamBodyBinder implements NonBlockingBodyArgumentBinder<Inpu
     /**
      * @param httpServerConfiguration The server config
      */
-    public InputStreamBodyBinder(HttpServerConfiguration httpServerConfiguration) {
+    NettyInputStreamBodyBinder(HttpServerConfiguration httpServerConfiguration) {
         this.httpServerConfiguration = httpServerConfiguration;
     }
 

@@ -18,14 +18,13 @@ package io.micronaut.http.server.netty;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
+import io.micronaut.http.server.netty.binders.NettyServerRequestBinderRegistry;
 import io.micronaut.web.router.RouteMatch;
 import jakarta.inject.Singleton;
 
 /**
  * A class containing methods to aid in satisfying arguments of a {@link io.micronaut.web.router.Route}.
- *
  * Contains Netty specific extensions - setting the body required for blocking binders.
  *
  * @author Graeme Rocher
@@ -35,18 +34,15 @@ import jakarta.inject.Singleton;
 @Primary
 @Singleton
 @Internal
-public class NettyRequestArgumentSatisfier extends RequestArgumentSatisfier {
-
-    private final RequestBinderRegistry requestBinderRegistry;
+final class NettyRequestArgumentSatisfier extends RequestArgumentSatisfier {
 
     /**
      * Constructor.
      *
      * @param requestBinderRegistry The request argument binder
      */
-    public NettyRequestArgumentSatisfier(RequestBinderRegistry requestBinderRegistry) {
+    NettyRequestArgumentSatisfier(NettyServerRequestBinderRegistry requestBinderRegistry) {
         super(requestBinderRegistry);
-        this.requestBinderRegistry = requestBinderRegistry;
     }
 
     @Override

@@ -39,7 +39,7 @@ import java.util.concurrent.Future;
  * @since 1.0
  */
 @Internal
-public class CompletableFutureBodyBinder
+final class NettyCompletableFutureBodyBinder
     implements NonBlockingBodyArgumentBinder<CompletableFuture<?>> {
 
     private static final Argument<CompletableFuture<?>> TYPE = (Argument) Argument.of(CompletableFuture.class);
@@ -47,9 +47,9 @@ public class CompletableFutureBodyBinder
     private final NettyBodyAnnotationBinder<Object> nettyBodyAnnotationBinder;
 
     /**
-     * @param nettyBodyAnnotationBinder
+     * @param nettyBodyAnnotationBinder The body binder
      */
-    public CompletableFutureBodyBinder(NettyBodyAnnotationBinder<Object> nettyBodyAnnotationBinder) {
+    NettyCompletableFutureBodyBinder(NettyBodyAnnotationBinder<Object> nettyBodyAnnotationBinder) {
         this.nettyBodyAnnotationBinder = nettyBodyAnnotationBinder;
     }
 
@@ -86,7 +86,7 @@ public class CompletableFutureBodyBinder
                     } catch (Throwable e) {
                         throw new RuntimeException(e);
                     }
-                    return value.orElseThrow(() -> PublisherBodyBinder.extractError(null, context));
+                    return value.orElseThrow(() -> NettyPublisherBodyBinder.extractError(null, context));
                 }).toCompletableFuture();
             return () -> Optional.of(future);
         } else {
