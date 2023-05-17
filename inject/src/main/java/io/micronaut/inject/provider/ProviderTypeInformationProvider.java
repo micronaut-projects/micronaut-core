@@ -32,6 +32,6 @@ public final class ProviderTypeInformationProvider implements TypeInformationPro
     public boolean isWrapperType(Class<?> type) {
         return BeanProvider.class == type ||
                 Provider.class == type ||
-                type.getName().equals("javax.inject.Provider");
+                type.getName().equals("jakarta.inject.Provider");
     }
 }

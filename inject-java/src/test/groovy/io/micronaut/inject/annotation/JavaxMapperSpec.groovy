@@ -3,14 +3,14 @@ package io.micronaut.inject.annotation
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationUtil
 
-class JakartaMapperSpec extends AbstractTypeElementSpec {
+class JavaxMapperSpec extends AbstractTypeElementSpec {
 
     void "test annotation mapper map stereotypes correctly"() {
         def metadata = buildTypeAnnotationMetadata('''
 package test;
 
-@jakarta.inject.Singleton
-@jakarta.inject.Named("test")
+@javax.inject.Singleton
+@javax.inject.Named("test")
 class Test {
 
 }
@@ -33,8 +33,8 @@ package test;
 
 @io.micronaut.context.annotation.Factory
 class TestFactory {
-    
-    @jakarta.inject.Singleton
+
+    @javax.inject.Singleton
     Test test() {
         return new Test();
     }
@@ -64,8 +64,8 @@ class Test {
 
 }
 
-@jakarta.inject.Singleton
-@jakarta.inject.Named("test")
+@javax.inject.Singleton
+@javax.inject.Named("test")
 @Retention(RUNTIME)
 @interface Meta {
 
@@ -75,7 +75,7 @@ class Test {
         expect:
         metadata != null
         metadata.hasDeclaredStereotype(AnnotationUtil.SINGLETON)
-        !metadata.hasStereotype(jakarta.inject.Singleton)
+        !metadata.hasStereotype(javax.inject.Singleton)
         metadata.hasDeclaredStereotype(AnnotationUtil.SCOPE)
         metadata.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
         metadata.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).contains(AnnotationUtil.SINGLETON)

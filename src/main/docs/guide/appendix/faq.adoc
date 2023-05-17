@@ -44,7 +44,7 @@ Micronaut's api:discovery.DiscoveryClient[] uses Micronaut's native HTTP client,
 
 ==== Why am I encountering a NoSuchMethodError occurs loading my beans (Groovy)?
 
-Groovy by default imports classes in the `groovy.lang` package, including one named `@Singleton`, an AST transformation class that makes your class a singleton by adding a private constructor and static retrieval method. This annotation is easily confused with the `javax.inject.Singleton` annotation used to define singleton beans in Micronaut. Make sure you use the correct annotation in your Groovy classes.
+Groovy by default imports classes in the `groovy.lang` package, including one named `@Singleton`, an AST transformation class that makes your class a singleton by adding a private constructor and static retrieval method. This annotation is easily confused with the `jakarta.inject.Singleton` annotation used to define singleton beans in Micronaut. Make sure you use the correct annotation in your Groovy classes.
 
 ==== Why is it taking much longer than it should to start the application
 

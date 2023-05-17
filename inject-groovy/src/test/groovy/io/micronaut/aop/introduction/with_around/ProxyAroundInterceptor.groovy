@@ -4,7 +4,7 @@ import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
 import io.micronaut.core.annotation.Nullable
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 @Singleton
 class ProxyAroundInterceptor implements MethodInterceptor<Object, Object> {

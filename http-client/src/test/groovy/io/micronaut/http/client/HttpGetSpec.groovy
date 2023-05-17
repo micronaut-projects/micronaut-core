@@ -44,7 +44,7 @@ import spock.lang.Issue
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
-import javax.annotation.Nullable
+import jakarta.annotation.Nullable
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter

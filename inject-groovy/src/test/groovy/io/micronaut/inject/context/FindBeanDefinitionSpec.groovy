@@ -20,8 +20,8 @@ import io.micronaut.context.annotation.Primary
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 
-import javax.inject.Named
-import javax.inject.Singleton
+import jakarta.inject.Named
+import jakarta.inject.Singleton
 
 /**
  * @author graemerocher

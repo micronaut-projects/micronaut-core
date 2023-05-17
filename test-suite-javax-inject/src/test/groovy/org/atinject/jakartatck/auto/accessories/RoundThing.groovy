@@ -17,7 +17,7 @@ package org.atinject.jakartatck.auto.accessories
 
 import groovy.transform.PackageScope
 
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 class RoundThing {
 

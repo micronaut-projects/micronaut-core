@@ -60,6 +60,7 @@ import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
 import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.qualifiers.TypeAnnotationQualifier;
+import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -303,7 +304,12 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
 
     @Override
     public final Optional<Class<? extends Annotation>> getScope() {
-        return precalculatedInfo.scope.flatMap(scopeClassName -> (Optional) ClassUtils.forName(scopeClassName, getClass().getClassLoader()));
+        return precalculatedInfo.scope.flatMap(scopeClassName -> {
+            if ("javax.inject.Singleton".equals(scopeClassName) || Singleton.class.getName().equals(scopeClassName)) {
+                return Optional.of(Singleton.class);
+            }
+            return (Optional) ClassUtils.forName(scopeClassName, getClass().getClassLoader());
+        });
     }
 
     @Override

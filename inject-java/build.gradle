@@ -57,6 +57,7 @@ dependencies {
         exclude group: 'io.micronaut'
     }
     testImplementation libs.javax.annotation.api
+    testImplementation libs.javax.inject
     testImplementation libs.managed.snakeyaml
     testRuntimeOnly libs.jakarta.el.impl
     testRuntimeOnly libs.jakarta.el

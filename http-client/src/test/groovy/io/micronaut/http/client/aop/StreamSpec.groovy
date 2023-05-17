@@ -40,7 +40,7 @@ import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import javax.annotation.Nullable
+import jakarta.annotation.Nullable
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CountDownLatch
 

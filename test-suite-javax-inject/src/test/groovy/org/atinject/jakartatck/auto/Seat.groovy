@@ -18,8 +18,8 @@ package org.atinject.jakartatck.auto
 import groovy.transform.PackageScope
 import org.atinject.jakartatck.auto.accessories.Cupholder
 
-import javax.inject.Inject
-import javax.inject.Singleton
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
 
 /**
  * Created by graemerocher on 12/05/2017.

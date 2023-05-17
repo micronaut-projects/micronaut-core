@@ -28,7 +28,7 @@ import java.util.Optional;
  *
  * @param <A> An annotation type
  * @author Graeme Rocher
- * @see javax.inject.Scope
+ * @see jakarta.inject.Scope
  * @since 1.0
  */
 @Indexed(CustomScope.class)

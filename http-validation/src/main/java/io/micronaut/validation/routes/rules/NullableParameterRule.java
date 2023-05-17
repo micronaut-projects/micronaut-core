@@ -107,7 +107,7 @@ public class NullableParameterRule implements RouteValidationRule {
     }
 
     private boolean isNullable(TypedElement p) {
-        // Handles javax.annotation.Nullable or org.jetbrains.annotations.Nullable or Spring's version
+        // Handles javax.annotation.Nullable, jakarta.annotation.Nullable or org.jetbrains.annotations.Nullable or Spring's version
         return p.getAnnotationNames().stream().anyMatch(n -> NameUtils.getSimpleName(n).equals("Nullable"));
     }
 

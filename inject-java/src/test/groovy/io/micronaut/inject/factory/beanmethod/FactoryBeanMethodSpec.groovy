@@ -5,6 +5,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.BeanDefinition
+import jakarta.inject.Singleton
 
 class FactoryBeanMethodSpec extends AbstractTypeElementSpec {
 
@@ -221,7 +222,7 @@ class Bar8 {
             bar1BeanDefinition.declaredQualifier == null
             bar1BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
         and:
-            !bar2BeanDefinition.getScope().isPresent() // javax.inject.Singleton is not present :-/
+            bar2BeanDefinition.getScope().get() == Singleton.class
             bar2BeanDefinition.singleton
             bar2BeanDefinition.declaredQualifier == null
             bar2BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1
@@ -231,7 +232,7 @@ class Bar8 {
             bar3BeanDefinition.declaredQualifier.toString() == "@Xyz"
             bar3BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 0
         and:
-            !bar4BeanDefinition.getScope().isPresent()
+            bar4BeanDefinition.getScope().get() == Singleton.class
             bar4BeanDefinition.singleton
             bar4BeanDefinition.declaredQualifier.toString() == "@Abc"
             bar4BeanDefinition.getAnnotationNamesByStereotype(AnnotationUtil.SCOPE).size() == 1

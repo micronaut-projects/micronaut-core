@@ -18,40 +18,42 @@ package io.micronaut.inject.annotation.internal;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.naming.NameUtils;
-import io.micronaut.inject.annotation.AnnotationRemapper;
+import io.micronaut.inject.annotation.NamedAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import io.micronaut.core.annotation.NonNull;
+import java.lang.annotation.Annotation;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
 /**
- * A remapper that remaps findbugs annotations to internal annotations.
+ * Allows using the `jakarta.persistence.PersistenceContext` annotation in Micronaut.
  *
- * @author graemerocher
- * @since 1.2.0
+ * @author Denis Stepanov
+ * @since 4.0.0
  */
 @Internal
-public final class FindBugsRemapper implements AnnotationRemapper {
+public final class JakartaPersistenceContextAnnotationMapper implements NamedAnnotationMapper {
+
+    private static final String SOURCE_ANNOTATION = "jakarta.persistence.PersistenceContext";
 
     @Override
-    @NonNull public String getPackageName() {
-        return "edu.umd.cs.findbugs.annotations";
+    public String getName() {
+        return SOURCE_ANNOTATION;
     }
 
     @Override
-    @NonNull public List<AnnotationValue<?>> remap(AnnotationValue<?> annotation, VisitorContext visitorContext) {
-        String simpleName = NameUtils.getSimpleName(annotation.getAnnotationName());
-        if ("nullable".equalsIgnoreCase(simpleName)) {
-            return Collections.singletonList(
-                    AnnotationValue.builder(AnnotationUtil.NULLABLE).build()
+    public List<AnnotationValue<?>> map(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
+        final String name = annotation.stringValue("name").orElse(null);
+        if (name != null) {
+            return Arrays.asList(
+                AnnotationValue.builder(AnnotationUtil.INJECT).build(),
+                AnnotationValue.builder(AnnotationUtil.NAMED).value(name).build()
             );
-        } else if ("nonnull".equalsIgnoreCase(simpleName)) {
+        } else {
             return Collections.singletonList(
-                    AnnotationValue.builder(AnnotationUtil.NON_NULL).build()
+                AnnotationValue.builder(AnnotationUtil.INJECT).build()
             );
         }
-        return Collections.singletonList(annotation);
     }
 }

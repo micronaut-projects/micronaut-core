@@ -35,7 +35,6 @@ import io.micronaut.inject.ast.PackageElement
 import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.ast.WildcardElement
-import jakarta.inject.Singleton
 import jakarta.validation.Valid
 import spock.lang.IgnoreIf
 import spock.lang.Issue
@@ -407,10 +406,10 @@ class Test {
         !element.hasAnnotation(AnnotationUtil.SINGLETON)
 
         when:
-        element.annotate(Singleton)
+        element.annotate(javax.inject.Singleton)
 
         then:
-        !element.hasAnnotation(Singleton)
+        !element.hasAnnotation(javax.inject.Singleton)
         element.hasAnnotation(AnnotationUtil.SINGLETON)
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2022 original authors
+ * Copyright 2017-2021 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,22 +27,23 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * A transformer that remaps {@link jakarta.annotation.Nullable} to {@code javax.annotation.Nullable}.
- * @since 4.0
+ * Transforms {@code javax.annotation.PreDestroy} into the javax meta-annotation {@link io.micronaut.core.annotation.AnnotationUtil#PRE_DESTROY}.
+ *
+ * @author graemerocher
+ * @since 3.0
  */
 @Internal
-public class JakartaNullableTransformer implements NamedAnnotationTransformer {
-
+public final class JavaxPreDestroyTransformer implements NamedAnnotationTransformer {
+    @NonNull
     @Override
-    public @NonNull String getName() {
-        return "jakarta.annotation.Nullable";
+    public String getName() {
+        return "javax.annotation.PreDestroy";
     }
 
     @Override
     public List<AnnotationValue<?>> transform(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
         return Collections.singletonList(
-                AnnotationValue.builder(AnnotationUtil.NULLABLE).build()
+                AnnotationValue.builder(AnnotationUtil.PRE_DESTROY).build()
         );
     }
 }
-

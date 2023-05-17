@@ -30,23 +30,23 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Remaps from jakarta.inject to javax.inject.
+ * Remaps from {@code javax.inject} to {@code jakarta.inject}.
  */
 @Internal
-public final class JakartaRemapper implements AnnotationRemapper {
+public final class JavaxRemapper implements AnnotationRemapper {
 
-    private static final Pattern JAKARTA = Pattern.compile("^jakarta");
+    private static final Pattern JAVAX = Pattern.compile("^javax");
 
     @Override
     @NonNull
     public String getPackageName() {
-        return "jakarta.inject";
+        return "javax.inject";
     }
 
     @Override
     @NonNull public List<AnnotationValue<?>> remap(AnnotationValue<?> annotation, VisitorContext visitorContext) {
         String name = annotation.getAnnotationName();
-        Matcher matcher = JAKARTA.matcher(name);
+        Matcher matcher = JAVAX.matcher(name);
 
         AnnotationValue<?> stereotype = null;
         if (name.equals(Named.class.getName())) {
@@ -56,7 +56,7 @@ public final class JakartaRemapper implements AnnotationRemapper {
         }
 
         return Collections.singletonList(
-                AnnotationValue.builder(matcher.replaceFirst("javax"))
+                AnnotationValue.builder(matcher.replaceFirst("jakarta"))
                         .members(annotation.getValues())
                         .stereotype(stereotype)
                         .build()

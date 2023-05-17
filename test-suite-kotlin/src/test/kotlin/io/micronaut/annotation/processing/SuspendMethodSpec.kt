@@ -21,7 +21,7 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.test.extensions.junit5.annotation.MicronautTest
 import org.junit.jupiter.api.Test
 import reactor.core.publisher.Flux
-import javax.inject.Inject
+import jakarta.inject.Inject
 import kotlin.test.assertEquals
 
 // issue https://github.com/micronaut-projects/micronaut-core/issues/5396

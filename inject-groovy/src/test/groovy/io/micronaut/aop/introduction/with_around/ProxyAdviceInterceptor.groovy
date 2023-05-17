@@ -6,7 +6,7 @@ import io.micronaut.context.BeanContext
 import io.micronaut.core.annotation.Nullable
 import io.micronaut.inject.ExecutableMethod
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 @Singleton
 class ProxyAdviceInterceptor implements MethodInterceptor<Object, Object> {

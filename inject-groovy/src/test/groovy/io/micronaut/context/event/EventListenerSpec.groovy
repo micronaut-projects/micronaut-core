@@ -18,7 +18,7 @@ package io.micronaut.context.event
 import io.micronaut.context.BeanContext
 import spock.lang.Specification
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 /**
  * @author Graeme Rocher
