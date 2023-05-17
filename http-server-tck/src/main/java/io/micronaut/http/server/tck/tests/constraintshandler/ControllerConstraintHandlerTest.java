@@ -29,8 +29,7 @@ import io.micronaut.http.annotation.Error;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Status;
-import io.micronaut.http.server.tck.AssertionUtils;
-import io.micronaut.http.server.tck.HttpResponseAssertion;
+
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
@@ -42,9 +41,12 @@ import jakarta.validation.constraints.NotNull;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
+import io.micronaut.http.tck.AssertionUtils;
+import io.micronaut.http.tck.HttpResponseAssertion;
+import io.micronaut.http.tck.ServerUnderTest;
+import io.micronaut.http.tck.ServerUnderTestProviderUtils;
+import static io.micronaut.http.tck.TestScenario.asserts;
 
-import static io.micronaut.http.server.tck.TestScenario.asserts;
-import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SuppressWarnings({
@@ -64,28 +66,36 @@ public class ControllerConstraintHandlerTest {
         })
         .build();
 
-    /**
-     * @see <a href="https://github.com/micronaut-projects/micronaut-aws/issues/1164">micronaut-aws #1164</a>
-     */
     @Test
-    void testPojoConstraintViolationExceptionIsHandledViaHandler() throws IOException {
+    void testPojoWithNullable() throws IOException {
         asserts(SPEC_NAME,
             HttpRequest.POST("/constraints-via-handler", "{\"username\":\"tim@micronaut.example\",\"password\":\"secret\"}"),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .build()));
-
-        asserts(SPEC_NAME,
-            HttpRequest.POST("/constraints-via-handler", "{\"username\":\"invalidemail\",\"password\":\"secret\"}"),
-            (server, request) -> AssertionUtils.assertThrows(server, request, constraintAssertion("must be a well-formed email address")));
-        asserts(SPEC_NAME,
-            HttpRequest.POST("/constraints-via-handler", "{\"username\":\"\",\"password\":\"secret\"}"),
-            (server, request) -> AssertionUtils.assertThrows(server, request, constraintAssertion("must not be blank\"")));
         asserts(SPEC_NAME,
             HttpRequest.POST("/constraints-via-handler/with-at-nullable", "{\"username\":\"invalidemail\",\"password\":\"secret\"}"),
             (server, request) -> AssertionUtils.assertThrows(server, request, constraintAssertion("must be a well-formed email address")));
         asserts(SPEC_NAME,
             HttpRequest.POST("/constraints-via-handler/with-at-nullable", "{\"username\":\"\",\"password\":\"secret\"}"),
+            (server, request) -> AssertionUtils.assertThrows(server, request, constraintAssertion("must not be blank\"")));
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/constraints-via-on-error-method/with-at-nullable", "{\"username\":\"\",\"password\":\"secret\"}"),
+            (server, request) -> AssertionUtils.assertThrows(server, request, TEAPOT_ASSERTION));
+
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/constraints-via-on-error-method/with-at-nullable", "{\"password\":\"secret\"}"),
+            (server, request) -> AssertionUtils.assertThrows(server, request, TEAPOT_ASSERTION));
+
+    }
+
+    @Test
+    void testWithPojoWithoutAnnotations() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/constraints-via-handler", "{\"username\":\"invalidemail\",\"password\":\"secret\"}"),
+            (server, request) -> AssertionUtils.assertThrows(server, request, constraintAssertion("must be a well-formed email address")));
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/constraints-via-handler", "{\"username\":\"\",\"password\":\"secret\"}"),
             (server, request) -> AssertionUtils.assertThrows(server, request, constraintAssertion("must not be blank\"")));
 
 
@@ -97,18 +107,11 @@ public class ControllerConstraintHandlerTest {
             HttpRequest.POST("/constraints-via-on-error-method", "{\"password\":\"secret\"}"),
             (server, request) -> AssertionUtils.assertThrows(server, request, TEAPOT_ASSERTION));
 
-        asserts(SPEC_NAME,
-            HttpRequest.POST("/constraints-via-on-error-method/with-at-nullable", "{\"username\":\"\",\"password\":\"secret\"}"),
-            (server, request) -> AssertionUtils.assertThrows(server, request, TEAPOT_ASSERTION));
-
-        asserts(SPEC_NAME,
-            HttpRequest.POST("/constraints-via-on-error-method/with-at-nullable", "{\"password\":\"secret\"}"),
-            (server, request) -> AssertionUtils.assertThrows(server, request, TEAPOT_ASSERTION));
     }
 
     @Disabled("currently not supported")
     @Test
-    void testPojoCanHaveNullabilityAnnotationsMatchingConstraints() throws IOException {
+    void testPojoWithNonNullAnnotation() throws IOException {
 
         asserts(SPEC_NAME,
             HttpRequest.POST("/constraints-via-handler/with-non-null", "{\"username\":\"invalidemail\",\"password\":\"secret\"}"),
