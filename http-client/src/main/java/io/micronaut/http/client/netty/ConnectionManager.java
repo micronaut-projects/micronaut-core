@@ -62,6 +62,7 @@ import io.netty.handler.codec.http2.Http2FrameCodec;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2HeadersFrame;
+import io.netty.handler.codec.http2.Http2MultiplexActiveStreamsException;
 import io.netty.handler.codec.http2.Http2MultiplexHandler;
 import io.netty.handler.codec.http2.Http2SettingsAckFrame;
 import io.netty.handler.codec.http2.Http2SettingsFrame;
@@ -109,12 +110,10 @@ import java.net.Proxy;
 import java.net.SocketAddress;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -1312,7 +1311,6 @@ public class ConnectionManager {
 
         class Http2ConnectionHolder extends ConnectionHolder {
             private final AtomicInteger liveRequests = new AtomicInteger(0);
-            private final Set<Channel> liveStreamChannels = new HashSet<>(); // todo: https://github.com/netty/netty/pull/12830
 
             Http2ConnectionHolder(Channel channel, NettyClientCustomizer customizer) {
                 super(channel, customizer);
@@ -1346,9 +1344,7 @@ public class ConnectionManager {
 
             @Override
             void fireReadTimeout(ChannelHandlerContext ctx) {
-                for (Channel sc : liveStreamChannels) {
-                    sc.pipeline().fireExceptionCaught(ReadTimeoutException.INSTANCE);
-                }
+                channel.pipeline().fireExceptionCaught(new Http2MultiplexActiveStreamsException(ReadTimeoutException.INSTANCE));
             }
 
             @Override
@@ -1380,7 +1376,6 @@ public class ConnectionManager {
                             @Override
                             public void release() {
                                 super.release();
-                                liveStreamChannels.remove(streamChannel);
                                 streamChannel.close();
                                 int newCount = liveRequests.decrementAndGet();
                                 if (windDownConnection && newCount <= 0) {
@@ -1400,7 +1395,6 @@ public class ConnectionManager {
                                 streamCustomizer.onRequestPipelineBuilt();
                             }
                         };
-                        liveStreamChannels.add(streamChannel);
                         emitPoolHandle(sink, ph);
                     } else {
                         log.debug("Failed to open http2 stream", future.cause());
