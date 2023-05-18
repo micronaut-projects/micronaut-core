@@ -122,7 +122,7 @@ public final class DefaultExecutableBeanContextBinder implements ExecutableBeanC
         AnnotationMetadata annotationMetadata = Objects.requireNonNull(argument, "Argument cannot be null").getAnnotationMetadata();
         boolean hasMetadata = annotationMetadata != AnnotationMetadata.EMPTY_METADATA;
 
-        List<String> qualifierTypes = hasMetadata ? annotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER) : Collections.emptyList();
+        List<String> qualifierTypes = hasMetadata ? AnnotationUtil.findQualifierAnnotationsNames(annotationMetadata) : Collections.emptyList();
         if (CollectionUtils.isNotEmpty(qualifierTypes)) {
             if (qualifierTypes.size() == 1) {
                 return Qualifiers.byAnnotation(

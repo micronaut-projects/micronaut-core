@@ -47,7 +47,7 @@ public interface QualifiedBeanType<T> extends BeanType<T>, AnnotationMetadataDel
             // All qualifiers are removed from the factory class anyway, so we can skip the hierarchy
             annotationMetadata = annotationMetadata.getDeclaredMetadata();
         }
-        List<AnnotationValue<Annotation>> annotations = annotationMetadata.getAnnotationValuesByStereotype(AnnotationUtil.QUALIFIER);
+        List<AnnotationValue<Annotation>> annotations = AnnotationUtil.findQualifierAnnotations(annotationMetadata);
         if (!annotations.isEmpty()) {
             if (annotations.size() == 1) {
                 final AnnotationValue<Annotation> annotationValue = annotations.iterator().next();
