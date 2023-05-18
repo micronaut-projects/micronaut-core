@@ -22,6 +22,126 @@ import java.lang.annotation.Annotation
 
 class AroundCompileSpec extends AbstractTypeElementSpec {
 
+    void "test around on introduced method"() {
+        given:
+            ApplicationContext context = buildContext('''
+package introductiontest;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import jakarta.inject.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+@TestIntroductionAnn
+interface MyBean {
+
+    @TestAroundAnn
+    int test();
+
+}
+
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@InterceptorBinding(kind = InterceptorKind.INTRODUCTION)
+@interface TestIntroductionAnn {
+}
+
+@InterceptorBean(TestIntroductionAnn.class)
+class StubIntroduction implements Interceptor {
+    int invoked = 0;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked++;
+        return 10;
+    }
+}
+
+@Inherited
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@InterceptorBinding
+@interface TestAroundAnn {
+}
+
+@InterceptorBean(TestAroundAnn.class)
+class TestInterceptor implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+}
+
+''')
+            def instance = getBean(context, 'introductiontest.MyBean')
+            def introductionInterceptor = getBean(context, 'introductiontest.StubIntroduction')
+            def aroundInterceptor = getBean(context, 'introductiontest.TestInterceptor')
+
+        when:
+            def result = instance.test()
+
+        then:"the interceptor was invoked"
+            instance instanceof Intercepted
+            result == 10
+            introductionInterceptor.invoked == 1
+            aroundInterceptor.invoked == true
+    }
+
+    void 'test apply interceptor using interface'() {
+        given:
+            ApplicationContext context = buildContext('''
+package test;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import jakarta.inject.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+interface IMyBean {
+    @TestAnn
+    void test();
+}
+
+@Singleton
+class MyBean implements IMyBean {
+
+    @Override
+    public void test() {
+
+    }
+
+}
+
+@Inherited
+@Retention(RUNTIME)
+@Target({ElementType.METHOD, ElementType.TYPE})
+@InterceptorBinding
+@interface TestAnn {
+}
+
+@InterceptorBean(TestAnn.class)
+class TestInterceptor implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+}
+
+''')
+            def instance = getBean(context, 'test.MyBean')
+            def interceptor = getBean(context, 'test.TestInterceptor')
+
+        when:
+            instance.test()
+
+        then:"the interceptor was invoked"
+            instance instanceof Intercepted
+            interceptor.invoked
+    }
+
     void 'test stereotype method level interceptor matching'() {
         given:
         ApplicationContext context = buildContext('''

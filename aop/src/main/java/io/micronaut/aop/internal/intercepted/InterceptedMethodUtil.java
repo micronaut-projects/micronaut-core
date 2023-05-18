@@ -30,11 +30,10 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.ReturnType;
 
+import java.lang.annotation.Annotation;
 import java.util.List;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Future;
-import java.util.function.Function;
-import java.util.function.Predicate;
 
 /**
  * The {@link InterceptedMethod} utils class.
@@ -81,94 +80,85 @@ public final class InterceptedMethodUtil {
 
     /**
      * Resolve interceptor binding annotations from the metadata.
+     *
      * @param annotationMetadata The annotation metadata
-     * @param interceptorKind The interceptor kind
+     * @param interceptorKind    The interceptor kind
      * @return the annotation values
      */
     public static io.micronaut.core.annotation.AnnotationValue<?>[] resolveInterceptorBinding(
-            AnnotationMetadata annotationMetadata,
-            InterceptorKind interceptorKind) {
+        AnnotationMetadata annotationMetadata,
+        InterceptorKind interceptorKind) {
         final List<AnnotationValue<InterceptorBinding>> interceptorBindings
-                = annotationMetadata.getAnnotationValuesByType(InterceptorBinding.class);
+            = annotationMetadata.getAnnotationValuesByType(InterceptorBinding.class);
         if (!interceptorBindings.isEmpty()) {
             return interceptorBindings
-                    .stream()
-                    .filter(av -> {
-                        final InterceptorKind kind = av.enumValue("kind", InterceptorKind.class)
-                                .orElse(InterceptorKind.AROUND);
-                        return kind == interceptorKind;
-                    })
-                    .toArray(io.micronaut.core.annotation.AnnotationValue[]::new);
+                .stream()
+                .filter(av -> {
+                    final InterceptorKind kind = av.enumValue("kind", InterceptorKind.class)
+                        .orElse(InterceptorKind.AROUND);
+                    return kind == interceptorKind;
+                })
+                .toArray(io.micronaut.core.annotation.AnnotationValue[]::new);
         }
         return AnnotationUtil.ZERO_ANNOTATION_VALUES;
     }
 
     /**
      * Does the given metadata have AOP advice declared.
+     *
      * @param annotationMetadata The annotation metadata
      * @return True if it does
      */
     public static boolean hasAroundStereotype(@Nullable AnnotationMetadata annotationMetadata) {
-        return hasAround(annotationMetadata,
-                annMetadata -> annMetadata.hasStereotype(Around.class),
-                annMetdata -> annMetdata.getAnnotationValuesByType(InterceptorBinding.class));
+        return hasInterceptorBinding(annotationMetadata,
+            false,
+            Around.class,
+            InterceptorKind.AROUND);
     }
 
     /**
      * Does the given metadata have introduction declared.
+     *
      * @param annotationMetadata The annotation metadata
      * @return True if it does
      */
     public static boolean hasIntroductionStereotype(@Nullable AnnotationMetadata annotationMetadata) {
-        return hasIntroduction(annotationMetadata,
-                annMetadata -> annMetadata.hasStereotype(Introduction.class),
-                annMetdata -> annMetdata.getAnnotationValuesByType(InterceptorBinding.class));
+        return hasInterceptorBinding(annotationMetadata,
+            false,
+            Introduction.class,
+            InterceptorKind.INTRODUCTION);
     }
 
     /**
      * Does the given metadata have declared AOP advice.
+     *
      * @param annotationMetadata The annotation metadata
      * @return True if it does
      */
     public static boolean hasDeclaredAroundAdvice(@Nullable AnnotationMetadata annotationMetadata) {
-        return hasAround(annotationMetadata,
-                annMetadata -> annMetadata.hasDeclaredStereotype(Around.class),
-                annMetdata -> annMetdata.getDeclaredAnnotationValuesByType(InterceptorBinding.class));
+        return hasInterceptorBinding(annotationMetadata,
+            true,
+            Around.class,
+            InterceptorKind.AROUND);
     }
 
-    private static boolean hasAround(@Nullable AnnotationMetadata annotationMetadata,
-                                     @NonNull Predicate<AnnotationMetadata> hasFunction,
-                                     @NonNull Function<AnnotationMetadata, List<AnnotationValue<InterceptorBinding>>> interceptorBindingsFunction) {
-        if (annotationMetadata == null) {
-            return false;
+    private static boolean hasInterceptorBinding(AnnotationMetadata annotationMetadata,
+                                                 boolean declared,
+                                                 Class<? extends Annotation> interceptorAnnotation,
+                                                 InterceptorKind kind) {
+        List<AnnotationValue<InterceptorBinding>> annotationsValues;
+        if (declared) {
+            if (annotationMetadata.hasDeclaredStereotype(interceptorAnnotation)) {
+                return true;
+            }
+            annotationsValues = annotationMetadata.getDeclaredAnnotationValuesByType(InterceptorBinding.class);
+        } else {
+            if (annotationMetadata.hasStereotype(interceptorAnnotation)) {
+                return true;
+            }
+            annotationsValues = annotationMetadata.getAnnotationValuesByType(InterceptorBinding.class);
         }
-        if (hasFunction.test(annotationMetadata)) {
-            return true;
-        } else if (annotationMetadata.hasDeclaredStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
-            return interceptorBindingsFunction.apply(annotationMetadata)
-                    .stream().anyMatch(av ->
-                            av.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND) == InterceptorKind.AROUND
-                    );
-        }
-
-        return false;
-    }
-
-    private static boolean hasIntroduction(@Nullable AnnotationMetadata annotationMetadata,
-                                           @NonNull Predicate<AnnotationMetadata> hasFunction,
-                                           @NonNull Function<AnnotationMetadata, List<AnnotationValue<InterceptorBinding>>> interceptorBindingsFunction) {
-        if (annotationMetadata == null) {
-            return false;
-        }
-        if (hasFunction.test(annotationMetadata)) {
-            return true;
-        } else if (annotationMetadata.hasDeclaredStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
-            return interceptorBindingsFunction.apply(annotationMetadata)
-                    .stream().anyMatch(av ->
-                            av.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND) == InterceptorKind.INTRODUCTION
-                    );
-        }
-
-        return false;
+        return annotationsValues
+            .stream().anyMatch(av -> av.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND) == kind);
     }
 }
