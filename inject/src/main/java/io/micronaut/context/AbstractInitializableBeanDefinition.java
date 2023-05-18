@@ -105,6 +105,8 @@ import java.util.stream.Stream;
 public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextConditional
     implements InstantiatableBeanDefinition<T>, InjectableBeanDefinition<T>, EnvironmentConfigurable, BeanContextConfigurable {
     private static final Logger LOG = LoggerFactory.getLogger(AbstractInitializableBeanDefinition.class);
+    @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
+    private static final Optional<Class<? extends Annotation>> SINGLETON_SCOPE = Optional.of(Singleton.class);
 
     private final Class<T> type;
     private final AnnotationMetadata annotationMetadata;
@@ -305,8 +307,8 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     @Override
     public final Optional<Class<? extends Annotation>> getScope() {
         return precalculatedInfo.scope.flatMap(scopeClassName -> {
-            if ("javax.inject.Singleton".equals(scopeClassName) || Singleton.class.getName().equals(scopeClassName)) {
-                return Optional.of(Singleton.class);
+            if (Singleton.class.getName().equals(scopeClassName)) {
+                return SINGLETON_SCOPE;
             }
             return (Optional) ClassUtils.forName(scopeClassName, getClass().getClassLoader());
         });
