@@ -136,7 +136,7 @@ class IOUtilsSpec extends Specification {
         URI uri = new URI(uriStr)
 
         expect:
-        expected == IOUtils.resolvePath(uri, path, toClose, (closeables, s) -> Paths.get("/")).toString()
+        expected == IOUtils.resolvePath(uri, path, toClose, (closeables, s) -> Paths.get("/")).toString().replaceAll("\\\\", "/")
 
         where:
         path                                                             | expected                                                          | uriStr

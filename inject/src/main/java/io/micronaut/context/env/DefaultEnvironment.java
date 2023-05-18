@@ -34,8 +34,6 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanConfiguration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -83,7 +81,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final String EC2_LINUX_BIOS_VENDOR_FILE = "/sys/devices/virtual/dmi/id/bios_vendor";
     private static final String EC2_WINDOWS_HYPERVISOR_CMD = "wmic path win32_computersystemproduct get uuid";
     private static final String FILE_SEPARATOR = ",";
-    private static final Logger LOG = LoggerFactory.getLogger(DefaultEnvironment.class);
     private static final String AWS_LAMBDA_FUNCTION_NAME_ENV = "AWS_LAMBDA_FUNCTION_NAME";
     private static final String K8S_ENV = "KUBERNETES_SERVICE_HOST";
     private static final String PCF_ENV = "VCAP_SERVICES";
@@ -135,9 +132,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @param logEnabled flag to enable or disable logger
      */
     public DefaultEnvironment(@NonNull ApplicationContextConfiguration configuration, boolean logEnabled) {
-        super(configuration.getConversionService());
+        super(configuration.getConversionService(), logEnabled);
 
-        this.logEnabled = logEnabled;
         this.configuration = configuration;
         this.resourceLoader = configuration.getResourceLoader();
 
@@ -167,8 +163,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         this.classLoader = configuration.getClassLoader();
         this.annotationScanner = createAnnotationScanner(classLoader);
         this.names = environments;
-        if (logEnabled && !environments.isEmpty()) {
-            LOG.info("Established active environments: {}", environments);
+        if (!environments.isEmpty()) {
+            log.info("Established active environments: {}", environments);
         }
         List<String> configLocations = configuration.getOverrideConfigLocations() == null ?
                 new ArrayList<>(DEFAULT_CONFIG_LOCATIONS) : configuration.getOverrideConfigLocations();
@@ -274,9 +270,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @Override
     public Environment start() {
         if (running.compareAndSet(false, true)) {
-            if (logEnabled) {
-                LOG.debug("Starting environment {} for active names {}", this, getActiveNames());
-            }
+            log.debug("Starting environment {} for active names {}", this, getActiveNames());
             if (reading.compareAndSet(false, true)) {
 
                 readPropertySources(getPropertySourceRootName());
@@ -364,9 +358,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     protected boolean shouldDeduceEnvironments() {
         if (deduceEnvironments != null) {
-            if (logEnabled) {
-                LOG.debug("Environment deduction was set explicitly via builder to: {}", deduceEnvironments);
-            }
+            log.debug("Environment deduction was set explicitly via builder to: {}", deduceEnvironments);
 
             return deduceEnvironments;
         } else if (configuration.isEnableDefaultPropertySources()) {
@@ -375,21 +367,15 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
             if (StringUtils.isNotEmpty(deduceEnv)) {
                 boolean deduce = Boolean.parseBoolean(deduceEnv);
-                if (logEnabled) {
-                    LOG.debug("Environment deduction was set via environment variable to: {}", deduce);
-                }
+                log.debug("Environment deduction was set via environment variable to: {}", deduce);
                 return deduce;
             } else if (StringUtils.isNotEmpty(deduceProperty)) {
                 boolean deduce = Boolean.parseBoolean(deduceProperty);
-                if (logEnabled) {
-                    LOG.debug("Environment deduction was set via system property to: {}", deduce);
-                }
+                log.debug("Environment deduction was set via system property to: {}", deduce);
                 return deduce;
             } else {
                 boolean deduceDefault = DEDUCE_ENVIRONMENT_DEFAULT;
-                if (logEnabled) {
-                    LOG.debug("Environment deduction is using the default of: {}", deduceDefault);
-                }
+                log.debug("Environment deduction is using the default of: {}", deduceDefault);
                 return deduceDefault;
             }
         } else {
@@ -440,9 +426,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         propertySources.addAll(this.propertySources.values());
         OrderUtil.sort(propertySources);
         for (PropertySource propertySource : propertySources) {
-            if (logEnabled) {
-                LOG.debug("Processing property source: {}", propertySource.getName());
-            }
+            log.debug("Processing property source: {}", propertySource.getName());
             processPropertySource(propertySource, propertySource.getConvention());
         }
     }
@@ -495,9 +479,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                         String fileName = NameUtils.filename(filePath);
                         Optional<PropertySourceLoader> propertySourceLoader = Optional.ofNullable(loaderByFormatMap.get(extension));
                         if (propertySourceLoader.isPresent()) {
-                            if (logEnabled) {
-                                LOG.debug("Reading property sources from loader: {}", propertySourceLoader);
-                            }
+                            log.debug("Reading property sources from loader: {}", propertySourceLoader);
                             Optional<Map<String, Object>> properties = readPropertiesFromLoader(fileName, filePath, propertySourceLoader.get());
                             if (properties.isPresent()) {
                                 propertySources.add(PropertySource.of(filePath, properties.get(), order));
@@ -547,9 +529,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             loadPropertySourceFromLoader(name, new PropertiesPropertySourceLoader(), propertySources, resourceLoader);
         } else {
             for (PropertySourceLoader propertySourceLoader : propertySourceLoaders) {
-                if (logEnabled) {
-                    LOG.debug("Reading property sources from loader: {}", propertySourceLoader);
-                }
+                log.debug("Reading property sources from loader: {}", propertySourceLoader);
                 loadPropertySourceFromLoader(name, propertySourceLoader, propertySources, resourceLoader);
             }
         }

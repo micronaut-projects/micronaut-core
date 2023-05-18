@@ -49,7 +49,7 @@ public interface Session extends MutableConvertibleValues<Object> {
 
     /**
      * Returns the last time the client sent a request associated with this session as an {@link Instant}.
-     * <p>
+     *
      * <p>Actions that your application takes, such as getting or setting a value associated with the session, do not
      * affect the access time.
      *

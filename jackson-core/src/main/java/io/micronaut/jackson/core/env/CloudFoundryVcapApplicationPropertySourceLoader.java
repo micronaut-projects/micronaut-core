@@ -46,6 +46,13 @@ public class CloudFoundryVcapApplicationPropertySourceLoader extends EnvJsonProp
 
     private static final String VCAP_APPLICATION = "VCAP_APPLICATION";
 
+    public CloudFoundryVcapApplicationPropertySourceLoader() {
+    }
+
+    public CloudFoundryVcapApplicationPropertySourceLoader(boolean logEnabled) {
+        super(logEnabled);
+    }
+
     @Override
     public int getOrder() {
         return POSITION;
