@@ -44,7 +44,6 @@ import java.util.Map;
 import java.util.Optional;
 
 import static io.micronaut.http.server.tck.TestScenario.asserts;
-import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SuppressWarnings({
@@ -126,7 +125,6 @@ public class ControllerConstraintHandlerTest {
             HttpRequest.POST("/constraints-via-on-error-method/with-non-null", "{\"password\":\"secret\"}"),
             (server, request) -> AssertionUtils.assertThrows(server, request, TEAPOT_ASSERTION));
     }
-
 
     private static HttpResponseAssertion constraintAssertion(String expectedMessage) {
         return HttpResponseAssertion.builder()
