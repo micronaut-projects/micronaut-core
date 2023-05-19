@@ -45,6 +45,13 @@ public class JsonPropertySourceLoader extends AbstractPropertySourceLoader {
      */
     public static final String FILE_EXTENSION = "json";
 
+    public JsonPropertySourceLoader() {
+    }
+
+    public JsonPropertySourceLoader(boolean logEnabled) {
+        super(logEnabled);
+    }
+
     @Override
     public Set<String> getExtensions() {
         return Collections.singleton(FILE_EXTENSION);

@@ -27,9 +27,21 @@ import java.io.InputStream;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.file.*;
-import java.util.*;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystemAlreadyExistsException;
+import java.nio.file.FileSystemNotFoundException;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.ProviderNotFoundException;
+import java.util.Collections;
+import java.util.Enumeration;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
+
+import org.slf4j.helpers.NOPLogger;
 
 /**
  * Loads resources from the classpath.
@@ -40,7 +52,7 @@ import java.util.stream.Stream;
  */
 public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DefaultClassPathResourceLoader.class);
+    private final Logger log;
 
     private final ClassLoader classLoader;
     private final String basePath;
@@ -77,6 +89,21 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      * @param checkBase   If set to {@code true} an extended check for the base path is performed otherwise paths with relative URLs like {@code ../} are prohibited.
      */
     public DefaultClassPathResourceLoader(ClassLoader classLoader, String basePath, boolean checkBase) {
+        this(classLoader, basePath, checkBase, true);
+    }
+
+    /**
+     * Use when resources should have a standard base path.
+     *
+     * @param classLoader The class loader for loading resources
+     * @param basePath    The path to look for resources under
+     * @param checkBase   If set to {@code true} an extended check for the base path is performed otherwise paths with relative URLs like {@code ../} are prohibited.
+     * @param logEnabled flag to enable or disable logger
+     */
+    public DefaultClassPathResourceLoader(ClassLoader classLoader, String basePath, boolean checkBase, boolean logEnabled) {
+
+        log = logEnabled ? LoggerFactory.getLogger(getClass()) : NOPLogger.NOP_LOGGER;
+
         this.classLoader = classLoader;
         this.basePath = normalize(basePath);
         this.baseURL = checkBase && basePath != null ? classLoader.getResource(normalize(basePath)) : null;
@@ -129,9 +156,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
                                     try {
                                         fileSystem.close();
                                     } catch (IOException e) {
-                                        if (LOG.isDebugEnabled()) {
-                                            LOG.debug("Error shutting down JAR file system [" + fileSystem + "]: " + e.getMessage(), e);
-                                        }
+                                        log.debug("Error shutting down JAR file system [{}]: {}", fileSystem, e.getMessage(), e);
                                     }
                                 }
                             }
@@ -144,9 +169,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
                         return Optional.of(Files.newInputStream(pathObject));
                     }
                 } catch (URISyntaxException | IOException | ProviderNotFoundException e) {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Error establishing whether path is a directory: " + e.getMessage(), e);
-                    }
+                    log.debug("Error establishing whether path is a directory: {}", e.getMessage(), e);
                 }
             }
         }
@@ -253,6 +276,18 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
         return new DefaultClassPathResourceLoader(classLoader, basePath);
     }
 
+    /**
+     * Need this method to ability disable Slf4J initizalization.
+     *
+     * @param basePath The path to load resources
+     * @param logEnabled flag to enable or disable logger
+     *
+     * @return The resource loader
+     */
+    public ResourceLoader forBase(String basePath, boolean logEnabled) {
+        return new DefaultClassPathResourceLoader(classLoader, basePath, false, logEnabled);
+    }
+
     @SuppressWarnings("MagicNumber")
     private String normalize(String path) {
         if (path != null) {
@@ -297,9 +332,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
                                     try {
                                         fileSystem.close();
                                     } catch (IOException e) {
-                                        if (LOG.isDebugEnabled()) {
-                                            LOG.debug("Error shutting down JAR file system [" + fileSystem + "]: " + e.getMessage(), e);
-                                        }
+                                        log.debug("Error shutting down JAR file system [{}]: {}", fileSystem, e.getMessage(), e);
                                     }
                                 }
                             }
@@ -309,9 +342,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
                         return pathObject == null || Files.isDirectory(pathObject);
                     }
                 } catch (URISyntaxException | IOException | ProviderNotFoundException e) {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Error establishing whether path is a directory: " + e.getMessage(), e);
-                    }
+                    log.debug("Error establishing whether path is a directory: {}", e.getMessage(), e);
                 }
             }
             return path.indexOf('.') == -1; // fallback to less sophisticated approach
