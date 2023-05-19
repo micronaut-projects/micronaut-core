@@ -15,6 +15,7 @@
  */
 package io.micronaut.json.body;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -48,6 +49,7 @@ import java.io.OutputStream;
 @Singleton
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
+@BootstrapContextCompatible
 public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {
     private final JsonMapper jsonMapper;
 
