@@ -33,7 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.PrintStream;
-import java.net.URL;
+import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -94,8 +94,8 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                             final EmbeddedServer embeddedServer = (EmbeddedServer) embeddedApplication;
                             if (LOG.isInfoEnabled()) {
                                 long took = elapsedMillis(start);
-                                URL url = embeddedServer.getURL();
-                                LOG.info("Startup completed in {}ms. Server Running: {}", took, url);
+                                URI uri = embeddedServer.getContextURI();
+                                LOG.info("Startup completed in {}ms. Server Running: {}", took, uri);
                             }
                             keepAlive = embeddedServer.isKeepAlive();
                         } else {

@@ -35,7 +35,10 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.MapPropertyResolver;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.core.value.ValueException;
+
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.helpers.NOPLogger;
 
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -66,8 +69,6 @@ import java.util.stream.Collectors;
  */
 public class PropertySourcePropertyResolver implements PropertyResolver, AutoCloseable {
 
-    private static final Logger LOG = ClassUtils.getLogger(PropertySourcePropertyResolver.class);
-
     private static final EnvironmentProperties CURRENT_ENV = StaticOptimizations.get(EnvironmentProperties.class)
             .orElseGet(EnvironmentProperties::empty);
     private static final Pattern DOT_PATTERN = Pattern.compile("\\.");
@@ -87,10 +88,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     protected final Map<String, Object>[] rawCatalog = new Map[58];
     protected final Map<String, Object>[] nonGenerated = new Map[58];
 
-    /**
-     * If you don't need to initialize SLF4J, set 'false'.
-     */
-    protected boolean logEnabled = true;
+    protected Logger log;
 
     private final SecureRandom random = new SecureRandom();
     private final Map<String, Boolean> containsCache = new ConcurrentHashMap<>(20);
@@ -101,10 +99,23 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * Creates a new, initially empty, {@link PropertySourcePropertyResolver} for the given {@link ConversionService}.
      *
      * @param conversionService The {@link ConversionService}
+     * @param logEnabled logEnabled flag to enable or disable logger
      */
-    public PropertySourcePropertyResolver(ConversionService<?> conversionService) {
+    public PropertySourcePropertyResolver(ConversionService<?> conversionService, boolean logEnabled) {
+
+        log = logEnabled ? LoggerFactory.getLogger(getClass()) : NOPLogger.NOP_LOGGER;
+
         this.conversionService = conversionService;
         this.propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(this, conversionService);
+    }
+
+    /**
+     * Creates a new, initially empty, {@link PropertySourcePropertyResolver} for the given {@link ConversionService}.
+     *
+     * @param conversionService The {@link ConversionService}
+     */
+    public PropertySourcePropertyResolver(ConversionService<?> conversionService) {
+        this(conversionService, true);
     }
 
     /**
@@ -330,11 +341,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                             converted = conversionService.convert(value, conversionContext);
                         }
 
-                        if (logEnabled && LOG.isTraceEnabled()) {
+                        if (log.isTraceEnabled()) {
                             if (converted.isPresent()) {
-                                LOG.trace("Resolved value [{}] for property: {}", converted.get(), name);
+                                log.trace("Resolved value [{}] for property: {}", converted.get(), name);
                             } else {
-                                LOG.trace("Resolved value [{}] cannot be converted to type [{}] for property: {}", value, conversionContext.getArgument(), name);
+                                log.trace("Resolved value [{}] cannot be converted to type [{}] for property: {}", value, conversionContext.getArgument(), name);
                             }
                         }
 
@@ -363,9 +374,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             }
 
         }
-        if (logEnabled) {
-            LOG.trace("No value found for property: {}", name);
-        }
+        log.trace("No value found for property: {}", name);
 
         Class<T> requiredType = conversionContext.getArgument().getType();
         if (Properties.class.isAssignableFrom(requiredType)) {
@@ -533,9 +542,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         synchronized (catalog) {
             for (String property : properties) {
 
-                if (logEnabled) {
-                    LOG.trace("Processing property key {}", property);
-                }
+                log.trace("Processing property key {}", property);
 
                 Object value = properties.get(property);
 
@@ -913,11 +920,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * Return logEnabled value.
      *
      * @return is log enabled
+     * @deprecated don't need to have this method
      *
      * @since 3.9.0
      */
+    @Deprecated
     public boolean isLogEnabled() {
-        return logEnabled;
+        return !(log instanceof NOPLogger);
     }
 
     /**
@@ -925,10 +934,17 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      *
      * @param logEnabled is log enabled
      *
+     * @deprecated set logEnabled value by constructor
+     *
      * @since 3.9.0
      */
+    @Deprecated
     public void setLogEnabled(boolean logEnabled) {
-        this.logEnabled = logEnabled;
+        if (logEnabled) {
+            log = LoggerFactory.getLogger(getClass());
+        } else {
+            log = NOPLogger.NOP_LOGGER;
+        }
     }
 
     /**
