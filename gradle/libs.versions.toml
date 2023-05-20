@@ -7,7 +7,7 @@ caffeine = "2.9.3"
 compile-testing = "0.19"
 
 geb = "7.0"
-gorm = "7.3.2"
+gorm = "7.3.4"
 # be sure to update graal version in gradle.properties as well
 graal-svm = "22.3.2"
 h2 = "2.1.214"
