@@ -15,7 +15,9 @@
  */
 package io.micronaut.http.server.tck.tests.codec;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
@@ -24,16 +26,16 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.server.tck.AssertionUtils;
+import io.micronaut.http.server.tck.BodyAssertion;
 import io.micronaut.http.server.tck.HttpResponseAssertion;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.Collections;
-import java.util.Optional;
+import java.util.Map;
 
 import static io.micronaut.http.server.tck.TestScenario.asserts;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 @SuppressWarnings({
@@ -43,27 +45,32 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 })
 public class JsonCodeAdditionalTypeTest {
     public static final String SPEC_NAME = "JsonCodeAdditionalTypeTest";
+    public static final String APPLICATION_JSON_FEED = "application/json+feed";
 
     @Test
     void itIsPossibleToCanRegisterAdditionTypesForJsonCodec() throws IOException {
+        HttpResponseAssertion assertion = HttpResponseAssertion.builder()
+            .body(BodyAssertion.builder().body("https://jsonfeed.org").contains())
+            .status(HttpStatus.OK)
+            .assertResponse(response -> assertEquals(APPLICATION_JSON_FEED, response.header("Content-Type"))).build();
+
+        Map<String, Object> config = Collections.singletonMap("micronaut.codec.json.additional-types", Collections.singletonList(APPLICATION_JSON_FEED));
         asserts(SPEC_NAME,
-            Collections.singletonMap("micronaut.codec.json.additional-types", Collections.singletonList("application/json+feed")),
-            HttpRequest.GET("/json-additional-codec").header(HttpHeaders.ACCEPT, "application/json+feed"),
-            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, Argument.of(String.class), HttpResponseAssertion.builder()
-                .status(HttpStatus.OK)
-                .assertResponse(response -> {
-                    Optional<String> jsonOptional = response.getBody(Argument.of(String.class));
-                    assertTrue(jsonOptional.isPresent());
-                    assertTrue(jsonOptional.get().contains("https://jsonfeed.org"));
-                    assertEquals("application/json+feed", response.header("Content-Type"));
-                }).build()));
+            config,
+            HttpRequest.GET("/json-additional-codec").header(HttpHeaders.ACCEPT, APPLICATION_JSON_FEED),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, assertion));
+
+        asserts(SPEC_NAME,
+            config,
+            HttpRequest.GET("/json-additional-codec/pojo").header(HttpHeaders.ACCEPT, APPLICATION_JSON_FEED),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, assertion));
     }
 
     @Requires(property = "spec.name", value = SPEC_NAME)
     @Controller
     static class JsonFeedController {
 
-        @Produces("application/json+feed")
+        @Produces(APPLICATION_JSON_FEED)
         @Get("/json-additional-codec")
         String index() {
             return "{\n" +
@@ -71,19 +78,47 @@ public class JsonCodeAdditionalTypeTest {
                 "    \"title\": \"My Example Feed\",\n" +
                 "    \"home_page_url\": \"https://example.org/\",\n" +
                 "    \"feed_url\": \"https://example.org/feed.json\",\n" +
-                "    \"items\": [\n" +
-                "        {\n" +
-                "            \"id\": \"2\",\n" +
-                "            \"content_text\": \"This is a second item.\",\n" +
-                "            \"url\": \"https://example.org/second-item\"\n" +
-                "        },\n" +
-                "        {\n" +
-                "            \"id\": \"1\",\n" +
-                "            \"content_html\": \"<p>Hello, world!</p>\",\n" +
-                "            \"url\": \"https://example.org/initial-post\"\n" +
-                "        }\n" +
                 "    ]\n" +
                 "}";
+        }
+
+        @Produces(APPLICATION_JSON_FEED)
+        @Get("/json-additional-codec/pojo")
+        JsonFeed pojo() {
+            return new JsonFeed("https://jsonfeed.org/version/1", "My Example Feed", "https://example.org/", "https://example.org/feed.json");
+        }
+    }
+
+    @Introspected
+    static class JsonFeed {
+        private final String version;
+        private final String title;
+        @JsonProperty("home_page_url")
+        private final String homePageUrl;
+        @JsonProperty("feed_url")
+        private final String feedUrl;
+
+        public JsonFeed(String version, String title, String homePageUrl, String feedUrl) {
+            this.version = version;
+            this.title = title;
+            this.homePageUrl = homePageUrl;
+            this.feedUrl = feedUrl;
+        }
+
+        public String getVersion() {
+            return version;
+        }
+
+        public String getTitle() {
+            return title;
+        }
+
+        public String getHomePageUrl() {
+            return homePageUrl;
+        }
+
+        public String getFeedUrl() {
+            return feedUrl;
         }
     }
 }
