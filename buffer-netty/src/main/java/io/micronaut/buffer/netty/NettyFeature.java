@@ -64,8 +64,8 @@ final class NettyFeature implements Feature {
         ImageSingletons.lookup(SystemPropertiesSupport.class).initializeProperty("io.netty.tryReflectionSetAccessible", "true");
         try {
             RuntimeReflection.register(access.findClassByName("java.nio.DirectByteBuffer").getDeclaredConstructor(long.class, int.class));
-        } catch (NoSuchMethodException e) {
-            throw new RuntimeException(e);
+        } catch (NoSuchMethodException ignored) {
+            // not present on JDK 21
         }
         Class<?> unsafeOld = access.findClassByName("sun.misc.Unsafe");
         if (unsafeOld != null) {
