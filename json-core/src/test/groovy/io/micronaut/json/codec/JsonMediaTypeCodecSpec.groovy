@@ -24,7 +24,7 @@ class JsonMediaTypeCodecSpec extends Specification {
     void "test additional type configuration"() {
         given:
         ApplicationContext ctx = ApplicationContext.run([
-                'micronaut.codec.json.additionalTypes': ['text/javascript']
+                'micronaut.codec.json.additional-types': ['text/javascript']
         ])
 
         when:
