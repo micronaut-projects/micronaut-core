@@ -57,14 +57,14 @@ jobs:
       - name: Generate subject
         id: hash
         run: |
-          # Find the relevant published artifacts in the local repository.
-          ARTIFACTS=$(find  build/repo/${{ steps.publish.outputs.group }}/*/${{ steps.publish.outputs.version }}/* \
-              -regextype sed -regex '\(.*\.jar\|.*\.pom\|.*\.module\|.*\.toml\)')
+          # Find the artifact JAR and POM files in the local repository.
+          ARTIFACTS=$(find build/repo/${{ steps.publish.outputs.group }}/*/${{ steps.publish.outputs.version }}/* \
+              -type f \( \( -iname "*.jar" -not -iname "*-javadoc.jar" -not -iname "*-sources.jar" \) -or -iname "*.pom" \))
           # Compute the hashes for the artifacts.
           # Set the hash as job output for debugging.
           echo "artifacts-sha256=$(sha256sum $ARTIFACTS | base64 -w0)" >> "$GITHUB_OUTPUT"
           # Store the hash in a file, which is uploaded as a workflow artifact.
-          echo $(sha256sum $ARTIFACTS | base64 -w0) > artifacts-sha256
+          sha256sum $ARTIFACTS | base64 -w0 > artifacts-sha256
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
         with:
@@ -156,7 +156,7 @@ jobs:
       compile-generator: true # Build the generator from source.
 
   github_release:
-    needs: [release]
+    needs: [release, provenance]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -169,7 +169,9 @@ jobs:
           path: build/repo
       - name: Create artifacts archive
         shell: bash
-        run: find build/repo -regextype sed -regex '\(.*\.jar\|.*\.pom\|.*\.module\|.*\.toml\)' | xargs zip artifacts.zip
+        run: |
+          find build/repo -type f \( \( -iname "*.jar" -not -iname "*-javadoc.jar" -not \
+              -iname "*-sources.jar" \) -or -iname "*.pom" \) | xargs zip artifacts.zip
       - name: Upload assets
         # Upload the artifacts to the existing release. Note that the SLSA provenance will
         # attest to each artifact file and not the aggregated ZIP file.
