@@ -25,7 +25,8 @@ class ClientHostNameSpec extends Specification {
 
         then:
         def e = thrown(HttpClientException)
-        e.message.contains('Connect Error: foo_bar') || e.message.contains('Connect Error: No such host is known (foo_bar)')
+        // messages can be different for different locales in the OS, can't compare whole string
+        e.message.contains('Connect Error:') && e.message.contains('foo_bar')
 
         cleanup:
         client.close()
