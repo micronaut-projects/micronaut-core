@@ -15,10 +15,14 @@
  */
 package io.micronaut.http.netty.body;
 
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.Writable;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
@@ -26,10 +30,12 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.body.RawMessageBodyHandler;
 import io.micronaut.http.body.WritableBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.MessageBodyException;
 import io.micronaut.http.netty.NettyHttpHeaders;
+import io.micronaut.runtime.ApplicationConfiguration;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufOutputStream;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
@@ -37,15 +43,24 @@ import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import jakarta.inject.Singleton;
+import org.reactivestreams.Publisher;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Collection;
 
 @Replaces(WritableBodyWriter.class)
 @Singleton
 @Internal
-final class NettyWritableBodyWriter implements NettyBodyWriter<Writable> {
-    private final WritableBodyWriter defaultWritable = new WritableBodyWriter();
+@BootstrapContextCompatible
+@Bean(typed = RawMessageBodyHandler.class)
+public final class NettyWritableBodyWriter implements NettyBodyWriter<Writable>, RawMessageBodyHandler<Writable> {
+    private final WritableBodyWriter defaultWritable;
+
+    public NettyWritableBodyWriter(ApplicationConfiguration applicationConfiguration) {
+        defaultWritable = new WritableBodyWriter(applicationConfiguration);
+    }
 
     @Override
     public boolean isBlocking() {
@@ -77,5 +92,20 @@ final class NettyWritableBodyWriter implements NettyBodyWriter<Writable> {
     @Override
     public void writeTo(Argument<Writable> type, MediaType mediaType, Writable object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
         defaultWritable.writeTo(type, mediaType, object, outgoingHeaders, outputStream);
+    }
+
+    @Override
+    public Publisher<? extends Writable> readChunked(Argument<Writable> type, MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
+        return defaultWritable.readChunked(type, mediaType, httpHeaders, input);
+    }
+
+    @Override
+    public Writable read(Argument<Writable> type, MediaType mediaType, Headers httpHeaders, InputStream inputStream) throws CodecException {
+        return defaultWritable.read(type, mediaType, httpHeaders, inputStream);
+    }
+
+    @Override
+    public Collection<? extends Class<?>> getTypes() {
+        return defaultWritable.getTypes();
     }
 }
