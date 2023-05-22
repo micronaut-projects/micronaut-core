@@ -19,7 +19,7 @@ package io.micronaut.docs.lifecycle.predestroy;
 
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Factory
 public class ConnectionFactory {

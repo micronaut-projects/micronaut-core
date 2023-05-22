@@ -21,7 +21,7 @@ import io.micronaut.http.annotation.CookieValue
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
 
-import javax.annotation.Nullable
+import jakarta.annotation.Nullable
 import java.time.ZonedDateTime
 
 @Controller("/binding")

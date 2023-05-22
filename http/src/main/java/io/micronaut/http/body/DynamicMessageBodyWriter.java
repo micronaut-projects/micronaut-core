@@ -26,7 +26,6 @@ import io.micronaut.http.codec.CodecException;
 
 import java.io.OutputStream;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Placeholder {@link MessageBodyWriter} implementation that decides which writer to use based on
@@ -51,15 +50,15 @@ public final class DynamicMessageBodyWriter implements MessageBodyWriter<Object>
     }
 
     public MessageBodyWriter<Object> find(Argument<Object> type, MediaType mediaType, Object object) {
-        Optional<MessageBodyWriter<Object>> specific = registry.findWriter(type, List.of(mediaType));
-        if (specific.isPresent() && !(specific.get() instanceof DynamicMessageBodyWriter)) {
-            return specific.get();
+        MessageBodyWriter<Object> specific = registry.findWriter(type, List.of(mediaType)).orElse(null);
+        if (specific != null && !(specific instanceof DynamicMessageBodyWriter)) {
+            return specific;
         }
         Argument<?> dynamicType = Argument.of(object.getClass());
-        Optional<? extends MessageBodyWriter<?>> dynamicWriter = registry.findWriter(dynamicType, List.of(mediaType));
-        if (dynamicWriter.isPresent() && !(dynamicWriter.get() instanceof DynamicMessageBodyWriter)) {
+        MessageBodyWriter<?> dynamicWriter = registry.findWriter(dynamicType, List.of(mediaType)).orElse(null);
+        if (dynamicWriter != null && !(dynamicWriter instanceof DynamicMessageBodyWriter)) {
             //noinspection unchecked
-            return (MessageBodyWriter<Object>) dynamicWriter.get();
+            return (MessageBodyWriter<Object>) dynamicWriter;
         }
         if (mediaType.equals(MediaType.TEXT_PLAIN_TYPE) && ClassUtils.isJavaLangType(object.getClass())) {
             // compatibility...
@@ -67,7 +66,7 @@ public final class DynamicMessageBodyWriter implements MessageBodyWriter<Object>
             //noinspection unchecked,OptionalGetWithoutIsPresent,rawtypes
             return (MessageBodyWriter) registry.findWriter(Argument.STRING, List.of(MediaType.TEXT_PLAIN_TYPE)).get();
         }
-        throw new CodecException("Cannot encode value [" + object + "]. No possible encoders found");
+        throw new CodecException("Cannot encode value [" + object + "]. No possible encoders found for medata type: " + mediaType);
     }
 
     @Override

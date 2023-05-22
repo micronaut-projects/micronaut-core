@@ -21,7 +21,7 @@ import io.micronaut.context.env.DefaultEnvironment
 import io.micronaut.context.env.Environment
 import spock.lang.Specification
 
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 /**
  * Created by graemerocher on 12/06/2017.

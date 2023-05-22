@@ -23,6 +23,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpAttributes;
@@ -37,6 +38,7 @@ import io.micronaut.http.body.MediaTypeProvider;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.codec.CodecException;
+import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
@@ -200,7 +202,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 serverConfiguration
             );
             outboundAccess.attachment(errorRequest);
-            new NettyRequestLifecycle(this, outboundAccess, errorRequest).handleException(e.getCause() == null ? e : e.getCause());
+            try (PropagatedContext.Scope ignore = PropagatedContext.newContext(new ServerHttpRequestContext(errorRequest)).propagate()) {
+                new NettyRequestLifecycle(this, outboundAccess, errorRequest).handleException(e.getCause() == null ? e : e.getCause());
+            }
             if (request instanceof StreamedHttpRequest streamed) {
                 streamed.closeIfNoSubscriber();
             } else {
@@ -209,7 +213,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
             return;
         }
         outboundAccess.attachment(mnRequest);
-        new NettyRequestLifecycle(this, outboundAccess, mnRequest).handleNormal();
+        try (PropagatedContext.Scope ignore = PropagatedContext.newContext(new ServerHttpRequestContext(mnRequest)).propagate()) {
+            new NettyRequestLifecycle(this, outboundAccess, mnRequest).handleNormal();
+        }
     }
 
     public void writeResponse(PipeliningServerHandler.OutboundAccess outboundAccess,
@@ -301,7 +307,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             Argument<Object> actualResponseType;
             if (messageBodyWriter == null || !responseBodyType.isInstance(body) || !messageBodyWriter.isWriteable(responseBodyType, responseMediaType)) {
                 messageBodyWriter = new DynamicMessageBodyWriter(messageBodyHandlerRegistry, List.of(responseMediaType));
-                actualResponseType = Argument.OBJECT_ARGUMENT;
+                actualResponseType = Argument.of((Class<Object>) body.getClass());
             } else {
                 actualResponseType = responseBodyType;
             }
@@ -309,9 +315,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
             handleMissingConnectionHeader(response, nettyRequest, outboundAccess);
             if (closure.isBlocking()) {
                 MediaType finalResponseMediaType = responseMediaType;
-                getIoExecutor().execute(() -> writeNettyMessageBody(nettyRequest.getChannelHandlerContext(), nettyRequest, (MutableHttpResponse<Object>) response, actualResponseType, finalResponseMediaType, body, closure, outboundAccess));
+                getIoExecutor().execute(() -> writeNettyMessageBody(nettyRequest, (MutableHttpResponse<Object>) response, actualResponseType, finalResponseMediaType, body, closure, outboundAccess));
             } else {
-                writeNettyMessageBody(nettyRequest.getChannelHandlerContext(), nettyRequest, (MutableHttpResponse<Object>) response, actualResponseType, responseMediaType, body, closure, outboundAccess);
+                writeNettyMessageBody(nettyRequest, (MutableHttpResponse<Object>) response, actualResponseType, responseMediaType, body, closure, outboundAccess);
             }
         } else {
             response.body(null);
@@ -324,7 +330,6 @@ public final class RoutingInBoundHandler implements RequestHandler {
     }
 
     private void writeNettyMessageBody(
-        ChannelHandlerContext context,
         NettyHttpRequest<?> nettyRequest,
         MutableHttpResponse<Object> response,
         Argument<Object> responseBodyType,

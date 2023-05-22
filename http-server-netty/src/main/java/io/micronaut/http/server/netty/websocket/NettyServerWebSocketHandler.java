@@ -23,6 +23,7 @@ import io.micronaut.core.bind.BoundExecutable;
 import io.micronaut.core.bind.DefaultExecutableBinder;
 import io.micronaut.core.bind.ExecutableBinder;
 import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 import io.micronaut.core.util.KotlinUtils;
@@ -325,7 +326,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                 if (executableMethod.isSuspend()) {
                     return Flux.deferContextual(ctx -> {
                         try {
-                            coroutineHelper.setupCoroutineContext(originatingRequest, ctx);
+                            coroutineHelper.setupCoroutineContext(originatingRequest, ctx, PropagatedContext.getOrEmpty());
 
                             Object immediateReturnValue = invokeExecutable0(boundExecutable, messageHandler);
 

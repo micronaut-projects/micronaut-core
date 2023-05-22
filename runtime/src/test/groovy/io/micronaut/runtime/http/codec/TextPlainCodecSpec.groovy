@@ -44,8 +44,8 @@ class TextPlainCodecSpec extends Specification {
     void "test additional type configuration"() {
         given:
         ApplicationContext ctx = ApplicationContext.run([
-                'micronaut.codec.text.additionalTypes': ['text/html'],
-                'micronaut.codec.json.additionalTypes': ['foo/javascript']
+                'micronaut.codec.text.additional-types': ['text/html'],
+                'micronaut.codec.json.additional-types': ['foo/javascript']
         ])
 
         when:
@@ -64,7 +64,7 @@ class TextPlainCodecSpec extends Specification {
     void "test additional type configuration 2"() {
         given:
         ApplicationContext ctx = ApplicationContext.run([
-                'micronaut.codec.json.additionalTypes': ['foo/javascript']
+                'micronaut.codec.json.additional-types': ['foo/javascript']
         ])
 
         when:

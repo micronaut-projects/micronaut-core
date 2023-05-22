@@ -20,7 +20,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-import javax.annotation.Nullable
+import jakarta.annotation.Nullable
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Pattern
 

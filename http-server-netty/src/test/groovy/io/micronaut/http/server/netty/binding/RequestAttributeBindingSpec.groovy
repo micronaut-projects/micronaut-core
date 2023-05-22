@@ -16,7 +16,7 @@ import io.micronaut.http.server.netty.AbstractMicronautSpec
 import org.reactivestreams.Publisher
 import spock.lang.Issue
 
-import javax.annotation.Nullable
+import jakarta.annotation.Nullable
 
 class RequestAttributeBindingSpec extends AbstractMicronautSpec {
 

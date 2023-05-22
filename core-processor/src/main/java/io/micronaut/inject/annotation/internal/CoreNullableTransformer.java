@@ -26,7 +26,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * A transformer that remaps {@link io.micronaut.core.annotation.Nullable} to {@code javax.annotation.Nullable}.
+ * A transformer that remaps {@link io.micronaut.core.annotation.Nullable} to {@link io.micronaut.core.annotation.AnnotationUtil#NULLABLE}.
  *
  * @author graemerocher
  * @since 2.4.0

@@ -166,7 +166,7 @@ final class AnnotationMetadataQualifier<T> implements Qualifier<T> {
 
     @NonNull
     private static Set<String> resolveNonBindingMembers(AnnotationMetadata annotationMetadata) {
-        final String[] nonBindingArray = annotationMetadata.stringValues(AnnotationUtil.QUALIFIER, AnnotationUtil.NON_BINDING_ATTRIBUTE);
+        String[] nonBindingArray = AnnotationUtil.resolveNonBindingMembers(annotationMetadata);
         return ArrayUtils.isNotEmpty(nonBindingArray) ? new LinkedHashSet<>(Arrays.asList(nonBindingArray)) : Collections.emptySet();
     }
 

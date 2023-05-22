@@ -25,7 +25,7 @@ In addition to being able to inject beans, Micronaut framework natively supports
 |`Engine[]`
 
 |link:{jeeapi}/javax/inject/Provider.html[Provider]
-|A `javax.inject.Provider` if a circular dependency requires it, or to instantiate a prototype for each `get` call.
+|A `jakarta.inject.Provider` if a circular dependency requires it, or to instantiate a prototype for each `get` call.
 |`Provider<Engine>`
 
 |link:{jakartaapi}/jakarta/inject/Provider.html[Provider]

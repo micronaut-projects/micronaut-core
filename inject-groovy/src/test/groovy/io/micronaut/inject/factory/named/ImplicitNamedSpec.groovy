@@ -9,31 +9,31 @@ class ImplicitNamedSpec extends AbstractBeanDefinitionSpec {
 package implicitnamed;
 
 import io.micronaut.context.annotation.*;
-import javax.inject.*;
+import jakarta.inject.*;
 
 @Factory
 class TestFactory {
     static final String CONST = "constNamedFoo"
-    
+
     @Singleton
     @Named
     Foo foo1() {
         return ()-> "one";
     }
-    
+
     @Singleton
     @Primary
     @Named
     Foo fooPrimary() {
         return ()-> "primary";
     }
-    
+
     @Singleton
     @Named("explicitlyNamedFoo")
     Foo explicitNamed() {
         return () -> "explicitlyNamed";
     }
-    
+
     @Singleton
     @Named(TestFactory.CONST)
     Foo constantNamed() {
@@ -45,43 +45,43 @@ class Test {
     @Named
     @Inject
     public Foo foo1;
-    
+
     @Named("foo1")
     @Inject
     public Foo anotherFoo1;
-    
+
     @Named("explicitlyNamedFoo")
     @Inject
     public Foo explicitlyNamedField;
-    
+
     @Named("explicitlyNamedFoo")
     @Inject
     Foo explicitlyNamedProp
-    
+
     @Named("explicitlyNamedFoo")
     Foo explicitlyNamedProp2
-    
+
     @Named(TestFactory.CONST)
     @Inject
     public Foo constNamedField;
-    
+
     @Named(TestFactory.CONST)
     @Inject
     Foo constNamedProp;
-    
+
     @Inject
     public Foo fooDefault;
-    
+
     @Named
     @Inject
     public Foo fooPrimary;
-    
-    Foo foo1Ctor; 
+
+    Foo foo1Ctor;
     Foo foo1Method;
     Test(@Named Foo foo1) {
         foo1Ctor = foo1;
     }
-    
+
     @Inject
     void setFoo(@Named Foo foo1) {
         foo1Method = foo1;

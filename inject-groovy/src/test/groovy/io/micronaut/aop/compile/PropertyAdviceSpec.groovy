@@ -15,10 +15,10 @@ package test;
 import io.micronaut.aop.interceptors.*;
 import io.micronaut.context.annotation.*;
 import jakarta.validation.constraints.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Mutating("name")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyPropertyBean {
     String name
 

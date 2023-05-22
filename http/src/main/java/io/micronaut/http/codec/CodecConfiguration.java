@@ -16,6 +16,8 @@
 package io.micronaut.http.codec;
 
 import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Parameter;
+import io.micronaut.core.naming.Named;
 import io.micronaut.http.MediaType;
 
 import java.util.Collections;
@@ -28,11 +30,16 @@ import java.util.List;
  * @since 1.0
  */
 @EachProperty(CodecConfiguration.PREFIX)
-public class CodecConfiguration {
+public class CodecConfiguration implements Named {
 
     public static final String PREFIX = "micronaut.codec";
 
     private List<MediaType> additionalTypes = Collections.emptyList();
+    private final String name;
+
+    public CodecConfiguration(@Parameter String name) {
+        this.name = name;
+    }
 
     /**
      * @return Media types in addition to the default that the codec should process
@@ -47,5 +54,10 @@ public class CodecConfiguration {
      */
     public void setAdditionalTypes(List<MediaType> additionalTypes) {
         this.additionalTypes = additionalTypes;
+    }
+
+    @Override
+    public String getName() {
+        return name;
     }
 }

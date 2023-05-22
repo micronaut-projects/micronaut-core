@@ -27,7 +27,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * A remapper that remaps findbugs annotations to javax.annotation which are represented internally.
+ * A remapper that remaps findbugs annotations to internal annotations.
  *
  * @author graemerocher
  * @since 1.2.0

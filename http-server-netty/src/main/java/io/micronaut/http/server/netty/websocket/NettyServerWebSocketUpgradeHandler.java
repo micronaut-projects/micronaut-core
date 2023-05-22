@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpMethod;
@@ -28,6 +29,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.NettyHttpHeaders;
@@ -140,7 +142,11 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 .findFirst();
 
             WebsocketRequestLifecycle requestLifecycle = new WebsocketRequestLifecycle(routeExecutor, msg, optionalRoute.orElse(null));
-            ExecutionFlow<MutableHttpResponse<?>> responseFlow = ExecutionFlow.async(ctx.channel().eventLoop(), requestLifecycle::handle);
+            ExecutionFlow<MutableHttpResponse<?>> responseFlow = ExecutionFlow.async(ctx.channel().eventLoop(), () -> {
+                try (PropagatedContext.Scope ignore = PropagatedContext.newContext(new ServerHttpRequestContext(msg)).propagate()) {
+                    return requestLifecycle.handle();
+                }
+            });
             responseFlow.onComplete((response, throwable) -> {
                 if (response != null) {
                     writeResponse(ctx, msg, requestLifecycle.shouldProceedNormally, response, outboundAccess);

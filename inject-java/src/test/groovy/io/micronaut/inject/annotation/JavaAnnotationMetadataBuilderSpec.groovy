@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.annotation
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.Around
 import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Primary
@@ -24,16 +25,10 @@ import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.http.annotation.Header
-import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.context.scope.ScopedProxy
 import spock.lang.Unroll
-
-import jakarta.inject.Qualifier
-import jakarta.inject.Scope
-import jakarta.inject.Singleton
-
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -51,7 +46,7 @@ import io.micronaut.context.annotation.*;
 
 @Prototype
 class Test {
-    $annotation  
+    $annotation
     void test() {}
 }
 """, 'test')
@@ -340,7 +335,7 @@ interface A {
         metadata.hasSimpleAnnotation("Singleton")
         metadata.hasStereotype(AnnotationUtil.SINGLETON)
         metadata.hasStereotype(AnnotationUtil.SCOPE)
-        metadata.getAnnotationNameByStereotype(AnnotationUtil.SINGLETON).get() == 'javax.inject.Singleton'
+        metadata.getAnnotationNameByStereotype(AnnotationUtil.SINGLETON).get() == 'jakarta.inject.Singleton'
     }
 
     void "test parse inherited stereotype data attributes"() {
@@ -593,7 +588,7 @@ class Test implements ITest {
 
 interface ITest {
     @MyAnn
-    void testMethod(); 
+    void testMethod();
 }
 
 @io.micronaut.context.annotation.Primary

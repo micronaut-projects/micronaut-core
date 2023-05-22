@@ -6,7 +6,7 @@ The most common causes of Dependency Injection failing to work are not having th
 
 ==== A NoSuchMethodError occurs loading beans (Groovy)
 
-By default, Groovy imports classes in the `groovy.lang` package which includes a class called `Singleton`. This is an AST transformation annotation that makes your class a singleton by adding a private constructor and static retrieval method. This annotation is easily confused with the `javax.inject.Singleton` annotation used to define singleton beans in Micronaut. Make sure you use the correct annotation in your Groovy classes.
+By default, Groovy imports classes in the `groovy.lang` package which includes a class called `Singleton`. This is an AST transformation annotation that makes your class a singleton by adding a private constructor and static retrieval method. This annotation is easily confused with the `jakarta.inject.Singleton` annotation used to define singleton beans in Micronaut. Make sure you use the correct annotation in your Groovy classes.
 
 ==== It is taking much longer to start my application than it should (*nix OS)
 

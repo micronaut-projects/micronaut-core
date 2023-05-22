@@ -57,7 +57,7 @@ The above example demonstrates creating a Groovy bean that looks like the follow
 ----
 package hello.world
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 @Singleton
 class HelloBean {
@@ -65,7 +65,7 @@ class HelloBean {
 }
 ----
 
-WARNING: Groovy automatically imports `groovy.lang.Singleton` which can be confusing as it conflicts with `javax.inject.Singleton`. Make sure you use `javax.inject.Singleton` when declaring a Micronaut singleton bean to avoid surprising behavior.
+WARNING: Groovy automatically imports `groovy.lang.Singleton` which can be confusing as it conflicts with `jakarta.inject.Singleton`. Make sure you use `jakarta.inject.Singleton` when declaring a Micronaut singleton bean to avoid surprising behavior.
 
 We can also create a client - don't forget Micronaut framework can act as a client or a server!
 

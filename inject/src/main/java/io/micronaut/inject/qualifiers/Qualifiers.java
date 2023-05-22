@@ -87,7 +87,7 @@ public class Qualifiers {
         AnnotationMetadata annotationMetadata = Objects.requireNonNull(argument, "Argument cannot be null").getAnnotationMetadata();
         boolean hasMetadata = annotationMetadata != AnnotationMetadata.EMPTY_METADATA;
 
-        List<String> qualifierTypes = hasMetadata ? annotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER) : null;
+        List<String> qualifierTypes = hasMetadata ? AnnotationUtil.findQualifierAnnotationsNames(annotationMetadata) : null;
         if (CollectionUtils.isNotEmpty(qualifierTypes)) {
             if (qualifierTypes.size() == 1) {
                 return Qualifiers.byAnnotation(
@@ -383,8 +383,8 @@ public class Qualifiers {
             if (aClass.isPresent()) {
                 return byType(aClass.get());
             }
-        } else if (Named.class == type || AnnotationUtil.NAMED.equals(type.getName())) {
-            Optional<String> value = metadata.stringValue(type);
+        } else if (Named.class == type) {
+            Optional<String> value = metadata.stringValue(type).or(() -> metadata.stringValue("javax.inject.Named"));
             if (value.isPresent()) {
                 return byName(value.get());
             }
@@ -405,8 +405,8 @@ public class Qualifiers {
         } else if (Qualifier.PRIMARY.equals(type)) {
             //noinspection unchecked
             return PrimaryQualifier.INSTANCE;
-        } else if (Named.class.getName().equals(type) || AnnotationUtil.NAMED.equals(type)) {
-            String n = metadata.stringValue(type).orElse(null);
+        } else if (Named.class.getName().equals(type) || "javax.inject.Named".equals(type)) {
+            String n = metadata.stringValue(type).or(() -> metadata.stringValue("javax.inject.Named")).orElse(null);
             if (n != null) {
                 return byName(n);
             }

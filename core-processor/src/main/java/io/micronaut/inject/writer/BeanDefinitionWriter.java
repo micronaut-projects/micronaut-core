@@ -145,7 +145,7 @@ import static io.micronaut.inject.visitor.BeanElementVisitor.VISITORS;
  * <pre>
  *     {@code
  *
- *          BeanDefinitionWriter writer = new BeanDefinitionWriter("my.package", "MyClass", "javax.inject.Singleton", true)
+ *          BeanDefinitionWriter writer = new BeanDefinitionWriter("my.package", "MyClass", "jakarta.inject.Singleton", true)
  *          writer.visitBeanDefinitionConstructor()
  *          writer.visitFieldInjectionPoint("my.Qualifier", false, "my.package.MyDependency", "myfield" )
  *          writer.visitBeanDefinitionEnd()

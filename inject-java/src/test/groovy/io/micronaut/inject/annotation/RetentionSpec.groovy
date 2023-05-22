@@ -131,6 +131,6 @@ class Test {
 ''')
             Set<String> allAnnotations = definition.getAnnotationNames() + definition.getStereotypeAnnotationNames()
         expect:
-            allAnnotations == ["javax.inject.Singleton", "javax.inject.Scope", "test.NotMissing1", "test.NotMissing2", "test.NotMissing3", "test.NotMissing4", "test.NotMissing5", "test.NotMissing6"] as Set
+            allAnnotations == ["jakarta.inject.Singleton", "jakarta.inject.Scope", "test.NotMissing1", "test.NotMissing2", "test.NotMissing3", "test.NotMissing4", "test.NotMissing5", "test.NotMissing6"] as Set
     }
 }

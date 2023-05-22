@@ -15,13 +15,14 @@
  */
 package io.micronaut.http.context;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.http.HttpRequest;
+
 import java.util.Optional;
 import java.util.concurrent.Callable;
 import java.util.function.Supplier;
-
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
-import io.micronaut.http.HttpRequest;
 
 /**
  * The holder for the current {@link HttpRequest} that is bound to instrumented threads.
@@ -33,22 +34,8 @@ import io.micronaut.http.HttpRequest;
 public final class ServerRequestContext {
 
     public static final String KEY = "micronaut.http.server.request";
-    private static final ThreadLocal<HttpRequest> REQUEST = new ThreadLocal<>();
 
     private ServerRequestContext() {
-    }
-
-    /**
-     * Set {@link HttpRequest}.
-     *
-     * @param request new {@link HttpRequest}
-     */
-    public static void set(@Nullable HttpRequest request) {
-        if (request == null) {
-            REQUEST.remove();
-        } else {
-            REQUEST.set(request);
-        }
     }
 
     /**
@@ -57,19 +44,9 @@ public final class ServerRequestContext {
      * @param request  The request
      * @param runnable The runnable
      */
-    public static void with(@Nullable HttpRequest request, @NonNull Runnable runnable) {
-        HttpRequest existing = REQUEST.get();
-        boolean isSet = false;
-        try {
-            if (request != existing) {
-                isSet = true;
-                set(request);
-            }
+    public static void with(@Nullable HttpRequest<?> request, @NonNull Runnable runnable) {
+        try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request)).propagate()) {
             runnable.run();
-        } finally {
-            if (isSet) {
-                set(existing);
-            }
         }
     }
 
@@ -80,7 +57,7 @@ public final class ServerRequestContext {
      * @param runnable The runnable
      * @return The newly instrumented runnable
      */
-    public static Runnable instrument(@Nullable HttpRequest request, @NonNull Runnable runnable) {
+    public static Runnable instrument(@Nullable HttpRequest<?> request, @NonNull Runnable runnable) {
         return () -> with(request, runnable);
     }
 
@@ -88,23 +65,13 @@ public final class ServerRequestContext {
      * Wrap the execution of the given callable in request context processing.
      *
      * @param request  The request
-     * @param callable The callable
+     * @param supplier The callable
      * @param <T>      The return type of the callable
      * @return The return value of the callable
      */
-    public static <T> T with(@Nullable HttpRequest request, @NonNull Supplier<T> callable) {
-        HttpRequest existing = REQUEST.get();
-        boolean isSet = false;
-        try {
-            if (request != existing) {
-                isSet = true;
-                set(request);
-            }
-            return callable.get();
-        } finally {
-            if (isSet) {
-                set(existing);
-            }
+    public static <T> T with(@Nullable HttpRequest<?> request, @NonNull Supplier<T> supplier) {
+        try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request)).propagate()) {
+            return supplier.get();
         }
     }
 
@@ -117,19 +84,9 @@ public final class ServerRequestContext {
      * @return The return value of the callable
      * @throws Exception If the callable throws an exception
      */
-    public static <T> T with(@Nullable HttpRequest request, @NonNull Callable<T> callable) throws Exception {
-        HttpRequest existing = REQUEST.get();
-        boolean isSet = false;
-        try {
-            if (request != existing) {
-                isSet = true;
-                set(request);
-            }
+    public static <T> T with(@Nullable HttpRequest<?> request, @NonNull Callable<T> callable) throws Exception {
+        try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request)).propagate()) {
             return callable.call();
-        } finally {
-            if (isSet) {
-                set(existing);
-            }
         }
     }
 
@@ -139,9 +96,8 @@ public final class ServerRequestContext {
      * @param <T> The body type
      * @return The request context if it is present
      */
-    @SuppressWarnings("unchecked")
     public static <T> Optional<HttpRequest<T>> currentRequest() {
-        return Optional.ofNullable(REQUEST.get());
+        return ServerHttpRequestContext.find();
     }
 }
 

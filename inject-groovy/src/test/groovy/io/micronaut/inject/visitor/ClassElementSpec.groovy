@@ -475,7 +475,7 @@ interface AnotherInterface {
 package clselem1;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController implements java.util.function.Supplier<String> {
@@ -501,7 +501,7 @@ public class TestController implements java.util.function.Supplier<String> {
 package clselem2;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController {
@@ -529,7 +529,7 @@ package clselem3;
 
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController {
@@ -557,7 +557,7 @@ public class TestController {
 package clselem4;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController {
@@ -583,7 +583,7 @@ public class TestController {
 package clselem5;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController<T extends Foo> {
@@ -611,7 +611,7 @@ class Foo {}
 package clselem6;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController<T extends Foo> {
@@ -641,7 +641,7 @@ class Foo {}
 package clselem7;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController {
@@ -669,7 +669,7 @@ class Foo {}
 package clselem8;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController<T extends Foo> {

@@ -258,7 +258,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             pathParams.putIfAbsent(k, v);
                         }
                     }
-                } else {
+                } else if (!Publishers.isConvertibleToPublisher(body)) {
                     BeanMap<Object> beanMap = BeanMap.of(body);
                     for (Map.Entry<String, Object> entry : beanMap.entrySet()) {
                         String k = entry.getKey();

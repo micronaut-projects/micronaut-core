@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.NonNull;
 import jakarta.inject.Provider;
 
 /**
- * Helper methods for dealing with {@link javax.inject.Provider}.
+ * Helper methods for dealing with {@link jakarta.inject.Provider}.
  *
  * @author Denis Stepanov
  * @since 2.0.2

@@ -71,7 +71,7 @@ public final class ApplicationEventPublisherFactory<T>
         try {
             metadata.addDeclaredAnnotation(Indexes.class.getName(), Collections.singletonMap(AnnotationMetadata.VALUE_MEMBER, getBeanType()));
         } catch (NoClassDefFoundError e) {
-            // ignore, might happen if javax.inject is not the classpath
+            // ignore, might happen if jakarta.inject is not the classpath
         }
         annotationMetadata = metadata;
     }

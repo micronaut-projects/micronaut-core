@@ -18,7 +18,7 @@ package io.micronaut.docs.lifecycle.predestroy;
 // tag::imports[]
 
 import javax.annotation.PostConstruct;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 // end::imports[]
 
 // tag::class[]

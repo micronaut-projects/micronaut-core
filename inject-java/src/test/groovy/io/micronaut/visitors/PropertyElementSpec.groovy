@@ -21,7 +21,7 @@ import io.micronaut.inject.ast.ClassElement
 import spock.lang.IgnoreIf
 import spock.util.environment.Jvm
 
-import javax.annotation.Nullable
+import jakarta.annotation.Nullable
 import jakarta.validation.constraints.NotBlank
 
 class PropertyElementSpec extends AbstractTypeElementSpec {
@@ -58,9 +58,9 @@ import io.micronaut.http.annotation.Get;
 public class TestController {
 
     private int age;
-    @javax.annotation.Nullable
+    @jakarta.annotation.Nullable
     private String name;
-    @javax.annotation.Nullable
+    @jakarta.annotation.Nullable
     private String description;
 
     /**

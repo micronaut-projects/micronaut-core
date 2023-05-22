@@ -42,6 +42,11 @@ class ClientBootstrapSpec extends Specification {
         String call() {
             "Hello Bootstrap"
         }
+
+        @Get("/json")
+        Map<String, Object> json() {
+            [foo:'bar']
+        }
     }
 
     @Requires(property = "spec.name", value = "ClientBootstrapSpec")
@@ -51,6 +56,9 @@ class ClientBootstrapSpec extends Specification {
 
         @Get("/bootstrap")
         String call()
+
+        @Get("/json")
+        Map<String, Object> json()
     }
 
     @Requires(property = "spec.name", value = "ClientBootstrapSpec")
@@ -66,6 +74,7 @@ class ClientBootstrapSpec extends Specification {
 
         @Override
         Iterable<PropertySource> findPropertySources(Environment environment) throws ConfigurationException {
+            assert myClient.json() != null
             return [PropertySource.of(Collections.singletonMap("bootstrap-call", myClient.call()))]
         }
     }

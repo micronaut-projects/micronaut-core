@@ -43,7 +43,7 @@ final class NoneQualifier<T> implements Qualifier<T> {
             if (candidate instanceof BeanDefinition) {
                 return ((BeanDefinition<?>) candidate).getDeclaredQualifier() == null;
             }
-            return !candidate.getAnnotationMetadata().hasDeclaredAnnotation(AnnotationUtil.QUALIFIER);
+            return !AnnotationUtil.hasDeclaredQualifierAnnotation(candidate.getAnnotationMetadata());
         });
     }
 

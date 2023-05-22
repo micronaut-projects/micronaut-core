@@ -4,7 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.async.annotation.SingleResult
-import io.micronaut.core.io.socket.SocketUtils
+import io.micronaut.core.propagation.PropagatedContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
@@ -18,6 +18,7 @@ import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.BlockingHttpClient
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.context.ServerHttpRequestContext
 import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
@@ -66,6 +67,7 @@ class HttpClientFilterRequestInReactorContextSpec extends Specification {
         @Override
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
             return Flux.deferContextual(contextView -> {
+                PropagatedContext.get().get(ServerHttpRequestContext)
                 HttpRequest<?> contexRequest = contextView.getOrDefault(ServerRequestContext.KEY, null);
                 final String path = contexRequest == null ? "/nocontext" : contexRequest.getPath();
                 return chain.proceed(request.header("FOOBAR", path));

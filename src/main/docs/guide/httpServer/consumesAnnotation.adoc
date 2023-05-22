@@ -15,7 +15,7 @@ Normally JSON parsing only happens if the content type is `application/json`. Th
 micronaut:
   codec:
     json:
-      additionalTypes:
+      additional-types:
         - text/javascript
         - ...
 ----

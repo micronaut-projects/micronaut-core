@@ -1,5 +1,5 @@
 [versions]
-asm = "9.4"
+asm = "9.5"
 awaitility = "4.2.0"
 bcpkix = "1.70"
 blaze = "1.6.8"
@@ -7,7 +7,7 @@ caffeine = "2.9.3"
 compile-testing = "0.19"
 
 geb = "7.0"
-gorm = "7.3.2"
+gorm = "7.3.4"
 # be sure to update graal version in gradle.properties as well
 graal-svm = "22.3.2"
 h2 = "2.1.214"
@@ -43,7 +43,10 @@ micronaut-test = "4.0.0-M3"
 micronaut-serde = "2.0.0-M1"
 micronaut-tracing = "5.0.0-SNAPSHOT"
 micronaut-validation = "4.0.0-M7"
-micrometer = "1.10.2"
+micronaut-rxjava2 = "2.0.0-SNAPSHOT"
+micronaut-rxjava3 = "3.0.0-SNAPSHOT"
+micronaut-reactor = "3.0.0-SNAPSHOT"
+micrometer = "1.11.0"
 neo4j-java-driver = "1.4.5"
 selenium = "4.7.2"
 slf4j = "2.0.7"
@@ -62,19 +65,19 @@ wiremock = "2.33.2"
 managed-groovy = "4.0.12"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "2.14.2"
-managed-jackson-databind = "2.14.1"
+managed-jackson-databind = "2.15.1"
 managed-kotlin = "1.8.21"
-managed-kotlin-coroutines = "1.7.0"
+managed-kotlin-coroutines = "1.7.1"
 managed-maven-native-plugin = "0.9.13"
-managed-methvin-directory-watcher = "0.16.1"
-managed-netty = "4.1.91.Final"
+managed-methvin-directory-watcher = "0.18.0"
+managed-netty = "4.1.92.Final"
 managed-netty-iouring = "0.0.21.Final"
 managed-netty-http3 = "0.0.16.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
-managed-reactor = "3.5.5"
+managed-reactor = "3.5.6"
 managed-snakeyaml = "2.0"
-managed-java-parser-core = "3.24.9"
+managed-java-parser-core = "3.25.3"
 managed-ksp = "1.8.21-1.0.11"
 micronaut-docs = "2.0.0"
 
@@ -84,6 +87,9 @@ test-boms-micronaut-aws = { module = "io.micronaut.aws:micronaut-aws-bom", versi
 test-boms-micronaut-sql = { module = "io.micronaut.sql:micronaut-sql-bom", version.ref = "micronaut-sql" }
 test-boms-micronaut-tracing = { module = "io.micronaut.tracing:micronaut-tracing-bom", version.ref = "micronaut-tracing" }
 test-boms-micronaut-validation = { module = "io.micronaut.validation:micronaut-validation-bom", version.ref = "micronaut-validation" }
+test-boms-micronaut-rxjava2 = { module = "io.micronaut.rxjava2:micronaut-rxjava2-bom", version.ref = "micronaut-rxjava2" }
+test-boms-micronaut-rxjava3 = { module = "io.micronaut.rxjava3:micronaut-rxjava3-bom", version.ref = "micronaut-rxjava3" }
+test-boms-micronaut-reactor = { module = "io.micronaut.reactor:micronaut-reactor-bom", version.ref = "micronaut-reactor" }
 
 boms-groovy = { module = "org.apache.groovy:groovy-bom", version.ref = "managed-groovy" }
 boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "managed-kotlin" }
