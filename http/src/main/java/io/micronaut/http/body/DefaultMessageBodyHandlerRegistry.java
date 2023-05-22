@@ -19,16 +19,21 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.codec.CodecConfiguration;
+import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
+import io.micronaut.inject.qualifiers.Qualifiers;
 import jakarta.inject.Singleton;
 
 import java.lang.annotation.Annotation;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -47,22 +52,31 @@ import java.util.stream.Stream;
 @BootstrapContextCompatible
 public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandlerRegistry {
     private final BeanContext beanLocator;
+    private final List<CodecConfiguration> codecConfigurations;
 
     /**
      * Default constructor.
      *
      * @param beanLocator The bean locator.
+     * @param codecConfigurations The codec configurations
      * @param rawHandlers The handlers for raw types
      */
-    DefaultMessageBodyHandlerRegistry(BeanContext beanLocator, List<RawMessageBodyHandler<?>> rawHandlers) {
+    DefaultMessageBodyHandlerRegistry(
+        BeanContext beanLocator,
+        List<CodecConfiguration> codecConfigurations,
+        List<RawMessageBodyHandler<?>> rawHandlers) {
         super(rawHandlers);
         this.beanLocator = beanLocator;
+        this.codecConfigurations = codecConfigurations;
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     @Override
     protected <T> MessageBodyReader<T> findReaderImpl(Argument<T> type, List<MediaType> mediaTypes) {
-        Collection<BeanDefinition<MessageBodyReader>> beanDefinitions = beanLocator.getBeanDefinitions(Argument.of(MessageBodyReader.class, type), new MediaTypeQualifier<>(type, mediaTypes, Consumes.class));
+        Collection<BeanDefinition<MessageBodyReader>> beanDefinitions = beanLocator.getBeanDefinitions(
+            Argument.of(MessageBodyReader.class, type),
+            newMediaTypeQualifier(type, mediaTypes, Consumes.class)
+        );
         if (beanDefinitions.size() == 1) {
             return beanLocator.getBean(beanDefinitions.iterator().next());
         } else {
@@ -87,10 +101,40 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
         }
     }
 
+    @NonNull
+    private <T, B> MediaTypeQualifier<B> newMediaTypeQualifier(Argument<T> type, List<MediaType> mediaTypes, Class<? extends Annotation> qualifierType) {
+        List<MediaType> resolvedMediaTypes = resolveMediaTypes(mediaTypes);
+        return new MediaTypeQualifier<>(type, resolvedMediaTypes, qualifierType);
+    }
+
+    @NonNull
+    private List<MediaType> resolveMediaTypes(List<MediaType> mediaTypes) {
+        if (codecConfigurations.isEmpty()) {
+            return mediaTypes;
+        }
+        List<MediaType> resolvedMediaTypes = new ArrayList<>(mediaTypes.size());
+        resolvedMediaTypes.addAll(mediaTypes);
+        for (MediaType mediaType : mediaTypes) {
+            for (CodecConfiguration codecConfiguration : codecConfigurations) {
+                List<MediaType> additionalTypes = codecConfiguration.getAdditionalTypes();
+                if (additionalTypes.contains(mediaType)) {
+                    beanLocator.findBean(MediaTypeCodec.class, Qualifiers.byName(codecConfiguration.getName())).ifPresent(codec ->
+                        resolvedMediaTypes.addAll(codec.getMediaTypes())
+                    );
+                    break;
+                }
+            }
+        }
+        return resolvedMediaTypes;
+    }
+
     @SuppressWarnings({"rawtypes", "unchecked"})
     @Override
     protected <T> MessageBodyWriter<T> findWriterImpl(Argument<T> type, List<MediaType> mediaTypes) {
-        Collection<BeanDefinition<MessageBodyWriter>> beanDefinitions = beanLocator.getBeanDefinitions(Argument.of(MessageBodyWriter.class, type), new MediaTypeQualifier<>(type, mediaTypes, Produces.class));
+        Collection<BeanDefinition<MessageBodyWriter>> beanDefinitions = beanLocator.getBeanDefinitions(
+            Argument.of(MessageBodyWriter.class, type),
+            newMediaTypeQualifier(type, mediaTypes, Produces.class)
+        );
         if (beanDefinitions.size() == 1) {
             return beanLocator.getBean(beanDefinitions.iterator().next());
         } else {

@@ -307,7 +307,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             Argument<Object> actualResponseType;
             if (messageBodyWriter == null || !responseBodyType.isInstance(body) || !messageBodyWriter.isWriteable(responseBodyType, responseMediaType)) {
                 messageBodyWriter = new DynamicMessageBodyWriter(messageBodyHandlerRegistry, List.of(responseMediaType));
-                actualResponseType = Argument.OBJECT_ARGUMENT;
+                actualResponseType = Argument.of((Class<Object>) body.getClass());
             } else {
                 actualResponseType = responseBodyType;
             }
@@ -315,9 +315,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
             handleMissingConnectionHeader(response, nettyRequest, outboundAccess);
             if (closure.isBlocking()) {
                 MediaType finalResponseMediaType = responseMediaType;
-                getIoExecutor().execute(() -> writeNettyMessageBody(nettyRequest.getChannelHandlerContext(), nettyRequest, (MutableHttpResponse<Object>) response, actualResponseType, finalResponseMediaType, body, closure, outboundAccess));
+                getIoExecutor().execute(() -> writeNettyMessageBody(nettyRequest, (MutableHttpResponse<Object>) response, actualResponseType, finalResponseMediaType, body, closure, outboundAccess));
             } else {
-                writeNettyMessageBody(nettyRequest.getChannelHandlerContext(), nettyRequest, (MutableHttpResponse<Object>) response, actualResponseType, responseMediaType, body, closure, outboundAccess);
+                writeNettyMessageBody(nettyRequest, (MutableHttpResponse<Object>) response, actualResponseType, responseMediaType, body, closure, outboundAccess);
             }
         } else {
             response.body(null);
@@ -330,7 +330,6 @@ public final class RoutingInBoundHandler implements RequestHandler {
     }
 
     private void writeNettyMessageBody(
-        ChannelHandlerContext context,
         NettyHttpRequest<?> nettyRequest,
         MutableHttpResponse<Object> response,
         Argument<Object> responseBodyType,
