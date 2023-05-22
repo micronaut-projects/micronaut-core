@@ -37,15 +37,13 @@ abstract class ManagedBody<T> implements HttpBody {
     }
 
     /**
-     * Get the value without claiming it.
+     * Get the value without claiming it.<br>
+     * Note: When the value has been claimed already, this method may be unsafe, because the value
+     * may be modified concurrently or may be released (for ref counted objects). Handle with care.
      *
      * @return The value
-     * @throws IllegalStateException if the value has already been claimed
      */
     final T value() {
-        if (claimed) {
-            throw new IllegalStateException("Already claimed");
-        }
         return value;
     }
 

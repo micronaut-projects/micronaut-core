@@ -33,7 +33,6 @@ import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
@@ -63,30 +62,40 @@ public class ControllerConstraintHandlerTest {
         })
         .build();
 
-    /**
-     * @see <a href="https://github.com/micronaut-projects/micronaut-aws/issues/1164">micronaut-aws #1164</a>
-     */
     @Test
-    void testPojoConstraintViolationExceptionIsHandledViaHandler() throws IOException {
+    void testPojoWithNullable() throws IOException {
         asserts(SPEC_NAME,
             HttpRequest.POST("/constraints-via-handler", "{\"username\":\"tim@micronaut.example\",\"password\":\"secret\"}"),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .build()));
-
-        asserts(SPEC_NAME,
-            HttpRequest.POST("/constraints-via-handler", "{\"username\":\"invalidemail\",\"password\":\"secret\"}"),
-            (server, request) -> AssertionUtils.assertThrows(server, request, constraintAssertion("must be a well-formed email address")));
-        asserts(SPEC_NAME,
-            HttpRequest.POST("/constraints-via-handler", "{\"username\":\"\",\"password\":\"secret\"}"),
-            (server, request) -> AssertionUtils.assertThrows(server, request, constraintAssertion("must not be blank\"")));
         asserts(SPEC_NAME,
             HttpRequest.POST("/constraints-via-handler/with-at-nullable", "{\"username\":\"invalidemail\",\"password\":\"secret\"}"),
             (server, request) -> AssertionUtils.assertThrows(server, request, constraintAssertion("must be a well-formed email address")));
         asserts(SPEC_NAME,
             HttpRequest.POST("/constraints-via-handler/with-at-nullable", "{\"username\":\"\",\"password\":\"secret\"}"),
             (server, request) -> AssertionUtils.assertThrows(server, request, constraintAssertion("must not be blank\"")));
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/constraints-via-on-error-method/with-at-nullable", "{\"username\":\"\",\"password\":\"secret\"}"),
+            (server, request) -> AssertionUtils.assertThrows(server, request, TEAPOT_ASSERTION));
 
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/constraints-via-on-error-method/with-at-nullable", "{\"password\":\"secret\"}"),
+            (server, request) -> AssertionUtils.assertThrows(server, request, TEAPOT_ASSERTION));
+
+    }
+
+    @Test
+    void testWithPojoWithoutAnnotations() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/constraints-via-handler", "{\"username\":\"invalidemail\",\"password\":\"secret\"}"),
+            (server, request) -> AssertionUtils.assertThrows(server, request, constraintAssertion("must be a well-formed email address")));
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/constraints-via-handler", "{\"username\":\"invalidemail\",\"password\":\"secret\"}"),
+            (server, request) -> AssertionUtils.assertThrows(server, request, constraintAssertion("must be a well-formed email address")));
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/constraints-via-handler", "{\"username\":\"\",\"password\":\"secret\"}"),
+            (server, request) -> AssertionUtils.assertThrows(server, request, constraintAssertion("must not be blank\"")));
 
         asserts(SPEC_NAME,
             HttpRequest.POST("/constraints-via-on-error-method", "{\"username\":\"\",\"password\":\"secret\"}"),
@@ -95,20 +104,11 @@ public class ControllerConstraintHandlerTest {
         asserts(SPEC_NAME,
             HttpRequest.POST("/constraints-via-on-error-method", "{\"password\":\"secret\"}"),
             (server, request) -> AssertionUtils.assertThrows(server, request, TEAPOT_ASSERTION));
-
-        asserts(SPEC_NAME,
-            HttpRequest.POST("/constraints-via-on-error-method/with-at-nullable", "{\"username\":\"\",\"password\":\"secret\"}"),
-            (server, request) -> AssertionUtils.assertThrows(server, request, TEAPOT_ASSERTION));
-
-        asserts(SPEC_NAME,
-            HttpRequest.POST("/constraints-via-on-error-method/with-at-nullable", "{\"password\":\"secret\"}"),
-            (server, request) -> AssertionUtils.assertThrows(server, request, TEAPOT_ASSERTION));
     }
 
-    @Disabled("currently not supported")
+    @Disabled
     @Test
-    void testPojoCanHaveNullabilityAnnotationsMatchingConstraints() throws IOException {
-
+    void testPojoWithNonNullAnnotation() throws IOException {
         asserts(SPEC_NAME,
             HttpRequest.POST("/constraints-via-handler/with-non-null", "{\"username\":\"invalidemail\",\"password\":\"secret\"}"),
             (server, request) -> AssertionUtils.assertThrows(server, request, constraintAssertion("must be a well-formed email address")));
@@ -185,7 +185,21 @@ public class ControllerConstraintHandlerTest {
         @Error(exception = ConstraintViolationException.class)
         @Status(HttpStatus.I_AM_A_TEAPOT)
         Optional<Map> constraintsEx(ConstraintViolationException e, HttpRequest<?> request) {
-            return request.getBody(Map.class);
+
+            Optional<?> objectOptional = request.getBody();
+            if (objectOptional.isEmpty()) {
+                return Optional.empty();
+            }
+            Object obj = objectOptional.get();
+            String password = null;
+            if (obj instanceof CredentialsWithoutNullabilityAnnotation credentials) {
+                password = credentials.getPassword();
+            } else if (obj instanceof CredentialsWithNullable credentials) {
+                password = credentials.getPassword();
+            } else if (obj instanceof CredentialsWithNonNull credentials) {
+                password = credentials.getPassword();
+            }
+            return password != null ? Optional.of(Map.of("password", password)) : Optional.empty();
         }
     }
 
