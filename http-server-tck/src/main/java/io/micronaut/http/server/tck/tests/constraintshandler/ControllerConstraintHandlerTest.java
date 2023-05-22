@@ -63,9 +63,6 @@ public class ControllerConstraintHandlerTest {
         })
         .build();
 
-    /**
-     * @see <a href="https://github.com/micronaut-projects/micronaut-aws/issues/1164">micronaut-aws #1164</a>
-     */
     @Test
     void testPojoConstraintViolationExceptionIsHandledViaHandler() throws IOException {
         asserts(SPEC_NAME,
