@@ -16,6 +16,7 @@
 package io.micronaut.http.server.websocket;
 
 import io.micronaut.context.ExecutionHandleLocator;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
@@ -26,6 +27,7 @@ import io.micronaut.web.router.UriRoute;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.annotation.ServerWebSocket;
+import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import jakarta.inject.Singleton;
 
 import java.util.HashSet;
@@ -39,18 +41,19 @@ import java.util.Set;
  */
 @Singleton
 @Internal
+@Requires(classes = {ServerWebSocket.class, WebSocketBeanRegistry.class})
 public class ServerWebSocketProcessor extends DefaultRouteBuilder implements ExecutableMethodProcessor<ServerWebSocket> {
 
-    private Set<Class> mappedWebSockets = new HashSet<>(4);
+    private Set<Class<?>> mappedWebSockets = new HashSet<>(4);
 
     /**
      * Default constructor.
      *
      * @param executionHandleLocator The {@link ExecutionHandleLocator}
-     * @param uriNamingStrategy The {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy}
-     * @param conversionService The {@link ConversionService}
+     * @param uriNamingStrategy      The {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy}
+     * @param conversionService      The {@link ConversionService}
      */
-    ServerWebSocketProcessor(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
+    ServerWebSocketProcessor(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService conversionService) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
     }
 

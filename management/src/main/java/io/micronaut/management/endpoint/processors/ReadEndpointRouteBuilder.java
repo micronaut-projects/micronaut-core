@@ -44,7 +44,7 @@ public class ReadEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
      */
     public ReadEndpointRouteBuilder(ApplicationContext beanContext,
                                     UriNamingStrategy uriNamingStrategy,
-                                    ConversionService<?> conversionService,
+                                    ConversionService conversionService,
                                     EndpointDefaultConfiguration endpointDefaultConfiguration) {
         super(beanContext, uriNamingStrategy, conversionService, endpointDefaultConfiguration);
     }

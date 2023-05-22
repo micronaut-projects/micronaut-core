@@ -66,6 +66,7 @@ public class DefaultMediaTypeCodecRegistry implements MediaTypeCodecRegistry {
     }
 
     @Override
+    @SuppressWarnings("java:S2789") // performance optimization
     public Optional<MediaTypeCodec> findCodec(@Nullable MediaType mediaType) {
         if (mediaType == null) {
             return Optional.empty();

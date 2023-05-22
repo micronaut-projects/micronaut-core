@@ -15,11 +15,14 @@
  */
 package io.micronaut.inject.visitor;
 
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.TypedElement;
+import org.junit.jupiter.api.Assertions;
 
 import java.util.*;
 
@@ -63,18 +66,44 @@ public class AllElementsVisitor implements TypeElementVisitor<Controller, Object
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
         visit(element);
+        Assertions.assertTrue(context.getClassElement(Object.class.getName()).isPresent());
+        Assertions.assertTrue(context.getClassElement(Object.class).isPresent());
+        element.getBeanProperties(); // Preload properties for tests otherwise it fails because the compiler is done
+        element.getAnnotationMetadata();
         VISITED_CLASS_ELEMENTS.add(element);
     }
 
     @Override
     public void visitMethod(MethodElement element, VisitorContext context) {
-        visit(element);
         VISITED_METHOD_ELEMENTS.add(element);
+        // Preload
+        element.getReturnType().getBeanProperties().forEach(AnnotationMetadataProvider::getAnnotationMetadata);
+        Arrays.stream(element.getParameters()).flatMap(p -> p.getType().getBeanProperties().stream()).forEach(propertyElement -> {
+            initialize(propertyElement);
+            propertyElement.getField().ifPresent(this::initialize);
+            propertyElement.getWriteMethod().ifPresent(methodElement -> {
+                initialize(methodElement.getReturnType());
+                Arrays.stream(methodElement.getParameters()).forEach(this::initialize);
+            });
+            propertyElement.getReadMethod().ifPresent(methodElement -> {
+                initialize(methodElement.getReturnType());
+                Arrays.stream(methodElement.getParameters()).forEach(this::initialize);
+            });
+        });
+        element.getAnnotationMetadata();
+        visit(element);
+    }
+
+    private void initialize(TypedElement typedElement) {
+        typedElement.getAnnotationMetadata();
+        typedElement.getType().getAnnotationMetadata();
+        typedElement.getGenericType().getAnnotationMetadata();
     }
 
     @Override
     public void visitField(FieldElement element, VisitorContext context) {
         visit(element);
+        element.getAnnotationMetadata();
     }
 
     void visit(Element element) {

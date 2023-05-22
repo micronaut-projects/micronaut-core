@@ -1,0 +1,14 @@
+WARNING: We recommend Micronaut developers use <<filtermethods,Filter methods>> instead of `HttpServerFilter` introduced in Micronaut Framework 4.0 to implement filters.
+
+
+For a server application, the api:http.filter.HttpServerFilter[] interface `doFilter` method can be implemented.
+
+The `doFilter` method accepts the api:http.HttpRequest[] and an instance of api:http.filter.ServerFilterChain[].
+
+The `ServerFilterChain` interface contains a resolved chain of filters where the final entry in the chain is the matched route. The api:http.filter.ServerFilterChain.proceed(io.micronaut.http.HttpRequest)[] method resumes processing of the request.
+
+The `proceed(..)` method returns a Reactive Streams rs:Publisher[] that emits the response to be returned to the client. Implementors of filters can subscribe to the rs:Publisher[] and mutate the emitted api:http.MutableHttpResponse[] to modify the response prior to returning the response to the client.
+
+To put these concepts into practice lets look at an example.
+
+IMPORTANT: Filters execute in the event loop, so blocking operations must be offloaded to another thread pool.

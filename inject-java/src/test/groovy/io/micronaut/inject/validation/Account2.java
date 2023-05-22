@@ -1,7 +1,7 @@
 package io.micronaut.inject.validation;
 
 import javax.persistence.Entity;
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotBlank;
 
 @Entity
 public class Account2 {

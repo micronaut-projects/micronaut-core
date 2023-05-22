@@ -80,7 +80,7 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
      * @param binders           The request binders
      * @param beanContext       The context to resolve beans
      */
-    protected DefaultHttpClientBinderRegistry(ConversionService<?> conversionService,
+    protected DefaultHttpClientBinderRegistry(ConversionService conversionService,
                                               List<ClientRequestBinder> binders,
                                               BeanContext beanContext) {
         byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (ClientArgumentRequestBinder<HttpHeaders>) (context, uriContext, value, request) -> value.forEachValue(request::header));

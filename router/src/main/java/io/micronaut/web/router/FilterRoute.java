@@ -17,6 +17,7 @@ package io.micronaut.web.router;
 
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.filter.FilterPatternStyle;
+import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.filter.HttpFilterResolver;
 
@@ -29,13 +30,13 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface FilterRoute extends HttpFilterResolver.FilterEntry<HttpFilter> {
+public interface FilterRoute extends HttpFilterResolver.FilterEntry {
 
     /**
      * @return The filter for this {@link FilterRoute}
      */
     @Override
-    HttpFilter getFilter();
+    GenericHttpFilter getFilter();
 
     /**
      * Matches the given path to this filter route.
@@ -44,7 +45,7 @@ public interface FilterRoute extends HttpFilterResolver.FilterEntry<HttpFilter> 
      * @param uri    The URI
      * @return An {@link Optional} of {@link HttpFilter}
      */
-    Optional<HttpFilter> match(HttpMethod method, URI uri);
+    Optional<GenericHttpFilter> match(HttpMethod method, URI uri);
 
     /**
      * Add an addition pattern to this filter route.

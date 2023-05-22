@@ -38,6 +38,7 @@ public class TraceFilterSpec {
     public static void setupServer() {
         Map<String, Object> map = new HashMap<>();
         map.put("spec.name", HelloControllerSpec.class.getSimpleName());
+        map.put("spec.filter", "TraceFilter");
         map.put("spec.lang", "java");
 
         server = ApplicationContext.run(EmbeddedServer.class, map, Environment.TEST);

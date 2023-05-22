@@ -2,7 +2,7 @@ For example, the following method handles JSON parse exceptions from Jackson for
 
 snippet::io.micronaut.docs.server.json.PersonController[tags="localError", indent=0, title="Local exception handler"]
 
-<1> A method that explicitly handles `JsonParseException` is declared
+<1> A method that explicitly handles `JsonSyntaxException` is declared
 <2> An instance of api:http.hateoas.JsonError[] is returned.
 <3> A custom response is returned to handle the error
 

@@ -53,7 +53,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     private static final char COLON = ':';
 
     private final PropertyResolver environment;
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
     private final String prefix;
     private Collection<PropertyExpressionResolver> expressionResolvers;
 

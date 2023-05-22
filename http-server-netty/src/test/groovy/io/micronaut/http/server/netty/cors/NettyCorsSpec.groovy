@@ -15,7 +15,9 @@
  */
 package io.micronaut.http.server.netty.cors
 
+import io.micronaut.context.annotation.Replaces
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -25,9 +27,21 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
+import io.micronaut.http.server.util.HttpHostResolver
+import jakarta.inject.Singleton
 import reactor.core.publisher.Flux
 
-import static io.micronaut.http.HttpHeaders.*
+import static io.micronaut.http.HttpHeaders.ACCEPT
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_MAX_AGE
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD
+import static io.micronaut.http.HttpHeaders.ORIGIN
+import static io.micronaut.http.HttpHeaders.VARY
 
 class NettyCorsSpec extends AbstractMicronautSpec {
 
@@ -39,8 +53,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         then:
         response.status == HttpStatus.NO_CONTENT
         response.contentLength == -1
-        headerNames.size() == 1
-        headerNames.contains("connection")
+        headerNames.isEmpty()
     }
 
     void "test cors request without configuration"() {
@@ -55,8 +68,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
         then:
         response.status == HttpStatus.NO_CONTENT
-        headerNames.size() == 1
-        headerNames.contains("connection")
+        headerNames.isEmpty()
     }
 
     void "test cors request with a controller that returns map"() {
@@ -142,7 +154,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
         then:
         response.code() == HttpStatus.FORBIDDEN.code
-        headerNames == ['connection'] as Set
+        headerNames == ['content-length'] as Set
     }
 
     void "test cors request with invalid header"() {
@@ -309,6 +321,16 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         'micronaut.server.cors.configurations.bar.maxAge': 150,
         'micronaut.server.cors.configurations.bar.allowCredentials': false,
         'micronaut.server.dateHeader': false]
+    }
+
+    @Requires(property = 'spec.name', value = 'NettyCorsSpec')
+    @Replaces(HttpHostResolver.class)
+    @Singleton
+    static class HttpHostResolverReplacement implements HttpHostResolver {
+        @Override
+        String resolve(@Nullable HttpRequest request) {
+            "https://micronautexample.com"
+        }
     }
 
     @Controller('/test')

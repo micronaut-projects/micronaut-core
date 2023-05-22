@@ -2,6 +2,10 @@ package io.micronaut.logging
 
 import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
+import ch.qos.logback.classic.LoggerContext
+import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.Appender
+import ch.qos.logback.core.ConsoleAppender
 import com.github.stefanbirkner.systemlambda.SystemLambda
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
@@ -10,29 +14,22 @@ import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.context.exceptions.ConfigurationException
 import org.slf4j.LoggerFactory
 import spock.lang.Specification
-import spock.lang.Unroll
 
 class LogbackLogLevelConfigurerSpec extends Specification {
 
-    @Unroll
     void 'test that log levels on logger "#loggerName" can be configured via properties'() {
         given:
-            ((Logger) LoggerFactory.getLogger('foo.bar1')).setLevel(Level.DEBUG)
-            ((Logger) LoggerFactory.getLogger('foo.bar2')).setLevel(Level.DEBUG)
-            ((Logger) LoggerFactory.getLogger('foo.bar3')).setLevel(Level.ERROR)
-            ((Logger) LoggerFactory.getLogger('foo.barBaz')).setLevel(Level.WARN)
-            ((Logger) LoggerFactory.getLogger('ignoring.error')).setLevel(Level.INFO)
+            def loggerLevels = [
+                    'logger.levels.aaa.bbb.ccc'   : 'ERROR',
+                    'logger.levels.foo.bar1'      : 'DEBUG',
+                    'logger.levels.foo.bar2'      : 'INFO',
+                    'logger.levels.foo.bar3'      : '',
+                    'logger.levels.foo.barBaz'    : 'INFO',
+                    'logger.levels.ignoring.error': 'OFF',
+            ]
 
         when:
-            ApplicationContext context = ApplicationContext.run(
-                    [
-                            'logger.levels.aaa.bbb.ccc'   : 'ERROR',
-                            'logger.levels.foo.bar2'      : 'INFO',
-                            'logger.levels.foo.bar3'      : '',
-                            'logger.levels.foo.barBaz'    : 'INFO',
-                            'logger.levels.ignoring.error': 'OFF',
-                    ]
-            )
+            ApplicationContext context = ApplicationContext.run(loggerLevels)
 
         then:
             ((Logger) LoggerFactory.getLogger(loggerName)).getLevel() == expectedLevel
@@ -89,13 +86,11 @@ logger:
     }
 
     void 'test that log levels can be configured via environment variables'() {
-        given:
-            ((Logger) LoggerFactory.getLogger('foo.bar1')).setLevel(Level.DEBUG)
-            ((Logger) LoggerFactory.getLogger('foo.bar2')).setLevel(Level.DEBUG)
-
         when:
             ApplicationContext context = ApplicationContext.builder().build()
-            SystemLambda.withEnvironmentVariable("LOGGER_LEVELS_FOO_BAR2", "INFO")
+            SystemLambda
+                    .withEnvironmentVariable("LOGGER_LEVELS_FOO_BAR1", "DEBUG")
+                    .and("LOGGER_LEVELS_FOO_BAR2", "INFO")
                     .execute(() -> {
                         context.start()
                     })
@@ -140,6 +135,45 @@ logger:
         where:
             loggerName    | expectedLevel
             'foo.bar3'    | Level.INFO
+    }
+
+    void 'logging refresh is properly called on application start'() {
+        given:
+        def map = new YamlPropertySourceLoader().read("application.yml", '''
+logger:
+  config: logback-env-test.xml
+  levels:
+    foo.bar4: ERROR
+'''.bytes)
+
+        ApplicationContext context = ApplicationContext.builder()
+                .propertySources(PropertySource.of("application", map, YamlPropertySourceLoader.DEFAULT_POSITION))
+                .build()
+
+        when:
+        SystemLambda.withEnvironmentVariable("SOME_ENV_VAR", "FOO")
+                .execute(() -> {
+                    context.start()
+                    LoggerFactory.getLogger("foo.bar4").error("Some error")
+                })
+
+        ConsoleAppender<ILoggingEvent> consoleAppender
+        for (Logger logger : ((LoggerContext)LoggerFactory.getILoggerFactory()).getLoggerList()) {
+            for (Iterator<Appender<ILoggingEvent>> index = logger.iteratorForAppenders(); index.hasNext();) {
+                Appender<ILoggingEvent> appender = index.next()
+                if (appender.getName() == "STDOUT") {
+                    consoleAppender = (ConsoleAppender<ILoggingEvent>) appender
+                    break
+                }
+            }
+        }
+
+        then:
+        consoleAppender != null
+        consoleAppender.getEncoder().getProperties()["pattern"].contains("[FOO]")
+
+        cleanup:
+        context.close()
     }
 
 }

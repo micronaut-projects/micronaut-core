@@ -17,7 +17,7 @@ package io.micronaut.inject.beans
 
 import io.micronaut.aop.Intercepted
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.BeanContext
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 
@@ -37,7 +37,7 @@ import jakarta.inject.Inject;
 import java.util.List;
 
 class Test {
-    
+
     @Inject
     List<InterceptRule> list;
 }
@@ -84,7 +84,7 @@ abstract class AbstractBean {
 
     void "test getBeansOfType filters proxy targets"() {
         when:
-        def ctx = DefaultBeanContext.run()
+        def ctx = BeanContext.run()
         def targetBean = ctx.getProxyTargetBean(InterceptedBean, null)
         def bean = ctx.getBean(InterceptedBean)
 
@@ -102,7 +102,7 @@ abstract class AbstractBean {
 
     void "test getBeansOfType filters proxy targets with context scoped beans"() {
         when:
-        def ctx = DefaultBeanContext.run()
+        def ctx = BeanContext.run()
         def targetBean = ctx.getProxyTargetBean(ContextScopedInterceptedBean, null)
         def bean = ctx.getBean(ContextScopedInterceptedBean)
 
@@ -120,7 +120,7 @@ abstract class AbstractBean {
 
     void "test getBeansOfType filters proxy targets with parallel beans"() {
         when:
-        def ctx = DefaultBeanContext.run()
+        def ctx = BeanContext.run()
         Thread.sleep(100)
         def targetBean = ctx.getProxyTargetBean(ParallelBean, null)
         def bean = ctx.getBean(ParallelBean)

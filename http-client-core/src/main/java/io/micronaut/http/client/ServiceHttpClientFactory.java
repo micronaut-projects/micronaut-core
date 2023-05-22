@@ -27,11 +27,11 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.discovery.StaticServiceInstanceList;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.event.ServerStartupEvent;
 import io.micronaut.scheduling.TaskScheduler;
 import reactor.core.publisher.Flux;
+
 import java.net.URI;
 import java.time.Duration;
 import java.util.Collection;
@@ -98,7 +98,7 @@ public class ServiceHttpClientFactory {
                     Collection<URI> loadBalancedURIs = instanceList.getLoadBalancedURIs();
                     final HttpClient httpClient = clientFactory.get()
                             .getClient(
-                                    configuration.getHttpVersion(),
+                                    HttpVersionSelection.forClientConfiguration(configuration),
                                     configuration.getServiceId(),
                                     configuration.getPath().orElse(null));
                     final Duration initialDelay = configuration.getHealthCheckInterval();
@@ -113,12 +113,12 @@ public class ServiceHttpClientFactory {
                                                 return Flux.just((HttpResponse<ByteBuffer>) responseException.getResponse());
                                             }
                                             return Flux.just(HttpResponse.serverError());
-                                        }).map(response -> Collections.singletonMap(originalURI, response.getStatus()));
+                                        }).map(response -> Collections.singletonMap(originalURI, response.code()));
                             }).subscribe(uriToStatusMap -> {
-                                Map.Entry<URI, HttpStatus> entry = uriToStatusMap.entrySet().iterator().next();
+                                Map.Entry<URI, Integer> entry = uriToStatusMap.entrySet().iterator().next();
                                 URI uri = entry.getKey();
-                                HttpStatus status = entry.getValue();
-                                if (status.getCode() >= 300) {
+                                int status = entry.getValue();
+                                if (status >= 300) {
                                     loadBalancedURIs.remove(uri);
                                 } else if (!loadBalancedURIs.contains(uri)) {
                                     loadBalancedURIs.add(uri);

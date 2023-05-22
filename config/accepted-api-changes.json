@@ -1,5 +1,9 @@
 [
-
+  {
+    "type": "io.micronaut.http.client.netty.DefaultHttpClient$HttpClientInitializer",
+    "member": "Constructor io.micronaut.http.client.netty.DefaultHttpClient$HttpClientInitializer(io.micronaut.http.client.netty.DefaultHttpClient,io.netty.handler.ssl.SslContext,java.lang.String,int,boolean,boolean,boolean,java.util.function.Consumer)",
+    "reason": "4.0.0 Release.  All bets are off"
+  },
   {
     "type": "io.micronaut.ast.groovy.visitor.AbstractGroovyElement",
     "member": "Class io.micronaut.ast.groovy.visitor.AbstractGroovyElement",
@@ -34,7 +38,7 @@
       "type": "io.micronaut.inject.visitor.TypeElementVisitor",
       "member": "Method io.micronaut.inject.visitor.TypeElementVisitor.visitEnumConstant(io.micronaut.inject.ast.EnumConstantElement,io.micronaut.inject.visitor.VisitorContext)",
       "reason": "Added EnumConstantElement. Added EnumElement.elements() method to collect enum constant elements"
-  },  
+  },
   {
     "type": "io.micronaut.scheduling.TaskScheduler",
     "member": "Method io.micronaut.scheduling.TaskScheduler.schedule(java.lang.String,java.lang.String,java.lang.Runnable)",
@@ -279,5 +283,65 @@
     "type": "io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference",
     "member": "Constructor io.micronaut.runtime.converters.time.$TimeConverterRegistrar$Definition$Reference()",
     "reason": "Not a bean anymore"
+  },
+  {
+    "type": "io.micronaut.annotation.processing.ServiceDescriptionProcessor",
+    "member": "Constructor io.micronaut.annotation.processing.ServiceDescriptionProcessor()",
+    "reason": "Deprecated and removed for Micronaut 4. No longer needed."
+  },
+  {
+    "type": "io.micronaut.annotation.processing.ServiceDescriptionProcessor",
+    "member": "Implemented interface javax.annotation.processing.Processor",
+    "reason": "Deprecated and removed for Micronaut 4. No longer needed"
+  },
+  {
+    "type": "io.micronaut.runtime.context.scope.refresh.RefreshScope",
+    "member": "Constructor io.micronaut.runtime.context.scope.refresh.RefreshScope(io.micronaut.context.BeanContext,java.util.concurrent.Executor)",
+    "reason": "Deprecated and removed for Micronaut 4"
+  },
+  {
+    "type": "io.micronaut.runtime.server.watch.event.FileWatchRestartListener",
+    "member": "Constructor io.micronaut.runtime.server.watch.event.FileWatchRestartListener(io.micronaut.runtime.server.EmbeddedServer)",
+    "reason": "Deprecated and removed for Micronaut 4. Use FileWatchRestartListener(EmbeddedApplication) instead."
+  },
+  {
+    "type": "io.micronaut.inject.processing.ProcessedTypes",
+    "member": "Field PRE_DESTROY",
+    "reason": "Deprecated and removed for Micronaut 4. Use io.micronaut.core.annotation.AnnotationUtil instead."
+  },
+  {
+    "type": "io.micronaut.inject.processing.ProcessedTypes",
+    "member": "Field POST_CONSTRUCT",
+    "reason": "Deprecated and removed for Micronaut 4. Use io.micronaut.core.annotation.AnnotationUtil instead."
+  },
+  {
+    "type": "io.micronaut.http.filter.OncePerRequestHttpServerFilter",
+    "member": "Constructor io.micronaut.http.filter.OncePerRequestHttpServerFilter()",
+    "reason": "Deprecated and removed for Micronaut 4. All filters are executed once per request starting in Micronaut 3.0."
+  },
+  {
+    "type": "io.micronaut.http.filter.OncePerRequestHttpServerFilter",
+    "member": "Implemented interface io.micronaut.http.filter.HttpServerFilter",
+    "reason": "Deprecated and removed for Micronaut 4. All filters are executed once per request starting in Micronaut 3.0."
+  },
+  {
+    "type": "io.micronaut.http.filter.OncePerRequestHttpServerFilter",
+    "member": "Implemented interface io.micronaut.http.filter.HttpFilter",
+    "reason": "Deprecated and removed for Micronaut 4. All filters are executed once per request starting in Micronaut 3.0."
+  },
+  {
+    "type": "io.micronaut.http.client.loadbalance.FixedLoadBalancer",
+    "member": "Constructor io.micronaut.http.client.loadbalance.FixedLoadBalancer(java.net.URL)",
+    "reason": "Deprecated and removed for Micronaut 4. Use FixedLoadBalancer(java.net.URI) instead"
+  },
+  {
+    "type": "io.micronaut.core.io.service.StreamSoftServiceLoader",
+    "member": "Constructor io.micronaut.core.io.service.StreamSoftServiceLoader()",
+    "reason": "Deprecated and removed for Micronaut 4. Use io.micronaut.core.io.service.SoftServiceLoader#collectAll(java.util.Collection)."
+  },
+  {
+    "type": "io.micronaut.http.server.exceptions.response.HateoasErrorResponseProcessor",
+    "member": "Constructor io.micronaut.http.server.exceptions.response.HateoasErrorResponseProcessor(io.micronaut.jackson.JacksonConfiguration)",
+    "reason": "Removed as was deprecated in 3.8.x"
   }
 ]

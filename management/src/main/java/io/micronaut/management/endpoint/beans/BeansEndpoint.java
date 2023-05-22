@@ -15,18 +15,9 @@
  */
 package io.micronaut.management.endpoint.beans;
 
-import io.micronaut.context.BeanContext;
 import io.micronaut.core.async.annotation.SingleResult;
-import io.micronaut.inject.BeanDefinition;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
-import org.reactivestreams.Publisher;
-import reactor.core.publisher.Mono;
-
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * <p>Exposes an {@link Endpoint} to provide information about the beans of the application.</p>
@@ -37,15 +28,12 @@ import java.util.stream.Collectors;
 @Endpoint("beans")
 public class BeansEndpoint {
 
-    private BeanContext beanContext;
-    private BeanDefinitionDataCollector beanDefinitionDataCollector;
+    private final BeanDefinitionDataCollector<Object> beanDefinitionDataCollector;
 
     /**
-     * @param beanContext                 The {@link BeanContext}
      * @param beanDefinitionDataCollector The {@link BeanDefinitionDataCollector}
      */
-    public BeansEndpoint(BeanContext beanContext, BeanDefinitionDataCollector beanDefinitionDataCollector) {
-        this.beanContext = beanContext;
+    public BeansEndpoint(BeanDefinitionDataCollector<Object> beanDefinitionDataCollector) {
         this.beanDefinitionDataCollector = beanDefinitionDataCollector;
     }
 
@@ -54,12 +42,7 @@ public class BeansEndpoint {
      */
     @Read
     @SingleResult
-    public Publisher<?> getBeans() {
-        List<BeanDefinition<?>> beanDefinitions = beanContext.getAllBeanDefinitions()
-                .stream()
-                .sorted(Comparator.comparing((BeanDefinition<?> bd) -> bd.getClass().getName()))
-                .collect(Collectors.toList());
-        return Mono.from(beanDefinitionDataCollector.getData(beanDefinitions))
-                    .defaultIfEmpty(Collections.emptyMap());
+    public Object getBeans() {
+        return beanDefinitionDataCollector.getData();
     }
 }

@@ -1,13 +1,63 @@
 package io.micronaut.inject.annotation
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Property
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValue
+import org.intellij.lang.annotations.Language
 
 class AnnotationMetadataHierarchySpec extends AbstractTypeElementSpec{
+
+    void "test merge annotation metadata"() {
+        when:
+            @Language("java")
+            def source = '''\
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Property(name = "myprop", value = "xyz")
+class Test {
+
+    @Property(name = "myprop", value = "abc")
+    void someMethod() {}
+}
+'''
+            AnnotationMetadata methodMetadata = buildMethodAnnotationMetadata(source, 'someMethod')
+            AnnotationMetadata typeMetadata = buildTypeAnnotationMetadata(source)
+            AnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(typeMetadata, methodMetadata).merge()
+
+        then:
+            annotationMetadata.stringValue(Property.class).get() == "abc"
+    }
+
+    void "test merge annotation metadata2"() {
+        when:
+            @Language("java")
+            def source = '''\
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@ConfigurationProperties(value = "xyz", includes = "abc", excludes = "lol")
+class Test {
+
+    @ConfigurationProperties(value = "qwe", excludes = "foo")
+    void someMethod() {}
+}
+'''
+            AnnotationMetadata methodMetadata = buildMethodAnnotationMetadata(source, 'someMethod')
+            AnnotationMetadata typeMetadata = buildTypeAnnotationMetadata(source)
+            AnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(typeMetadata, methodMetadata).merge()
+
+        then:
+            annotationMetadata.stringValue(ConfigurationReader.class, "prefix").get() == "qwe"
+            annotationMetadata.stringValue(ConfigurationReader.class, "includes").get() == "abc"
+            annotationMetadata.stringValue(ConfigurationReader.class, "excludes").get() == "foo"
+    }
 
     void "test basic method annotation metadata"() {
 
@@ -24,7 +74,7 @@ class Test {
     void someMethod() {}
 }
 '''
-        AnnotationMetadata methodMetadata = buildDeclaredMethodAnnotationMetadata(source, 'someMethod')
+        AnnotationMetadata methodMetadata = buildMethodAnnotationMetadata(source, 'someMethod')
         AnnotationMetadata typeMetadata = buildTypeAnnotationMetadata(source)
         AnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(typeMetadata, methodMetadata)
 
@@ -63,9 +113,9 @@ package test;
 import io.micronaut.inject.annotation.repeatable.*;
 import io.micronaut.context.annotation.*;
 
-@Property(name="prop2", value="value2")    
-@Property(name="prop3", value="value33")    
-@Property(name="prop4", value="value4")    
+@Property(name="prop2", value="value2")
+@Property(name="prop3", value="value33")
+@Property(name="prop4", value="value4")
 class Test {
 }
 ''')
@@ -108,7 +158,7 @@ class Test {
     void someMethod() {}
 }
 '''
-        AnnotationMetadata methodMetadata = buildDeclaredMethodAnnotationMetadata(source, 'someMethod')
+        AnnotationMetadata methodMetadata = buildMethodAnnotationMetadata(source, 'someMethod')
         AnnotationMetadata typeMetadata = buildTypeAnnotationMetadata(source)
         AnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(typeMetadata, methodMetadata)
 

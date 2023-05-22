@@ -46,7 +46,6 @@ class YamlPropertySourceLoaderSpec extends Specification {
             @Override
             protected SoftServiceLoader<PropertySourceLoader> readPropertySourceLoaders() {
                 GroovyClassLoader gcl = new GroovyClassLoader()
-                gcl.addClass(YamlPropertySourceLoader)
                 gcl.addURL(YamlPropertySourceLoader.getResource("/META-INF/services/io.micronaut.context.env.PropertySourceLoader"))
                 return new SoftServiceLoader<PropertySourceLoader>(PropertySourceLoader, gcl)
             }
@@ -70,7 +69,7 @@ dataSource:
     pooled: true
     driverClassName: org.h2.Driver
     username: sa
-    password: ''    
+    password: ''
 '''.bytes))
                 }
 
@@ -99,7 +98,6 @@ dataSource:
             @Override
             protected SoftServiceLoader<PropertySourceLoader> readPropertySourceLoaders() {
                 GroovyClassLoader gcl = new GroovyClassLoader()
-                gcl.addClass(YamlPropertySourceLoader)
                 gcl.addURL(YamlPropertySourceLoader.getResource("/META-INF/services/io.micronaut.context.env.PropertySourceLoader"))
                 return new SoftServiceLoader<PropertySourceLoader>(PropertySourceLoader, gcl)
             }
@@ -113,7 +111,7 @@ datasources.default: {}
                 }
                 else if(path.endsWith("application.yml")) {
                     return Optional.of(new ByteArrayInputStream('''\
-datasources.default: {}    
+datasources.default: {}
 '''.bytes))
                 }
 

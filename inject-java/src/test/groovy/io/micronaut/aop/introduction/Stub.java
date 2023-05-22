@@ -16,7 +16,6 @@
 package io.micronaut.aop.introduction;
 
 import io.micronaut.aop.Introduction;
-import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Type;
 
 import java.lang.annotation.Documented;

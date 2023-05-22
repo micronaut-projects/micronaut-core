@@ -19,10 +19,9 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Blocking
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import io.micronaut.inject.writer.BeanDefinitionWriter
-
 /**
  * @author graemerocher
  * @since 1.0
@@ -76,11 +75,11 @@ import io.micronaut.core.annotation.*;
 class MyBean implements MyInterface {
 
     private String myValue;
-    
+
     MyBean(@Value("${foo.bar}") String val) {
         this.myValue = val;
     }
-    
+
     @Override
     public String someMethod() {
         return myValue;
@@ -103,7 +102,7 @@ interface MyInterface {
 
         when:
         def context = ApplicationContext.run('foo.bar':'test')
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
 
         then:
@@ -144,7 +143,7 @@ class Service extends BaseService implements ContractService {
 
     @SomeAnnot
     public void serviceMethod() {}
-    
+
     public void interfaceServiceMethod() {}
 }
 
@@ -166,7 +165,7 @@ class SomeInterceptor implements MethodInterceptor<Object, Object>, Ordered {
 
 ''')
         then:
-        Class clazz = ctx.classLoader.loadClass("test.ContractService")
+        Class<?> clazz = ctx.classLoader.loadClass("test.ContractService")
         ctx.getBean(clazz)
 
         when:

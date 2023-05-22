@@ -1,5 +1,6 @@
 package io.micronaut.inject.util
 
+import io.micronaut.inject.visitor.util.VisitorContextUtils
 import spock.lang.Specification
 import spock.lang.Stepwise
 import spock.util.environment.RestoreSystemProperties
@@ -8,6 +9,7 @@ import javax.annotation.processing.ProcessingEnvironment
 
 @Stepwise
 class VisitorContextUtilsSpec extends Specification {
+
     public static final String INVALID_CUSTOM_PROP_1 = "invalid.custom.prop"
     public static final String VALID_CUSTOM_PROP_1 = "micronaut.custom.prop"
     public static final String VALID_CUSTOM_PROP_2 = "micronaut.another.custom.prop"
@@ -52,9 +54,9 @@ class VisitorContextUtilsSpec extends Specification {
 
         with(options) {
             size() == 2
-            containsKey(VALID_CUSTOM_PROP_1)
-            containsKey(VALID_CUSTOM_PROP_2)
-            !containsKey(INVALID_CUSTOM_PROP_1)
+            containsKey(VisitorContextUtilsSpec.VALID_CUSTOM_PROP_1)
+            containsKey(VisitorContextUtilsSpec.VALID_CUSTOM_PROP_2)
+            !containsKey(VisitorContextUtilsSpec.INVALID_CUSTOM_PROP_1)
         }
     }
 

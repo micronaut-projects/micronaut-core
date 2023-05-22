@@ -3,13 +3,15 @@ plugins {
 }
 
 repositories {
+    mavenCentral()
     gradlePluginPortal()
 }
 
 dependencies {
-    implementation "gradle.plugin.com.github.johnrengelman:shadow:7.1.2"
     implementation "org.aim42:htmlSanityCheck:1.1.6"
-    implementation "io.micronaut.build.internal:micronaut-gradle-plugins:5.3.15"
-    implementation "org.graalvm.buildtools.native:org.graalvm.buildtools.native.gradle.plugin:0.9.14"
-    implementation "org.tomlj:tomlj:1.0.0"
+    implementation "io.micronaut.build.internal:micronaut-gradle-plugins:6.4.4"
+
+    implementation "org.tomlj:tomlj:1.1.0"
+    implementation "me.champeau.gradle:japicmp-gradle-plugin:0.4.1"
+    implementation "org.graalvm.buildtools.native:org.graalvm.buildtools.native.gradle.plugin:0.9.22"
 }

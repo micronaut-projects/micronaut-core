@@ -15,11 +15,10 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.io.scan.ClassPathResourceLoader;
-
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.convert.MutableConversionService;
+import io.micronaut.core.io.scan.ClassPathResourceLoader;
 
 import java.util.Collections;
 import java.util.List;
@@ -40,10 +39,31 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
     @NonNull List<String> getEnvironments();
 
     /**
+     * If set to {@code true} (the default is {@code true}) Micronaut will attempt to automatically deduce the environment
+     * it is running in using environment variables and/or stack trace inspection.
+     *
+     * <p>This method differs from {@link #isDeduceCloudEnvironment()} which controls whether network and/or disk probes
+     *  are performed to try and automatically establish the Cloud environment.</p>
+     *
+     * <p>This behaviour controls the automatic activation of, for example, the {@link io.micronaut.context.env.Environment#TEST} when running tests.</p>
+     *
      * @return True if the environments should be deduced
      */
     default Optional<Boolean> getDeduceEnvironments() {
         return Optional.empty();
+    }
+
+    /**
+     * If set to {@code true} Micronaut will attempt to deduce the environment using safe methods like environment variables and the stack trace.
+     *
+     * <p>Enabling this should be done with caution since network probes are required to figure out whether the application is
+     * running in certain clouds like GCP.</p>
+     *
+     * @return True if the environments should be deduced
+     * @since 4.0.0
+     */
+    default boolean isDeduceCloudEnvironment() {
+        return false;
     }
 
     /**
@@ -73,6 +93,7 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
     /**
      * @return The environment variables to include in configuration
      */
+    @SuppressWarnings("java:S1168") // null used to establish absence of config
     default @Nullable List<String> getEnvironmentVariableIncludes() {
         return null;
     }
@@ -80,17 +101,18 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
     /**
      * @return The environment variables to exclude from configuration
      */
+    @SuppressWarnings("java:S1168") // null used to establish absence of config
     default @Nullable List<String> getEnvironmentVariableExcludes() {
         return null;
     }
 
     /**
-     * The default conversion service to use.
+     * The optional conversion service to use.
      *
      * @return The conversion service
      */
-    default @NonNull ConversionService<?> getConversionService() {
-        return ConversionService.SHARED;
+    default Optional<MutableConversionService> getConversionService() {
+        return Optional.empty();
     }
 
     /**
@@ -107,6 +129,7 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
      *
      * @return The config locations
      */
+    @SuppressWarnings("java:S1168") // null used to establish absence of config
     default @Nullable List<String> getOverrideConfigLocations() {
         return null;
     }
@@ -121,6 +144,7 @@ public interface ApplicationContextConfiguration extends BeanContextConfiguratio
     }
 
     @Nullable
+    @SuppressWarnings("java:S2447") // null used to establish absence of config
     default Boolean isBootstrapEnvironmentEnabled() {
         return null;
     }

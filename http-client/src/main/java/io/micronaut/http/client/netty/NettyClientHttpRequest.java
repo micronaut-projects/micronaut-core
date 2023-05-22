@@ -17,7 +17,7 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
@@ -39,6 +39,7 @@ import io.micronaut.http.uri.UriBuilder;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
+import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpContent;
@@ -65,7 +66,7 @@ import java.util.Set;
  * @since 1.0
  */
 @Internal
-class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpRequestBuilder {
+public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpRequestBuilder {
 
     static final CharSequence CHANNEL = "netty_channel";
     private final NettyHttpHeaders headers = new NettyHttpHeaders();
@@ -76,6 +77,7 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpReque
     private URI uri;
     private Object body;
     private NettyHttpParameters httpParameters;
+    private ConversionService conversionService = ConversionService.SHARED;
 
     /**
      * This constructor is actually required for the case of non-standard http methods.
@@ -174,8 +176,8 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpReque
     }
 
     @Override
-    public <T> Optional<T> getBody(Argument<T> type) {
-        return getBody().flatMap(b -> ConversionService.SHARED.convert(b, ConversionContext.of(type)));
+    public <T> Optional<T> getBody(ArgumentConversionContext<T> conversionContext) {
+        return getBody().flatMap(b -> conversionService.convert(b, conversionContext));
     }
 
     @Override
@@ -217,7 +219,7 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpReque
     private NettyHttpParameters decodeParameters(URI uri) {
         QueryStringDecoder queryStringDecoder = createDecoder(uri);
         return new NettyHttpParameters(queryStringDecoder.parameters(),
-                ConversionService.SHARED,
+                conversionService,
                 (name, value) -> {
                     UriBuilder newUri = UriBuilder.of(getUri());
                     newUri.replaceQueryParam(name.toString(), value.toArray());
@@ -263,6 +265,7 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpReque
 
     @NonNull
     @Override
+    @Deprecated
     public FullHttpRequest toFullHttpRequest() {
         String uriStr = resolveUriPath();
         io.netty.handler.codec.http.HttpMethod method = getMethod(httpMethodName);
@@ -281,7 +284,8 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpReque
                 req = new DefaultFullHttpRequest(
                         HttpVersion.HTTP_1_1,
                         method,
-                        uriStr
+                        uriStr,
+                        false
                 );
                 req.headers().setAll(headers.getNettyHeaders());
             }
@@ -300,12 +304,13 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpReque
 
     @NonNull
     @Override
+    @Deprecated
     public StreamedHttpRequest toStreamHttpRequest() {
         if (body instanceof Publisher) {
             String uriStr = resolveUriPath();
             io.netty.handler.codec.http.HttpMethod method = getMethod(httpMethodName);
             DefaultStreamedHttpRequest req = new DefaultStreamedHttpRequest(
-                    HttpVersion.HTTP_1_1, method, uriStr, (Publisher<HttpContent>) body);
+                                HttpVersion.HTTP_1_1, method, uriStr, false, (Publisher<HttpContent>) body);
             req.headers().setAll(headers.getNettyHeaders());
             return req;
         } else {
@@ -315,6 +320,7 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpReque
 
     @NonNull
     @Override
+    @Deprecated
     public HttpRequest toHttpRequest() {
         if (isStream()) {
             return toStreamHttpRequest();
@@ -324,7 +330,23 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHttpReque
     }
 
     @Override
+    public HttpRequest toHttpRequestWithoutBody() {
+        return new DefaultHttpRequest(
+            HttpVersion.HTTP_1_1,
+            getMethod(httpMethodName),
+            resolveUriPath(),
+            headers.getNettyHeaders()
+        );
+    }
+
+    @Override
+    @Deprecated
     public boolean isStream() {
         return body instanceof Publisher;
+    }
+
+    @Override
+    public void setConversionService(ConversionService conversionService) {
+        this.conversionService = conversionService;
     }
 }

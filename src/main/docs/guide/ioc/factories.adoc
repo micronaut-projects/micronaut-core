@@ -18,7 +18,7 @@ TIP: To allow the resulting bean to participate in the application context shutd
 
 === Beans from Fields
 
-With Micronaut 3.0 or above it is also possible to produce beans from fields by declaring the ann:context.annotation.Bean[] annotation on a field.
+With Micronaut framework 3.0 or above it is also possible to produce beans from fields by declaring the ann:context.annotation.Bean[] annotation on a field.
 
 Whilst generally this approach should be discouraged in favour for factory methods, which provide more flexibility it does simplify testing code. For example with bean fields you can easily produce mocks in your test code:
 
@@ -36,7 +36,7 @@ NOTE: Qualifiers from the factory instance aren't inherited to the beans.
 
 ==== Primitive Beans and Arrays
 
-Since Micronaut 3.1 it is possible to define and inject primitive types and array types from factories.
+Since Micronaut framework 3.1 it is possible to define and inject primitive types and array types from factories.
 
 For example:
 

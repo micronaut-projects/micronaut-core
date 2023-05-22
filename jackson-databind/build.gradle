@@ -8,7 +8,7 @@ dependencies {
 
     api project(":jackson-core")
 
-    compileOnly libs.managed.graal
+    compileOnly libs.graal
     api libs.managed.jackson.databind
     api libs.managed.jackson.datatype.jdk8
     api libs.managed.jackson.datatype.jsr310
@@ -27,6 +27,7 @@ dependencies {
     testImplementation project(":inject-java-test")
     testImplementation project(":inject-groovy")
     testImplementation "com.fasterxml.jackson.dataformat:jackson-dataformat-xml"
+    testImplementation libs.managed.snakeyaml
     if (!JavaVersion.current().isJava9Compatible()) {
         testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }

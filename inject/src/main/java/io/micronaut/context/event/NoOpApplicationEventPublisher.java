@@ -34,4 +34,9 @@ final class NoOpApplicationEventPublisher implements ApplicationEventPublisher<O
     public Future<Void> publishEventAsync(Object event) {
         return CompletableFuture.completedFuture(null);
     }
+
+    @Override
+    public boolean isEmpty() {
+        return true;
+    }
 }

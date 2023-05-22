@@ -1,4 +1,4 @@
-In addition to being able to inject beans, Micronaut natively supports injecting the following types:
+In addition to being able to inject beans, Micronaut framework natively supports injecting the following types:
 
 .Injectable Container Types
 |===
@@ -8,9 +8,13 @@ In addition to being able to inject beans, Micronaut natively supports injecting
 |An `Optional` of a bean. `empty()` is injected if the bean doesn't exist
 |`Optional<Engine>`
 
-|link:{jdkapi}/java/util/Collection.html[java.lang.Collection]
+|link:{jdkapi}/java/util/Collection.html[java.util.Collection]
 |An `Collection` or subtype of `Collection` (e.g. `List`, `Set`, etc.)
 |`Collection<Engine>`
+
+|link:{jdkapi}/java/util/Map.html[java.util.Map]
+|An `Map` or subtype of `Map` (e.g. `LinkedHashMap`, `TreeMap`, etc.) where the key is the qualifier
+|`Map<String, Engine>`
 
 |link:{jdkapi}/java/util/stream/Stream.html[java.util.stream.Stream]
 |A lazy `Stream` of beans
@@ -21,7 +25,7 @@ In addition to being able to inject beans, Micronaut natively supports injecting
 |`Engine[]`
 
 |link:{jeeapi}/javax/inject/Provider.html[Provider]
-|A `javax.inject.Provider` if a circular dependency requires it, or to instantiate a prototype for each `get` call.
+|A `jakarta.inject.Provider` if a circular dependency requires it, or to instantiate a prototype for each `get` call.
 |`Provider<Engine>`
 
 |link:{jakartaapi}/jakarta/inject/Provider.html[Provider]
@@ -60,7 +64,7 @@ TIP: A prototype bean will have one instance created per place the bean is injec
 
 === Collection Ordering
 
-When injecting a collection of beans, they are not ordered by default. Implement the api:core.order.Ordered[] interface to inject an ordered collection. If the requested bean type does not implement api:core.order.Ordered[], Micronaut searches for the ann:core.annotation.Order[] annotation on beans.
+When injecting a collection of beans, they are not ordered by default. Implement the api:core.order.Ordered[] interface to inject an ordered collection. If the requested bean type does not implement api:core.order.Ordered[], Micronaut framework searches for the ann:core.annotation.Order[] annotation on beans.
 
 The ann:core.annotation.Order[] annotation is especially useful for ordering beans created by factories where the bean type is a class in a third-party library. In this example, both `LowRateLimit` and `HighRateLimit` implement the `RateLimit` interface.
 

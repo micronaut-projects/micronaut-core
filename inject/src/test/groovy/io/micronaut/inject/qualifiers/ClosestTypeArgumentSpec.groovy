@@ -165,7 +165,7 @@ class ClosestTypeArgumentSpec extends Specification {
         beanDefinitions[0] == b
     }
 
-    private BeanDefinition stubFor(Class... typeArguments) {
+    private BeanDefinition stubFor(Class<?>... typeArguments) {
         Stub(BeanDefinition) {
             getTypeArguments(BeanType) >> {
                 typeArguments.collect { Argument.of(it) }

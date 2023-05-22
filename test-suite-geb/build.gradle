@@ -1,0 +1,42 @@
+import org.apache.tools.ant.taskdefs.condition.Os
+
+buildscript {
+    repositories {
+        maven { url "https://plugins.gradle.org/m2/" }
+    }
+    dependencies {
+        classpath "gradle.plugin.com.energizedwork.webdriver-binaries:webdriver-binaries-gradle-plugin:$webdriverBinariesVersion"
+    }
+}
+
+plugins {
+    id "io.micronaut.build.internal.convention-test-library"
+    id 'io.micronaut.build.internal.functional-test'
+    id 'java-test-fixtures'
+    id 'io.micronaut.build.internal.convention-geb-base'
+}
+
+micronautBuild {
+    core {
+        usesMicronautTestJunit()
+        usesMicronautTestSpock()
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url "https://s01.oss.sonatype.org/content/repositories/snapshots/"
+        mavenContent {
+            snapshotsOnly()
+        }
+    }
+}
+
+dependencies {
+    testImplementation project(':http')
+    testImplementation project(':http-server-netty')
+    testImplementation project(":jackson-databind")
+
+    testRuntimeOnly libs.logback.classic
+}

@@ -23,14 +23,18 @@ import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
-import io.micronaut.core.annotation.*;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Indexes;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ArgumentCoercible;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
-import io.micronaut.inject.BeanFactory;
 import io.micronaut.inject.InjectionPoint;
+import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -46,7 +50,7 @@ import java.util.Optional;
  * @since 3.0.0
  * @author graemerocher
  */
-public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>, BeanFactory<T>, BeanDefinitionReference<T> {
+public abstract class AbstractProviderDefinition<T> implements InstantiatableBeanDefinition<T>, BeanDefinitionReference<T> {
 
     private static final Argument<Object> TYPE_VARIABLE = Argument.ofTypeVariable(Object.class, "T");
     private final AnnotationMetadata annotationMetadata;
@@ -63,7 +67,7 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
         try {
             metadata.addDeclaredAnnotation(Indexes.class.getName(), Collections.singletonMap(AnnotationMetadata.VALUE_MEMBER, getBeanType()));
         } catch (NoClassDefFoundError e) {
-            // ignore, might happen if javax.inject is not the classpath
+            // ignore, might happen if jakarta.inject is not the classpath
         }
         annotationMetadata = metadata;
     }
@@ -71,6 +75,11 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
     @Override
     public boolean isContainerType() {
         return false;
+    }
+
+    @Override
+    public boolean isCandidateBean(Argument<?> beanType) {
+        return beanType.isAssignableFrom(getBeanType());
     }
 
     @Override
@@ -111,11 +120,8 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
             boolean singleton);
 
     @Override
-    public T build(
-            BeanResolutionContext resolutionContext,
-            BeanContext context,
-            BeanDefinition<T> definition) throws BeanInstantiationException {
-        final BeanResolutionContext.Segment<?> segment = resolutionContext.getPath().currentSegment().orElse(null);
+    public T instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException {
+        final BeanResolutionContext.Segment<?, ?> segment = resolutionContext.getPath().currentSegment().orElse(null);
         if (segment != null) {
             final InjectionPoint<?> injectionPoint = segment.getInjectionPoint();
             if (injectionPoint instanceof ArgumentCoercible) {
@@ -146,7 +152,7 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
                                 context,
                                 argument,
                                 qualifier,
-                                definition.isSingleton()
+                                isSingleton()
                         );
                     } else {
                         if (injectionPointArgument.isOptional()) {
@@ -160,7 +166,7 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
                                         context,
                                         argument,
                                         qualifier,
-                                        definition.isSingleton()
+                                        isSingleton()
                                 );
                             } else {
                                 throw new NoSuchBeanException(argument, qualifier);
@@ -194,6 +200,11 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
     }
 
     @Override
+    public boolean isConfigurationProperties() {
+        return false;
+    }
+
+    @Override
     @NonNull
     public final List<Argument<?>> getTypeArguments(Class<?> type) {
         if (type == getBeanType()) {
@@ -206,7 +217,7 @@ public abstract class AbstractProviderDefinition<T> implements BeanDefinition<T>
     @NonNull
     public final List<Argument<?>> getTypeArguments() {
         return Collections.singletonList(TYPE_VARIABLE);
-    }    
+    }
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {

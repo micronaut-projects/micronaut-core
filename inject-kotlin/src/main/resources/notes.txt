@@ -1,0 +1,3 @@
+Differences:
+
+In Kotlin the enums have implicit properties name and ordinal that I'm not able to distinguish between defined properties. In Java only the defined properties are properties in the introspeciton

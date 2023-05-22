@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -33,6 +34,7 @@ import io.netty.channel.ChannelOption;
 import io.netty.handler.logging.LogLevel;
 import io.netty.handler.ssl.ApplicationProtocolNames;
 import jakarta.inject.Inject;
+import jakarta.inject.Named;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -111,11 +113,61 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * The default configuration for boolean flag indicating whether to add connection header `keep-alive` to responses with HttpStatus > 499.
      */
     @SuppressWarnings("WeakerAccess")
-    public static final boolean DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR = false;
+    public static final boolean DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR = true;
+
+    /**
+     * The default value for eager parsing.
+     *
+     * @since 4.0.0
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_EAGER_PARSING = false;
+
+    /**
+     * The default value for eager parsing.
+     *
+     * @since 4.0.0
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_JSON_BUFFER_MAX_COMPONENTS = 4096;
+    /**
+     * Default value for {@link Http3Settings#getInitialMaxData()}.
+     *
+     * @since 4.0.0
+     */
+    @Experimental
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_HTTP3_INITIAL_MAX_DATA = 10000000;
+    /**
+     * Default value for {@link Http3Settings#getInitialMaxStreamDataBidirectionalLocal()}.
+     *
+     * @since 4.0.0
+     */
+    @Experimental
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_HTTP3_INITIAL_MAX_STREAM_DATA_BIDIRECTIONAL_LOCAL = 1000000;
+    /**
+     * Default value for {@link Http3Settings#getInitialMaxStreamDataBidirectionalRemote()}.
+     *
+     * @since 4.0.0
+     */
+    @Experimental
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_HTTP3_INITIAL_MAX_STREAM_DATA_BIDIRECTIONAL_REMOTE = 1000000;
+    /**
+     * Default value for {@link Http3Settings#getInitialMaxStreamsBidirectional()}.
+     *
+     * @since 4.0.0
+     */
+    @Experimental
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_HTTP3_INITIAL_MAX_STREAMS_BIDIRECTIONAL = 100;
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServerConfiguration.class);
 
     private final List<ChannelPipelineListener> pipelineCustomizers;
+
+    private HttpServerType serverType = HttpServerType.STREAMED;
 
     private Map<ChannelOption, Object> childOptions = Collections.emptyMap();
     private Map<ChannelOption, Object> options = Collections.emptyMap();
@@ -126,6 +178,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private int maxHeaderSize = DEFAULT_MAXHEADERSIZE;
     private int maxChunkSize = DEFAULT_MAXCHUNKSIZE;
     private int maxH2cUpgradeRequestSize = DEFAULT_MAXCHUNKSIZE; // same default as maxChunkSize, we don't want to buffer super long bodies
+
+    private boolean closeOnExpectationFailed = false;
     private boolean chunkedSupported = DEFAULT_CHUNKSUPPORTED;
     private boolean validateHeaders = DEFAULT_VALIDATEHEADERS;
     private int initialBufferSize = DEFAULT_INITIALBUFFERSIZE;
@@ -136,9 +190,12 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private String fallbackProtocol = ApplicationProtocolNames.HTTP_1_1;
     private AccessLogger accessLogger;
     private Http2Settings http2Settings = new Http2Settings();
+    private Http3Settings http3Settings = new Http3Settings();
     private boolean keepAliveOnServerError = DEFAULT_KEEP_ALIVE_ON_SERVER_ERROR;
     private String pcapLoggingPathPattern = null;
     private List<NettyListenerConfiguration> listeners = null;
+    private boolean eagerParsing = DEFAULT_EAGER_PARSING;
+    private int jsonBufferMaxComponents = DEFAULT_JSON_BUFFER_MAX_COMPONENTS;
 
     /**
      * Default empty constructor.
@@ -164,6 +221,50 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
             List<ChannelPipelineListener> pipelineCustomizers) {
         super(applicationConfiguration);
         this.pipelineCustomizers = pipelineCustomizers;
+    }
+
+    /**
+     * @return Sets the server type.
+     * @see HttpServerType
+     */
+    @NonNull
+    public HttpServerType getServerType() {
+        return serverType;
+    }
+
+    /**
+     * If a 100-continue response is detected but the content length is too large then true means close the connection. otherwise the connection will remain open and data will be consumed and discarded until the next request is received.
+     *
+     * <p>only relevant when {@link HttpServerType#FULL_CONTENT} is set</p>
+     * @return True if the connection should be closed
+     * @see #setServerType(HttpServerType)
+     * @see io.netty.handler.codec.http.HttpObjectAggregator
+     */
+    public boolean isCloseOnExpectationFailed() {
+        return closeOnExpectationFailed;
+    }
+
+    /**
+     * If a 100-continue response is detected but the content length is too large then true means close the connection. otherwise the connection will remain open and data will be consumed and discarded until the next request is received.
+     *
+     * <p>only relevant when {@link HttpServerType#FULL_CONTENT} is set</p>
+     * @param closeOnExpectationFailed  True if the connection should be closed
+     * @see #setServerType(HttpServerType)
+     * @see io.netty.handler.codec.http.HttpObjectAggregator
+     */
+    public void setCloseOnExpectationFailed(boolean closeOnExpectationFailed) {
+        this.closeOnExpectationFailed = closeOnExpectationFailed;
+    }
+
+    /**
+     * Set the server type.
+     *
+     * @param serverType The server type
+     */
+    public void setServerType(@Nullable HttpServerType serverType) {
+        if (serverType != null) {
+            this.serverType = serverType;
+        }
     }
 
     /**
@@ -197,6 +298,26 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     public void setHttp2(Http2Settings http2) {
         if (http2 != null) {
             this.http2Settings = http2;
+        }
+    }
+
+    /**
+     * Returns the Http3Settings.
+     * @return The Http3Settings.
+     */
+    @Experimental
+    public Http3Settings getHttp3() {
+        return http3Settings;
+    }
+
+    /**
+     * Sets the Http3Settings.
+     * @param http3Settings The Http3Settings.
+     */
+    @Experimental
+    public void setHttp3Settings(Http3Settings http3Settings) {
+        if (http3Settings != null) {
+            this.http3Settings = http3Settings;
         }
     }
 
@@ -564,6 +685,50 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
+     * Parse incoming JSON data eagerly, before route binding. Default value
+     * {@value DEFAULT_EAGER_PARSING}.
+     *
+     * @return Whether to parse incoming JSON data eagerly before route binding
+     * @since 4.0.0
+     */
+    public boolean isEagerParsing() {
+        return eagerParsing;
+    }
+
+    /**
+     * Parse incoming JSON data eagerly, before route binding. Default value
+     * {@value DEFAULT_EAGER_PARSING}.
+     *
+     * @param eagerParsing Whether to parse incoming JSON data eagerly before route binding
+     * @since 4.0.0
+     */
+    public void setEagerParsing(boolean eagerParsing) {
+        this.eagerParsing = eagerParsing;
+    }
+
+    /**
+     * Maximum number of buffers to keep around in JSON parsing before they should be consolidated.
+     * Defaults to {@value #DEFAULT_JSON_BUFFER_MAX_COMPONENTS}.
+     *
+     * @return The maximum number of components
+     * @since 4.0.0
+     */
+    public int getJsonBufferMaxComponents() {
+        return jsonBufferMaxComponents;
+    }
+
+    /**
+     * Maximum number of buffers to keep around in JSON parsing before they should be consolidated.
+     * Defaults to {@value #DEFAULT_JSON_BUFFER_MAX_COMPONENTS}.
+     *
+     * @param jsonBufferMaxComponents The maximum number of components
+     * @since 4.0.0
+     */
+    public void setJsonBufferMaxComponents(int jsonBufferMaxComponents) {
+        this.jsonBufferMaxComponents = jsonBufferMaxComponents;
+    }
+
+    /**
      * Http2 settings.
      */
     @ConfigurationProperties("http2")
@@ -624,6 +789,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
          */
         @Deprecated
         public void setPushEnabled(Boolean enabled) {
+            // deprecated
         }
 
         /**
@@ -712,6 +878,90 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
+     * Configuration for the experimental HTTP/3 server.
+     */
+    @ConfigurationProperties("http3")
+    @Experimental
+    public static final class Http3Settings {
+        private int initialMaxData = DEFAULT_HTTP3_INITIAL_MAX_DATA;
+        private int initialMaxStreamDataBidirectionalLocal = DEFAULT_HTTP3_INITIAL_MAX_STREAM_DATA_BIDIRECTIONAL_LOCAL;
+        private int initialMaxStreamDataBidirectionalRemote = DEFAULT_HTTP3_INITIAL_MAX_STREAM_DATA_BIDIRECTIONAL_REMOTE;
+        private int initialMaxStreamsBidirectional = DEFAULT_HTTP3_INITIAL_MAX_STREAMS_BIDIRECTIONAL;
+
+        /**
+         * QUIC initial_max_data setting, see RFC 9000.
+         *
+         * @return The initial_max_data setting
+         */
+        public int getInitialMaxData() {
+            return initialMaxData;
+        }
+
+        /**
+         * QUIC initial_max_data setting, see RFC 9000.
+         *
+         * @param initialMaxData The initial_max_data setting
+         */
+        public void setInitialMaxData(int initialMaxData) {
+            this.initialMaxData = initialMaxData;
+        }
+
+        /**
+         * QUIC initial_max_stream_data_bidi_local setting, see RFC 9000.
+         *
+         * @return The initial_max_stream_data_bidi_local setting
+         */
+        public int getInitialMaxStreamDataBidirectionalLocal() {
+            return initialMaxStreamDataBidirectionalLocal;
+        }
+
+        /**
+         * QUIC initial_max_stream_data_bidi_local setting, see RFC 9000.
+         *
+         * @param initialMaxStreamDataBidirectionalLocal The initial_max_stream_data_bidi_local setting
+         */
+        public void setInitialMaxStreamDataBidirectionalLocal(int initialMaxStreamDataBidirectionalLocal) {
+            this.initialMaxStreamDataBidirectionalLocal = initialMaxStreamDataBidirectionalLocal;
+        }
+
+        /**
+         * QUIC initial_max_stream_data_bidi_remote setting, see RFC 9000.
+         *
+         * @return The initial_max_stream_data_bidi_remote setting
+         */
+        public int getInitialMaxStreamDataBidirectionalRemote() {
+            return initialMaxStreamDataBidirectionalRemote;
+        }
+
+        /**
+         * QUIC initial_max_stream_data_bidi_remote setting, see RFC 9000.
+         *
+         * @param initialMaxStreamDataBidirectionalRemote The initial_max_stream_data_bidi_remote setting
+         */
+        public void setInitialMaxStreamDataBidirectionalRemote(int initialMaxStreamDataBidirectionalRemote) {
+            this.initialMaxStreamDataBidirectionalRemote = initialMaxStreamDataBidirectionalRemote;
+        }
+
+        /**
+         * QUIC initial_max_streams_bidi setting, see RFC 9000.
+         *
+         * @return The initial_max_streams_bidi setting
+         */
+        public int getInitialMaxStreamsBidirectional() {
+            return initialMaxStreamsBidirectional;
+        }
+
+        /**
+         * QUIC initial_max_streams_bidi setting, see RFC 9000.
+         *
+         * @param initialMaxStreamsBidirectional The initial_max_streams_bidi setting
+         */
+        public void setInitialMaxStreamsBidirectional(int initialMaxStreamsBidirectional) {
+            this.initialMaxStreamsBidirectional = initialMaxStreamsBidirectional;
+        }
+    }
+
+    /**
      * Access logger configuration.
      */
     @ConfigurationProperties("access-logger")
@@ -792,6 +1042,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * Configuration for Netty worker.
      */
     @ConfigurationProperties("worker")
+    @Named("netty-server-worker-event-loop")
     public static class Worker extends EventLoopConfig {
         /**
          * Default constructor.
@@ -806,6 +1057,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     @ConfigurationProperties(Parent.NAME)
     @Requires(missingProperty = EventLoopGroupConfiguration.EVENT_LOOPS + ".parent")
+    @Named("netty-server-parent-event-loop")
     public static class Parent extends EventLoopConfig {
 
         public static final String NAME = "parent";
@@ -823,7 +1075,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      *
      * @author James Kleeh
      * @author graemerocher
-     * @since @since 3.1.0
+     * @since 3.1.0
      */
     @ConfigurationProperties("responses.file")
     public static class FileTypeHandlerConfiguration {
@@ -1205,6 +1457,25 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
              * UNIX domain socket.
              */
             UNIX,
+            /**
+             * QUIC (HTTP/3) listener.
+             */
+            @Experimental
+            QUIC,
         }
+    }
+
+    /**
+     * Sets the manner in which the HTTP server is configured to receive requests.
+     */
+    public enum HttpServerType {
+        /**
+         * Requests are streamed on demand with {@link io.netty.handler.flow.FlowControlHandler} used to control back pressure.
+         */
+        STREAMED,
+        /**
+         * Execute controllers only once the full content of the request has been received.
+         */
+        FULL_CONTENT
     }
 }

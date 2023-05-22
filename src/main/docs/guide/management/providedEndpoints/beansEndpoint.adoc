@@ -7,7 +7,7 @@ To execute the beans endpoint, send a GET request to /beans.
 To configure the beans endpoint, supply configuration through `endpoints.beans`.
 
 .Beans Endpoint Configuration Example
-[source,yaml]
+[configuration]
 ----
 endpoints:
   beans:

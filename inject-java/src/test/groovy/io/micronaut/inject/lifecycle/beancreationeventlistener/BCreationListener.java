@@ -23,8 +23,16 @@ import jakarta.inject.Singleton;
 @Singleton
 public class BCreationListener implements BeanCreatedEventListener<B> {
 
+    static boolean initialized;
+    static boolean executed;
+
+    BCreationListener() {
+        initialized = true;
+    }
+
     @Override
     public B onCreated(BeanCreatedEvent<B> event) {
+        executed = true;
         ChildB childB = new ChildB(event.getBean());
         childB.name = "good";
         return childB;

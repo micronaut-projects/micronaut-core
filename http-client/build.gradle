@@ -11,24 +11,38 @@ micronautBuild {
 
 dependencies {
     annotationProcessor project(":inject-java")
-    api project(":runtime")
+    api project(":context")
     api project(":http-client-core")
     api project(":websocket")
     api project(":http-netty")
     api libs.managed.netty.handler.proxy
 
-    testAnnotationProcessor project(":validation")
+    compileOnly libs.managed.netty.incubator.codec.http3
+
+    testAnnotationProcessor platform(libs.test.boms.micronaut.validation)
+    testAnnotationProcessor (libs.micronaut.validation.processor) {
+        exclude group: 'io.micronaut'
+    }
     testAnnotationProcessor project(":inject-java")
 
     testCompileOnly project(":inject-groovy")
-    testImplementation project(":validation")
     testImplementation project(":inject")
+
+    testImplementation platform(libs.test.boms.micronaut.validation)
+    testImplementation (libs.micronaut.validation) {
+        exclude group: 'io.micronaut'
+    }
+    testImplementation (libs.micronaut.validation.processor) { // For Groovy
+        exclude group: 'io.micronaut'
+    }
 
     implementation libs.managed.reactor
 
+    testImplementation project(":retry")
+    testImplementation project(":jackson-databind")
     testImplementation project(":http-server-netty")
     testImplementation libs.wiremock
-    testImplementation libs.managed.logback
+    testImplementation libs.logback.classic
 
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
         testImplementation libs.bcpkix

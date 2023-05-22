@@ -6,8 +6,17 @@ import jakarta.inject.Singleton;
 
 @Singleton
 public class ACreatedListener implements BeanCreatedEventListener<A> {
+
+    static boolean initialized;
+    static boolean executed;
+
+    ACreatedListener() {
+        initialized = true;
+    }
+
     @Override
     public A onCreated(BeanCreatedEvent<A> event) {
+        executed = true;
         return event.getBean();
     }
 }

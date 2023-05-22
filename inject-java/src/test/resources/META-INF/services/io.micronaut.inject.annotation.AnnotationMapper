@@ -5,3 +5,5 @@ io.micronaut.aop.introduction.ListenerAdviceMarkerMapper
 io.micronaut.aop.compile.AroundCompileSpec$NamedTestAnnMapper
 io.micronaut.annotation.mapping.CustomEmbeddedIdMapper
 io.micronaut.annotation.mapping.NonNullProducingMapper
+io.micronaut.annotation.mapping.MapToRepeatableAnnotationSpec$TheAnnotationMapper
+io.micronaut.annotation.mapping.MappedValueHasDefaultSpec$TheAnnotationMapper

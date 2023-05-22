@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.convert.value.ConvertibleMultiValuesMap;
 import io.micronaut.http.MutableHttpParameters;
 
@@ -44,7 +43,7 @@ import java.util.stream.Collectors;
 public class NettyHttpParameters implements MutableHttpParameters {
 
     private final LinkedHashMap<CharSequence, List<String>> valuesMap;
-    private final ConvertibleMultiValues<String> values;
+    private final ConvertibleMultiValuesMap<String> values;
     private final BiConsumer<CharSequence, List<String>> onChange;
 
     /**
@@ -53,7 +52,7 @@ public class NettyHttpParameters implements MutableHttpParameters {
      * @param onChange A callback for changes
      */
     public NettyHttpParameters(Map<String, List<String>> parameters,
-                               ConversionService<?> conversionService,
+                               ConversionService conversionService,
                                @Nullable BiConsumer<CharSequence, List<String>> onChange) {
         this.valuesMap = new LinkedHashMap<>(parameters.size());
         this.values = new ConvertibleMultiValuesMap<>(valuesMap, conversionService);
@@ -107,5 +106,15 @@ public class NettyHttpParameters implements MutableHttpParameters {
             onChange.accept(name, valueList);
         }
         return this;
+    }
+
+    @Override
+    public ConversionService getConversionService() {
+        return values.getConversionService();
+    }
+
+    @Override
+    public void setConversionService(ConversionService conversionService) {
+        values.setConversionService(conversionService);
     }
 }

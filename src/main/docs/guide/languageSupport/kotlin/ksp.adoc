@@ -1,0 +1,123 @@
+You can build Micronaut applications with Kotlin and https://kotlinlang.org/docs/ksp-overview.html[KSP]:
+
+____
+Kotlin Symbol Processing (KSP) is an API that you can use to develop lightweight compiler plugins. KSP provides a simplified compiler plugin API that leverages the power of Kotlin while keeping the learning curve at a minimum. Compared to kapt, annotation processors that use KSP can run up to 2 times faster.
+____
+
+If you use the https://micronaut-projects.github.io/micronaut-gradle-plugin/latest/[Micronaut Gradle Plugin], you can build Micronaut applications with Kotlin and https://kotlinlang.org/docs/ksp-overview.html[KSP]. You need to apply the `com.google.devtools.ksp` Gradle plugin.
+
+[source,kotlin]
+.build.gradle.kts
+----
+plugins {
+    id("org.jetbrains.kotlin.jvm") version "1.8.21"
+    id("com.google.devtools.ksp") version "1.8.21-1.0.11"
+    id("org.jetbrains.kotlin.plugin.allopen") version "1.8.21"
+    id("io.micronaut.application") version "4.0.0"
+}
+version = "0.1"
+group = "example.micronaut"
+repositories {
+    mavenCentral()
+}
+dependencies {
+    runtimeOnly("ch.qos.logback:logback-classic")
+    runtimeOnly("org.yaml:snakeyaml")
+    implementation("io.micronaut:micronaut-jackson-databind")
+    testImplementation("io.micronaut:micronaut-http-client")
+}
+application {
+    mainClass.set("example.micronaut.Application")
+}
+java {
+    sourceCompatibility = JavaVersion.toVersion("17")
+    targetCompatibility = JavaVersion.toVersion("17")
+}
+tasks {
+    compileKotlin {
+        kotlinOptions {
+            jvmTarget = "17"
+        }
+    }
+    compileTestKotlin {
+        kotlinOptions {
+            jvmTarget = "17"
+        }
+    }
+}
+graalvmNative.toolchainDetection.set(false)
+micronaut {
+    runtime("netty")
+    testRuntime("junit5")
+    processing {
+        incremental(true)
+        annotations("example.micronaut.*")
+    }
+}
+----
+
+If you don't use the https://micronaut-projects.github.io/micronaut-gradle-plugin/latest/[Micronaut Gradle Plugin], in addition to applying the `com.google.devtools.ksp` Gradle plugin, you have to add `micronaut-inject-kotlin` with the `ksp` configuration.
+
+[source, kotlin]
+----
+plugins {
+    id("org.jetbrains.kotlin.jvm") version "1.8.21"
+    id("com.google.devtools.ksp") version "1.8.21-1.0.11"
+    id("org.jetbrains.kotlin.plugin.allopen") version "1.8.21"
+    application
+}
+version = "0.1"
+group = "dockerisms"
+repositories {
+    mavenCentral()
+
+    maven {
+        url = uri("https://s01.oss.sonatype.org/content/repositories/snapshots/")
+    }
+}
+val micronautVersion by properties
+dependencies {
+    runtimeOnly("ch.qos.logback:logback-classic")
+    runtimeOnly("org.yaml:snakeyaml")
+    implementation("io.micronaut:micronaut-jackson-databind")
+
+
+    implementation(platform("io.micronaut.platform:micronaut-platform:$micronautVersion"))
+    implementation("io.micronaut:micronaut-http-server-netty")
+
+    ksp(platform("io.micronaut.platform:micronaut-platform:$micronautVersion"))
+    ksp("io.micronaut:micronaut-inject-kotlin")
+    kspTest(platform("io.micronaut.platform:micronaut-platform:$micronautVersion"))
+    kspTest("io.micronaut:micronaut-inject-kotlin")
+
+    testImplementation(platform("io.micronaut.platform:micronaut-platform:$micronautVersion"))
+    testImplementation("io.micronaut:micronaut-http-client")
+    testImplementation("io.micronaut.test:micronaut-test-junit5")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
+}
+
+application {
+    mainClass.set("dockerisms.Application")
+}
+
+java {
+    sourceCompatibility = JavaVersion.toVersion("17")
+    targetCompatibility = JavaVersion.toVersion("17")
+}
+
+tasks {
+    compileKotlin {
+        kotlinOptions {
+            jvmTarget = "17"
+        }
+    }
+    compileTestKotlin {
+        kotlinOptions {
+            jvmTarget = "17"
+        }
+    }
+    withType<Test> {
+        useJUnitPlatform()
+    }
+}
+----

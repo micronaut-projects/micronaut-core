@@ -19,8 +19,12 @@ import io.micronaut.core.naming.Named;
 import io.micronaut.core.util.ArgumentUtils;
 
 import io.micronaut.core.annotation.NonNull;
-import javax.annotation.concurrent.Immutable;
-import java.io.*;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -32,7 +36,7 @@ import java.nio.file.Path;
  * @author graemerocher
  * @since 1.1.0
  */
-@Immutable
+//@Immutable
 public interface Readable extends Named {
 
     /**
@@ -41,7 +45,8 @@ public interface Readable extends Named {
      * @return The input stream
      * @throws IOException if an I/O exception occurs
      */
-    @NonNull InputStream asInputStream() throws IOException;
+    @NonNull
+    InputStream asInputStream() throws IOException;
 
     /**
      * Does the underlying readable resource exist.

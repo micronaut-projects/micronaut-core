@@ -191,7 +191,7 @@ class ConfigurationPropertiesInheritanceSpec extends Specification {
         Collection<ParentArrayEachPropsCtor.ManagerProps> managers = context.getBeansOfType(ParentArrayEachPropsCtor.ManagerProps)
 
         then: "The instance is the same"
-        managers.size() == 1
         managers[0].is(teams[0].manager)
+        managers.size() == 1
     }
 }

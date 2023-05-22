@@ -15,9 +15,9 @@
  */
 package io.micronaut.http;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.cookie.Cookie;
 
-import io.micronaut.core.annotation.Nullable;
 import java.nio.charset.Charset;
 import java.util.Collections;
 import java.util.Locale;
@@ -72,7 +72,12 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
      * @param message The message
      * @return This response object
      */
-    MutableHttpResponse<B> status(HttpStatus status, CharSequence message);
+    default MutableHttpResponse<B> status(HttpStatus status, CharSequence message) {
+        if (message == null) {
+            message = status.getReason();
+        }
+        return status(status.getCode(), message);
+    }
 
     @Override
     default MutableHttpResponse<B> headers(Consumer<MutableHttpHeaders> headers) {
@@ -152,7 +157,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
      * @return This response object
      */
     default MutableHttpResponse<B> status(int status) {
-        return status(HttpStatus.valueOf(status));
+        return status(status, null);
     }
 
     /**
@@ -162,9 +167,7 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
      * @param message The message
      * @return This response object
      */
-    default MutableHttpResponse<B> status(int status, CharSequence message) {
-        return status(HttpStatus.valueOf(status), message);
-    }
+    MutableHttpResponse<B> status(int status, CharSequence message);
 
     /**
      * Sets the response status.
@@ -184,5 +187,10 @@ public interface MutableHttpResponse<B> extends HttpResponse<B>, MutableHttpMess
      */
     default MutableHttpResponse<B> attribute(CharSequence name, Object value) {
         return (MutableHttpResponse<B>) setAttribute(name, value);
+    }
+
+    @Override
+    default MutableHttpResponse<?> toMutableResponse() {
+        return this;
     }
 }

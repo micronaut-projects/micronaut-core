@@ -65,7 +65,7 @@ this should be used with care because private and sensitive information will be 
 
 By default, all management endpoints are exposed over the same port as the application. You can alter this behaviour by specifying the `endpoints.all.port` setting:
 
-[source,yaml]
+[configuration]
 ----
 endpoints:
   all:
@@ -76,4 +76,4 @@ In the above example the management endpoints are exposed only over port 8085.
 
 === JMX
 
-Micronaut provides functionality to register endpoints with JMX. See the section on <<jmx, JMX>> to get started.
+The Micronaut framework provides functionality to register endpoints with JMX. See the section on <<jmx, JMX>> to get started.

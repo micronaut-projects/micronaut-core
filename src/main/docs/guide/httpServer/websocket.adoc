@@ -1,1 +1,5 @@
-Micronaut features dedicated support for creating WebSocket clients and servers. The pkg:websocket.annotation[] package includes annotations for defining both clients and servers.
+The Micronaut framework features dedicated support for creating WebSocket clients and servers. The pkg:websocket.annotation[] package includes annotations for defining both clients and servers.
+
+WARNING: Since Micronaut Framework 4.0. `io.micronaut:micronaut-http-server` no longer exposes `micronaut-websocket` transitively. To use annotations such as ann:websocket.annotation.ServerWebSocket[], add the `micronaut-websocket` dependency to your application classpath:
+
+dependency::micronaut-websocket[]

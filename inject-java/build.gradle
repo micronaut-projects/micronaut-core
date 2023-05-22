@@ -9,48 +9,58 @@ micronautBuild {
 }
 
 dependencies {
-    api project(":inject")
-    api project(':aop')
+    api project(":core-processor")
 
     if (!JavaVersion.current().isJava9Compatible()) {
         compileOnly files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
-    compileOnly libs.managed.validation
 
     testImplementation project(":context")
     testImplementation project(':aop')
+
     testAnnotationProcessor project(":inject-java")
+    testAnnotationProcessor platform(libs.test.boms.micronaut.validation)
+    testAnnotationProcessor (libs.micronaut.validation.processor) {
+        exclude group: 'io.micronaut'
+    }
+
     testImplementation project(":inject-java-test")
     testImplementation project(":inject-test-utils")
     testImplementation project(":runtime")
 
     testImplementation libs.managed.reactor
 
-    testImplementation libs.managed.spotbugs
+    testImplementation libs.spotbugs
     testImplementation libs.hibernate
     testImplementation libs.compile.testing
-    testImplementation(libs.managed.neo4j.bolt) {
-        version {
-            require "1.4.5"
-        }
-    }
+    testImplementation(libs.neo4j.bolt)
     testImplementation libs.managed.groovy.json
     if (!JavaVersion.current().isJava9Compatible()) {
         testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
-    testImplementation libs.managed.micrometer.core
-    testImplementation project(":validation")
-    testImplementation libs.junit.jupiter.api
-    testImplementation(platform(libs.boms.micronaut.tracing))
-    testImplementation(libs.micronaut.tracing.zipkin) {
-        exclude module: 'micronaut-bom'
-        exclude module: 'micronaut-http-client'
-        exclude module: 'micronaut-inject'
-        exclude module: 'micronaut-runtime'
+    testImplementation libs.micrometer.core
+    testImplementation (libs.micronaut.session) {
+        exclude group: 'io.micronaut'
     }
-
-    testRuntimeOnly libs.javax.el.impl
-    testRuntimeOnly libs.javax.el
+    testImplementation(project(":http-server"))
+    testImplementation platform(libs.test.boms.micronaut.validation)
+    testImplementation (libs.micronaut.validation) {
+        exclude group: 'io.micronaut'
+    }
+    testImplementation (libs.micronaut.validation.processor) {
+        exclude group: 'io.micronaut'
+    }
+    testImplementation project(":jackson-databind")
+    testImplementation libs.junit.jupiter.api
+    testImplementation(platform(libs.test.boms.micronaut.tracing))
+    testImplementation(libs.micronaut.tracing.zipkin) {
+        exclude group: 'io.micronaut'
+    }
+    testImplementation libs.javax.annotation.api
+    testImplementation libs.javax.inject
+    testImplementation libs.managed.snakeyaml
+    testRuntimeOnly libs.jakarta.el.impl
+    testRuntimeOnly libs.jakarta.el
 }
 //compileTestJava.options.fork = true
 //compileTestJava.options.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
@@ -58,7 +68,7 @@ dependencies {
 
 tasks.withType(Test).configureEach {
     forkEvery = 100
-    maxParallelForks = 2
+    maxParallelForks = 4
     useJUnitPlatform()
 }
 

@@ -60,7 +60,7 @@ package test
 
 enum MyEnum {
     @io.micronaut.ast.groovy.visitor.EnumConstantAnn("C")
-    A, 
+    A,
     B
 }
 """)

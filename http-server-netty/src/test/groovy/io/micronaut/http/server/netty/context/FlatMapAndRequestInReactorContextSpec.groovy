@@ -36,7 +36,7 @@ import spock.lang.PendingFeature
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
-import javax.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotBlank
 import java.util.stream.Stream
 
 class FlatMapAndRequestInReactorContextSpec extends Specification {

@@ -47,6 +47,7 @@ config:
   environments: The Environment
   propertySource: Externalized Configuration with PropertySources
   valueAnnotation: Configuration Injection
+  evaluatedExpressions: Expression Language
   configurationProperties: Configuration Properties
   customTypeConverter: Custom Type Converters
   eachProperty: Using @EachProperty to Drive Configuration
@@ -110,7 +111,18 @@ httpServer:
   serverIO: Writing Response Data
   uploads: File Uploads
   transfers: File Transfers
-  filters: HTTP Filters
+  filters:
+    title: HTTP Filters
+    filterPatterns: Filter Patterns
+    filtermethods:
+      title: Filter Methods
+      filtermethodsexample: Server Filter with Filter Methods
+      errorStates: Error States
+      continuations: Continuations
+    httpServerFilter:
+      title: HttpServerFilter
+      httpServerFilterExample: HttpServerFilter Example
+      httpServerFilterErrorStates: HttpServerFilter Error States
   sessions: HTTP Sessions
   sse: Server Sent Events
   websocket:
@@ -118,17 +130,29 @@ httpServer:
     websocketServer: Using @ServerWebSocket
     websocketClient: Using @ClientWebSocket
   http2Server: HTTP/2 Support
+  http3Server: HTTP/3 Support
   serverEvents: Server Events
   serverConfiguration:
     title: Configuring the HTTP Server
     threadPools:
       title: Configuring Server Thread Pools
       blockingOperations: Blocking Operations
+      virtualThreads: Virtual Threads
       atBlocking: '@Blocking'
     nettyClientPipeline: Configuring the Netty Client Pipeline
     nettyServerPipeline: Configuring the Netty Server Pipeline
     listener: Advanced Listener Configuration
-    cors: Configuring CORS
+    cors:
+      title: Configuring CORS
+      annotationBasedCors: Annotation-based CORS Configuration
+      corsConfiguration: CORS via Configuration
+      corsAllowedOrigins: Allowed Origins
+      corsAllowedMethods: Allowed Methods
+      corsAllowedHeaders: Allowed Headers
+      corsExposedHeaders: Exposed Headers
+      corsAllowCredentials: Allow Credentials
+      corsMaxAge: Max Age
+      corsMultipleHeaderValues: Multiple Header Values
     https: Securing the Server with HTTPS
     dualProtocol: Enabling HTTP and HTTPS
     accessLogger: Enabling Access Logger
@@ -139,6 +163,12 @@ httpServer:
   graphql: GraphQL Support
 httpClient:
   title: The HTTP Client
+  httpClientImplementations:
+    title: HTTP Client Implementations
+    nettyHttpClient: HTTP Client based on Netty
+    jdkHttpClient:
+      title: HTTP Client based on the Java HTTP Client
+  lowLevelOrHighLevel: Low-Level and High-Level APIs
   lowLevelHttpClient:
     title: Using the Low-Level HTTP Client
     clientBasics: Sending your first HTTP request
@@ -161,6 +191,7 @@ httpClient:
     netflixHystrix: Netflix Hystrix Support
   clientFilter: HTTP Client Filters
   clientHttp2: HTTP/2 Support
+  clientHttp3: HTTP/3 Support
   clientSample: HTTP Client Sample
 cloud:
   title: Cloud Native Features
@@ -237,6 +268,10 @@ languageSupport:
   groovy: Micronaut for Groovy
   kotlin:
     title: Micronaut for Kotlin
+    kaptOrKsp: Kotlin support via KAPT or KSP
+    kapt: Kotlin Annotation Processing (KAPT)
+    ksp: Kotlin Symbol Processing (KSP)
+    controller: Controller in Kotlin
     kaptintellij: Kotlin, Kapt and IntelliJ
     gradlekapt: Incremental Annotation Processing with Gradle and Kapt
     openandaop: Kotlin and AOP Advice

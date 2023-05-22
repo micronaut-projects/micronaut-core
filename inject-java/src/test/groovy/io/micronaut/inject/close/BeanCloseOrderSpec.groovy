@@ -20,7 +20,7 @@ import spock.lang.Specification
 
 class BeanCloseOrderSpec extends Specification {
 
-    static List<Class> closed = []
+    static List<Class<?>> closed = []
 
     void "test close order"() {
         given:

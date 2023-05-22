@@ -54,6 +54,9 @@ abstract class PublicMethodVisitor extends ClassCodeVisitorSupport {
             this.current = classNode
             classNode.visitContents(this)
             for (i in classNode.getAllInterfaces()) {
+                if (classNode == i) {
+                    continue
+                }
                 if (i.name != GroovyObject.class.name) {
                     this.current = i
                     i.visitContents(this)

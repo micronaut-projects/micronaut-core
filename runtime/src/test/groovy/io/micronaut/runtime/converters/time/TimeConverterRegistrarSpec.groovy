@@ -16,7 +16,7 @@
 package io.micronaut.runtime.converters.time
 
 import io.micronaut.core.convert.ConversionService
-import io.micronaut.core.convert.DefaultConversionService
+import io.micronaut.core.convert.DefaultMutableConversionService
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -35,7 +35,7 @@ class TimeConverterRegistrarSpec extends Specification {
     @Unroll
     void "test convert duration #val"() {
         given:
-        ConversionService conversionService = new DefaultConversionService()
+        ConversionService conversionService = new DefaultMutableConversionService()
         new TimeConverterRegistrar().register(conversionService)
 
 
@@ -55,7 +55,7 @@ class TimeConverterRegistrarSpec extends Specification {
     @Unroll
     void "test converts a #sourceObject.class.name to a #targetType.name"() {
         given:
-        ConversionService conversionService = new DefaultConversionService()
+        ConversionService conversionService = new DefaultMutableConversionService()
         new TimeConverterRegistrar().register(conversionService)
 
         expect:

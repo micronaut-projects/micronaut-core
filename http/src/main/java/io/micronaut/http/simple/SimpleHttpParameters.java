@@ -17,11 +17,15 @@ package io.micronaut.http.simple;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.convert.value.ConvertibleMultiValuesMap;
 import io.micronaut.http.MutableHttpParameters;
 
-import java.util.*;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -35,7 +39,7 @@ import java.util.stream.Collectors;
 public class SimpleHttpParameters implements MutableHttpParameters {
 
     private final Map<CharSequence, List<String>> valuesMap;
-    private final ConvertibleMultiValues<String> values;
+    private final ConvertibleMultiValuesMap<String> values;
 
     /**
      * @param values The parameter values
@@ -82,5 +86,10 @@ public class SimpleHttpParameters implements MutableHttpParameters {
     public MutableHttpParameters add(CharSequence name, List<CharSequence> values) {
         valuesMap.put(name, values.stream().map(v -> v == null ? null : v.toString()).collect(Collectors.toList()));
         return this;
+    }
+
+    @Override
+    public void setConversionService(ConversionService conversionService) {
+        values.setConversionService(conversionService);
     }
 }

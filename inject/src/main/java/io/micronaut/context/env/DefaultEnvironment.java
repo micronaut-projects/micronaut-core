@@ -20,6 +20,7 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
@@ -32,10 +33,9 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanConfiguration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -83,7 +83,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final String EC2_LINUX_BIOS_VENDOR_FILE = "/sys/devices/virtual/dmi/id/bios_vendor";
     private static final String EC2_WINDOWS_HYPERVISOR_CMD = "wmic path win32_computersystemproduct get uuid";
     private static final String FILE_SEPARATOR = ",";
-    private static final Logger LOG = LoggerFactory.getLogger(DefaultEnvironment.class);
     private static final String AWS_LAMBDA_FUNCTION_NAME_ENV = "AWS_LAMBDA_FUNCTION_NAME";
     private static final String K8S_ENV = "KUBERNETES_SERVICE_HOST";
     private static final String PCF_ENV = "VCAP_SERVICES";
@@ -101,15 +100,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final List<String> DEFAULT_CONFIG_LOCATIONS = Arrays.asList("classpath:/", "file:config/");
     protected final ClassPathResourceLoader resourceLoader;
     protected final List<PropertySource> refreshablePropertySources = new ArrayList<>(10);
-
+    protected final MutableConversionService mutableConversionService;
     private EnvironmentsAndPackage environmentsAndPackage;
-
     private final Set<String> names;
     private final ClassLoader classLoader;
     private final Collection<String> packages = new ConcurrentLinkedQueue<>();
     private final BeanIntrospectionScanner annotationScanner;
-    private Collection<String> configurationIncludes = new HashSet<>(3);
-    private Collection<String> configurationExcludes = new HashSet<>(3);
+    private final Collection<String> configurationIncludes = new HashSet<>(3);
+    private final Collection<String> configurationExcludes = new HashSet<>(3);
     private final AtomicBoolean running = new AtomicBoolean(false);
     private Collection<PropertySourceLoader> propertySourceLoaderList;
     private final Map<String, PropertySourceLoader> loaderByFormatMap = new ConcurrentHashMap<>();
@@ -125,7 +123,18 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @param configuration The configuration
      */
     public DefaultEnvironment(@NonNull ApplicationContextConfiguration configuration) {
-        super(configuration.getConversionService());
+        this(configuration, true);
+    }
+
+    /**
+     * Construct a new environment for the given configuration.
+     *
+     * @param configuration The configuration
+     * @param logEnabled flag to enable or disable logger
+     */
+    public DefaultEnvironment(@NonNull ApplicationContextConfiguration configuration, boolean logEnabled) {
+        super(configuration.getConversionService().orElseGet(MutableConversionService::create));
+        this.mutableConversionService = (MutableConversionService) conversionService;
         this.configuration = configuration;
         this.resourceLoader = configuration.getResourceLoader();
 
@@ -155,8 +164,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         this.classLoader = configuration.getClassLoader();
         this.annotationScanner = createAnnotationScanner(classLoader);
         this.names = environments;
-        if (LOG.isInfoEnabled() && !environments.isEmpty()) {
-            LOG.info("Established active environments: {}", environments);
+        if (!environments.isEmpty()) {
+            log.info("Established active environments: {}", environments);
         }
         List<String> configLocations = configuration.getOverrideConfigLocations() == null ?
                 new ArrayList<>(DEFAULT_CONFIG_LOCATIONS) : configuration.getOverrideConfigLocations();
@@ -262,9 +271,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @Override
     public Environment start() {
         if (running.compareAndSet(false, true)) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Starting environment {} for active names {}", this, getActiveNames());
-            }
+            log.debug("Starting environment {} for active names {}", this, getActiveNames());
             if (reading.compareAndSet(false, true)) {
 
                 readPropertySources(getPropertySourceRootName());
@@ -302,24 +309,22 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     @Override
     public <T> Optional<T> convert(Object object, Class<T> targetType, ConversionContext context) {
-        return conversionService.convert(object, targetType, context);
+        return mutableConversionService.convert(object, targetType, context);
     }
 
     @Override
     public <S, T> boolean canConvert(Class<S> sourceType, Class<T> targetType) {
-        return conversionService.canConvert(sourceType, targetType);
+        return mutableConversionService.canConvert(sourceType, targetType);
     }
 
     @Override
-    public <S, T> Environment addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
-        conversionService.addConverter(sourceType, targetType, typeConverter);
-        return this;
+    public <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
+        mutableConversionService.addConverter(sourceType, targetType, typeConverter);
     }
 
     @Override
-    public <S, T> Environment addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> typeConverter) {
-        conversionService.addConverter(sourceType, targetType, typeConverter);
-        return this;
+    public <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> typeConverter) {
+        mutableConversionService.addConverter(sourceType, targetType, typeConverter);
     }
 
     @Override
@@ -352,9 +357,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     protected boolean shouldDeduceEnvironments() {
         if (deduceEnvironments != null) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Environment deduction was set explicitly via builder to: " + deduceEnvironments);
-            }
+            log.debug("Environment deduction was set explicitly via builder to: {}", deduceEnvironments);
 
             return deduceEnvironments;
         } else if (configuration.isEnableDefaultPropertySources()) {
@@ -363,21 +366,15 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
             if (StringUtils.isNotEmpty(deduceEnv)) {
                 boolean deduce = Boolean.parseBoolean(deduceEnv);
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Environment deduction was set via environment variable to: " + deduce);
-                }
+                log.debug("Environment deduction was set via environment variable to: {}", deduce);
                 return deduce;
             } else if (StringUtils.isNotEmpty(deduceProperty)) {
                 boolean deduce = Boolean.parseBoolean(deduceProperty);
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Environment deduction was set via system property to: " + deduce);
-                }
+                log.debug("Environment deduction was set via system property to: {}", deduce);
                 return deduce;
             } else {
                 boolean deduceDefault = DEDUCE_ENVIRONMENT_DEFAULT;
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Environment deduction is using the default of: " + deduceDefault);
-                }
+                log.debug("Environment deduction is using the default of: {}", deduceDefault);
                 return deduceDefault;
             }
         } else {
@@ -428,19 +425,23 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         propertySources.addAll(this.propertySources.values());
         OrderUtil.sort(propertySources);
         for (PropertySource propertySource : propertySources) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Processing property source: {}", propertySource.getName());
-            }
+            log.debug("Processing property source: {}", propertySource.getName());
             processPropertySource(propertySource, propertySource.getConvention());
         }
     }
 
     private void readConstantPropertySources(String name, List<PropertySource> propertySources) {
-        Set<String> propertySourceNames = Stream.concat(Stream.of(name), getActiveNames().stream().map(env -> name + "-" + env))
-                .collect(Collectors.toSet());
-        getConstantPropertySources().stream()
-                .filter(p -> propertySourceNames.contains(p.getName()))
-                .forEach(propertySources::add);
+        Set<String> activeNames = getActiveNames();
+        Set<String> propertySourceNames = CollectionUtils.newHashSet(activeNames.size() + 1);
+        propertySourceNames.add(name);
+        for (String env : activeNames) {
+            propertySourceNames.add(name + "-" + env);
+        }
+        for (PropertySource p : getConstantPropertySources()) {
+            if (propertySourceNames.contains(p.getName())) {
+                propertySources.add(p);
+            }
+        }
     }
 
     /**
@@ -483,9 +484,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                         String fileName = NameUtils.filename(filePath);
                         Optional<PropertySourceLoader> propertySourceLoader = Optional.ofNullable(loaderByFormatMap.get(extension));
                         if (propertySourceLoader.isPresent()) {
-                            if (LOG.isDebugEnabled()) {
-                                LOG.debug("Reading property sources from loader: {}", propertySourceLoader);
-                            }
+                            log.debug("Reading property sources from loader: {}", propertySourceLoader);
                             Optional<Map<String, Object>> properties = readPropertiesFromLoader(fileName, filePath, propertySourceLoader.get());
                             if (properties.isPresent()) {
                                 propertySources.add(PropertySource.of(filePath, properties.get(), order));
@@ -535,9 +534,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             loadPropertySourceFromLoader(name, new PropertiesPropertySourceLoader(), propertySources, resourceLoader);
         } else {
             for (PropertySourceLoader propertySourceLoader : propertySourceLoaders) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Reading property sources from loader: {}", propertySourceLoader);
-                }
+                log.debug("Reading property sources from loader: {}", propertySourceLoader);
                 loadPropertySourceFromLoader(name, propertySourceLoader, propertySources, resourceLoader);
             }
         }
@@ -640,16 +637,18 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     private EnvironmentsAndPackage getEnvironmentsAndPackage(List<String> specifiedNames) {
         EnvironmentsAndPackage environmentsAndPackage = this.environmentsAndPackage;
-        final boolean extendedDeduction = !specifiedNames.contains(Environment.FUNCTION);
+        boolean isNotFunction = !specifiedNames.contains(Environment.FUNCTION);
+        final boolean deduceEnvironment = shouldDeduceEnvironments();
+        final boolean deduceCloudEnvironmentUsingProbes = isNotFunction && configuration.isDeduceCloudEnvironment();
         if (environmentsAndPackage == null) {
             synchronized (EnvironmentsAndPackage.class) { // double check
                 environmentsAndPackage = this.environmentsAndPackage;
                 if (environmentsAndPackage == null) {
                     environmentsAndPackage = deduceEnvironmentsAndPackage(
-                            shouldDeduceEnvironments(),
-                            extendedDeduction,
-                            extendedDeduction,
-                            !extendedDeduction
+                            deduceEnvironment,
+                            deduceCloudEnvironmentUsingProbes,
+                            isNotFunction,
+                            !deduceCloudEnvironmentUsingProbes
                     );
                     this.environmentsAndPackage = environmentsAndPackage;
                 }
@@ -954,6 +953,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             }
         } catch (InterruptedException e) {
             // test negative
+            Thread.currentThread().interrupt();
         }
         return false;
     }
@@ -995,6 +995,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             }
         } catch (InterruptedException e) {
             // test negative
+            Thread.currentThread().interrupt();
         }
         return false;
     }

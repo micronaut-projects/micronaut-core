@@ -42,7 +42,7 @@ import java.util.concurrent.ConcurrentHashMap;
 class DefaultWebSocketBeanRegistry implements WebSocketBeanRegistry {
     private final BeanContext beanContext;
     private final Class<? extends Annotation> stereotype;
-    private final Map<Class, WebSocketBean> webSocketBeanMap = new ConcurrentHashMap<>(3);
+    private final Map<Class<?>, WebSocketBean> webSocketBeanMap = new ConcurrentHashMap<>(3);
 
     /**
      * Default constructor.

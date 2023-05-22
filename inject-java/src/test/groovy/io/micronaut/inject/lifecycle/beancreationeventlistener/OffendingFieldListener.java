@@ -9,11 +9,19 @@ import jakarta.inject.Singleton;
 @Singleton
 public class OffendingFieldListener implements BeanCreatedEventListener<B> {
 
+    static boolean initialized;
+    static boolean executed;
+
     @Inject A a;
     @Inject Provider<C> cProvider;
 
+    OffendingFieldListener() {
+        initialized = true;
+    }
+
     @Override
     public B onCreated(BeanCreatedEvent<B> event) {
+        executed = true;
         return event.getBean();
     }
 }

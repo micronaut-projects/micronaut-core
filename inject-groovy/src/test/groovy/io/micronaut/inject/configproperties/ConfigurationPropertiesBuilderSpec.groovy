@@ -19,7 +19,7 @@ import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import org.neo4j.driver.v1.Config
 
 class ConfigurationPropertiesBuilderSpec extends AbstractBeanDefinitionSpec {
@@ -33,14 +33,14 @@ import io.micronaut.context.annotation.*
 
 @ConfigurationProperties("test")
 class MyPropertiesAA {
-    
+
     TestAA test
-    
+
     @ConfigurationBuilder(factoryMethod="build", includes="foo")
     void setTest(TestAA test) {
       this.test = test;
     }
-    
+
     TestAA getTest() {
       return this.test
     }
@@ -49,35 +49,35 @@ class MyPropertiesAA {
 class TestAA {
     private String foo
     private String bar
-    
+
     private TestAA() {}
-    
-    public void setFoo(String s) { 
+
+    public void setFoo(String s) {
         this.foo = s;
     }
     public String getFoo() {
         return foo;
     }
-    public void setBar(String s) { 
+    public void setBar(String s) {
         this.bar = s;
     }
     public String getBar() {
         return bar;
     }
-    
+
     static TestAA build() {
         new TestAA()
-    } 
+    }
 }
 ''')
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'test.foo':'good',
                 'test.bar':'bad'
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean.test.foo == 'good'
@@ -93,7 +93,7 @@ import io.micronaut.context.annotation.*
 
 @ConfigurationProperties("test")
 class MyPropertiesA {
-    
+
     @ConfigurationBuilder(factoryMethod="build", includes="foo")
     TestA test
 }
@@ -101,35 +101,35 @@ class MyPropertiesA {
 class TestA {
     private String foo
     private String bar
-    
+
     private TestA() {}
-    
-    public void setFoo(String s) { 
+
+    public void setFoo(String s) {
         this.foo = s;
     }
     public String getFoo() {
         return foo;
     }
-    public void setBar(String s) { 
+    public void setBar(String s) {
         this.bar = s;
     }
     public String getBar() {
         return bar;
     }
-    
+
     static TestA build() {
         new TestA()
-    } 
+    }
 }
 ''')
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'test.foo':'good',
                 'test.bar':'bad'
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean.test.foo == 'good'
@@ -146,29 +146,29 @@ import io.micronaut.context.annotation.*
 
 @ConfigurationProperties("test")
 class MyPropertiesB {
-    
+
     @ConfigurationBuilder(factoryMethod="build")
     TestB test
-    
+
 }
 
 class TestB {
     String bar
-    
+
     private TestB() {}
 
     static TestB build() {
         new TestB()
-    } 
+    }
 }
 ''')
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'test.bar':'good',
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean.test.bar == 'good'
@@ -183,25 +183,25 @@ import io.micronaut.context.annotation.*
 
 @ConfigurationProperties("test")
 class MyProperties {
-    
+
     @ConfigurationBuilder
     TestC test = new TestC()
-   
+
 }
 
 class TestC {
-    public void setFoo(String s) { 
+    public void setFoo(String s) {
         throw new NoSuchMethodError("setFoo")
     }
 }
 ''')
 
         expect:"The bean was built and a warning was logged"
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'test.foo':'good',
         )
-        factory.build(applicationContext, beanDefinition)
+        factory.instantiate(applicationContext)
     }
 
 
@@ -223,20 +223,20 @@ class MyProperties {
 class TestD {
     String foo
     int bar
-    
+
     @Deprecated
     Long baz
 }
 ''')
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'test.foo':'good',
                 'test.bar': '10',
                 'test.baz':'20'
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -262,9 +262,9 @@ import org.neo4j.driver.v1.*
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
     protected java.net.URI uri
-    
+
     @ConfigurationBuilder(
-        prefixes="with", 
+        prefixes="with",
         allowZeroArgs=true
     )
     Config.ConfigBuilder options = Config.build()
@@ -276,13 +276,13 @@ class Neo4jProperties {
         beanDefinition.injectedFields.first().name == 'uri'
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'neo4j.test.encryptionLevel':'none',
                 'neo4j.test.leakedSessionsLogging':true,
                 'neo4j.test.maxIdleSessions':2
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -309,14 +309,14 @@ import org.neo4j.driver.v1.*
 class Neo4jProperties {
 
     protected java.net.URI uri
-    
+
     @ConfigurationBuilder(
-        prefixes="with", 
+        prefixes="with",
         allowZeroArgs=true,
         configurationPrefix="options"
     )
     Config.ConfigBuilder options = Config.build()
-   
+
 }
 ''')
         then:
@@ -324,13 +324,13 @@ class Neo4jProperties {
         beanDefinition.injectedFields.first().name == 'uri'
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'neo4j.test.options.encryptionLevel':'none',
                 'neo4j.test.options.leakedSessionsLogging':true,
                 'neo4j.test.options.maxIdleSessions':2
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -357,14 +357,14 @@ import org.neo4j.driver.v1.*
 class Neo4jProperties {
 
     protected java.net.URI uri
-    
+
     @ConfigurationBuilder(
-        prefixes="with", 
+        prefixes="with",
         allowZeroArgs=true,
         value="options"
     )
     Config.ConfigBuilder options = Config.build()
-   
+
 }
 ''')
         then:
@@ -372,13 +372,13 @@ class Neo4jProperties {
         beanDefinition.injectedFields.first().name == 'uri'
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'neo4j.test.options.encryptionLevel':'none',
                 'neo4j.test.options.leakedSessionsLogging':true,
                 'neo4j.test.options.maxIdleSessions':2
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -404,13 +404,13 @@ import org.neo4j.driver.v1.*
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
     protected java.net.URI uri
-    
+
     @ConfigurationBuilder(
-        prefixes="with", 
+        prefixes="with",
         allowZeroArgs=true
     )
     Config.ConfigBuilder options = Config.build()
-        
+
 }
 ''')
         then:
@@ -418,11 +418,11 @@ class Neo4jProperties {
         beanDefinition.injectedFields.first().name == 'uri'
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'neo4j.test.connectionLivenessCheckTimeout': '6s'
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -445,20 +445,20 @@ import org.neo4j.driver.v1.*
 
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
-    
+
     @ConfigurationBuilder(
-        prefixes="with", 
+        prefixes="with",
         allowZeroArgs=true
     )
     final Config.ConfigBuilder options = Config.build()
-        
+
 }
 ''')
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'neo4j.test.connectionLivenessCheckTimeout': '17s'
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -479,53 +479,53 @@ package cpbtest11
 
 import io.micronaut.context.annotation.*
 
-@ConfigurationProperties("pool")    
-final class PoolConfig { 
-    
+@ConfigurationProperties("pool")
+final class PoolConfig {
+
     @ConfigurationBuilder(prefixes = [""])
     public ConnectionPool.Builder builder = DefaultConnectionPool.builder()
-    
+
 }
 
 interface ConnectionPool {
-    
+
     interface Builder {
         Builder maxConcurrency(Integer maxConcurrency)
         ConnectionPool build()
     }
-    
+
     int getMaxConcurrency()
 }
 
 class DefaultConnectionPool implements ConnectionPool {
     private final int maxConcurrency
-    
+
     DefaultConnectionPool(int maxConcurrency) {
         this.maxConcurrency = maxConcurrency
     }
-    
+
     static ConnectionPool.Builder builder() {
         return new DefaultBuilder()
     }
-    
-    @Override 
+
+    @Override
     int getMaxConcurrency() {
         return maxConcurrency
     }
-    
+
     private static class DefaultBuilder implements ConnectionPool.Builder {
-    
+
         private int maxConcurrency
-    
+
         private DefaultBuilder() {
         }
-    
+
         @Override
         ConnectionPool.Builder maxConcurrency(Integer maxConcurrency) {
             this.maxConcurrency = maxConcurrency
             return this
         }
-        
+
         ConnectionPool build() {
             return new DefaultConnectionPool(maxConcurrency)
         }
@@ -535,7 +535,7 @@ class DefaultConnectionPool implements ConnectionPool {
         ctx.getEnvironment().addPropertySource(PropertySource.of(["pool.max-concurrency": 123]))
 
         when:
-        Class testProps = ctx.classLoader.loadClass("cpbtest11.PoolConfig")
+        Class<?> testProps = ctx.classLoader.loadClass("cpbtest11.PoolConfig")
         def testPropBean = ctx.getBean(testProps)
 
         then:

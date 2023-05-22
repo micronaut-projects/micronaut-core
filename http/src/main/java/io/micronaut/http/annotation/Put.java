@@ -15,8 +15,6 @@
  */
 package io.micronaut.http.annotation;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.core.async.annotation.SingleResult;
 
@@ -25,6 +23,8 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * Annotation that can be applied to method to signify the method receives a {@link io.micronaut.http.HttpMethod#PUT}.

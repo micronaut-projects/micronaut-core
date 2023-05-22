@@ -15,20 +15,11 @@
  */
 package io.micronaut.http.server.exceptions;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.server.exceptions.response.Error;
-import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
-import jakarta.inject.Inject;
+import io.micronaut.json.JsonSyntaxException;
 import jakarta.inject.Singleton;
-
-import java.util.Optional;
 
 /**
  * Default exception handler for JSON processing errors.
@@ -38,36 +29,14 @@ import java.util.Optional;
  */
 @Produces
 @Singleton
-@Requires(classes = JsonProcessingException.class)
-public class JsonExceptionHandler implements ExceptionHandler<JsonProcessingException, Object> {
-
-    private final ErrorResponseProcessor<?> responseProcessor;
-
+@Internal
+public final class JsonExceptionHandler extends BaseJsonExceptionHandler<JsonSyntaxException> implements ExceptionHandler<JsonSyntaxException, Object> {
     /**
      * Constructor.
+     *
      * @param responseProcessor Error Response Processor
      */
-    @Inject
     public JsonExceptionHandler(ErrorResponseProcessor<?> responseProcessor) {
-        this.responseProcessor = responseProcessor;
-    }
-
-    @Override
-    public Object handle(HttpRequest request, JsonProcessingException exception) {
-        MutableHttpResponse<Object> response = HttpResponse.status(HttpStatus.BAD_REQUEST, "Invalid JSON");
-        return responseProcessor.processResponse(ErrorContext.builder(request)
-                .cause(exception)
-                .error(new Error() {
-                    @Override
-                    public String getMessage() {
-                        return "Invalid JSON: " + exception.getMessage();
-                    }
-
-                    @Override
-                    public Optional<String> getTitle() {
-                        return Optional.of("Invalid JSON");
-                    }
-                })
-                .build(), response);
+        super(responseProcessor);
     }
 }

@@ -31,7 +31,7 @@ class MyFactory {
 }
 
 class MyClass implements SomeInterface {
-    
+
     @Override
     public String goDog() {
         return "go";
@@ -101,5 +101,6 @@ interface MyClient extends ReactorStreamingHttpClient {
         retrieveMethod.returnType.typeParameters.length == 1
         retrieveMethod.returnType.typeParameters[0].type == Object.class
         streamMethod.returnType.typeParameters[0].type == byte[].class
+        blockingMethod.returnType.type == byte[].class
     }
 }

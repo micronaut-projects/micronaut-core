@@ -1,5 +1,4 @@
-
-Micronaut supports the programmatic creation of additional Netty servers through the api:http.server.netty.NettyEmbeddedServerFactory[] interface.
+The Micronaut framework supports the programmatic creation of additional Netty servers through the api:http.server.netty.NettyEmbeddedServerFactory[] interface.
 
 This is useful in cases where you, for example, need to expose distinct servers over different ports with potentially differing configurations (HTTPS, thread resources etc.).
 

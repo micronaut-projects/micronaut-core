@@ -23,7 +23,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import io.micronaut.validation.Validated
 
-import javax.validation.Valid
+import jakarta.validation.Valid
 //end::imports[]
 
 @Requires(property = "spec.name", value = "datavalidationgroups")

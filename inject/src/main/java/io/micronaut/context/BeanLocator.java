@@ -23,6 +23,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 
 import java.util.Collection;
+import java.util.Collections;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -229,6 +231,59 @@ public interface BeanLocator {
         );
     }
 
+    /**
+     * Obtain a map of beans of the given type where the key is the qualifier.
+     *
+     * @param beanType  The potentially parameterized bean type
+     * @param qualifier The qualifier
+     * @param <V>       The bean concrete type
+     * @return A map of instances
+     * @see io.micronaut.inject.qualifiers.Qualifiers
+     * @since 4.0.0
+     */
+    default @NonNull <V> Map<String, V> mapOfType(@NonNull Argument<V> beanType, @Nullable Qualifier<V> qualifier) {
+        return Collections.emptyMap();
+    }
+
+    /**
+     * Obtain a map of beans of the given type where the key is the qualifier.
+     *
+     * @param beanType  The potentially parameterized bean type
+     * @param qualifier The qualifier
+     * @param <V>       The bean concrete type
+     * @return A map of instances
+     * @see io.micronaut.inject.qualifiers.Qualifiers
+     * @since 4.0.0
+     */
+    default @NonNull <V> Map<String, V> mapOfType(@NonNull Class<V> beanType, @Nullable Qualifier<V> qualifier) {
+        return mapOfType(Argument.of(beanType), qualifier);
+    }
+
+    /**
+     * Obtain a map of beans of the given type where the key is the qualifier.
+     *
+     * @param beanType  The potentially parameterized bean type
+     * @param <V>       The bean concrete type
+     * @return A map of instances
+     * @see io.micronaut.inject.qualifiers.Qualifiers
+     * @since 4.0.0
+     */
+    default @NonNull <V> Map<String, V> mapOfType(@NonNull Class<V> beanType) {
+        return mapOfType(Argument.of(beanType), null);
+    }
+
+    /**
+     * Obtain a map of beans of the given type where the key is the qualifier.
+     *
+     * @param beanType  The potentially parameterized bean type
+     * @param <V>       The bean concrete type
+     * @return A map of instances
+     * @see io.micronaut.inject.qualifiers.Qualifiers
+     * @since 4.0.0
+     */
+    default @NonNull <V> Map<String, V> mapOfType(@NonNull Argument<V> beanType) {
+        return mapOfType(beanType, null);
+    }
 
     /**
      * Resolves the proxy target for a given bean type. If the bean has no proxy then the original bean is returned.

@@ -28,6 +28,9 @@ import io.micronaut.http.ssl.SslConfigurationException;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
+import io.netty.incubator.codec.http3.Http3;
+import io.netty.incubator.codec.quic.QuicSslContext;
+import io.netty.incubator.codec.quic.QuicSslContextBuilder;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,12 +90,26 @@ public class SelfSignedSslBuilder extends SslBuilder<SslContext> implements Serv
                 LOG.warn("HTTP Server is configured to use a self-signed certificate ('build-self-signed' is set to true). This configuration should not be used in a production environment as self-signed certificates are inherently insecure.");
             }
             SelfSignedCertificate ssc = new SelfSignedCertificate();
-            final SslContextBuilder sslBuilder = SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey());
+            final SslContextBuilder sslBuilder = SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey())
+                .trustManager(getTrustManagerFactory(ssl));
             CertificateProvidedSslBuilder.setupSslBuilder(sslBuilder, ssl, httpVersion);
             return Optional.of(sslBuilder.build());
         } catch (CertificateException | SSLException e) {
             throw new SslConfigurationException("Encountered an error while building a self signed certificate", e);
         }
+    }
+
+    @Override
+    public Optional<QuicSslContext> buildQuic() {
+        SelfSignedCertificate ssc;
+        try {
+            ssc = new SelfSignedCertificate();
+        } catch (CertificateException e) {
+            throw new SslConfigurationException("Encountered an error while building a self signed certificate", e);
+        }
+        return Optional.of(QuicSslContextBuilder.forServer(ssc.privateKey(), null, ssc.certificate())
+            .applicationProtocols(Http3.supportedApplicationProtocols())
+            .build());
     }
 
     static class SelfSignedConfigured extends BuildSelfSignedCondition {

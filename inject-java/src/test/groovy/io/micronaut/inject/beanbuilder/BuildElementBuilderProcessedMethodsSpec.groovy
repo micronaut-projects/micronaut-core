@@ -21,7 +21,7 @@ import jakarta.inject.Singleton;
 
 @Singleton
 class Foo {
-    
+
 }
 ''')
 

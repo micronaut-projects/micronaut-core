@@ -17,10 +17,10 @@ import java.util.Optional;
 public class ShoppingCartRequestArgumentBinder
         implements AnnotatedRequestArgumentBinder<ShoppingCart, Object> { //<1>
 
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
     private final JacksonObjectSerializer objectSerializer;
 
-    public ShoppingCartRequestArgumentBinder(ConversionService<?> conversionService,
+    public ShoppingCartRequestArgumentBinder(ConversionService conversionService,
                                              JacksonObjectSerializer objectSerializer) {
         this.conversionService = conversionService;
         this.objectSerializer = objectSerializer;

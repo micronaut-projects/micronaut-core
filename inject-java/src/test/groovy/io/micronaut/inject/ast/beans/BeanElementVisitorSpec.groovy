@@ -16,26 +16,25 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.core.convert.ConversionService;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
-import jakarta.inject.Singleton;
 
 @Prototype
 @Named("blah")
 class Test implements Runnable {
-    @Inject ConversionService<?> conversionService;
-    
+    @Inject ConversionService conversionService;
+
     @Inject
     void setEnvironment(Environment environment) {
-        
+
     }
-    
+
     @Override public void run() {
-    
+
     }
 }
 
 @Prototype
 class Excluded {
-    
+
 }
 ''')
 
@@ -59,20 +58,19 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.core.convert.ConversionService;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
-import jakarta.inject.Singleton;
 
 @Prototype
 @Named("blah")
 class Test implements Runnable {
-    @Inject ConversionService<?> conversionService;
-    
+    @Inject ConversionService conversionService;
+
     @Inject
     void setEnvironment(Environment environment) {
-        
+
     }
-    
+
     @Override public void run() {
-    
+
     }
 }
 ''')
@@ -103,26 +101,24 @@ import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.convert.ConversionService;
 import jakarta.inject.Inject;
-import jakarta.inject.Named;
-import jakarta.inject.Singleton;
 
 @Prototype
 @Factory
 class TestFactory implements Runnable {
-    @Inject ConversionService<?> conversionService;
-    
+    @Inject ConversionService conversionService;
+
     @Inject
     void setEnvironment(Environment environment) {
-        
+
     }
-    
+
     @Bean
     Test test() {
         return new Test();
     }
-    
+
     @Override public void run() {
-    
+
     }
 }
 

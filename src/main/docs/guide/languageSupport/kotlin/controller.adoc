@@ -1,0 +1,18 @@
+An example controller written in Kotlin can be seen below:
+
+[source, kotlin]
+.src/main/kotlin/example/HelloController.kt
+----
+package example
+
+import io.micronaut.http.annotation.*
+
+@Controller("/")
+class HelloController {
+
+    @Get("/hello/{name}")
+    fun hello(name: String): String {
+        return "Hello $name"
+    }
+}
+----

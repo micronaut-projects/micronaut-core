@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.netty.stream;
 
+import io.micronaut.http.netty.reactive.HotObservable;
+import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
 
 /**
@@ -25,7 +27,7 @@ import io.netty.handler.codec.http.HttpRequest;
  * @author jroper
  * @author Graeme Rocher
  */
-public interface StreamedHttpRequest extends HttpRequest, StreamedHttpMessage {
+public interface StreamedHttpRequest extends HttpRequest, StreamedHttpMessage, HotObservable<HttpContent> {
 
     /**
      * Releases the stream if there is no subscriber.

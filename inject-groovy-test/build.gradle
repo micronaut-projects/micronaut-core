@@ -7,10 +7,11 @@ dependencies {
 
     api project(":inject-groovy")
     api libs.managed.groovy
-    api(libs.managed.spock) {
+    api(libs.spock) {
         exclude module:'groovy-all'
     }
     api project(":context")
+    api libs.jetbrains.annotations
 }
 
 tasks.named("sourcesJar") {

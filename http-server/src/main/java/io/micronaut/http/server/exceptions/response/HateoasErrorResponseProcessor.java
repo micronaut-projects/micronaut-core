@@ -23,7 +23,6 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.hateoas.Resource;
-import io.micronaut.jackson.JacksonConfiguration;
 import io.micronaut.json.JsonConfiguration;
 import jakarta.inject.Singleton;
 
@@ -46,38 +45,21 @@ public class HateoasErrorResponseProcessor implements ErrorResponseProcessor<Jso
         this.alwaysSerializeErrorsAsList = jacksonConfiguration.isAlwaysSerializeErrorsAsList();
     }
 
-    /**
-     * Constructor for binary compatibility. Equivalent to
-     * {@link HateoasErrorResponseProcessor#HateoasErrorResponseProcessor(JsonConfiguration)}
-     *
-     * @deprecated Use {@link HateoasErrorResponseProcessor#HateoasErrorResponseProcessor(JsonConfiguration)} instead.
-     * @param jacksonConfiguration the configuration to use for processing.
-     */
-    @Deprecated
-    public HateoasErrorResponseProcessor(JacksonConfiguration jacksonConfiguration) {
-        this((JsonConfiguration) jacksonConfiguration);
-    }
-
     @Override
     @NonNull
     public MutableHttpResponse<JsonError> processResponse(@NonNull ErrorContext errorContext, @NonNull MutableHttpResponse<?> response) {
-        return getJsonErrorMutableHttpResponse(alwaysSerializeErrorsAsList, errorContext, response);
-    }
-
-    @NonNull
-    static MutableHttpResponse<JsonError> getJsonErrorMutableHttpResponse(boolean alwaysSerializeErrorsAsList, ErrorContext errorContext, MutableHttpResponse<?> response) {
         if (errorContext.getRequest().getMethod() == HttpMethod.HEAD) {
             return (MutableHttpResponse<JsonError>) response;
         }
         JsonError error;
         if (!errorContext.hasErrors()) {
-            error = new JsonError(response.getStatus().getReason());
+            error = new JsonError(response.reason());
         } else if (errorContext.getErrors().size() == 1 && !alwaysSerializeErrorsAsList) {
             Error jsonError = errorContext.getErrors().get(0);
             error = new JsonError(jsonError.getMessage());
             jsonError.getPath().ifPresent(error::path);
         } else {
-            error = new JsonError(response.getStatus().getReason());
+            error = new JsonError(response.reason());
             List<Resource> errors = new ArrayList<>();
             for (Error jsonError : errorContext.getErrors()) {
                 errors.add(new JsonError(jsonError.getMessage()).path(jsonError.getPath().orElse(null)));

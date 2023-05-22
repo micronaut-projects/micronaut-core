@@ -25,6 +25,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.DelegatingBeanDefinition;
@@ -33,9 +34,8 @@ import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -166,8 +166,8 @@ final class AnnotationMetadataQualifier<T> implements Qualifier<T> {
 
     @NonNull
     private static Set<String> resolveNonBindingMembers(AnnotationMetadata annotationMetadata) {
-        final String[] nonBindingArray = annotationMetadata.stringValues(AnnotationUtil.QUALIFIER, "nonBinding");
-        return ArrayUtils.isNotEmpty(nonBindingArray) ? new HashSet<>(Arrays.asList(nonBindingArray)) : Collections.emptySet();
+        String[] nonBindingArray = AnnotationUtil.resolveNonBindingMembers(annotationMetadata);
+        return ArrayUtils.isNotEmpty(nonBindingArray) ? new LinkedHashSet<>(Arrays.asList(nonBindingArray)) : Collections.emptySet();
     }
 
     @Override
@@ -183,7 +183,7 @@ final class AnnotationMetadataQualifier<T> implements Qualifier<T> {
 
     @Override
     public int hashCode() {
-        return Objects.hash(annotationName, qualifierAnn);
+        return ObjectUtils.hash(annotationName, qualifierAnn);
     }
 
     @Override

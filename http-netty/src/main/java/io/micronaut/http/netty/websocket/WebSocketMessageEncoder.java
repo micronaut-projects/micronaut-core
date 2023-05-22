@@ -16,6 +16,7 @@
 package io.micronaut.http.netty.websocket;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.MediaTypeCodec;
@@ -38,6 +39,7 @@ import java.util.Optional;
  * @author sdelamo
  * @since 1.0
  */
+@Requires(classes = WebSocketSessionException.class)
 @Singleton
 public class WebSocketMessageEncoder {
 

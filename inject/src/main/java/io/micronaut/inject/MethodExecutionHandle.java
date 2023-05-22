@@ -25,12 +25,12 @@ import io.micronaut.core.annotation.NonNull;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MethodExecutionHandle<T, R> extends ExecutionHandle<T, R>, MethodReference {
+public interface MethodExecutionHandle<T, R> extends ExecutionHandle<T, R>, MethodReference<T, R> {
     /**
      * The underlying {@link ExecutableMethod} reference.
      *
      * @return The underlying method reference.
      */
     @NonNull
-    ExecutableMethod<?, R> getExecutableMethod();
+    ExecutableMethod<T, R> getExecutableMethod();
 }

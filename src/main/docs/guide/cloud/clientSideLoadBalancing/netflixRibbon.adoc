@@ -17,10 +17,10 @@ dependency:io.micronaut.netflix:micronaut-netflix-ribbon[]
 
 The api:http.client.LoadBalancer[] implementations will now be link:{micronautribbonapi}/io/micronaut/configuration/ribbon/RibbonLoadBalancer.html[RibbonLoadBalancer] instances.
 
-Ribbon's https://netflix.github.io/ribbon/ribbon-core-javadoc/com/netflix/client/config/CommonClientConfigKey.html[Configuration options] can be set using the `ribbon` namespace in configuration. For example in `application.yml`:
+Ribbon's https://netflix.github.io/ribbon/ribbon-core-javadoc/com/netflix/client/config/CommonClientConfigKey.html[Configuration options] can be set using the `ribbon` namespace in configuration. For example in your configuration file (e.g `application.yml`):
 
 .Configuring Ribbon
-[source,yaml]
+[configuration]
 ----
 ribbon:
   VipAddress: test
@@ -30,7 +30,7 @@ ribbon:
 Each discovered client can also be configured under `ribbon.clients`. For example given a `@Client(id = "hello-world")` you can configure Ribbon settings with:
 
 .Per Client Ribbon Settings
-[source,yaml]
+[configuration]
 ----
 ribbon:
   clients:
@@ -39,4 +39,4 @@ ribbon:
       ServerListRefreshInterval: 2000
 ----
 
-By default Micronaut registers a link:{micronautribbonapi}/io/micronaut/configuration/ribbon/DiscoveryClientServerList.html[DiscoveryClientServerList] for each client that integrates Ribbon with Micronaut's api:discovery.DiscoveryClient[].
+By default, the Micronaut framework registers a link:{micronautribbonapi}/io/micronaut/configuration/ribbon/DiscoveryClientServerList.html[DiscoveryClientServerList] for each client that integrates Ribbon with the Micronaut framework's api:discovery.DiscoveryClient[].

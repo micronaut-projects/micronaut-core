@@ -1,9 +1,9 @@
 === Global Configuration for All Clients
 
-The default HTTP client configuration is a <<configurationProperties, Configuration Properties>> named api:http.client.DefaultHttpClientConfiguration[] that allows configuring the default behaviour for all HTTP clients. For example, in `application.yml`:
+The default HTTP client configuration is a <<configurationProperties, Configuration Properties>> named api:http.client.DefaultHttpClientConfiguration[] that allows configuring the default behaviour for all HTTP clients. For example, in your configuration file (e.g `application.yml`):
 
 .Altering default HTTP client configuration
-[source,yaml]
+[configuration]
 ----
 micronaut:
   http:
@@ -15,10 +15,10 @@ The above example sets the `readTimeout` property of the api:http.client.HttpCli
 
 === Client Specific Configuration
 
-To have separate configuration per-client, there are a couple of options. You can configure <<serviceDiscoveryManual, Service Discovery>> manually in `application.yml` and apply per-client configuration:
+To have separate configuration per-client, there are a couple of options. You can configure <<serviceDiscoveryManual, Service Discovery>> manually in your configuration file (e.g `application.yml`) and apply per-client configuration:
 
 .Manually configuring HTTP services
-[source,yaml]
+[configuration]
 ----
 micronaut:
   http:
@@ -27,10 +27,10 @@ micronaut:
         urls:
           - http://foo1
           - http://foo2
-        read-timeout: 5s # <1>
+        read-timeout: 5s
 ----
 
-<1> The read timeout is applied to the `foo` client.
+- The `read-timeout` is applied to the `foo` client.
 
 WARN: This client configuration can be used in conjunction with the `@Client` annotation, either by injecting an `HttpClient` directly or use on a client interface. In any case, all other attributes on the annotation *will be ignored* except the service id.
 
@@ -42,7 +42,7 @@ Then, inject the named client configuration:
 @Client("foo") @Inject ReactorHttpClient httpClient;
 ----
 
-You can also define a bean that extends from api:http.client.HttpClientConfiguration[] and ensure that the `javax.inject.Named` annotation names it appropriately:
+You can also define a bean that extends from api:http.client.HttpClientConfiguration[] and ensure that the `jakarta.inject.Named` annotation names it appropriately:
 
 .Defining an HTTP client configuration bean
 [source,java]
@@ -75,12 +75,20 @@ Alternatively, if you don't use service discovery you can use the `configuration
 ReactorHttpClient httpClient;
 ----
 
-=== Using HTTP Client Connection Pooling
+=== Connection Pooling and HTTP/2
 
-A client that handles a significant number of requests will benefit from enabling HTTP client connection pooling. The following configuration enables pooling for the `foo` client:
+Connections using normal HTTP (without TLS/SSL) use HTTP/1.1. This can be configured using the `plaintext-mode` configuration option.
+
+Secure connections (i.e. HTTP**S**, with TLS/SSL) use a feature called "Application Layer Protocol Negotiation" (ALPN) that is part of TLS to select the HTTP version. If the server supports HTTP/2, the Micronaut HTTP Client will use that capability by default, but if it doesn't, HTTP/1.1 is still supported. This is configured using the `alpn-modes` option, which is a list of supported ALPN protocol IDs (`"h2"` and `"http/1.1"`).
+
+NOTE: The HTTP/2 standard forbids the use of certain less secure TLS cipher suites for HTTP/2 connections. When the HTTP client supports HTTP/2 (which is the default), it will not support those cipher suites. Removing `"h2"` from `alpn-modes` will enable support for all cipher suites.
+
+Each HTTP/1.1 connection can only support one request at a time, but can be reused for subsequent requests using the `keep-alive` mechanism. HTTP/2 connections can support any number of concurrent requests.
+
+To remove the overhead of opening a new connection for each request, the Micronaut HTTP Client will reuse HTTP connections wherever possible. They are managed in a _connection pool_. HTTP/1.1 connections are kept around using keep-alive and are used for new requests, and for HTTP/2, a single connection is used for all requests.
 
 .Manually configuring HTTP services
-[source,yaml]
+[configuration]
 ----
 micronaut:
   http:
@@ -90,23 +98,26 @@ micronaut:
           - http://foo1
           - http://foo2
         pool:
-          enabled: true # <1>
-          max-connections: 50 # <2>
+          max-concurrent-http1-connections: 50
+          enabled: true
+          max-connections: 50
 ----
-
-<1> Enables the pool
-<2> Sets the maximum number of connections in the pool
+- Limit maximum concurrent HTTP/1.1 connections
+- `max-concurrent-http1-connections` limits the maximum concurrent HTTP/1.1 connections to 50.
+- `pool` enables the pool and sets the maximum number of connections for it
 
 See the API for link:{api}/io/micronaut/http/client/HttpClientConfiguration.ConnectionPoolConfiguration.html[ConnectionPoolConfiguration] for details on available pool configuration options.
 
+By setting the `pool.enabled` property to `false`, you can disable connection reuse. The pool is still used and other configuration options (e.g. concurrent HTTP 1 connections) still apply, but one connection will only serve one request.
+
 === Configuring Event Loop Groups
 
-By default, Micronaut shares a common Netty `EventLoopGroup` for worker threads and all HTTP client threads.
+By default, the Micronaut framework shares a common Netty `EventLoopGroup` for worker threads and all HTTP client threads.
 
 This `EventLoopGroup` can be configured via the `micronaut.netty.event-loops.default` property:
 
 .Configuring The Default Event Loop
-[source,yaml]
+[configuration]
 ----
 micronaut:
   netty:
@@ -125,7 +136,7 @@ For example, if your interactions with an HTTP client involve CPU-intensive work
 The following example configures an additional event loop group called "other" with 10 threads:
 
 .Configuring Additional Event Loops
-[source,yaml]
+[configuration]
 ----
 micronaut:
   netty:
@@ -138,7 +149,7 @@ micronaut:
 Once an additional event loop has been configured you can alter the HTTP client configuration to use it:
 
 .Altering the Event Loop Group used by Clients
-[source,yaml]
+[configuration]
 ----
 micronaut:
   http:

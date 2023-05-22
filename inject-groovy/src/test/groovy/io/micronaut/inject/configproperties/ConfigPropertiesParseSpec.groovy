@@ -5,7 +5,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Property
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.configuration.Engine
 
 class ConfigPropertiesParseSpec extends AbstractBeanDefinitionSpec {
@@ -28,9 +28,9 @@ class MyConfig1 {
         this
     }
 }''')
-            BeanFactory factory = beanDefinition
+            InstantiatableBeanDefinition factory = beanDefinition
             ApplicationContext applicationContext = ApplicationContext.builder(["my.host": "abc"]).start()
-            def bean = factory.build(applicationContext, beanDefinition)
+            def bean = factory.instantiate(applicationContext)
 
         then:
         bean.getHost() == "abc"
@@ -238,13 +238,13 @@ class Parent {
         beanDefinition.injectedFields.isEmpty()
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'foo.manufacturer':'Subaru',
                // 'foo.two.manufacturer':'Subaru',
                 'foo.three.manufacturer':'Subaru'
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         ((Engine.Builder) bean.engine).build().manufacturer == 'Subaru'
@@ -283,7 +283,7 @@ package test
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.annotation.EachProperty
 
-import javax.inject.Inject
+import jakarta.inject.Inject
 import java.util.List
 
 @ConfigurationProperties("parent")

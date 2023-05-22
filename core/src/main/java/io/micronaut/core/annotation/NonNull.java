@@ -15,8 +15,8 @@
  */
 package io.micronaut.core.annotation;
 
-import javax.annotation.Nonnull;
-import javax.annotation.meta.TypeQualifierNickname;
+import jakarta.annotation.Nonnull;
+
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -32,9 +32,6 @@ import java.lang.annotation.Target;
  * <p>Should be used at parameter, return value, and field level. Method overrides should repeat parent {@code @NonNull} annotations unless
  * they behave differently.</p>
  *
- * <p>Use {@code @NonNullApi} (scope = parameters + return values) to set the default behavior to non-nullable in order to avoid annotating
- * your whole codebase with {@code @NonNull}.</p>
- *
  * @author graemerocher
  * @see Nullable
  * @since 2.4
@@ -43,6 +40,5 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @Nonnull
-@TypeQualifierNickname
 public @interface NonNull {
 }

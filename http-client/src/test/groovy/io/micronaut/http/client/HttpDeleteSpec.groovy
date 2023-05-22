@@ -45,9 +45,17 @@ class HttpDeleteSpec extends Specification {
     @Inject
     MyDeleteClient myDeleteClient
 
-    void "test http delete"() {
+    void "test http delete with URI string"() {
         when:
         HttpResponse<?> res = client.toBlocking().exchange(HttpRequest.DELETE('/delete/simple'))
+
+        then:
+        res.status == HttpStatus.NO_CONTENT
+    }
+
+    void "test http delete with URI object"() {
+        when:
+        HttpResponse<?> res = client.toBlocking().exchange(HttpRequest.DELETE(URI.create('/delete/simple')))
 
         then:
         res.status == HttpStatus.NO_CONTENT

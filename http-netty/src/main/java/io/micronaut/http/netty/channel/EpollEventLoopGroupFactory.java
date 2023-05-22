@@ -20,9 +20,11 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.ServerChannel;
 import io.netty.channel.epoll.Epoll;
+import io.netty.channel.epoll.EpollDatagramChannel;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollServerDomainSocketChannel;
 import io.netty.channel.epoll.EpollServerSocketChannel;
@@ -124,4 +126,28 @@ public class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
         return true;
     }
 
+    @Override
+    public Class<? extends Channel> channelClass(NettyChannelType type) throws UnsupportedOperationException {
+        return switch (type) {
+            case SERVER_SOCKET -> EpollServerSocketChannel.class;
+            case CLIENT_SOCKET -> EpollSocketChannel.class;
+            case DOMAIN_SERVER_SOCKET -> EpollServerDomainSocketChannel.class;
+            case DATAGRAM_SOCKET -> EpollDatagramChannel.class;
+        };
+    }
+
+    @Override
+    public Class<? extends Channel> channelClass(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration) {
+        return channelClass(type);
+    }
+
+    @Override
+    public Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration) {
+        return switch (type) {
+            case SERVER_SOCKET -> new EpollServerSocketChannel();
+            case CLIENT_SOCKET -> new EpollSocketChannel();
+            case DOMAIN_SERVER_SOCKET -> new EpollServerDomainSocketChannel();
+            case DATAGRAM_SOCKET -> new EpollDatagramChannel();
+        };
+    }
 }

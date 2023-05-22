@@ -1,0 +1,7 @@
+Since Java 19, the JVM includes experimental support for https://openjdk.org/jeps/425[virtual threads ("project loom")]. As it is a preview feature, you need to pass `--enable-preview` as a JVM parameter to enable it.
+
+The Micronaut framework will detect virtual thread support and use it for the executor named `blocking` if available. If virtual threads are not supported, this executor will be aliased to the `io` thread pool.
+
+To use the `blocking` executor, simply mark e.g. a controller with `ExecuteOn`:
+
+snippet::io.micronaut.docs.taskexecutors.HelloWorldController[tags="clazz", indent=0, title="Configuring the Server I/O Thread Pool"]

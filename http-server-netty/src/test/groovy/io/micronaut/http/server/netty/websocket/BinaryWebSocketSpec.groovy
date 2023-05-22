@@ -19,10 +19,12 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.BeanCreatedEvent
 import io.micronaut.context.event.BeanCreatedEventListener
-import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
+import io.micronaut.http.client.netty.NettyClientCustomizer
+import io.micronaut.http.server.netty.NettyServerCustomizer
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.websocket.WebSocketClient
 import io.netty.buffer.Unpooled
+import io.netty.channel.Channel
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelOutboundHandlerAdapter
 import io.netty.channel.ChannelPipeline
@@ -32,17 +34,14 @@ import jakarta.inject.Singleton
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.Issue
-import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
-@Retry
 class BinaryWebSocketSpec extends Specification {
 
-    @Retry
     void "test binary websocket exchange"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.builder('micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
@@ -69,7 +68,6 @@ class BinaryWebSocketSpec extends Specification {
             fred.replies.size() == 1
         }
 
-
         when:"A message is sent"
         fred.send("Hello bob!".bytes)
 
@@ -86,7 +84,6 @@ class BinaryWebSocketSpec extends Specification {
 
         then:
         conditions.eventually {
-
             fred.replies.contains("[bob] Hi fred. How are things?")
             fred.replies.size() == 2
             bob.replies.contains("[fred] Hello bob!")
@@ -99,8 +96,6 @@ class BinaryWebSocketSpec extends Specification {
 
         when:
         bob.close()
-        sleep(1000)
-
 
         then:
         conditions.eventually {
@@ -218,7 +213,8 @@ class BinaryWebSocketSpec extends Specification {
                 'spec.name'            : 'test per-message compression',
                 'micronaut.server.port': -1
         ])
-        def compressionDetectionCustomizer = ctx.getBean(CompressionDetectionCustomizer)
+        def cdcServer = ctx.getBean(CompressionDetectionCustomizerServer)
+        def cdcClient = ctx.getBean(CompressionDetectionCustomizerClient)
         EmbeddedServer embeddedServer = ctx.getBean(EmbeddedServer)
         embeddedServer.start()
         PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
@@ -237,11 +233,12 @@ class BinaryWebSocketSpec extends Specification {
             fred.replies.size() == 1
         }
 
-        compressionDetectionCustomizer.getPipelines().size() == 4
+        cdcServer.getPipelines().size() == 2
+        cdcClient.getPipelines().size() == 2
 
         when: "A message is sent"
         List<MessageInterceptor> interceptors = new ArrayList<>()
-        for (ChannelPipeline pipeline : compressionDetectionCustomizer.getPipelines()) {
+        for (ChannelPipeline pipeline : cdcServer.getPipelines() + cdcClient.getPipelines()) {
             def interceptor = new MessageInterceptor()
             if (pipeline.get('ws-encoder') != null) {
                 pipeline.addAfter('ws-encoder', 'MessageInterceptor', interceptor)
@@ -268,16 +265,61 @@ class BinaryWebSocketSpec extends Specification {
 
     @Singleton
     @Requires(property = 'spec.name', value = 'test per-message compression')
-    static class CompressionDetectionCustomizer implements BeanCreatedEventListener<ChannelPipelineCustomizer> {
+    static class CompressionDetectionCustomizerServer implements BeanCreatedEventListener<NettyServerCustomizer.Registry> {
         List<ChannelPipeline> pipelines = Collections.synchronizedList(new ArrayList<>())
 
         @Override
-        ChannelPipelineCustomizer onCreated(BeanCreatedEvent<ChannelPipelineCustomizer> event) {
-            event.getBean().doOnConnect {
-                pipelines.add(it)
-                return it
-            }
+        NettyServerCustomizer.Registry onCreated(BeanCreatedEvent<NettyServerCustomizer.Registry> event) {
+            event.getBean().register(new Customizer(null))
             return event.bean
+        }
+
+        class Customizer implements NettyServerCustomizer {
+            final Channel channel
+
+            Customizer(Channel channel) {
+                this.channel = channel
+            }
+
+            @Override
+            NettyServerCustomizer specializeForChannel(Channel channel, ChannelRole role) {
+                return new Customizer(channel)
+            }
+
+            @Override
+            void onInitialPipelineBuilt() {
+                pipelines.add(channel.pipeline())
+            }
+        }
+    }
+
+    @Singleton
+    @Requires(property = 'spec.name', value = 'test per-message compression')
+    static class CompressionDetectionCustomizerClient implements BeanCreatedEventListener<NettyClientCustomizer.Registry> {
+        List<ChannelPipeline> pipelines = Collections.synchronizedList(new ArrayList<>())
+
+        @Override
+        NettyClientCustomizer.Registry onCreated(BeanCreatedEvent<NettyClientCustomizer.Registry> event) {
+            event.getBean().register(new Customizer(null))
+            return event.bean
+        }
+
+        class Customizer implements NettyClientCustomizer {
+            final Channel channel
+
+            Customizer(Channel channel) {
+                this.channel = channel
+            }
+
+            @Override
+            NettyClientCustomizer specializeForChannel(Channel channel, ChannelRole role) {
+                return new Customizer(channel)
+            }
+
+            @Override
+            void onInitialPipelineBuilt() {
+                pipelines.add(channel.pipeline())
+            }
         }
     }
 

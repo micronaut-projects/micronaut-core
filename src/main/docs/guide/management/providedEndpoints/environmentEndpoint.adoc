@@ -5,13 +5,15 @@ The environment endpoint returns information about the api:context.env.Environme
 To enable and configure the environment endpoint, supply configuration through `endpoints.env`.
 
 .Environment Endpoint Configuration Example
-[source,yaml]
+[configuration]
 ----
 endpoints:
   env:
-    enabled: Boolean    # default: false
-    sensitive: Boolean  # default: true
+    enabled: Boolean
+    sensitive: Boolean
 ----
+
+- defaults are false for `enabled` and true for `sensitive`
 
 By default the endpoint will mask all values.
 To customize this masking you need to supply a Bean that implements api:management.endpoint.env.EnvironmentEndpointFilter[].

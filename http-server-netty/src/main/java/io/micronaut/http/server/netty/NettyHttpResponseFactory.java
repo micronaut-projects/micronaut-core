@@ -39,16 +39,12 @@ public class NettyHttpResponseFactory implements HttpResponseFactory {
 
     @Override
     public <T> MutableHttpResponse<T> ok(T body) {
-        MutableHttpResponse<T> ok = new NettyMutableHttpResponse<>(ConversionService.SHARED);
-
-        return body != null ? ok.body(body) : ok;
+        return new NettyMutableHttpResponse<>(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, null, body, ConversionService.SHARED);
     }
 
     @Override
     public <T> MutableHttpResponse<T> status(HttpStatus status, T body) {
-        MutableHttpResponse<T> ok = new NettyMutableHttpResponse<>(ConversionService.SHARED);
-        ok.status(status);
-        return body != null ? ok.body(body) : ok;
+        return ok(body).status(status);
     }
 
     @Override
@@ -57,7 +53,19 @@ public class NettyHttpResponseFactory implements HttpResponseFactory {
         if (reason == null) {
             nettyStatus = HttpResponseStatus.valueOf(status.getCode());
         } else {
-            nettyStatus = new HttpResponseStatus(status.getCode(), reason);
+            nettyStatus = HttpResponseStatus.valueOf(status.getCode(), reason);
+        }
+
+        return new NettyMutableHttpResponse(HttpVersion.HTTP_1_1, nettyStatus, ConversionService.SHARED);
+    }
+
+    @Override
+    public <T> MutableHttpResponse<T> status(int status, String reason) {
+        HttpResponseStatus nettyStatus;
+        if (reason == null) {
+            nettyStatus = HttpResponseStatus.valueOf(status);
+        } else {
+            nettyStatus = HttpResponseStatus.valueOf(status, reason);
         }
 
         return new NettyMutableHttpResponse(HttpVersion.HTTP_1_1, nettyStatus, ConversionService.SHARED);

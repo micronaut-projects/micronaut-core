@@ -16,7 +16,7 @@
 package io.micronaut.docs.server.binding;
 
 // tag::imports[]
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;

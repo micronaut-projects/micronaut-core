@@ -61,7 +61,7 @@ class HelloControllerSpec: StringSpec() {
             // tag::jsonmaptypes[]
             response = Flux.from(client.retrieve(
                     GET<Any>("/greet/John"),
-                    Argument.of(Map::class.java, String::class.java, String::class.java) // <1>
+                    Argument.mapOf(String::class.java, String::class.java) // <1>
             ))
             // end::jsonmaptypes[]
 

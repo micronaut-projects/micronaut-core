@@ -186,11 +186,4 @@ public class StreamUtils {
         }, Collections::unmodifiableCollection);
     }
 
-    /**
-     * @param <T> The type
-     * @return An immutable collection
-     */
-    public static <T> Collector<T, Collection<T>, Collection<T>> toImmutableCollection() {
-        return toImmutableCollection(ArrayList::new);
-    }
 }

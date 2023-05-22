@@ -15,15 +15,18 @@
  */
 package io.micronaut.http;
 
-import io.micronaut.http.cookie.Cookies;
-
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.http.cookie.Cookies;
+
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.security.Principal;
 import java.security.cert.Certificate;
-import java.util.*;
+import java.util.Collection;
+import java.util.Locale;
+import java.util.Objects;
+import java.util.Optional;
 
 /**
  * <p>Common interface for HTTP request implementations.</p>
@@ -87,13 +90,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @return A list of zero or many {@link MediaType} instances
      */
     default Collection<MediaType> accept() {
-        final HttpHeaders headers = getHeaders();
-        if (headers.contains(HttpHeaders.ACCEPT)) {
-            return MediaType.orderedOf(
-                    headers.getAll(HttpHeaders.ACCEPT)
-            );
-        }
-        return Collections.emptySet();
+        return getHeaders().accept();
     }
 
     /**
@@ -172,21 +169,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
 
     @Override
     default Optional<Locale> getLocale() {
-        return getHeaders().findFirst(HttpHeaders.ACCEPT_LANGUAGE)
-            .map(text -> {
-                int len = text.length();
-                if (len == 0 || (len == 1 && text.charAt(0) == '*')) {
-                    return Locale.getDefault().toLanguageTag();
-                }
-                if (text.indexOf(';') > -1) {
-                    text = text.split(";")[0];
-                }
-                if (text.indexOf(',') > -1) {
-                    text = text.split(",")[0];
-                }
-                return text;
-            })
-            .map(Locale::forLanguageTag);
+        return Optional.ofNullable(getHeaders().acceptLanguage());
     }
 
     /**
@@ -194,8 +177,19 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      *
      * @return A certificate used for authentication, if applicable.
      */
+    @SuppressWarnings("deprecation")
     default Optional<Certificate> getCertificate() {
         return this.getAttribute(HttpAttributes.X509_CERTIFICATE, Certificate.class);
+    }
+
+    /**
+     * Get the origin header.
+     *
+     * @return The origin header
+     * @see HttpHeaders#getOrigin()
+     */
+    default Optional<String> getOrigin() {
+        return getHeaders().getOrigin();
     }
 
     /**
@@ -386,6 +380,18 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpRequest<T> DELETE(String uri) {
         return DELETE(uri, null);
+    }
+
+    /**
+     * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#DELETE} request for the given URI.
+     *
+     * @param uri The URI
+     * @param <T> The Http request type
+     * @return The {@link MutableHttpRequest} instance
+     * @see HttpRequestFactory
+     */
+    static <T> MutableHttpRequest<T> DELETE(URI uri) {
+        return DELETE(uri.toString(), null);
     }
 
     /**

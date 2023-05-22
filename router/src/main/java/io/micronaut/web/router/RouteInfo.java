@@ -15,33 +15,58 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
-import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Consumes;
-import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.annotation.Status;
-import io.micronaut.http.sse.Event;
-import io.micronaut.inject.util.KotlinExecutableMethodUtils;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.scheduling.executor.ThreadSelection;
 
-import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Common information shared between route and route match.
  *
- * @param <R> The route
+ * @param <R> The result
  * @author Graeme Rocher
  * @since 1.0
  */
 public interface RouteInfo<R> extends AnnotationMetadataProvider {
+
+    /**
+     * The default media type produced by routes.
+     */
+    List<MediaType> DEFAULT_PRODUCES = Collections.singletonList(MediaType.APPLICATION_JSON_TYPE);
+
+    /**
+     * @return The message body writer, if any.
+     * @since 4.0.0
+     */
+    @Nullable
+    default MessageBodyWriter<R> getMessageBodyWriter() {
+        return null;
+    }
+
+    /**
+     * @return The message body reader. if any.
+     * @since 4.0.0
+     */
+    @Nullable
+    default MessageBodyReader<?> getMessageBodyReader() {
+        return null;
+    }
 
     /**
      * @return The return type
@@ -51,22 +76,67 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
     /**
      * @return The argument representing the data type being produced.
      */
+    @NonNull
+    Argument<?> getResponseBodyType();
+
+    /**
+     * Is the response body json formattable.
+     * @return The response body.
+     */
+    default boolean isResponseBodyJsonFormattable() {
+        Argument<?> argument = getResponseBodyType();
+        // it would be nice to support netty ByteBuf here, but it's not clear how.
+        return !(argument.getType() == byte[].class
+            || ByteBuffer.class.isAssignableFrom(argument.getType()));
+    }
+
+    /**
+     * @return The response body type
+     * @deprecated Use {@link #getResponseBodyType()} instead
+     */
+    @Deprecated(since = "4.0", forRemoval = true)
     default Argument<?> getBodyType() {
-        final ReturnType<? extends R> returnType = getReturnType();
-        if (returnType.isAsyncOrReactive()) {
-            Argument<?> reactiveType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-            if (HttpResponse.class.isAssignableFrom(reactiveType.getType())) {
-                reactiveType = reactiveType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-            }
-            return reactiveType;
-        } else if (HttpResponse.class.isAssignableFrom(returnType.getType())) {
-            Argument<?> responseType = returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-            if (responseType.isAsyncOrReactive()) {
-                return responseType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-            }
-            return responseType;
-        }
-        return returnType.asArgument();
+        return getResponseBodyType();
+    }
+
+    /**
+     * @return The argument that represents the body of the request
+     */
+    Optional<Argument<?>> getRequestBodyType();
+
+    /**
+     * @return The argument that represents the body of the request
+     * @deprecated UYse {@link #getRequestBodyType()} instead
+     */
+    @Deprecated(since = "4.0", forRemoval = true)
+    default Optional<Argument<?>> getBodyArgument() {
+        return getRequestBodyType();
+    }
+
+    /**
+     * Like {@link #getRequestBodyType()}, but excludes body arguments that may match only a part of
+     * the body (i.e. that have no {@code @Body} annotation, or where the {@code @Body} has a value
+     * set).
+     *
+     * @return The argument that represents the body
+     */
+    @Internal
+    default Optional<Argument<?>> getFullRequestBodyType() {
+        return getRequestBodyType()
+            /*
+            The getBodyArgument() method returns arguments for functions where it is
+            not possible to dictate whether the argument is supposed to bind the entire
+            body or just a part of the body. We check to ensure the argument has the body
+            annotation to exclude that use case
+            */
+            .filter(argument -> {
+                AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+                if (annotationMetadata.hasAnnotation(Body.class)) {
+                    return annotationMetadata.stringValue(Body.class).isEmpty();
+                } else {
+                    return false;
+                }
+            });
     }
 
     /**
@@ -79,113 +149,109 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
      *
      * @return A list of {@link MediaType} that this route can produce
      */
-    default List<MediaType> getProduces() {
-        MediaType[] types = MediaType.of(getAnnotationMetadata().stringValues(Produces.class));
-        Optional<Argument<?>> firstTypeVariable = getReturnType().getFirstTypeVariable();
-        if (firstTypeVariable.isPresent() && Event.class.isAssignableFrom(firstTypeVariable.get().getType())) {
-            return Collections.singletonList(MediaType.TEXT_EVENT_STREAM_TYPE);
-        } else if (ArrayUtils.isNotEmpty(types)) {
-            return Collections.unmodifiableList(Arrays.asList(types));
-        } else {
-            return Route.DEFAULT_PRODUCES;
-        }
-    }
+    List<MediaType> getProduces();
 
     /**
      * The media types able to produced by this route.
      *
      * @return A list of {@link MediaType} that this route can produce
      */
-    default List<MediaType> getConsumes() {
-        MediaType[] types = MediaType.of(getAnnotationMetadata().stringValues(Consumes.class));
-        if (ArrayUtils.isNotEmpty(types)) {
-            return Collections.unmodifiableList(Arrays.asList(types));
-        } else {
-            return Collections.emptyList();
-        }
-    }
+    List<MediaType> getConsumes();
+
+    /**
+     * Whether the specified content type is an accepted type.
+     *
+     * @param contentType The content type
+     * @return True if it is
+     */
+    boolean doesConsume(@Nullable MediaType contentType);
+
+    /**
+     * Whether the route does produce any of the given types.
+     *
+     * @param acceptableTypes The acceptable types
+     * @return True if it is
+     */
+    boolean doesProduce(@Nullable Collection<MediaType> acceptableTypes);
+
+    /**
+     * Whether the route does produce any of the given types.
+     *
+     * @param acceptableType The acceptable type
+     * @return True if it is
+     */
+    boolean doesProduce(@Nullable MediaType acceptableType);
+
+    /**
+     * Whether the specified content type is explicitly an accepted type.
+     *
+     * @param contentType The content type
+     * @return True if it is
+     */
+    boolean explicitlyConsumes(@Nullable MediaType contentType);
+
+    /**
+     * Whether the specified content type is explicitly a producing type.
+     *
+     * @param contentType The content type
+     * @return True if it is
+     * @since 2.5.0
+     */
+    boolean explicitlyProduces(@Nullable MediaType contentType);
 
     /**
      * @return Is this route match a suspended function (Kotlin).
      * @since 2.0.0
      */
-    default boolean isSuspended() {
-        return getReturnType().isSuspended();
-    }
+    boolean isSuspended();
 
     /**
      * @return Is the route a reactive route.
      * @since 2.0.0
      */
-    default boolean isReactive() {
-        return getReturnType().isReactive();
-    }
+    boolean isReactive();
 
     /**
      * @return Does the route emit a single result or multiple results
      * @since 2.0
      */
-    default boolean isSingleResult() {
-        ReturnType<? extends R> returnType = getReturnType();
-        return returnType.isSingleResult() ||
-                (isReactive() && returnType.getFirstTypeVariable()
-                        .filter(t -> HttpResponse.class.isAssignableFrom(t.getType())).isPresent()) ||
-                returnType.isAsync() ||
-                returnType.isSuspended();
-    }
+    boolean isSingleResult();
 
     /**
      * @return Does the route emit a single result or multiple results
      * @since 2.0
      */
-    default boolean isSpecifiedSingle() {
-        return getReturnType().isSpecifiedSingle();
-    }
+    boolean isSpecifiedSingle();
 
     /**
      * @return is the return type completable
      * @since 2.0
      */
-    default boolean isCompletable() {
-        return getReturnType().isCompletable();
-    }
+    boolean isCompletable();
 
     /**
      * @return Is the route an async route.
      * @since 2.0.0
      */
-    default boolean isAsync() {
-        return getReturnType().isAsync();
-    }
+    boolean isAsync();
 
     /**
      * @return Is the route an async or reactive route.
      * @since 2.0.0
      */
-    default boolean isAsyncOrReactive() {
-        return getReturnType().isAsyncOrReactive();
-    }
+    boolean isAsyncOrReactive();
 
     /**
      * @return Does the route return void
      * @since 2.0.0
      */
-    default boolean isVoid() {
-        if (getReturnType().isVoid()) {
-            return true;
-        } else if (this instanceof MethodBasedRouteMatch && isSuspended()) {
-            return KotlinExecutableMethodUtils.isKotlinFunctionReturnTypeUnit(((MethodBasedRouteMatch) this).getExecutableMethod());
-        }
-        return false;
-    }
+    boolean isVoid();
 
     /**
      * @return True if the route was called due to an error
      * @since 3.0.0
      */
-    default boolean isErrorRoute() {
-        return false;
-    }
+    boolean isErrorRoute();
 
     /**
      * Finds predefined route http status or uses default.
@@ -195,9 +261,7 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
      * @since 2.5.2
      */
     @NonNull
-    default HttpStatus findStatus(HttpStatus defaultStatus) {
-        return getAnnotationMetadata().enumValue(Status.class, HttpStatus.class).orElse(defaultStatus);
-    }
+    HttpStatus findStatus(HttpStatus defaultStatus);
 
     /**
      * Checks if route is for web socket.
@@ -205,7 +269,26 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
      * @return true if it's web socket route
      * @since 2.5.2
      */
-    default boolean isWebSocketRoute() {
-        return getAnnotationMetadata().hasAnnotation("io.micronaut.websocket.annotation.OnMessage");
-    }
+    boolean isWebSocketRoute();
+
+    /**
+     * Whether the route permits a request body.
+     * @return True if the route permits a request body
+     * @since 4.0.0
+     */
+    boolean isPermitsRequestBody();
+
+    /**
+     * @param threadSelection The thread selection
+     * @return The route executor
+     * @since 4.0.0
+     */
+    @Nullable
+    ExecutorService getExecutor(@Nullable ThreadSelection threadSelection);
+
+    /**
+     * @return true if the route needs request body to be read
+     * @since 4.0.0
+     */
+    boolean needsRequestBody();
 }

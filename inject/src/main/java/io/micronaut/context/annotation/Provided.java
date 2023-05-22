@@ -17,9 +17,9 @@ package io.micronaut.context.annotation;
 
 import jakarta.inject.Scope;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import java.lang.annotation.Retention;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * <p>Provided scope is used to define a bean that should not be considered a candidate for dependency injection because

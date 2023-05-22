@@ -7,7 +7,7 @@ To execute the stop endpoint, send a POST request to /stop.
 To configure the stop endpoint, supply configuration through `endpoints.stop`.
 
 .Stop Endpoint Configuration Example
-[source,yaml]
+[configuration]
 ----
 endpoints:
   stop:

@@ -10,6 +10,23 @@ micronautBuild {
     enableProcessing = false
 }
 
+repositories {
+    mavenCentral()
+    maven { url "https://s01.oss.sonatype.org/content/repositories/snapshots/" }
+}
+
+configurations.all {
+    resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
+    resolutionStrategy.cacheDynamicVersionsFor 0, 'seconds'
+}
+
+configurations {
+    testRuntimeClasspath {
+        // Use AOP from here, not from maven
+        exclude group: 'io.micronaut', module: 'micronaut-aop'
+    }
+}
+
 group = projectGroupId
 
 def micronautBuild = (ExtensionAware) project.extensions.getByName("micronautBuild")
@@ -46,6 +63,20 @@ tasks.withType(Jar).configureEach {
     preserveFileTimestamps = false
 }
 
+configurations.all {
+    resolutionStrategy.dependencySubstitution {
+        rootProject.subprojects.each {
+            if (!it.name.startsWith('test-')) {
+                if (it.name.contains('bom')) {
+                    substitute platform(module("io.micronaut:micronaut-${it.name}")) using platform(project(":${it.name}")) because "we want to test with what we're building"
+                } else {
+                    substitute module("io.micronaut:micronaut-${it.name}") using project(":${it.name}") because "we want to test with what we're building"
+                }
+            }
+        }
+    }
+}
+
 dependencies {
     annotationProcessor libs.bundles.asm
     annotationProcessor(libs.micronaut.docs.map {
@@ -58,7 +89,7 @@ dependencies {
         transitive = false
     }
 
-    api libs.managed.slf4j
+    api libs.slf4j.api
     compileOnly libs.caffeine
     compileOnly libs.bundles.asm
 
@@ -67,7 +98,7 @@ dependencies {
 
     testImplementation libs.caffeine
     testImplementation libs.managed.groovy
-    testImplementation(libs.managed.spock) {
+    testImplementation(libs.spock) {
         exclude module: 'groovy-all'
     }
 

@@ -76,6 +76,7 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
 
     @NonNull
     @Override
+    @SuppressWarnings("java:S2789") // performance optimization
     public Optional<String> getRawMessage(@NonNull String code, @NonNull MessageContext context) {
         final Locale locale = defaultBundle != null ? context.getLocale(defaultBundle.getLocale()) : context.getLocale();
         MessageKey messageKey = new MessageKey(locale, code);
@@ -142,6 +143,7 @@ public class ResourceBundleMessageSource extends AbstractMessageSource {
         return opt;
     }
 
+    @SuppressWarnings("java:S2789") // performance optimization
     private Optional<ResourceBundle> resolveBundle(Locale locale) {
         MessageKey key = new MessageKey(locale, baseName);
         final Optional<ResourceBundle> resourceBundle = bundleCache.get(key);

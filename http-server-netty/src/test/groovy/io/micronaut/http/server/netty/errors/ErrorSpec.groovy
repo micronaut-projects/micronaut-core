@@ -18,20 +18,21 @@ package io.micronaut.http.server.netty.errors
 import groovy.json.JsonSlurper
 import io.micronaut.context.annotation.Property
 import io.micronaut.core.annotation.NonNull
-import io.micronaut.http.*
-import io.micronaut.http.annotation.Body
+import io.micronaut.core.async.annotation.SingleResult
+import io.micronaut.http.HttpHeaders
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.http.hateoas.JsonError
 import io.micronaut.http.server.exceptions.ExceptionHandler
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.netty.bootstrap.Bootstrap
-import io.netty.buffer.ByteBuf
-import io.netty.buffer.CompositeByteBuf
 import io.netty.buffer.Unpooled
 import io.netty.channel.Channel
 import io.netty.channel.ChannelHandlerContext
@@ -40,21 +41,16 @@ import io.netty.channel.ChannelInitializer
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.codec.http.FullHttpResponse
-import io.netty.handler.codec.http.HttpClientCodec
 import io.netty.handler.codec.http.HttpObjectAggregator
 import io.netty.handler.codec.http.HttpResponseDecoder
 import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
-import io.micronaut.core.async.annotation.SingleResult
 import spock.lang.Issue
-import spock.lang.PendingFeature
 import spock.lang.Timeout
 
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.CopyOnWriteArrayList
-
 /**
  * Tests for different kinds of errors and the expected responses
  *
@@ -214,7 +210,6 @@ class ErrorSpec extends AbstractMicronautSpec {
         response.getBody(Map).get()._embedded.errors[0].message.contains('foo')
     }
 
-    @PendingFeature
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/7786')
     void "test encoding error with handler"() {
         given:
@@ -230,13 +225,13 @@ class ErrorSpec extends AbstractMicronautSpec {
         expect:
         response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
         response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
-        response.getBody(Map).get()._embedded.errors[0].message.contains('Server error')
+        response.getBody(Map).get()._embedded.errors[0].message.contains('foo')
     }
 
     void "test encoding error with handler loop"() {
         given:
         HttpResponse response = Flux.from(rxClient.exchange(
-                HttpRequest.GET('/errors/encoding-error/handled')
+                HttpRequest.GET('/errors/encoding-error/handled/loop')
         )).onErrorResume(t -> {
             if (t instanceof HttpClientResponseException) {
                 return Flux.just(((HttpClientResponseException) t).response)
@@ -422,7 +417,7 @@ X-Long-Header: $longString\r
 
         @Error
         HttpResponse<String> error(HttpRequest<?> request, Throwable e) {
-            HttpResponse.serverError("Server error")
+            HttpResponse.serverError("Handled server error")
         }
     }
 

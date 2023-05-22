@@ -130,7 +130,7 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
      */
     default boolean isContainerType() {
         final Class<T> type = getType();
-        return Map.class == type ||  DefaultArgument.CONTAINER_TYPES.contains(type);
+        return Map.class == type ||  DefaultArgument.CONTAINER_TYPES.contains(type.getName());
     }
 
     /**
@@ -199,7 +199,7 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
      * @since 2.0
      */
     default boolean isSpecifiedSingle() {
-        return RuntimeTypeInformation.isSpecifiedSingle(this);
+        return RuntimeTypeInformation.isSpecifiedSingle(getType(), this);
     }
 
     /**

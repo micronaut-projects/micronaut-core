@@ -15,17 +15,17 @@
  */
 package io.micronaut.http.netty;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
-import io.netty.buffer.ByteBuf;
-import io.netty.handler.codec.http.DefaultFullHttpRequest;
+import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpVersion;
 
-import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Common interface for client and server to implement to construct the Netty versions of the request objects.
@@ -33,67 +33,119 @@ import java.util.Objects;
  * @author graemerocher
  * @since 2.0.0
  */
+@Internal
 public interface NettyHttpRequestBuilder {
     /**
      * Converts this object to a full http request.
      *
      * @return a full http request
      */
+    @Deprecated
     @NonNull
-    FullHttpRequest toFullHttpRequest();
+    default FullHttpRequest toFullHttpRequest() {
+        throw new UnsupportedOperationException();
+    }
 
     /**
      * Converts this object to a streamed http request.
+     *
      * @return The streamed request
+     * @deprecated Go through {@link #toHttpRequestDirect()} and {@link #toHttpRequestWithoutBody()} instead
      */
+    @Deprecated(since = "4.0.0", forRemoval = true)
     @NonNull
-    StreamedHttpRequest toStreamHttpRequest();
+    default StreamedHttpRequest toStreamHttpRequest() {
+        throw new UnsupportedOperationException();
+    }
 
     /**
      * Converts this object to the most appropriate http request type.
      * @return The http request
+     * @deprecated Go through {@link #toHttpRequestDirect()} and {@link #toHttpRequestWithoutBody()} instead
      */
     @NonNull
-    HttpRequest toHttpRequest();
+    @Deprecated(since = "4.0.0", forRemoval = true)
+    default HttpRequest toHttpRequest() {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * Directly convert this request to netty, including the body, if possible. If the body of this
+     * request has been changed, this will return an empty value.
+     *
+     * @return The request including the body
+     */
+    @NonNull
+    default Optional<HttpRequest> toHttpRequestDirect() {
+        return Optional.empty();
+    }
+
+    /**
+     * Convert this request to a netty request without the body. The caller will handle adding the
+     * body.
+     *
+     * @return The request excluding the body
+     */
+    @NonNull
+    HttpRequest toHttpRequestWithoutBody();
 
     /**
      * @return Is the request a stream.
+     * @deprecated Go through {@link #toHttpRequestDirect()} and {@link #toHttpRequestWithoutBody()} instead
      */
-    boolean isStream();
+    @Deprecated(since = "4.0.0", forRemoval = true)
+    default boolean isStream() {
+        throw new UnsupportedOperationException();
+    }
 
     /**
      * Convert the given request to a full http request.
      * @param request The request
      * @return The full request.
+     * @deprecated Go through {@link #toHttpRequestDirect()} and {@link #toHttpRequestWithoutBody()} instead
      */
+    @Deprecated(since = "4.0.0", forRemoval = true)
     static @NonNull HttpRequest toHttpRequest(@NonNull io.micronaut.http.HttpRequest<?> request) {
-        Objects.requireNonNull(request, "The request cannot be null");
-        while (request instanceof HttpRequestWrapper) {
-            request = ((HttpRequestWrapper<?>) request).getDelegate();
+        return asBuilder(request).toHttpRequestWithoutBody();
+    }
+
+    /**
+     * Transform the given request to an equivalent {@link NettyHttpRequestBuilder}, so that it can
+     * be transformed to a netty request.
+     *
+     * @param request The micronaut http request
+     * @return The builder for further operations
+     */
+    static NettyHttpRequestBuilder asBuilder(@NonNull io.micronaut.http.HttpRequest<?> request) {
+        boolean supportDirect = true;
+        while (request instanceof HttpRequestWrapper<?> wrapper) {
+            supportDirect &= wrapper.getBody() == wrapper.getDelegate().getBody();
+            request = wrapper.getDelegate();
         }
-        if (request instanceof NettyHttpRequestBuilder) {
-            return ((NettyHttpRequestBuilder) request).toHttpRequest();
-        }
-        // manual conversion
-        HttpRequest nettyRequest;
-        ByteBuf byteBuf = request.getBody(ByteBuf.class).orElse(null);
-        if (byteBuf != null) {
-            nettyRequest = new DefaultFullHttpRequest(
-                    HttpVersion.HTTP_1_1,
-                    HttpMethod.valueOf(request.getMethodName()),
-                    request.getUri().toString(),
-                    byteBuf
-            );
-        } else {
-            nettyRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1,
-                    HttpMethod.valueOf(request.getMethodName()),
-                    request.getUri().toString()
-            );
+        if (request instanceof NettyHttpRequestBuilder builder) {
+            if (supportDirect) {
+                return builder;
+            } else {
+                // delegate to builder, excluding toHttpRequestDirect
+                //noinspection Convert2Lambda
+                return new NettyHttpRequestBuilder() {
+                    @Override
+                    public HttpRequest toHttpRequestWithoutBody() {
+                        return builder.toHttpRequestWithoutBody();
+                    }
+                };
+            }
         }
 
+        // manual conversion
+        HttpRequest nettyRequest = new DefaultHttpRequest(
+            HttpVersion.HTTP_1_1,
+            HttpMethod.valueOf(request.getMethodName()),
+            request.getUri().toString()
+        );
         request.getHeaders()
-                .forEach((s, strings) -> nettyRequest.headers().add(s, strings));
-        return nettyRequest;
+            .forEach((s, strings) -> nettyRequest.headers().add(s, strings));
+        return () -> nettyRequest;
     }
 
 }

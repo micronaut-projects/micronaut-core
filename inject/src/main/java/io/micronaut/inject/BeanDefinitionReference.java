@@ -46,7 +46,7 @@ import jakarta.inject.Singleton;
  * @since 1.0
  */
 @Internal
-public interface BeanDefinitionReference<T> extends BeanType<T> {
+public interface BeanDefinitionReference<T> extends QualifiedBeanType<T> {
 
     /**
      * @return The class name of the backing {@link BeanDefinition}
@@ -108,5 +108,23 @@ public interface BeanDefinitionReference<T> extends BeanType<T> {
      */
     default boolean isConfigurationProperties() {
         return getAnnotationMetadata().hasDeclaredStereotype(ConfigurationReader.class);
+    }
+
+    /**
+     * Returns whether another bean exists that proxies this bean. In other words
+     * this bean is the target of a proxy.
+     *
+     * @return Is the reference a proxy target.
+     * @since 4.0.0
+     */
+    default boolean isProxiedBean() {
+        return false;
+    }
+
+    /**
+     * @return Whether this reference is a proxy target.
+     */
+    default boolean isProxyTarget() {
+        return false;
     }
 }

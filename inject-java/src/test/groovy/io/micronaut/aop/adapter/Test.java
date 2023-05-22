@@ -16,9 +16,11 @@
 package io.micronaut.aop.adapter;
 
 import io.micronaut.aop.Adapter;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.StartupEvent;
 
+@Requires(property = "spec", value = "MethodAdapterSpec")
 @jakarta.inject.Singleton
 class Test {
 

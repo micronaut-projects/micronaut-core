@@ -34,6 +34,7 @@ final class NextFireTime implements Supplier<Duration> {
     private Duration duration;
     private ZonedDateTime nextFireTime;
     private final CronExpression cron;
+    private final ZoneId zoneId;
 
     /**
      * Default constructor.
@@ -41,8 +42,7 @@ final class NextFireTime implements Supplier<Duration> {
      * @param cron A cron expression
      */
     NextFireTime(CronExpression cron) {
-        this.cron = cron;
-        nextFireTime = ZonedDateTime.now();
+        this(cron, ZoneId.systemDefault());
     }
 
     /**
@@ -51,12 +51,13 @@ final class NextFireTime implements Supplier<Duration> {
      */
     NextFireTime(CronExpression cron, ZoneId zoneId) {
         this.cron = cron;
+        this.zoneId = zoneId;
         nextFireTime = ZonedDateTime.now(zoneId);
     }
 
     @Override
     public Duration get() {
-        ZonedDateTime now = ZonedDateTime.now();
+        ZonedDateTime now = ZonedDateTime.now(zoneId);
         // check if the task have fired too early
         computeNextFireTime(now.isAfter(nextFireTime) ? now : nextFireTime);
         return duration;
@@ -64,6 +65,6 @@ final class NextFireTime implements Supplier<Duration> {
 
     private void computeNextFireTime(ZonedDateTime currentFireTime) {
         nextFireTime = cron.nextTimeAfter(currentFireTime);
-        duration = Duration.ofMillis(nextFireTime.toInstant().toEpochMilli() - ZonedDateTime.now().toInstant().toEpochMilli());
+        duration = Duration.ofMillis(nextFireTime.toInstant().toEpochMilli() - ZonedDateTime.now(zoneId).toInstant().toEpochMilli());
     }
 }

@@ -1,11 +1,11 @@
 As mentioned previously, Jackson is used for message encoding to JSON. A default Jackson `ObjectMapper` is configured and used by Micronaut HTTP clients.
 
-You can override the settings used to construct the `ObjectMapper` with properties defined by the api:jackson.JacksonConfiguration[] class in `application.yml`.
+You can override the settings used to construct the `ObjectMapper` with properties defined by the api:jackson.JacksonConfiguration[] class in your configuration file (e.g `application.yml`).
 
 For example, the following configuration enables indented output for Jackson:
 
 .Example Jackson Configuration
-[source,yaml]
+[configuration]
 ----
 jackson:
   serialization:

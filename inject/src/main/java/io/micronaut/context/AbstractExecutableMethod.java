@@ -22,7 +22,9 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.core.type.UnsafeExecutable;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 
@@ -42,7 +44,7 @@ import java.util.Objects;
  * @since 1.0
  */
 @Internal
-public abstract class AbstractExecutableMethod extends AbstractExecutable implements ExecutableMethod, EnvironmentConfigurable {
+public abstract class AbstractExecutableMethod extends AbstractExecutable implements UnsafeExecutable, ExecutableMethod, EnvironmentConfigurable {
 
     private final ReturnType returnType;
     private final Argument<?> genericReturnType;
@@ -64,7 +66,7 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
         super(declaringType, methodName, arguments);
         this.genericReturnType = genericReturnType;
         this.returnType = new ReturnTypeImpl();
-        int result = Objects.hash(declaringType, methodName);
+        int result = ObjectUtils.hash(declaringType, methodName);
         result = 31 * result + Arrays.hashCode(argTypes);
         this.hashCode = result;
     }
@@ -142,12 +144,12 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
     }
 
     @Override
-    public Class[] getArgumentTypes() {
+    public Class<?>[] getArgumentTypes() {
         return argTypes;
     }
 
     @Override
-    public Class getDeclaringType() {
+    public Class<?> getDeclaringType() {
         return declaringType;
     }
 
@@ -159,6 +161,11 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
     @Override
     public final Object invoke(Object instance, Object... arguments) {
         ArgumentUtils.validateArguments(this, getArguments(), arguments);
+        return invokeInternal(instance, arguments);
+    }
+
+    @Override
+    public Object invokeUnsafe(Object instance, Object... arguments) {
         return invokeInternal(instance, arguments);
     }
 

@@ -17,12 +17,11 @@ package io.micronaut.http.client.annotation;
 
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.context.annotation.Type;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.client.HttpClientConfiguration;
-import io.micronaut.http.client.interceptor.HttpClientIntroductionAdvice;
+import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.hateoas.JsonError;
-import io.micronaut.retry.annotation.Recoverable;
 import jakarta.inject.Singleton;
 
 import java.lang.annotation.Documented;
@@ -39,8 +38,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 @Introduction
-@Type(HttpClientIntroductionAdvice.class)
-@Recoverable
 @Singleton
 // tag::value[]
 public @interface Client {
@@ -80,6 +77,36 @@ public @interface Client {
      * The HTTP version.
      *
      * @return The HTTP version of the client.
+     * @deprecated There are now separate settings for HTTP and HTTPS connections. To configure
+     * HTTP connections (e.g. for h2c), use {@link #plaintextMode}. To configure ALPN, set
+     * {@link #alpnModes}.
      */
+    @Deprecated
     HttpVersion httpVersion() default HttpVersion.HTTP_1_1;
+
+    /**
+     * The connection mode to use for <i>plaintext</i> (http as opposed to https) connections.
+     * <br>
+     * <b>Note: If {@link #httpVersion} is set, this setting is ignored!</b>
+     *
+     * @return The plaintext connection mode.
+     * @since 4.0.0
+     */
+    @NonNull
+    HttpVersionSelection.PlaintextMode plaintextMode() default HttpVersionSelection.PlaintextMode.HTTP_1;
+
+    /**
+     * The protocols to support for TLS ALPN. If HTTP 2 is included, this will also restrict the
+     * TLS cipher suites to those supported by the HTTP 2 standard.
+     * <br>
+     * <b>Note: If {@link #httpVersion} is set, this setting is ignored!</b>
+     *
+     * @return The supported ALPN protocols.
+     * @since 4.0.0
+     */
+    @NonNull
+    String[] alpnModes() default {
+        HttpVersionSelection.ALPN_HTTP_2,
+        HttpVersionSelection.ALPN_HTTP_1
+    };
 }

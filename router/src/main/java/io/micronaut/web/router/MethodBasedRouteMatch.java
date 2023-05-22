@@ -38,7 +38,7 @@ public interface MethodBasedRouteMatch<T, R> extends RouteMatch<R>, MethodExecut
      * @return The required arguments in order to invoke this route
      */
     @Override
-    default Collection<Argument> getRequiredArguments() {
+    default Collection<Argument<?>> getRequiredArguments() {
         return Arrays.asList(getArguments());
     }
 }

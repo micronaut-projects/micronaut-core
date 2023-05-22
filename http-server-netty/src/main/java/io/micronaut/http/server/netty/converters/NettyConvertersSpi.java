@@ -16,7 +16,7 @@
 package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.http.multipart.CompletedFileUpload;
@@ -47,7 +47,7 @@ import java.util.Optional;
 @Internal
 public final class NettyConvertersSpi implements TypeConverterRegistrar {
     @Override
-    public void register(ConversionService<?> conversionService) {
+    public void register(MutableConversionService conversionService) {
         conversionService.addConverter(
             ByteBuf.class,
             CharSequence.class,
@@ -144,6 +144,8 @@ public final class NettyConvertersSpi implements TypeConverterRegistrar {
                     return Optional.empty();
                 }
 
+                // unlike NettyCompletedAttribute, NettyCompletedFileUpload does a `retain` on
+                // construct, so we don't need one here
                 return Optional.of(new NettyCompletedFileUpload(object));
             } catch (Exception e) {
                 context.reject(e);
@@ -158,11 +160,13 @@ public final class NettyConvertersSpi implements TypeConverterRegistrar {
     private TypeConverter<Attribute, CompletedPart> attributeToCompletedPartConverter() {
         return (object, targetType, context) -> {
             try {
-                if (!object.isCompleted()) {
+                if (!object.isCompleted() || !targetType.isAssignableFrom(NettyCompletedAttribute.class)) {
                     return Optional.empty();
                 }
 
-                return Optional.of(new NettyCompletedAttribute(object));
+                // converter does not claim the input object, so we need to retain it here. it's
+                // released by NettyCompletedAttribute.get*
+                return Optional.of(new NettyCompletedAttribute(object.retain()));
             } catch (Exception e) {
                 context.reject(e);
                 return Optional.empty();

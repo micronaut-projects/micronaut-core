@@ -74,7 +74,7 @@ Before contributing new code it is recommended you install IntelliJ [CheckStyle-
 
 IntelliJ will mark in red the issues Checkstyle finds. For example:
 
-![](https://github.com/micronaut-projects/micronaut-core/raw/master/src/main/docs/resources/img/checkstyle-issue.png)
+![checkstyle-issue](https://docs.micronaut.io/docsassets/img/checkstyle-issue.png)
 
 In this case, to fix the issues, we need to:
 

@@ -20,7 +20,7 @@ import io.micronaut.context.annotation.EachProperty
 import io.micronaut.context.annotation.Parameter
 import io.micronaut.core.order.Ordered
 
-import javax.annotation.Nullable
+import jakarta.annotation.Nullable
 
 @EachProperty(value = "teams", list = true)
 class ParentArrayEachPropsCtor implements Ordered {

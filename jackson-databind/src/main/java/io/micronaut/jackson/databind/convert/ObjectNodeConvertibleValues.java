@@ -43,13 +43,13 @@ import java.util.Set;
 public class ObjectNodeConvertibleValues<V> implements ConvertibleValues<V> {
 
     private final ObjectNode objectNode;
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
 
     /**
      * @param objectNode        The node that maps to JSON object structure
      * @param conversionService To convert the JSON node into given type
      */
-    public ObjectNodeConvertibleValues(ObjectNode objectNode, ConversionService<?> conversionService) {
+    public ObjectNodeConvertibleValues(ObjectNode objectNode, ConversionService conversionService) {
         this.objectNode = objectNode;
         this.conversionService = conversionService;
     }

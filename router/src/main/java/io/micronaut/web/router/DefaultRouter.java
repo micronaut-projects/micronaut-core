@@ -30,7 +30,8 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.filter.FilterPatternStyle;
-import io.micronaut.http.filter.HttpFilter;
+import io.micronaut.http.filter.FilterRunner;
+import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpServerFilterResolver;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.web.router.exceptions.RoutingException;
@@ -42,15 +43,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -64,21 +62,25 @@ import java.util.stream.Stream;
 @Singleton
 public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatch<?>> {
 
-    private final Map<String, List<UriRoute>> routesByMethod = new HashMap<>();
-    private final List<StatusRoute> statusRoutes = new ArrayList<>();
-    private final List<ErrorRoute> errorRoutes = new ArrayList<>();
+    private static final UriRouteInfo<Object, Object>[] EMPTY = new UriRouteInfo[0];
+
+    private final Map<String, UriRouteInfo<Object, Object>[]> routesByMethod;
+    private final StatusRouteInfo<Object, Object>[] statusRoutes;
+    private final ErrorRouteInfo<Object, Object>[] errorRoutes;
     private final Set<Integer> exposedPorts;
+    @Nullable
+    private Set<Integer> ports;
     private final List<FilterRoute> alwaysMatchesFilterRoutes = new ArrayList<>();
     private final List<FilterRoute> preconditionFilterRoutes = new ArrayList<>();
-    private final Supplier<List<HttpFilter>> alwaysMatchesHttpFilters = SupplierUtil.memoized(() -> {
+    private final Supplier<List<GenericHttpFilter>> alwaysMatchesHttpFilters = SupplierUtil.memoized(() -> {
         if (alwaysMatchesFilterRoutes.isEmpty()) {
             return Collections.emptyList();
         }
-        List<HttpFilter> httpFilters = new ArrayList<>(alwaysMatchesFilterRoutes.size());
+        List<GenericHttpFilter> httpFilters = new ArrayList<>(alwaysMatchesFilterRoutes.size());
         for (FilterRoute filterRoute : alwaysMatchesFilterRoutes) {
             httpFilters.add(filterRoute.getFilter());
         }
-        httpFilters.sort(OrderUtil.COMPARATOR);
+        FilterRunner.sort(httpFilters);
         return httpFilters;
     });
 
@@ -100,26 +102,32 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     public DefaultRouter(Collection<RouteBuilder> builders) {
         Set<Integer> exposedPorts = new HashSet<>(5);
         List<FilterRoute> filterRoutes = new ArrayList<>();
+        Map<String, List<UriRouteInfo<Object, Object>>> routesByMethod = CollectionUtils.newHashMap(HttpMethod.values().length);
+        Set<StatusRouteInfo<Object, Object>> statusRoutes = new LinkedHashSet<>();
+        Set<ErrorRouteInfo<Object, Object>> errorRoutes = new LinkedHashSet<>();
         for (RouteBuilder builder : builders) {
             List<UriRoute> constructedRoutes = builder.getUriRoutes();
             for (UriRoute route : constructedRoutes) {
                 String key = route.getHttpMethodName();
-                routesByMethod.computeIfAbsent(key, x -> new ArrayList<>()).add(route);
+                UriRouteInfo<Object, Object> uriRouteInfo = route.toRouteInfo();
+                routesByMethod.computeIfAbsent(key, x -> new ArrayList<>()).add(uriRouteInfo);
             }
 
             for (StatusRoute statusRoute : builder.getStatusRoutes()) {
-                if (statusRoutes.contains(statusRoute)) {
-                    final StatusRoute existing = statusRoutes.stream().filter(r -> r.equals(statusRoute)).findFirst().orElse(null);
+                StatusRouteInfo<Object, Object> routeInfo = statusRoute.toRouteInfo();
+                if (statusRoutes.contains(routeInfo)) {
+                    final StatusRouteInfo<Object, Object> existing = statusRoutes.stream().filter(r -> r.equals(routeInfo)).findFirst().orElse(null);
                     throw new RoutingException("Attempted to register multiple local routes for http status [" + statusRoute.status() + "]. New route: " + statusRoute + ". Existing: " + existing);
                 }
-                this.statusRoutes.add(statusRoute);
+                statusRoutes.add(routeInfo);
             }
             for (ErrorRoute errorRoute : builder.getErrorRoutes()) {
-                if (errorRoutes.contains(errorRoute)) {
-                    final ErrorRoute existing = errorRoutes.stream().filter(r -> r.equals(errorRoute)).findFirst().orElse(null);
+                ErrorRouteInfo<Object, Object> routeInfo = errorRoute.toRouteInfo();
+                if (errorRoutes.contains(routeInfo)) {
+                    final ErrorRouteInfo<Object, Object> existing = errorRoutes.stream().filter(r -> r.equals(routeInfo)).findFirst().orElse(null);
                     throw new RoutingException("Attempted to register multiple local routes for error [" + errorRoute.exceptionType().getSimpleName() + "]. New route: " + errorRoute + ". Existing: " + existing);
                 }
-                this.errorRoutes.add(errorRoute);
+                errorRoutes.add(routeInfo);
             }
             filterRoutes.addAll(builder.getFilterRoutes());
             exposedPorts.addAll(builder.getExposedPorts());
@@ -139,6 +147,13 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 preconditionFilterRoutes.add(filterRoute);
             }
         }
+        Map<String, UriRouteInfo<Object, Object>[]> map = CollectionUtils.newHashMap(routesByMethod.size());
+        for (Map.Entry<String, List<UriRouteInfo<Object, Object>>> e : routesByMethod.entrySet()) {
+            map.put(e.getKey(), finalizeRoutes(e.getValue()));
+        }
+        this.routesByMethod = map;
+        this.statusRoutes = statusRoutes.toArray(StatusRouteInfo[]::new);
+        this.errorRoutes = errorRoutes.toArray(ErrorRouteInfo[]::new);
     }
 
     private boolean isMatchesAll(FilterRoute filterRoute) {
@@ -165,67 +180,57 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public void applyDefaultPorts(List<Integer> ports) {
-        Predicate<HttpRequest<?>> portMatches = (httpRequest -> ports.contains(httpRequest.getServerAddress().getPort()));
-        for (List<UriRoute> routes : routesByMethod.values()) {
-            for (int i = 0; i < routes.size(); i++) {
-                UriRoute route = routes.get(i);
-                if (route.getPort() == null) {
-                    routes.set(i, route.where(portMatches));
-                }
-            }
-        }
+        this.ports = new HashSet<>(ports);
     }
 
     @NonNull
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest<?> request, @NonNull CharSequence uri) {
-        return this.<T, R>find(request.getMethodName(), uri, null).stream();
+        return this.<T, R>toMatches(uri.toString(), findInternal(request)).stream();
     }
 
     @NonNull
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpRequest<?> request) {
-        boolean permitsBody = HttpMethod.permitsRequestBody(request.getMethod());
-        return this.<T, R>find(request, request.getPath())
-                .filter(match -> match.test(request) && (!permitsBody || match.doesConsume(request.getContentType().orElse(null))));
+        return this.<T, R>toMatches(request.getPath(), findInternal(request)).stream();
     }
 
     @NonNull
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri, @Nullable HttpRequest<?> context) {
-        return this.<T, R>find(httpMethod.name(), uri, null).stream();
+        return this.<T, R>toMatches(
+                uri.toString(),
+                routesByMethod.getOrDefault(httpMethod.name(), EMPTY)
+        ).stream();
     }
 
     @NonNull
     @Override
-    public Stream<UriRoute> uriRoutes() {
-        return routesByMethod.values().stream().flatMap(List::stream);
+    public Stream<UriRouteInfo<?, ?>> uriRoutes() {
+        return routesByMethod.values().stream().flatMap(Arrays::stream);
     }
 
     @NonNull
     @Override
     public <T, R> List<UriRouteMatch<T, R>> findAllClosest(@NonNull HttpRequest<?> request) {
-        final HttpMethod httpMethod = request.getMethod();
-        final MediaType contentType = request.getContentType().orElse(null);
-        boolean permitsBody = HttpMethod.permitsRequestBody(httpMethod);
-        final Collection<MediaType> acceptedProducedTypes = request.accept();
-        List<UriRouteMatch<T, R>> uriRoutes = this.find(
-                request.getMethodName(),
-                request.getPath(),
-                routeMatch -> routeMatch.test(request) && (!permitsBody || routeMatch.doesConsume(contentType)) && routeMatch.doesProduce(acceptedProducedTypes)
-        );
-        int routeCount = uriRoutes.size();
-        if (routeCount <= 1) {
+        List<UriRouteInfo<Object, Object>> routes = findInternal(request);
+        if (routes.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<UriRouteMatch<T, R>> uriRoutes = toMatches(request.getPath(), routes);
+        if (routes.size() == 1) {
             return uriRoutes;
         }
+
         // if there are multiple routes, try to resolve the ambiguity
 
+        final Collection<MediaType> acceptedProducedTypes = request.accept();
         if (CollectionUtils.isNotEmpty(acceptedProducedTypes)) {
             // take the highest priority accepted type
             final MediaType mediaType = acceptedProducedTypes.iterator().next();
-            List<UriRouteMatch<T, R>> mostSpecific = new ArrayList<>(uriRoutes.size());
+            List<UriRouteMatch<T, R>> mostSpecific = new ArrayList<>(routes.size());
             for (UriRouteMatch<T, R> routeMatch : uriRoutes) {
-                if (routeMatch.explicitlyProduces(mediaType)) {
+                if (routeMatch.getRouteInfo().explicitlyProduces(mediaType)) {
                     mostSpecific.add(routeMatch);
                 }
             }
@@ -233,17 +238,18 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 uriRoutes = mostSpecific;
             }
         }
-        routeCount = uriRoutes.size();
+        boolean permitsBody = request.getMethod().permitsRequestBody();
+        int routeCount = uriRoutes.size();
         if (routeCount > 1 && permitsBody) {
-
+            final MediaType contentType = request.getContentType().orElse(MediaType.ALL_TYPE);
             List<UriRouteMatch<T, R>> explicitlyConsumedRoutes = new ArrayList<>(routeCount);
             List<UriRouteMatch<T, R>> consumesRoutes = new ArrayList<>(routeCount);
 
-            for (UriRouteMatch<T, R> match: uriRoutes) {
-                if (match.explicitlyConsumes(contentType != null ? contentType : MediaType.ALL_TYPE)) {
+            for (UriRouteMatch<T, R> match : uriRoutes) {
+                if (match.getRouteInfo().explicitlyConsumes(contentType)) {
                     explicitlyConsumedRoutes.add(match);
                 }
-                if (explicitlyConsumedRoutes.isEmpty() && match.doesConsume(contentType)) {
+                if (explicitlyConsumedRoutes.isEmpty()) {
                     consumesRoutes.add(match);
                 }
             }
@@ -263,7 +269,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
             for (int i = 0; i < routeCount; i++) {
                 UriRouteMatch<T, R> match = uriRoutes.get(i);
-                UriMatchTemplate template = match.getRoute().getUriMatchTemplate();
+                UriMatchTemplate template = match.getRouteInfo().getUriMatchTemplate();
                 long variable = template.getPathVariableSegmentCount();
                 long raw = template.getRawSegmentLength();
                 if (i == 0) {
@@ -281,12 +287,47 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         return uriRoutes;
     }
 
+    private <T, R> List<UriRouteMatch<T, R>> toMatches(String path, List<UriRouteInfo<Object, Object>> routes) {
+        if (routes.size() == 1) {
+            UriRouteMatch match = routes.iterator().next().tryMatch(path);
+            if (match != null) {
+                return List.of(match);
+            }
+            return List.of();
+        }
+        List<UriRouteMatch<T, R>> uriRoutes = new ArrayList<>(routes.size());
+        for (UriRouteInfo<Object, Object> route : routes) {
+            UriRouteMatch match = route.tryMatch(path);
+            if (match != null) {
+                uriRoutes.add(match);
+            }
+        }
+        return uriRoutes;
+    }
+
+    private <T, R> List<UriRouteMatch<T, R>> toMatches(String path, UriRouteInfo<Object, Object>[] routes) {
+        if (routes.length == 1) {
+            UriRouteMatch match = routes[0].tryMatch(path);
+            if (match != null) {
+                return List.of(match);
+            }
+            return List.of();
+        }
+        List<UriRouteMatch<T, R>> uriRoutes = new ArrayList<>(routes.length);
+        for (UriRouteInfo<Object, Object> route : routes) {
+            UriRouteMatch match = route.tryMatch(path);
+            if (match != null) {
+                uriRoutes.add(match);
+            }
+        }
+        return uriRoutes;
+    }
+
     @NonNull
     @Override
     public <T, R> Optional<UriRouteMatch<T, R>> route(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri) {
-        List<UriRoute> routes = routesByMethod.getOrDefault(httpMethod.name(), Collections.emptyList());
-        for (UriRoute uriRoute : routes) {
-            Optional<UriRouteMatch> match = uriRoute.match(uri.toString());
+        for (UriRouteInfo<Object, Object> uriRouteInfo : routesByMethod.getOrDefault(httpMethod.name(), EMPTY)) {
+            Optional<UriRouteMatch<Object, Object>> match = uriRouteInfo.match(uri.toString());
             if (match.isPresent()) {
                 return (Optional) match;
             }
@@ -296,11 +337,11 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public <R> Optional<RouteMatch<R>> route(@NonNull HttpStatus status) {
-        for (StatusRoute statusRoute : statusRoutes) {
-            if (statusRoute.originatingType() == null) {
-                Optional<RouteMatch<R>> match = statusRoute.match(status);
+        for (StatusRouteInfo<Object, Object> statusRouteInfo : statusRoutes) {
+            if (statusRouteInfo.originatingType() == null) {
+                Optional<RouteMatch<Object>> match = statusRouteInfo.match(status);
                 if (match.isPresent()) {
-                    return match;
+                    return (Optional) match;
                 }
             }
         }
@@ -308,23 +349,23 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(@NonNull Class originatingClass, @NonNull HttpStatus status) {
-        for (StatusRoute statusRoute : statusRoutes) {
-            Optional<RouteMatch<R>> match = statusRoute.match(originatingClass, status);
+    public <R> Optional<RouteMatch<R>> route(@NonNull Class<?> originatingClass, @NonNull HttpStatus status) {
+        for (StatusRouteInfo<Object, Object> statusRouteInfo : statusRoutes) {
+            Optional<RouteMatch<Object>> match = statusRouteInfo.match(originatingClass, status);
             if (match.isPresent()) {
-                return match;
+                return (Optional) match;
             }
         }
         return Optional.empty();
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(@NonNull Class originatingClass, @NonNull Throwable error) {
-        Map<ErrorRoute, RouteMatch<R>> matchedRoutes = new LinkedHashMap<>();
-        for (ErrorRoute errorRoute : errorRoutes) {
-            Optional<RouteMatch<R>> match = errorRoute.match(originatingClass, error);
+    public <R> Optional<RouteMatch<R>> route(@NonNull Class<?> originatingClass, @NonNull Throwable error) {
+        List<RouteMatch<R>> matchedRoutes = new ArrayList<>();
+        for (ErrorRouteInfo<Object, Object> errorRouteInfo : errorRoutes) {
+            Optional match = errorRouteInfo.match(originatingClass, error);
             match.ifPresent(m ->
-                    matchedRoutes.put(errorRoute, m)
+                    matchedRoutes.add((RouteMatch<R>) m)
             );
         }
         return findRouteMatch(matchedRoutes, error);
@@ -344,29 +385,36 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         Collection<MediaType> accept = request.accept();
         final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(accept);
         if (hasAcceptHeader) {
-            Map<ErrorRoute, RouteMatch<R>> matchedRoutes = new LinkedHashMap<>();
-            for (ErrorRoute errorRoute : errorRoutes) {
+            List<RouteMatch<R>> matchedRoutes = new ArrayList<>();
+            for (ErrorRouteInfo<Object, Object> errorRoute : errorRoutes) {
+                if (!errorRoute.doesProduce(accept)) {
+                    continue;
+                }
+                if (!errorRoute.matching(request)) {
+                    continue;
+                }
                 @SuppressWarnings("unchecked")
-                final RouteMatch<R> match = (RouteMatch<R>) errorRoute
-                        .match(originatingClass, error).orElse(null);
-                if (match != null && match.doesProduce(accept)) {
-                    matchedRoutes.put(errorRoute, match);
+                final RouteMatch<R> match = (RouteMatch<R>) errorRoute.match(originatingClass, error).orElse(null);
+                if (match != null) {
+                    matchedRoutes.add(match);
                 }
             }
             return findRouteMatch(matchedRoutes, error);
         } else {
-            Map<ErrorRoute, RouteMatch<R>> producesAllMatchedRoutes = new LinkedHashMap<>();
-            Map<ErrorRoute, RouteMatch<R>> producesSpecificMatchedRoutes = new LinkedHashMap<>();
-            for (ErrorRoute errorRoute : errorRoutes) {
-                @SuppressWarnings("unchecked")
-                final RouteMatch<R> match = (RouteMatch<R>) errorRoute
+            List<RouteMatch<R>> producesAllMatchedRoutes = new ArrayList<>(errorRoutes.length);
+            List<RouteMatch<R>> producesSpecificMatchedRoutes = new ArrayList<>(errorRoutes.length);
+            for (ErrorRouteInfo<Object, Object> errorRouteInfo : errorRoutes) {
+                if (!errorRouteInfo.matching(request)) {
+                    continue;
+                }
+                @SuppressWarnings("unchecked") final RouteMatch<R> match = (RouteMatch<R>) errorRouteInfo
                         .match(originatingClass, error).orElse(null);
                 if (match != null) {
-                    final List<MediaType> produces = match.getProduces();
+                    final List<MediaType> produces = match.getRouteInfo().getProduces();
                     if (CollectionUtils.isEmpty(produces) || produces.contains(MediaType.ALL_TYPE)) {
-                        producesAllMatchedRoutes.put(errorRoute, match);
+                        producesAllMatchedRoutes.add(match);
                     } else {
-                        producesSpecificMatchedRoutes.put(errorRoute, match);
+                        producesSpecificMatchedRoutes.add(match);
                     }
                 }
             }
@@ -400,23 +448,29 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 request.accept();
         final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(accept);
         if (hasAcceptHeader) {
-
-            for (StatusRoute statusRoute : statusRoutes) {
-                @SuppressWarnings("unchecked")
-                final RouteMatch<R> match = (RouteMatch<R>) statusRoute
+            for (StatusRouteInfo<Object, Object> statusRouteInfo : statusRoutes) {
+                if (!statusRouteInfo.doesProduce(accept)) {
+                    continue;
+                }
+                if (!statusRouteInfo.matching(request)) {
+                    continue;
+                }
+                @SuppressWarnings("unchecked") final RouteMatch<R> match = (RouteMatch<R>) statusRouteInfo
                         .match(originatingClass, status).orElse(null);
-                if (match != null && match.doesProduce(accept)) {
+                if (match != null) {
                     return Optional.of(match);
                 }
             }
         } else {
             RouteMatch<R> firstMatch = null;
-            for (StatusRoute errorRoute : statusRoutes) {
-                @SuppressWarnings("unchecked")
-                final RouteMatch<R> match = (RouteMatch<R>) errorRoute
+            for (StatusRouteInfo<Object, Object> statusRouteInfo : statusRoutes) {
+                if (!statusRouteInfo.matching(request)) {
+                    continue;
+                }
+                @SuppressWarnings("unchecked") final RouteMatch<R> match = (RouteMatch<R>) statusRouteInfo
                         .match(originatingClass, status).orElse(null);
                 if (match != null) {
-                    final List<MediaType> produces = match.getProduces();
+                    final List<MediaType> produces = match.getRouteInfo().getProduces();
                     if (CollectionUtils.isEmpty(produces) || produces.contains(MediaType.ALL_TYPE)) {
                         return Optional.of(match);
                     } else if (firstMatch == null) {
@@ -433,24 +487,23 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public <R> Optional<RouteMatch<R>> route(@NonNull Throwable error) {
-        Map<ErrorRoute, RouteMatch<R>> matchedRoutes = new LinkedHashMap<>();
-        for (ErrorRoute errorRoute : errorRoutes) {
-            if (errorRoute.originatingType() == null) {
-                Optional<RouteMatch<R>> match = errorRoute.match(error);
-                match.ifPresent(m -> matchedRoutes.put(errorRoute, m));
+        List<RouteMatch<R>> matchedRoutes = new ArrayList<>();
+        for (ErrorRouteInfo<Object, Object> errorRouteInfo : errorRoutes) {
+            if (errorRouteInfo.originatingType() == null) {
+                Optional match = errorRouteInfo.match(error);
+                match.ifPresent(m -> matchedRoutes.add((RouteMatch<R>) m));
             }
         }
-
         return findRouteMatch(matchedRoutes, error);
     }
 
     @NonNull
     @Override
-    public List<HttpFilter> findFilters(@NonNull HttpRequest<?> request) {
+    public List<GenericHttpFilter> findFilters(@NonNull HttpRequest<?> request) {
         if (preconditionFilterRoutes.isEmpty()) {
             return alwaysMatchesHttpFilters.get();
         }
-        List<HttpFilter> httpFilters = new ArrayList<>(alwaysMatchesFilterRoutes.size() + preconditionFilterRoutes.size());
+        List<GenericHttpFilter> httpFilters = new ArrayList<>(alwaysMatchesFilterRoutes.size() + preconditionFilterRoutes.size());
         httpFilters.addAll(alwaysMatchesHttpFilters.get());
         RouteMatch routeMatch = (RouteMatch) request.getAttribute(HttpAttributes.ROUTE_MATCH).filter(o -> o instanceof RouteMatch).orElse(null);
         HttpMethod method = request.getMethod();
@@ -463,20 +516,28 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             }
             filterRoute.match(method, uri).ifPresent(httpFilters::add);
         }
-        httpFilters.sort(OrderUtil.COMPARATOR);
+        FilterRunner.sort(httpFilters);
         return Collections.unmodifiableList(httpFilters);
     }
 
     @SuppressWarnings("unchecked")
     @NonNull
     @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> findAny(@NonNull CharSequence uri, @Nullable HttpRequest<?> context) {
+    public <T, R> Stream<UriRouteMatch<T, R>> findAny(@NonNull CharSequence uri, @Nullable HttpRequest<?> request) {
         List matchedRoutes = new ArrayList<>(5);
         final String uriStr = uri.toString();
-        for (List<UriRoute> routes : routesByMethod.values()) {
-            for (UriRoute route : routes) {
-                final UriRouteMatch match = route.match(uriStr).orElse(null);
-                if (match != null && match.test(context)) {
+        for (UriRouteInfo<Object, Object>[] routes : routesByMethod.values()) {
+            for (UriRouteInfo<Object, Object> route : routes) {
+                if (request != null) {
+                    if (shouldSkipForPort(request, route)) {
+                        continue;
+                    }
+                    if (!route.matching(request)) {
+                        continue;
+                    }
+                }
+                UriRouteMatch match = route.tryMatch(uriStr);
+                if (match != null) {
                     matchedRoutes.add(match);
                 }
             }
@@ -484,53 +545,98 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         return matchedRoutes.stream();
     }
 
-    private <T, R> List<UriRouteMatch<T, R>> find(String httpMethodName, CharSequence uri, @Nullable Predicate<UriRouteMatch> predicate) {
-        List<UriRoute> routes = routesByMethod.getOrDefault(httpMethodName, Collections.emptyList());
-        if (CollectionUtils.isNotEmpty(routes)) {
-            final String uriStr = uri.toString();
-            List<UriRouteMatch<T, R>> routeMatches = new LinkedList<>();
-            for (UriRoute route : routes) {
-                Optional<UriRouteMatch> match = route.match(uriStr);
-                if (predicate != null) {
-                    match = match.filter(predicate);
+    @Override
+    public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request) {
+        String path = request.getPath();
+        List matchedRoutes = new ArrayList<>(5);
+        for (UriRouteInfo<Object, Object>[] routes : routesByMethod.values()) {
+            for (UriRouteInfo<Object, Object> route : routes) {
+                if (shouldSkipForPort(request, route)) {
+                    continue;
                 }
-                match.ifPresent(routeMatches::add);
+                if (!route.matching(request)) {
+                    continue;
+                }
+                UriRouteMatch match = route.tryMatch(path);
+                if (match != null) {
+                    matchedRoutes.add(match);
+                }
             }
-            return routeMatches;
-        } else {
-            //noinspection unchecked
+        }
+        return matchedRoutes;
+    }
+
+    private List<UriRouteInfo<Object, Object>> findInternal(HttpRequest<?> request) {
+        String httpMethodName = request.getMethodName();
+        boolean permitsBody = request.getMethod().permitsRequestBody();
+        final Collection<MediaType> acceptedProducedTypes = request.accept();
+        UriRouteInfo<Object, Object>[] routes = routesByMethod.getOrDefault(httpMethodName, EMPTY);
+        if (routes.length == 0) {
             return Collections.emptyList();
         }
+        List<UriRouteInfo<Object, Object>> result = new ArrayList<>(routes.length);
+        for (UriRouteInfo<Object, Object> route : routes) {
+            if (shouldSkipForPort(request, route)) {
+                continue;
+            }
+            if (permitsBody) {
+                if (!route.isPermitsRequestBody()) {
+                    continue;
+                }
+                if (!route.doesConsume(request.getContentType().orElse(null))) {
+                    continue;
+                }
+            }
+            if (!route.doesProduce(acceptedProducedTypes)) {
+                continue;
+            }
+            if (!route.matching(request)) {
+                continue;
+            }
+            result.add(route);
+        }
+        return result;
     }
 
-    private UriRoute[] finalizeRoutes(List<UriRoute> routes) {
+    private boolean shouldSkipForPort(HttpRequest<?> request, UriRouteInfo<Object, Object> route) {
+        if (ports == null || route.getPort() != null) {
+            return false;
+        }
+        if (!ports.contains(request.getServerAddress().getPort())) {
+            return true;
+        }
+        return false;
+    }
+
+    private UriRouteInfo<Object, Object>[] finalizeRoutes(List<UriRouteInfo<Object, Object>> routes) {
         Collections.sort(routes);
-        return routes.toArray(new UriRoute[0]);
+        return routes.toArray(new UriRouteInfo[0]);
     }
 
-    private <T> Optional<RouteMatch<T>> findRouteMatch(Map<ErrorRoute, RouteMatch<T>> matchedRoutes, Throwable error) {
+    private <T> Optional<RouteMatch<T>> findRouteMatch(List<RouteMatch<T>> matchedRoutes, Throwable error) {
         if (matchedRoutes.size() == 1) {
-            return matchedRoutes.values().stream().findFirst();
+            return matchedRoutes.stream().findFirst();
         } else if (matchedRoutes.size() > 1) {
             int minCount = Integer.MAX_VALUE;
 
-            Supplier<List<Class>> hierarchySupplier = () -> ClassUtils.resolveHierarchy(error.getClass());
+            Supplier<List<Class<?>>> hierarchySupplier = () -> ClassUtils.resolveHierarchy(error.getClass());
             Optional<RouteMatch<T>> match = Optional.empty();
-            Class errorClass = error.getClass();
+            Class<?> errorClass = error.getClass();
 
-            for (Map.Entry<ErrorRoute, RouteMatch<T>> entry: matchedRoutes.entrySet()) {
-                Class exceptionType = entry.getKey().exceptionType();
+            for (RouteMatch<T> errorMatch : matchedRoutes) {
+                ErrorRouteInfo<T, ?> routeInfo = (ErrorRouteInfo<T, ?>) errorMatch.getRouteInfo();
+                Class<?> exceptionType = routeInfo.exceptionType();
                 if (exceptionType.equals(errorClass)) {
-                    match = Optional.of(entry.getValue());
+                    match = Optional.of(errorMatch);
                     break;
                 } else {
-                    List<Class> hierarchy = hierarchySupplier.get();
+                    List<Class<?>> hierarchy = hierarchySupplier.get();
                     //measures the distance in the hierarchy from the error and the route error type
                     int index = hierarchy.indexOf(exceptionType);
                     //the class closest in the hierarchy should be chosen
                     if (index > -1 && index < minCount) {
                         minCount = index;
-                        match = Optional.of(entry.getValue());
+                        match = Optional.of(errorMatch);
                     }
                 }
             }
@@ -541,11 +647,11 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     @Override
-    public List<FilterEntry<HttpFilter>> resolveFilterEntries(RouteMatch<?> routeMatch) {
+    public List<FilterEntry> resolveFilterEntries(RouteMatch<?> routeMatch) {
         if (preconditionFilterRoutes.isEmpty()) {
-            return (List) alwaysMatchesFilterRoutes;
+            return new ArrayList<>(alwaysMatchesFilterRoutes);
         }
-        List<FilterEntry<HttpFilter>> filterEntries = new ArrayList<>(alwaysMatchesFilterRoutes.size() + preconditionFilterRoutes.size());
+        List<FilterEntry> filterEntries = new ArrayList<>(alwaysMatchesFilterRoutes.size() + preconditionFilterRoutes.size());
         filterEntries.addAll(alwaysMatchesFilterRoutes);
         for (FilterRoute filterRoute : preconditionFilterRoutes) {
             if (!matchesFilterMatcher(filterRoute, routeMatch)) {
@@ -557,9 +663,9 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     @Override
-    public List<HttpFilter> resolveFilters(HttpRequest<?> request, List<FilterEntry<HttpFilter>> filterEntries) {
-        List<HttpFilter> httpFilters = new ArrayList<>(filterEntries.size());
-        for (FilterEntry<HttpFilter> entry : filterEntries) {
+    public List<GenericHttpFilter> resolveFilters(HttpRequest<?> request, List<FilterEntry> filterEntries) {
+        List<GenericHttpFilter> httpFilters = new ArrayList<>(filterEntries.size());
+        for (FilterEntry entry : filterEntries) {
             if (entry.hasMethods() && !entry.getFilterMethods().contains(request.getMethod())) {
                 continue;
             }
@@ -567,8 +673,8 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 String path = request.getPath();
                 String[] patterns = entry.getPatterns();
                 FilterPatternStyle patternStyle = entry.getAnnotationMetadata()
-                    .enumValue("patternStyle", FilterPatternStyle.class)
-                    .orElse(FilterPatternStyle.ANT);
+                        .enumValue("patternStyle", FilterPatternStyle.class)
+                        .orElse(FilterPatternStyle.ANT);
                 boolean matches = true;
                 for (String pattern : patterns) {
                     if (!matches) {
@@ -592,7 +698,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         if (!matches) {
             String filterAnnotation = annotationMetadata.getAnnotationNameByStereotype(FilterMatcher.NAME).orElse(null);
             if (filterAnnotation != null) {
-                matches = context.getAnnotationMetadata().hasStereotype(filterAnnotation);
+                matches = context.getRouteInfo().getAnnotationMetadata().hasStereotype(filterAnnotation);
             }
         }
         return matches;

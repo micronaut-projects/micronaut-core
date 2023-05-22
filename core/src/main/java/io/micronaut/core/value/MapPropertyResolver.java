@@ -20,11 +20,13 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
+import java.util.Set;
 
 /**
  * A {@link PropertyResolver} that resolves values from a backing map.
@@ -34,7 +36,7 @@ import java.util.stream.Collectors;
  */
 public class MapPropertyResolver implements PropertyResolver {
     private final Map<String, Object> map;
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
 
     /**
      * @param map The map to resolves the properties from
@@ -74,18 +76,29 @@ public class MapPropertyResolver implements PropertyResolver {
     public Collection<String> getPropertyEntries(@NonNull String name) {
         if (StringUtils.isNotEmpty(name)) {
             String prefix = name + ".";
-            return map.keySet().stream().filter(k -> k.startsWith(prefix))
-                    .map(k -> {
-                        String withoutPrefix = k.substring(prefix.length());
-                        int i = withoutPrefix.indexOf('.');
-                        if (i > -1) {
-                            return withoutPrefix.substring(0, i);
-                        }
-                        return withoutPrefix;
-                    })
-                    // to list to retain order from linked hash map
-                    .collect(Collectors.toList());
+            Set<String> strings = map.keySet();
+            // to list to retain order from linked hash map
+            List<String> entries = new ArrayList<>(strings.size());
+            for (String k : strings) {
+                if (k.startsWith(prefix)) {
+                    String withoutPrefix = k.substring(prefix.length());
+                    int i = withoutPrefix.indexOf('.');
+                    String e;
+                    if (i > -1) {
+                        e = withoutPrefix.substring(0, i);
+                    } else {
+                        e = withoutPrefix;
+                    }
+                    entries.add(e);
+                }
+            }
+            return entries;
         }
         return Collections.emptySet();
+    }
+
+    @Override
+    public List<List<String>> getPropertyPathMatches(String pathPattern) {
+        return Collections.emptyList();
     }
 }

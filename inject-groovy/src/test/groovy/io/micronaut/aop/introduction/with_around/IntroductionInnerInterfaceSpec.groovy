@@ -3,7 +3,7 @@ package io.micronaut.aop.introduction.with_around
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 
 class IntroductionInnerInterfaceSpec extends AbstractBeanDefinitionSpec {
@@ -16,7 +16,7 @@ package test;
 import io.micronaut.aop.introduction.*;
 import io.micronaut.aop.*;
 import io.micronaut.context.annotation.*;
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 import java.lang.annotation.Retention;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
@@ -26,7 +26,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Introduction(interfaces = ObservableUI.Inner.class)
 @Retention(RUNTIME)
 @interface ObservableUI {
-    public interface Inner {   
+    public interface Inner {
         String hello();
     }
 }
@@ -43,7 +43,7 @@ class MyBean {
 
         when:
         def context = ApplicationContext.run()
-        def instance = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         then:
         instance.hello() == "World"

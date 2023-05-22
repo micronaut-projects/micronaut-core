@@ -33,8 +33,4 @@ public interface InjectionPoint<T> extends AnnotationMetadataProvider {
      */
     @NonNull BeanDefinition<T> getDeclaringBean();
 
-    /**
-     * @return Whether reflection is required to satisfy the injection point
-     */
-    boolean requiresReflection();
 }

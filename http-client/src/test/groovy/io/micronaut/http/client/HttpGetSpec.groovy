@@ -15,13 +15,17 @@
  */
 package io.micronaut.http.client
 
-import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.core.convert.format.Format
 import io.micronaut.core.type.Argument
-import io.micronaut.http.*
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.MediaType
+import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
@@ -40,7 +44,7 @@ import spock.lang.Issue
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
-import javax.annotation.Nullable
+import jakarta.annotation.Nullable
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -52,6 +56,7 @@ import java.util.function.Consumer
  */
 @MicronautTest
 @Property(name = 'spec.name', value = 'HttpGetSpec')
+@Property(name = 'micronaut.http.client.read-timeout', value = '30s')
 class HttpGetSpec extends Specification {
 
     @Inject
@@ -239,7 +244,7 @@ class HttpGetSpec extends Specification {
     void "test simple get request with POJO list"() {
         when:
         Flux<HttpResponse<List<Book>>> flowable = Flux.from(client.exchange(
-                HttpRequest.GET("/get/pojoList"), Argument.of(List, Book)
+                HttpRequest.GET("/get/pojoList"), Argument.listOf(Book)
         ))
 
         HttpResponse<List<Book>> response = flowable.blockFirst()
@@ -306,7 +311,7 @@ class HttpGetSpec extends Specification {
         String body = res.getBody(String).orElse(null)
 
         then:
-        body == null
+        body == "success"
     }
 
     void "test that Optional.empty() should return 404"() {

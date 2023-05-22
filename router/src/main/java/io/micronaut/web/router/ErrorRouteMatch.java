@@ -19,13 +19,11 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * Represents a match for an error.
@@ -42,15 +40,15 @@ class ErrorRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
     private final Map<String, Object> variables;
 
     /**
-     * @param error The throwable
-     * @param abstractRoute The abstract route
+     * @param error             The throwable
+     * @param routeInfo         The route info
      * @param conversionService The conversion service
      */
-    ErrorRouteMatch(Throwable error, DefaultRouteBuilder.AbstractRoute abstractRoute, ConversionService<?> conversionService) {
-        super(abstractRoute, conversionService);
+    ErrorRouteMatch(Throwable error, ErrorRouteInfo<T, R> routeInfo, ConversionService conversionService) {
+        super(routeInfo, conversionService);
         this.error = error;
         this.variables = new LinkedHashMap<>();
-        for (Argument argument : getArguments()) {
+        for (Argument<?> argument : getArguments()) {
             if (argument.getType().isInstance(error)) {
                 variables.put(argument.getName(), error);
             }
@@ -58,11 +56,15 @@ class ErrorRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
     }
 
     @Override
-    public Collection<Argument> getRequiredArguments() {
-        return Arrays
-            .stream(getArguments())
-            .filter(argument -> !argument.getType().isInstance(error))
-            .collect(Collectors.toList());
+    public Collection<Argument<?>> getRequiredArguments() {
+        Argument<?>[] arguments = getArguments();
+        List<Argument<?>> list = new ArrayList<>(arguments.length);
+        for (Argument<?> argument : arguments) {
+            if (!argument.getType().isInstance(error)) {
+                list.add(argument);
+            }
+        }
+        return list;
     }
 
     @Override
@@ -71,50 +73,7 @@ class ErrorRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
     }
 
     @Override
-    public boolean isErrorRoute() {
-        return true;
-    }
-
-    @Override
-    protected RouteMatch<R> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments) {
-        return new ErrorRouteMatch<T, R>(error, abstractRoute, conversionService) {
-            @Override
-            public Collection<Argument> getRequiredArguments() {
-                return requiredArguments;
-            }
-
-            @Override
-            public Map<String, Object> getVariableValues() {
-                return newVariables;
-            }
-        };
-    }
-
-    @Override
-    public RouteMatch<R> decorate(Function<RouteMatch<R>, R> executor) {
-        Map<String, Object> variables = getVariableValues();
-        Collection<Argument> arguments = getRequiredArguments();
-        RouteMatch thisRoute = this;
-        return new ErrorRouteMatch(error, abstractRoute, conversionService) {
-            @Override
-            public Collection<Argument> getRequiredArguments() {
-                return arguments;
-            }
-
-            @Override
-            public T execute(Map argumentValues) {
-                return (T) executor.apply(thisRoute);
-            }
-
-            @Override
-            public Map<String, Object> getVariableValues() {
-                return variables;
-            }
-        };
-    }
-
-    @Override
     public String toString() {
-        return abstractRoute.toString();
+        return routeInfo.toString();
     }
 }

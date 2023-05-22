@@ -19,6 +19,7 @@ import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.annotation.Prototype;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
@@ -36,7 +37,15 @@ import java.io.Closeable;
 @Prototype
 public class ClientWebSocketInterceptor implements MethodInterceptor<Object, Object> {
 
+    private final ConversionService conversionService;
     private WebSocketSession webSocketSession;
+
+    /**
+     * @param conversionService The conversion service
+     */
+    public ClientWebSocketInterceptor(ConversionService conversionService) {
+        this.conversionService = conversionService;
+    }
 
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
@@ -63,7 +72,7 @@ public class ClientWebSocketInterceptor implements MethodInterceptor<Object, Obj
                 MediaType mediaType = context.stringValue(Produces.class).map(MediaType::of).orElse(MediaType.APPLICATION_JSON_TYPE);
                 validateSession();
 
-                InterceptedMethod interceptedMethod = InterceptedMethod.of(context);
+                InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
                 Class<?> javaReturnType = context.getReturnType().getType();
                 if (interceptedMethod.resultType() == InterceptedMethod.ResultType.SYNCHRONOUS && javaReturnType != void.class) {
                     return context.proceed();
@@ -71,16 +80,17 @@ public class ClientWebSocketInterceptor implements MethodInterceptor<Object, Obj
                 try {
                     Object[] parameterValues = context.getParameterValues();
                     switch (parameterValues.length) {
-                        case 0:
-                            throw new IllegalArgumentException("At least 1 parameter is required to a send method");
-                        case 1:
+                        case 0 -> throw new IllegalArgumentException("At least 1 parameter is required to a send method");
+                        case 1 -> {
                             Object value = parameterValues[0];
                             if (value == null) {
                                 throw new IllegalArgumentException("Parameter cannot be null");
                             }
                             return send(interceptedMethod, value, mediaType);
-                        default:
+                        }
+                        default -> {
                             return send(interceptedMethod, context.getParameterValueMap(), mediaType);
+                        }
                     }
                 } catch (Exception e) {
                     return interceptedMethod.handleException(e);
@@ -92,15 +102,19 @@ public class ClientWebSocketInterceptor implements MethodInterceptor<Object, Obj
 
     private Object send(InterceptedMethod interceptedMethod, Object message, MediaType mediaType) {
         switch (interceptedMethod.resultType()) {
-            case COMPLETION_STAGE:
+            case COMPLETION_STAGE -> {
                 return interceptedMethod.handleResult(webSocketSession.sendAsync(message, mediaType));
-            case PUBLISHER:
+            }
+            case PUBLISHER -> {
                 return interceptedMethod.handleResult(webSocketSession.send(message, mediaType));
-            case SYNCHRONOUS:
+            }
+            case SYNCHRONOUS -> {
                 webSocketSession.sendSync(message, mediaType);
                 return null;
-            default:
+            }
+            default -> {
                 return interceptedMethod.unsupported();
+            }
         }
     }
 

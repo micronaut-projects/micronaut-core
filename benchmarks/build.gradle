@@ -1,32 +1,42 @@
 plugins {
     id 'io.micronaut.build.internal.convention-base'
-    id "me.champeau.jmh" version "0.6.7"
+    id "me.champeau.jmh" version "0.6.8"
 }
 
 dependencies {
     annotationProcessor project(":inject-java")
     jmhAnnotationProcessor project(":inject-java")
     jmhAnnotationProcessor libs.bundles.asm
-    
-    annotationProcessor project(":validation")
-    compileOnly project(":validation")
+    jmhAnnotationProcessor libs.jmh.generator.annprocess
+
+    annotationProcessor platform(libs.test.boms.micronaut.validation)
+    annotationProcessor (libs.micronaut.validation.processor) {
+        exclude group: 'io.micronaut'
+    }
+
+    compileOnly platform(libs.test.boms.micronaut.validation)
+    compileOnly (libs.micronaut.validation) {
+        exclude group: 'io.micronaut'
+    }
+
     api project(":inject")
     api project(":inject-java-test")
-    api project(":validation")
     api project(":http-server")
+    api project(":http-server-netty")
+    api project(":jackson-databind")
     api project(":router")
     api project(":runtime")
 
-    jmh libs.jmh
-    jmh libs.jmh.generator.annprocess
+    api platform(libs.test.boms.micronaut.validation)
+    api (libs.micronaut.validation) {
+        exclude group: 'io.micronaut'
+    }
+
+    jmh libs.jmh.core
 }
 jmh {
     includes = ['io.micronaut.http.server.StartupBenchmark']
     duplicateClassesStrategy = DuplicatesStrategy.WARN
-    warmupIterations = 2
-    iterations = 3
-    fork = 1
-//    jvmArgs = ["-agentpath:/Applications/YourKit-Java-Profiler-2018.04.app/Contents/Resources/bin/mac/libyjpagent.jnilib"]
 }
 
 tasks.named("processJmhResources") {

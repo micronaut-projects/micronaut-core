@@ -33,7 +33,7 @@ import io.micronaut.core.annotation.Nullable;
  * @param <T> The argument type
  */
 @Internal
-class EnvironmentAwareArgument<T> extends DefaultArgument<T> implements EnvironmentConfigurable {
+final class EnvironmentAwareArgument<T> extends DefaultArgument<T> implements EnvironmentConfigurable {
 
     private final AnnotationMetadata annotationMetadata;
     private Environment environment;

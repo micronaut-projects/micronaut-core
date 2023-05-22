@@ -15,15 +15,45 @@
  */
 package io.micronaut.inject.annotation;
 
-import io.micronaut.context.annotation.*;
-import io.micronaut.core.annotation.*;
+import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.context.annotation.Aliases;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Configuration;
+import io.micronaut.context.annotation.ConfigurationBuilder;
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Context;
+import io.micronaut.context.annotation.EachBean;
+import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Executable;
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Parameter;
+import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.annotation.Property;
+import io.micronaut.context.annotation.PropertySource;
+import io.micronaut.context.annotation.Prototype;
+import io.micronaut.context.annotation.Provided;
+import io.micronaut.context.annotation.Replaces;
+import io.micronaut.context.annotation.Requirements;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.Secondary;
+import io.micronaut.context.annotation.Type;
+import io.micronaut.context.annotation.Value;
+import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationValueProvider;
+import io.micronaut.core.annotation.Indexed;
+import io.micronaut.core.annotation.Indexes;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.ReflectionConfig;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.StringUtils;
-
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Inject;
@@ -32,16 +62,19 @@ import jakarta.inject.Qualifier;
 import jakarta.inject.Scope;
 import jakarta.inject.Singleton;
 
-import javax.validation.constraints.NotNull;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.util.*;
+import java.util.AbstractMap;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Consumer;
-import java.util.function.Function;
 
 /**
  * Support method for {@link io.micronaut.core.annotation.AnnotationMetadata}.
@@ -52,8 +85,8 @@ import java.util.function.Function;
 @Internal
 public final class AnnotationMetadataSupport {
 
-    private static final Map<String, Map<String, Object>> ANNOTATION_DEFAULTS = new ConcurrentHashMap<>(20);
-    private static final Map<String, String> REPEATABLE_ANNOTATIONS = new ConcurrentHashMap<>(20);
+    private static final Map<String, Map<CharSequence, Object>> ANNOTATION_DEFAULTS = new ConcurrentHashMap<>(20);
+    private static final Map<String, String> REPEATABLE_ANNOTATIONS_CONTAINERS = new ConcurrentHashMap<>(20);
 
     private static final Map<Class<? extends Annotation>, Optional<Constructor<InvocationHandler>>> ANNOTATION_PROXY_CACHE = new ConcurrentHashMap<>(20);
     private static final Map<String, Class<? extends Annotation>> ANNOTATION_TYPES = new ConcurrentHashMap<>(20);
@@ -94,9 +127,12 @@ public final class AnnotationMetadataSupport {
                 ANNOTATION_TYPES.put(ann.getName(), ann)
         );
 
+
         for (Map.Entry<Class<? extends Annotation>, Class<? extends Annotation>> e : getCoreRepeatableAnnotations()) {
-            REPEATABLE_ANNOTATIONS.put(e.getKey().getName(), e.getValue().getName());
+            REPEATABLE_ANNOTATIONS_CONTAINERS.put(e.getKey().getName(), e.getValue().getName());
         }
+
+        REPEATABLE_ANNOTATIONS_CONTAINERS.put("io.micronaut.aop.InterceptorBinding", "io.micronaut.aop.InterceptorBindingDefinitions");
     }
 
     /**
@@ -108,7 +144,8 @@ public final class AnnotationMetadataSupport {
                 new AbstractMap.SimpleEntry<>(Indexed.class, Indexes.class),
                 new AbstractMap.SimpleEntry<>(Requires.class, Requirements.class),
                 new AbstractMap.SimpleEntry<>(AliasFor.class, Aliases.class),
-                new AbstractMap.SimpleEntry<>(Property.class, PropertySource.class)
+                new AbstractMap.SimpleEntry<>(Property.class, PropertySource.class),
+                new AbstractMap.SimpleEntry<>(ReflectionConfig.class, ReflectionConfig.ReflectionConfigList.class)
         );
     }
 
@@ -117,8 +154,18 @@ public final class AnnotationMetadataSupport {
      * @return The default values for the annotation
      */
     @UsedByGeneratedCode
-    public static Map<String, Object> getDefaultValues(String annotation) {
+    @NonNull
+    public static Map<CharSequence, Object> getDefaultValues(String annotation) {
         return ANNOTATION_DEFAULTS.getOrDefault(annotation, Collections.emptyMap());
+    }
+
+    /**
+     * @param annotation The annotation
+     * @return The default values for the annotation
+     */
+    @Nullable
+    public static Map<CharSequence, Object> getDefaultValuesOrNull(String annotation) {
+        return ANNOTATION_DEFAULTS.get(annotation);
     }
 
     /**
@@ -127,7 +174,7 @@ public final class AnnotationMetadataSupport {
      */
     @Internal
     public static String getRepeatableAnnotation(String annotation) {
-        return REPEATABLE_ANNOTATIONS.get(annotation);
+        return REPEATABLE_ANNOTATIONS_CONTAINERS.get(annotation);
     }
 
     /**
@@ -153,15 +200,13 @@ public final class AnnotationMetadataSupport {
             return Optional.of(type);
         } else {
             // last resort, try dynamic load, shouldn't normally happen.
-            final Optional<Class> aClass = ClassUtils.forName(name, classLoader);
-            return aClass.flatMap((Function<Class, Optional<Class<? extends Annotation>>>) aClass1 -> {
-                if (Annotation.class.isAssignableFrom(aClass1)) {
-                    //noinspection unchecked
-                    ANNOTATION_TYPES.put(name, aClass1);
-                    return Optional.of(aClass1);
-                }
-                return Optional.empty();
-            });
+            @SuppressWarnings("unchecked") final Class<? extends Annotation> aClass =
+                (Class<? extends Annotation>) ClassUtils.forName(name, classLoader).orElse(null);
+            if (aClass != null && Annotation.class.isAssignableFrom(aClass)) {
+                ANNOTATION_TYPES.put(name, aClass);
+                return Optional.of(aClass);
+            }
+            return Optional.empty();
         }
     }
 
@@ -184,7 +229,7 @@ public final class AnnotationMetadataSupport {
      * @return The default values for the annotation
      */
     @SuppressWarnings("unchecked")
-    static Map<String, Object> getDefaultValues(Class<? extends Annotation> annotation) {
+    static Map<CharSequence, Object> getDefaultValues(Class<? extends Annotation> annotation) {
         return getDefaultValues(annotation.getName());
     }
 
@@ -204,7 +249,7 @@ public final class AnnotationMetadataSupport {
      * @param annotation    The annotation
      * @param defaultValues The default values
      */
-    static void registerDefaultValues(String annotation, Map<String, Object> defaultValues) {
+    static void registerDefaultValues(String annotation, Map<CharSequence, Object> defaultValues) {
         if (StringUtils.isNotEmpty(annotation)) {
             ANNOTATION_DEFAULTS.put(annotation, defaultValues);
         }
@@ -216,7 +261,7 @@ public final class AnnotationMetadataSupport {
      * @param annotation    The annotation
      * @param defaultValues The default values
      */
-    static void registerDefaultValues(AnnotationClassValue<?> annotation, Map<String, Object> defaultValues) {
+    static void registerDefaultValues(AnnotationClassValue<?> annotation, Map<CharSequence, Object> defaultValues) {
         if (defaultValues != null) {
             registerDefaultValues(annotation.getName(), defaultValues);
         }
@@ -232,34 +277,35 @@ public final class AnnotationMetadataSupport {
     static void registerAnnotationType(AnnotationClassValue<?> annotationClassValue) {
         final String name = annotationClassValue.getName();
         if (!ANNOTATION_TYPES.containsKey(name)) {
-            annotationClassValue.getType().ifPresent((Consumer<Class<?>>) aClass -> {
-                if (Annotation.class.isAssignableFrom(aClass)) {
-                    ANNOTATION_TYPES.put(name, (Class<? extends Annotation>) aClass);
-                }
-            });
+            Class<?> aClass = annotationClassValue.getType().orElse(null);
+            if (aClass != null && Annotation.class.isAssignableFrom(aClass)) {
+                ANNOTATION_TYPES.put(name, (Class<? extends Annotation>) aClass);
+            }
         }
     }
 
     /**
-     * Registers repeatable annotations.
+     * Registers repeatable annotation containers.
+     * @MyRepeatable -> @MyRepeatableContainer
      *
      * @param repeatableAnnotations the repeatable annotations
      */
     @Internal
     static void registerRepeatableAnnotations(Map<String, String> repeatableAnnotations) {
-        REPEATABLE_ANNOTATIONS.putAll(repeatableAnnotations);
+        REPEATABLE_ANNOTATIONS_CONTAINERS.putAll(repeatableAnnotations);
     }
 
     /**
-     * Remove Core repeatable annotations.
+     * Registers repeatable annotation containers.
      *
-     * @param repeatableAnnotations the repeatable annotations
+     * @param repeatable          the repeatable annotations
+     * @param repeatableContainer the repeatable annotation container
+     * @MyRepeatable -> @MyRepeatableContainer
+     * @since 4.0.0
      */
     @Internal
-    static void removeCoreRepeatableAnnotations(@NotNull Map<String, String> repeatableAnnotations) {
-        for (Map.Entry<Class<? extends Annotation>, Class<? extends Annotation>> e : getCoreRepeatableAnnotations()) {
-            repeatableAnnotations.remove(e.getKey().getName());
-        }
+    static void registerRepeatableAnnotation(@NonNull String repeatable, @NonNull String repeatableContainer) {
+        REPEATABLE_ANNOTATIONS_CONTAINERS.put(repeatable, repeatableContainer);
     }
 
     /**
@@ -275,15 +321,18 @@ public final class AnnotationMetadataSupport {
     }
 
     /**
+     * Builds the annotation based on the annotation value.
+     *
      * @param annotationClass The annotation class
      * @param annotationValue The annotation value
      * @param <T>             The type
      * @return The annotation
      */
-    static <T extends Annotation> T buildAnnotation(Class<T> annotationClass, @Nullable AnnotationValue<T> annotationValue) {
+    @Internal
+    public static <T extends Annotation> T buildAnnotation(Class<T> annotationClass, @Nullable AnnotationValue<T> annotationValue) {
         Optional<Constructor<InvocationHandler>> proxyClass = getProxyClass(annotationClass);
         if (proxyClass.isPresent()) {
-            Map<String, Object> values = new HashMap<>(getDefaultValues(annotationClass));
+            Map<CharSequence, Object> values = new HashMap<>(getDefaultValues(annotationClass));
             if (annotationValue != null) {
                 final Map<CharSequence, Object> annotationValues = annotationValue.getValues();
                 annotationValues.forEach((key, o) -> values.put(key.toString(), o));

@@ -1,4 +1,4 @@
-Like Spring and Grails, Micronaut features a api:scheduling.annotation.Scheduled[] annotation for scheduling background tasks.
+Like Spring and Grails, the Micronaut framework features a api:scheduling.annotation.Scheduled[] annotation for scheduling background tasks.
 
 == Using the @Scheduled Annotation
 
@@ -55,11 +55,10 @@ The above example allows the task execution frequency to be configured with the 
 
 Tasks executed by `@Scheduled` are run by default on a jdk:java.util.concurrent.ScheduledExecutorService[] configured to have twice the number of threads as available processors.
 
-You can configure this thread pool using `application.yml`, for example:
+You can configure this thread pool in your configuration file (e.g `application.yml`):
 
 //TODO: Move YAML snippet to ExecutorServiceConfigSpec
-.Configuring Scheduled Task Thread Pool
-[source,yaml]
+[configuration,title="Configuring Scheduled Task Thread Pool"]
 ----
 micronaut:
   executors:
@@ -72,6 +71,6 @@ include::{includedir}configurationProperties/io.micronaut.scheduling.executor.Us
 
 == Handling Exceptions
 
-By default, Micronaut includes a api:io.micronaut.scheduling.DefaultTaskExceptionHandler[] bean that implements the api:io.micronaut.scheduling.TaskExceptionHandler[] interface and simply logs the exception if an error occurs invoking a scheduled task.
+By default, the Micronaut framework includes a api:io.micronaut.scheduling.DefaultTaskExceptionHandler[] bean that implements the api:io.micronaut.scheduling.TaskExceptionHandler[] interface and simply logs the exception if an error occurs invoking a scheduled task.
 
 If you have custom requirements you can replace this bean with your own implementation (for example to send an email or shutdown the context to fail fast). To do so, write your own api:io.micronaut.scheduling.TaskExceptionHandler[] and annotate it with `@Replaces(DefaultTaskExceptionHandler.class)`.

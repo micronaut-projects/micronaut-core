@@ -2,12 +2,18 @@ plugins {
     id "io.micronaut.build.internal.convention-library"
 }
 
+repositories {
+    mavenCentral()
+}
+
 dependencies {
-    api project(":websocket")
-    api project(":runtime")
+    api project(":http")
     api project(":router")
-    compileOnly libs.kotlinx.coroutines.core
-    compileOnly libs.kotlinx.coroutines.reactor
+
+    compileOnly project(":websocket")
+    compileOnly project(":jackson-databind")
+    compileOnly libs.managed.kotlinx.coroutines.core
+    compileOnly libs.managed.kotlinx.coroutines.reactor
     compileOnly(libs.micronaut.runtime.groovy)
     implementation libs.managed.reactor
     annotationProcessor project(":inject-java")

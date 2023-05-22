@@ -15,8 +15,8 @@
  */
 package io.micronaut.http.filter;
 
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -30,10 +30,9 @@ import java.util.Set;
  *
  * @author graemerocher
  * @since 2.0
- * @param <T> The filter type
  */
-final class DefaultFilterEntry<T extends HttpFilter> implements HttpFilterResolver.FilterEntry<T> {
-    private final T httpFilter;
+final class DefaultFilterEntry implements HttpFilterResolver.FilterEntry {
+    private final GenericHttpFilter httpFilter;
     private final AnnotationMetadata annotationMetadata;
     private final Set<HttpMethod> filterMethods;
     private final String[] patterns;
@@ -50,7 +49,7 @@ final class DefaultFilterEntry<T extends HttpFilter> implements HttpFilterResolv
      * @param patterns THe patterns
      */
     DefaultFilterEntry(
-            T filter,
+            GenericHttpFilter filter,
             AnnotationMetadata annotationMetadata,
             Set<HttpMethod> httpMethods,
             FilterPatternStyle patternStyle,
@@ -71,7 +70,7 @@ final class DefaultFilterEntry<T extends HttpFilter> implements HttpFilterResolv
     }
 
     @Override
-    public T getFilter() {
+    public GenericHttpFilter getFilter() {
         return httpFilter;
     }
 

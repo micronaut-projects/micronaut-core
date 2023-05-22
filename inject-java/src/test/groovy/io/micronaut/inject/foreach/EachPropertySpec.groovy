@@ -17,9 +17,13 @@ package io.micronaut.inject.foreach
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.context.Qualifier
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.env.PropertySource
+import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.context.exceptions.NonUniqueBeanException
+import io.micronaut.inject.foreach.nested.A
+import io.micronaut.inject.foreach.nested.C
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 /**
@@ -27,6 +31,54 @@ import spock.lang.Specification
  * @since 1.0
  */
 class EachPropertySpec extends Specification {
+
+    void "test error when configuration is missing for EachProperty"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+
+        when:
+        context.getBean(MyConfiguration)
+
+        then:
+        def error = thrown(NoSuchBeanException)
+        error.message == 'No bean of type [io.micronaut.inject.foreach.MyConfiguration] exists. No configuration entries found under the prefix: [foo.bar.*]. Provide the necessary configuration to resolve this issue.'
+
+        when:
+        context.getBean(MyConfiguration, Qualifiers.byName("baz"))
+
+        then:
+        error = thrown(NoSuchBeanException)
+        error.message == 'No bean of type [io.micronaut.inject.foreach.MyConfiguration] exists for the given qualifier: @Named(\'baz\'). No configuration entries found under the prefix: [foo.bar.baz]. Provide the necessary configuration to resolve this issue.'
+
+        cleanup:
+        context.close()
+    }
+
+    void "test error when configuration is missing for EachBean"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+
+        when:
+        context.getBean(MyBean)
+
+        then:
+        def error = thrown(NoSuchBeanException)
+        error.message.startsWith("No bean of type [io.micronaut.inject.foreach.MyBean] exists.")
+        error.message.contains("* [MyBean] requires the presence of a bean of type [io.micronaut.inject.foreach.MyConfiguration] which does not exist.")
+        error.message.endsWith("* [MyConfiguration] requires the presence of configuration. No configuration entries found under the prefix: [foo.bar.*]. Provide the necessary configuration to resolve this issue.")
+
+        when:
+        context.getBean(C.class, Qualifiers.byName("test"))
+
+        then:
+        error = thrown(NoSuchBeanException)
+        error.message.contains('* [C] requires the presence of a bean of type [io.micronaut.inject.foreach.nested.B] with qualifier [@Named(\'test\')] which does not exist.')
+        error.message.contains("* [B] requires the presence of a bean of type [io.micronaut.inject.foreach.nested.A] with qualifier [@Named('test')] which does not exist.")
+        error.message.endsWith('* [A] requires the presence of configuration. No configuration entries found under the prefix: [foo.test]. Provide the necessary configuration to resolve this issue.')
+
+        cleanup:
+        context.close()
+    }
 
     void "test configuration properties binding"() {
         given:
@@ -283,6 +335,13 @@ class EachPropertySpec extends Specification {
         bean2.configuration.primitiveDefaultValue == 9999
         bean2.configuration.inner.enabled == 'false'
 
+
+        when:
+        def map = applicationContext.mapOfType(MyBeanWithPrimary)
+
+        then:
+        map['one'].is(bean)
+        map['two'].is(bean2)
 
         cleanup:
         applicationContext.close()

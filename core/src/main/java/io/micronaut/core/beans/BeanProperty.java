@@ -27,7 +27,6 @@ import io.micronaut.core.util.ArgumentUtils;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import javax.annotation.concurrent.Immutable;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Optional;
@@ -45,7 +44,7 @@ import java.util.Optional;
  * @since 1.1
  * @see BeanIntrospection
  */
-@Immutable
+//@Immutable
 public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadataDelegate, ArgumentCoercible<T> {
 
     /**

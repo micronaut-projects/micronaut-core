@@ -1,38 +1,47 @@
 name: Corretto CI
 on:
-  push:
-    branches:
-      - master
+  schedule:
+    - cron: "0 1 * * 1-5" # Mon-Fri at 1am UTC
+  workflow_dispatch:
 jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        java: ['8', '11', '17']
-    container: amazoncorretto:${{ matrix.java }}
+        java: ['17']
     steps:
-    - name: Display Java and Linux version
-      run: java -version && cat /etc/system-release
-    - name: Install tar && gzip
-      run: yum install -y tar gzip
-    - uses: actions/checkout@v3
-    - uses: actions/cache@v3.0.2
-      with:
-        path: ~/.gradle/caches
-        key: ${{ runner.os }}-micronaut-core-gradle-${{ hashFiles('**/*.gradle') }}
-        restore-keys: |
-          ${{ runner.os }}-micronaut-core-gradle-
-    - uses: actions/cache@v3.0.2
-      with:
-        path: ~/.gradle/wrapper
-        key: ${{ runner.os }}-micronaut-core-wrapper-${{ hashFiles('**/*.gradle') }}
-        restore-keys: |
-          ${{ runner.os }}-micronaut-core-wrapper-
-    - name: Build with Gradle
-      env:
-        GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
-        GH_USERNAME: ${{ secrets.GH_USERNAME }}
-        GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
-        GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
-        GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
-      run: unset HOSTNAME ; LANG=en_US.utf-8 LC_ALL=en_US.utf-8 ./gradlew check --no-daemon --parallel --continue
+      # https://github.com/actions/virtual-environments/issues/709
+      - name: Free disk space
+        run: |
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          sudo apt-get clean
+          df -h
+      - uses: actions/checkout@v3
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'corretto'
+          java-version: ${{ matrix.java }}
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2.4.2
+      - name: Optional setup step
+        env:
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
+          GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
+          GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
+        run: |
+          [ -f ./setup.sh ] && ./setup.sh || true
+      - name: Build with Gradle
+        id: gradle
+        run: |
+          ./gradlew check --no-daemon --parallel --continue
+        env:
+          GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
+          GH_USERNAME: ${{ secrets.GH_USERNAME }}
+          MICRONAUT_TEST_USE_VENDOR: true
+          TESTCONTAINERS_RYUK_DISABLED: true
+          GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
+          GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
+          GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
+          PREDICTIVE_TEST_SELECTION: "${{ github.event_name == 'pull_request' && 'true' || 'false' }}"

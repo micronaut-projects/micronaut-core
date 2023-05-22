@@ -16,6 +16,7 @@
 package io.micronaut.ast.groovy.utils
 
 import groovy.transform.CompileStatic
+import io.micronaut.core.annotation.Nullable
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.control.Janitor
 import org.codehaus.groovy.control.SourceUnit
@@ -39,8 +40,8 @@ class AstMessageUtils {
      * @param node The AST node
      * @param message The message
      */
-    static void warning(final SourceUnit sourceUnit, final ASTNode node, final String message) {
-        final String sample = sourceUnit.getSample(node.getLineNumber(), node.getColumnNumber(), new Janitor())
+    static void warning(SourceUnit sourceUnit, @Nullable ASTNode node, String message) {
+        final String sample = node ? sourceUnit.getSample(node.getLineNumber(), node.getColumnNumber(), new Janitor()) : null
         if (sample) {
             System.err.println("""WARNING: $message
 
@@ -50,7 +51,7 @@ $sample""")
         }
     }
 
-    static void error(SourceUnit sourceUnit, ASTNode expr, String errorMessage) {
+    static void error(SourceUnit sourceUnit, @Nullable ASTNode expr, String errorMessage) {
         if (expr == null) {
             error(sourceUnit, errorMessage)
         } else {

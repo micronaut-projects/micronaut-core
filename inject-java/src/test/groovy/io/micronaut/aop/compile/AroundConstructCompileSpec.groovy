@@ -56,23 +56,23 @@ class MyBean {
 @TestAnn(num=1)
 class TestInterceptor implements ConstructorInterceptor<Object> {
     public boolean invoked = false;
-    @Override 
+    @Override
     public Object intercept(ConstructorInvocationContext<Object> context) {
         invoked = true;
         return context.proceed();
     }
-} 
+}
 
 @Singleton
 @TestAnn(num=2)
 class TestInterceptor2 implements ConstructorInterceptor<Object> {
     public boolean invoked = false;
-    @Override 
+    @Override
     public Object intercept(ConstructorInvocationContext<Object> context) {
         invoked = true;
         return context.proceed();
     }
-} 
+}
 
 ''')
 
@@ -97,7 +97,7 @@ class TestInterceptor2 implements ConstructorInterceptor<Object> {
     void 'test around construct on type and constructor with proxy target + bind members'() {
         given:
         ApplicationContext context = buildContext("""
-package ctorbinding; 
+package ctorbinding;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
@@ -175,7 +175,7 @@ class Interceptor2 implements ConstructorInterceptor<Object> {
     void 'test around construct on type and constructor with proxy target'() {
         given:
         ApplicationContext context = buildContext("""
-package ctorbinding; 
+package ctorbinding;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
@@ -253,7 +253,7 @@ class Interceptor2 implements ConstructorInterceptor<Object> {
     void 'test around construct on type and constructor'() {
         given:
         ApplicationContext context = buildContext("""
-package ctorbinding; 
+package ctorbinding;
 
 import java.lang.annotation.*;
 import io.micronaut.aop.*;
@@ -369,21 +369,21 @@ class MyOtherBean {}
 class TestConstructInterceptor implements ConstructorInterceptor<Object> {
     boolean invoked = false;
     Object[] parameters;
-    
+
     @Override
     public Object intercept(ConstructorInvocationContext<Object> context) {
         invoked = true;
         parameters = context.getParameterValues();
         return context.proceed();
     }
-} 
+}
 
 @Singleton
 @InterceptorBean(TestAnn.class)
 class TypeSpecificConstructInterceptor implements ConstructorInterceptor<MyBean> {
     boolean invoked = false;
     Object[] parameters;
-    
+
     @Override
     public MyBean intercept(ConstructorInvocationContext<MyBean> context) {
         invoked = true;
@@ -391,7 +391,7 @@ class TypeSpecificConstructInterceptor implements ConstructorInterceptor<MyBean>
         MyBean mb = context.proceed();
         return mb;
     }
-} 
+}
 
 @Singleton
 @InterceptorBinding(TestAnn.class)
@@ -402,7 +402,7 @@ class TestInterceptor implements MethodInterceptor {
         invoked = true;
         return context.proceed();
     }
-} 
+}
 
 @Singleton
 class AnotherInterceptor implements Interceptor {
@@ -412,7 +412,7 @@ class AnotherInterceptor implements Interceptor {
         invoked = true;
         return context.proceed();
     }
-} 
+}
 """)
         when:
         def interceptor = getBean(context, 'annbinding1.TestInterceptor')
@@ -513,14 +513,14 @@ class MyOtherBean {}
 class TestConstructInterceptor implements ConstructorInterceptor<Object> {
     boolean invoked = false;
     Object[] parameters;
-    
+
     @Override
     public Object intercept(ConstructorInvocationContext<Object> context) {
         invoked = true;
         parameters = context.getParameterValues();
         return context.proceed();
     }
-} 
+}
 
 @Singleton
 @InterceptorBinding(TestAnn.class)
@@ -531,7 +531,7 @@ class TestInterceptor implements MethodInterceptor {
         invoked = true;
         return context.proceed();
     }
-} 
+}
 
 @Singleton
 class AnotherInterceptor implements Interceptor {
@@ -541,7 +541,7 @@ class AnotherInterceptor implements Interceptor {
         invoked = true;
         return context.proceed();
     }
-} 
+}
 """)
         when:
         def interceptor = getBean(context, 'annbinding1.TestInterceptor')
@@ -610,7 +610,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 class MyBean {
     @TestAnn
     MyBean(io.micronaut.context.env.Environment env) {}
-    
+
     void test() {
     }
 }
@@ -627,14 +627,14 @@ class MyBean {
 class TestConstructInterceptor implements ConstructorInterceptor<Object> {
     boolean invoked = false;
     Object[] parameters;
-    
+
     @Override
     public Object intercept(ConstructorInvocationContext<Object> context) {
         invoked = true;
         parameters = context.getParameterValues();
         return context.proceed();
     }
-} 
+}
 
 """)
         when:
@@ -676,28 +676,16 @@ class MyBean {
     }
 }
 
-@io.micronaut.context.annotation.Factory
-class MyFactory {
-    @TestAnn
-    @Singleton
-    MyOtherBean test(io.micronaut.context.env.Environment env) {
-        return new MyOtherBean();
-    }
-}
-
-class MyOtherBean {}
-
 @Retention(RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE})
 @AroundConstruct
 @interface TestAnn {
 }
 
-
 @Factory
 class InterceptorFactory {
     boolean aroundConstructInvoked = false;
-    
+
     @InterceptorBean(TestAnn.class)
     ConstructorInterceptor<Object> aroundIntercept() {
         return (context) -> {
@@ -705,7 +693,7 @@ class InterceptorFactory {
             return context.proceed();
         };
     }
-    
+
 }
 
 """)
@@ -722,10 +710,8 @@ class InterceptorFactory {
         !(instance instanceof Intercepted)
         factory.aroundConstructInvoked
 
-
         cleanup:
         context.close()
-
     }
 
     void 'test around construct with introduction advice'() {
@@ -758,14 +744,14 @@ abstract class MyBean {
 class TestConstructInterceptor implements ConstructorInterceptor<Object> {
     boolean invoked = false;
     Object[] parameters;
-    
+
     @Override
     public Object intercept(ConstructorInvocationContext<Object> context) {
         invoked = true;
         parameters = context.getParameterValues();
         return context.proceed();
     }
-} 
+}
 
 @Singleton
 @InterceptorBinding(TestAnn.class)
@@ -776,7 +762,7 @@ class TestInterceptor implements MethodInterceptor {
         invoked = true;
         return "good";
     }
-} 
+}
 
 @Singleton
 class AnotherInterceptor implements Interceptor {
@@ -786,7 +772,7 @@ class AnotherInterceptor implements Interceptor {
         invoked = true;
         return context.proceed();
     }
-} 
+}
 """)
         when:
         def interceptor = getBean(context, 'annbinding1.TestInterceptor')

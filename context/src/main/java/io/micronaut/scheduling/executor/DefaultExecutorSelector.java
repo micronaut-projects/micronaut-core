@@ -47,20 +47,26 @@ public class DefaultExecutorSelector implements ExecutorSelector {
     private static final String EXECUTE_ON = ExecuteOn.class.getName();
     private final BeanLocator beanLocator;
     private final Supplier<ExecutorService> ioExecutor;
+    private final Supplier<ExecutorService> blockingExecutor;
 
     /**
      * Default constructor.
      * @param beanLocator The bean locator
      * @param ioExecutor The IO executor
+     * @param blockingExecutor The blocking executor
      */
     @Inject
-    protected DefaultExecutorSelector(BeanLocator beanLocator, @jakarta.inject.Named(TaskExecutors.IO) BeanProvider<ExecutorService> ioExecutor) {
+    protected DefaultExecutorSelector(
+        BeanLocator beanLocator,
+        @jakarta.inject.Named(TaskExecutors.IO) BeanProvider<ExecutorService> ioExecutor,
+        @jakarta.inject.Named(TaskExecutors.BLOCKING) BeanProvider<ExecutorService> blockingExecutor) {
         this.beanLocator = beanLocator;
         this.ioExecutor = SupplierUtil.memoized(ioExecutor::get);
+        this.blockingExecutor = SupplierUtil.memoized(blockingExecutor::get);
     }
 
     @Override
-    public Optional<ExecutorService> select(MethodReference method, ThreadSelection threadSelection) {
+    public Optional<ExecutorService> select(MethodReference<?, ?> method, ThreadSelection threadSelection) {
         final String name = method.stringValue(EXECUTE_ON).orElse(null);
         if (name != null) {
             final ExecutorService executorService;
@@ -77,7 +83,7 @@ public class DefaultExecutorSelector implements ExecutorSelector {
             if (method.hasStereotype(NonBlocking.class)) {
                 return Optional.empty();
             } else if (method.hasStereotype(Blocking.class)) {
-                return Optional.of(ioExecutor.get());
+                return Optional.of(blockingExecutor.get());
             } else {
                 TypeInformation<?> returnType = method.getReturnType();
                 if (returnType.isWrapperType()) {
@@ -89,11 +95,13 @@ public class DefaultExecutorSelector implements ExecutorSelector {
                 if (returnType.isAsyncOrReactive()) {
                     return Optional.empty();
                 } else {
-                    return Optional.of(ioExecutor.get());
+                    return Optional.of(blockingExecutor.get());
                 }
             }
         } else if (threadSelection == ThreadSelection.IO) {
             return Optional.of(ioExecutor.get());
+        } else if (threadSelection == ThreadSelection.BLOCKING) {
+            return Optional.of(blockingExecutor.get());
         }
         return Optional.empty();
     }

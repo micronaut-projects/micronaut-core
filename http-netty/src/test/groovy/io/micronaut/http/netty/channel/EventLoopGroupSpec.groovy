@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.inject.qualifiers.Qualifiers
+import io.netty.buffer.PooledByteBufAllocator
 import io.netty.channel.EventLoopGroup
 import io.netty.util.NettyRuntime
 import io.netty.util.ResourceLeakDetector
@@ -12,6 +13,19 @@ import spock.lang.Specification
 import java.time.Duration
 
 class EventLoopGroupSpec extends Specification {
+
+    void "test default allocator order"() {
+        given:
+        def context = ApplicationContext.run()
+
+        when:
+        context.getBean(EventLoopGroup)
+        then:
+        PooledByteBufAllocator.defaultMaxOrder() == 3
+
+        cleanup:
+        context.close()
+    }
 
     void "test default event loop group"() {
         given:
@@ -23,7 +37,7 @@ class EventLoopGroupSpec extends Specification {
         then:
         !eventLoopGroup.isTerminated()
         eventLoopGroup.executorCount() == NettyRuntime.availableProcessors() * 2
-        ResourceLeakDetector.level == ResourceLeakDetector.Level.SIMPLE
+        ResourceLeakDetector.level == ResourceLeakDetector.Level.DISABLED
 
         when:
         context.close()

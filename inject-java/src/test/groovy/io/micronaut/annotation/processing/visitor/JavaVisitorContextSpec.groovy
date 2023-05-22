@@ -56,6 +56,30 @@ enum Foo {}
         lookedUp[0].name == 'example.Foo'
     }
 
+    def 'return inner class from getClassElements'() {
+        given:
+        ClassElement[] lookedUp
+        def typeVisitor = new TypeElementVisitor<Object, Object>() {
+            @Override
+            void visitClass(ClassElement element, VisitorContext context) {
+                lookedUp = context.getClassElements(element.packageName, '*')
+            }
+        }
+        localTypeElementVisitors = [typeVisitor]
+
+        buildClassLoader('example.Foo', '''
+package example;
+class Foo {
+  class Bar {}
+}
+''')
+
+        expect:
+        lookedUp.size() == 2
+        lookedUp[0].name == 'example.Foo'
+        lookedUp[1].name == 'example.Foo$Bar'
+    }
+
     @Override
     protected Collection<TypeElementVisitor> getLocalTypeElementVisitors() {
         return localTypeElementVisitors

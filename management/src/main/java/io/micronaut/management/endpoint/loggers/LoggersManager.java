@@ -17,8 +17,8 @@ package io.micronaut.management.endpoint.loggers;
 
 import org.reactivestreams.Publisher;
 
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 
 /**
  * Used to retrieve and update logger information for the {@link LoggersEndpoint}.

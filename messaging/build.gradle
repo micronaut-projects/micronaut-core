@@ -2,10 +2,15 @@ plugins {
     id "io.micronaut.build.internal.convention-library"
 }
 
+micronautBuild {
+    core {
+        usesMicronautTestSpock()
+    }
+}
+
 dependencies {
     annotationProcessor project(":inject-java")
-    api project(":inject")
-    api project(":runtime")
+    api project(":context")
 
     testAnnotationProcessor project(":inject-java")
     testImplementation project(":inject")

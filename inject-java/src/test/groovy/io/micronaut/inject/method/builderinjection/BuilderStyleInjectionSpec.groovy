@@ -15,12 +15,10 @@
  */
 package io.micronaut.inject.method.builderinjection
 
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanDefinitionReference
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import spock.lang.Issue
 
 class BuilderStyleInjectionSpec extends AbstractTypeElementSpec {
@@ -37,7 +35,7 @@ import io.micronaut.context.annotation.*;
 @jakarta.inject.Singleton
 class Test {
     public java.net.URL url;
-    
+
     @jakarta.inject.Inject
     Test setURL( java.net.URL url) {
         this.url = url;
@@ -56,9 +54,7 @@ class Test {
         def context = new DefaultBeanContext()
         def url = new URL("http://localhost")
         context.registerSingleton(url)
-        def test = ((BeanFactory)definition).build(
-                context, definition
-        )
+        def test = ((InstantiatableBeanDefinition)definition).instantiate(context)
 
         then:
         test.url == url
@@ -79,23 +75,23 @@ class TestConfig {
 
     public java.net.URL url;
     private java.net.URL anotherUrl;
-    
+
     private String name;
-    
+
     public void setName(String name) {
         this.name = name;
-    }   
-    
+    }
+
     public String getName() {
         return this.name;
     }
-    
+
     @jakarta.inject.Inject
     TestConfig setURL( java.net.URL url) {
         this.url = url;
         return this;
     }
-    
+
     @jakarta.inject.Inject
     void setAnotherURL( java.net.URL url) {
         this.anotherUrl = url;
@@ -113,9 +109,7 @@ class TestConfig {
         def context = new DefaultBeanContext()
         def url = new URL("http://localhost")
         context.registerSingleton(url)
-        def test = ((BeanFactory)definition).build(
-                context, definition
-        )
+        def test = ((InstantiatableBeanDefinition)definition).instantiate(context)
 
         then:
         test.url == url

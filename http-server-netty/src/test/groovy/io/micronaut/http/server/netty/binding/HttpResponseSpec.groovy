@@ -24,17 +24,12 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
-import io.micronaut.http.client.DefaultHttpClientConfiguration
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import io.micronaut.runtime.Micronaut
 import io.micronaut.runtime.server.EmbeddedServer
 import reactor.core.publisher.Flux
 import spock.lang.Shared
 import spock.lang.Unroll
-
-import java.time.Duration
-import java.time.temporal.ChronoUnit
 
 /**
  * @author Graeme Rocher
@@ -71,19 +66,19 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
         where:
         action                | status                        | body                       | headers
-        "ok"                  | HttpStatus.OK                 | null                       | [connection: 'close']
-        "ok-with-body"        | HttpStatus.OK                 | "some text"                | ['content-length': '9', 'content-type': 'text/plain'] + [connection: 'close']
-        "error-with-body"     | HttpStatus.INTERNAL_SERVER_ERROR | "some text"             | ['content-length': '9', 'content-type': 'text/plain'] + [connection: 'close']
-        "ok-with-body-object" | HttpStatus.OK                 | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
-        "status"              | HttpStatus.MOVED_PERMANENTLY  | null                       | [connection: 'close']
-        "created-body"        | HttpStatus.CREATED            | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
-        "created-uri"         | HttpStatus.CREATED            | null                       | [connection: 'close', 'location': 'http://test.com']
-        "created-body-uri"    | HttpStatus.CREATED            | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close', 'location': 'http://test.com']
-        "accepted"            | HttpStatus.ACCEPTED           | null                       | [connection: 'close']
-        "accepted-uri"        | HttpStatus.ACCEPTED           | null                       | [connection: 'close', 'location': 'http://example.com']
-        "disallow"            | HttpStatus.METHOD_NOT_ALLOWED | null                       | [connection: "close", 'allow': 'DELETE']
-        "optional-response/false" | HttpStatus.OK             | null                       | [connection: 'close']
-        "optional-response/true"  | HttpStatus.NOT_FOUND      | null                       | ['content-type': 'application/json', 'content-length': '162', connection: 'close']
+        "ok"                  | HttpStatus.OK                 | null                       | ['content-length': '0']
+        "ok-with-body"        | HttpStatus.OK                 | "some text"                | ['content-length': '9', 'content-type': 'text/plain']
+        "error-with-body"     | HttpStatus.INTERNAL_SERVER_ERROR | "some text"             | ['content-length': '9', 'content-type': 'text/plain']
+        "ok-with-body-object" | HttpStatus.OK                 | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json']
+        "status"              | HttpStatus.MOVED_PERMANENTLY  | null                       | ['content-length': '0']
+        "created-body"        | HttpStatus.CREATED            | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json']
+        "created-uri"         | HttpStatus.CREATED            | null                       | ['content-length': '0', 'location': 'http://test.com']
+        "created-body-uri"    | HttpStatus.CREATED            | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + ['location': 'http://test.com']
+        "accepted"            | HttpStatus.ACCEPTED           | null                       | ['content-length': '0']
+        "accepted-uri"        | HttpStatus.ACCEPTED           | null                       | ['content-length': '0', 'location': 'http://example.com']
+        "disallow"            | HttpStatus.METHOD_NOT_ALLOWED | null                       | ['content-length': '0', 'allow': 'DELETE']
+        "optional-response/false" | HttpStatus.OK             | null                       | ['content-length': '0']
+        "optional-response/true"  | HttpStatus.NOT_FOUND      | null                       | ['content-type': 'application/json', 'content-length': '162']
 
     }
 
@@ -104,7 +99,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         }
         def responseBody = response.body.orElse(null)
 
-        def defaultHeaders = [connection: 'close']
+        def defaultHeaders = [connection: 'keep-alive']
 
         then:
         response.code() == status.code
@@ -113,15 +108,15 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
         where:
         action                | status                       | body                       | headers
-        "ok"                  | HttpStatus.OK                | null                       | [connection: 'close']
-        "ok-with-body"        | HttpStatus.OK                | "some text"                | ['content-length': '9', 'content-type': 'text/plain'] + [connection: 'close']
-        "error-with-body"     | HttpStatus.INTERNAL_SERVER_ERROR | "some text"            | ['content-length': '9', 'content-type': 'text/plain'] + [connection: 'close']
-        "ok-with-body-object" | HttpStatus.OK                | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
-        "status"              | HttpStatus.MOVED_PERMANENTLY | null                       | [connection: 'close']
-        "created-body"        | HttpStatus.CREATED           | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
-        "created-uri"         | HttpStatus.CREATED           | null                       | [connection: 'close', 'location': 'http://test.com']
-        "accepted"            | HttpStatus.ACCEPTED          | null                       | [connection: 'close']
-        "accepted-uri"        | HttpStatus.ACCEPTED          | null                       | [connection: 'close', 'location': 'http://example.com']
+        "ok"                  | HttpStatus.OK                | null                       | ['content-length': '0']
+        "ok-with-body"        | HttpStatus.OK                | "some text"                | ['content-length': '9', 'content-type': 'text/plain']
+        "error-with-body"     | HttpStatus.INTERNAL_SERVER_ERROR | "some text"            | ['content-length': '9', 'content-type': 'text/plain']
+        "ok-with-body-object" | HttpStatus.OK                | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json']
+        "status"              | HttpStatus.MOVED_PERMANENTLY | null                       | ['content-length': '0']
+        "created-body"        | HttpStatus.CREATED           | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json']
+        "created-uri"         | HttpStatus.CREATED           | null                       | ['content-length': '0', 'location': 'http://test.com']
+        "accepted"            | HttpStatus.ACCEPTED          | null                       | ['content-length': '0']
+        "accepted-uri"        | HttpStatus.ACCEPTED          | null                       | ['content-length': '0', 'location': 'http://example.com']
     }
 
     void "test content encoding"() {
@@ -153,16 +148,15 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         HttpHeaders headers = response.headers
 
         then: // The content length header was replaced, not appended
-        !headers.names().contains("content-type")
-        !headers.names().contains("Content-Length")
-        headers.contains("content-length")
         response.header("Content-Type") == "text/plain"
         response.header("Content-Length") == "3"
+        response.header("content-type") == "text/plain"
+        response.header("content-length") == "3"
     }
 
     void "test server header"() {
         given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['micronaut.server.serverHeader': 'Foo!', (SPEC_NAME_PROPERTY):getClass().simpleName])
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['micronaut.server.server-header': 'Foo!', (SPEC_NAME_PROPERTY):getClass().simpleName])
         def ctx = server.getApplicationContext()
         HttpClient client = ctx.createBean(HttpClient, server.getURL())
 
@@ -216,7 +210,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
     void "test date header turned off"() {
         given:
-        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['micronaut.server.dateHeader': false, (SPEC_NAME_PROPERTY):getClass().simpleName])
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['micronaut.server.date-header': false, (SPEC_NAME_PROPERTY):getClass().simpleName])
         ApplicationContext ctx = server.getApplicationContext()
         HttpClient client = ctx.createBean(HttpClient, server.getURL())
 
@@ -232,11 +226,15 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         server.close()
     }
 
-    void "test keep alive connection header is not set by default for > 499 response"() {
+    void "test keep alive connection header is not set for 500 response"() {
         when:
-        EmbeddedServer server = applicationContext.run(EmbeddedServer, [(SPEC_NAME_PROPERTY):getClass().simpleName])
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+                'micronaut.server.netty.keepAliveOnServerError': false,
+                'micronaut.server.date-header': false,
+                (SPEC_NAME_PROPERTY):getClass().simpleName,
+        ])
         ApplicationContext ctx = server.getApplicationContext()
-        HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL())
+        HttpClient client = ctx.createBean(HttpClient, server.getURL())
 
         Flux.from(client.exchange(
           HttpRequest.GET('/test-header/fail')
@@ -253,17 +251,13 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         server.close()
     }
 
-    void "test connection header is defaulted to keep-alive when configured to true for > 499 response"() {
+    void "test connection header is defaulted to keep-alive by default for > 499 response"() {
         when:
-        DefaultHttpClientConfiguration config = new DefaultHttpClientConfiguration()
-        // The client will explicitly request "Connection: close" unless using a connection pool, so set it up
-        config.connectionPoolConfiguration.enabled = true
-        EmbeddedServer server = applicationContext.run(EmbeddedServer, [
-          (SPEC_NAME_PROPERTY):getClass().simpleName,
-          'micronaut.server.netty.keepAliveOnServerError':true
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [
+          (SPEC_NAME_PROPERTY):getClass().simpleName
         ])
         def ctx = server.getApplicationContext()
-        HttpClient client = applicationContext.createBean(HttpClient, embeddedServer.getURL(), config)
+        HttpClient client = ctx.createBean(HttpClient, server.getURL())
 
         Flux.from(client.exchange(
           HttpRequest.GET('/test-header/fail')
@@ -272,7 +266,8 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         then:
         HttpClientResponseException e = thrown()
         e.response.status == HttpStatus.INTERNAL_SERVER_ERROR
-        e.response.header(HttpHeaders.CONNECTION) == 'keep-alive'
+        // HTTP/1.1 is keep-alive by default
+        e.response.header(HttpHeaders.CONNECTION) == null
 
         cleanup:
         ctx.stop()
@@ -301,6 +296,6 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
     @Override
     Map<String, Object> getConfiguration() {
-        super.getConfiguration() << ['micronaut.server.dateHeader': false]
+        super.getConfiguration() << ['micronaut.server.date-header': false]
     }
 }

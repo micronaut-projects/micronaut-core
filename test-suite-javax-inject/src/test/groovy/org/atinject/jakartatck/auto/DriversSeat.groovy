@@ -17,7 +17,7 @@ package org.atinject.jakartatck.auto
 
 import org.atinject.jakartatck.auto.accessories.Cupholder
 
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 class DriversSeat extends Seat {
 

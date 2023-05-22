@@ -1,0 +1,27 @@
+Micronaut CORS configuration applies by default to all endpoints in the running application.
+
+As an alternative, <<corsConfiguration, CORS configuration>> can be applied in a more fine-grained manner to specific routes using the
+link:{api}/io/micronaut/http/server/cors/CrossOrigin.html[@CrossOrigin] annotation. This is applied to `@Controller` to apply the CORS configuration to all endpoints in the controller. Alternatively, the annotation can be applied to specific endpoints on a controller, for even more fine-grained control.
+
+The `@CrossOrigin` annotation maps with a one-to-one correspondence to application-wide link:{api}/io/micronaut/http/server/cors/CorsOriginConfiguration.html[CorsOriginConfiguration] configuration properties. To specify just an allowed origin, use `@CrossOrigin("https://foo.com")`. To specify additional configuration details, use  a combination of annotation attributes the same as you would for specifying global `CorsOriginConfiguration` properties.
+
+[source,java]
+----
+@CrossOrigin(
+	allowedOrigins = { "http://foo.com" },
+	allowedOriginsRegex = "^http(|s):\\/\\/www\\.google\\.com$",
+	allowedMethods = { HttpMethod.POST, HttpMethod.PUT },
+	allowedHeaders = { HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION },
+	exposedHeaders = { HttpHeaders.CONTENT_TYPE, HttpHeaders.AUTHORIZATION },
+	allowCredentials = false,
+	maxAge = 3600
+)
+----
+
+The following example demonstrates how the annotation might be applied to a specific endpoint. To enable CORS for all endpoints in the controller, move the annotation to the class level and configure it appropriately.
+
+snippet::io.micronaut.docs.http.server.cors.CorsController[tags="imports,controller", indent=0, title="@CrossOrigin Example"]
+
+<1> The ann:http.server.cors.CrossOrigin[] annotation is applied to a specific endpoint, making the CORS configuration fine-grained.
+<2> The `GET /hello` endpoint has "https://myui.com" as an allowed cross origin endpoint
+<3> The `GET /hello/nocors` endpoint cannot use "https://myui.com" as an origin, since it doesn't have a CORS configuration that allows it.

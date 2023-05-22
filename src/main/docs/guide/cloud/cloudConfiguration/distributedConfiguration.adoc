@@ -1,6 +1,6 @@
-As you can see, Micronaut features a robust system for externalizing and adapting configuration to the environment inspired by similar approaches in Grails and Spring Boot.
+As you can see, the Micronaut framework features a robust system for externalizing and adapting configuration to the environment inspired by similar approaches in Grails and Spring Boot.
 
-However, what if you want multiple microservices to share configuration? Micronaut includes APIs for distributed configuration.
+However, what if you want multiple microservices to share configuration? the Micronaut framework includes APIs for distributed configuration.
 
 The api:discovery.config.ConfigurationClient[] interface has a `getPropertySources` method that can be implemented to read and resolve configuration from distributed sources.
 

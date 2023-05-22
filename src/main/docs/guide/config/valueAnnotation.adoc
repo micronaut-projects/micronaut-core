@@ -6,7 +6,7 @@ Consider the following example:
 
 snippet::io.micronaut.docs.config.value.EngineImpl[tags="imports,class",indent=0,title="@Value Example"]
 
-<1> The `@Value` annotation accepts a string that can have embedded placeholder values (the default value can be provided by specifying a value after the colon `:` character). Also try to avoid setting the member visibility to `private`, since this requires Micronaut Framework to use reflection. Prefer to use `protected`.
+<1> The `@Value` annotation accepts a string that can have embedded placeholder values (the default value can be provided by specifying a value after the colon `:` character). Also try to avoid setting the member visibility to `private`, since this requires the Micronaut Framework to use reflection. Prefer to use `protected`.
 <2> The injected value can then be used within code.
 
 Note that `@Value` can also be used to inject a static value. For example the following injects the number 10:
@@ -91,8 +91,7 @@ The above instead injects the value of the `my.url` property resolved from appli
 
 You can also use this feature to resolve sub maps. For example, consider the following configuration:
 
-.Example `application.yml` configuration
-[source,yaml]
+[configuration]
 ----
 datasources:
   default:

@@ -1,9 +1,9 @@
-Since 1.1, Micronaut features a native https://spring.io/projects/spring-cloud-config[Spring Cloud Configuration] for those who have not switched to a dedicated more complete solution like Consul.
+Since 1.1, the Micronaut framework features a native https://spring.io/projects/spring-cloud-config[Spring Cloud Configuration] for those who have not switched to a dedicated more complete solution like Consul.
 
-To enable support for Spring Cloud Configuration, create a `src/main/resources/bootstrap.yml` configuration file and add the following configuration:
+To enable distributed configuration make sure <<bootstrap>> is enabled and create a `src/main/resources/bootstrap.[yml/toml/properties]` file with the following configuration:
 
 .Integrating with Spring Cloud Configuration
-[source,yaml]
+[configuration]
 ----
 micronaut:
   application:
@@ -15,10 +15,13 @@ spring:
     config:
       enabled: true
       uri: http://localhost:8888/
-      retry-attempts: 4 # optional, number of times to retry
-      retry-delay: 2s # optional, delay between retries
+      retry-attempts: 4
+      retry-delay: 2s
 ----
 
-Micronaut uses the configured `micronaut.application.name` to look up property sources for the application from Spring Cloud config server configured via `spring.cloud.config.uri`.
+- `retry-attempts` is optional, and specifies the number of times to retry
+- `retry-delay` is optional, and specifies the delay between retries
+
+The Micronaut framework uses the configured `micronaut.application.name` to look up property sources for the application from Spring Cloud config server configured via `spring.cloud.config.uri`.
 
 See the https://spring.io/projects/spring-cloud-config#learn[Documentation for Spring Cloud Config Server] for more information on how to set up the server.

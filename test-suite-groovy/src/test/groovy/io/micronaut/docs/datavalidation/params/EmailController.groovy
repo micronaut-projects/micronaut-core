@@ -22,7 +22,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.validation.Validated
 
-import javax.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotBlank
 //end::imports[]
 
 @Requires(property = "spec.name", value = "datavalidationparams")

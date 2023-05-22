@@ -16,8 +16,12 @@
 package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.context.BeanProvider;
+import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.naming.NameUtils;
@@ -32,7 +36,7 @@ import io.netty.buffer.ByteBufInputStream;
 import io.netty.channel.ChannelOption;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
-import jakarta.inject.Singleton;
+import io.netty.util.ReferenceCounted;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -46,13 +50,13 @@ import java.util.Optional;
  * @author graemerocher
  * @since 1.0
  */
-@Singleton
+@Prototype
 @Internal
 public class NettyConverters implements TypeConverterRegistrar {
 
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
     private final BeanProvider<MediaTypeCodecRegistry> decoderRegistryProvider;
-    private final ChannelOptionFactory channelOptionFactory;
+    private final BeanProvider<ChannelOptionFactory> channelOptionFactory;
 
     /**
      * Default constructor.
@@ -60,24 +64,24 @@ public class NettyConverters implements TypeConverterRegistrar {
      * @param decoderRegistryProvider The decoder registry provider
      * @param channelOptionFactory The decoder channel option factory
      */
-    public NettyConverters(ConversionService<?> conversionService,
+    public NettyConverters(ConversionService conversionService,
                            //Prevent early initialization of the codecs
                            BeanProvider<MediaTypeCodecRegistry> decoderRegistryProvider,
-                           ChannelOptionFactory channelOptionFactory) {
+                           BeanProvider<ChannelOptionFactory> channelOptionFactory) {
         this.conversionService = conversionService;
         this.decoderRegistryProvider = decoderRegistryProvider;
         this.channelOptionFactory = channelOptionFactory;
     }
 
     @Override
-    public void register(ConversionService<?> conversionService) {
+    public void register(MutableConversionService conversionService) {
         conversionService.addConverter(
                 CharSequence.class,
                 ChannelOption.class,
                 (object, targetType, context) -> {
                     String str = object.toString();
                     String name = NameUtils.underscoreSeparate(str).toUpperCase(Locale.ENGLISH);
-                    return Optional.of(channelOptionFactory.channelOption(name));
+                    return Optional.of(channelOptionFactory.get().channelOption(name));
                 }
         );
 
@@ -108,7 +112,7 @@ public class NettyConverters implements TypeConverterRegistrar {
         conversionService.addConverter(
                 String.class,
                 ChannelOption.class,
-                s -> channelOptionFactory.channelOption(NameUtils.environmentName(s))
+                s -> channelOptionFactory.get().channelOption(NameUtils.environmentName(s))
         );
     }
 
@@ -186,5 +190,55 @@ public class NettyConverters implements TypeConverterRegistrar {
      */
     protected TypeConverter<ByteBuf, Object> byteBufToObjectConverter() {
         return (object, targetType, context) -> conversionService.convert(object.toString(context.getCharset()), targetType, context);
+    }
+
+    /**
+     * This method converts a
+     * {@link io.netty.util.ReferenceCounted netty reference counted object} and transfers release
+     * ownership to the new object.
+     *
+     * @param service The conversion service
+     * @param context The context to convert to
+     * @param input The object to convert
+     * @param <T> Target type
+     * @return The converted object
+     */
+    public static <T> Optional<T> refCountAwareConvert(ConversionService service, ReferenceCounted input, ArgumentConversionContext<T> context) {
+        Optional<T> converted = service.convert(input, context);
+        postProcess(input, converted);
+        return converted;
+    }
+
+    /**
+     * This method converts a
+     * {@link io.netty.util.ReferenceCounted netty reference counted object} and transfers release
+     * ownership to the new object.
+     *
+     * @param service The conversion service
+     * @param input The object to convert
+     * @param targetType The type to convert to
+     * @param context The context to convert with
+     * @param <T> Target type
+     * @return The converted object
+     */
+    public static <T> Optional<T> refCountAwareConvert(ConversionService service, ReferenceCounted input, Class<T> targetType, ConversionContext context) {
+        Optional<T> converted = service.convert(input, targetType, context);
+        postProcess(input, converted);
+        return converted;
+    }
+
+    @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
+    private static <T> void postProcess(ReferenceCounted input, Optional<T> converted) {
+        if (converted.isPresent()) {
+            input.touch();
+            T item = converted.get();
+            // this is not great, but what can we do?
+            boolean targetRefCounted = item instanceof ReferenceCounted || item instanceof io.micronaut.core.io.buffer.ReferenceCounted;
+            if (!targetRefCounted) {
+                input.release();
+            }
+        } else {
+            input.release();
+        }
     }
 }

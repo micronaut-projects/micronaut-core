@@ -123,7 +123,7 @@ public @interface Requires {
      *
      * @return The classes
      */
-    Class[] classes() default {};
+    Class<?>[] classes() default {};
 
     /**
      * Expresses that the configuration requires entities annotated with the given annotations to be available to the
@@ -139,14 +139,14 @@ public @interface Requires {
      *
      * @return The beans
      */
-    Class[] beans() default {};
+    Class<?>[] beans() default {};
 
     /**
      * Expresses the given classes that should be missing from the classpath for the bean or configuration to load.
      *
      * @return The classes
      */
-    Class[] missing() default {};
+    Class<?>[] missing() default {};
 
     /**
      * Expresses the given class names should be missing from the classpath for the bean configuration to load.
@@ -211,7 +211,7 @@ public @interface Requires {
      * @return The configuration properties class
      * @since 3.4.0
      */
-    Class bean() default void.class;
+    Class<?> bean() default void.class;
 
     /**
      * Used in combination with {@link #bean()} to

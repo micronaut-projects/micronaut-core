@@ -46,21 +46,22 @@ import java.util.Set;
  * @since 1.0
  */
 public class DefaultApplicationContextBuilder implements ApplicationContextBuilder, ApplicationContextConfiguration {
-    private List<Object> singletons = new ArrayList<>();
-    private List<String> environments = new ArrayList<>();
-    private List<String> defaultEnvironments = new ArrayList<>();
-    private List<String> packages = new ArrayList<>();
-    private Map<String, Object> properties = new LinkedHashMap<>();
-    private List<PropertySource> propertySources = new ArrayList<>();
-    private Collection<String> configurationIncludes = new HashSet<>();
-    private Collection<String> configurationExcludes = new HashSet<>();
+    private final List<Object> singletons = new ArrayList<>();
+    private final List<String> environments = new ArrayList<>();
+    private final List<String> defaultEnvironments = new ArrayList<>();
+    private final List<String> packages = new ArrayList<>();
+    private final Map<String, Object> properties = new LinkedHashMap<>();
+    private final List<PropertySource> propertySources = new ArrayList<>();
+    private final Collection<String> configurationIncludes = new HashSet<>();
+    private final Collection<String> configurationExcludes = new HashSet<>();
     private Boolean deduceEnvironments = null;
+    private boolean deduceCloudEnvironment = false;
     private ClassLoader classLoader = getClass().getClassLoader();
     private boolean envPropertySource = true;
-    private List<String> envVarIncludes = new ArrayList<>();
-    private List<String> envVarExcludes = new ArrayList<>();
+    private final List<String> envVarIncludes = new ArrayList<>();
+    private final List<String> envVarExcludes = new ArrayList<>();
     private String[] args = new String[0];
-    private Set<Class<? extends Annotation>> eagerInitAnnotated = new HashSet<>(3);
+    private final Set<Class<? extends Annotation>> eagerInitAnnotated = new HashSet<>(3);
     private String[] overrideConfigLocations;
     private boolean banner = true;
     private ClassPathResourceLoader classPathResourceLoader;
@@ -73,6 +74,11 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
      */
     protected DefaultApplicationContextBuilder() {
         loadApplicationContextCustomizer(resolveClassLoader()).configure(this);
+    }
+
+    DefaultApplicationContextBuilder(ClassLoader classLoader) {
+        loadApplicationContextCustomizer(classLoader).configure(this);
+        this.classLoader = classLoader;
     }
 
     private ClassLoader resolveClassLoader() {
@@ -89,7 +95,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
-    @NonNull 
+    @NonNull
     public ApplicationContextBuilder enableDefaultPropertySources(boolean areEnabled) {
         this.enableDefaultPropertySources = areEnabled;
         return this;
@@ -170,6 +176,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
+    public ApplicationContextBuilder deduceCloudEnvironment(boolean deduceEnvironment) {
+        this.deduceCloudEnvironment = deduceEnvironment;
+        return this;
+    }
+
+    @Override
     public @NonNull ApplicationContextBuilder environments(@Nullable String... environments) {
         if (environments != null) {
             this.environments.addAll(Arrays.asList(environments));
@@ -237,6 +249,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
+    public boolean isDeduceCloudEnvironment() {
+        boolean basicDeduce = getDeduceEnvironments().orElse(true);
+        return basicDeduce && this.deduceCloudEnvironment;
+    }
+
+    @Override
     public @NonNull List<String> getEnvironments() {
         return environments;
     }
@@ -262,7 +280,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
-    public @NonNull ApplicationContextBuilder mainClass(Class mainClass) {
+    public @NonNull ApplicationContextBuilder mainClass(Class<?> mainClass) {
         if (mainClass != null) {
             if (this.classLoader == null) {
                 this.classLoader = mainClass.getClassLoader();
@@ -395,9 +413,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
      */
     @NonNull
     private static ApplicationContextConfigurer loadApplicationContextCustomizer(@Nullable ClassLoader classLoader) {
-        SoftServiceLoader<ApplicationContextConfigurer> loader = classLoader != null ? SoftServiceLoader.load(
-                ApplicationContextConfigurer.class, classLoader
-        ) : SoftServiceLoader.load(ApplicationContextConfigurer.class);
+        SoftServiceLoader<ApplicationContextConfigurer> loader = SoftServiceLoader.load(ApplicationContextConfigurer.class, classLoader);
         List<ApplicationContextConfigurer> configurers = new ArrayList<>(10);
         loader.collectAll(configurers);
         if (configurers.isEmpty()) {

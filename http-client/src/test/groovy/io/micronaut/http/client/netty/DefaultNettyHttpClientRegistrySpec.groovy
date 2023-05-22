@@ -1,17 +1,13 @@
 package io.micronaut.http.client.netty
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.BeanContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.BeanCreatedEvent
 import io.micronaut.context.event.BeanCreatedEventListener
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
-import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
-import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.test.extensions.spock.annotation.MicronautTest
-import io.netty.util.Attribute
+import io.netty.channel.Channel
 import io.netty.util.AttributeKey
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
@@ -88,22 +84,27 @@ class DefaultNettyHttpClientRegistrySpec extends Specification {
 
     @Requires(property = 'spec.name', value = 'DefaultNettyHttpClientRegistrySpec')
     @Singleton
-    static class MyCustomizer implements BeanCreatedEventListener<ChannelPipelineCustomizer> {
+    static class MyCustomizer implements BeanCreatedEventListener<NettyClientCustomizer.Registry> {
         static final AttributeKey<Boolean> CUSTOMIZED = AttributeKey.valueOf('micronaut.test.customized')
 
         def connected = 0
         def duplicate = false
 
         @Override
-        ChannelPipelineCustomizer onCreated(BeanCreatedEvent<ChannelPipelineCustomizer> event) {
-            event.bean.doOnConnect {
-                if (it.channel().hasAttr(CUSTOMIZED)) {
-                    duplicate = true
+        NettyClientCustomizer.Registry onCreated(BeanCreatedEvent<NettyClientCustomizer.Registry> event) {
+            event.bean.register(new NettyClientCustomizer() {
+                @Override
+                NettyClientCustomizer specializeForChannel(Channel channel, NettyClientCustomizer.ChannelRole role) {
+                    if (role == NettyClientCustomizer.ChannelRole.CONNECTION) {
+                        if (channel.hasAttr(CUSTOMIZED)) {
+                            duplicate = true
+                        }
+                        channel.attr(CUSTOMIZED).set(true)
+                        connected++
+                    }
+                    return this
                 }
-                it.channel().attr(CUSTOMIZED).set(true)
-                connected++
-                return it
-            }
+            })
             return event.bean
         }
     }

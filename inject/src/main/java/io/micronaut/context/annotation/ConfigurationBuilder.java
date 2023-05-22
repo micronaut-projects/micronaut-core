@@ -17,12 +17,12 @@ package io.micronaut.context.annotation;
 
 import io.micronaut.core.annotation.AccessorsStyle;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * <p>An annotation applicable to a field or method of a {@link ConfigurationProperties} instance that allows to
@@ -34,6 +34,7 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.FIELD, ElementType.METHOD})
+@BeanProperties(accessKind = BeanProperties.AccessKind.METHOD, visibility = BeanProperties.Visibility.DEFAULT, allowWriteWithMultipleArgs = true, allowWriteWithZeroArgs = true)
 public @interface ConfigurationBuilder {
 
     /**
@@ -76,6 +77,7 @@ public @interface ConfigurationBuilder {
      *
      * @return True if zero arg setters should be processed
      */
+    @AliasFor(annotation = BeanProperties.class, member = BeanProperties.MEMBER_ALLOW_WRITE_WITH_ZERO_ARGS)
     boolean allowZeroArgs() default false;
 
     /**
@@ -93,10 +95,12 @@ public @interface ConfigurationBuilder {
     /**
      * @return The names of the properties to include
      */
+    @AliasFor(annotation = BeanProperties.class, member = BeanProperties.MEMBER_INCLUDES)
     String[] includes() default {};
 
     /**
      * @return The names of the properties to exclude
      */
+    @AliasFor(annotation = BeanProperties.class, member = BeanProperties.MEMBER_EXCLUDES)
     String[] excludes() default {};
 }

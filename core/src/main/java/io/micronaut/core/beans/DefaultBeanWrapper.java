@@ -19,6 +19,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArgumentUtils;
 
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.util.ObjectUtils;
+
 import java.util.Objects;
 
 /**
@@ -73,6 +75,6 @@ final class DefaultBeanWrapper<T> implements BeanWrapper<T> {
 
     @Override
     public int hashCode() {
-        return Objects.hash(bean, introspection);
+        return ObjectUtils.hash(bean, introspection);
     }
 }

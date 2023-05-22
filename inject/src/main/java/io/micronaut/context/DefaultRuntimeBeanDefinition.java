@@ -15,21 +15,30 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.exceptions.BeanInstantiationException;
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.qualifiers.PrimaryQualifier;
+import io.micronaut.inject.qualifiers.TypeArgumentQualifier;
 
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -45,6 +54,7 @@ import java.util.function.Supplier;
 @Experimental
 final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextConditional implements RuntimeBeanDefinition<T> {
     private static final AtomicInteger REF_COUNT = new AtomicInteger(0);
+    private static final String MSG_BEAN_TYPE_CANNOT_BE_NULL = "Bean type cannot be null";
     private final Argument<T> beanType;
     private final Supplier<T> supplier;
     private final AnnotationMetadata annotationMetadata;
@@ -53,6 +63,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     private final boolean isSingleton;
     private final Class<? extends Annotation> scope;
     private final Class<?>[] exposedTypes;
+    private Map<Class<?>, List<Argument<?>>> typeArguments;
 
     DefaultRuntimeBeanDefinition(
         @NonNull Argument<T> beanType,
@@ -61,8 +72,9 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         @Nullable AnnotationMetadata annotationMetadata,
         boolean isSingleton,
         @Nullable Class<? extends Annotation> scope,
-        Class<?>[] exposedTypes) {
-        Objects.requireNonNull(beanType, "Bean type cannot be null");
+        Class<?>[] exposedTypes, Map<Class<?>,
+        List<Argument<?>>> typeArguments) {
+        Objects.requireNonNull(beanType, MSG_BEAN_TYPE_CANNOT_BE_NULL);
         Objects.requireNonNull(supplier, "Bean supplier cannot be null");
 
         this.beanType = beanType;
@@ -73,6 +85,35 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         this.isSingleton = isSingleton;
         this.scope = scope;
         this.exposedTypes = exposedTypes;
+        this.typeArguments = typeArguments;
+    }
+
+    @Override
+    public List<Argument<?>> getTypeArguments(Class<?> type) {
+        Class<T> bt = getBeanType();
+        if (type == bt) {
+            return getTypeArguments();
+        }
+        if (type != null && type.isAssignableFrom(bt)) {
+            if (typeArguments != null) {
+                List<Argument<?>> args = typeArguments.get(type);
+                if (args != null) {
+                    return args;
+                }
+            }
+            List<Argument<?>> list = RuntimeBeanDefinition.super.getTypeArguments(type);
+            if (CollectionUtils.isNotEmpty(list)) {
+                if (typeArguments == null) {
+                    synchronized (this.beanType) {
+                        typeArguments = new LinkedHashMap<>(3);
+                    }
+                }
+                typeArguments.put(type, list);
+            }
+            return list;
+        } else {
+            return Collections.emptyList();
+        }
     }
 
     @Override
@@ -126,7 +167,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
      * @return The bean name
      */
     static String generateBeanName(@NonNull Class<?> beanType) {
-        Objects.requireNonNull(beanType, "Bean type cannot be null");
+        Objects.requireNonNull(beanType, MSG_BEAN_TYPE_CANNOT_BE_NULL);
         return beanType.getName() + "$DynamicDefinition" + REF_COUNT.incrementAndGet();
     }
 
@@ -178,9 +219,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
     }
 
     @Override
-    public T build(BeanResolutionContext resolutionContext,
-                   BeanContext context,
-                   BeanDefinition<T> definition) throws BeanInstantiationException {
+    public T instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException {
         return supplier.get();
     }
 
@@ -189,7 +228,7 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
      * @param <B> The bean
      */
     static final class RuntimeBeanBuilder<B> implements RuntimeBeanDefinition.Builder<B> {
-        private final Argument<B> beanType;
+        private Argument<B> beanType;
         private final Supplier<B> supplier;
         private Qualifier<B> qualifier;
         private boolean singleton;
@@ -197,14 +236,29 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         private Class<? extends Annotation> scope;
         private Class<?>[] exposedTypes = ReflectionUtils.EMPTY_CLASS_ARRAY;
 
+        private Map<Class<?>, List<Argument<?>>> typeArguments;
+        private Class<? extends B> replacesType;
+
         RuntimeBeanBuilder(Argument<B> beanType, Supplier<B> supplier) {
-            this.beanType = Objects.requireNonNull(beanType, "Bean type cannot be null");
+            this.beanType = Objects.requireNonNull(beanType, MSG_BEAN_TYPE_CANNOT_BE_NULL);
             this.supplier = Objects.requireNonNull(supplier, "Bean supplier cannot be null");
         }
 
         @Override
         public Builder<B> qualifier(Qualifier<B> qualifier) {
             this.qualifier = qualifier;
+            if (qualifier instanceof TypeArgumentQualifier<B> typeArgumentQualifier) {
+                Argument<?>[] arguments = Arrays.stream(typeArgumentQualifier.getTypeArguments())
+                                                .map(Argument::of)
+                                                .toArray(Argument[]::new);
+                typeArguments(arguments);
+            }
+            return this;
+        }
+
+        @Override
+        public Builder<B> replaces(Class<? extends B> otherType) {
+            this.replacesType = otherType;
             return this;
         }
 
@@ -236,6 +290,21 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         }
 
         @Override
+        public Builder<B> typeArguments(Argument<?>... arguments) {
+            this.beanType = Argument.of(beanType.getType(), arguments);
+            return this;
+        }
+
+        @Override
+        public Builder<B> typeArguments(Class<?> implementedType, Argument<?>... arguments) {
+            if (typeArguments == null) {
+                typeArguments = new LinkedHashMap<>(5);
+            }
+            typeArguments.put(implementedType, List.of(arguments));
+            return this;
+        }
+
+        @Override
         public Builder<B> annotationMetadata(AnnotationMetadata annotationMetadata) {
             this.annotationMetadata = annotationMetadata;
             return this;
@@ -244,6 +313,24 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         @Override
         @NonNull
         public RuntimeBeanDefinition<B> build() {
+            if (replacesType != null) {
+                MutableAnnotationMetadata mutableAnnotationMetadata;
+                if (this.annotationMetadata instanceof MutableAnnotationMetadata mm) {
+                    mutableAnnotationMetadata = mm;
+                } else if (this.annotationMetadata == null || this.annotationMetadata == EMPTY_METADATA) {
+                    mutableAnnotationMetadata = new MutableAnnotationMetadata();
+                    this.annotationMetadata = mutableAnnotationMetadata;
+                } else {
+                    throw new IllegalStateException("Previous non-mutable annotation metadata set");
+                }
+
+                Map<CharSequence, Object> values = new HashMap<>(3);
+                values.put(AnnotationMetadata.VALUE_MEMBER, new AnnotationClassValue<>(replacesType));
+                if (qualifier instanceof Named named) {
+                    values.put("named", named.getName());
+                }
+                mutableAnnotationMetadata.addAnnotation(Replaces.class.getName(), values);
+            }
             return new DefaultRuntimeBeanDefinition<>(
                 beanType,
                 supplier,
@@ -251,7 +338,8 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
                 annotationMetadata,
                 singleton,
                 scope,
-                exposedTypes
+                exposedTypes,
+                typeArguments
             );
         }
     }

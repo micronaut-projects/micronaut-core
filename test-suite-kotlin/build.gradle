@@ -12,34 +12,52 @@ micronautBuild {
     }
 }
 
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven {
+        url "https://s01.oss.sonatype.org/content/repositories/snapshots/"
+        mavenContent {
+            snapshotsOnly()
+        }
+    }
+}
+
 dependencies {
-    api libs.kotlin.stdlib
-    api libs.kotlin.reflect
-    api libs.kotlinx.coroutines.core
-    api libs.kotlinx.coroutines.jdk8
-    api libs.kotlinx.coroutines.rx2
+    api libs.managed.kotlin.stdlib
+    api libs.managed.kotlin.reflect
+    api libs.managed.kotlinx.coroutines.core
+    api libs.managed.kotlinx.coroutines.jdk8
+    api libs.managed.kotlinx.coroutines.rx2
     api project(':http-server-netty')
     api project(':http-client')
     api project(':runtime')
 
     testImplementation project(":context")
-    testImplementation libs.kotlin.test
-    testImplementation libs.kotlinx.coroutines.core
-    testImplementation libs.kotlinx.coroutines.rx2
-    testImplementation libs.kotlinx.coroutines.slf4j
-    testImplementation libs.kotlinx.coroutines.reactor
+    testImplementation libs.managed.kotlin.test
+    testImplementation libs.managed.kotlinx.coroutines.core
+    testImplementation libs.managed.kotlinx.coroutines.rx2
+    testImplementation libs.managed.kotlinx.coroutines.slf4j
+    testImplementation libs.managed.kotlinx.coroutines.reactor
+    testImplementation libs.managed.kotlinx.coroutines.reactive
 
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation libs.junit.jupiter.api
-
-    testImplementation project(":validation")
+    testImplementation libs.awaitility
+    testImplementation platform(libs.test.boms.micronaut.validation)
+    testImplementation (libs.micronaut.validation) {
+        exclude group: 'io.micronaut'
+    }
     testImplementation project(":management")
     testImplementation project(':inject-java')
     testImplementation project(":inject")
-    testImplementation libs.managed.jcache
-    testImplementation project(':validation')
+    testImplementation libs.jcache
     testImplementation project(":http-client")
-    testImplementation project(":session")
+    testImplementation project(":http-client-jdk")
+    testImplementation (libs.micronaut.session) {
+        exclude group: 'io.micronaut'
+    }
+    testImplementation project(":jackson-databind")
     testImplementation libs.managed.groovy.templates
 
     testImplementation project(":function-client")
@@ -47,18 +65,19 @@ dependencies {
     testImplementation libs.kotlin.kotest.junit5
     testImplementation libs.logbook.netty
     kaptTest project(':inject-java')
-    kaptTest project(':validation')
+    kaptTest platform(libs.test.boms.micronaut.validation)
+    kaptTest (libs.micronaut.validation.processor) {
+        exclude group: 'io.micronaut'
+    }
+
     testImplementation libs.javax.inject
-    testImplementation(platform(libs.boms.micronaut.tracing))
+    testImplementation(platform(libs.test.boms.micronaut.tracing))
     testImplementation(libs.micronaut.tracing.zipkin) {
-        exclude module: 'micronaut-bom'
-        exclude module: 'micronaut-http-client'
-        exclude module: 'micronaut-inject'
-        exclude module: 'micronaut-runtime'
+        exclude group: 'io.micronaut'
     }
 
     testRuntimeOnly libs.junit.jupiter.engine
-    testRuntimeOnly(platform(libs.boms.micronaut.aws))
+    testRuntimeOnly(platform(libs.test.boms.micronaut.aws))
     testRuntimeOnly libs.aws.java.sdk.lambda
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
         testImplementation libs.bcpkix
@@ -76,7 +95,7 @@ configurations.testRuntimeClasspath {
 }
 
 tasks.named("compileTestKotlin") {
-    kotlinOptions.jvmTarget = "1.8"
+    kotlinOptions.jvmTarget = "17"
 }
 
 tasks.named("test") {

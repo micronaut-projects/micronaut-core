@@ -33,10 +33,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.PrintStream;
-import java.net.URL;
+import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -48,12 +47,12 @@ import java.util.function.Function;
  * @since 1.0
  */
 public class Micronaut extends DefaultApplicationContextBuilder implements ApplicationContextBuilder  {
-    private static final String MICRONAUT = "  Micronaut";
+    private static final String MICRONAUT_PREFIX = "  Micronaut";
     private static final String BANNER_NAME = "micronaut-banner.txt";
     private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);
     private static final String SHUTDOWN_MONITOR_THREAD = "micronaut-shutdown-monitor-thread";
 
-    private Map<Class<? extends Throwable>, Function<Throwable, Integer>> exitHandlers = new LinkedHashMap<>();
+    private final Map<Class<? extends Throwable>, Function<Throwable, Integer>> exitHandlers = new LinkedHashMap<>();
 
     /**
      * The default constructor.
@@ -65,6 +64,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * @return Run this {@link Micronaut}
      */
     @Override
+    @SuppressWarnings({"java:S1181", "java:S3776", "java:S1141"})
     public @NonNull ApplicationContext start() {
         long start = System.nanoTime();
         printBanner();
@@ -74,28 +74,26 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
 
             applicationContext.start();
 
-            Optional<EmbeddedApplication> embeddedContainerBean = applicationContext.findBean(EmbeddedApplication.class);
+            EmbeddedApplication<?> embeddedApplication = applicationContext.findBean(EmbeddedApplication.class).orElse(null);
 
-            embeddedContainerBean.ifPresent((embeddedApplication -> {
+            if (embeddedApplication != null) {
                 try {
                     embeddedApplication.start();
 
-                    boolean keepAlive = false;
-                    if (embeddedApplication instanceof Described) {
+                    boolean keepAlive;
+                    if (embeddedApplication instanceof Described described) {
                         if (LOG.isInfoEnabled()) {
                             long took = elapsedMillis(start);
-                            String desc = ((Described) embeddedApplication).getDescription();
+                            String desc = described.getDescription();
                             LOG.info("Startup completed in {}ms. Server Running: {}", took, desc);
                         }
                         keepAlive = embeddedApplication.isServer();
                     } else {
-                        if (embeddedApplication instanceof EmbeddedServer) {
-
-                            final EmbeddedServer embeddedServer = (EmbeddedServer) embeddedApplication;
+                        if (embeddedApplication instanceof EmbeddedServer embeddedServer) {
                             if (LOG.isInfoEnabled()) {
                                 long took = elapsedMillis(start);
-                                URL url = embeddedServer.getURL();
-                                LOG.info("Startup completed in {}ms. Server Running: {}", took, url);
+                                URI uri = embeddedServer.getContextURI();
+                                LOG.info("Startup completed in {}ms. Server Running: {}", took, uri);
                             }
                             keepAlive = embeddedServer.isKeepAlive();
                         } else {
@@ -131,7 +129,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                                     Thread.sleep(1000);
                                 }
                             } catch (InterruptedException e) {
-                                // ignore
+                                Thread.currentThread().interrupt();
                             }
                         }, SHUTDOWN_MONITOR_THREAD).start();
 
@@ -142,6 +140,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                                 break;
                             } catch (InterruptedException e) {
                                 interrupted = true;
+                                Thread.currentThread().interrupt();
                             }
                         }
                         if (interrupted) {
@@ -158,16 +157,18 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
 
                 } catch (Throwable e) {
                     handleStartupException(applicationContext.getEnvironment(), e);
+                    Thread.currentThread().interrupt();
                 }
-            }));
+            }
 
-            if (LOG.isInfoEnabled() && !embeddedContainerBean.isPresent()) {
+            if (LOG.isInfoEnabled() && embeddedApplication == null) {
                 LOG.info("No embedded container found. Running as CLI application");
             }
             return applicationContext;
         } catch (Throwable e) {
             handleStartupException(applicationContext.getEnvironment(), e);
-            return null;
+            Thread.currentThread().interrupt();
+            return applicationContext;
         }
     }
 
@@ -196,9 +197,9 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * @param classes The application
      * @return The classes
      */
-    public @NonNull Micronaut classes(@Nullable Class... classes) {
+    public @NonNull Micronaut classes(@Nullable Class<?>... classes) {
         if (classes != null) {
-            for (Class aClass : classes) {
+            for (Class<?> aClass : classes) {
                 packages(aClass.getPackage().getName());
             }
         }
@@ -236,7 +237,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     @Override
-    public @NonNull Micronaut mainClass(Class mainClass) {
+    public @NonNull Micronaut mainClass(Class<?> mainClass) {
         return (Micronaut) super.mainClass(mainClass);
     }
 
@@ -295,7 +296,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * @return The {@link ApplicationContext}
      */
     public static ApplicationContext run(String... args) {
-        return run(new Class[0], args);
+        return run(new Class<?>[0], args);
     }
 
     /**
@@ -305,8 +306,8 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * @param args The arguments
      * @return The {@link ApplicationContext}
      */
-    public static ApplicationContext run(Class cls, String... args) {
-        return run(new Class[]{cls}, args);
+    public static ApplicationContext run(Class<?> cls, String... args) {
+        return run(new Class<?>[]{cls}, args);
     }
 
     /**
@@ -316,7 +317,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
      * @param args    The arguments
      * @return The {@link ApplicationContext}
      */
-    public static ApplicationContext run(Class[] classes, String... args) {
+    public static ApplicationContext run(Class<?>[] classes, String... args) {
         return new Micronaut()
             .classes(classes)
             .args(args)
@@ -335,13 +336,14 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
         Integer code = exitCodeMapper.apply(exception);
         if (code > 0 && !environment.getActiveNames().contains(Environment.TEST)) {
             if (LOG.isErrorEnabled()) {
-                LOG.error("Error starting Micronaut server: " + exception.getMessage(), exception);
+                LOG.error("Error starting Micronaut server: {}", exception.getMessage(), exception);
             }
             System.exit(code);
         }
         throw new ApplicationStartupException("Error starting Micronaut server: " + exception.getMessage(), exception);
     }
 
+    @SuppressWarnings("java:S106")
     private void printBanner() {
         if (!isBannerEnabled()) {
             return;
@@ -354,7 +356,7 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     private void printMicronautVersion(@NonNull PrintStream out) {
         String version = VersionUtils.getMicronautVersion();
         version = (version != null) ? " (v" + version + ")" : "";
-        out.println(MICRONAUT + version + "\n");
+        out.println(MICRONAUT_PREFIX + version + "\n");
     }
 
     @NonNull

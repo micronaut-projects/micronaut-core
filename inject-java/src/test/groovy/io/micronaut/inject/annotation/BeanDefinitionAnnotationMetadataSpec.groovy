@@ -46,9 +46,9 @@ class Test {
 
 
         expect:
-        def ann = definition.synthesize(Named, "javax.inject.Named")
+        def ann = definition.synthesize(Named, "jakarta.inject.Named")
         ann.value() == 'test'
-        definition.synthesizeDeclared(Named, "javax.inject.Named").value() == 'test'
+        definition.synthesizeDeclared(Named, "jakarta.inject.Named").value() == 'test'
         ann instanceof AnnotationValueProvider
         ann.annotationValue()
     }
@@ -71,7 +71,6 @@ class Test {
         definition.isSingleton()
         !definition.isIterable()
         definition.isPrimary()
-        !definition.isProvided()
         definition.getScopeName().get() == AnnotationUtil.SINGLETON
     }
 

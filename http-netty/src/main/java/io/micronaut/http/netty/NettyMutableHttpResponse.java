@@ -21,16 +21,18 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.MutableHttpMessage;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
@@ -63,7 +65,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Internal
 @TypeHint(value = NettyMutableHttpResponse.class)
-public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpResponseBuilder {
+public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpResponseBuilder {
     private static final ServerCookieEncoder DEFAULT_SERVER_COOKIE_ENCODER = ServerCookieEncoder.LAX;
 
     private final HttpVersion httpVersion;
@@ -79,6 +81,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
     private ServerCookieEncoder serverCookieEncoder = DEFAULT_SERVER_COOKIE_ENCODER;
 
     private final BodyConvertor bodyConvertor = newBodyConvertor();
+    private MessageBodyWriter<B> messageBodyWriter;
 
     /**
      * @param nettyResponse     The {@link FullHttpResponse}
@@ -115,7 +118,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
      * @param conversionService The conversion service
      */
     public NettyMutableHttpResponse(HttpVersion httpVersion, HttpResponseStatus httpResponseStatus, Object body, ConversionService conversionService) {
-        this(httpVersion, httpResponseStatus, new DefaultHttpHeaders(), body, conversionService);
+        this(httpVersion, httpResponseStatus, null, body, conversionService);
     }
 
     /**
@@ -144,12 +147,38 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
                                      ConversionService conversionService) {
         this.httpVersion = httpVersion;
         this.httpResponseStatus = httpResponseStatus;
-        this.nettyHeaders = nettyHeaders;
         this.trailingNettyHeaders = trailingNettyHeaders;
         this.decoderResult = decoderResult;
         this.conversionService = conversionService;
+
+        boolean hasHeaders = nettyHeaders != null;
+        if (!hasHeaders) {
+            nettyHeaders = new DefaultHttpHeaders(false);
+        }
+        this.nettyHeaders = nettyHeaders;
         this.headers = new NettyHttpHeaders(nettyHeaders, conversionService);
-        setBody(body);
+        if (body == null) {
+            this.body = null;
+            this.optionalBody = Optional.empty();
+        } else {
+            this.body = body;
+            this.optionalBody = Optional.of(body);
+            Optional<MediaType> mediaType = MediaType.fromType(body.getClass());
+            if (mediaType.isPresent() && (!hasHeaders || !nettyHeaders.contains(HttpHeaderNames.CONTENT_TYPE))) {
+                contentType(mediaType.get());
+            }
+        }
+    }
+
+    @Override
+    public Optional<MessageBodyWriter<B>> getBodyWriter() {
+        return Optional.ofNullable(messageBodyWriter);
+    }
+
+    @Override
+    public MutableHttpMessage<B> bodyWriter(MessageBodyWriter<B> messageBodyWriter) {
+        this.messageBodyWriter = messageBodyWriter;
+        return this;
     }
 
     /**
@@ -181,8 +210,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
 
     @Override
     public String toString() {
-        HttpStatus status = getStatus();
-        return status.getCode() + " " + status.getReason();
+        return code() + " " + reason();
     }
 
     @Override
@@ -206,8 +234,16 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
     }
 
     @Override
-    public HttpStatus getStatus() {
-        return HttpStatus.valueOf(httpResponseStatus.code());
+    public io.micronaut.http.HttpResponse<B> setAttribute(CharSequence name, Object value) {
+        // This is the copy from the super method to avoid the type pollution
+        if (StringUtils.isNotEmpty(name)) {
+            if (value == null) {
+                getAttributes().remove(name.toString());
+            } else {
+                getAttributes().put(name.toString(), value);
+            }
+        }
+        return this;
     }
 
     @Override
@@ -253,16 +289,17 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
         return getBody(Argument.of(type));
     }
 
-    @SuppressWarnings("unchecked")
     @Override
-    public <T> Optional<T> getBody(Argument<T> type) {
-        return bodyConvertor.convert(type, body);
+    public <T> Optional<T> getBody(ArgumentConversionContext<T> conversionContext) {
+        return bodyConvertor.convert(conversionContext, body);
     }
 
     @Override
-    public MutableHttpResponse<B> status(HttpStatus status, CharSequence message) {
-        message = message == null ? status.getReason() : message;
-        httpResponseStatus = new HttpResponseStatus(status.getCode(), message.toString());
+    public MutableHttpResponse<B> status(int status, CharSequence message) {
+        if (message == null) {
+            message = HttpStatus.getDefaultReason(status);
+        }
+        httpResponseStatus = new HttpResponseStatus(status, message.toString());
         return this;
     }
 
@@ -276,6 +313,18 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
             bodyConvertor.cleanup();
         }
         return (MutableHttpResponse<T>) this;
+    }
+
+    @Override
+    public MutableHttpResponse<B> contentType(MediaType mediaType) {
+        if (mediaType == null) {
+            headers.remove(HttpHeaderNames.CONTENT_TYPE);
+        } else {
+            // optimization for content type validation
+            mediaType.validate(() -> NettyHttpHeaders.validateHeader(HttpHeaderNames.CONTENT_TYPE, mediaType));
+            headers.setUnsafe(HttpHeaderNames.CONTENT_TYPE, mediaType);
+        }
+        return this;
     }
 
     /**
@@ -359,14 +408,14 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
         return new BodyConvertor() {
 
             @Override
-            public Optional convert(Argument valueType, Object value) {
+            public Optional convert(ArgumentConversionContext conversionContext, Object value) {
                 if (value == null) {
                     return Optional.empty();
                 }
-                if (Argument.OBJECT_ARGUMENT.equalsType(valueType)) {
+                if (Argument.OBJECT_ARGUMENT.equalsType(conversionContext.getArgument())) {
                     return Optional.of(value);
                 }
-                return convertFromNext(conversionService, valueType, value);
+                return convertFromNext(conversionService, conversionContext, value);
             }
 
         };
@@ -376,31 +425,39 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
 
         private BodyConvertor<T> nextConvertor;
 
-        public abstract Optional<T> convert(Argument<T> valueType, T value);
+        public abstract Optional<T> convert(ArgumentConversionContext<T> valueType, T value);
 
-        protected synchronized Optional<T> convertFromNext(ConversionService conversionService, Argument<T> conversionValueType, T value) {
+        protected synchronized Optional<T> convertFromNext(ConversionService conversionService, ArgumentConversionContext<T> conversionContext, T value) {
             if (nextConvertor == null) {
                 Optional<T> conversion;
-                ArgumentConversionContext<T> context = ConversionContext.of(conversionValueType);
                 if (value instanceof ByteBuffer) {
-                    conversion = conversionService.convert(((ByteBuffer) value).asNativeBuffer(), context);
+                    conversion = conversionService.convert(((ByteBuffer) value).asNativeBuffer(), conversionContext);
                 } else {
-                    conversion = conversionService.convert(value, context);
+                    conversion = conversionService.convert(value, conversionContext);
                 }
                 nextConvertor = new BodyConvertor<T>() {
 
                     @Override
-                    public Optional<T> convert(Argument<T> valueType, T value) {
-                        if (conversionValueType.equalsType(valueType)) {
+                    public Optional<T> convert(ArgumentConversionContext<T> currentConversionContext, T value) {
+                        if (currentConversionContext == conversionContext) {
                             return conversion;
                         }
-                        return convertFromNext(conversionService, valueType, value);
+                        if (currentConversionContext.getArgument().equalsType(conversionContext.getArgument())) {
+                            conversionContext.getLastError().ifPresent(error -> {
+                                error.getOriginalValue().ifPresentOrElse(
+                                    originalValue -> currentConversionContext.reject(originalValue, error.getCause()),
+                                    () -> currentConversionContext.reject(error.getCause())
+                                );
+                            });
+                            return conversion;
+                        }
+                        return convertFromNext(conversionService, currentConversionContext, value);
                     }
 
                 };
                 return conversion;
             }
-            return nextConvertor.convert(conversionValueType, value);
+            return nextConvertor.convert(conversionContext, value);
         }
 
         public void cleanup() {

@@ -4,9 +4,6 @@ buildscript {
     repositories {
         maven { url "https://plugins.gradle.org/m2/" }
     }
-    dependencies {
-        classpath "gradle.plugin.com.energizedwork.webdriver-binaries:webdriver-binaries-gradle-plugin:$webdriverBinariesVersion"
-    }
 }
 
 plugins {
@@ -22,18 +19,38 @@ micronautBuild {
     }
 }
 
-apply from: "${rootProject.projectDir}/gradle/geb.gradle"
-apply from: "${rootProject.projectDir}/gradle/webdriverbinaries.gradle"
+repositories {
+    mavenCentral()
+    maven {
+        url "https://s01.oss.sonatype.org/content/repositories/snapshots/"
+        mavenContent {
+            snapshotsOnly()
+        }
+    }
+}
 
 dependencies {
     annotationProcessor project(":inject-java")
-    api project(":inject")
+    annotationProcessor platform(libs.test.boms.micronaut.validation)
+    annotationProcessor (libs.micronaut.validation.processor) {
+        exclude group: 'io.micronaut'
+    }
+
+    api project(":core-processor")
 
     testImplementation project(":context")
     testImplementation libs.managed.netty.codec.http
     testImplementation project(":http-server-netty")
+    testImplementation project(":jackson-databind")
     testImplementation project(":http-client")
-    testImplementation project(":validation")
+    testImplementation project(":http-client-jdk")
+    testImplementation platform(libs.test.boms.micronaut.validation)
+    testImplementation (libs.micronaut.validation) {
+        exclude group: 'io.micronaut'
+    }
+    testImplementation (libs.micronaut.validation.processor) { // For Groovy
+        exclude group: 'io.micronaut'
+    }
     testImplementation project(":inject-groovy")
     testImplementation project(":inject-java")
     testImplementation project(":inject-java-test")
@@ -42,20 +59,20 @@ dependencies {
     testImplementation project(":inject")
     testImplementation project(":function-client")
     testImplementation project(":function-web")
-    testImplementation project(":session")
+    testImplementation (libs.micronaut.session) {
+        exclude group: 'io.micronaut'
+    }
 
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation libs.junit.jupiter.api
 
-    testImplementation libs.managed.jcache
-    testImplementation(platform(libs.boms.micronaut.tracing))
+    testImplementation libs.jcache
+    testImplementation(platform(libs.test.boms.micronaut.tracing))
     testImplementation(libs.micronaut.tracing.jaeger) {
-        exclude module: 'micronaut-bom'
-        exclude module: 'micronaut-http-client'
-        exclude module: 'micronaut-inject'
-        exclude module: 'micronaut-runtime'
+        exclude group: 'io.micronaut'
     }
     testImplementation libs.managed.groovy.json
+    testImplementation libs.managed.groovy.templates
     // tag::testcontainers-dependencies[]
     testImplementation libs.testcontainers.spock
     // end::testcontainers-dependencies[]
@@ -64,11 +81,15 @@ dependencies {
     testAnnotationProcessor project(":test-suite-helper")
     testAnnotationProcessor project(":inject-java")
     testAnnotationProcessor project(":test-suite")
+    testAnnotationProcessor platform(libs.test.boms.micronaut.validation)
+    testAnnotationProcessor (libs.micronaut.validation.processor) {
+        exclude group: 'io.micronaut'
+    }
 
-    testRuntimeOnly(platform(libs.boms.micronaut.aws))
-    testRuntimeOnly libs.managed.h2
+    testRuntimeOnly(platform(libs.test.boms.micronaut.aws))
+    testRuntimeOnly libs.h2
     testRuntimeOnly libs.junit.vintage
-    testRuntimeOnly libs.managed.logback
+    testRuntimeOnly libs.logback.classic
     testRuntimeOnly libs.aws.java.sdk.lambda
 
     // needed for HTTP/2 tests
@@ -80,8 +101,9 @@ dependencies {
             classifier = Os.isFamily(Os.FAMILY_MAC) ? (Os.isArch("aarch64") ? "osx-aarch_64" : "osx-x86_64") : 'linux-x86_64'
         }
     }
+    testImplementation libs.managed.netty.incubator.codec.http3
     testImplementation libs.logbook.netty
-    testImplementation libs.managed.logback
+    testImplementation libs.logback.classic
 
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
         testImplementation libs.bcpkix
@@ -89,8 +111,9 @@ dependencies {
 
     testImplementation libs.managed.reactor
 
-    testFixturesApi libs.managed.spock
+    testFixturesApi libs.spock
     testFixturesApi libs.managed.groovy
+    testFixturesApi libs.jetbrains.annotations
 }
 
 //tasks.withType(Test).configureEach {

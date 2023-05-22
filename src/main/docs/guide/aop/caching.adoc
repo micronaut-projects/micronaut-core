@@ -1,4 +1,4 @@
-Like Spring and Grails, Micronaut provides caching annotations in the link:{micronautcacheapi}/io/micronaut/cache/package-summary.html[io.micronaut.cache] package.
+Like Spring and Grails, the Micronaut framework provides caching annotations in the link:{micronautcacheapi}/io/micronaut/cache/package-summary.html[io.micronaut.cache] package.
 
 The link:{micronautcacheapi}/io/micronaut/cache/CacheManager.html[CacheManager] interface allows different cache implementations to be plugged in as necessary.
 
@@ -20,10 +20,9 @@ In addition, if the underlying Cache implementation supports non-blocking cache 
 
 == Configuring Caches
 
-By default, https://github.com/ben-manes/caffeine[Caffeine] is used to create caches from application configuration. For example with `application.yml`:
+By default, https://github.com/ben-manes/caffeine[Caffeine] is used to create caches from application configuration. For example:
 
-.Cache Configuration Example
-[source,yaml]
+[configuration,title="Cache Configuration Example"]
 ----
 micronaut:
   caches:
@@ -47,7 +46,7 @@ See the https://micronaut-projects.github.io/micronaut-cache/latest/guide/config
 
 A {micronautcacheapi}/io/micronaut/cache/DynamicCacheManager.html[DynamicCacheManager] bean can be registered for use cases where caches cannot be configured ahead of time. When a cache is attempted to be retrieved that was not predefined, the dynamic cache manager is invoked to create and return a cache.
 
-By default, if there is no other dynamic cache manager defined in the application, Micronaut registers an instance of {micronautcacheapi}/io/micronaut/cache/caffeine/DefaultDynamicCacheManager.html[DefaultDynamicCacheManager] that creates Caffeine caches with default values.
+By default, if there is no other dynamic cache manager defined in the application, the Micronaut framework registers an instance of {micronautcacheapi}/io/micronaut/cache/caffeine/DefaultDynamicCacheManager.html[DefaultDynamicCacheManager] that creates Caffeine caches with default values.
 
 == Other Cache Implementations
 

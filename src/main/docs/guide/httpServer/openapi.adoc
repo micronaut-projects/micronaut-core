@@ -1,2 +1,2 @@
-To configure Micronaut integration with https://swagger.io/docs/specification/about/[OpenAPI/Swagger], please follow
+To configure the Micronaut integration with https://swagger.io/docs/specification/about/[OpenAPI/Swagger], please follow
 https://micronaut-projects.github.io/micronaut-openapi/latest/guide/index.html[these instructions]

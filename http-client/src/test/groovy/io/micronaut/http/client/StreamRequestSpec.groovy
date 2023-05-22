@@ -15,19 +15,22 @@
  */
 package io.micronaut.http.client
 
-import io.micronaut.core.async.annotation.SingleResult
 import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
-import io.micronaut.core.annotation.NonNull
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.*
+import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Header
+import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
@@ -35,7 +38,6 @@ import jakarta.inject.Inject
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.FluxSink
-import reactor.core.publisher.Mono
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
@@ -87,8 +89,8 @@ class StreamRequestSpec extends Specification {
         )).contentType(MediaType.TEXT_PLAIN_TYPE), List)).blockFirst()
 
         then:
-        result.body().size() == 5
-        result.body() == ["Number 0", "Number 1", "Number 2", "Number 3", "Number 4"]
+        // no guarantee that the strings aren't merged, so we have to allow for it
+        result.body().join("") == "Number 0Number 1Number 2Number 3Number 4"
 
     }
 
@@ -120,8 +122,8 @@ class StreamRequestSpec extends Specification {
         )).contentType(MediaType.TEXT_PLAIN_TYPE), List)).blockFirst()
 
         then:
-        result.body().size() == 5
-        result.body() == ["Number 0", "Number 1", "Number 2", "Number 3", "Number 4"]
+        // no guarantee that the strings aren't merged, so we have to allow for it
+        result.body().join("") == "Number 0Number 1Number 2Number 3Number 4"
     }
 
     void "test stream post request with POJOs"() {
@@ -133,7 +135,7 @@ class StreamRequestSpec extends Specification {
                 }
                 emitter.complete()
         }, FluxSink.OverflowStrategy.BUFFER
-        )), Argument.of(List, Book))).blockFirst()
+        )), Argument.listOf(Book))).blockFirst()
 
         then:
         result.body().size() == 5
@@ -156,7 +158,7 @@ class StreamRequestSpec extends Specification {
                 emitter.complete()
         }, FluxSink.OverflowStrategy.BUFFER
 
-        )), Argument.of(List, Book))).blockFirst()
+        )), Argument.listOf(Book))).blockFirst()
 
         then:
         result.body().size() == 5
@@ -272,7 +274,7 @@ class StreamRequestSpec extends Specification {
 
         @Post("/pojo-flowable-error")
         Publisher<Book> pojoReactiveSequenceError(@Header MediaType contentType, @Body Publisher<Book> books) {
-            return Flux.from(books).flatMap({ Book book ->
+            return Flux.from(books).concatMap ({ Book book ->
                 if(book.title.endsWith("3")) {
                     return Flux.error(new RuntimeException("Can't have books with 3"))
                 }

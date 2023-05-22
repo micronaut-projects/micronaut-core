@@ -16,9 +16,6 @@
 
 package io.micronaut.core.util.clhm;
 
-import javax.annotation.concurrent.GuardedBy;
-import javax.annotation.concurrent.Immutable;
-import javax.annotation.concurrent.ThreadSafe;
 import java.io.InvalidObjectException;
 import java.io.ObjectInputStream;
 import java.io.Serializable;
@@ -101,7 +98,7 @@ import static io.micronaut.core.util.clhm.ConcurrentLinkedHashMap.DrainStatus.RE
  * @see <a href="https://code.google.com/p/concurrentlinkedhashmap/">
  *      https://code.google.com/p/concurrentlinkedhashmap/</a>
  */
-@ThreadSafe
+// @ThreadSafe
 public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
         implements ConcurrentMap<K, V>, Serializable {
 
@@ -181,14 +178,14 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
     private final int concurrencyLevel;
 
     // These fields provide support to bound the map by a maximum capacity
-    @GuardedBy("evictionLock")
+    // @GuardedBy("evictionLock")
     private final long[] readBufferReadCount;
-    @GuardedBy("evictionLock")
+    // @GuardedBy("evictionLock")
     private final LinkedDeque<Node<K, V>> evictionDeque;
 
-    @GuardedBy("evictionLock") // must write under lock
+    // @GuardedBy("evictionLock") // must write under lock
     private final AtomicLong weightedSize;
-    @GuardedBy("evictionLock") // must write under lock
+    // @GuardedBy("evictionLock") // must write under lock
     private final AtomicLong capacity;
 
     private final Lock evictionLock;
@@ -300,12 +297,12 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
         notifyListener();
     }
 
-    @GuardedBy("evictionLock")
+    // @GuardedBy("evictionLock")
     private boolean hasOverflowed() {
         return weightedSize.get() > capacity.get();
     }
 
-    @GuardedBy("evictionLock")
+    // @GuardedBy("evictionLock")
     private void evict() {
         // Attempts to evict entries from the map if it exceeds the maximum
         // capacity. If the eviction fails due to a concurrent removal of the
@@ -416,14 +413,14 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
     }
 
     /** Drains the read and write buffers up to an amortized threshold. */
-    @GuardedBy("evictionLock")
+    // @GuardedBy("evictionLock")
     void drainBuffers() {
         drainReadBuffers();
         drainWriteBuffer();
     }
 
     /** Drains the read buffers, each up to an amortized threshold. */
-    @GuardedBy("evictionLock")
+    // @GuardedBy("evictionLock")
     void drainReadBuffers() {
         final int start = (int) Thread.currentThread().getId();
         final int end = start + NUMBER_OF_READ_BUFFERS;
@@ -432,7 +429,7 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
         }
     }
 
-    @GuardedBy("evictionLock")
+    // @GuardedBy("evictionLock")
     private void drainReadBuffer(int bufferIndex) {
         final long writeCount = readBufferWriteCount[bufferIndex].get();
         for (int i = 0; i < READ_BUFFER_DRAIN_THRESHOLD; i++) {
@@ -450,7 +447,7 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
         readBufferDrainAtWriteCount[bufferIndex].lazySet(writeCount);
     }
 
-    @GuardedBy("evictionLock")
+    // @GuardedBy("evictionLock")
     private void applyRead(Node<K, V> node) {
         // An entry may be scheduled for reordering despite having been removed.
         // This can occur when the entry was concurrently read while a writer was
@@ -462,7 +459,7 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
     }
 
     /** Drains the read buffer up to an amortized threshold. */
-    @GuardedBy("evictionLock")
+    // @GuardedBy("evictionLock")
     void drainWriteBuffer() {
         for (int i = 0; i < WRITE_BUFFER_DRAIN_THRESHOLD; i++) {
             final Runnable task = writeBuffer.poll();
@@ -514,7 +511,7 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
      *
      * @param node the entry in the page replacement policy
      */
-    @GuardedBy("evictionLock")
+    // @GuardedBy("evictionLock")
     void makeDead(Node<K, V> node) {
         for (;;) {
             WeightedValue<V> current = node.get();
@@ -1148,7 +1145,7 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
      *
      * @param <V> The value type
      **/
-    @Immutable
+    // @Immutable
     private static final class WeightedValue<V> {
         final int weight;
         final V value;
@@ -1197,9 +1194,9 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
     private static final class Node<K, V> extends AtomicReference<WeightedValue<V>>
             implements Linked<Node<K, V>> {
         final K key;
-        @GuardedBy("evictionLock")
+        // @GuardedBy("evictionLock")
         Node<K, V> prev;
-        @GuardedBy("evictionLock")
+        // @GuardedBy("evictionLock")
         Node<K, V> next;
         WeightedValue<V> weightedValue;
 
@@ -1211,25 +1208,25 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
         }
 
         @Override
-        @GuardedBy("evictionLock")
+        // @GuardedBy("evictionLock")
         public Node<K, V> getPrevious() {
             return prev;
         }
 
         @Override
-        @GuardedBy("evictionLock")
+        // @GuardedBy("evictionLock")
         public void setPrevious(Node<K, V> prev) {
             this.prev = prev;
         }
 
         @Override
-        @GuardedBy("evictionLock")
+        // @GuardedBy("evictionLock")
         public Node<K, V> getNext() {
             return next;
         }
 
         @Override
-        @GuardedBy("evictionLock")
+        // @GuardedBy("evictionLock")
         public void setNext(Node<K, V> next) {
             this.next = next;
         }
@@ -1505,7 +1502,7 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
         INSTANCE;
 
         @Override public void onEviction(Object key, Object value) {
-
+            // discard
         }
     }
 
@@ -1590,7 +1587,7 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
         }
 
         @Override
-        @GuardedBy("evictionLock")
+        // @GuardedBy("evictionLock")
         public void run() {
             weightedSize.lazySet(weightedSize.get() + weight);
 
@@ -1611,7 +1608,7 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
         }
 
         @Override
-        @GuardedBy("evictionLock")
+        // @GuardedBy("evictionLock")
         public void run() {
             // add may not have been processed yet
             evictionDeque.remove(node);
@@ -1630,7 +1627,7 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
         }
 
         @Override
-        @GuardedBy("evictionLock")
+        // @GuardedBy("evictionLock")
         public void run() {
             weightedSize.lazySet(weightedSize.get() + weightDifference);
             applyRead(node);

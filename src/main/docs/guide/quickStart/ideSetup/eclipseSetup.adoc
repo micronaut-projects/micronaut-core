@@ -1,6 +1,6 @@
 To use Eclipse IDE, it is recommended you import your Micronaut project into Eclipse using either https://projects.eclipse.org/projects/tools.buildship[Gradle BuildShip] for Gradle or https://www.eclipse.org/m2e/[M2Eclipse] for Maven.
 
-NOTE: Micronaut requires Eclipse IDE 4.9 or higher
+NOTE: The Micronaut framework requires Eclipse IDE 4.9 or higher
 
 === Eclipse and Gradle
 

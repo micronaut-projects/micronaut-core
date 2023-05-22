@@ -113,7 +113,7 @@ class UploadSpec extends AbstractMicronautSpec {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.response.getBody(Map).get()._embedded.errors[0].message == "Required argument [CompletedFileUpload file] not specified"
+        ex.response.getBody(Map).get()._embedded.errors[0].message == "Cannot convert type [class io.micronaut.http.server.netty.MicronautHttpData\$AttributeImpl] to target type: interface io.micronaut.http.multipart.CompletedFileUpload. Considering defining a TypeConverter bean to handle this case."
     }
 
     void "test completed file upload with no file name and no bytes"() {
@@ -133,7 +133,7 @@ class UploadSpec extends AbstractMicronautSpec {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.response.getBody(Map).get()._embedded.errors[0].message == "Required argument [CompletedFileUpload file] not specified"
+        ex.response.getBody(Map).get()._embedded.errors[0].message == "Cannot convert type [class io.micronaut.http.server.netty.MicronautHttpData\$AttributeImpl] to target type: interface io.micronaut.http.multipart.CompletedFileUpload. Considering defining a TypeConverter bean to handle this case."
     }
 
     void "test completed file upload with no part"() {

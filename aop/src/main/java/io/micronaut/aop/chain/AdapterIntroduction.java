@@ -43,7 +43,7 @@ final class AdapterIntroduction implements MethodInterceptor<Object, Object> {
      * Default constructor.
      *
      * @param beanContext The bean context
-     * @param method The target method
+     * @param method      The target method
      */
     AdapterIntroduction(BeanContext beanContext, ExecutableMethod<?, ?> method) {
         Class<?> beanType = method.classValue(Adapter.class, ADAPTED_BEAN).orElse(null);
@@ -52,27 +52,28 @@ final class AdapterIntroduction implements MethodInterceptor<Object, Object> {
             throw new IllegalStateException("No bean type to adapt found in Adapter configuration for method: " + method);
         }
 
-        String beanMethod  = method.stringValue(Adapter.class, ADAPTED_METHOD).orElse(null);
+        String beanMethod = method.stringValue(Adapter.class, ADAPTED_METHOD).orElse(null);
         if (StringUtils.isEmpty(beanMethod)) {
             throw new IllegalStateException("No bean method to adapt found in Adapter configuration for method: " + method);
         }
 
-        String beanQualifier  = method.stringValue(Adapter.class, ADAPTED_QUALIFIER).orElse(null);
-        Class[] argumentTypes = method.classValues(Adapter.class, ADAPTED_ARGUMENT_TYPES);
-        Class[] methodArgumentTypes = method.getArgumentTypes();
+        String beanQualifier = method.stringValue(Adapter.class, ADAPTED_QUALIFIER).orElse(null);
+        Class<?>[] argumentTypes = method.classValues(Adapter.class, ADAPTED_ARGUMENT_TYPES);
+        Class<?>[] methodArgumentTypes = method.getArgumentTypes();
+        Class<?>[] arguments = argumentTypes.length == methodArgumentTypes.length ? argumentTypes : methodArgumentTypes;
         if (StringUtils.isNotEmpty(beanQualifier)) {
             this.executionHandle = beanContext.findExecutionHandle(
-                    beanType,
-                    Qualifiers.byName(beanQualifier),
-                    beanMethod,
-                    argumentTypes.length == methodArgumentTypes.length ? argumentTypes : methodArgumentTypes
+                beanType,
+                Qualifiers.byName(beanQualifier),
+                beanMethod,
+                arguments
             ).orElseThrow(() -> new IllegalStateException("Cannot adapt method [" + method + "]. Target method [" + beanMethod + "] not found on bean " + beanType));
 
         } else {
             this.executionHandle = beanContext.findExecutionHandle(
-                    beanType,
-                    beanMethod,
-                    argumentTypes.length == methodArgumentTypes.length  ? argumentTypes : methodArgumentTypes
+                beanType,
+                beanMethod,
+                arguments
             ).orElseThrow(() -> new IllegalStateException("Cannot adapt method [" + method + "]. Target method [" + beanMethod + "] not found on bean " + beanType));
         }
     }

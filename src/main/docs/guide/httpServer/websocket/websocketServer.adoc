@@ -39,7 +39,7 @@ The previous example uses the `broadcastSync` method of the api:websocket.WebSoc
 
 snippet::io.micronaut.docs.http.server.netty.websocket.ReactivePojoChatServerWebSocket[tags="onmessage", indent=0,title="WebSocket Chat Example"]
 
-The example above uses `broadcast`, which creates an instance of rs:Publisher[] and returns the value to Micronaut. Micronaut sends the message asynchronously based on the Publisher interface. The similar `send` method sends a single message asynchronously via Micronaut return value.
+The example above uses `broadcast`, which creates an instance of rs:Publisher[] and returns the value to Micronaut. The Micronaut framework sends the message asynchronously based on the Publisher interface. The similar `send` method sends a single message asynchronously via Micronaut return value.
 
 For sending messages asynchronously outside Micronaut annotated handler methods, you can use `broadcastAsync` and `sendAsync` methods in their respective api:websocket.WebSocketBroadcaster[] and api:websocket.WebSocketSession[] interfaces. For blocking sends, the `broadcastSync` and `sendSync` methods can be used.
 
@@ -68,23 +68,23 @@ $ mn create-websocket-server MyChat
 
 === Connection Timeouts
 
-By default, Micronaut times out idle connections with no activity after five minutes. Normally this is not a problem as browsers automatically reconnect WebSocket sessions, however you can control this behaviour by setting the `micronaut.server.idle-timeout` setting (a negative value results in no timeout):
+By default, Micronaut framework times out idle connections with no activity after five minutes. Normally this is not a problem as browsers automatically reconnect WebSocket sessions, however you can control this behaviour by setting the `micronaut.server.idle-timeout` setting (a negative value results in no timeout):
 
 .Setting the Connection Timeout for the Server
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:
-    idle-timeout: 30m # 30 minutes
+    idle-timeout: 30m
 ----
 
 If you use Micronaut's WebSocket client you may also wish to set the timeout on the client:
 
 .Setting the Connection Timeout for the Client
-[source,yaml]
+[configuration]
 ----
 micronaut:
   http:
     client:
-      read-idle-timeout: 30m # 30 minutes
+      read-idle-timeout: 30m
 ----

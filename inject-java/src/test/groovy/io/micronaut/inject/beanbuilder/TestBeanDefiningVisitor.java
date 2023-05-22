@@ -4,7 +4,6 @@ import io.micronaut.aop.InterceptorBean;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.InterceptorBindingDefinitions;
 import io.micronaut.aop.InterceptorKind;
-import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.env.Environment;

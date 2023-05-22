@@ -19,6 +19,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.expressions.EvaluatedExpression;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -43,6 +44,9 @@ import java.util.stream.Stream;
  * <p>If a member is not present then the methods of the class will attempt to resolve the default value for a given annotation member. In this sense the behaviour of this class is similar to how
  * a implementation of {@link Annotation} behaves.</p>
  *
+ * NOTE: During the mapping or remapping, nullable stereotypes value means that
+ * the stereotypes will be filled from the annotation definition, when empty collection will skip it.
+ *
  * @param <A> The annotation type
  * @author Graeme Rocher
  * @since 1.0
@@ -52,9 +56,11 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     private final String annotationName;
     private final ConvertibleValues<Object> convertibleValues;
     private final Map<CharSequence, Object> values;
-    private final Map<String, Object> defaultValues;
+    @Nullable
+    private final Map<CharSequence, Object> defaultValues;
     private final Function<Object, Object> valueMapper;
     private final RetentionPolicy retentionPolicy;
+    @Nullable
     private final List<AnnotationValue<?>> stereotypes;
 
     /**
@@ -64,7 +70,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     @UsedByGeneratedCode
     @Internal
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values) {
-        this(annotationName, values, Collections.emptyMap());
+        this(annotationName, values, null, RetentionPolicy.RUNTIME);
     }
 
     /**
@@ -74,7 +80,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @Internal
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
-        this(annotationName, values, Collections.emptyMap(), retentionPolicy, null);
+        this(annotationName, values, null, retentionPolicy, null);
     }
 
     /**
@@ -85,7 +91,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @Internal
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values, RetentionPolicy retentionPolicy, List<AnnotationValue<?>> stereotypes) {
-        this(annotationName, values, Collections.emptyMap(), retentionPolicy, stereotypes);
+        this(annotationName, values, null, retentionPolicy, stereotypes);
     }
 
 
@@ -96,7 +102,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @UsedByGeneratedCode
     @Internal
-    public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<String, Object> defaultValues) {
+    public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<CharSequence, Object> defaultValues) {
         this(annotationName, values, defaultValues, RetentionPolicy.RUNTIME, null);
     }
 
@@ -108,7 +114,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @UsedByGeneratedCode
     @Internal
-    public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<String, Object> defaultValues, RetentionPolicy retentionPolicy) {
+    public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<CharSequence, Object> defaultValues, RetentionPolicy retentionPolicy) {
         this(annotationName, values, defaultValues, retentionPolicy, null);
     }
 
@@ -120,11 +126,11 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @param stereotypes     The stereotypes of the annotation
      */
     @Internal
-    public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<String, Object> defaultValues, RetentionPolicy retentionPolicy, List<AnnotationValue<?>> stereotypes) {
+    public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<CharSequence, Object> defaultValues, RetentionPolicy retentionPolicy, List<AnnotationValue<?>> stereotypes) {
         this.annotationName = annotationName;
         this.convertibleValues = newConvertibleValues(values);
         this.values = values;
-        this.defaultValues = defaultValues != null ? defaultValues : Collections.emptyMap();
+        this.defaultValues = defaultValues;
         this.valueMapper = null;
         this.retentionPolicy = retentionPolicy != null ? retentionPolicy : RetentionPolicy.RUNTIME;
         this.stereotypes = stereotypes;
@@ -133,7 +139,6 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     /**
      * @param annotationName The annotation name
      */
-    @SuppressWarnings("unchecked")
     @UsedByGeneratedCode
     @Internal
     public AnnotationValue(String annotationName) {
@@ -148,17 +153,14 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     public AnnotationValue(String annotationName, ConvertibleValues<Object> convertibleValues) {
         this.annotationName = annotationName;
         this.convertibleValues = convertibleValues;
-        Map<String, Object> existing = convertibleValues.asMap();
-        this.values = new HashMap<>(existing);
-        this.defaultValues = Collections.emptyMap();
+        this.values = new LinkedHashMap<>(convertibleValues.asMap());
+        this.defaultValues = null;
         this.valueMapper = null;
         this.retentionPolicy = RetentionPolicy.RUNTIME;
         this.stereotypes = null;
     }
 
     /**
-     * Internal copy constructor.
-     *
      * @param target            The target
      * @param defaultValues     The default values
      * @param convertibleValues The convertible values
@@ -166,18 +168,27 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @Internal
     @UsedByGeneratedCode
-    protected AnnotationValue(
-            AnnotationValue<A> target,
-            Map<String, Object> defaultValues,
-            ConvertibleValues<Object> convertibleValues,
-            Function<Object, Object> valueMapper) {
+    public AnnotationValue(AnnotationValue<A> target,
+                           Map<CharSequence, Object> defaultValues,
+                           ConvertibleValues<Object> convertibleValues,
+                           Function<Object, Object> valueMapper) {
         this.annotationName = target.annotationName;
-        this.defaultValues = defaultValues != null ? defaultValues : target.defaultValues;
+        this.defaultValues = defaultValues;
         this.values = target.values;
         this.convertibleValues = convertibleValues;
         this.valueMapper = valueMapper;
         this.retentionPolicy = RetentionPolicy.RUNTIME;
-        this.stereotypes = null;
+        this.stereotypes = target.stereotypes;
+    }
+
+    /**
+     * Creates a builder with the initial value of this annotation.
+     *
+     * @return The builder with this annotation value
+     * @since 4.0.0
+     */
+    public AnnotationValueBuilder<A> mutate() {
+        return builder(this);
     }
 
     /**
@@ -194,6 +205,16 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     @Nullable
     public List<AnnotationValue<?>> getStereotypes() {
         return stereotypes;
+    }
+
+    /**
+     * The default values.
+     * @return The default of the annotation or null if not specified.
+     * @since 4.0.0
+     */
+    @Nullable
+    public Map<CharSequence, Object> getDefaultValues() {
+        return defaultValues;
     }
 
     /**
@@ -216,8 +237,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @param member The member
      * @return The properties as a immutable map.
      */
-    public @NonNull
-    Map<String, String> getProperties(@NonNull String member) {
+    @NonNull
+    public Map<String, String> getProperties(@NonNull String member) {
         return getProperties(member, "name");
     }
 
@@ -231,20 +252,21 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     public Map<String, String> getProperties(@NonNull String member, String keyMember) {
         ArgumentUtils.requireNonNull("keyMember", keyMember);
-        if (StringUtils.isNotEmpty(member)) {
-            List<AnnotationValue<Annotation>> values = getAnnotations(member);
-            if (CollectionUtils.isNotEmpty(values)) {
-                Map<String, String> props = new LinkedHashMap<>(values.size());
-                for (AnnotationValue<Annotation> av : values) {
-                    String name = av.stringValue(keyMember).orElse(null);
-                    if (StringUtils.isNotEmpty(name)) {
-                        av.stringValue(AnnotationMetadata.VALUE_MEMBER, valueMapper).ifPresent(v -> props.put(name, v));
-                    }
-                }
-                return Collections.unmodifiableMap(props);
+        if (StringUtils.isEmpty(member)) {
+            return Collections.emptyMap();
+        }
+        List<AnnotationValue<Annotation>> values = getAnnotations(member);
+        if (CollectionUtils.isEmpty(values)) {
+            return Collections.emptyMap();
+        }
+        Map<String, String> props = CollectionUtils.newLinkedHashMap(values.size());
+        for (AnnotationValue<Annotation> av : values) {
+            String name = av.stringValue(keyMember).orElse(null);
+            if (StringUtils.isNotEmpty(name)) {
+                av.stringValue(AnnotationMetadata.VALUE_MEMBER, valueMapper).ifPresent(v -> props.put(name, v));
             }
         }
-        return Collections.emptyMap();
+        return Collections.unmodifiableMap(props);
     }
 
     /**
@@ -256,7 +278,6 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return An {@link Optional} of the enum value
      */
     @Override
-    @SuppressWarnings("unchecked")
     public <E extends Enum> Optional<E> enumValue(@NonNull String member, @NonNull Class<E> enumType) {
         return enumValue(member, enumType, valueMapper);
     }
@@ -270,14 +291,14 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @param <E>         The enum type
      * @return An {@link Optional} of the enum value
      */
-    @SuppressWarnings("unchecked")
     public <E extends Enum> Optional<E> enumValue(@NonNull String member, @NonNull Class<E> enumType, Function<Object, Object> valueMapper) {
         ArgumentUtils.requireNonNull("enumType", enumType);
-        if (StringUtils.isNotEmpty(member)) {
-            Object o = getRawSingleValue(member, valueMapper);
-            if (o != null) {
-                return convertToEnum(enumType, o);
-            }
+        if (StringUtils.isEmpty(member)) {
+            return Optional.empty();
+        }
+        Object o = getRawSingleValue(member, valueMapper);
+        if (o != null) {
+            return convertToEnum(enumType, o);
         }
         return Optional.empty();
     }
@@ -294,11 +315,11 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     @SuppressWarnings("unchecked")
     public <E extends Enum> E[] enumValues(@NonNull String member, @NonNull Class<E> enumType) {
         ArgumentUtils.requireNonNull("enumType", enumType);
-        if (StringUtils.isNotEmpty(member)) {
-            Object rawValue = values.get(member);
-            return resolveEnumValues(enumType, rawValue);
+        if (StringUtils.isEmpty(member)) {
+            return (E[]) Array.newInstance(enumType, 0);
         }
-        return (E[]) Array.newInstance(enumType, 0);
+        Object rawValue = values.get(member);
+        return resolveEnumValues(enumType, rawValue);
     }
 
     /**
@@ -307,8 +328,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return An {@link Optional} class
      */
     @Override
-    public @NonNull
-    Optional<Class<?>> classValue() {
+    @NonNull
+    public Optional<Class<?>> classValue() {
         return classValue(AnnotationMetadata.VALUE_MEMBER);
     }
 
@@ -319,7 +340,6 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return An {@link Optional} class
      */
     @Override
-    @SuppressWarnings("unchecked")
     public Optional<Class<?>> classValue(@NonNull String member) {
         return classValue(member, valueMapper);
     }
@@ -336,25 +356,27 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     @SuppressWarnings("unchecked")
     public <T> Optional<Class<? extends T>> classValue(@NonNull String member, @NonNull Class<T> requiredType) {
         ArgumentUtils.requireNonNull("requiredType", requiredType);
-        if (StringUtils.isNotEmpty(member)) {
-            Object o = getRawSingleValue(member, valueMapper);
-            if (o instanceof AnnotationClassValue) {
-                Class<?> t = ((AnnotationClassValue<?>) o).getType().orElse(null);
-                if (t != null && requiredType.isAssignableFrom(t)) {
-                    return Optional.of((Class<? extends T>) t);
-                }
-                return Optional.empty();
-            } else if (o instanceof Class) {
-                Class t = (Class) o;
-                if (requiredType.isAssignableFrom(t)) {
-                    return Optional.of((Class<? extends T>) t);
-                }
-                return Optional.empty();
-            } else if (o != null) {
-                Class t = ClassUtils.forName(o.toString(), getClass().getClassLoader()).orElse(null);
-                if (t != null && requiredType.isAssignableFrom(t)) {
-                    return Optional.of((Class<? extends T>) t);
-                }
+        if (StringUtils.isEmpty(member)) {
+            return Optional.empty();
+        }
+        Object o = getRawSingleValue(member, valueMapper);
+        if (o instanceof AnnotationClassValue<?> annotationClassValue) {
+            Class<?> t = annotationClassValue.getType().orElse(null);
+            if (t != null && requiredType.isAssignableFrom(t)) {
+                return Optional.of((Class<? extends T>) t);
+            }
+            return Optional.empty();
+        }
+        if (o instanceof Class<?> t) {
+            if (requiredType.isAssignableFrom(t)) {
+                return Optional.of((Class<? extends T>) t);
+            }
+            return Optional.empty();
+        }
+        if (o != null) {
+            Class<?> t = ClassUtils.forName(o.toString(), getClass().getClassLoader()).orElse(null);
+            if (t != null && requiredType.isAssignableFrom(t)) {
+                return Optional.of((Class<? extends T>) t);
             }
         }
         return Optional.empty();
@@ -368,13 +390,14 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return An {@link Optional} class
      */
     public Optional<Class<?>> classValue(@NonNull String member, @Nullable Function<Object, Object> valueMapper) {
-        if (StringUtils.isNotEmpty(member)) {
-            Object o = getRawSingleValue(member, valueMapper);
-            if (o instanceof AnnotationClassValue) {
-                return ((AnnotationClassValue) o).getType();
-            } else if (o instanceof Class) {
-                return Optional.of(((Class) o));
-            }
+        if (StringUtils.isEmpty(member)) {
+            return Optional.empty();
+        }
+        Object o = getRawSingleValue(member, valueMapper);
+        if (o instanceof AnnotationClassValue annotationClassValue) {
+            return annotationClassValue.getType();
+        } else if (o instanceof Class<?> aClass) {
+            return Optional.of(aClass);
         }
         return Optional.empty();
     }
@@ -389,66 +412,70 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     @Override
     public boolean[] booleanValues(String member) {
         Object v = values.get(member);
-        if (v != null) {
-            if (v instanceof boolean[]) {
-                return (boolean[]) v;
-            } else if (v instanceof Boolean) {
-                return new boolean[] { (Boolean) v };
-            } else {
-                String[] strings = resolveStringValues(v, this.valueMapper);
-                if (ArrayUtils.isNotEmpty(strings)) {
-                    boolean[] booleans = new boolean[strings.length];
-                    for (int i = 0; i < strings.length; i++) {
-                        String string = strings[i];
-                        booleans[i] = Boolean.parseBoolean(string);
-                    }
-                    return booleans;
-                }
-            }
+        if (v == null) {
+            return ArrayUtils.EMPTY_BOOLEAN_ARRAY;
         }
-        return ArrayUtils.EMPTY_BOOLEAN_ARRAY;
+        if (v instanceof boolean[] booleans) {
+            return booleans;
+        }
+        if (v instanceof Boolean aBoolean) {
+            return new boolean[]{aBoolean};
+        }
+        String[] strings = resolveStringValues(v, this.valueMapper);
+        if (ArrayUtils.isEmpty(strings)) {
+            return ArrayUtils.EMPTY_BOOLEAN_ARRAY;
+        }
+        boolean[] booleans = new boolean[strings.length];
+        for (int i = 0; i < strings.length; i++) {
+            String string = strings[i];
+            booleans[i] = Boolean.parseBoolean(string);
+        }
+        return booleans;
     }
 
     @Override
     public byte[] byteValues(String member) {
         Object v = values.get(member);
-        if (v != null) {
-            if (v instanceof byte[]) {
-                return (byte[]) v;
-            } else if (v instanceof Number) {
-                return new byte[] { ((Number) v).byteValue() };
-            } else {
-                String[] strings = resolveStringValues(v, this.valueMapper);
-                if (ArrayUtils.isNotEmpty(strings)) {
-                    byte[] bytes = new byte[strings.length];
-                    for (int i = 0; i < strings.length; i++) {
-                        String string = strings[i];
-                        bytes[i] = Byte.parseByte(string);
-                    }
-                    return bytes;
-                }
-            }
+        if (v == null) {
+            return ArrayUtils.EMPTY_BYTE_ARRAY;
         }
-        return ArrayUtils.EMPTY_BYTE_ARRAY;
+        if (v instanceof byte[] bytes) {
+            return bytes;
+        }
+        if (v instanceof Number number) {
+            return new byte[]{number.byteValue()};
+        }
+        String[] strings = resolveStringValues(v, this.valueMapper);
+        if (ArrayUtils.isEmpty(strings)) {
+            return ArrayUtils.EMPTY_BYTE_ARRAY;
+        }
+        byte[] bytes = new byte[strings.length];
+        for (int i = 0; i < strings.length; i++) {
+            String string = strings[i];
+            bytes[i] = Byte.parseByte(string);
+        }
+        return bytes;
     }
 
     @Override
     public char[] charValues(String member) {
         Object v = values.get(member);
-        if (v != null) {
-            if (v instanceof char[]) {
-                return (char[]) v;
-            } else if (v instanceof Character[]) {
-                Character[] v2 = (Character[]) v;
-                char[] chars = new char[v2.length];
-                for (int i = 0; i < v2.length; i++) {
-                    Character character = v2[i];
-                    chars[i] = character;
-                }
-                return chars;
-            } else if (v instanceof Character) {
-                return new char[] { (Character) v };
+        if (v == null) {
+            return ArrayUtils.EMPTY_CHAR_ARRAY;
+        }
+        if (v instanceof char[] chars) {
+            return chars;
+        }
+        if (v instanceof Character[] v2) {
+            char[] chars = new char[v2.length];
+            for (int i = 0; i < v2.length; i++) {
+                Character character = v2[i];
+                chars[i] = character;
             }
+            return chars;
+        }
+        if (v instanceof Character character) {
+            return new char[]{character};
         }
         return ArrayUtils.EMPTY_CHAR_ARRAY;
     }
@@ -456,116 +483,121 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     @Override
     public int[] intValues(String member) {
         Object v = values.get(member);
-        if (v != null) {
-            if (v instanceof int[]) {
-                return (int[]) v;
-            } else if (v instanceof Number) {
-                return new int[] { ((Number) v).intValue() };
-            } else {
-                String[] strings = resolveStringValues(v, this.valueMapper);
-                if (ArrayUtils.isNotEmpty(strings)) {
-                    int[] integers = new int[strings.length];
-                    for (int i = 0; i < strings.length; i++) {
-                        String string = strings[i];
-                        integers[i] = Integer.parseInt(string);
-                    }
-                    return integers;
-                }
-            }
+        if (v == null) {
+            return ArrayUtils.EMPTY_INT_ARRAY;
         }
-        return ArrayUtils.EMPTY_INT_ARRAY;
+        if (v instanceof int[] ints) {
+            return ints;
+        }
+        if (v instanceof Number number) {
+            return new int[]{number.intValue()};
+        }
+        String[] strings = resolveStringValues(v, this.valueMapper);
+        if (ArrayUtils.isEmpty(strings)) {
+            return ArrayUtils.EMPTY_INT_ARRAY;
+        }
+        int[] integers = new int[strings.length];
+        for (int i = 0; i < strings.length; i++) {
+            String string = strings[i];
+            integers[i] = Integer.parseInt(string);
+        }
+        return integers;
     }
 
     @Override
     public double[] doubleValues(String member) {
         Object v = values.get(member);
-        if (v != null) {
-            if (v instanceof double[]) {
-                return (double[]) v;
-            } else if (v instanceof Number) {
-                return new double[] { ((Number) v).doubleValue() };
-            } else {
-                String[] strings = resolveStringValues(v, this.valueMapper);
-                if (ArrayUtils.isNotEmpty(strings)) {
-                    double[] doubles = new double[strings.length];
-                    for (int i = 0; i < strings.length; i++) {
-                        String string = strings[i];
-                        doubles[i] = Double.parseDouble(string);
-                    }
-                    return doubles;
-                }
-            }
+        if (v == null) {
+            return ArrayUtils.EMPTY_DOUBLE_ARRAY;
         }
-        return ArrayUtils.EMPTY_DOUBLE_ARRAY;
+        if (v instanceof double[] doubles) {
+            return doubles;
+        }
+        if (v instanceof Number number) {
+            return new double[]{number.doubleValue()};
+        }
+        String[] strings = resolveStringValues(v, this.valueMapper);
+        if (ArrayUtils.isEmpty(strings)) {
+            return ArrayUtils.EMPTY_DOUBLE_ARRAY;
+        }
+        double[] doubles = new double[strings.length];
+        for (int i = 0; i < strings.length; i++) {
+            String string = strings[i];
+            doubles[i] = Double.parseDouble(string);
+        }
+        return doubles;
     }
 
     @Override
     public long[] longValues(String member) {
         Object v = values.get(member);
-        if (v != null) {
-            if (v instanceof long[]) {
-                return (long[]) v;
-            } else if (v instanceof Number) {
-                return new long[] { ((Number) v).longValue() };
-            } else {
-                String[] strings = resolveStringValues(v, this.valueMapper);
-                if (ArrayUtils.isNotEmpty(strings)) {
-                    long[] longs = new long[strings.length];
-                    for (int i = 0; i < strings.length; i++) {
-                        String string = strings[i];
-                        longs[i] = Long.parseLong(string);
-                    }
-                    return longs;
-                }
-            }
+        if (v == null) {
+            return ArrayUtils.EMPTY_LONG_ARRAY;
         }
-        return ArrayUtils.EMPTY_LONG_ARRAY;
+        if (v instanceof long[] longs) {
+            return longs;
+        }
+        if (v instanceof Number number) {
+            return new long[]{number.longValue()};
+        }
+        String[] strings = resolveStringValues(v, this.valueMapper);
+        if (ArrayUtils.isEmpty(strings)) {
+            return ArrayUtils.EMPTY_LONG_ARRAY;
+        }
+        long[] longs = new long[strings.length];
+        for (int i = 0; i < strings.length; i++) {
+            String string = strings[i];
+            longs[i] = Long.parseLong(string);
+        }
+        return longs;
     }
 
     @Override
     public float[] floatValues(String member) {
         Object v = values.get(member);
-        if (v != null) {
-            if (v instanceof float[]) {
-                return (float[]) v;
-            } else if (v instanceof Number) {
-                return new float[] { ((Number) v).floatValue() };
-            } else {
-                String[] strings = resolveStringValues(v, this.valueMapper);
-                if (ArrayUtils.isNotEmpty(strings)) {
-                    float[] floats = new float[strings.length];
-                    for (int i = 0; i < strings.length; i++) {
-                        String string = strings[i];
-                        floats[i] = Float.parseFloat(string);
-                    }
-                    return floats;
-                }
-            }
+        if (v == null) {
+            return ArrayUtils.EMPTY_FLOAT_ARRAY;
         }
-        return ArrayUtils.EMPTY_FLOAT_ARRAY;
+        if (v instanceof float[] floats) {
+            return floats;
+        }
+        if (v instanceof Number number) {
+            return new float[]{number.floatValue()};
+        }
+        String[] strings = resolveStringValues(v, this.valueMapper);
+        if (ArrayUtils.isEmpty(strings)) {
+            return ArrayUtils.EMPTY_FLOAT_ARRAY;
+        }
+        float[] floats = new float[strings.length];
+        for (int i = 0; i < strings.length; i++) {
+            String string = strings[i];
+            floats[i] = Float.parseFloat(string);
+        }
+        return floats;
     }
 
     @Override
     public short[] shortValues(String member) {
         Object v = values.get(member);
-        if (v != null) {
-            if (v instanceof short[]) {
-                return (short[]) v;
-            } else if (v instanceof Number) {
-                return new short[] { ((Number) v).shortValue() };
-            } else {
-                String[] strings = resolveStringValues(v, this.valueMapper);
-                if (ArrayUtils.isNotEmpty(strings)) {
-                    short[] shorts = new short[strings.length];
-                    for (int i = 0; i < strings.length; i++) {
-                        String string = strings[i];
-                        shorts[i] = Short.parseShort(string);
-                    }
-                    return shorts;
-                }
-            }
+        if (v == null) {
+            return ArrayUtils.EMPTY_SHORT_ARRAY;
         }
-        return ArrayUtils.EMPTY_SHORT_ARRAY;
+        if (v instanceof short[] shorts) {
+            return shorts;
+        }
+        if (v instanceof Number number) {
+            return new short[]{number.shortValue()};
+        }
+        String[] strings = resolveStringValues(v, this.valueMapper);
+        if (ArrayUtils.isEmpty(strings)) {
+            return ArrayUtils.EMPTY_SHORT_ARRAY;
+        }
+        short[] shorts = new short[strings.length];
+        for (int i = 0; i < strings.length; i++) {
+            String string = strings[i];
+            shorts[i] = Short.parseShort(string);
+        }
+        return shorts;
     }
 
     /**
@@ -576,25 +608,26 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The string values
      */
     public String[] stringValues(@NonNull String member, Function<Object, Object> valueMapper) {
-        if (StringUtils.isNotEmpty(member)) {
-            Object o = values.get(member);
-            String[] strs = resolveStringValues(o, valueMapper);
-            if (strs != null) {
-                return strs;
-            }
+        if (StringUtils.isEmpty(member)) {
+            return StringUtils.EMPTY_STRING_ARRAY;
+        }
+        Object o = values.get(member);
+        String[] strs = resolveStringValues(o, valueMapper);
+        if (strs != null) {
+            return strs;
         }
         return StringUtils.EMPTY_STRING_ARRAY;
     }
 
     @Override
     public Class<?>[] classValues(@NonNull String member) {
-        if (StringUtils.isNotEmpty(member)) {
-            Object o = values.get(member);
-            Class<?>[] type = resolveClassValues(o);
-            if (type != null) {
-                return type;
-            }
-
+        if (StringUtils.isEmpty(member)) {
+            return ReflectionUtils.EMPTY_CLASS_ARRAY;
+        }
+        Object o = values.get(member);
+        Class<?>[] type = resolveClassValues(o);
+        if (type != null) {
+            return type;
         }
         return ReflectionUtils.EMPTY_CLASS_ARRAY;
     }
@@ -602,28 +635,31 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     @NonNull
     @Override
     public AnnotationClassValue<?>[] annotationClassValues(@NonNull String member) {
-        if (StringUtils.isNotEmpty(member)) {
-            Object o = values.get(member);
-            if (o instanceof AnnotationClassValue) {
-                return new AnnotationClassValue[]{(AnnotationClassValue) o};
-            } else if (o instanceof AnnotationClassValue[]) {
-                return (AnnotationClassValue<?>[]) o;
-            }
+        if (StringUtils.isEmpty(member)) {
+            return AnnotationClassValue.EMPTY_ARRAY;
+        }
+        Object o = values.get(member);
+        if (o instanceof AnnotationClassValue<?> annotationClassValue) {
+            return new AnnotationClassValue[]{annotationClassValue};
+        }
+        if (o instanceof AnnotationClassValue<?>[] annotationClassValues) {
+            return annotationClassValues;
         }
         return AnnotationClassValue.EMPTY_ARRAY;
     }
 
     @Override
     public Optional<AnnotationClassValue<?>> annotationClassValue(@NonNull String member) {
-        if (StringUtils.isNotEmpty(member)) {
-            Object o = values.get(member);
-            if (o instanceof AnnotationClassValue) {
-                return Optional.of((AnnotationClassValue<?>) o);
-            } else if (o instanceof AnnotationClassValue[]) {
-                AnnotationClassValue[] a = (AnnotationClassValue[]) o;
-                if (a.length > 0) {
-                    return Optional.of(a[0]);
-                }
+        if (StringUtils.isEmpty(member)) {
+            return Optional.empty();
+        }
+        Object o = values.get(member);
+        if (o instanceof AnnotationClassValue<?> annotationClassValue) {
+            return Optional.of(annotationClassValue);
+        }
+        if (o instanceof AnnotationClassValue<?>[] annotationClassValues) {
+            if (annotationClassValues.length > 0) {
+                return Optional.of(annotationClassValues[0]);
             }
         }
         return Optional.empty();
@@ -648,16 +684,25 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return An {@link OptionalInt}
      */
     public OptionalInt intValue(@NonNull String member, @Nullable Function<Object, Object> valueMapper) {
-        if (StringUtils.isNotEmpty(member)) {
-            Object o = getRawSingleValue(member, valueMapper);
-            if (o instanceof Number) {
-                return OptionalInt.of(((Number) o).intValue());
-            } else if (o instanceof CharSequence) {
-                try {
-                    return OptionalInt.of(Integer.parseInt(o.toString()));
-                } catch (NumberFormatException e) {
-                    return OptionalInt.empty();
-                }
+        if (StringUtils.isEmpty(member)) {
+            return OptionalInt.empty();
+        }
+        Object o = getRawSingleValue(member, valueMapper);
+        if (o instanceof Number number) {
+            return OptionalInt.of(number.intValue());
+        }
+        if (o instanceof String s) {
+            try {
+                return OptionalInt.of(Integer.parseInt(s));
+            } catch (NumberFormatException e) {
+                return OptionalInt.empty();
+            }
+        }
+        if (o instanceof CharSequence charSequence) {
+            try {
+                return OptionalInt.of(Integer.parseInt(charSequence.toString()));
+            } catch (NumberFormatException e) {
+                return OptionalInt.empty();
             }
         }
         return OptionalInt.empty();
@@ -665,16 +710,18 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
     @Override
     public Optional<Byte> byteValue(String member) {
-        if (StringUtils.isNotEmpty(member)) {
-            Object o = getRawSingleValue(member, valueMapper);
-            if (o instanceof Number) {
-                return Optional.of(((Number) o).byteValue());
-            } else if (o instanceof CharSequence) {
-                try {
-                    return Optional.of(Byte.parseByte(o.toString()));
-                } catch (NumberFormatException e) {
-                    return Optional.empty();
-                }
+        if (StringUtils.isEmpty(member)) {
+            return Optional.empty();
+        }
+        Object o = getRawSingleValue(member, valueMapper);
+        if (o instanceof Number number) {
+            return Optional.of(number.byteValue());
+        }
+        if (o instanceof CharSequence charSequence) {
+            try {
+                return Optional.of(Byte.parseByte(charSequence.toString()));
+            } catch (NumberFormatException e) {
+                return Optional.empty();
             }
         }
         return Optional.empty();
@@ -682,11 +729,12 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
     @Override
     public Optional<Character> charValue(String member) {
-        if (StringUtils.isNotEmpty(member)) {
-            Object o = getRawSingleValue(member, valueMapper);
-            if (o instanceof Character) {
-                return Optional.of(((Character) o));
-            }
+        if (StringUtils.isEmpty(member)) {
+            return Optional.empty();
+        }
+        Object o = getRawSingleValue(member, valueMapper);
+        if (o instanceof Character character) {
+            return Optional.of(character);
         }
         return Optional.empty();
     }
@@ -703,7 +751,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
     @Override
     public OptionalLong longValue(@NonNull String member) {
-        return longValue(member, null);
+        return longValue(member, valueMapper);
     }
 
     /**
@@ -714,16 +762,25 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return An {@link OptionalLong}
      */
     public OptionalLong longValue(@NonNull String member, @Nullable Function<Object, Object> valueMapper) {
-        if (StringUtils.isNotEmpty(member)) {
-            Object o = getRawSingleValue(member, valueMapper);
-            if (o instanceof Number) {
-                return OptionalLong.of((((Number) o).longValue()));
-            } else if (o instanceof CharSequence) {
-                try {
-                    return OptionalLong.of(Long.parseLong(o.toString()));
-                } catch (NumberFormatException e) {
-                    return OptionalLong.empty();
-                }
+        if (StringUtils.isEmpty(member)) {
+            return OptionalLong.empty();
+        }
+        Object o = getRawSingleValue(member, valueMapper);
+        if (o instanceof Number number) {
+            return OptionalLong.of(number.longValue());
+        }
+        if (o instanceof String s) {
+            try {
+                return OptionalLong.of(Long.parseLong(s));
+            } catch (NumberFormatException e) {
+                return OptionalLong.empty();
+            }
+        }
+        if (o instanceof CharSequence charSequence) {
+            try {
+                return OptionalLong.of(Long.parseLong(charSequence.toString()));
+            } catch (NumberFormatException e) {
+                return OptionalLong.empty();
             }
         }
         return OptionalLong.empty();
@@ -731,7 +788,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
     @Override
     public Optional<Short> shortValue(@NonNull String member) {
-        return shortValue(member, null);
+        return shortValue(member, valueMapper);
     }
 
     /**
@@ -742,16 +799,18 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return An {@link Optional} of {@link Short}
      */
     public Optional<Short> shortValue(@NonNull String member, @Nullable Function<Object, Object> valueMapper) {
-        if (StringUtils.isNotEmpty(member)) {
-            Object o = getRawSingleValue(member, valueMapper);
-            if (o instanceof Number) {
-                return Optional.of((((Number) o).shortValue()));
-            } else if (o instanceof CharSequence) {
-                try {
-                    return Optional.of(Short.parseShort(o.toString()));
-                } catch (NumberFormatException e) {
-                    return Optional.empty();
-                }
+        if (StringUtils.isEmpty(member)) {
+            return Optional.empty();
+        }
+        Object o = getRawSingleValue(member, valueMapper);
+        if (o instanceof Number number) {
+            return Optional.of(number.shortValue());
+        }
+        if (o instanceof CharSequence charSequence) {
+            try {
+                return Optional.of(Short.parseShort(charSequence.toString()));
+            } catch (NumberFormatException e) {
+                return Optional.empty();
             }
         }
         return Optional.empty();
@@ -765,13 +824,18 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return An {@link Optional} boolean
      */
     public Optional<Boolean> booleanValue(@NonNull String member, @Nullable Function<Object, Object> valueMapper) {
-        if (StringUtils.isNotEmpty(member)) {
-            Object o = getRawSingleValue(member, valueMapper);
-            if (o instanceof Boolean) {
-                return Optional.of((Boolean) o);
-            } else if (o instanceof CharSequence) {
-                return Optional.of(StringUtils.isTrue(o.toString()));
-            }
+        if (StringUtils.isEmpty(member)) {
+            return Optional.empty();
+        }
+        Object o = getRawSingleValue(member, valueMapper);
+        if (o instanceof Boolean aBoolean) {
+            return Optional.of(aBoolean);
+        }
+        if (o instanceof String s) {
+            return Optional.of(StringUtils.isTrue(s));
+        }
+        if (o instanceof CharSequence charSequence) {
+            return Optional.of(StringUtils.isTrue(charSequence.toString()));
         }
         return Optional.empty();
     }
@@ -795,16 +859,25 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return An {@link OptionalDouble}
      */
     public OptionalDouble doubleValue(@NonNull String member, @Nullable Function<Object, Object> valueMapper) {
-        if (StringUtils.isNotEmpty(member)) {
-            Object o = getRawSingleValue(member, valueMapper);
-            if (o instanceof Number) {
-                return OptionalDouble.of(((Number) o).doubleValue());
-            } else if (o instanceof CharSequence) {
-                try {
-                    return OptionalDouble.of(Double.parseDouble(o.toString()));
-                } catch (NumberFormatException e) {
-                    return OptionalDouble.empty();
-                }
+        if (StringUtils.isEmpty(member)) {
+            return OptionalDouble.empty();
+        }
+        Object o = getRawSingleValue(member, valueMapper);
+        if (o instanceof Number number) {
+            return OptionalDouble.of(number.doubleValue());
+        }
+        if (o instanceof String s) {
+            try {
+                return OptionalDouble.of(Double.parseDouble(s));
+            } catch (NumberFormatException e) {
+                return OptionalDouble.empty();
+            }
+        }
+        if (o instanceof CharSequence charSequence) {
+            try {
+                return OptionalDouble.of(Double.parseDouble(charSequence.toString()));
+            } catch (NumberFormatException e) {
+                return OptionalDouble.empty();
             }
         }
         return OptionalDouble.empty();
@@ -823,16 +896,18 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return An {@link OptionalDouble}
      */
     public Optional<Float> floatValue(@NonNull String member, @Nullable Function<Object, Object> valueMapper) {
-        if (StringUtils.isNotEmpty(member)) {
-            Object o = getRawSingleValue(member, valueMapper);
-            if (o instanceof Number) {
-                return Optional.of(((Number) o).floatValue());
-            } else if (o instanceof CharSequence) {
-                try {
-                    return Optional.of(Float.parseFloat(o.toString()));
-                } catch (NumberFormatException e) {
-                    return Optional.empty();
-                }
+        if (StringUtils.isEmpty(member)) {
+            return Optional.empty();
+        }
+        Object o = getRawSingleValue(member, valueMapper);
+        if (o instanceof Number number) {
+            return Optional.of(number.floatValue());
+        }
+        if (o instanceof CharSequence charSequence) {
+            try {
+                return Optional.of(Float.parseFloat(charSequence.toString()));
+            } catch (NumberFormatException e) {
+                return Optional.empty();
             }
         }
         return Optional.empty();
@@ -856,11 +931,12 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @Override
     public Optional<String> stringValue(@NonNull String member) {
-        if (StringUtils.isNotEmpty(member)) {
-            Object o = getRawSingleValue(member, valueMapper);
-            if (o != null) {
-                return Optional.of(o.toString());
-            }
+        if (StringUtils.isEmpty(member)) {
+            return Optional.empty();
+        }
+        Object o = getRawSingleValue(member, valueMapper);
+        if (o != null) {
+            return Optional.of(o.toString());
         }
         return Optional.empty();
     }
@@ -873,11 +949,12 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return An {@link OptionalInt}
      */
     public Optional<String> stringValue(@NonNull String member, @Nullable Function<Object, Object> valueMapper) {
-        if (StringUtils.isNotEmpty(member)) {
-            Object o = getRawSingleValue(member, valueMapper);
-            if (o != null) {
-                return Optional.of(o.toString());
-            }
+        if (StringUtils.isEmpty(member)) {
+            return Optional.empty();
+        }
+        Object o = getRawSingleValue(member, valueMapper);
+        if (o != null) {
+            return Optional.of(o.toString());
         }
         return Optional.empty();
     }
@@ -894,7 +971,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
     @Override
     public Optional<Boolean> booleanValue(@NonNull String member) {
-        return booleanValue(member, null);
+        return booleanValue(member, valueMapper);
     }
 
     /**
@@ -934,13 +1011,14 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return Is the value of the annotation true.
      */
     public boolean isTrue(@NonNull String member, @Nullable Function<Object, Object> valueMapper) {
-        if (StringUtils.isNotEmpty(member)) {
-            Object o = getRawSingleValue(member, valueMapper);
-            if (o instanceof Boolean) {
-                return (Boolean) o;
-            } else if (o != null) {
-                return StringUtils.isTrue(o.toString());
-            }
+        if (StringUtils.isEmpty(member)) {
+            return false;
+        }
+        Object o = getRawSingleValue(member, valueMapper);
+        if (o instanceof Boolean aBoolean) {
+            return aBoolean;
+        } else if (o != null) {
+            return StringUtils.isTrue(o.toString());
         }
         return false;
     }
@@ -968,8 +1046,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      *
      * @return The annotation name
      */
-    public @NonNull
-    final String getAnnotationName() {
+    @NonNull
+    public final String getAnnotationName() {
         return annotationName;
     }
 
@@ -988,8 +1066,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      *
      * @return The names of the members
      */
-    public @NonNull
-    final Set<CharSequence> getMemberNames() {
+    @NonNull
+    public final Set<CharSequence> getMemberNames() {
         return values.keySet();
     }
 
@@ -997,24 +1075,26 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The attribute values
      */
     @Override
-    @SuppressWarnings("unchecked")
-    public @NonNull
-    Map<CharSequence, Object> getValues() {
+    @NonNull
+    public Map<CharSequence, Object> getValues() {
         return Collections.unmodifiableMap(values);
     }
 
     /**
      * @return The convertible values
      */
-    public @NonNull
-    ConvertibleValues<Object> getConvertibleValues() {
+    @NonNull
+    public ConvertibleValues<Object> getConvertibleValues() {
         return convertibleValues;
     }
 
     @Override
     public <T> Optional<T> get(CharSequence member, ArgumentConversionContext<T> conversionContext) {
         Optional<T> result = convertibleValues.get(member, conversionContext);
-        if (!result.isPresent()) {
+        if (result.isPresent()) {
+            return result;
+        }
+        if (defaultValues != null) {
             Object dv = defaultValues.get(member.toString());
             if (dv != null) {
                 return ConversionService.SHARED.convert(dv, conversionContext);
@@ -1064,8 +1144,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The result
      * @throws IllegalStateException If no member is available that conforms to the given type
      */
-    public @NonNull
-    final <T> T getRequiredValue(Class<T> type) {
+    @NonNull
+    public final <T> T getRequiredValue(Class<T> type) {
         return getRequiredValue(AnnotationMetadata.VALUE_MEMBER, type);
     }
 
@@ -1078,8 +1158,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The result
      * @throws IllegalStateException If no member is available that conforms to the given name and type
      */
-    public @NonNull
-    final <T> T getRequiredValue(String member, Class<T> type) {
+    @NonNull
+    public final <T> T  getRequiredValue(String member, Class<T> type) {
         return get(member, ConversionContext.of(type)).orElseThrow(() -> new IllegalStateException("No value available for annotation member @" + annotationName + "[" + member + "] of type: " + type));
     }
 
@@ -1092,34 +1172,42 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The result
      * @throws IllegalStateException If no member is available that conforms to the given name and type
      */
-    public final @NonNull
-    <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member, Class<T> type) {
+    @NonNull
+    @SuppressWarnings("java:S2259") // false positive
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member, Class<T> type) {
         ArgumentUtils.requireNonNull("type", type);
         String typeName = type.getName();
 
         ArgumentUtils.requireNonNull("member", member);
         Object v = values.get(member);
-        AnnotationValue[] values = null;
-        if (v instanceof AnnotationValue) {
-            values = new AnnotationValue[]{(AnnotationValue) v};
-        } else if (v instanceof AnnotationValue[]) {
-            values = (AnnotationValue[]) v;
+        Collection<AnnotationValue<?>> values = null;
+        if (v instanceof AnnotationValue<?> annotationValue) {
+            values = Collections.singletonList(annotationValue);
+        } else if (v instanceof AnnotationValue<?>[] annotationValues) {
+            values = Arrays.asList(annotationValues);
+        } else if (v instanceof Collection<?> collection) {
+            final Iterator<?> i = collection.iterator();
+            if (i.hasNext()) {
+                final Object o = i.next();
+                if (o instanceof AnnotationValue) {
+                    values = (Collection<AnnotationValue<?>>) collection;
+                }
+            }
         }
-        if (ArrayUtils.isNotEmpty(values)) {
-            List<AnnotationValue<T>> list = new ArrayList<>(values.length);
-
-            for (AnnotationValue value : values) {
+        if (CollectionUtils.isEmpty(values)) {
+            return Collections.emptyList();
+        } else {
+            List<AnnotationValue<T>> list = new ArrayList<>(values.size());
+            for (AnnotationValue<?> value : values) {
                 if (value == null) {
                     continue;
                 }
                 if (value.getAnnotationName().equals(typeName)) {
-                    //noinspection unchecked
-                    list.add(value);
+                    list.add((AnnotationValue<T>) value);
                 }
             }
             return list;
         }
-        return Collections.emptyList();
     }
 
     /**
@@ -1131,16 +1219,18 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @throws IllegalStateException If no member is available that conforms to the given name and type
      */
     @SuppressWarnings("unchecked")
-    public final @NonNull
-    <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member) {
+    @NonNull
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member) {
         ArgumentUtils.requireNonNull("member", member);
         Object v = values.get(member);
-        if (v instanceof AnnotationValue) {
-            return Collections.singletonList((AnnotationValue) v);
-        } else if (v instanceof AnnotationValue[]) {
-            return Arrays.asList((AnnotationValue[]) v);
-        } else if (v instanceof Collection) {
-            final Iterator<?> i = ((Collection<?>) v).iterator();
+        if (v instanceof AnnotationValue annotationValue) {
+            return Collections.singletonList(annotationValue);
+        }
+        if (v instanceof AnnotationValue[] annotationValues) {
+            return Arrays.asList(annotationValues);
+        }
+        if (v instanceof Collection<?> collection) {
+            final Iterator<?> i = collection.iterator();
             if (i.hasNext()) {
                 final Object o = i.next();
                 if (o instanceof AnnotationValue) {
@@ -1160,21 +1250,20 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The result
      * @throws IllegalStateException If no member is available that conforms to the given name and type
      */
-    public @NonNull
-    final <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(String member, Class<T> type) {
+    @NonNull
+    public <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(String member, Class<T> type) {
         ArgumentUtils.requireNonNull("type", type);
         String typeName = type.getName();
 
         ArgumentUtils.requireNonNull("member", member);
         Object v = values.get(member);
-        if (v instanceof AnnotationValue) {
-            final AnnotationValue<T> av = (AnnotationValue<T>) v;
+        if (v instanceof AnnotationValue av) {
             if (av.getAnnotationName().equals(typeName)) {
                 return Optional.of(av);
             }
             return Optional.empty();
-        } else if (v instanceof AnnotationValue[]) {
-            final AnnotationValue[] values = (AnnotationValue[]) v;
+        }
+        if (v instanceof AnnotationValue[] values) {
             if (ArrayUtils.isNotEmpty(values)) {
                 final AnnotationValue value = values[0];
                 if (value.getAnnotationName().equals(typeName)) {
@@ -1195,22 +1284,31 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @throws IllegalStateException If no member is available that conforms to the given name and type
      * @since 3.3.0
      */
-    public @NonNull
-    final <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(@NonNull String member) {
+    @NonNull
+    public <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(@NonNull String member) {
         ArgumentUtils.requireNonNull("member", member);
         Object v = values.get(member);
-        if (v instanceof AnnotationValue) {
-            final AnnotationValue<T> av = (AnnotationValue<T>) v;
+        if (v instanceof AnnotationValue av) {
             return Optional.of(av);
-        } else if (v instanceof AnnotationValue[]) {
-            final AnnotationValue[] values = (AnnotationValue[]) v;
+        }
+        if (v instanceof AnnotationValue[] values) {
             if (ArrayUtils.isNotEmpty(values)) {
-                final AnnotationValue value = values[0];
-                return Optional.of(value);
+                return Optional.of(values[0]);
             }
             return Optional.empty();
         }
         return Optional.empty();
+    }
+
+    /**
+     * If this AnnotationValue contains Evaluated Expressions.
+     *
+     * @return true if it is
+     * @since 4.0.0
+     */
+    public boolean hasEvaluatedExpressions() {
+        return values.values().stream()
+            .anyMatch(value -> value instanceof EvaluatedExpression);
     }
 
     @Override
@@ -1218,9 +1316,19 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         if (values.isEmpty()) {
             return "@" + annotationName;
         } else {
-            return "@" + annotationName + "(" + values.entrySet().stream().map(entry -> entry.getKey() + "=" + entry.getValue()).collect(
+            return "@" + annotationName + "(" + values.entrySet().stream().map(entry -> entry.getKey() + "=" + toStringValue(entry.getValue())).collect(
                     Collectors.joining(", ")) + ")";
         }
+    }
+
+    private String toStringValue(Object object) {
+        if (object == null) {
+            return "null";
+        }
+        if (object instanceof Object[]) {
+            return Arrays.deepToString((Object[]) object);
+        }
+        return object.toString();
     }
 
     @Override
@@ -1236,11 +1344,9 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         if (obj == null) {
             return false;
         }
-        if (!AnnotationValue.class.isInstance(obj)) {
+        if (!(obj instanceof AnnotationValue<?> other)) {
             return false;
         }
-
-        AnnotationValue other = AnnotationValue.class.cast(obj);
 
         if (!annotationName.equals(other.getAnnotationName())) {
             return false;
@@ -1279,9 +1385,9 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     /**
      * Start building a new annotation for the given name.
      *
-     * @param annotationName The annotation name
+     * @param annotationName  The annotation name
      * @param retentionPolicy The retention policy
-     * @param <T>            The annotation type
+     * @param <T>             The annotation type
      * @return The builder
      * @since 2.4.0
      */
@@ -1298,6 +1404,19 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     public static <T extends Annotation> AnnotationValueBuilder<T> builder(Class<T> annotation) {
         return new AnnotationValueBuilder<>(annotation);
+    }
+
+    /**
+     * Start building a new annotation existing value.
+     *
+     * @param annotation      The annotation name
+     * @param <T>             The annotation type
+     * @return The builder
+     * @since 4.0.0
+     */
+    public static <T extends Annotation> AnnotationValueBuilder<T> builder(@NonNull AnnotationValue<T> annotation) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        return new AnnotationValueBuilder<>(annotation, annotation.getRetentionPolicy());
     }
 
     /**
@@ -1321,20 +1440,24 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The string[] or null
      */
     @Internal
-    public static @Nullable
-    String[] resolveStringValues(@Nullable Object value, @Nullable Function<Object, Object> valueMapper) {
+    @Nullable
+    public static String[] resolveStringValues(@Nullable Object value, @Nullable Function<Object, Object> valueMapper) {
         if (value == null) {
             return null;
         }
         if (valueMapper != null) {
             value = valueMapper.apply(value);
         }
+        if (value instanceof String s) {
+            return new String[]{s};
+        }
+        if (value instanceof String[] existing) {
+            return Arrays.copyOf(existing, existing.length);
+        }
         if (value instanceof CharSequence) {
             return new String[]{value.toString()};
-        } else if (value instanceof String[]) {
-            final String[] existing = (String[]) value;
-            return Arrays.copyOf(existing, existing.length);
-        } else if (value != null) {
+        }
+        if (value != null) {
             if (value.getClass().isArray()) {
                 int len = Array.getLength(value);
                 String[] newArray = new String[len];
@@ -1361,8 +1484,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return An array of enum values
      */
     @Internal
-    public static @NonNull
-    <E extends Enum> E[] resolveEnumValues(@NonNull Class<E> enumType, @Nullable Object rawValue) {
+    @NonNull
+    public static <E extends Enum> E[] resolveEnumValues(@NonNull Class<E> enumType, @Nullable Object rawValue) {
         if (rawValue == null) {
             return (E[]) Array.newInstance(enumType, 0);
         }
@@ -1372,8 +1495,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             for (int i = 0; i < len; i++) {
                 convertToEnum(enumType, Array.get(rawValue, i)).ifPresent(list::add);
             }
-        } else if (rawValue instanceof Iterable) {
-            for (Object o : (Iterable) rawValue) {
+        } else if (rawValue instanceof Iterable<?> iterable) {
+            for (Object o : iterable) {
                 convertToEnum(enumType, o).ifPresent(list::add);
             }
         } else if (enumType.isAssignableFrom(rawValue.getClass())) {
@@ -1412,48 +1535,52 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The class values or null
      */
     @Internal
-    public static @Nullable
-    Class<?>[] resolveClassValues(@Nullable Object value) {
+    @Nullable
+    public static Class<?>[] resolveClassValues(@Nullable Object value) {
         // conditional branches ordered from most likely to least likely
         // generally at runtime values are always AnnotationClassValue
         // A class can be present at compilation time
         if (value == null) {
             return null;
-        } else if (value instanceof AnnotationClassValue) {
-            Class<?> type = ((AnnotationClassValue<?>) value).getType().orElse(null);
+        }
+        if (value instanceof AnnotationClassValue<?> annotationClassValue) {
+            Class<?> type = annotationClassValue.getType().orElse(null);
             if (type != null) {
-                return new Class[]{type};
+                return new Class<?>[]{type};
             }
-        } else if (value instanceof AnnotationValue[]) {
-            AnnotationValue[] array = (AnnotationValue[]) value;
-            int len = array.length;
+            return null;
+        }
+        if (value instanceof AnnotationValue<?>[] annotationValues) {
+            int len = annotationValues.length;
             if (len > 0) {
                 if (len == 1) {
-                    return array[0].classValues();
+                    return annotationValues[0].classValues();
                 } else {
-                    return Arrays.stream(array)
+                    return Arrays.stream(annotationValues)
                             .flatMap(annotationValue -> Stream.of(annotationValue.classValues())).toArray(Class[]::new);
                 }
             }
-        } else if (value instanceof AnnotationValue) {
-            return ((AnnotationValue) value).classValues();
-        } else if (value instanceof Object[]) {
-            Object[] values = (Object[]) value;
-            if (values instanceof Class[]) {
-                return (Class<?>[]) values;
+            return null;
+        }
+        if (value instanceof AnnotationValue<?> annotationValue) {
+            return annotationValue.classValues();
+        }
+        if (value instanceof Object[] values) {
+            if (values instanceof Class<?>[] classes) {
+                return classes;
             } else {
                 return Arrays.stream(values).flatMap(o -> {
-                    if (o instanceof AnnotationClassValue) {
-                        Optional<? extends Class<?>> type = ((AnnotationClassValue<?>) o).getType();
-                        return type.map(Stream::of).orElse(Stream.empty());
-                    } else if (o instanceof Class) {
-                        return Stream.of((Class) o);
+                    if (o instanceof AnnotationClassValue<?> annotationClassValue) {
+                        return annotationClassValue.getType().stream();
+                    } else if (o instanceof Class<?> aClass) {
+                        return Stream.of(aClass);
                     }
                     return Stream.empty();
                 }).toArray(Class[]::new);
             }
-        } else if (value instanceof Class) {
-            return new Class[]{(Class) value};
+        }
+        if (value instanceof Class<?> aClass) {
+            return new Class<?>[]{aClass};
         }
         return null;
     }
@@ -1472,8 +1599,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         }
     }
 
-    private @Nullable
-    Object getRawSingleValue(@NonNull String member, Function<Object, Object> valueMapper) {
+    @Nullable
+    private Object getRawSingleValue(@NonNull String member, Function<Object, Object> valueMapper) {
         Object rawValue = values.get(member);
         if (rawValue != null) {
             if (rawValue.getClass().isArray()) {
@@ -1481,14 +1608,14 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
                 if (len > 0) {
                     rawValue = Array.get(rawValue, 0);
                 }
-            } else if (rawValue instanceof Iterable) {
-                Iterator i = ((Iterable) rawValue).iterator();
+            } else if (rawValue instanceof Iterable<?> iterable) {
+                Iterator<?> i = iterable.iterator();
                 if (i.hasNext()) {
                     rawValue = i.next();
                 }
             }
         }
-        if (valueMapper != null && rawValue instanceof String) {
+        if (valueMapper != null && (rawValue instanceof String || rawValue instanceof EvaluatedExpression)) {
             return valueMapper.apply(rawValue);
         }
         return rawValue;

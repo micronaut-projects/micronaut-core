@@ -16,8 +16,6 @@
 
 package io.micronaut.core.util.clhm;
 
-import javax.annotation.concurrent.ThreadSafe;
-
 /**
  * A class that can determine the weight of an entry. The total weight threshold
  * is used to determine when an eviction is required.
@@ -28,7 +26,7 @@ import javax.annotation.concurrent.ThreadSafe;
  * @see <a href="https://code.google.com/p/concurrentlinkedhashmap/">
  *      https://code.google.com/p/concurrentlinkedhashmap/</a>
  */
-@ThreadSafe
+//@ThreadSafe
 public interface EntryWeigher<K, V> {
 
     /**

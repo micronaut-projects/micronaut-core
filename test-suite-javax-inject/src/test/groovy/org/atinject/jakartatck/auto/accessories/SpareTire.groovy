@@ -19,7 +19,7 @@ import groovy.transform.PackageScope
 import org.atinject.jakartatck.auto.FuelTank
 import org.atinject.jakartatck.auto.Tire
 
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 class SpareTire extends Tire {
 

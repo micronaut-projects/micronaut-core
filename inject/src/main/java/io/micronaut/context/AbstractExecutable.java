@@ -23,6 +23,8 @@ import io.micronaut.core.type.Executable;
 import io.micronaut.core.util.ArrayUtils;
 
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.util.ObjectUtils;
+
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Objects;
@@ -36,9 +38,9 @@ import java.util.Objects;
 @Internal
 abstract class AbstractExecutable implements Executable {
 
-    protected final Class declaringType;
+    protected final Class<?> declaringType;
     protected final String methodName;
-    protected final Class[] argTypes;
+    protected final Class<?>[] argTypes;
 
     private Argument[] arguments;
     private Method method;
@@ -79,7 +81,7 @@ abstract class AbstractExecutable implements Executable {
 
     @Override
     public int hashCode() {
-        int result = Objects.hash(declaringType, methodName);
+        int result = ObjectUtils.hash(declaringType, methodName);
         result = 31 * result + Arrays.hashCode(argTypes);
         return result;
     }

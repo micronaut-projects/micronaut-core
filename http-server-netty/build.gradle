@@ -14,6 +14,7 @@ micronautBuild {
 tasks.named("test") {
     systemProperty("io.netty.leakDetection.level", "paranoid")
     systemProperty("io.netty.customResourceLeakDetector", "io.micronaut.http.server.netty.fuzzing.BufferLeakDetection")
+    systemProperty("io.netty.leakDetection.targetRecords", "100")
     maxHeapSize("1G")
 }
 
@@ -25,27 +26,48 @@ dependencies {
     api project(":core")
     api project(":http-netty")
     api libs.managed.netty.codec.http
-
     implementation libs.managed.reactor
-
-    compileOnly libs.kotlin.stdlib
+    compileOnly project(":jackson-databind")
+    compileOnly project(":websocket")
+    compileOnly libs.managed.kotlin.stdlib
     compileOnly libs.managed.netty.transport.native.unix.common
+    compileOnly libs.managed.netty.incubator.codec.http3
+
+    testImplementation libs.jmh.core
+    testAnnotationProcessor libs.jmh.generator.annprocess
 
     testCompileOnly project(":inject-groovy")
     testCompileOnly(libs.jetbrains.annotations)
+
     testAnnotationProcessor project(":inject-java")
+    testAnnotationProcessor platform(libs.test.boms.micronaut.validation)
+    testAnnotationProcessor (libs.micronaut.validation.processor) {
+        exclude group: 'io.micronaut'
+    }
+
+    testImplementation platform(libs.test.boms.micronaut.validation)
+    testImplementation (libs.micronaut.validation) {
+        exclude group: 'io.micronaut'
+    }
+    testImplementation (libs.micronaut.validation.processor) { // For Groovy
+        exclude group: 'io.micronaut'
+    }
+
     testImplementation project(":inject")
     testImplementation project(":inject-java-test")
     testImplementation project(":http-client")
-    testImplementation libs.managed.spotbugs
+    testImplementation libs.spotbugs
+    testImplementation libs.managed.netty.incubator.codec.http3
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
         testImplementation libs.bcpkix
     }
-
-    testImplementation(libs.managed.micronaut.xml) {
-        exclude module:'micronaut-inject'
-        exclude module:'micronaut-http'
-    }
+    testImplementation project(":jackson-databind")
+// Add Micronaut Jackson XML after v4 Migration
+//    testImplementation(libs.managed.micronaut.xml) {
+//        exclude module:'micronaut-inject'
+//        exclude module:'micronaut-http'
+//        exclude module:'micronaut-bom'
+//    }
     testImplementation libs.managed.jackson.databind
 
     // http impls for tests
@@ -68,10 +90,17 @@ dependencies {
             classifier = Os.isArch("aarch64") ? "osx-aarch_64" : "osx-x86_64"
         }
     }
-    testImplementation libs.managed.logback
+    testImplementation libs.logback.classic
 
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation libs.junit.jupiter.api
+    testImplementation project(":websocket")
+}
+
+tasks.withType(Test).configureEach {
+    forkEvery = 100
+    maxParallelForks = 4
+    useJUnitPlatform()
 }
 
 //tasks.withType(Test).configureEach {
@@ -82,3 +111,5 @@ dependencies {
 //}
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
+//compileJava.options.fork = true
+//compileJava.options.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

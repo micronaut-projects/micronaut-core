@@ -5,30 +5,27 @@ import io.micronaut.context.BeanProvider
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
 import io.micronaut.http.MutableHttpRequest
-import io.micronaut.http.annotation.Filter
+import io.micronaut.http.annotation.ClientFilter
+import io.micronaut.http.annotation.RequestFilter
 import io.micronaut.http.client.HttpClient
-import io.micronaut.http.filter.ClientFilterChain
-import io.micronaut.http.filter.HttpClientFilter
-import org.reactivestreams.Publisher
-import reactor.core.publisher.Mono
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.annotation.ExecuteOn
 import java.net.URLEncoder
 
 @Requires(env = [Environment.GOOGLE_COMPUTE])
-@Filter(patterns = ["/google-auth/api/**"])
+@ClientFilter(patterns = ["/google-auth/api/**"])
 class GoogleAuthFilter (
-    private val authClientProvider: BeanProvider<HttpClient>) : HttpClientFilter { // <1>
+    private val authClientProvider: BeanProvider<HttpClient>) { // <1>
 
-    override fun doFilter(request: MutableHttpRequest<*>,
-                          chain: ClientFilterChain): Publisher<out HttpResponse<*>?> {
-        return Mono.fromCallable { encodeURI(request) }
-            .flux()
-            .map { authURI: String ->
-                authClientProvider.get().retrieve(HttpRequest.GET<Any>(authURI)
-                    .header("Metadata-Flavor", "Google") // <2>
-                )
-            }.flatMap { t -> chain.proceed(request.bearerAuth(t.toString())) }
+    @RequestFilter
+    @ExecuteOn(TaskExecutors.BLOCKING)
+    fun filter(request: MutableHttpRequest<*>) {
+        val authURI = encodeURI(request)
+        val t = authClientProvider.get().toBlocking().retrieve(HttpRequest.GET<Any>(authURI)
+            .header("Metadata-Flavor", "Google") // <2>
+        )
+        request.bearerAuth(t.toString())
     }
 
     private fun encodeURI(request: MutableHttpRequest<*>): String {

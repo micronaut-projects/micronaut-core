@@ -83,11 +83,9 @@ Content-Type: ${contentType}\r
         def request = uploadRequest(embeddedServer.URI)
         def response = client.send(request, loadClass('java.net.http.HttpResponse$BodyHandlers').ofString())
 
-        println 'status code: ' + response.statusCode()
-        println response.body()
-
         then:
-        1 == 1
+        response.statusCode() == 200
+        response.body() == "uploaded"
 
         cleanup:
         ctx.stop()
@@ -99,13 +97,13 @@ Content-Type: ${contentType}\r
         @SuppressWarnings(['GrMethodMayBeStatic', 'unused'])
         @Post('/testupload2')
         @Consumes(MediaType.MULTIPART_FORM_DATA)
-        Publisher<MutableHttpResponse<String>> uploadTest2(Flux<StreamingFileUpload> dataFile) {
+        Publisher<MutableHttpResponse<String>> uploadTest2(Publisher<StreamingFileUpload> dataFile) {
             def os = new OutputStream() {
                 @Override
                 void write(int b) throws IOException {
                 }
             }
-            return dataFile
+            return Flux.from(dataFile)
                     .flatMap { it.transferTo(os) }
                     .map { success -> success ? io.micronaut.http.HttpResponse.<String> ok('uploaded') : io.micronaut.http.HttpResponse.<String> status(HttpStatus.INTERNAL_SERVER_ERROR, 'error 1') }
         }

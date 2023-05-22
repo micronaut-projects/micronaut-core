@@ -18,7 +18,6 @@ package io.micronaut.inject.visitor;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
-import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 

@@ -32,8 +32,7 @@ class ConstructorFactorySpec extends Specification {
 
     void "test injection with constructor supplied by a provider"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        BeanContext context = BeanContext.run()
 
         when:"A bean is obtained which has a constructor that depends on a bean provided by a provider"
         B b =  context.getBean(B)
@@ -44,7 +43,10 @@ class ConstructorFactorySpec extends Specification {
         b.a.c != null
         b.a.c2 != null
         b.a.d != null
-        b.a.is(context.getBean(AImpl))
+        b.a.is(context.getBean(A))
+
+        cleanup:
+        context.close()
     }
 
     static interface A {

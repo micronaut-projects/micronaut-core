@@ -147,7 +147,7 @@ final class JsonBeanPropertyBinder implements BeanPropertyBinder {
                 return Optional.empty();
             }
         };
-        Class type = object != null ? object.getClass() : Object.class;
+        Class<?> type = object != null ? object.getClass() : Object.class;
         return new ConversionErrorException(Argument.of(type), conversionError);
     }
 

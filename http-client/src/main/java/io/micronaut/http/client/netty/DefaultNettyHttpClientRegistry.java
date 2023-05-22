@@ -26,21 +26,27 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpVersion;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.bind.DefaultRequestBinderRegistry;
 import io.micronaut.http.bind.RequestBinderRegistry;
-import io.micronaut.http.client.HttpClientRegistry;
-import io.micronaut.http.client.StreamingHttpClientRegistry;
-import io.micronaut.http.client.ProxyHttpClient;
-import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.client.DefaultHttpClientConfiguration;
 import io.micronaut.http.client.HttpClient;
-import io.micronaut.http.client.StreamingHttpClient;
-import io.micronaut.http.client.ProxyHttpClientRegistry;
+import io.micronaut.http.client.HttpClientConfiguration;
+import io.micronaut.http.client.HttpClientRegistry;
+import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.LoadBalancerResolver;
+import io.micronaut.http.client.ProxyHttpClient;
+import io.micronaut.http.client.ProxyHttpClientRegistry;
+import io.micronaut.http.client.ServiceHttpClientConfiguration;
+import io.micronaut.http.client.StreamingHttpClient;
+import io.micronaut.http.client.StreamingHttpClientRegistry;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
@@ -50,23 +56,31 @@ import io.micronaut.http.client.sse.SseClientRegistry;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.filter.HttpClientFilterResolver;
+import io.micronaut.http.netty.body.CustomizableNettyJsonHandler;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupFactory;
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
+import io.micronaut.http.netty.channel.NettyChannelType;
+import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.qualifiers.Qualifiers;
-import io.micronaut.json.JsonMapper;
 import io.micronaut.json.JsonFeatures;
+import io.micronaut.json.JsonMapper;
 import io.micronaut.json.codec.MapperMediaTypeCodec;
+import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
+import io.micronaut.runtime.context.scope.refresh.RefreshEventListener;
 import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.websocket.WebSocketClient;
 import io.micronaut.websocket.WebSocketClientRegistry;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
+import io.netty.channel.Channel;
 import io.netty.channel.ChannelFactory;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.socket.DatagramChannel;
+import io.netty.channel.socket.SocketChannel;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,6 +91,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ThreadFactory;
@@ -98,13 +114,16 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         WebSocketClientRegistry<WebSocketClient>,
         ProxyHttpClientRegistry<ProxyHttpClient>,
         ChannelPipelineCustomizer,
-        NettyClientCustomizer.Registry {
+        NettyClientCustomizer.Registry,
+        RefreshEventListener {
     private static final Logger LOG = LoggerFactory.getLogger(DefaultNettyHttpClientRegistry.class);
-    private final Map<ClientKey, DefaultHttpClient> clients = new ConcurrentHashMap<>(10);
+    private final Map<ClientKey, DefaultHttpClient> unbalancedClients = new ConcurrentHashMap<>(10);
+    private final List<DefaultHttpClient> balancedClients = Collections.synchronizedList(new ArrayList<>());
     private final LoadBalancerResolver loadBalancerResolver;
     private final NettyClientSslBuilder nettyClientSslBuilder;
     private final ThreadFactory threadFactory;
     private final MediaTypeCodecRegistry codecRegistry;
+    private final MessageBodyHandlerRegistry handlerRegistry;
     private final BeanContext beanContext;
     private final HttpClientConfiguration defaultHttpClientConfiguration;
     private final EventLoopGroupRegistry eventLoopGroupRegistry;
@@ -124,6 +143,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
      * @param nettyClientSslBuilder           The client SSL builder
      * @param threadFactory                   The thread factory
      * @param codecRegistry                   The codec registry
+     * @param handlerRegistry                 The handler registry
      * @param eventLoopGroupRegistry          The event loop group registry
      * @param eventLoopGroupFactory           The event loop group factory
      * @param beanContext                     The bean context
@@ -137,6 +157,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             NettyClientSslBuilder nettyClientSslBuilder,
             ThreadFactory threadFactory,
             MediaTypeCodecRegistry codecRegistry,
+            MessageBodyHandlerRegistry handlerRegistry,
             EventLoopGroupRegistry eventLoopGroupRegistry,
             EventLoopGroupFactory eventLoopGroupFactory,
             BeanContext beanContext,
@@ -148,6 +169,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         this.nettyClientSslBuilder = nettyClientSslBuilder;
         this.threadFactory = threadFactory;
         this.codecRegistry = codecRegistry;
+        this.handlerRegistry = handlerRegistry;
         this.beanContext = beanContext;
         this.eventLoopGroupFactory = eventLoopGroupFactory;
         this.eventLoopGroupRegistry = eventLoopGroupRegistry;
@@ -157,7 +179,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
 
     @NonNull
     @Override
-    public HttpClient getClient(HttpVersion httpVersion, @NonNull String clientId, @Nullable String path) {
+    public HttpClient getClient(@NonNull HttpVersionSelection httpVersion, @NonNull String clientId, @Nullable String path) {
         final ClientKey key = new ClientKey(
                 httpVersion,
                 clientId,
@@ -203,7 +225,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     @Override
     @PreDestroy
     public void close() {
-        for (HttpClient httpClient : clients.values()) {
+        for (HttpClient httpClient : unbalancedClients.values()) {
             try {
                 httpClient.close();
             } catch (Throwable e) {
@@ -212,16 +234,16 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 }
             }
         }
-        clients.clear();
+        unbalancedClients.clear();
     }
 
     @Override
     public void disposeClient(AnnotationMetadata annotationMetadata) {
         final ClientKey key = getClientKey(annotationMetadata);
-        final StreamingHttpClient streamingHttpClient = clients.get(key);
+        final StreamingHttpClient streamingHttpClient = unbalancedClients.get(key);
         if (streamingHttpClient != null && streamingHttpClient.isRunning()) {
             streamingHttpClient.close();
-            clients.remove(key);
+            unbalancedClients.remove(key);
         }
     }
 
@@ -308,7 +330,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     }
 
     private DefaultHttpClient getClient(ClientKey key, BeanContext beanContext, AnnotationMetadata annotationMetadata) {
-        return clients.computeIfAbsent(key, clientKey -> {
+        return unbalancedClients.computeIfAbsent(key, clientKey -> {
             DefaultHttpClient clientBean = null;
             final String clientId = clientKey.clientId;
             final Class<?> configurationClass = clientKey.configurationClass;
@@ -384,6 +406,28 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                     codecs.add(createNewJsonCodec(this.beanContext, jsonFeatures));
                 }
                 client.setMediaTypeCodecRegistry(MediaTypeCodecRegistry.of(codecs));
+
+                client.setHandlerRegistry(new MessageBodyHandlerRegistry() {
+                    final MessageBodyHandlerRegistry delegate = client.getHandlerRegistry();
+
+                    @SuppressWarnings("unchecked")
+                    private <T> T customize(T handler) {
+                        if (handler instanceof CustomizableNettyJsonHandler cnjh) {
+                            return (T) cnjh.customize(jsonFeatures);
+                        }
+                        return handler;
+                    }
+
+                    @Override
+                    public <T> Optional<MessageBodyReader<T>> findReader(Argument<T> type, List<MediaType> mediaType) {
+                        return delegate.findReader(type, mediaType).map(this::customize);
+                    }
+
+                    @Override
+                    public <T> Optional<MessageBodyWriter<T>> findWriter(Argument<T> type, List<MediaType> mediaType) {
+                        return delegate.findWriter(type, mediaType).map(this::customize);
+                    }
+                });
             }
             return client;
         });
@@ -391,7 +435,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
 
     private DefaultHttpClient buildClient(
             LoadBalancer loadBalancer,
-            HttpVersion httpVersion,
+            HttpVersionSelection httpVersion,
             HttpClientConfiguration configuration,
             String clientId,
             String contextPath,
@@ -399,6 +443,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             AnnotationMetadata annotationMetadata) {
 
         EventLoopGroup eventLoopGroup = resolveEventLoopGroup(configuration, beanContext);
+        ConversionService conversionService = beanContext.getBean(ConversionService.class);
         return new DefaultHttpClient(
                 loadBalancer,
                 httpVersion,
@@ -412,16 +457,18 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 threadFactory,
                 nettyClientSslBuilder,
                 codecRegistry,
+                handlerRegistry,
                 WebSocketBeanRegistry.forClient(beanContext),
                 beanContext.findBean(RequestBinderRegistry.class).orElseGet(() ->
-                        new DefaultRequestBinderRegistry(ConversionService.SHARED)
+                        new DefaultRequestBinderRegistry(conversionService)
                 ),
                 eventLoopGroup,
-                resolveSocketChannelFactory(configuration, beanContext),
-                pipelineListeners,
+                resolveSocketChannelFactory(NettyChannelType.CLIENT_SOCKET, SocketChannel.class, configuration, beanContext),
+                resolveSocketChannelFactory(NettyChannelType.DATAGRAM_SOCKET, DatagramChannel.class, configuration, beanContext),
                 clientCustomizer,
                 invocationInstrumenterFactories,
-                clientId
+                clientId,
+                conversionService
         );
     }
 
@@ -446,21 +493,23 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             if (configuration == null) {
                 configuration = defaultHttpClientConfiguration;
             }
-            return buildClient(
-                    loadBalancer,
-                    null,
-                    configuration,
-                    null,
-                    loadBalancer.getContextPath().orElse(null),
-                    beanContext,
-                    AnnotationMetadata.EMPTY_METADATA
+            DefaultHttpClient c = buildClient(
+                loadBalancer,
+                null,
+                configuration,
+                null,
+                loadBalancer.getContextPath().orElse(null),
+                beanContext,
+                AnnotationMetadata.EMPTY_METADATA
             );
+            balancedClients.add(c);
+            return c;
         } else {
             return getClient(injectionPoint != null ? injectionPoint.getAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA);
         }
     }
 
-    private ChannelFactory resolveSocketChannelFactory(HttpClientConfiguration configuration, BeanContext beanContext) {
+    private <C extends Channel> ChannelFactory<? extends C> resolveSocketChannelFactory(NettyChannelType type, Class<C> channelClass, HttpClientConfiguration configuration, BeanContext beanContext) {
         final String eventLoopGroup = configuration.getEventLoopGroup();
 
         final EventLoopGroupConfiguration eventLoopGroupConfiguration = beanContext.findBean(EventLoopGroupConfiguration.class, Qualifiers.byName(eventLoopGroup))
@@ -472,21 +521,20 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                     }
                 });
 
-        return () -> eventLoopGroupFactory.clientSocketChannelInstance(eventLoopGroupConfiguration);
+        return () -> channelClass.cast(eventLoopGroupFactory.channelInstance(type, eventLoopGroupConfiguration));
     }
 
     private ClientKey getClientKey(AnnotationMetadata metadata) {
-        final HttpVersion httpVersion =
-                metadata.enumValue(Client.class, "httpVersion", HttpVersion.class).orElse(null);
+        HttpVersionSelection httpVersionSelection = HttpVersionSelection.forClientAnnotation(metadata);
         String clientId = metadata.stringValue(Client.class).orElse(null);
         String path = metadata.stringValue(Client.class, "path").orElse(null);
         List<String> filterAnnotation = metadata
                 .getAnnotationNamesByStereotype(FilterMatcher.class);
-        final Class configurationClass =
+        final Class<?> configurationClass =
                 metadata.classValue(Client.class, "configuration").orElse(null);
         JsonFeatures jsonFeatures = jsonMapper.detectFeatures(metadata).orElse(null);
 
-        return new ClientKey(httpVersion, clientId, filterAnnotation, path, configurationClass, jsonFeatures);
+        return new ClientKey(httpVersionSelection, clientId, filterAnnotation, path, configurationClass, jsonFeatures);
     }
 
     private static MediaTypeCodec createNewJsonCodec(BeanContext beanContext, JsonFeatures jsonFeatures) {
@@ -497,12 +545,27 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         return beanContext.getBean(MapperMediaTypeCodec.class, Qualifiers.byName(MapperMediaTypeCodec.REGULAR_JSON_MEDIA_TYPE_CODEC_NAME));
     }
 
+    @Override
+    public Set<String> getObservedConfigurationPrefixes() {
+        return Set.of(DefaultHttpClientConfiguration.PREFIX, ServiceHttpClientConfiguration.PREFIX, SslConfiguration.PREFIX);
+    }
+
+    @Override
+    public void onApplicationEvent(RefreshEvent event) {
+        for (DefaultHttpClient client : unbalancedClients.values()) {
+            client.connectionManager.refresh();
+        }
+        for (DefaultHttpClient client : balancedClients) {
+            client.connectionManager.refresh();
+        }
+    }
+
     /**
      * Client key.
      */
     @Internal
     private static final class ClientKey {
-        final HttpVersion httpVersion;
+        final HttpVersionSelection httpVersion;
         final String clientId;
         final List<String> filterAnnotations;
         final String path;
@@ -510,7 +573,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         final JsonFeatures jsonFeatures;
 
         ClientKey(
-                HttpVersion httpVersion,
+            HttpVersionSelection httpVersion,
                 String clientId,
                 List<String> filterAnnotations,
                 String path,

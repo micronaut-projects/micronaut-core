@@ -1,4 +1,4 @@
-Micronaut supports context propagation from Reactor's context to coroutine context. To enable this propagation you need to include following dependency:
+The Micronaut framework supports context propagation from Reactor's context to coroutine context. To enable this propagation you need to include following dependency:
 
 dependency:org.jetbrains.kotlinx:kotlinx-coroutines-reactor[]
 

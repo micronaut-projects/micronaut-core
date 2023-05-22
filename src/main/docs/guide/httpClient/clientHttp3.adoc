@@ -1,0 +1,16 @@
+Since the Micronaut framework 4.x, Micronaut's Netty-based HTTP client can be configured to support HTTP/3. This support is experimental and may change without notice.
+
+Instead of the TCP used for HTTP/1.1 and HTTP/2, HTTP/3 runs on UDP. If the client is configured with the special `h3` value for the `alpn-modes` property, the client will automatically use HTTP/3 over UDP instead of HTTP/1.1 or HTTP/2 over TCP. At this time, the client cannot fall back to TCP if the server does not support HTTP/3.
+
+.Enabling HTTP/3 in Clients
+[source,yaml]
+----
+micronaut:
+  http:
+    client:
+      alpn-modes: [h3]
+----
+
+Additionally, the netty HTTP/3 codec needs to be present on the classpath:
+
+dependency:netty-incubator-codec-http3[groupId="io.netty.incubator",artifactId="netty-incubator-codec-http3"]

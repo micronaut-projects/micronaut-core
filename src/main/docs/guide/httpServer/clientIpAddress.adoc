@@ -1,4 +1,4 @@
-You may need to resolve the originating IP address of an HTTP Request. Micronaut includes an implementation of api:http.server.util.HttpClientAddressResolver[].
+You may need to resolve the originating IP address of an HTTP Request. The Micronaut framework includes an implementation of api:http.server.util.HttpClientAddressResolver[].
 
 The default implementation resolves the client address in the following places in order:
 

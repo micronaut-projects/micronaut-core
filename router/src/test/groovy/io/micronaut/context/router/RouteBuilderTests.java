@@ -21,14 +21,20 @@ import io.micronaut.context.annotation.Executable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.web.router.*;
-
+import io.micronaut.web.router.DefaultRouteBuilder;
+import io.micronaut.web.router.DefaultRouter;
+import io.micronaut.web.router.MethodBasedRouteMatch;
+import io.micronaut.web.router.Router;
+import io.micronaut.web.router.UriRoute;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
-import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * @author Graeme Rocher
@@ -58,27 +64,27 @@ public class RouteBuilderTests {
         assertTrue(builtRoutes
                 .stream()
                 .anyMatch(route ->
-                        route.match("/books/1/authors").isPresent() && route.getHttpMethod() == HttpMethod.GET)
+                        route.toRouteInfo().match("/books/1/authors").isPresent() && route.getHttpMethod() == HttpMethod.GET)
         );
         assertTrue(builtRoutes
                 .stream()
                 .anyMatch(route ->
-                        route.match("/books").isPresent() && route.getHttpMethod() == HttpMethod.POST)
+                        route.toRouteInfo().match("/books").isPresent() && route.getHttpMethod() == HttpMethod.POST)
         );
         assertTrue(builtRoutes
                 .stream()
                 .anyMatch(route ->
-                        route.match("/book").isPresent() && route.getHttpMethod() == HttpMethod.POST)
+                        route.toRouteInfo().match("/book").isPresent() && route.getHttpMethod() == HttpMethod.POST)
         );
         assertFalse(builtRoutes
                 .stream()
                 .anyMatch(route ->
-                        route.match("/boo").isPresent() && route.getHttpMethod() == HttpMethod.POST)
+                        route.toRouteInfo().match("/boo").isPresent() && route.getHttpMethod() == HttpMethod.POST)
         );
         assertTrue(builtRoutes
                 .stream()
                 .anyMatch(route ->
-                        route.match("/book/1").isPresent() && route.getHttpMethod() == HttpMethod.GET)
+                        route.toRouteInfo().match("/book/1").isPresent() && route.getHttpMethod() == HttpMethod.GET)
         );
     }
 

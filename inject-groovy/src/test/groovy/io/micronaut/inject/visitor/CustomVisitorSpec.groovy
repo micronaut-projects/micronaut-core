@@ -16,7 +16,6 @@
 package io.micronaut.inject.visitor
 
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
-import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 
 class CustomVisitorSpec extends AbstractBeanDefinitionSpec {
 
@@ -25,10 +24,6 @@ class CustomVisitorSpec extends AbstractBeanDefinitionSpec {
         AllElementsVisitor.clearVisited()
         AllClassesVisitor.clearVisited()
         TestInjectVisitor.clearVisited()
-    }
-
-    void cleanup() {
-        AstAnnotationUtils.invalidateCache()
     }
 
     void "test class is visited by custom visitor"() {
@@ -42,21 +37,21 @@ import jakarta.inject.Inject
 class TestController {
 
     @Inject private String privateField
-    protected String protectedField  
+    protected String protectedField
     public String publicField
     @groovy.transform.PackageScope String packagePrivateField
     String property
-    
+
     TestController(String constructorArg) {}
-    
+
     @Inject
     void setterMethod(String method) {}
-    
+
     @Get("/getMethod")
     String getMethod(String argument) {
         ""
     }
-    
+
     @Post("/postMethod")
     String postMethod() {
         ""
@@ -66,7 +61,13 @@ class TestController {
 ''')
         expect:
         ControllerGetVisitor.getVisited() == ["test.TestController", "getMethod"]
-        AllElementsVisitor.getVisited().toSet() == ["test.TestController","privateField", "protectedField", "publicField", "packagePrivateField", "property", "setterMethod", "getMethod", "postMethod"].toSet()
+        AllElementsVisitor.getVisited().toSet() == ["test.TestController",
+                                                    "privateField",
+                                                    "protectedField",
+                                                    "publicField", "setProperty", "getProperty",
+                                                    "packagePrivateField", "setPackagePrivateField", "getPackagePrivateField",
+                                                    "property",
+                                                    "setterMethod", "getMethod", "postMethod"].toSet()
         AllClassesVisitor.getVisited() == ["test.TestController", "getMethod"]
     }
 
@@ -80,21 +81,21 @@ import jakarta.inject.Inject
 public class TestController {
 
     @Inject private String privateField
-    protected String protectedField  
+    protected String protectedField
     public String publicField
     @groovy.transform.PackageScope String packagePrivateField
     String property
-    
-    
+
+
     TestController(String constructorArg) {}
-    
+
     void setterMethod(String method) {}
-    
+
     @Get("/getMethod")
     String getMethod(String argument) {
         ""
     }
-    
+
     @Post("/postMethod")
     String postMethod() {
         ""
@@ -120,14 +121,14 @@ import jakarta.inject.Inject
 public class TestGenerated {
 
     @Inject private String privateField
-    protected String protectedField  
+    protected String protectedField
     public String publicField
     @groovy.transform.PackageScope String packagePrivateField
     String property
-    
-    
+
+
     TestGenerated(String constructorArg) {}
-    
+
     void setterMethod(String method) {}
 
 }

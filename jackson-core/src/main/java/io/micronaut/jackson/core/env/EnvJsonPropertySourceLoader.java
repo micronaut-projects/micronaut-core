@@ -43,6 +43,13 @@ public class EnvJsonPropertySourceLoader extends JsonPropertySourceLoader {
     private static final String SPRING_APPLICATION_JSON = "SPRING_APPLICATION_JSON";
     private static final String MICRONAUT_APPLICATION_JSON = "MICRONAUT_APPLICATION_JSON";
 
+    public EnvJsonPropertySourceLoader() {
+    }
+
+    public EnvJsonPropertySourceLoader(boolean logEnabled) {
+        super(logEnabled);
+    }
+
     @Override
     public int getOrder() {
         return POSITION;

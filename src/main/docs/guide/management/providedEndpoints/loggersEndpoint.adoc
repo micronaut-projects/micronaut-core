@@ -68,7 +68,7 @@ $ curl http://localhost:8080/loggers/ROOT
 To configure the loggers endpoint, supply configuration through `endpoints.loggers`.
 
 .Loggers Endpoint Configuration Example
-[source,yaml]
+[configuration]
 ----
 endpoints:
   loggers:

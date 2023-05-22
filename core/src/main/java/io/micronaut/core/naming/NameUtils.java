@@ -93,7 +93,7 @@ public class NameUtils {
         final String rest = name.substring(1);
 
         // Funky rule so that names like 'pNAME' will still work.
-        if (Character.isLowerCase(name.charAt(0)) && (rest.length() > 0) && Character.isUpperCase(rest.charAt(0))) {
+        if (Character.isLowerCase(name.charAt(0)) && (!rest.isEmpty()) && Character.isUpperCase(rest.charAt(0))) {
             return name;
         }
 
@@ -135,7 +135,7 @@ public class NameUtils {
     public static String dehyphenate(String name) {
         StringBuilder sb = new StringBuilder(name.length());
         for (String token : StringUtils.splitOmitEmptyStrings(name, '-')) {
-            if (token.length() > 0 && Character.isLetter(token.charAt(0))) {
+            if (!token.isEmpty() && Character.isLetter(token.charAt(0))) {
                 sb.append(Character.toUpperCase(token.charAt(0)));
                 sb.append(token.substring(1));
             } else {
@@ -229,13 +229,14 @@ public class NameUtils {
     public static boolean isWriterName(@NonNull String methodName, @NonNull String[] writePrefixes) {
         boolean isValid = false;
         for (String writePrefix : writePrefixes) {
-            if (writePrefix.length() == 0) {
+            if (writePrefix.isEmpty()) {
                 return true;
             }
             int len = methodName.length();
             int prefixLength = writePrefix.length();
             if (len > prefixLength && methodName.startsWith(writePrefix)) {
-                isValid = Character.isUpperCase(methodName.charAt(prefixLength));
+                char nextChar = methodName.charAt(prefixLength);
+                isValid = isValidCharacterAfterReaderWriterPrefix(nextChar);
             }
 
             if (isValid) {
@@ -360,7 +361,7 @@ public class NameUtils {
         boolean isValid = false;
         for (String readPrefix : readPrefixes) {
             int prefixLength = 0;
-            if (readPrefix.length() == 0) {
+            if (readPrefix.isEmpty()) {
                 return true;
             } else if (methodName.startsWith(readPrefix)) {
                 prefixLength = readPrefix.length();
@@ -369,7 +370,8 @@ public class NameUtils {
             }
             int len = methodName.length();
             if (len > prefixLength) {
-                isValid = Character.isUpperCase(methodName.charAt(prefixLength));
+                char firstVarNameChar = methodName.charAt(prefixLength);
+                isValid = isValidCharacterAfterReaderWriterPrefix(firstVarNameChar);
             }
 
             if (isValid) {
@@ -378,6 +380,10 @@ public class NameUtils {
         }
 
         return isValid;
+    }
+
+    private static boolean isValidCharacterAfterReaderWriterPrefix(char c) {
+        return c == '_' || c == '$' || Character.isUpperCase(c);
     }
 
     /**
@@ -491,7 +497,7 @@ public class NameUtils {
     }
 
     private static String nameFor(String prefix, @NonNull String propertyName) {
-        if (prefix.length() == 0) {
+        if (prefix.isEmpty()) {
             return propertyName;
         }
 

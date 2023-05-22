@@ -1,0 +1,21 @@
+Don't define `allowed-origins` or `allowed-origins-regex` to allow any origin for a given configuration.
+
+For multiple valid origins, set the `allowed-origins` key of the configuration to a list of strings.
+
+You can also define via `allowed-origins-regex` a regular expression (`^http(|s)://www\.google\.com$`). The Regular expression is passed to link:{javase}java/util/regex/Pattern.html#compile-java.lang.String-[Pattern#compile] and compared to the request origin with link:{javase}java/util/regex/Matcher.html#matches--[Matcher#matches].
+
+.Example CORS Configuration
+[configuration]
+----
+micronaut:
+  server:
+    cors:
+      enabled: true
+      configurations:
+        web:
+          allowed-origins-regex: '^http(|s):\/\/www\.google\.com$'
+          allowed-origins:
+            - http://foo.com
+----
+
+WARNING: Use the `allowed-origins-regex` configuration judiciously. You may accidentally make an insecure configuration which could be targeted by an attacker registering domains targeting the regular expression.

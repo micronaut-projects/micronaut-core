@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.simple;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -26,7 +27,6 @@ import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.simple.cookies.SimpleCookies;
 
-import io.micronaut.core.annotation.Nullable;
 import java.util.Optional;
 import java.util.Set;
 
@@ -45,7 +45,9 @@ class SimpleHttpResponse<B> implements MutableHttpResponse<B> {
     private final SimpleCookies cookies = new SimpleCookies(ConversionService.SHARED);
     private final MutableConvertibleValues<Object> attributes = new MutableConvertibleValuesMap<>();
 
-    private HttpStatus status = HttpStatus.OK;
+    private int status = HttpStatus.OK.getCode();
+    private String reason = HttpStatus.OK.getReason();
+
     private Object body;
 
     @Override
@@ -84,14 +86,24 @@ class SimpleHttpResponse<B> implements MutableHttpResponse<B> {
     }
 
     @Override
-    public MutableHttpResponse<B> status(HttpStatus status, CharSequence message) {
-        this.status = status;
-        return this;
+    public int code() {
+        return status;
     }
 
     @Override
-    public HttpStatus getStatus() {
-        return this.status;
+    public String reason() {
+        return reason;
+    }
+
+    @Override
+    public MutableHttpResponse<B> status(int status, CharSequence message) {
+        this.status = status;
+        if (message == null) {
+            this.reason = HttpStatus.getDefaultReason(status);
+        } else {
+            this.reason = message.toString();
+        }
+        return this;
     }
 
     /**

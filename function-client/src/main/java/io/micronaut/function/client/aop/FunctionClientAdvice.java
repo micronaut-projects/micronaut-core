@@ -20,6 +20,7 @@ import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.function.client.FunctionDefinition;
@@ -44,16 +45,19 @@ import java.util.concurrent.CompletableFuture;
 @Singleton
 public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
 
+    private final ConversionService conversionService;
     private final FunctionDiscoveryClient discoveryClient;
     private final FunctionInvokerChooser functionInvokerChooser;
 
     /**
      * Constructor.
      *
-     * @param discoveryClient discoveryClient
+     * @param conversionService      The conversion service
+     * @param discoveryClient        discoveryClient
      * @param functionInvokerChooser functionInvokerChooser
      */
-    public FunctionClientAdvice(FunctionDiscoveryClient discoveryClient, FunctionInvokerChooser functionInvokerChooser) {
+    public FunctionClientAdvice(ConversionService conversionService, FunctionDiscoveryClient discoveryClient, FunctionInvokerChooser functionInvokerChooser) {
+        this.conversionService = conversionService;
         this.discoveryClient = discoveryClient;
         this.functionInvokerChooser = functionInvokerChooser;
     }
@@ -78,21 +82,25 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
                 .orElse(NameUtils.hyphenate(context.getMethodName(), true));
 
         Flux<FunctionDefinition> functionDefinition = Flux.from(discoveryClient.getFunction(functionName));
-        InterceptedMethod interceptedMethod = InterceptedMethod.of(context);
+        InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
         try {
             switch (interceptedMethod.resultType()) {
-                case PUBLISHER:
+                case PUBLISHER -> {
                     return interceptedMethod.handleResult(invokeFn(body, functionName, functionDefinition, interceptedMethod.returnTypeValue()));
-                case COMPLETION_STAGE:
+                }
+                case COMPLETION_STAGE -> {
                     return interceptedMethod.handleResult(toCompletableFuture(
                             invokeFn(body, functionName, functionDefinition, interceptedMethod.returnTypeValue())
                     ));
-                case SYNCHRONOUS:
+                }
+                case SYNCHRONOUS -> {
                     FunctionDefinition def = functionDefinition.blockFirst();
                     FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));
                     return functionInvoker.invoke(def, body, context.getReturnType().asArgument());
-                default:
+                }
+                default -> {
                     return interceptedMethod.unsupported();
+                }
             }
         } catch (Exception e) {
             return interceptedMethod.handleException(e);

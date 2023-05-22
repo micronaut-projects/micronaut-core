@@ -1,7 +1,7 @@
-When dealing with blocking operations, Micronaut shifts the blocking operations to an unbound, caching I/O thread pool by default. You can configure the I/O thread pool using the api:scheduling.executor.ExecutorConfiguration[] named `io`. For example:
+When dealing with blocking operations, the Micronaut framework shifts the blocking operations to an unbound, caching I/O thread pool by default. You can configure the I/O thread pool using the api:scheduling.executor.ExecutorConfiguration[] named `io`. For example:
 
 .Configuring the Server I/O Thread Pool
-[source,yaml]
+[configuration]
 ----
 micronaut:
   executors:

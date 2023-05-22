@@ -86,10 +86,10 @@ class FooFactory {
 
     @Bean(preDestroy="close")
     Foo foo() {
-        new Foo() { 
+        new Foo() {
             @Override
              void close()throws Exception{
-                println("closed")     
+                println("closed")
             }
         }
     }
@@ -121,15 +121,15 @@ class FooFactory {
     @Singleton
     @Bean(preDestroy="close")
     Foo foo() {
-        new Foo() { 
-        
+        new Foo() {
+
             private boolean running = true
-        
+
             @Override
             boolean isRunning(){
                 return running
             }
-            
+
             @Override
             Foo stop() {
                 running = false
@@ -146,7 +146,7 @@ interface Foo extends LifeCycle<Foo> {
 
         then:
         noExceptionThrown()
-        Class fooClass = beanContext.classLoader.loadClass("test.Foo")
+        Class<?> fooClass = beanContext.classLoader.loadClass("test.Foo")
         beanContext.getBeanDefinition(fooClass) instanceof DisposableBeanDefinition
 
         when:

@@ -42,9 +42,9 @@ import java.util.Optional;
  */
 public class QueryValueClientArgumentRequestBinder implements AnnotatedClientArgumentRequestBinder<QueryValue> {
 
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
 
-    public QueryValueClientArgumentRequestBinder(ConversionService<?> conversionService) {
+    public QueryValueClientArgumentRequestBinder(ConversionService conversionService) {
         this.conversionService = conversionService;
     }
 

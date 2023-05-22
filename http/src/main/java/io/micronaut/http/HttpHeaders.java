@@ -17,14 +17,22 @@ package io.micronaut.http;
 
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.type.Headers;
-import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.util.HttpHeadersUtil;
+import jakarta.annotation.Nullable;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.OptionalLong;
 
 /**
  * Constants for common HTTP headers. See https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html.
@@ -500,6 +508,106 @@ public interface HttpHeaders extends Headers {
     String X_AUTH_TOKEN = "X-Auth-Token";
 
     /**
+     * Unmodifiable List of every header constant defined in {@link HttpHeaders}.
+     */
+    List<String> STANDARD_HEADERS = Collections.unmodifiableList(Arrays.asList(
+        ACCEPT,
+        ACCEPT,
+        ACCEPT_CH,
+        ACCEPT_CH_LIFETIME,
+        ACCEPT_CHARSET,
+        ACCEPT_ENCODING,
+        ACCEPT_LANGUAGE,
+        ACCEPT_RANGES,
+        ACCEPT_PATCH,
+        ACCESS_CONTROL_ALLOW_CREDENTIALS,
+        ACCESS_CONTROL_ALLOW_HEADERS,
+        ACCESS_CONTROL_ALLOW_METHODS,
+        ACCESS_CONTROL_ALLOW_ORIGIN,
+        ACCESS_CONTROL_EXPOSE_HEADERS,
+        ACCESS_CONTROL_MAX_AGE,
+        ACCESS_CONTROL_REQUEST_HEADERS,
+        ACCESS_CONTROL_REQUEST_METHOD,
+        AGE,
+        ALLOW,
+        AUTHORIZATION,
+        AUTHORIZATION_INFO,
+        CACHE_CONTROL,
+        CONNECTION,
+        CONTENT_BASE,
+        CONTENT_DISPOSITION,
+        CONTENT_DPR,
+        CONTENT_ENCODING,
+        CONTENT_LANGUAGE,
+        CONTENT_LENGTH,
+        CONTENT_LOCATION,
+        CONTENT_TRANSFER_ENCODING,
+        CONTENT_MD5,
+        CONTENT_RANGE,
+        CONTENT_TYPE,
+        COOKIE,
+        CROSS_ORIGIN_RESOURCE_POLICY,
+        DATE,
+        DEVICE_MEMORY,
+        DOWNLINK,
+        DPR,
+        ECT,
+        ETAG,
+        EXPECT,
+        EXPIRES,
+        FEATURE_POLICY,
+        FORWARDED,
+        FROM,
+        HOST,
+        IF_MATCH,
+        IF_MODIFIED_SINCE,
+        IF_NONE_MATCH,
+        IF_RANGE,
+        IF_UNMODIFIED_SINCE,
+        LAST_MODIFIED,
+        LINK,
+        LOCATION,
+        MAX_FORWARDS,
+        ORIGIN,
+        PRAGMA,
+        PROXY_AUTHENTICATE,
+        PROXY_AUTHORIZATION,
+        RANGE,
+        REFERER,
+        REFERRER_POLICY,
+        RETRY_AFTER,
+        RTT,
+        SAVE_DATA,
+        SEC_WEBSOCKET_KEY1,
+        SEC_WEBSOCKET_KEY2,
+        SEC_WEBSOCKET_LOCATION,
+        SEC_WEBSOCKET_ORIGIN,
+        SEC_WEBSOCKET_PROTOCOL,
+        SEC_WEBSOCKET_VERSION,
+        SEC_WEBSOCKET_KEY,
+        SEC_WEBSOCKET_ACCEPT,
+        SERVER,
+        SET_COOKIE,
+        SET_COOKIE2,
+        SOURCE_MAP,
+        TE,
+        TRAILER,
+        TRANSFER_ENCODING,
+        UPGRADE,
+        USER_AGENT,
+        VARY,
+        VIA,
+        VIEWPORT_WIDTH,
+        WARNING,
+        WEBSOCKET_LOCATION,
+        WEBSOCKET_ORIGIN,
+        WEBSOCKET_PROTOCOL,
+        WIDTH,
+        WWW_AUTHENTICATE,
+        X_AUTH_TOKEN
+    ));
+
+    /**
      * Obtain the date header.
      *
      * @param name The header name
@@ -588,29 +696,53 @@ public interface HttpHeaders extends Headers {
      * @return A list of zero or many {@link MediaType} instances
      */
     default List<MediaType> accept() {
-        final List<String> values = getAll(HttpHeaders.ACCEPT);
-        if (!values.isEmpty()) {
-            List<MediaType> mediaTypes = new ArrayList<>(10);
-            for (String value : values) {
-                for (String token : StringUtils.splitOmitEmptyStrings(value, ',')) {
+        return MediaType.orderedOf(getAll(HttpHeaders.ACCEPT));
+    }
+
+    /**
+     * The {@code Accept-Charset} header, or {@code null} if unset.
+     *
+     * @return The {@code Accept-Charset} header
+     * @since 4.0.0
+     */
+    @Nullable
+    default Charset acceptCharset() {
+        return findFirst(HttpHeaders.ACCEPT_CHARSET)
+            .map(text -> {
+                text = HttpHeadersUtil.splitAcceptHeader(text);
+                if (text != null) {
                     try {
-                        mediaTypes.add(MediaType.of(token));
-                    } catch (IllegalArgumentException e) {
-                        // ignore
+                        return Charset.forName(text);
+                    } catch (Exception ignored) {
                     }
                 }
-            }
-            return mediaTypes;
-        } else {
-            return Collections.emptyList();
-        }
+                // default to UTF-8
+                return StandardCharsets.UTF_8;
+            })
+            .orElse(null);
+    }
+
+    /**
+     * The {@code Accept-Language} header, or {@code null} if unset.
+     *
+     * @return The {@code Accept-Language} header
+     * @since 4.0.0
+     */
+    @Nullable
+    default Locale acceptLanguage() {
+        return findFirst(HttpHeaders.ACCEPT_LANGUAGE)
+            .map(text -> {
+                String part = HttpHeadersUtil.splitAcceptHeader(text);
+                return part == null ? Locale.getDefault() : Locale.forLanguageTag(part);
+            })
+            .orElse(null);
     }
 
     /**
      * @return Whether the {@link HttpHeaders#CONNECTION} header is set to Keep-Alive
      */
     default boolean isKeepAlive() {
-        return getFirst(CONNECTION, ConversionContext.STRING)
+        return findFirst(CONNECTION)
                  .map(val -> val.equalsIgnoreCase(HttpHeaderValues.CONNECTION_KEEP_ALIVE)).orElse(false);
     }
 

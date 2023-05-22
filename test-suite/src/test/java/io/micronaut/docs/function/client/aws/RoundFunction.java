@@ -16,6 +16,7 @@
 package io.micronaut.docs.function.client.aws;
 
 import io.micronaut.function.FunctionBean;
+import io.micronaut.http.annotation.Body;
 
 import java.util.function.Function;
 
@@ -29,7 +30,7 @@ public class RoundFunction implements Function<Float, Integer> {
     }
 
     @Override
-    public Integer apply(Float aFloat) {
+    public Integer apply(@Body Float aFloat) {
         return mathService.round(aFloat);
     }
 }

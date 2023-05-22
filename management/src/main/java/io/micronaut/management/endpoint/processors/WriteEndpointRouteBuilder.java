@@ -47,7 +47,7 @@ public class WriteEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
      */
     public WriteEndpointRouteBuilder(ApplicationContext beanContext,
                                      UriNamingStrategy uriNamingStrategy,
-                                     ConversionService<?> conversionService,
+                                     ConversionService conversionService,
                                      EndpointDefaultConfiguration endpointDefaultConfiguration) {
         super(beanContext, uriNamingStrategy, conversionService, endpointDefaultConfiguration);
     }

@@ -16,6 +16,7 @@
 package io.micronaut.http.client.interceptor;
 
 import io.micronaut.aop.InterceptedMethod;
+import io.micronaut.aop.InterceptorBean;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
@@ -55,8 +56,8 @@ import io.micronaut.http.annotation.HttpMethodMapping;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
-import io.micronaut.http.client.ReactiveClientResultTransformer;
 import io.micronaut.http.client.HttpClientRegistry;
+import io.micronaut.http.client.ReactiveClientResultTransformer;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.bind.ClientArgumentRequestBinder;
@@ -68,7 +69,6 @@ import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.json.codec.JsonMediaTypeCodec;
-import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -88,7 +88,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -98,7 +97,7 @@ import java.util.function.Supplier;
  * @author graemerocher
  * @since 1.0
  */
-@Singleton
+@InterceptorBean(Client.class)
 @Internal
 @BootstrapContextCompatible
 public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, Object> {
@@ -114,7 +113,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private final HttpClientBinderRegistry binderRegistry;
     private final JsonMediaTypeCodec jsonMediaTypeCodec;
     private final HttpClientRegistry<?> clientFactory;
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
 
     /**
      * Constructor for advice class to setup things like Headers, Cookies, Parameters for Clients.
@@ -130,7 +129,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             JsonMediaTypeCodec jsonMediaTypeCodec,
             List<ReactiveClientResultTransformer> transformers,
             HttpClientBinderRegistry binderRegistry,
-            ConversionService<?> conversionService) {
+            ConversionService conversionService) {
         this.clientFactory = clientFactory;
         this.jsonMediaTypeCodec = jsonMediaTypeCodec;
         this.transformers = transformers != null ? transformers : Collections.emptyList();
@@ -139,7 +138,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     }
 
     /**
-     * Interceptor to apply headers, cookies, parameter and body arguements.
+     * Interceptor to apply headers, cookies, parameter and body arguments.
      *
      * @param context The context
      * @return httpClient or future
@@ -161,7 +160,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         Optional<Class<? extends Annotation>> httpMethodMapping = context.getAnnotationTypeByStereotype(HttpMethodMapping.class);
         HttpClient httpClient = clientFactory.getClient(annotationMetadata);
-        if (context.hasStereotype(HttpMethodMapping.class) && httpClient != null) {
+        if (httpMethodMapping.isPresent() && context.hasStereotype(HttpMethodMapping.class) && httpClient != null) {
             AnnotationValue<HttpMethodMapping> mapping = context.getAnnotation(HttpMethodMapping.class);
             String uri = mapping.getRequiredValue(String.class);
             if (StringUtils.isEmpty(uri)) {
@@ -194,7 +193,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             .orElse(argument.getName());
                     // Convert and put as path param
                     if (argument.getAnnotationMetadata().hasStereotype(Format.class)) {
-                        ConversionService.SHARED.convert(value,
+                        conversionService.convert(value,
                                 ConversionContext.STRING.with(argument.getAnnotationMetadata()))
                                 .ifPresent(v -> pathParams.put(name, v));
                     } else {
@@ -215,7 +214,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
             }
 
-            InterceptedMethod interceptedMethod = InterceptedMethod.of(context);
+            InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
 
             // Apply all the argument binders
             Argument[] arguments = context.getArguments();
@@ -259,7 +258,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             pathParams.putIfAbsent(k, v);
                         }
                     }
-                } else {
+                } else if (!Publishers.isConvertibleToPublisher(body)) {
                     BeanMap<Object> beanMap = BeanMap.of(body);
                     for (Map.Entry<String, Object> entry : beanMap.entrySet()) {
                         String k = entry.getKey();
@@ -299,11 +298,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             request.setAttribute(HttpAttributes.INVOCATION_CONTEXT, context);
             // Set the URI template used to make the request for tracing purposes
             request.setAttribute(HttpAttributes.URI_TEMPLATE, resolveTemplate(annotationMetadata, uriTemplate.toString()));
-            String serviceId = getClientId(annotationMetadata);
             Argument<?> errorType = annotationMetadata.classValue(Client.class, "errorType")
                     .map((Function<Class, Argument>) Argument::of).orElse(HttpClient.DEFAULT_ERROR_TYPE);
-            request.setAttribute(HttpAttributes.SERVICE_ID, serviceId);
-
 
             final MediaType[] acceptTypes;
             Collection<MediaType> accept = request.accept();
@@ -346,18 +342,23 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                         Publisher<?> csPublisher = httpClientResponsePublisher(httpClient, request, returnType, errorType, valueType);
                         CompletableFuture<Object> future = new CompletableFuture<>();
                         csPublisher.subscribe(new CompletionAwareSubscriber<Object>() {
-                            AtomicReference<Object> reference = new AtomicReference<>();
+                            Object message;
+                            Subscription subscription;
 
                             @Override
                             protected void doOnSubscribe(Subscription subscription) {
-                                subscription.request(1);
+                                this.subscription = subscription;
+                                subscription.request(Long.MAX_VALUE);
                             }
 
                             @Override
                             protected void doOnNext(Object message) {
                                 if (Void.class != reactiveValueType) {
-                                    reference.set(message);
+                                    this.message = message;
                                 }
+                                // we only want the first item
+                                subscription.cancel();
+                                doOnComplete();
                             }
 
                             @Override
@@ -383,7 +384,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
                             @Override
                             protected void doOnComplete() {
-                                future.complete(reference.get());
+                                // can be called twice
+                                future.complete(message);
                             }
                         });
                         return interceptedMethod.handleResult(future);
@@ -426,7 +428,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         Class<?> argumentType = reactiveValueArgument.getType();
         if (Void.class == argumentType || returnType.isVoid()) {
             request.getHeaders().remove(HttpHeaders.ACCEPT);
-            return httpClient.exchange(request, Argument.VOID, errorType);
+            return httpClient.retrieve(request, Argument.VOID, errorType);
         } else {
             if (HttpResponse.class.isAssignableFrom(argumentType)) {
                 return httpClient.exchange(request, reactiveValueArgument, errorType);
@@ -461,9 +463,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 if (reactiveValueType == ByteBuffer.class) {
                     return byteBufferPublisher;
                 } else {
-                    if (ConversionService.SHARED.canConvert(ByteBuffer.class, reactiveValueType)) {
+                    if (conversionService.canConvert(ByteBuffer.class, reactiveValueType)) {
                         // It would be nice if we could capture the TypeConverter here
-                        return Publishers.map(byteBufferPublisher, value -> ConversionService.SHARED.convert(value, reactiveValueType).get());
+                        return Publishers.map(byteBufferPublisher, value -> conversionService.convert(value, reactiveValueType).get());
                     } else {
                         throw new ConfigurationException("Cannot create the generated HTTP client's " +
                                 "required return type, since no TypeConverter from ByteBuffer to " +

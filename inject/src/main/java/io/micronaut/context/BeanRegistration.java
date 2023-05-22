@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.BeanType;
@@ -146,7 +147,7 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
 
     @Override
     public int hashCode() {
-        return Objects.hash(identifier, beanDefinition);
+        return ObjectUtils.hash(identifier, beanDefinition);
     }
 
     @Override

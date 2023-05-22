@@ -22,8 +22,8 @@ import io.micronaut.http.annotation.Post
 import io.micronaut.session.Session
 import io.micronaut.session.annotation.SessionValue
 
-import javax.annotation.Nullable
-import javax.validation.constraints.NotBlank
+import jakarta.annotation.Nullable
+import jakarta.validation.constraints.NotBlank
 // end::imports[]
 
 // tag::class[]

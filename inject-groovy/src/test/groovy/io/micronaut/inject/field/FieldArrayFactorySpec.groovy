@@ -31,8 +31,7 @@ class FieldArrayFactorySpec extends Specification {
 
     void "test injection with field supplied by a provider"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        BeanContext context = BeanContext.run()
 
         when:"A bean is obtained which has a field that depends on a bean provided by a provider"
         B b =  context.getBean(B)
@@ -42,7 +41,10 @@ class FieldArrayFactorySpec extends Specification {
         b.all[0] instanceof AImpl
         b.all[0].c != null
         b.all[0].c2 != null
-        b.all[0].is(context.getBean(AImpl))
+        b.all[0].is(context.getBean(A))
+
+        cleanup:
+        context.close()
     }
 
     static interface A {

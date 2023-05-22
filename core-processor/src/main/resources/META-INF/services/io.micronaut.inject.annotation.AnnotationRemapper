@@ -1,0 +1,5 @@
+io.micronaut.inject.annotation.internal.FindBugsRemapper
+io.micronaut.inject.annotation.internal.JavaxRemapper
+io.micronaut.inject.annotation.internal.QualifierBindingMembers
+io.micronaut.inject.annotation.internal.InterceptorBindingMembers
+

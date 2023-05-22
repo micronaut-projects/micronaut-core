@@ -22,6 +22,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
 
 import io.micronaut.core.annotation.NonNull;
@@ -312,7 +313,7 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
 
     @Override
     public int hashCode() {
-        return Objects.hash(beanType);
+        return beanType.hashCode();
     }
 
     @Override
@@ -349,7 +350,7 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
 
         @Override
         public int hashCode() {
-            return Objects.hash(type, value);
+            return ObjectUtils.hash(type, value);
         }
     }
 }

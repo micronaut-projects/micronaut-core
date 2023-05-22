@@ -9,8 +9,8 @@ import io.micronaut.inject.MethodInjectionPoint
 import spock.lang.Requires
 
 import jakarta.inject.Singleton
-import javax.validation.Valid
-import javax.validation.constraints.Min
+import jakarta.validation.Valid
+import jakarta.validation.constraints.Min
 
 class AnnotationsOnGenericTypesSpec extends AbstractTypeElementSpec {
 
@@ -24,14 +24,14 @@ import io.micronaut.context.annotation.Executable;
 import jakarta.inject.Singleton;
 import java.util.List;
 import java.util.List;
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 
 @Singleton
 class Test {
 
     @Executable
     void test(List<@Min(10) Long> values) {
-    
+
     }
 }
 ''')
@@ -52,14 +52,14 @@ import io.micronaut.context.annotation.Executable;
 import jakarta.inject.Singleton;
 import java.util.List;
 import java.util.List;
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 
 @Singleton
 class Test {
 
     @Executable
     void test(List<@Valid Foo> values) {
-    
+
     }
 }
 
@@ -86,14 +86,14 @@ import io.micronaut.context.annotation.Executable;
 import jakarta.inject.Singleton;
 import java.util.List;
 import java.util.List;
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 
 @Singleton
 class Test {
 
     @Executable
     void test(@Valid Foo value) {
-    
+
     }
 }
 
@@ -121,7 +121,7 @@ import io.micronaut.context.annotation.Executable;
 import jakarta.inject.Singleton;
 import java.util.List;
 import java.util.List;
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 
 @Singleton
 class Test {
@@ -149,7 +149,7 @@ import io.micronaut.context.annotation.*;
 import jakarta.inject.Singleton;
 import java.util.List;
 import java.util.List;
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 
 @Singleton
 class Test {
@@ -175,14 +175,14 @@ import io.micronaut.context.annotation.*;
 import jakarta.inject.*;
 import java.util.List;
 import java.util.List;
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 
 @Singleton
 class Test {
 
     @Inject
     void test(List<@Min(10) Long> values) {
-    
+
     }
 }
 ''')

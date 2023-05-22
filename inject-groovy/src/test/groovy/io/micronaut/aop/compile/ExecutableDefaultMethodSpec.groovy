@@ -14,12 +14,12 @@ class ExecutableDefaultMethodSpec extends AbstractBeanDefinitionSpec {
 package test
 
 import io.micronaut.context.annotation.*
-import javax.inject.*
+import jakarta.inject.*
 
 interface SomeInterface<T> {
 
     String goDog(T dog)
-    
+
     default String go() { return "go"; }
 }
 
@@ -34,7 +34,7 @@ class MyFactory {
 }
 
 class MyClass implements SomeInterface<String> {
-    
+
     @Override
     String goDog(String name) {
         name

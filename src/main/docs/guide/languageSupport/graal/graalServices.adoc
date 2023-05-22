@@ -1,6 +1,6 @@
-=== Getting Started with Micronaut and GraalVM
+=== Getting Started with the Micronaut framework and GraalVM
 
-Since Micronaut 2.2, any Micronaut application is ready to be built into a native image using the Micronaut Gradle or Maven plugins. To get started, create a new application:
+Since Micronaut framework 2.2, any Micronaut application is ready to be built into a native image using the Micronaut Gradle or Maven plugins. To get started, create a new application:
 
 .Creating a GraalVM Native Microservice
 [source,bash]
@@ -75,11 +75,11 @@ You can then run the native image from the directory where you built it.
 $ ./hello-world
 ----
 
-=== Understanding Micronaut and GraalVM
+=== Understanding Micronaut framework and GraalVM
 
-Micronaut itself does not rely on reflection or dynamic classloading, so it works automatically with GraalVM native, however certain third-party libraries used by Micronaut may require additional input about uses of reflection.
+The Micronaut framework itself does not rely on reflection or dynamic classloading, so it works automatically with GraalVM native, however certain third-party libraries used by Micronaut may require additional input about uses of reflection.
 
-Micronaut includes an annotation processor that helps to generate reflection configuration that is automatically picked up by the `native-image` tool:
+The Micronaut framework includes an annotation processor that helps to generate reflection configuration that is automatically picked up by the `native-image` tool:
 
 dependency:micronaut-graal[scope="annotationProcessor"]
 
@@ -105,7 +105,7 @@ If you have more advanced requirements and only wish to include certain fields o
 
 === Adding Additional Classes for Reflective Access
 
-To inform Micronaut of additional classes to be included in the generated reflection configuration a number of annotations are available including:
+To inform the Micronaut framework of additional classes to be included in the generated reflection configuration a number of annotations are available including:
 
 * ann:core.annotation.ReflectiveAccess[] - An annotation that can be declared on a specific type, constructor, method or field to enable reflective access just for the annotated element.
 * ann:core.annotation.TypeHint[] - An annotation that allows to bulk configuration of reflective access to one or many types
@@ -177,4 +177,4 @@ As you can see, the native image startup completes in milliseconds, and memory c
 
 === Resource file generation
 
-Starting in Micronaut 3.0 the automatic generation of the `resource-config.json` file is now part of the https://github.com/micronaut-projects/micronaut-gradle-plugin[Gradle] and https://github.com/micronaut-projects/micronaut-maven-plugin[Maven] plugins.
+Starting in Micronaut framework 3.0 the automatic generation of the `resource-config.json` file is now part of the https://github.com/micronaut-projects/micronaut-gradle-plugin[Gradle] and https://github.com/micronaut-projects/micronaut-maven-plugin[Maven] plugins.

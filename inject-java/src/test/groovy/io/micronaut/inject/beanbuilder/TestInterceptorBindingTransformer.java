@@ -6,7 +6,6 @@ import io.micronaut.inject.annotation.TypedAnnotationTransformer;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 public class TestInterceptorBindingTransformer implements TypedAnnotationTransformer<SomeInterceptorBinding> {

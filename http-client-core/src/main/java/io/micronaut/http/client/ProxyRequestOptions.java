@@ -62,7 +62,7 @@ public final class ProxyRequestOptions {
 
     @Override
     public int hashCode() {
-        return Objects.hash(isRetainHostHeader());
+        return Objects.hashCode(isRetainHostHeader());
     }
 
     /**

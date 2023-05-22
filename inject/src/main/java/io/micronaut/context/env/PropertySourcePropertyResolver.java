@@ -15,7 +15,6 @@
  */
 package io.micronaut.context.env;
 
-import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -23,7 +22,6 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.format.MapFormat;
-import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.optim.StaticOptimizations;
@@ -34,15 +32,17 @@ import io.micronaut.core.util.EnvironmentProperties;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.MapPropertyResolver;
 import io.micronaut.core.value.PropertyResolver;
-import io.micronaut.core.value.ValueException;
-import org.slf4j.Logger;
 
-import java.security.SecureRandom;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.helpers.NOPLogger;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.ListIterator;
@@ -50,13 +50,12 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Properties;
-import java.util.UUID;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * <p>A {@link PropertyResolver} that resolves from one or many {@link PropertySource} instances.</p>
@@ -66,18 +65,14 @@ import java.util.stream.Collectors;
  */
 public class PropertySourcePropertyResolver implements PropertyResolver, AutoCloseable {
 
-    private static final Logger LOG = ClassUtils.getLogger(PropertySourcePropertyResolver.class);
-
     private static final EnvironmentProperties CURRENT_ENV = StaticOptimizations.get(EnvironmentProperties.class)
             .orElseGet(EnvironmentProperties::empty);
     private static final Pattern DOT_PATTERN = Pattern.compile("\\.");
-    private static final String RANDOM_PREFIX = "\\s?random\\.(\\S+?)";
-    private static final String RANDOM_UPPER_LIMIT = "(\\(-?\\d+(\\.\\d+)?\\))";
-    private static final String RANDOM_RANGE = "(\\[-?\\d+(\\.\\d+)?,\\s?-?\\d+(\\.\\d+)?])";
-    private static final Pattern RANDOM_PATTERN = Pattern.compile("\\$\\{" + RANDOM_PREFIX + "(" + RANDOM_UPPER_LIMIT + "|" + RANDOM_RANGE + ")?\\}");
+
     private static final Object NO_VALUE = new Object();
     private static final PropertyCatalog[] CONVENTIONS = {PropertyCatalog.GENERATED, PropertyCatalog.RAW};
-    protected final ConversionService<?> conversionService;
+    private static final String WILD_CARD_SUFFIX = ".*";
+    protected final ConversionService conversionService;
     protected final PropertyPlaceholderResolver propertyPlaceholderResolver;
     protected final Map<String, PropertySource> propertySources = new ConcurrentHashMap<>(10);
     // properties are stored in an array of maps organized by character in the alphabet
@@ -86,7 +81,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     protected final Map<String, Object>[] catalog = new Map[58];
     protected final Map<String, Object>[] rawCatalog = new Map[58];
     protected final Map<String, Object>[] nonGenerated = new Map[58];
-    private final SecureRandom random = new SecureRandom();
+
+    protected Logger log;
+
     private final Map<String, Boolean> containsCache = new ConcurrentHashMap<>(20);
     private final Map<String, Object> resolvedValueCache = new ConcurrentHashMap<>(20);
     private final EnvironmentProperties environmentProperties = EnvironmentProperties.fork(CURRENT_ENV);
@@ -95,10 +92,21 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * Creates a new, initially empty, {@link PropertySourcePropertyResolver} for the given {@link ConversionService}.
      *
      * @param conversionService The {@link ConversionService}
+     * @param logEnabled logEnabled flag to enable or disable logger
      */
-    public PropertySourcePropertyResolver(ConversionService<?> conversionService) {
+    public PropertySourcePropertyResolver(ConversionService conversionService, boolean logEnabled) {
+        this.log = logEnabled ? LoggerFactory.getLogger(getClass()) : NOPLogger.NOP_LOGGER;
         this.conversionService = conversionService;
         this.propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(this, conversionService);
+    }
+
+    /**
+     * Creates a new, initially empty, {@link PropertySourcePropertyResolver} for the given {@link ConversionService}.
+     *
+     * @param conversionService The {@link ConversionService}
+     */
+    public PropertySourcePropertyResolver(ConversionService conversionService) {
+        this(conversionService, true);
     }
 
     /**
@@ -205,16 +213,65 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                     name, false, PropertyCatalog.NORMALIZED);
             if (entries != null) {
                 String prefix = name + '.';
-                return entries.keySet().stream().filter(k -> k.startsWith(prefix))
-                              .map(k -> {
-                                  String withoutPrefix = k.substring(prefix.length());
-                                  int i = withoutPrefix.indexOf('.');
-                                  if (i > -1) {
-                                      return withoutPrefix.substring(0, i);
-                                  }
-                                  return withoutPrefix;
-                              })
-                              .collect(Collectors.toSet());
+                Set<String> result = new HashSet<>();
+                Set<String> strings = entries.keySet();
+                for (String k : strings) {
+                    if (k.startsWith(prefix)) {
+                        String withoutPrefix = k.substring(prefix.length());
+                        int i = withoutPrefix.indexOf('.');
+                        String s;
+                        if (i > -1) {
+                            s = withoutPrefix.substring(0, i);
+                        } else {
+                            s = withoutPrefix;
+                        }
+                        result.add(s);
+                    }
+                }
+                return result;
+            }
+        }
+        return Collections.emptySet();
+    }
+
+    @Override
+    public Set<List<String>> getPropertyPathMatches(String pathPattern) {
+        if (StringUtils.isNotEmpty(pathPattern)) {
+            Map<String, Object> entries = resolveEntriesForKey(
+                pathPattern, false, null);
+
+            if (entries != null) {
+                boolean endsWithWildCard = pathPattern.endsWith(WILD_CARD_SUFFIX);
+                String resolvedPattern = pathPattern
+                    .replace("[*]", "\\[([\\w\\d-]+?)\\]")
+                    .replace(".*.", "\\.([\\w\\d-]+?)\\.");
+                if (endsWithWildCard) {
+                    resolvedPattern = resolvedPattern.replace(WILD_CARD_SUFFIX, "\\S*");
+                } else {
+                    resolvedPattern += "\\S*";
+                }
+                Pattern pattern = Pattern.compile(resolvedPattern);
+                Set<String> keys = entries.keySet();
+                Set<List<String>> results = new HashSet<>(keys.size());
+                for (String key : keys) {
+                    Matcher matcher = pattern.matcher(key);
+                    if (matcher.matches()) {
+                        int i = matcher.groupCount();
+                        if (i > 0) {
+                            if (i == 1) {
+                                results.add(Collections.singletonList(matcher.group(1)));
+                            } else {
+                                List<String> resolved = new ArrayList<>(i);
+                                for (int j = 0; j < i; j++) {
+                                    resolved.add(matcher.group(j + 1));
+                                }
+                                results.add(CollectionUtils.unmodifiableList(resolved));
+                            }
+                        }
+                    }
+                }
+
+                return Collections.unmodifiableSet(results);
             }
         }
         return Collections.emptySet();
@@ -324,11 +381,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                             converted = conversionService.convert(value, conversionContext);
                         }
 
-                        if (LOG.isTraceEnabled()) {
+                        if (log.isTraceEnabled()) {
                             if (converted.isPresent()) {
-                                LOG.trace("Resolved value [{}] for property: {}", converted.get(), name);
+                                log.trace("Resolved value [{}] for property: {}", converted.get(), name);
                             } else {
-                                LOG.trace("Resolved value [{}] cannot be converted to type [{}] for property: {}", value, conversionContext.getArgument(), name);
+                                log.trace("Resolved value [{}] cannot be converted to type [{}] for property: {}", value, conversionContext.getArgument(), name);
                             }
                         }
 
@@ -357,9 +414,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             }
 
         }
-        if (LOG.isTraceEnabled()) {
-            LOG.trace("No value found for property: {}", name);
-        }
+        log.trace("No value found for property: {}", name);
 
         Class<T> requiredType = conversionContext.getArgument().getType();
         if (Properties.class.isAssignableFrom(requiredType)) {
@@ -527,26 +582,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         synchronized (catalog) {
             for (String property : properties) {
 
-                if (LOG.isTraceEnabled()) {
-                    LOG.trace("Processing property key {}", property);
-                }
+                log.trace("Processing property key {}", property);
 
                 Object value = properties.get(property);
-
-                if (value instanceof CharSequence) {
-                    value = processRandomExpressions(convention, property, (CharSequence) value);
-                } else if (value instanceof List) {
-                    final ListIterator i = ((List) value).listIterator();
-                    while (i.hasNext()) {
-                        final Object o = i.next();
-                        if (o instanceof CharSequence) {
-                            final CharSequence newValue = processRandomExpressions(convention, property, (CharSequence) o);
-                            if (newValue != o) {
-                                i.set(newValue);
-                            }
-                        }
-                    }
-                }
 
                 List<String> resolvedProperties = resolvePropertiesForConvention(property, convention);
                 boolean first = true;
@@ -669,67 +707,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         }
     }
 
-    private CharSequence processRandomExpressions(PropertySource.PropertyConvention convention, String property, CharSequence str) {
-        if (convention != PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE && str.toString().contains(propertyPlaceholderResolver.getPrefix())) {
-            StringBuffer newValue = new StringBuffer();
-            Matcher matcher = RANDOM_PATTERN.matcher(str);
-            boolean hasRandoms = false;
-            while (matcher.find()) {
-                hasRandoms = true;
-                String type = matcher.group(1).trim().toLowerCase();
-                String range = matcher.group(2);
-                if (range != null) {
-                    range = range.substring(1, range.length() - 1);
-                }
-                String randomValue;
-                switch (type) {
-                    case "port":
-                        randomValue = String.valueOf(SocketUtils.findAvailableTcpPort());
-                        break;
-                    case "int":
-                    case "integer":
-                        randomValue = String.valueOf(range == null ? random.nextInt() : getNextIntegerInRange(range, property));
-                        break;
-                    case "long":
-                        randomValue = String.valueOf(range == null ? random.nextLong() : getNextLongInRange(range, property));
-                        break;
-                    case "float":
-                        randomValue = String.valueOf(range == null ? random.nextFloat() : getNextFloatInRange(range, property));
-                        break;
-                    case "shortuuid":
-                        randomValue = UUID.randomUUID().toString().substring(25, 35);
-                        break;
-                    case "uuid":
-                        randomValue = UUID.randomUUID().toString();
-                        break;
-                    case "uuid2":
-                        randomValue = UUID.randomUUID().toString().replace("-", "");
-                        break;
-                    default:
-                        throw new ConfigurationException("Invalid random expression " + matcher.group(0) + " for property: " + property);
-                }
-                matcher.appendReplacement(newValue, randomValue);
-            }
-
-            if (hasRandoms) {
-                matcher.appendTail(newValue);
-                return newValue.toString();
-            }
-
-        }
-        return str;
-    }
-
-    /**
-     * @param name        The name
-     * @param allowCreate Whether allows creation
-     * @return The map with the resolved entries for the name
-     */
-    @SuppressWarnings("MagicNumber")
-    protected Map<String, Object> resolveEntriesForKey(String name, boolean allowCreate) {
-        return resolveEntriesForKey(name, allowCreate, null);
-    }
-
     /**
      * @param name        The name
      * @param allowCreate Whether allows creation
@@ -760,18 +737,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     private Map<String, Object>[] getCatalog(@Nullable PropertyCatalog propertyCatalog) {
         propertyCatalog = propertyCatalog != null ? propertyCatalog : PropertyCatalog.GENERATED;
-        final Map<String, Object>[] catalog;
-        switch (propertyCatalog) {
-            case RAW:
-                catalog = this.rawCatalog;
-            break;
-            case NORMALIZED:
-                catalog = this.nonGenerated;
-            break;
-            default:
-                catalog = this.catalog;
-        }
-        return catalog;
+        return switch (propertyCatalog) {
+            case RAW -> this.rawCatalog;
+            case NORMALIZED -> this.nonGenerated;
+            default -> this.catalog;
+        };
     }
 
     /**
@@ -854,54 +824,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         }
     }
 
-    private int getNextIntegerInRange(String range, String property) {
-        try {
-            String[] tokens = range.split(",");
-            int lowerBound = Integer.parseInt(tokens[0]);
-            if (tokens.length == 1) {
-                return lowerBound >= 0 ? 1 : -1  * (random.nextInt(Math.abs(lowerBound)));
-            }
-            int upperBound = Integer.parseInt(tokens[1]);
-            return lowerBound + (int) (Math.random() * (upperBound - lowerBound));
-        } catch (NumberFormatException ex) {
-            throw new ValueException("Invalid range: `" + range + "` found for type Integer while parsing property: " + property, ex);
-        }
-    }
-
-    private long getNextLongInRange(String range, String property) {
-        try {
-            String[] tokens = range.split(",");
-            long lowerBound = Long.parseLong(tokens[0]);
-            if (tokens.length == 1) {
-                return (long) (Math.random() * (lowerBound));
-            }
-            long upperBound = Long.parseLong(tokens[1]);
-            return lowerBound + (long) (Math.random() * (upperBound - lowerBound));
-        } catch (NumberFormatException ex) {
-            throw new ValueException("Invalid range: `" + range + "` found for type Long while parsing property: " + property, ex);
-        }
-    }
-
-    private float getNextFloatInRange(String range, String property) {
-        try {
-            String[] tokens = range.split(",");
-            float lowerBound = Float.parseFloat(tokens[0]);
-            if (tokens.length == 1) {
-                return (float) (Math.random() * (lowerBound));
-            }
-            float upperBound = Float.parseFloat(tokens[1]);
-            return lowerBound + (float) (Math.random() * (upperBound - lowerBound));
-        } catch (NumberFormatException ex) {
-            throw new ValueException("Invalid range: `" + range + "` found for type Float while parsing property: " + property, ex);
-        }
-    }
-
     @Override
     public void close() throws Exception {
         if (propertyPlaceholderResolver instanceof AutoCloseable) {
             ((AutoCloseable) propertyPlaceholderResolver).close();
         }
     }
+
 
     /**
      * The property catalog to use.

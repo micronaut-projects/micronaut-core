@@ -19,6 +19,8 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.json.tree.JsonNode;
 import org.reactivestreams.Processor;
@@ -28,7 +30,9 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
+import java.util.ServiceLoader;
 import java.util.function.Consumer;
+import java.util.stream.Stream;
 
 /**
  * Common abstraction for mapping json to data structures.
@@ -38,6 +42,18 @@ import java.util.function.Consumer;
  */
 @Experimental
 public interface JsonMapper {
+    /**
+     * Specialize this mapper for the given type. Read and write operations on the returned mapper
+     * may only be called with that type.
+     *
+     * @param type The type to read or write
+     * @return The specialized {@link JsonMapper}.
+     */
+    @NonNull
+    default JsonMapper createSpecific(@NonNull Argument<?> type) {
+        return this;
+    }
+
     /**
      * Transform a {@link JsonNode} to a value of the given type.
      *
@@ -85,6 +101,19 @@ public interface JsonMapper {
     <T> T readValue(@NonNull byte[] byteArray, @NonNull Argument<T> type) throws IOException;
 
     /**
+     * Parse and map json from the given byte buffer.
+     *
+     * @param byteBuffer The input data.
+     * @param type       The type to deserialize to.
+     * @param <T>        Type variable of the return type.
+     * @return The deserialized object.
+     * @throws IOException IOException
+     */
+    default <T> T readValue(@NonNull ByteBuffer<?> byteBuffer, @NonNull Argument<T> type) throws IOException {
+        return readValue(byteBuffer.toByteArray(), type);
+    }
+
+    /**
      * Parse and map json from the given string.
      *
      * @param string The input data.
@@ -105,7 +134,10 @@ public interface JsonMapper {
      * @return The reactive processor.
      */
     @NonNull
-    Processor<byte[], JsonNode> createReactiveParser(@NonNull Consumer<Processor<byte[], JsonNode>> onSubscribe, boolean streamArray);
+    @Deprecated
+    default Processor<byte[], JsonNode> createReactiveParser(@NonNull Consumer<Processor<byte[], JsonNode>> onSubscribe, boolean streamArray) {
+        throw new UnsupportedOperationException("Reactive parser not supported");
+    }
 
     /**
      * Transform an object value to a json tree.
@@ -222,4 +254,25 @@ public interface JsonMapper {
      */
     @NonNull
     JsonStreamConfig getStreamConfig();
+
+    /**
+     * Resolves the default {@link JsonMapper}.
+     * @return The default {@link JsonMapper}
+     * @throws IllegalStateException If no {@link JsonMapper} implementation exists on the classpath.
+     * @since 4.0.0
+     */
+    static @NonNull JsonMapper createDefault() {
+        return ServiceLoader.load(JsonMapperSupplier.class).stream()
+            .flatMap(p -> {
+                try {
+                    JsonMapperSupplier supplier = p.get();
+                    return Stream.ofNullable(supplier);
+                } catch (Exception e) {
+                    return Stream.empty();
+                }
+            })
+            .min(OrderUtil.COMPARATOR)
+            .orElseThrow(() -> new IllegalStateException("No JsonMapper implementation found"))
+            .get();
+    }
 }

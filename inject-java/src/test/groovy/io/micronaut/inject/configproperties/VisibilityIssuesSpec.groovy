@@ -15,10 +15,10 @@
  */
 package io.micronaut.inject.configproperties
 
-import io.micronaut.context.ApplicationContext
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 
 class VisibilityIssuesSpec extends AbstractTypeElementSpec {
 
@@ -26,19 +26,19 @@ class VisibilityIssuesSpec extends AbstractTypeElementSpec {
         given:
         BeanDefinition beanDefinition = buildBeanDefinition("io.micronaut.inject.configproperties.ChildConfigProperties", """
             package io.micronaut.inject.configproperties;
-            
+
             import io.micronaut.context.annotation.ConfigurationProperties;
             import io.micronaut.inject.configproperties.other.ParentConfigProperties;
-            
+
             @ConfigurationProperties("child")
             public class ChildConfigProperties extends ParentConfigProperties {
-                
+
                 private Integer age;
-            
+
                 public Integer getAge() {
                     return age;
                 }
-            
+
                 public void setAge(Integer age) {
                     this.age = age;
                 }
@@ -50,7 +50,7 @@ class VisibilityIssuesSpec extends AbstractTypeElementSpec {
                 'parent.child.age': 22,
                 'parent.name': 'Sally',
                 'parent.engine.manufacturer': 'Chevy')
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:
         beanDefinition.injectedMethods.size() == 2
@@ -70,23 +70,23 @@ class VisibilityIssuesSpec extends AbstractTypeElementSpec {
         given:
         BeanDefinition beanDefinition = buildBeanDefinition("io.micronaut.inject.configproperties.ChildConfigProperties", """
             package io.micronaut.inject.configproperties;
-            
+
             import io.micronaut.context.annotation.ConfigurationProperties;
             import io.micronaut.inject.configproperties.other.ParentConfigProperties;
-            
+
             @ConfigurationProperties("child")
             public class ChildConfigProperties extends ParentConfigProperties {
-                
+
                 protected void setName(String name) {
                     super.setName(name);
                 }
- 
+
             }
         """)
 
         when:
         def context = ApplicationContext.run('parent.nationality': 'Italian', 'parent.child.name': 'Sally')
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
         then:
         beanDefinition.injectedMethods.size() == 1

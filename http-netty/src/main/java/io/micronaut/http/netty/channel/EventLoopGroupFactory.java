@@ -18,6 +18,7 @@ package io.micronaut.http.netty.channel;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ArgumentUtils;
+import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.ServerChannel;
 import io.netty.channel.socket.ServerSocketChannel;
@@ -122,6 +123,22 @@ public interface EventLoopGroupFactory {
     }
 
     /**
+     * Returns the domain socket server channel class.
+     *
+     * @param type Type of the channel to return
+     * @return A channel class.
+     * @throws UnsupportedOperationException if domain sockets are not supported.
+     */
+    @NonNull
+    default Class<? extends Channel> channelClass(NettyChannelType type) throws UnsupportedOperationException {
+        return switch (type) {
+            case SERVER_SOCKET -> serverSocketChannelClass();
+            case DOMAIN_SERVER_SOCKET -> domainServerSocketChannelClass();
+            default -> throw new UnsupportedOperationException("Channel type not supported");
+        };
+    }
+
+    /**
      * Returns the server channel class.
      *
      * @param configuration The configuration
@@ -140,6 +157,23 @@ public interface EventLoopGroupFactory {
      */
     default @NonNull Class<? extends ServerDomainSocketChannel> domainServerSocketChannelClass(@Nullable EventLoopGroupConfiguration configuration) {
         return domainServerSocketChannelClass();
+    }
+
+    /**
+     * Returns the domain socket server channel class.
+     *
+     * @param type Type of the channel to return
+     * @param configuration The configuration
+     * @return A channel implementation.
+     * @throws UnsupportedOperationException if domain sockets are not supported.
+     */
+    default @NonNull Class<? extends Channel> channelClass(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration) {
+        return switch (type) {
+            case SERVER_SOCKET -> serverSocketChannelClass(configuration);
+            case CLIENT_SOCKET -> clientSocketChannelClass(configuration);
+            case DOMAIN_SERVER_SOCKET -> domainServerSocketChannelClass(configuration);
+            default -> throw new UnsupportedOperationException("Channel type not supported");
+        };
     }
 
     /**
@@ -169,6 +203,23 @@ public interface EventLoopGroupFactory {
         } catch (ReflectiveOperationException e) {
             throw new RuntimeException("Cannot instantiate server socket channel instance", e);
         }
+    }
+
+    /**
+     * Returns the domain socket server channel class.
+     *
+     * @param type Type of the channel to return
+     * @param configuration The configuration
+     * @return A ServerDomainSocketChannel implementation.
+     * @throws UnsupportedOperationException if domain sockets are not supported.
+     */
+    default @NonNull Channel channelInstance(NettyChannelType type, @Nullable EventLoopGroupConfiguration configuration) {
+        return switch (type) {
+            case SERVER_SOCKET -> serverSocketChannelInstance(configuration);
+            case CLIENT_SOCKET -> clientSocketChannelInstance(configuration);
+            case DOMAIN_SERVER_SOCKET -> domainServerSocketChannelInstance(configuration);
+            default -> throw new UnsupportedOperationException("Channel type not supported");
+        };
     }
 
     /**

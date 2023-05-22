@@ -15,16 +15,23 @@
  */
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ArrayableClassElement;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.WildcardElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
+import io.micronaut.inject.ast.annotation.WildcardElementAnnotationMetadata;
 
 import javax.lang.model.type.WildcardType;
+import java.util.Collection;
 import java.util.List;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * Implementation of {@link io.micronaut.inject.ast.WildcardElement} for Java.
@@ -35,25 +42,63 @@ import java.util.stream.Collectors;
 @Internal
 final class JavaWildcardElement extends JavaClassElement implements WildcardElement {
     private final WildcardType wildcardType;
+    private final JavaClassElement upperBound;
     private final List<JavaClassElement> upperBounds;
     private final List<JavaClassElement> lowerBounds;
+    private final ElementAnnotationMetadata typeAnnotationMetadata;
+    @Nullable
+    private ElementAnnotationMetadata genericTypeAnnotationMetadata;
 
-    JavaWildcardElement(@NonNull WildcardType wildcardType, @NonNull List<JavaClassElement> upperBounds, @NonNull List<JavaClassElement> lowerBounds) {
+    JavaWildcardElement(ElementAnnotationMetadataFactory elementAnnotationMetadataFactory,
+                        @NonNull WildcardType wildcardType,
+                        @NonNull JavaClassElement mostUpper,
+                        @NonNull List<JavaClassElement> upperBounds,
+                        @NonNull List<JavaClassElement> lowerBounds) {
         super(
-                upperBounds.get(0).classElement,
-                upperBounds.get(0).getAnnotationMetadata(),
-                upperBounds.get(0).visitorContext,
-                upperBounds.get(0).typeArguments,
-                upperBounds.get(0).getGenericTypeInfo()
+                mostUpper.getNativeType(),
+                elementAnnotationMetadataFactory,
+                mostUpper.visitorContext,
+                mostUpper.typeArguments,
+                mostUpper.getTypeArguments()
         );
         this.wildcardType = wildcardType;
+        this.upperBound = mostUpper;
         this.upperBounds = upperBounds;
         this.lowerBounds = lowerBounds;
+        typeAnnotationMetadata = new WildcardElementAnnotationMetadata(this, upperBound);
     }
 
     @Override
-    public Object getNativeType() {
+    public MutableAnnotationMetadataDelegate<AnnotationMetadata> getGenericTypeAnnotationMetadata() {
+        if (genericTypeAnnotationMetadata == null) {
+            genericTypeAnnotationMetadata = elementAnnotationMetadataFactory.buildGenericTypeAnnotations(this);
+        }
+        return genericTypeAnnotationMetadata;
+    }
+
+    @Override
+    protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
+        return getGenericTypeAnnotationMetadata();
+    }
+
+    @Override
+    public MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
+        return typeAnnotationMetadata;
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return new AnnotationMetadataHierarchy(true, super.getAnnotationMetadata(), getGenericTypeAnnotationMetadata());
+    }
+
+    @Override
+    public Object getGenericNativeType() {
         return wildcardType;
+    }
+
+    @Override
+    public boolean isTypeVariable() {
+        return true;
     }
 
     @NonNull
@@ -78,9 +123,9 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
 
     @Override
     public ClassElement foldBoundGenericTypes(@NonNull Function<ClassElement, ClassElement> fold) {
-        List<JavaClassElement> upperBounds = this.upperBounds.stream().map(ele -> toJavaClassElement(ele.foldBoundGenericTypes(fold))).collect(Collectors.toList());
-        List<JavaClassElement> lowerBounds = this.lowerBounds.stream().map(ele -> toJavaClassElement(ele.foldBoundGenericTypes(fold))).collect(Collectors.toList());
-        return fold.apply(upperBounds.contains(null) || lowerBounds.contains(null) ? null : new JavaWildcardElement(wildcardType, upperBounds, lowerBounds));
+        List<JavaClassElement> upperBounds = this.upperBounds.stream().map(ele -> toJavaClassElement(ele.foldBoundGenericTypes(fold))).toList();
+        List<JavaClassElement> lowerBounds = this.lowerBounds.stream().map(ele -> toJavaClassElement(ele.foldBoundGenericTypes(fold))).toList();
+        return fold.apply(upperBounds.contains(null) || lowerBounds.contains(null) ? null : new JavaWildcardElement(elementAnnotationMetadataFactory, wildcardType, upperBound, upperBounds, lowerBounds));
     }
 
     private JavaClassElement toJavaClassElement(ClassElement element) {
@@ -90,11 +135,12 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
             if (element.isWildcard() || element.isGenericPlaceholder()) {
                 throw new UnsupportedOperationException("Cannot convert wildcard / free type variable to JavaClassElement");
             } else {
-                return (JavaClassElement) ((ArrayableClassElement) visitorContext.getClassElement(element.getName())
+                return (JavaClassElement) ((ArrayableClassElement) visitorContext.getClassElement(element.getName(), elementAnnotationMetadataFactory)
                         .orElseThrow(() -> new UnsupportedOperationException("Cannot convert ClassElement to JavaClassElement, class was not found on the visitor context")))
                         .withArrayDimensions(element.getArrayDimensions())
-                        .withBoundGenericTypes(element.getBoundGenericTypes());
+                        .withTypeArguments((Collection<ClassElement>) element.getBoundGenericTypes());
             }
         }
     }
+
 }

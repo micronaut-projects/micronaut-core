@@ -17,7 +17,6 @@ package io.micronaut.jackson;
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
-import com.oracle.svm.core.annotate.AutomaticFeature;
 import io.micronaut.core.annotation.Internal;
 import org.graalvm.nativeimage.hosted.Feature;
 import org.graalvm.nativeimage.hosted.RuntimeReflection;
@@ -31,7 +30,6 @@ import java.util.stream.Stream;
  * @since 3.4.1
  */
 @Internal
-@AutomaticFeature
 final class JacksonDatabindFeature implements Feature {
     @SuppressWarnings("deprecation")
     @Override

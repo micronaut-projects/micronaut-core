@@ -83,11 +83,13 @@ public abstract class SslBuilder<T> {
      */
     protected Optional<KeyStore> getTrustStore(SslConfiguration ssl) throws Exception {
         SslConfiguration.TrustStoreConfiguration trustStore = ssl.getTrustStore();
-        if (!trustStore.getPath().isPresent()) {
+        Optional<String> path = trustStore.getPath();
+        if (path.isPresent()) {
+            return Optional.of(load(trustStore.getType(),
+                path.get(), trustStore.getPassword()));
+        } else {
             return Optional.empty();
         }
-        return Optional.of(load(trustStore.getType(),
-            trustStore.getPath().get(), trustStore.getPassword()));
     }
 
     /**
@@ -102,8 +104,9 @@ public abstract class SslBuilder<T> {
                 .getInstance(KeyManagerFactory.getDefaultAlgorithm());
             Optional<String> password = ssl.getKey().getPassword();
             char[] keyPassword = password.map(String::toCharArray).orElse(null);
-            if (keyPassword == null && ssl.getKeyStore().getPassword().isPresent()) {
-                keyPassword = ssl.getKeyStore().getPassword().get().toCharArray();
+            Optional<String> pwd = ssl.getKeyStore().getPassword();
+            if (keyPassword == null && pwd.isPresent()) {
+                keyPassword = pwd.get().toCharArray();
             }
             keyManagerFactory.init(keyStore.orElse(null), keyPassword);
             return keyManagerFactory;
@@ -120,11 +123,13 @@ public abstract class SslBuilder<T> {
      */
     protected Optional<KeyStore> getKeyStore(SslConfiguration ssl) throws Exception {
         SslConfiguration.KeyStoreConfiguration keyStore = ssl.getKeyStore();
-        if (!keyStore.getPath().isPresent()) {
+        Optional<String> path = keyStore.getPath();
+        if (path.isPresent()) {
+            return Optional.of(load(keyStore.getType(),
+                path.get(), keyStore.getPassword()));
+        } else {
             return Optional.empty();
         }
-        return Optional.of(load(keyStore.getType(),
-            keyStore.getPath().get(), keyStore.getPassword()));
     }
 
     /**

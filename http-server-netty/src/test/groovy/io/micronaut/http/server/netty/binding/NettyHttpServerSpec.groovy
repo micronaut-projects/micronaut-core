@@ -20,7 +20,11 @@ import io.micronaut.context.env.Environment
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.event.StartupEvent
 import io.micronaut.core.io.socket.SocketUtils
-import io.micronaut.http.*
+import io.micronaut.http.HttpHeaders
+import io.micronaut.http.HttpMethod
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Put
@@ -32,7 +36,6 @@ import io.micronaut.runtime.Micronaut
 import io.micronaut.runtime.event.annotation.EventListener
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Singleton
-import reactor.core.publisher.Flux
 import spock.lang.Retry
 import spock.lang.Specification
 import spock.lang.Stepwise
@@ -179,7 +182,6 @@ class NettyHttpServerSpec extends Specification {
         DefaultHttpClientConfiguration config = new DefaultHttpClientConfiguration()
         // The client will explicitly request "Connection: close" unless using a connection pool, so set it up
         config.connectionPoolConfiguration.enabled = true
-        config.connectionPoolConfiguration.maxConnections = 2;
         config.connectionPoolConfiguration.acquireTimeout = Duration.of(3, ChronoUnit.SECONDS);
 
         ApplicationContext applicationContext = Micronaut.run()
@@ -190,7 +192,7 @@ class NettyHttpServerSpec extends Specification {
         HttpResponse response = client.toBlocking().exchange(request, String)
         then:
         response.body() == "Person Named Fred"
-        response.header(HttpHeaders.CONNECTION) == 'keep-alive'
+        response.header(HttpHeaders.CONNECTION) == null // HTTP/1.1 is keep-alive by default
 
         cleanup:
         client.stop()

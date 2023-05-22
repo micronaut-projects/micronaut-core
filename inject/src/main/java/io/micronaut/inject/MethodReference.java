@@ -62,7 +62,7 @@ public interface MethodReference<T, R> extends AnnotationMetadataDelegate, Annot
     /**
      * @return The argument types
      */
-    default Class[] getArgumentTypes() {
+    default Class<?>[] getArgumentTypes() {
         return Arrays
             .stream(getArguments())
             .map(Argument::getType)

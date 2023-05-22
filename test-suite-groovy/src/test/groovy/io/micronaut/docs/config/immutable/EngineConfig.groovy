@@ -20,10 +20,10 @@ import io.micronaut.context.annotation.ConfigurationInject
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.core.bind.annotation.Bindable
 
-import javax.annotation.Nullable
-import javax.validation.constraints.Min
-import javax.validation.constraints.NotBlank
-import javax.validation.constraints.NotNull
+import jakarta.annotation.Nullable
+import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.NotNull
 // end::imports[]
 
 // tag::class[]

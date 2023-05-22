@@ -1,0 +1,13 @@
+The default maximum age that preflight requests can be cached is 30 minutes. To change that behavior, specify a value in seconds.
+
+.Example CORS Configuration
+[configuration]
+----
+micronaut:
+  server:
+    cors:
+      enabled: true
+      configurations:
+        web:
+          max-age: 3600 # 1 hour
+----

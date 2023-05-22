@@ -35,7 +35,7 @@ class FieldArrayFactorySpec extends Specification {
         b.all[0] instanceof AImpl
         ((AImpl)b.all[0]).c != null
         ((AImpl)b.all[0]).c2 != null
-        b.all[0].is(context.getBean(AImpl))
+        b.all[0].is(context.getBean(A))
     }
 }
 

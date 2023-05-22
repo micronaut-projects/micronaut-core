@@ -31,5 +31,5 @@ public interface TypeConverterRegistrar {
      *
      * @param conversionService The {@link ConversionService}
      */
-    void register(ConversionService<?> conversionService);
+    void register(MutableConversionService conversionService);
 }

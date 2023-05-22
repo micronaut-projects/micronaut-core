@@ -21,12 +21,11 @@ import io.micronaut.aop.introduction.NotImplementedAdvice
 import io.micronaut.context.BeanContext
 import io.micronaut.inject.AdvisedBeanType
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 
-import javax.validation.constraints.Min
-import javax.validation.constraints.NotBlank
-
+import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.NotBlank
 /**
  * @author graemerocher
  * @since 1.0
@@ -50,7 +49,7 @@ interface MyBean {
 
 ''')
         def context = BeanContext.run()
-        def bean = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def bean = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
         when:
         bean.test()
@@ -76,11 +75,11 @@ import io.micronaut.aop.simple.Mutating;
 @NotImplemented
 abstract class MyBean {
     abstract void test();
-    
+
     public String test2() {
         return "good";
     }
-    
+
     @Mutating("arg")
     public String test3(String arg) {
         return arg;
@@ -91,7 +90,7 @@ abstract class MyBean {
 
 ''')
         def context = BeanContext.run()
-        def bean = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def bean = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
         when:
         bean.test()
 
@@ -121,7 +120,7 @@ package test;
 import io.micronaut.aop.introduction.*;
 import io.micronaut.context.annotation.*;
 import java.net.*;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 
 interface MyInterface{
     @Executable
@@ -142,15 +141,16 @@ interface MyBean extends MyInterface {
         beanDefinition != null
         beanDefinition.injectedFields.size() == 0
         beanDefinition.executableMethods.size() == 2
-        beanDefinition.executableMethods[0].methodName == 'save'
-        beanDefinition.executableMethods[0].returnType.type == void.class
-        beanDefinition.executableMethods[0].arguments[0].getAnnotationMetadata().hasAnnotation(NotBlank)
-        beanDefinition.executableMethods[0].arguments[1].getAnnotationMetadata().hasAnnotation(Min)
-        beanDefinition.executableMethods[0].arguments[1].getAnnotationMetadata().getValue(Min, Integer).get() == 1
-
-        beanDefinition.executableMethods[1].methodName == 'saveTwo'
-        beanDefinition.executableMethods[1].returnType.type == void.class
-        beanDefinition.executableMethods[1].arguments[0].getAnnotationMetadata().hasAnnotation(Min)
+        def saveMethod = beanDefinition.executableMethods.find { it.name == "save" }
+        saveMethod.methodName == 'save'
+        saveMethod.returnType.type == void.class
+        saveMethod.arguments[0].getAnnotationMetadata().hasAnnotation(NotBlank)
+        saveMethod.arguments[1].getAnnotationMetadata().hasAnnotation(Min)
+        saveMethod.arguments[1].getAnnotationMetadata().getValue(Min, Integer).get() == 1
+        def saveTwoMethod = beanDefinition.executableMethods.find { it.name == "saveTwo" }
+        saveTwoMethod.methodName == 'saveTwo'
+        saveTwoMethod.returnType.type == void.class
+        saveTwoMethod.arguments[0].getAnnotationMetadata().hasAnnotation(Min)
 
     }
 

@@ -18,6 +18,7 @@ package io.micronaut.core.type;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.reflect.ClassUtils;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -39,29 +40,23 @@ import java.util.ServiceLoader;
  */
 @Internal
 final class RuntimeTypeInformation {
-    private static final Map<Class<?>, Argument<?>> WRAPPER_TO_TYPE = new HashMap<>(3);
-    private static final Collection<TypeInformationProvider> TYPE_INFORMATION_PROVIDERS;
 
-    static {
-        WRAPPER_TO_TYPE.put(OptionalDouble.class, Argument.DOUBLE);
-        WRAPPER_TO_TYPE.put(OptionalLong.class, Argument.LONG);
-        WRAPPER_TO_TYPE.put(OptionalInt.class, Argument.INT);
-        final ServiceLoader<TypeInformationProvider> loader = ServiceLoader.load(TypeInformationProvider.class);
-        List<TypeInformationProvider> informationProviders = new ArrayList<>(2);
-        for (TypeInformationProvider informationProvider : loader) {
-            informationProviders.add(informationProvider);
-        }
-
-        TYPE_INFORMATION_PROVIDERS = Collections.unmodifiableList(informationProviders);
+    private static boolean isJavaBasicTypeAndNotReactiveAndNotWrapper(Class<?> type) {
+        // Not of them are reactive or wrappers
+        return ClassUtils.isJavaBasicType(type);
     }
 
     /**
      * Returns whether the annotation metadata specifies the type as single.
+     * @param type The return type
      * @param annotationMetadata The annotation metadata provider
      * @return True if does
      */
-    static boolean isSpecifiedSingle(AnnotationMetadataProvider annotationMetadata) {
-        for (TypeInformationProvider provider : TYPE_INFORMATION_PROVIDERS) {
+    static boolean isSpecifiedSingle(Class<?> type, AnnotationMetadataProvider annotationMetadata) {
+        if (isJavaBasicTypeAndNotReactiveAndNotWrapper(type)) {
+            return false;
+        }
+        for (TypeInformationProvider provider : LazyTypeInfo.TYPE_INFORMATION_PROVIDERS) {
             if (provider.isSpecifiedSingle(annotationMetadata)) {
                 return true;
             }
@@ -75,7 +70,10 @@ final class RuntimeTypeInformation {
      * @return True if it is single
      */
     static boolean isSingle(Class<?> type) {
-        for (TypeInformationProvider provider : TYPE_INFORMATION_PROVIDERS) {
+        if (isJavaBasicTypeAndNotReactiveAndNotWrapper(type)) {
+            return false;
+        }
+        for (TypeInformationProvider provider : LazyTypeInfo.TYPE_INFORMATION_PROVIDERS) {
             if (provider.isSingle(type)) {
                 return true;
             }
@@ -89,7 +87,10 @@ final class RuntimeTypeInformation {
      * @return True if it is reactive
      */
     static boolean isReactive(Class<?> type) {
-        for (TypeInformationProvider provider : TYPE_INFORMATION_PROVIDERS) {
+        if (isJavaBasicTypeAndNotReactiveAndNotWrapper(type)) {
+            return false;
+        }
+        for (TypeInformationProvider provider : LazyTypeInfo.TYPE_INFORMATION_PROVIDERS) {
             if (provider.isReactive(type)) {
                 return true;
             }
@@ -103,7 +104,10 @@ final class RuntimeTypeInformation {
      * @return True if it is completable
      */
     static boolean isCompletable(Class<?> type) {
-        for (TypeInformationProvider provider : TYPE_INFORMATION_PROVIDERS) {
+        if (isJavaBasicTypeAndNotReactiveAndNotWrapper(type)) {
+            return false;
+        }
+        for (TypeInformationProvider provider : LazyTypeInfo.TYPE_INFORMATION_PROVIDERS) {
             if (provider.isCompletable(type)) {
                 return true;
             }
@@ -119,12 +123,15 @@ final class RuntimeTypeInformation {
      * @see TypeInformation#isWrapperType()
      */
     static <T> boolean isWrapperType(Class<T> type) {
-        for (TypeInformationProvider provider : TYPE_INFORMATION_PROVIDERS) {
+        if (isJavaBasicTypeAndNotReactiveAndNotWrapper(type)) {
+            return false;
+        }
+        for (TypeInformationProvider provider : LazyTypeInfo.TYPE_INFORMATION_PROVIDERS) {
             if (provider.isWrapperType(type)) {
                 return true;
             }
         }
-        return type == Optional.class || WRAPPER_TO_TYPE.containsKey(type);
+        return type == Optional.class || LazyWrappers.WRAPPER_TO_TYPE.containsKey(type);
     }
 
     /**
@@ -134,10 +141,33 @@ final class RuntimeTypeInformation {
      * @return The wrapped type
      */
     static <T> Argument<?> getWrappedType(@NonNull TypeInformation<?> typeInfo) {
-        final Argument<?> a = WRAPPER_TO_TYPE.get(typeInfo.getType());
+        final Argument<?> a = LazyWrappers.WRAPPER_TO_TYPE.get(typeInfo.getType());
         if (a != null) {
             return a;
         }
         return typeInfo.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+    }
+
+    private static class LazyTypeInfo {
+        private static final Collection<TypeInformationProvider> TYPE_INFORMATION_PROVIDERS;
+
+        static {
+            final ServiceLoader<TypeInformationProvider> loader = ServiceLoader.load(TypeInformationProvider.class);
+            List<TypeInformationProvider> informationProviders = new ArrayList<>(2);
+            for (TypeInformationProvider informationProvider : loader) {
+                informationProviders.add(informationProvider);
+            }
+            TYPE_INFORMATION_PROVIDERS = Collections.unmodifiableList(informationProviders);
+        }
+    }
+
+    private static class LazyWrappers {
+        private static final Map<Class<?>, Argument<?>> WRAPPER_TO_TYPE = new HashMap<>(3);
+
+        static {
+            WRAPPER_TO_TYPE.put(OptionalDouble.class, Argument.DOUBLE);
+            WRAPPER_TO_TYPE.put(OptionalLong.class, Argument.LONG);
+            WRAPPER_TO_TYPE.put(OptionalInt.class, Argument.INT);
+        }
     }
 }

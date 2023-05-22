@@ -19,14 +19,19 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.beans.BeanInfo;
+import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 
 import java.util.Collections;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -36,7 +41,7 @@ import java.util.Set;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextConditional {
+public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextConditional, BeanInfo<T> {
 
     /**
      * @return Whether the bean definition is the {@link io.micronaut.context.annotation.Primary}
@@ -50,7 +55,23 @@ public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextCond
      *
      * @return The underlying bean type
      */
-    Class<T> getBeanType();
+    @NonNull Class<T> getBeanType();
+
+    /**
+     * Returns the name of the bean usually resolved via the {@link jakarta.inject.Named} annotation.
+     * @return The name of the bean if any
+     * @since 4.0.0
+     */
+    default Optional<String> getBeanName() {
+        if (this instanceof NameResolver nameResolver) {
+            return nameResolver.resolveName();
+        }
+        AnnotationMetadata annotationMetadata = getAnnotationMetadata();
+        // here we resolved the declared Qualifier of the bean
+        return annotationMetadata
+            .findDeclaredAnnotation(AnnotationUtil.NAMED).or(() -> annotationMetadata.findDeclaredAnnotation("javax.inject.Named"))
+            .flatMap(AnnotationValue::stringValue);
+    }
 
     /**
      * Checks whether the bean type is a container type.
@@ -58,7 +79,7 @@ public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextCond
      * @since 3.0.0
      */
     default boolean isContainerType() {
-        return DefaultArgument.CONTAINER_TYPES.contains(getBeanType());
+        return DefaultArgument.CONTAINER_TYPES.contains(getBeanType().getName());
     }
 
     /**

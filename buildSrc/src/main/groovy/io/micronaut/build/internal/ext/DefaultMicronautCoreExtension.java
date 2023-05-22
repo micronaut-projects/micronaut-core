@@ -38,6 +38,8 @@ public abstract class DefaultMicronautCoreExtension implements MicronautCoreExte
         dep.exclude(module("micronaut-runtime"));
         dep.exclude(module("micronaut-inject"));
         dep.exclude(module("micronaut-bom"));
+        dep.exclude(module("micronaut-core-bom"));
+        dep.exclude(module("micronaut-platform"));
     }
 
     @Override
@@ -57,12 +59,12 @@ public abstract class DefaultMicronautCoreExtension implements MicronautCoreExte
 
     @Override
     public void usesMicronautTestKotest() {
-        addTestImplementationDependency("kotest");
+        addTestImplementationDependency("kotest5");
     }
 
     private void addTestImplementationDependency(String lib) {
         dependencyHandler.addProvider("testImplementation", libs.findLibrary(
-                "managed.micronaut.test." + lib
+                "micronaut.test." + lib
         ).get(), DefaultMicronautCoreExtension::excludeMicronautLibs);
     }
 

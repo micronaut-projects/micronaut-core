@@ -15,18 +15,73 @@
  */
 package io.micronaut.http.server.netty;
 
-import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.Toggleable;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
-import org.reactivestreams.Subscriber;
+
+import java.util.Collection;
 
 /**
- * A reactive streams {@link org.reactivestreams.Processor} that processes incoming {@link ByteBufHolder} and
- * outputs a given type.
+ * This class represents the first step of the HTTP body parsing pipeline. It transforms
+ * {@link ByteBufHolder} instances that come from a
+ * {@link io.micronaut.http.netty.stream.StreamedHttpRequest} into parsed objects, e.g. json nodes
+ * or form data fragments.<br>
+ * Processors are stateful. They can receive repeated calls to {@link #add} with more data,
+ * followed by a call to {@link #complete} to finish up. Both of these methods accept a
+ * {@link Collection} {@code out} parameter that is populated with the processed items.
  *
- * @param <T> The type
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Use the {@link io.micronaut.http.body.MessageBodyReader} API instead
  */
-public interface HttpContentProcessor<T> extends Publishers.MicronautPublisher<T>, Subscriber<ByteBufHolder>, Toggleable {
+@Deprecated
+public interface HttpContentProcessor extends Toggleable {
+    /**
+     * Process more data.
+     *
+     * @param data The input data
+     * @param out The collection to add output items to
+     */
+    void add(ByteBufHolder data, Collection<Object> out) throws Throwable;
+
+    /**
+     * Finish processing data.
+     *
+     * @param out The collection to add remaining output items to
+     */
+    default void complete(Collection<Object> out) throws Throwable {
+    }
+
+    /**
+     * Cancel processing, clean up any data. After this, there should be no more calls to
+     * {@link #add} and {@link #complete}.
+     */
+    default void cancel() throws Throwable {
+    }
+
+    /**
+     * Set the type of the values returned by this processor. Most processors do not respect this
+     * setting, but e.g. the {@link io.micronaut.http.server.netty.jackson.JsonContentProcessor}
+     * does.
+     *
+     * @param type The type produced by this processor
+     * @return This processor, for chaining
+     */
+    default HttpContentProcessor resultType(Argument<?> type) {
+        return this;
+    }
+
+    /**
+     * Process a single {@link ByteBuf} into a single item, if possible.
+     *
+     * @param data The input data
+     * @return The output value, or {@code null} if this is unsupported.
+     * @throws Throwable Any failure
+     */
+    @Nullable
+    default Object processSingle(ByteBuf data) throws Throwable {
+        return null;
+    }
 }

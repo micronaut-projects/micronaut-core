@@ -50,7 +50,7 @@ class NettyByteBuffer implements ByteBuffer<ByteBuf>, ReferenceCounted {
     }
 
     @Override
-    public ByteBuffer retain() {
+    public NettyByteBuffer retain() {
         delegate.retain();
         return this;
     }

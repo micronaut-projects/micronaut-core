@@ -3,7 +3,7 @@ package io.micronaut.aop.compile
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionWriter
 
 class LifeCycleWithProxySpec extends AbstractTypeElementSpec {
@@ -22,16 +22,16 @@ class MyBean {
 
     @jakarta.inject.Inject public ConversionService conversionService;
     public int count = 0;
-    
+
     public String someMethod() {
         return "good";
     }
-    
+
     @jakarta.annotation.PostConstruct
     void created() {
         count++;
     }
-    
+
     @javax.annotation.PreDestroy
     void destroyed() {
         count--;
@@ -70,16 +70,16 @@ class MyBean {
 
     @jakarta.inject.Inject public ConversionService conversionService;
     public int count = 0;
-    
+
     public String someMethod() {
         return "good";
     }
-    
+
     @jakarta.annotation.PostConstruct
     void created() {
         count++;
     }
-    
+
     @javax.annotation.PreDestroy
     void destroyed() {
         count--;
@@ -96,7 +96,7 @@ class MyBean {
         when:
         def context = ApplicationContext.run()
 
-        def instance = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
 
         then:
@@ -122,7 +122,7 @@ class MyBean {
     @jakarta.inject.Inject public ConversionService conversionService;
 
     public int count = 0;
-    
+
     @Mutating("someVal")
     public String someMethod() {
         return "good";
@@ -132,7 +132,7 @@ class MyBean {
     void created() {
         count++;
     }
-    
+
     @javax.annotation.PreDestroy
     void destroyed() {
         count--;
@@ -147,7 +147,7 @@ class MyBean {
 
         when:
         def context = ApplicationContext.run()
-        def instance = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
 
         then:
@@ -173,17 +173,17 @@ class MyBean {
 
     @jakarta.inject.Inject public ConversionService conversionService;
     public int count = 0;
-    
+
     @jakarta.annotation.PostConstruct
     void created() {
         count++;
     }
-    
+
     @javax.annotation.PreDestroy
     void destroyed() {
         count--;
     }
-        
+
     @Mutating("someVal")
     public String someMethod() {
         return "good";
@@ -198,7 +198,7 @@ class MyBean {
 
         when:
         def context = ApplicationContext.run()
-        def instance = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
 
 
         then:

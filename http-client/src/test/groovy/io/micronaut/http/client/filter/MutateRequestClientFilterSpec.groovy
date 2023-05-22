@@ -35,7 +35,7 @@ import spock.lang.Issue
 import spock.lang.Shared
 import spock.lang.Specification
 
-import javax.annotation.Nullable
+import jakarta.annotation.Nullable
 
 @Issue("https://github.com/micronaut-projects/micronaut-core/issues/917")
 class MutateRequestClientFilterSpec extends Specification {
@@ -55,7 +55,7 @@ class MutateRequestClientFilterSpec extends Specification {
 
     void "test mutate stream request URI"() {
         expect:
-        myClient.stream().blockFirst() == "xxxxxxxxxxx"
+        myClient.stream().collectList().block().join("") == '["xxxxxxxxxxx"]'
     }
 
     @Requires(property = 'spec.name', value = 'MutateRequestClientFilterSpec')

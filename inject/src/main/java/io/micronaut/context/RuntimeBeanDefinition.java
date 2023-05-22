@@ -20,16 +20,21 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanContextConditional;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
-import io.micronaut.inject.BeanFactory;
+import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.lang.annotation.Annotation;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /**
  * Allow the construction for bean definitions programmatically that can be registered
@@ -48,7 +53,7 @@ import java.util.function.Supplier;
  * @see BeanDefinitionRegistry#registerBeanDefinition(RuntimeBeanDefinition)
  */
 @Experimental
-public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, BeanDefinition<T>, BeanFactory<T>, BeanContextConditional {
+public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, InstantiatableBeanDefinition<T>, BeanContextConditional {
 
     @Override
     @NonNull
@@ -62,8 +67,31 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, Be
     }
 
     @Override
+    default List<Argument<?>> getTypeArguments(Class<?> type) {
+        Class<T> beanType = getBeanType();
+        if (type != null && type.isAssignableFrom(beanType)) {
+            if (type.isInterface()) {
+                return Arrays.stream(GenericTypeUtils.resolveInterfaceTypeArguments(beanType, type))
+                    .map(Argument::of)
+                    .collect(Collectors.toList());
+            } else {
+                return Arrays.stream(GenericTypeUtils.resolveSuperTypeGenericArguments(beanType, type))
+                    .map(Argument::of)
+                    .collect(Collectors.toList());
+            }
+        } else {
+            return Collections.emptyList();
+        }
+    }
+
+    @Override
     default boolean isContextScope() {
         return getAnnotationMetadata().hasDeclaredAnnotation(Context.class);
+    }
+
+    @Override
+    default boolean isConfigurationProperties() {
+        return BeanDefinitionReference.super.isConfigurationProperties();
     }
 
     @Override
@@ -180,7 +208,17 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, Be
          * @param qualifier The qualifier
          * @return This builder
          */
+        @NonNull
         Builder<B> qualifier(@Nullable Qualifier<B> qualifier);
+
+        /**
+         * Adds this type as a bean replacement of the given type.
+         * @param otherType The other type
+         * @return This bean builder
+         * @since 4.0.0
+         */
+        @NonNull
+        Builder<B> replaces(@Nullable Class<? extends B> otherType);
 
         /**
          * The qualifier to use.
@@ -188,6 +226,7 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, Be
          * @return This builder
          * @since 3.7.0
          */
+        @NonNull
         default Builder<B> named(@Nullable String name) {
             if (name == null) {
                 qualifier(null);
@@ -202,6 +241,7 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, Be
          * @param scope The scope
          * @return This builder
          */
+        @NonNull
         Builder<B> scope(@Nullable Class<? extends Annotation> scope);
 
         /**
@@ -209,6 +249,7 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, Be
          * @param isSingleton True if it is singleton
          * @return This builder
          */
+        @NonNull
         Builder<B> singleton(boolean isSingleton);
 
         /**
@@ -216,13 +257,32 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, Be
          * @param types The exposed types
          * @return This builder
          */
+        @NonNull
         Builder<B> exposedTypes(Class<?>...types);
+
+        /**
+         * The type arguments for the type.
+         * @param arguments The arguments
+         * @return This builder
+         */
+        @NonNull
+        Builder<B> typeArguments(Argument<?>... arguments);
+
+        /**
+         * The type arguments for an implemented type of this type.
+         * @param implementedType The implemented type
+         * @param arguments The arguments
+         * @return This builder
+         */
+        @NonNull
+        Builder<B> typeArguments(Class<?> implementedType, Argument<?>... arguments);
 
         /**
          * The annotation metadata for the bean.
          * @param annotationMetadata The annotation metadata
          * @return This builder
          */
+        @NonNull
         Builder<B> annotationMetadata(@Nullable AnnotationMetadata annotationMetadata);
 
         /**

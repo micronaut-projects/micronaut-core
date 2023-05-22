@@ -18,9 +18,8 @@ package io.micronaut.aop.compile
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
-
 /**
  * @author graemerocher
  * @since 1.0
@@ -38,8 +37,8 @@ import io.micronaut.context.annotation.*;
 @Stub
 @jakarta.inject.Singleton
 abstract class AbstractBean {
-    public abstract String isAbstract(); 
-    
+    public abstract String isAbstract();
+
     public String nonAbstract() {
         return "good";
     }
@@ -54,7 +53,7 @@ abstract class AbstractBean {
         when:
         def context = new DefaultBeanContext()
         context.start()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
 
         then:
@@ -76,8 +75,8 @@ interface Foo {
 @Stub
 @jakarta.inject.Singleton
 abstract class AbstractBean implements Foo {
-    public abstract String isAbstract(); 
-    
+    public abstract String isAbstract();
+
     @Override
     public String nonAbstract() {
         return "good";
@@ -93,7 +92,7 @@ abstract class AbstractBean implements Foo {
         when:
         def context = new DefaultBeanContext()
         context.start()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
 
         then:
@@ -116,8 +115,8 @@ interface Foo {
 @Stub
 @jakarta.inject.Singleton
 abstract class AbstractBean implements Foo {
-    public abstract String isAbstract(); 
-    
+    public abstract String isAbstract();
+
     @Override
     public String nonAbstract() {
         return "good";
@@ -133,7 +132,7 @@ abstract class AbstractBean implements Foo {
         when:
         def context = new DefaultBeanContext()
         context.start()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
 
         then:
@@ -152,7 +151,7 @@ import io.micronaut.context.annotation.*;
 interface Bar {
     @Stub
     String nonAbstract();
-    
+
     String another();
 }
 
@@ -163,13 +162,13 @@ interface Foo extends Bar {
 @Stub
 @jakarta.inject.Singleton
 abstract class AbstractBean implements Foo {
-    public abstract String isAbstract(); 
-    
+    public abstract String isAbstract();
+
     @Override
     public String nonAbstract() {
         return "good";
     }
-    
+
     @Override
     public String another() {
         return "good";
@@ -185,7 +184,7 @@ abstract class AbstractBean implements Foo {
         when:
         def context = new DefaultBeanContext()
         context.start()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
 
         then:
@@ -209,8 +208,8 @@ interface Foo {
 @Stub
 @jakarta.inject.Singleton
 abstract class AbstractBean implements Foo {
-    public abstract String isAbstract(); 
-    
+    public abstract String isAbstract();
+
     @Override
     public String nonAbstract() {
         return "good";
@@ -226,7 +225,7 @@ abstract class AbstractBean implements Foo {
         when:
         def context = new DefaultBeanContext()
         context.start()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
 
         then:
@@ -245,7 +244,7 @@ import io.micronaut.context.annotation.*;
 @Stub
 interface Foo {
     String nonAbstract();
-    
+
     default String anotherNonAbstract() {
         return "good";
     }
@@ -253,8 +252,8 @@ interface Foo {
 @Stub
 @jakarta.inject.Singleton
 abstract class AbstractBean implements Foo {
-    public abstract String isAbstract(); 
-    
+    public abstract String isAbstract();
+
     @Override
     public String nonAbstract() {
         return "good";
@@ -270,7 +269,7 @@ abstract class AbstractBean implements Foo {
         when:
         def context = new DefaultBeanContext()
         context.start()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
 
         then:
@@ -293,7 +292,7 @@ interface Bar {
 }
 interface Foo extends Bar {
     String nonAbstract();
-    
+
     @Override
     default String anotherNonAbstract() {
         return "good";
@@ -302,8 +301,8 @@ interface Foo extends Bar {
 @Stub
 @jakarta.inject.Singleton
 abstract class AbstractBean implements Foo {
-    public abstract String isAbstract(); 
-    
+    public abstract String isAbstract();
+
     @Override
     public String nonAbstract() {
         return "good";
@@ -319,7 +318,7 @@ abstract class AbstractBean implements Foo {
         when:
         def context = new DefaultBeanContext()
         context.start()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
 
         then:

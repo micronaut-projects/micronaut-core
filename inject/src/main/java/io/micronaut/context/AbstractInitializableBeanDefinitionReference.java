@@ -21,8 +21,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.Set;
@@ -37,7 +35,6 @@ import java.util.Set;
 @Internal
 public abstract class AbstractInitializableBeanDefinitionReference<T> extends AbstractBeanContextConditional implements BeanDefinitionReference<T> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(AbstractInitializableBeanDefinitionReference.class);
     private final String beanTypeName;
     private final String beanDefinitionTypeName;
     private final AnnotationMetadata annotationMetadata;
@@ -49,6 +46,8 @@ public abstract class AbstractInitializableBeanDefinitionReference<T> extends Ab
     private final boolean isConfigurationProperties;
     private final boolean hasExposedTypes;
     private final boolean requiresMethodProcessing;
+    private final boolean isProxiedBean;
+    private final boolean isProxyTarget;
 
     private Boolean present;
     private Set<Class<?>> exposedTypes;
@@ -70,6 +69,28 @@ public abstract class AbstractInitializableBeanDefinitionReference<T> extends Ab
                                                         boolean isPrimary, boolean isContextScope, boolean isConditional,
                                                         boolean isContainerType, boolean isSingleton, boolean isConfigurationProperties,
                                                         boolean hasExposedTypes, boolean requiresMethodProcessing) {
+        this(beanTypeName, beanDefinitionTypeName, annotationMetadata, isPrimary, isContextScope, isConditional, isContainerType, isSingleton, isConfigurationProperties, hasExposedTypes, requiresMethodProcessing, false, false);
+    }
+
+    /**
+     * @param beanTypeName              The bean type name
+     * @param beanDefinitionTypeName    The bean definition type name
+     * @param annotationMetadata        The annotationMetadata
+     * @param isPrimary                 Is primary bean?
+     * @param isContextScope            Is context scope?
+     * @param isConditional             Is conditional? = No @Requires
+     * @param isContainerType           Is container type?
+     * @param isSingleton               Is singleton?
+     * @param isConfigurationProperties Is configuration properties?
+     * @param hasExposedTypes           Has exposed types?
+     * @param requiresMethodProcessing  Is requires method processing?
+     * @param isProxiedBean             Is the bean proxied
+     * @param isProxyTarget             Is the bean a retained proxy target
+     */
+    protected AbstractInitializableBeanDefinitionReference(String beanTypeName, String beanDefinitionTypeName, AnnotationMetadata annotationMetadata,
+                                                        boolean isPrimary, boolean isContextScope, boolean isConditional,
+                                                        boolean isContainerType, boolean isSingleton, boolean isConfigurationProperties,
+                                                        boolean hasExposedTypes, boolean requiresMethodProcessing, boolean isProxiedBean, boolean isProxyTarget) {
         this.beanTypeName = beanTypeName;
         this.beanDefinitionTypeName = beanDefinitionTypeName;
         this.annotationMetadata = annotationMetadata;
@@ -81,6 +102,18 @@ public abstract class AbstractInitializableBeanDefinitionReference<T> extends Ab
         this.isConfigurationProperties = isConfigurationProperties;
         this.hasExposedTypes = hasExposedTypes;
         this.requiresMethodProcessing = requiresMethodProcessing;
+        this.isProxiedBean = isProxiedBean;
+        this.isProxyTarget = isProxyTarget;
+    }
+
+    @Override
+    public boolean isProxyTarget() {
+        return isProxyTarget;
+    }
+
+    @Override
+    public boolean isProxiedBean() {
+        return isProxiedBean;
     }
 
     @Override
@@ -143,8 +176,15 @@ public abstract class AbstractInitializableBeanDefinitionReference<T> extends Ab
     @Override
     public BeanDefinition load(BeanContext context) {
         BeanDefinition definition = load();
-        if (context instanceof ApplicationContext && definition instanceof EnvironmentConfigurable) {
-            ((EnvironmentConfigurable) definition).configure(((ApplicationContext) context).getEnvironment());
+        if (context instanceof DefaultApplicationContext applicationContext
+            && definition instanceof EnvironmentConfigurable environmentConfigurable) {
+            // Performance optimization to check for the actual class to avoid the type-check pollution
+            environmentConfigurable.configure(applicationContext.getEnvironment());
+        } else if (context instanceof ApplicationContext applicationContext && definition instanceof EnvironmentConfigurable environmentConfigurable) {
+            environmentConfigurable.configure(applicationContext.getEnvironment());
+        }
+        if (definition instanceof BeanContextConfigurable ctxConfigurable) {
+            ctxConfigurable.configure(context);
         }
         return definition;
     }
@@ -158,8 +198,8 @@ public abstract class AbstractInitializableBeanDefinitionReference<T> extends Ab
                 present = true;
             } catch (Throwable e) {
                 if (e instanceof TypeNotPresentException || e instanceof ClassNotFoundException || e instanceof NoClassDefFoundError) {
-                    if (LOG.isTraceEnabled()) {
-                        LOG.trace("Bean definition for type [" + beanTypeName + "] not loaded since it is not on the classpath", e);
+                    if (ConditionLog.LOG.isTraceEnabled()) {
+                        ConditionLog.LOG.trace("Bean definition for type [" + beanTypeName + "] not loaded since it is not on the classpath", e);
                     }
                 } else {
                     throw new BeanContextException("Unexpected error loading bean definition [" + beanDefinitionTypeName + "]: " + e.getMessage(), e);

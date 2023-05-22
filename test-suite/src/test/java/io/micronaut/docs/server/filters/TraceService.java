@@ -28,10 +28,8 @@ import reactor.core.scheduler.Schedulers;
 // tag::class[]
 @Singleton
 public class TraceService {
-
     private static final Logger LOG = LoggerFactory.getLogger(TraceService.class);
-
-    Publisher<Boolean> trace(HttpRequest<?> request) {
+    public Publisher<Boolean> trace(HttpRequest<?> request) {
         return Mono.fromCallable(() -> { // <1>
             LOG.debug("Tracing request: {}", request.getUri());
             // trace logic here, potentially performing I/O <2>

@@ -16,6 +16,7 @@
 package io.micronaut.runtime.http.codec
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.convert.MutableConversionService
 import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.core.io.buffer.ByteBufferFactory
 import io.micronaut.http.MediaType
@@ -26,7 +27,7 @@ import java.nio.charset.StandardCharsets
 
 class TextPlainCodecSpec extends Specification {
 
-    @Shared TextPlainCodec codec = new TextPlainCodec(StandardCharsets.UTF_8)
+    @Shared TextPlainCodec codec = new TextPlainCodec(StandardCharsets.UTF_8, MutableConversionService.create())
 
     void "test the buffer min and max are correct for special characters"() {
         given:
@@ -43,8 +44,8 @@ class TextPlainCodecSpec extends Specification {
     void "test additional type configuration"() {
         given:
         ApplicationContext ctx = ApplicationContext.run([
-                'micronaut.codec.text.additionalTypes': ['text/html'],
-                'micronaut.codec.json.additionalTypes': ['foo/javascript']
+                'micronaut.codec.text.additional-types': ['text/html'],
+                'micronaut.codec.json.additional-types': ['foo/javascript']
         ])
 
         when:
@@ -63,7 +64,7 @@ class TextPlainCodecSpec extends Specification {
     void "test additional type configuration 2"() {
         given:
         ApplicationContext ctx = ApplicationContext.run([
-                'micronaut.codec.json.additionalTypes': ['foo/javascript']
+                'micronaut.codec.json.additional-types': ['foo/javascript']
         ])
 
         when:

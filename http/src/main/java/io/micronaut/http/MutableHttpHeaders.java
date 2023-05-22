@@ -15,6 +15,7 @@
  */
 package io.micronaut.http;
 
+import io.micronaut.core.convert.ConversionServiceAware;
 import io.micronaut.core.type.MutableHeaders;
 
 import java.net.URI;
@@ -35,7 +36,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
+public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders, ConversionServiceAware {
 
     /**
      * The default GMT zone for date values.

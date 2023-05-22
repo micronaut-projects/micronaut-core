@@ -41,7 +41,7 @@ public @interface Trace {
     @AliasFor(annotation = Around.class, member = "hotswap")
     boolean something() default false;
 
-    Class type();
+    Class<?> type();
 
-    Class[] types();
+    Class<?>[] types();
 }

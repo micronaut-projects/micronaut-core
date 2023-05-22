@@ -9,6 +9,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
@@ -107,6 +108,28 @@ class ThreadSelectionSpec extends Specification {
         ThreadSelection.MANUAL |  "controller: $LOOP" | "handler: $LOOP" | "handler: $IO"
     }
 
+    void "test thread selection for error route"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.thread-selection': strategy])
+        ThreadSelectionClient client = embeddedServer.applicationContext.getBean(ThreadSelectionClient)
+
+        when:
+        def exResult = client.throwsExErrorRoute()
+
+        then:
+        exResult.contains(controller)
+        exResult.contains(handler)
+
+        cleanup:
+        embeddedServer.close()
+
+        where:
+        strategy               |  controller          | handler
+        ThreadSelection.AUTO   |  "controller: $IO"   | "handler: $IO"
+        ThreadSelection.IO     |  "controller: $IO"   | "handler: $IO"
+        ThreadSelection.MANUAL |  "controller: $LOOP" | "handler: $LOOP"
+    }
+
     void "test injecting an executor service does not inject the Netty event loop"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
@@ -140,7 +163,7 @@ class ThreadSelectionSpec extends Specification {
         String alterflowable()
 
         @Post(uri = "/alterflowablePost", produces = MediaType.TEXT_PLAIN)
-        String alterflowablePost(String body)
+        String alterflowablePost(@Body String body)
 
         @Get("/schedulereactive")
         String scheduleReactive()
@@ -150,6 +173,9 @@ class ThreadSelectionSpec extends Specification {
 
         @Get("/exception")
         String exception()
+
+        @Get("/exception-error-route")
+        String throwsExErrorRoute()
 
         @Get("/scheduleexception")
         String scheduleException()
@@ -217,9 +243,19 @@ class ThreadSelectionSpec extends Specification {
             throw new MyException()
         }
 
+        @Get("/exception-error-route")
+        String throwsExErrorRoute() {
+            throw new MyExceptionWithErrorRoute()
+        }
+
         @Get("/scheduleexception")
         String throwsScheduledEx() {
             throw new MyExceptionScheduled()
+        }
+
+        @Error(MyExceptionWithErrorRoute.class)
+        HttpResponse errorRoute(MyExceptionWithErrorRoute e) {
+            return HttpResponse.ok("handler: ${Thread.currentThread().name}, controller: " + e.getMessage())
         }
     }
 
@@ -240,6 +276,14 @@ class ThreadSelectionSpec extends Specification {
     static class MyException extends RuntimeException {
 
         MyException() {
+            super(Thread.currentThread().getName())
+        }
+
+    }
+
+    static class MyExceptionWithErrorRoute extends RuntimeException {
+
+        MyExceptionWithErrorRoute() {
             super(Thread.currentThread().getName())
         }
 

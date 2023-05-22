@@ -17,16 +17,77 @@ package io.micronaut.inject.context
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.RuntimeBeanDefinition
+import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Type
+import io.micronaut.core.type.Argument
 import io.micronaut.inject.qualifiers.Qualifiers
+import jakarta.inject.Named
+import jakarta.inject.Singleton
 import spock.lang.Issue
 import spock.lang.Specification
 
+import java.lang.reflect.Proxy
+
 class RegisterSingletonSpec extends Specification {
+
+    void "test register singleton with generic types"() {
+        given:
+        BeanContext context = BeanContext.run()
+
+        when:
+        context.registerSingleton(new TestReporter())
+
+        then:
+        context.containsBean(Argument.of(Reporter, Span))
+
+        cleanup:
+        context.close()
+    }
+
+    void "test register singleton and exposed type"() {
+        given:
+        BeanContext context = BeanContext.run()
+
+        when:
+        context.registerBeanDefinition(
+                RuntimeBeanDefinition.builder(Codec, ()-> new OverridingCodec())
+                        .singleton(true)
+                        .qualifier(Qualifiers.byName("foo"))
+                        .replaces(ToBeReplacedCodec)
+                        .build()
+        ) // replaces ToBeReplacedCodec
+        context.registerSingleton(Codec, {  } as Codec) // adds a new codec
+        context.registerSingleton(Codec, new FooCodec()) // adds another codec
+        context.registerSingleton(new BarCodec()) // should be registered with bean type BarCodec
+        context.registerSingleton(Codec, new BazCodec(), Qualifiers.byName("baz"))
+
+        then:
+        def codecs = context.getBeansOfType(Codec)
+        codecs.size() == 7
+        codecs.find { it in FooCodec }
+        codecs.find { it in BarCodec }
+        codecs.find { it in BazCodec }
+        !codecs.find { it in ToBeReplacedCodec }
+        codecs.find { it in OverridingCodec }
+        codecs.find { it in OtherCodec }
+        codecs.find { it in StuffCodec }
+        codecs.find { it in Proxy }
+        codecs == context.getBeansOfType(Codec) // second resolve returns the same result
+        context.getBeansOfType(FooCodec).size() == 0 // not an exposed type
+        context.getBeansOfType(BarCodec).size() == 1 // BarCodec type is exposed
+        context.findBean(FooCodec).isEmpty() // not an exposed type
+        context.findBean(StuffCodec).isEmpty() // not an exposed type
+        context.findBean(OtherCodec).isPresent() // an exposed type
+
+        cleanup:
+        context.close()
+    }
+
 
     void "test register singleton method"() {
         given:
-        BeanContext context = new DefaultBeanContext().start()
+        BeanContext context = BeanContext.run()
         def b = new B()
 
         when:
@@ -83,4 +144,26 @@ class RegisterSingletonSpec extends Specification {
             this.type = type
         }
     }
+
+    static interface Codec {
+
+    }
+
+    static class OverridingCodec implements Codec {}
+    static class FooCodec implements Codec {}
+    static class BarCodec implements Codec {}
+    static class BazCodec implements Codec {}
+    @Singleton
+    @Bean(typed = Codec)
+    static class StuffCodec implements Codec {}
+    @Singleton
+    static class OtherCodec implements Codec {}
+
+    @Singleton
+    @Named("foo")
+    static class ToBeReplacedCodec implements Codec {}
+
+    static interface Reporter<B> {}
+    static class Span {}
+    static class TestReporter implements Reporter<Span> {}
 }

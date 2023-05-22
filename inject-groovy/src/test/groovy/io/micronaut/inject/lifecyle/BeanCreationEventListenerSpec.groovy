@@ -21,7 +21,7 @@ import io.micronaut.context.event.BeanCreatedEvent
 import io.micronaut.context.event.BeanCreatedEventListener
 import spock.lang.Specification
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 /**
  * Created by graemerocher on 26/05/2017.

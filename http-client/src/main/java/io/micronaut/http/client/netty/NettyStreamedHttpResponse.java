@@ -22,7 +22,6 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.cookie.Cookie;
@@ -34,9 +33,9 @@ import io.micronaut.http.netty.cookies.NettyCookies;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 
-import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -47,24 +46,22 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpResponseBuilder {
+final class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpResponseBuilder {
 
     private final StreamedHttpResponse nettyResponse;
-    private HttpStatus status;
     private final NettyHttpHeaders headers;
     @GuardedBy("this")
     private NettyCookies nettyCookies; // initialized lazily
     private B body;
-    private volatile MutableConvertibleValues<Object> attributes;
+    private MutableConvertibleValues<Object> attributes;
 
     /**
      * @param response The streamed Http response
-     * @param httpStatus The Http status
+     * @param conversionService The conversion service
      */
-    NettyStreamedHttpResponse(StreamedHttpResponse response, HttpStatus httpStatus) {
+    NettyStreamedHttpResponse(StreamedHttpResponse response, ConversionService conversionService) {
         this.nettyResponse = response;
-        this.status = httpStatus;
-        this.headers = new NettyHttpHeaders(response.headers(), ConversionService.SHARED);
+        this.headers = new NettyHttpHeaders(response.headers(), conversionService);
     }
 
     /**
@@ -75,13 +72,13 @@ class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpR
     }
 
     @Override
-    public String reason() {
-        return nettyResponse.status().reasonPhrase();
+    public int code() {
+        return nettyResponse.status().code();
     }
 
     @Override
-    public HttpStatus getStatus() {
-        return status;
+    public String reason() {
+        return nettyResponse.status().reasonPhrase();
     }
 
     @Override
@@ -91,17 +88,17 @@ class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpR
 
     @Override
     public MutableConvertibleValues<Object> getAttributes() {
-        MutableConvertibleValues<Object> attributes = this.attributes;
-        if (attributes == null) {
+        MutableConvertibleValues<Object> mcv = this.attributes;
+        if (mcv == null) {
             synchronized (this) { // double check
-                attributes = this.attributes;
-                if (attributes == null) {
-                    attributes = new MutableConvertibleValuesMap<>();
-                    this.attributes = attributes;
+                mcv = this.attributes;
+                if (mcv == null) {
+                    mcv = new MutableConvertibleValuesMap<>();
+                    this.attributes = mcv;
                 }
             }
         }
-        return attributes;
+        return mcv;
     }
 
     /**
@@ -143,8 +140,7 @@ class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpR
 
     @Override
     public synchronized MutableHttpResponse<B> cookie(Cookie cookie) {
-        if (cookie instanceof NettyCookie) {
-            NettyCookie nettyCookie = (NettyCookie) cookie;
+        if (cookie instanceof NettyCookie nettyCookie) {
             // this is a response cookie, encode with server encoder
             String value = ServerCookieEncoder.STRICT.encode(nettyCookie.getNettyCookie());
             headers.add(HttpHeaderNames.SET_COOKIE, value);
@@ -175,8 +171,12 @@ class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpR
     }
 
     @Override
-    public MutableHttpResponse<B> status(HttpStatus status, CharSequence message) {
-        this.status = Objects.requireNonNull(status, "Status is required");
+    public MutableHttpResponse<B> status(int status, CharSequence message) {
+        if (message == null) {
+            nettyResponse.setStatus(HttpResponseStatus.valueOf(status));
+        } else {
+            nettyResponse.setStatus(HttpResponseStatus.valueOf(status, message.toString()));
+        }
         return this;
     }
 }

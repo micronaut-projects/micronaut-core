@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonView;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
@@ -60,16 +61,19 @@ public class JsonViewServerFilter implements HttpServerFilter {
 
     private final JsonViewCodecResolver codecFactory;
     private final ExecutorService executorService;
+    private final ConversionService conversionService;
 
     /**
      * @param jsonViewCodecResolver The JSON view codec resolver.
-     * @param executorService The I/O executor service
+     * @param executorService       The I/O executor service
+     * @param conversionService     The conversion service
      */
-    public JsonViewServerFilter(
-            JsonViewCodecResolver jsonViewCodecResolver,
-            @Named(TaskExecutors.IO) ExecutorService executorService) {
+    public JsonViewServerFilter(JsonViewCodecResolver jsonViewCodecResolver,
+                                @Named(TaskExecutors.BLOCKING) ExecutorService executorService,
+                                ConversionService conversionService) {
         this.codecFactory = jsonViewCodecResolver;
         this.executorService = executorService;
+        this.conversionService = conversionService;
     }
 
     @Override
@@ -87,14 +91,14 @@ public class JsonViewServerFilter implements HttpServerFilter {
                         Object body = optionalBody.get();
                         MediaTypeCodec codec = codecFactory.resolveJsonViewCodec(viewClass.get());
                         if (Publishers.isConvertibleToPublisher(body)) {
-                            Publisher<?> pub = Publishers.convertPublisher(body, Publisher.class);
+                            Publisher<?> pub = Publishers.convertPublisher(conversionService, body, Publisher.class);
                             response.body(Flux.from(pub)
-                                                  .map(o -> codec.encode((Argument) routeInfo.getBodyType(), o))
+                                                  .map(o -> codec.encode((Argument) routeInfo.getResponseBodyType(), o))
                                                   .subscribeOn(Schedulers.fromExecutorService(executorService)));
                         } else {
                             return Mono.fromCallable(() -> {
                                 @SuppressWarnings({"unchecked", "rawtypes"})
-                                final byte[] encoded = codec.encode((Argument) routeInfo.getBodyType(), body);
+                                final byte[] encoded = codec.encode((Argument) routeInfo.getResponseBodyType(), body);
                                 response.body(encoded);
                                 return response;
                             }).subscribeOn(Schedulers.fromExecutorService(executorService));

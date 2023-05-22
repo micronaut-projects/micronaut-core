@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.ssl;
 
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.netty.handler.ssl.SslContext;
+import io.netty.incubator.codec.quic.QuicSslContext;
 
 import java.util.Optional;
 
@@ -35,4 +36,8 @@ public interface ServerSslBuilder {
      * @return Builds the SSL configuration wrapped inside an optional
      */
     Optional<SslContext> build();
+
+    default Optional<QuicSslContext> buildQuic() {
+        throw new UnsupportedOperationException("QUIC not supported");
+    }
 }

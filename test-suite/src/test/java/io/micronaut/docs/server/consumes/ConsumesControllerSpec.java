@@ -21,6 +21,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.codec.CodecException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -74,7 +75,7 @@ public class ConsumesControllerSpec {
                 client.toBlocking().exchange(HttpRequest.POST("/consumes/multiple", book)
                 .contentType(MediaType.APPLICATION_JSON)));
 
-        Assertions.assertDoesNotThrow(() ->
+        Assertions.assertThrows(CodecException.class, () ->
                 client.toBlocking().exchange(HttpRequest.POST("/consumes/member", book)
                 .contentType(MediaType.TEXT_PLAIN)));
     }

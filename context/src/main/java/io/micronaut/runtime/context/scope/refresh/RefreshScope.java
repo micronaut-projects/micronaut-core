@@ -33,9 +33,6 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.context.scope.Refreshable;
-import io.micronaut.scheduling.TaskExecutors;
-import jakarta.inject.Inject;
-import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
 import java.util.Collection;
@@ -44,7 +41,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.Executor;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -69,17 +65,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
 
     /**
      * @param beanContext     The bean context to allow DI of beans annotated with @Inject
-     * @param executorService The executor service
      */
-    @Deprecated
-    public RefreshScope(BeanContext beanContext, @Named(TaskExecutors.IO) Executor executorService) {
-        this.beanContext = beanContext;
-    }
-
-    /**
-     * @param beanContext     The bean context to allow DI of beans annotated with @Inject
-     */
-    @Inject
     public RefreshScope(BeanContext beanContext) {
         this.beanContext = beanContext;
     }

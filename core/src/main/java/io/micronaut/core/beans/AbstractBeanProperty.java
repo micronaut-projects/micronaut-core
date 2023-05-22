@@ -24,6 +24,7 @@ import io.micronaut.core.util.ArgumentUtils;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.util.ObjectUtils;
 
 import java.util.Objects;
 
@@ -219,7 +220,7 @@ public abstract class AbstractBeanProperty<B, P> implements UnsafeBeanProperty<B
 
     @Override
     public int hashCode() {
-        return Objects.hash(beanType, type, name);
+        return ObjectUtils.hash(beanType, type, name);
     }
 
     @Override

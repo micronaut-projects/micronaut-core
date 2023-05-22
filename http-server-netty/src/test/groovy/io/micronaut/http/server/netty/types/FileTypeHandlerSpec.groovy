@@ -30,10 +30,6 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
-import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
-import io.micronaut.http.server.netty.types.files.FileTypeHandler
-import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType
-import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType
 import io.micronaut.http.server.types.files.StreamedFile
 import io.micronaut.http.server.types.files.SystemFile
 import jakarta.inject.Inject
@@ -47,13 +43,16 @@ import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ExecutorService
 
+import static io.micronaut.http.HttpHeaders.ACCEPT_RANGES
 import static io.micronaut.http.HttpHeaders.CACHE_CONTROL
 import static io.micronaut.http.HttpHeaders.CONTENT_DISPOSITION
 import static io.micronaut.http.HttpHeaders.CONTENT_LENGTH
+import static io.micronaut.http.HttpHeaders.CONTENT_RANGE
 import static io.micronaut.http.HttpHeaders.CONTENT_TYPE
 import static io.micronaut.http.HttpHeaders.DATE
 import static io.micronaut.http.HttpHeaders.EXPIRES
 import static io.micronaut.http.HttpHeaders.LAST_MODIFIED
+import static io.micronaut.http.HttpHeaders.RANGE
 
 class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
@@ -75,6 +74,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         response.header(CONTENT_TYPE) == "text/html"
         Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
         response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
+        response.headers.getAll(DATE).size() == 1
         response.header(CACHE_CONTROL) == "private, max-age=60"
         response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(tempFile.lastModified()), ZoneId.of("GMT")).truncatedTo(ChronoUnit.SECONDS)
         response.body() == tempFileContents
@@ -89,6 +89,34 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         then:
         response.code() == HttpStatus.NOT_MODIFIED.code
         response.header(DATE)
+    }
+
+    void "test 206 is returned for Byte-Range queries"() {
+        when:
+        MutableHttpRequest<?> request = HttpRequest.GET('/test/html')
+        request.headers.add(RANGE, range)
+        def response = rxClient.toBlocking().exchange(request, String)
+
+        then:
+        response.code() == expectedStatus
+        response.header(ACCEPT_RANGES) == "bytes"
+        response.header(CONTENT_RANGE) == expectedContentRange
+        response.header(CONTENT_LENGTH) == Long.toString(expectedContent.length())
+        response.body() == expectedContent
+
+        where:
+        range          | expectedStatus | expectedContentRange                                     | expectedContent
+        ""             | 200            | null                                                     | tempFileContents
+        "bytes"        | 200            | null                                                     | tempFileContents
+        "bytes="       | 200            | null                                                     | tempFileContents
+        "bytes=2"      | 200            | null                                                     | tempFileContents
+        "bytes=9000-"  | 200            | null                                                     | tempFileContents
+        "bytes=0-9000" | 200            | null                                                     | tempFileContents
+        "bytes=abc-10" | 200            | null                                                     | tempFileContents
+        "bytes=0-def"  | 200            | null                                                     | tempFileContents
+        "bytes=0-"     | 206            | "bytes 0-${tempFile.length() - 1}/${tempFile.length()}"  | tempFileContents
+        "bytes=10-"    | 206            | "bytes 10-${tempFile.length() - 1}/${tempFile.length()}" | tempFileContents.substring(10)
+        "bytes=1-2"    | 206            | "bytes 1-2/${tempFile.length()}"                         | tempFileContents.substring(1, 3)
     }
 
     void "test cache control can be overridden"() {
@@ -276,22 +304,6 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         response.body() == ("a".."z").join('')
     }
 
-    void "test supports"() {
-        when:
-        FileTypeHandler fileTypeHandler = new FileTypeHandler(new NettyHttpServerConfiguration.FileTypeHandlerConfiguration())
-
-        then:
-        fileTypeHandler.supports(type) == expected
-
-        where:
-        type                                      | expected
-        NettySystemFileCustomizableResponseType   | true
-        NettyStreamedFileCustomizableResponseType | true
-        StreamedFile                              | true
-        File                                      | true
-        SystemFile                                | true
-    }
-
     @Controller('/test')
     @Requires(property = 'spec.name', value = 'FileTypeHandlerSpec')
     static class TestController {
@@ -314,7 +326,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         @Get('/custom-cache-control')
         HttpResponse<File> cacheControl() {
             HttpResponse.ok(tempFile)
-                        .header(CACHE_CONTROL, "public, immutable, max-age=31556926")
+                    .header(CACHE_CONTROL, "public, immutable, max-age=31556926")
         }
 
         @Get('/different-name')

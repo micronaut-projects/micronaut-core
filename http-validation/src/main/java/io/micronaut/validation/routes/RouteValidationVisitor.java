@@ -21,13 +21,17 @@ import io.micronaut.context.env.DefaultPropertyPlaceholderResolver.RawSegment;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver.Segment;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.convert.DefaultConversionService;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.validation.routes.rules.*;
+import io.micronaut.validation.routes.rules.ClientTypesRule;
+import io.micronaut.validation.routes.rules.MissingParameterRule;
+import io.micronaut.validation.routes.rules.NullableParameterRule;
+import io.micronaut.validation.routes.rules.RequestBeanParameterRule;
+import io.micronaut.validation.routes.rules.RouteValidationRule;
 
 import javax.annotation.processing.SupportedOptions;
 import java.util.ArrayList;
@@ -51,7 +55,7 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, Object
     private static final String METHOD_MAPPING_ANN = "io.micronaut.http.annotation.HttpMethodMapping";
     private List<RouteValidationRule> rules = new ArrayList<>();
     private boolean skipValidation = false;
-    private final DefaultPropertyPlaceholderResolver resolver = new DefaultPropertyPlaceholderResolver(null, new DefaultConversionService());
+    private final DefaultPropertyPlaceholderResolver resolver = new DefaultPropertyPlaceholderResolver(null, ConversionService.SHARED);
 
     @NonNull
     @Override

@@ -103,7 +103,7 @@ public class HelloControllerTest {
         // tag::jsonmaptypes[]
         response = Flux.from(client.retrieve(
                 GET("/greet/John"),
-                Argument.of(Map.class, String.class, String.class) // <1>
+                Argument.mapOf(String.class, String.class) // <1>
         ));
         // end::jsonmaptypes[]
 

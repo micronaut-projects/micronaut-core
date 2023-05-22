@@ -4,27 +4,23 @@ plugins {
 }
 
 dependencies {
-    annotationProcessor project(":inject-java")
-
-    api project(":inject-java")
+    api project(":inject-kotlin")
     api libs.managed.groovy
-    api(libs.managed.spock) {
+    api(libs.spock) {
         exclude module:'groovy-all'
     }
     if (!JavaVersion.current().isJava9Compatible()) {
         api files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
-
-    testAnnotationProcessor project(":inject-java")
-    testCompileOnly project(":inject-groovy")
-    testImplementation libs.managed.validation
+    api(libs.managed.ksp.api)
+    api(libs.managed.ksp)
+    implementation(libs.managed.kotlin.compiler.embeddable)
+    implementation "com.squareup.okio:okio:3.3.0"
+    implementation "io.github.classgraph:classgraph:4.8.149"
     testImplementation libs.javax.persistence
     testImplementation project(":runtime")
     api libs.blaze.persistence.core
-
-    implementation libs.kotlin.compiler.embeddable
-    implementation libs.kotlin.annotation.processing.embeddable
-    implementation libs.kotlin.stdlib
+    implementation libs.managed.kotlin.stdlib
 }
 
 tasks.named("sourcesJar") {
@@ -34,12 +30,29 @@ tasks.named("sourcesJar") {
 
 tasks.named("compileKotlin") {
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
 }
 
 tasks.named("compileGroovy") {
     // this allows groovy to access kotlin classes.
     dependsOn tasks.getByPath('compileKotlin')
-    classpath += files(compileKotlin.destinationDir)
+    classpath += files(compileKotlin.destinationDirectory)
+}
+
+tasks.named("test", Test) {
+    if(JavaVersion.current().majorVersion.toInteger() >= 17) {
+        jvmArgs(
+                '--add-opens', 'jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED',
+                '--add-opens', 'jdk.compiler/com.sun.tools.javac.tree=ALL-UNNAMED',
+                '--add-opens', 'jdk.compiler/com.sun.tools.javac.main=ALL-UNNAMED',
+                '--add-opens', 'jdk.compiler/com.sun.tools.javac.jvm=ALL-UNNAMED',
+                '--add-opens', 'jdk.compiler/com.sun.tools.javac.parser=ALL-UNNAMED',
+                '--add-opens', 'jdk.compiler/com.sun.tools.javac.processing=ALL-UNNAMED',
+                '--add-opens', 'jdk.compiler/com.sun.tools.javac.code=ALL-UNNAMED',
+                '--add-opens', 'jdk.compiler/com.sun.tools.javac.comp=ALL-UNNAMED',
+                '--add-opens', 'jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED',
+                '--add-opens', 'jdk.compiler/com.sun.tools.javac.file=ALL-UNNAMED'
+        )
+    }
 }

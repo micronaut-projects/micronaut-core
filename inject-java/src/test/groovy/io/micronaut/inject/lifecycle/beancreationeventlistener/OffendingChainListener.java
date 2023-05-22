@@ -7,10 +7,16 @@ import jakarta.inject.Singleton;
 @Singleton
 public class OffendingChainListener implements BeanCreatedEventListener<B> {
 
-    OffendingChainListener(D d) {}
+    static boolean initialized;
+    static boolean executed;
+
+    OffendingChainListener(D d) {
+        initialized = true;
+    }
 
     @Override
     public B onCreated(BeanCreatedEvent<B> event) {
+        executed = true;
         return event.getBean();
     }
 }

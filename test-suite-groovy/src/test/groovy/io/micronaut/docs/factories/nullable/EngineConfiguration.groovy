@@ -18,7 +18,7 @@ package io.micronaut.docs.factories.nullable
 import io.micronaut.context.annotation.EachProperty
 import io.micronaut.core.util.Toggleable
 
-import javax.validation.constraints.NotNull
+import jakarta.validation.constraints.NotNull
 
 // tag::class[]
 @EachProperty("engines")

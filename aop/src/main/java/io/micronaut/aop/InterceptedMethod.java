@@ -18,6 +18,7 @@ package io.micronaut.aop;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import org.reactivestreams.Publisher;
 
@@ -38,9 +39,22 @@ public interface InterceptedMethod {
      *
      * @param context The {@link MethodInvocationContext}
      * @return The {@link InterceptedMethod}
+     * @deprecated replaced with {@link #of(MethodInvocationContext, ConversionService)}
      */
+    @Deprecated(since = "4", forRemoval = true)
     static InterceptedMethod of(MethodInvocationContext<?, ?> context) {
-        return InterceptedMethodUtil.of(context);
+        return of(context, ConversionService.SHARED);
+    }
+
+    /**
+     * Creates a new instance of intercept method supporting intercepting different reactive invocations.
+     *
+     * @param context           The {@link MethodInvocationContext}
+     * @param conversionService The conversion service
+     * @return The {@link InterceptedMethod}
+     */
+    static InterceptedMethod of(MethodInvocationContext<?, ?> context, ConversionService conversionService) {
+        return InterceptedMethodUtil.of(context, conversionService);
     }
 
     /**

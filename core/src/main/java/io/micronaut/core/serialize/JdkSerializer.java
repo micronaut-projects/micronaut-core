@@ -36,12 +36,12 @@ import java.util.Optional;
  */
 public class JdkSerializer implements ObjectSerializer {
 
-    private final ConversionService<?> conversionService;
+    private final ConversionService conversionService;
 
     /**
      * @param conversionService The conversion service
      */
-    public JdkSerializer(ConversionService<?> conversionService) {
+    public JdkSerializer(ConversionService conversionService) {
         this.conversionService = conversionService;
     }
 
@@ -121,7 +121,7 @@ public class JdkSerializer implements ObjectSerializer {
         return new ObjectInputStream(inputStream) {
             @Override
             protected Class<?> resolveClass(ObjectStreamClass desc) throws IOException, ClassNotFoundException {
-                Optional<Class> aClass = ClassUtils.forName(desc.getName(), requiredType.getClassLoader());
+                Optional<Class<?>> aClass = ClassUtils.forName(desc.getName(), requiredType.getClassLoader());
                 if (aClass.isPresent()) {
                     return aClass.get();
                 }

@@ -15,49 +15,24 @@
  */
 package io.micronaut.core.convert;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.annotation.Nullable;
+
 import java.util.Optional;
-import java.util.function.Function;
 
 /**
  * A service for allowing conversion from one type to another.
  *
- * @param <Impl> The type
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ConversionService<Impl extends ConversionService> {
+public interface ConversionService {
 
     /**
      * The default shared conversion service.
      */
-    ConversionService<?> SHARED = new DefaultConversionService();
-
-    /**
-     * Adds a type converter.
-     *
-     * @param sourceType    The source type
-     * @param targetType    The target type
-     * @param typeConverter The type converter
-     * @param <S>           The source generic type
-     * @param <T>           The target generic type
-     * @return This conversion service
-     */
-    <S, T> Impl addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> typeConverter);
-
-    /**
-     * Adds a type converter.
-     *
-     * @param sourceType    The source type
-     * @param targetType    The target type
-     * @param typeConverter The type converter
-     * @param <S>           The source generic type
-     * @param <T>           The target generic type
-     * @return This conversion service
-     */
-    <S, T> Impl addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter);
+    ConversionService SHARED = new DefaultMutableConversionService();
 
     /**
      * Attempts to convert the given object to the given target type. If conversion fails or is not possible an empty {@link Optional} is returned.

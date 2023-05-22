@@ -169,7 +169,12 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
 
     @Override
     public char[] getTextCharacters() throws IOException {
-        return getText().toCharArray();
+        String text = getText();
+        if (text != null) {
+            return text.toCharArray();
+        } else {
+            return new char[0];
+        }
     }
 
     @Override
@@ -247,7 +252,8 @@ final class JsonNodeTraversingParser extends ParserMinimalBase {
 
     @Override
     public int getTextLength() throws IOException {
-        return getText().length();
+        String text = getText();
+        return text != null ? text.length() : 0;
     }
 
     @Override

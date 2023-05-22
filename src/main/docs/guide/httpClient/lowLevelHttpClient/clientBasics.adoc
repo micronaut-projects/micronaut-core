@@ -60,10 +60,9 @@ To debug requests being sent and received from the HTTP client you can enable tr
 
 ==== Client Specific Debugging / Tracing
 
-To enable client-specific logging you can configure the default logger for all HTTP clients. You can also configure different loggers for different clients using <<_client_specific_configuration, Client-Specific Configuration>>. For example, in `application.yml`:
+To enable client-specific logging you can configure the default logger for all HTTP clients. You can also configure different loggers for different clients using <<_client_specific_configuration, Client-Specific Configuration>>. For example, in your configuration file (e.g `application.yml`):
 
-.application.yml
-[source,xml]
+[configuration]
 ----
 micronaut:
   http:

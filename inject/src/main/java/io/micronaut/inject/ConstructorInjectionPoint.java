@@ -16,7 +16,6 @@
 package io.micronaut.inject;
 
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.beans.BeanConstructor;
 
 /**
  * A constructor injection point.
@@ -25,23 +24,10 @@ import io.micronaut.core.beans.BeanConstructor;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ConstructorInjectionPoint<T> extends CallableInjectionPoint<T>, BeanConstructor<T> {
+public interface ConstructorInjectionPoint<T> extends CallableInjectionPoint<T> {
 
-    /**
-     * Invoke the constructor.
-     *
-     * @param args The arguments
-     * @return The new value
-     */
-    T invoke(Object... args);
-
-    @Override
     default @NonNull Class<T> getDeclaringBeanType() {
         return getDeclaringBean().getBeanType();
     }
 
-    @Override
-    default @NonNull T instantiate(Object... parameterValues) {
-        return invoke(parameterValues);
-    }
 }

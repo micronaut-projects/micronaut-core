@@ -1,4 +1,4 @@
-As mentioned previously, Micronaut includes both an <<httpServer,HTTP server>> and an <<httpClient,HTTP client>>. A <<lowLevelHttpClient,low-level HTTP client>> is provided which you can use to test the `HelloController` created in the previous section.
+As mentioned previously, the Micronaut framework includes both an <<httpServer,HTTP server>> and an <<httpClient,HTTP client>>. A <<lowLevelHttpClient,low-level HTTP client>> is provided which you can use to test the `HelloController` created in the previous section.
 
 .Testing Hello World
 
@@ -9,7 +9,7 @@ snippet::io.micronaut.docs.server.intro.HelloControllerSpec[tags="imports,class"
 <3> The test uses the `toBlocking()` method to make a blocking call
 <4> The `retrieve` method returns the controller response as a `String`
 
-In addition to a low-level client, Micronaut features a <<clientAnnotation,declarative, compile-time HTTP client>>, powered by the api:http.client.annotation.Client[] annotation.
+In addition to a low-level client, the Micronaut framework features a <<clientAnnotation,declarative, compile-time HTTP client>>, powered by the api:http.client.annotation.Client[] annotation.
 
 To create a client, create an interface annotated with `@Client`, for example:
 

@@ -40,7 +40,7 @@ public class TestFunctionFactory {
     // it is an AOP proxy
     @FunctionBean("round")
     Function<Double, Long> round() {
-        return (doub) -> Math.round(doub.doubleValue());
+        return Math::round;
     }
 
     @FunctionBean("upper")

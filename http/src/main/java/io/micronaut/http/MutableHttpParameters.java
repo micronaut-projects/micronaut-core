@@ -15,6 +15,8 @@
  */
 package io.micronaut.http;
 
+import io.micronaut.core.convert.ConversionServiceAware;
+
 import java.util.Collections;
 import java.util.List;
 
@@ -24,7 +26,7 @@ import java.util.List;
  * @author Vladimir Orany
  * @since 1.0
  */
-public interface MutableHttpParameters extends HttpParameters {
+public interface MutableHttpParameters extends HttpParameters, ConversionServiceAware {
 
     /**
      * Adds a new http parameter.

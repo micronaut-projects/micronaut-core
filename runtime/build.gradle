@@ -5,30 +5,29 @@ plugins {
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":graal")
+    api project(':aop')
+    api project(':discovery-core')
+    api project(':context')
+    api project(':context-propagation')
+    api project(":core-reactive")
     api project(":http")
     api project(':inject')
-    api project(':aop')
-    api project(':context')
-    api project(":core-reactive")
-    api project(":jackson-databind")
-    api libs.managed.validation
+    api project(':retry')
 
     implementation libs.managed.reactor
 
-    compileOnly libs.managed.graal
-    compileOnly libs.managed.jcache
+    compileOnly libs.graal
+    compileOnly libs.jcache
 
-    compileOnly libs.log4j
-    compileOnly libs.javax.el
+    compileOnly libs.jakarta.el
     compileOnly libs.caffeine
-    compileOnly libs.kotlinx.coroutines.core
-    compileOnly libs.kotlinx.coroutines.reactive
-    compileOnly libs.managed.logback
-    testImplementation libs.managed.logback
-
+    compileOnly libs.managed.kotlinx.coroutines.core
+    compileOnly libs.managed.kotlinx.coroutines.reactive
+    testImplementation libs.logback.classic
+    testImplementation libs.managed.snakeyaml
     testAnnotationProcessor project(":inject-java")
     testImplementation libs.jsr107
-    testImplementation libs.managed.jcache
+    testImplementation libs.jcache
     testImplementation project(":inject-java")
     testImplementation project(":inject-java-test")
     testImplementation project(":inject-groovy")
@@ -49,8 +48,8 @@ spotless {
     }
 }
 
-tasks.withType(Test) {
-    if(JavaVersion.current().majorVersion.toInteger() >= 17) {
+tasks.withType(Test).configureEach {
+    if (JavaVersion.current().majorVersion.toInteger() >= 17) {
         logger.warn("Opening java.util, so SystemLambda can work")
         jvmArgs += ['--add-opens', 'java.base/java.util=ALL-UNNAMED']
     }

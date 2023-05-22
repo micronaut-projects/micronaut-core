@@ -28,6 +28,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ProxyBeanDefinition;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -265,7 +266,17 @@ public interface BeanDefinitionRegistry {
     @NonNull Collection<BeanDefinitionReference<?>> getBeanDefinitionReferences();
 
     /**
-     * Find active {@link javax.inject.Singleton} beans for the given qualifier. Note that
+     * Get all of the disabled {@link DisabledBean}.
+     *
+     * @return The disabled bean definitions
+     * @since 4.0.0
+     */
+    default @NonNull Collection<DisabledBean<?>> getDisabledBeans() {
+        return Collections.emptyList();
+    }
+
+    /**
+     * Find active {@link jakarta.inject.Singleton} beans for the given qualifier. Note that
      * this method can return multiple registrations for a given singleton bean instance since each bean may have multiple qualifiers.
      *
      * @param qualifier The qualifier
@@ -274,7 +285,7 @@ public interface BeanDefinitionRegistry {
     @NonNull Collection<BeanRegistration<?>> getActiveBeanRegistrations(@NonNull Qualifier<?> qualifier);
 
     /**
-     * Find active {@link javax.inject.Singleton} beans for the given bean type. Note that
+     * Find active {@link jakarta.inject.Singleton} beans for the given bean type. Note that
      * this method can return multiple registrations for a given singleton bean instance since each bean may have multiple qualifiers.
      *
      * @param beanType The bean type
@@ -284,7 +295,7 @@ public interface BeanDefinitionRegistry {
     @NonNull <T> Collection<BeanRegistration<T>> getActiveBeanRegistrations(@NonNull Class<T> beanType);
 
     /**
-     * Find and if necessary initialize {@link javax.inject.Singleton} beans for the given bean type, returning all the active registrations. Note that
+     * Find and if necessary initialize {@link jakarta.inject.Singleton} beans for the given bean type, returning all the active registrations. Note that
      * this method can return multiple registrations for a given singleton bean instance since each bean may have multiple qualifiers.
      *
      * @param beanType The bean type
@@ -294,7 +305,7 @@ public interface BeanDefinitionRegistry {
     @NonNull <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Class<T> beanType);
 
     /**
-     * Find and if necessary initialize {@link javax.inject.Singleton} beans for the given bean type, returning all the active registrations. Note that
+     * Find and if necessary initialize {@link jakarta.inject.Singleton} beans for the given bean type, returning all the active registrations. Note that
      * this method can return multiple registrations for a given singleton bean instance since each bean may have multiple qualifiers.
      *
      * @param beanType The bean type
@@ -306,7 +317,7 @@ public interface BeanDefinitionRegistry {
     @NonNull <T> Collection<BeanRegistration<T>> getBeanRegistrations(@NonNull Class<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
-     * Find and if necessary initialize {@link javax.inject.Singleton} beans for the given bean type, returning all the active registrations. Note that
+     * Find and if necessary initialize {@link jakarta.inject.Singleton} beans for the given bean type, returning all the active registrations. Note that
      * this method can return multiple registrations for a given singleton bean instance since each bean may have multiple qualifiers.
      *
      * @param beanType The bean type

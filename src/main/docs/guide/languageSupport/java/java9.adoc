@@ -1,4 +1,4 @@
-Micronaut is built with Java 8 but works fine with Java 9 and above. The classes that Micronaut generates sit alongside existing classes in the same package, hence do not violate anything regarding the Java module system.
+The Micronaut framework is built with Java 8 but works fine with Java 9 and above. The classes that Micronaut generates sit alongside existing classes in the same package, hence do not violate anything regarding the Java module system.
 
 There are some considerations when using Java 9+ with Micronaut.
 

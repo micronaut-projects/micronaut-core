@@ -1,1 +1,2 @@
 example.micronaut.inject.visitor.AnnotatingVisitor
+io.micronaut.docs.expressions.ContextRegistrar

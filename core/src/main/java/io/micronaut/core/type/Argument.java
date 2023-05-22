@@ -15,19 +15,23 @@
  */
 package io.micronaut.core.type;
 
-import io.micronaut.core.annotation.*;
-import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.annotation.AnnotatedElement;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
-import java.util.Collections;
 
 /**
  * Represents an argument to a method or constructor or type.
@@ -432,7 +436,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
         if (ArrayUtils.isEmpty(typeParameters)) {
             return of(type);
         }
-        return new DefaultArgument<>(type, NameUtils.decapitalize(type.getSimpleName()), AnnotationMetadata.EMPTY_METADATA, typeParameters);
+        return new DefaultArgument<>(type, null, AnnotationMetadata.EMPTY_METADATA, typeParameters);
     }
 
     /**
@@ -507,6 +511,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
 
     /**
      * Creates a new argument for the given type and name.
+     * NOTE: This method should be avoided as it does use the reflection to retrieve the type parameter names.
      *
      * @param type               The type
      * @param annotationMetadata The annotation metadata
@@ -530,7 +535,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
         Argument<?>[] typeArguments = new Argument[len];
         for (int i = 0; i < parameters.length; i++) {
             TypeVariable<Class<T>> parameter = parameters[i];
-            typeArguments[i] = Argument.of(typeParameters[i], parameter.getName());
+            typeArguments[i] = Argument.ofTypeVariable(typeParameters[i], parameter.getName());
         }
         return new DefaultArgument<>(type, annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA, typeArguments);
     }
@@ -544,8 +549,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      */
     @NonNull
     static <T> Argument<List<T>> listOf(@NonNull Class<T> type) {
-        //noinspection unchecked
-        return of((Class<List<T>>) ((Class) List.class), type);
+        return listOf(Argument.of(type, "E"));
     }
 
     /**
@@ -559,7 +563,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     @NonNull
     static <T> Argument<List<T>> listOf(@NonNull Argument<T> type) {
         //noinspection unchecked
-        return of((Class<List<T>>) ((Class) List.class), type);
+        return of((Class<List<T>>) ((Class) List.class), "list", type);
     }
 
     /**
@@ -571,8 +575,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      */
     @NonNull
     static <T> Argument<Set<T>> setOf(@NonNull Class<T> type) {
-        //noinspection unchecked
-        return of((Class<Set<T>>) ((Class) Set.class), type);
+        return setOf(Argument.of(type, "E"));
     }
 
     /**
@@ -586,7 +589,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     @NonNull
     static <T> Argument<Set<T>> setOf(@NonNull Argument<T> type) {
         //noinspection unchecked
-        return of((Class<Set<T>>) ((Class) Set.class), type);
+        return of((Class<Set<T>>) ((Class) Set.class), "set", type);
     }
 
     /**
@@ -600,8 +603,7 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
      */
     @NonNull
     static <K, V> Argument<Map<K, V>> mapOf(@NonNull Class<K> keyType, @NonNull Class<V> valueType) {
-        //noinspection unchecked
-        return of((Class<Map<K, V>>) ((Class) Map.class), keyType, valueType);
+        return mapOf(Argument.of(keyType, "K"), Argument.of(valueType, "V"));
     }
 
     /**
@@ -617,7 +619,34 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     @NonNull
     static <K, V> Argument<Map<K, V>> mapOf(@NonNull Argument<K> keyType, @NonNull Argument<V> valueType) {
         //noinspection unchecked
-        return of((Class<Map<K, V>>) ((Class) Map.class), keyType, valueType);
+        return of((Class<Map<K, V>>) ((Class) Map.class), "map", keyType, valueType);
+    }
+
+    /**
+     * Creates a new argument representing an optional.
+     *
+     * @param optionalValueClass   The optional type
+     * @param <T>       The optional type
+     * @return The argument instance
+     * @since 4.0.0
+     */
+    @NonNull
+    static <T> Argument<Optional<T>> optionalOf(@NonNull Class<T> optionalValueClass) {
+        return optionalOf(Argument.of(optionalValueClass, "T"));
+    }
+
+    /**
+     * Creates a new argument representing an optional.
+     *
+     * @param optionalValueArgument   The optional type
+     * @param <T>       The optional type
+     * @return The argument instance
+     * @since 4.0.0
+     */
+    @NonNull
+    static <T> Argument<Optional<T>> optionalOf(@NonNull Argument<T> optionalValueArgument) {
+        //noinspection unchecked
+        return of((Class<Optional<T>>) ((Class) Optional.class), "optional", optionalValueArgument);
     }
 
 }

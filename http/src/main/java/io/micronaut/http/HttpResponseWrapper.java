@@ -31,8 +31,13 @@ public class HttpResponseWrapper<B> extends HttpMessageWrapper<B> implements Htt
     }
 
     @Override
-    public HttpStatus getStatus() {
-        return getDelegate().getStatus();
+    public int code() {
+        return getDelegate().code();
+    }
+
+    @Override
+    public String reason() {
+        return getDelegate().reason();
     }
 
     @Override

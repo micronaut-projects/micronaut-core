@@ -20,13 +20,13 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.MethodInjectionPoint;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
-import io.micronaut.core.annotation.Nullable;
-import java.lang.reflect.Method;
+
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -41,11 +41,11 @@ import java.util.Objects;
 @Internal
 class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, EnvironmentConfigurable {
 
+    protected final Class<?> declaringType;
     private final BeanDefinition<B> declaringBean;
     private final AnnotationMetadata annotationMetadata;
-    private final Class<?> declaringType;
     private final String methodName;
-    private final Class[] argTypes;
+    private final Class<?>[] argTypes;
     private final Argument<?>[] arguments;
     private Environment environment;
 
@@ -90,14 +90,6 @@ class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, E
     }
 
     @Override
-    public Method getMethod() {
-        Method method = ReflectionUtils.getMethod(declaringType, methodName, argTypes)
-            .orElseThrow(() -> ReflectionUtils.newNoSuchMethodError(declaringType, methodName, argTypes));
-        method.setAccessible(true);
-        return method;
-    }
-
-    @Override
     public String getName() {
         return methodName;
     }
@@ -113,12 +105,6 @@ class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, E
     }
 
     @Override
-    public T invoke(Object instance, Object... args) {
-        Method targetMethod = getMethod();
-        return ReflectionUtils.invokeMethod(instance, targetMethod, args);
-    }
-
-    @Override
     @NonNull
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
@@ -128,11 +114,6 @@ class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, E
     @NonNull
     public BeanDefinition<B> getDeclaringBean() {
         return declaringBean;
-    }
-
-    @Override
-    public boolean requiresReflection() {
-        return false;
     }
 
     @Override
@@ -158,9 +139,7 @@ class DefaultMethodInjectionPoint<B, T> implements MethodInjectionPoint<B, T>, E
 
     @Override
     public int hashCode() {
-        int result = Objects.hash(declaringType, methodName);
-        result = 31 * result + Arrays.hashCode(argTypes);
-        return result;
+        return ObjectUtils.hash(declaringType, methodName, Arrays.hashCode(argTypes));
     }
 
     private AnnotationMetadata initAnnotationMetadata(@Nullable AnnotationMetadata annotationMetadata) {

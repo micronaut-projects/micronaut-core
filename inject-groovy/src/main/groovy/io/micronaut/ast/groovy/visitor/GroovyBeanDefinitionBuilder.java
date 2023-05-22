@@ -31,14 +31,12 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.TypedElement;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.beans.BeanParameterElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
-import org.codehaus.groovy.ast.ClassNode;
-import org.codehaus.groovy.ast.FieldNode;
-import org.codehaus.groovy.ast.MethodNode;
 
 import java.lang.annotation.Annotation;
 import java.util.function.BiConsumer;
@@ -58,17 +56,19 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     /**
      * Default constructor.
      *
-     * @param originatingElement The originating element
-     * @param beanType           The bean type
-     * @param metadataBuilder    the metadata builder
-     * @param visitorContext     the visitor context
+     * @param originatingElement               The originating element
+     * @param beanType                         The bean type
+     * @param metadataBuilder                  the metadata builder
+     * @param elementAnnotationMetadataFactory The element annotation metadata factory
+     * @param visitorContext                   the visitor context
      */
     GroovyBeanDefinitionBuilder(
-            Element originatingElement,
-            ClassElement beanType,
-            ConfigurationMetadataBuilder<?> metadataBuilder,
-            GroovyVisitorContext visitorContext) {
-        super(originatingElement, beanType, metadataBuilder, visitorContext);
+        Element originatingElement,
+        ClassElement beanType,
+        ConfigurationMetadataBuilder metadataBuilder,
+        ElementAnnotationMetadataFactory elementAnnotationMetadataFactory,
+        GroovyVisitorContext visitorContext) {
+        super(originatingElement, beanType, metadataBuilder, visitorContext, elementAnnotationMetadataFactory);
         if (getClass() == GroovyBeanDefinitionBuilder.class) {
             visitorContext.addBeanDefinitionBuilder(this);
         }
@@ -79,10 +79,11 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     protected AbstractBeanDefinitionBuilder createChildBean(FieldElement producerField) {
         final ClassElement parentType = getBeanType();
         return new GroovyBeanDefinitionBuilder(
-                GroovyBeanDefinitionBuilder.this.getOriginatingElement(),
-                producerField.getGenericField().getType(),
-                GroovyBeanDefinitionBuilder.this.metadataBuilder,
-                GroovyBeanDefinitionBuilder.this.visitorContext
+            GroovyBeanDefinitionBuilder.this.getOriginatingElement(),
+            producerField.getGenericField().getType(),
+            GroovyBeanDefinitionBuilder.this.metadataBuilder,
+            elementAnnotationMetadataFactory,
+            GroovyBeanDefinitionBuilder.this.visitorContext
         ) {
             @Override
             public Element getProducingElement() {
@@ -97,16 +98,12 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
             @Override
             protected BeanDefinitionVisitor createBeanDefinitionWriter() {
                 final BeanDefinitionVisitor writer = super.createBeanDefinitionWriter();
-                final GroovyElementFactory elementFactory = ((GroovyVisitorContext) visitorContext).getElementFactory();
-                final FieldNode fieldNode = (FieldNode) producerField.getNativeType();
-                ClassElement resolvedParent = resolveParent(parentType, elementFactory);
+                ClassElement newParent = parentType.withAnnotationMetadata(parentType.copyAnnotationMetadata()); // Just a copy
                 writer.visitBeanFactoryField(
-                        resolvedParent,
-                        elementFactory.newFieldElement(
-                                resolvedParent,
-                                fieldNode,
-                                new AnnotationMetadataHierarchy(resolvedParent.getDeclaredMetadata(), producerField.getDeclaredMetadata())
-                        )
+                    newParent,
+                    producerField.withAnnotationMetadata(
+                        new AnnotationMetadataHierarchy(newParent.getDeclaredMetadata(), producerField.getDeclaredMetadata())
+                    )
                 );
                 return writer;
             }
@@ -118,10 +115,11 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     protected AbstractBeanDefinitionBuilder createChildBean(MethodElement producerMethod) {
         final ClassElement parentType = getBeanType();
         return new GroovyBeanDefinitionBuilder(
-                GroovyBeanDefinitionBuilder.this.getOriginatingElement(),
-                producerMethod.getGenericReturnType().getType(),
-                GroovyBeanDefinitionBuilder.this.metadataBuilder,
-                GroovyBeanDefinitionBuilder.this.visitorContext
+            GroovyBeanDefinitionBuilder.this.getOriginatingElement(),
+            producerMethod.getGenericReturnType().getType(),
+            GroovyBeanDefinitionBuilder.this.metadataBuilder,
+            elementAnnotationMetadataFactory,
+            GroovyBeanDefinitionBuilder.this.visitorContext
         ) {
             BeanParameterElement[] parameters;
 
@@ -148,15 +146,12 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
                 final BeanDefinitionVisitor writer = super.createBeanDefinitionWriter();
                 final GroovyElementFactory elementFactory = ((GroovyVisitorContext) visitorContext).getElementFactory();
                 ClassElement resolvedParent = resolveParent(parentType, elementFactory);
-                final MethodNode methodNode = (MethodNode) producerMethod.getNativeType();
                 writer.visitBeanFactoryMethod(
-                        resolvedParent,
-                        elementFactory.newMethodElement(
-                                resolvedParent,
-                                methodNode,
-                                new AnnotationMetadataHierarchy(resolvedParent.getDeclaredMetadata(), producerMethod.getDeclaredMetadata())
-                        ),
-                        getParameters()
+                    resolvedParent,
+                    producerMethod.withAnnotationMetadata(
+                        new AnnotationMetadataHierarchy(resolvedParent.getDeclaredMetadata(), producerMethod.getDeclaredMetadata())
+                    ),
+                    getParameters()
                 );
                 return writer;
             }
@@ -170,11 +165,11 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
             consumer.accept(builder);
             AnnotationValue<T> av = builder.build();
             final GroovyAnnotationMetadataBuilder annotationBuilder = new GroovyAnnotationMetadataBuilder(
-                    visitorContext.getSourceUnit(),
-                    visitorContext.getCompilationUnit());
+                visitorContext.getSourceUnit(),
+                visitorContext.getCompilationUnit());
             annotationBuilder.annotate(
-                    annotationMetadata,
-                    av
+                annotationMetadata,
+                av
             );
         }
     }
@@ -185,11 +180,11 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
         ArgumentUtils.requireNonNull("annotationValue", annotationValue);
 
         final GroovyAnnotationMetadataBuilder annotationBuilder = new GroovyAnnotationMetadataBuilder(
-                visitorContext.getSourceUnit(),
-                visitorContext.getCompilationUnit());
+            visitorContext.getSourceUnit(),
+            visitorContext.getCompilationUnit());
         annotationBuilder.annotate(
-                annotationMetadata,
-                annotationValue
+            annotationMetadata,
+            annotationValue
         );
     }
 
@@ -197,11 +192,11 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     protected void removeStereotype(AnnotationMetadata annotationMetadata, String annotationType) {
         if (annotationMetadata != null && annotationType != null) {
             final GroovyAnnotationMetadataBuilder annotationBuilder = new GroovyAnnotationMetadataBuilder(
-                    visitorContext.getSourceUnit(),
-                    visitorContext.getCompilationUnit());
+                visitorContext.getSourceUnit(),
+                visitorContext.getCompilationUnit());
             annotationBuilder.removeStereotype(
-                    annotationMetadata,
-                    annotationType
+                annotationMetadata,
+                annotationType
             );
         }
     }
@@ -210,11 +205,11 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     protected <T extends Annotation> void removeAnnotationIf(AnnotationMetadata annotationMetadata, Predicate<AnnotationValue<T>> predicate) {
         if (annotationMetadata != null && predicate != null) {
             final GroovyAnnotationMetadataBuilder annotationBuilder = new GroovyAnnotationMetadataBuilder(
-                    visitorContext.getSourceUnit(),
-                    visitorContext.getCompilationUnit());
+                visitorContext.getSourceUnit(),
+                visitorContext.getCompilationUnit());
             annotationBuilder.removeAnnotationIf(
-                    annotationMetadata,
-                    predicate
+                annotationMetadata,
+                predicate
             );
         }
     }
@@ -223,20 +218,19 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     protected void removeAnnotation(AnnotationMetadata annotationMetadata, String annotationType) {
         if (annotationMetadata != null && annotationType != null) {
             final GroovyAnnotationMetadataBuilder annotationBuilder = new GroovyAnnotationMetadataBuilder(
-                    visitorContext.getSourceUnit(),
-                    visitorContext.getCompilationUnit());
+                visitorContext.getSourceUnit(),
+                visitorContext.getCompilationUnit());
             annotationBuilder.removeAnnotation(
-                    annotationMetadata,
-                    annotationType
+                annotationMetadata,
+                annotationType
             );
         }
     }
 
     private ClassElement resolveParent(ClassElement parentType, GroovyElementFactory elementFactory) {
-        Object nativeType = parentType.getNativeType();
         ClassElement resolvedParent = parentType;
-        if (nativeType instanceof ClassNode) {
-            resolvedParent = elementFactory.newClassElement((ClassNode) nativeType, this.getAnnotationMetadata());
+        if (parentType instanceof GroovyClassElement groovyClassElement) {
+            resolvedParent = elementFactory.newClassElement(groovyClassElement.classNode, elementAnnotationMetadataFactory);
         }
         return resolvedParent;
     }
@@ -244,13 +238,12 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
     @Override
     protected BeanDefinitionVisitor createAopWriter(BeanDefinitionWriter beanDefinitionWriter, AnnotationMetadata annotationMetadata) {
         AnnotationValue<?>[] interceptorTypes =
-                InterceptedMethodUtil.resolveInterceptorBinding(annotationMetadata, InterceptorKind.AROUND);
+            InterceptedMethodUtil.resolveInterceptorBinding(annotationMetadata, InterceptorKind.AROUND);
         return new AopProxyWriter(
-                beanDefinitionWriter,
-                annotationMetadata.getValues(Around.class, Boolean.class),
-                ConfigurationMetadataBuilder.getConfigurationMetadataBuilder().orElse(null),
-                visitorContext,
-                interceptorTypes
+            beanDefinitionWriter,
+            annotationMetadata.getValues(Around.class, Boolean.class),
+            visitorContext,
+            interceptorTypes
         );
     }
 
@@ -259,10 +252,10 @@ class GroovyBeanDefinitionBuilder extends AbstractBeanDefinitionBuilder {
         AopProxyWriter aopProxyWriter = (AopProxyWriter) aopWriter;
         return (bean, method) -> {
             AnnotationValue<?>[] newTypes =
-                    InterceptedMethodUtil.resolveInterceptorBinding(method.getAnnotationMetadata(), InterceptorKind.AROUND);
+                InterceptedMethodUtil.resolveInterceptorBinding(method.getAnnotationMetadata(), InterceptorKind.AROUND);
             aopProxyWriter.visitInterceptorBinding(newTypes);
             aopProxyWriter.visitAroundMethod(
-                    bean, method
+                bean, method
             );
         };
     }

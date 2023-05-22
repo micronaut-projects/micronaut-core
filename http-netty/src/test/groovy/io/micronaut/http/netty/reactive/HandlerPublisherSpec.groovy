@@ -27,7 +27,12 @@ class HandlerPublisherSpec extends Specification {
          */
 
         def embeddedChannel = new EmbeddedChannel()
-        def handlerPublisher = new HandlerPublisher(embeddedChannel.eventLoop(), Object)
+        def handlerPublisher = new HandlerPublisher(embeddedChannel.eventLoop()) {
+            @Override
+            protected boolean acceptInboundMessage(Object msg) {
+                return true
+            }
+        }
         boolean killOnNextRead = false
         embeddedChannel.pipeline().addLast(new ChannelDuplexHandler() {
             @Override

@@ -24,12 +24,13 @@ import io.netty.channel.ChannelOption
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.handler.codec.http.DefaultFullHttpRequest
+import io.netty.handler.codec.http.DefaultHttpRequest
+import io.netty.handler.codec.http.DefaultLastHttpContent
 import io.netty.handler.codec.http.FullHttpResponse
 import io.netty.handler.codec.http.HttpClientCodec
 import io.netty.handler.codec.http.HttpClientUpgradeHandler
 import io.netty.handler.codec.http.HttpHeaderNames
 import io.netty.handler.codec.http.HttpHeaderValues
-import io.netty.handler.codec.http.HttpMessage
 import io.netty.handler.codec.http.HttpMethod
 import io.netty.handler.codec.http.HttpObjectAggregator
 import io.netty.handler.codec.http.HttpResponseStatus
@@ -48,7 +49,6 @@ import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler
 import io.netty.handler.ssl.SslContextBuilder
 import io.netty.handler.ssl.SupportedCipherSuiteFilter
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory
-import io.netty.util.ReferenceCountUtil
 import jakarta.inject.Singleton
 import org.slf4j.LoggerFactory
 import reactor.core.publisher.Mono
@@ -225,11 +225,12 @@ class AccessLogSpec extends Specification {
                 })
                 .remoteAddress(server.host, server.port)
 
-        def request1 = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, '/interleave/post', Unpooled.wrappedBuffer('foo'.getBytes(StandardCharsets.UTF_8)))
+        def request1 = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, '/interleave/post')
         request1.headers().add(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE)
         request1.headers().add(HttpHeaderNames.EXPECT, HttpHeaderValues.CONTINUE)
         request1.headers().add(HttpHeaderNames.CONTENT_TYPE, HttpHeaderValues.TEXT_PLAIN)
         request1.headers().add(HttpHeaderNames.CONTENT_LENGTH, 3)
+        def body1 = new DefaultLastHttpContent(Unpooled.wrappedBuffer('foo'.getBytes(StandardCharsets.UTF_8)))
         def request2 = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/interleave/simple')
         request2.headers().add(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE)
 
@@ -239,7 +240,14 @@ class AccessLogSpec extends Specification {
 
         when:
         def channel = bootstrap.connect().sync().channel()
-        channel.write(request1)
+        channel.writeAndFlush(request1)
+        then:
+        new PollingConditions(timeout: 5).eventually {
+            responses.size() == 1
+        }
+
+        when:
+        channel.write(body1)
         channel.writeAndFlush(request2)
 
         then:
@@ -274,6 +282,7 @@ class AccessLogSpec extends Specification {
                 'micronaut.ssl.buildSelfSigned': true,
                 'micronaut.server.netty.access-logger.enabled': true,
                 'micronaut.server.netty.access-logger.logger-name': 'http-access-log',
+                'micronaut.netty.event-loops.default.num-threads': 1
         ])
         def server = ctx.getBean(EmbeddedServer)
         server.start()
@@ -358,15 +367,15 @@ class AccessLogSpec extends Specification {
             responses.size() == 3
         }
         responses[0].content().toString(StandardCharsets.UTF_8) == 'simple'
-        responses[1].content().toString(StandardCharsets.UTF_8) == 'open'
-        responses[2].content().toString(StandardCharsets.UTF_8) == 'finish'
+        responses[1].content().toString(StandardCharsets.UTF_8) == 'finish'
+        responses[2].content().toString(StandardCharsets.UTF_8) == 'open'
 
         new PollingConditions(timeout: 5).eventually {
             listAppender.list.size() == 3
         }
         listAppender.list[0].message.contains('/interleave/simple')
-        listAppender.list[1].message.contains('/interleave/open')
-        listAppender.list[2].message.contains('/interleave/finish')
+        listAppender.list[1].message.contains('/interleave/finish')
+        listAppender.list[2].message.contains('/interleave/open')
 
         cleanup:
         responses*.content().forEach(ByteBuf::release)
@@ -455,16 +464,16 @@ class AccessLogSpec extends Specification {
         }
         responses[0].content().toString(StandardCharsets.UTF_8) == 'simple'
         responses[1].content().toString(StandardCharsets.UTF_8) == 'simple'
-        responses[2].content().toString(StandardCharsets.UTF_8) == 'open'
-        responses[3].content().toString(StandardCharsets.UTF_8) == 'finish'
+        responses[2].content().toString(StandardCharsets.UTF_8) == 'finish'
+        responses[3].content().toString(StandardCharsets.UTF_8) == 'open'
 
         new PollingConditions(timeout: 5).eventually {
             listAppender.list.size() == 4
         }
         listAppender.list[0].message.contains('/interleave/simple')
         listAppender.list[1].message.contains('/interleave/simple')
-        listAppender.list[2].message.contains('/interleave/open')
-        listAppender.list[3].message.contains('/interleave/finish')
+        listAppender.list[2].message.contains('/interleave/finish')
+        listAppender.list[3].message.contains('/interleave/open')
 
         cleanup:
         responses*.content().forEach(ByteBuf::release)
@@ -554,8 +563,8 @@ class AccessLogSpec extends Specification {
         }
         responses[0].content().toString(StandardCharsets.UTF_8) == 'simple'
         responses[1].content().toString(StandardCharsets.UTF_8) == 'simple'
-        responses[2].content().toString(StandardCharsets.UTF_8) == 'open'
-        responses[3].content().toString(StandardCharsets.UTF_8) == 'finish'
+        responses[2].content().toString(StandardCharsets.UTF_8) == 'finish'
+        responses[3].content().toString(StandardCharsets.UTF_8) == 'open'
 
         new PollingConditions(timeout: 5).eventually {
             listAppender.list.size() == 1

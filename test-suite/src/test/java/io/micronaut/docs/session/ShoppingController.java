@@ -23,7 +23,7 @@ import io.micronaut.session.Session;
 import io.micronaut.session.annotation.SessionValue;
 import io.micronaut.core.annotation.Nullable;
 
-import javax.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotBlank;
 // end::imports[]
 
 // tag::class[]

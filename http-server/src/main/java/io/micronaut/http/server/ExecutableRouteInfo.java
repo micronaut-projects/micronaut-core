@@ -19,21 +19,22 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodReference;
-import io.micronaut.web.router.RouteInfo;
+import io.micronaut.web.router.DefaultRouteInfo;
 
 import java.lang.reflect.Method;
+import java.util.List;
 
-class ExecutableRouteInfo<T> implements RouteInfo<Object>, MethodReference<T, Object> {
+class ExecutableRouteInfo<T, R> extends DefaultRouteInfo<R> implements MethodReference<T, R> {
 
-    private final ExecutableMethod<T, Object> method;
-    private final boolean errorRoute;
+    private final ExecutableMethod<T, R> method;
 
-    ExecutableRouteInfo(ExecutableMethod<T, Object> method,
+    ExecutableRouteInfo(ExecutableMethod<T, R> method,
                         boolean errorRoute) {
+        super(method, method.getReturnType(), List.of(), List.of(), method.getDeclaringType(), errorRoute, false, MessageBodyHandlerRegistry.EMPTY);
         this.method = method;
-        this.errorRoute = errorRoute;
     }
 
     @Override
@@ -47,7 +48,7 @@ class ExecutableRouteInfo<T> implements RouteInfo<Object>, MethodReference<T, Ob
     }
 
     @Override
-    public ReturnType<Object> getReturnType() {
+    public ReturnType<R> getReturnType() {
         return method.getReturnType();
     }
 
@@ -59,11 +60,6 @@ class ExecutableRouteInfo<T> implements RouteInfo<Object>, MethodReference<T, Ob
     @Override
     public String getMethodName() {
         return method.getMethodName();
-    }
-
-    @Override
-    public boolean isErrorRoute() {
-        return errorRoute;
     }
 
     @Override

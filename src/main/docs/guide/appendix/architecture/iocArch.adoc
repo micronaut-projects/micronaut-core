@@ -1,4 +1,4 @@
-Micronaut is an implementation of the JSR-330 specification for Dependency Injection.
+Micronaut framework is an implementation of the JSR-330 specification for Dependency Injection.
 
 Dependency Injection (or Inversion of Control) is a widely adopted and common pattern in Java that allows loosely decoupling components to allow applications to be easily extended and tested. 
 

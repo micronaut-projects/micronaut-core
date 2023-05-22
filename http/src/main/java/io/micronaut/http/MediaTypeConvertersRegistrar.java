@@ -16,9 +16,11 @@
 package io.micronaut.http;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.util.StringUtils;
+
+import java.util.Optional;
 
 /**
  * The media type converters registrar.
@@ -30,13 +32,18 @@ import io.micronaut.core.util.StringUtils;
 public final class MediaTypeConvertersRegistrar implements TypeConverterRegistrar {
 
     @Override
-    public void register(ConversionService<?> conversionService) {
-        conversionService.addConverter(CharSequence.class, MediaType.class, charSequence -> {
-                if (StringUtils.isNotEmpty(charSequence)) {
-                    return MediaType.of(charSequence.toString());
+    public void register(MutableConversionService conversionService) {
+        conversionService.addConverter(CharSequence.class, MediaType.class, (object, targetType, context) -> {
+            if (StringUtils.isEmpty(object)) {
+                return Optional.empty();
+            } else {
+                try {
+                    return Optional.of(MediaType.of(object.toString()));
+                } catch (IllegalArgumentException e) {
+                    context.reject(e);
+                    return Optional.empty();
                 }
-                return null;
             }
-        );
+        });
     }
 }

@@ -1,0 +1,31 @@
+Filter patterns can be defined on the filter class (in api:http.annotation.Filter[], the api:http.annotation.ServerFilter[] or api:http.annotation.ClientFilter[] annotation), or on the filter method (in the api:http.annotation.RequestFilter[] or api:http.annotation.ResponseFilter[] annotation).
+
+You can use different styles of pattern for path matching by setting `patternStyle`. By default, api:core.util.AntPathMatcher[] is used for path matching. When using Ant, the mapping matches URLs using the following rules:
+
+* ? matches one character
+* * matches zero or more characters
+* ** matches zero or more subdirectories in a path
+
+.@Filter Annotation Path Matching Examples
+|===
+|Pattern|Example Matched Paths
+
+|`/**`
+|any path
+
+|`customer/j?y`
+|customer/joy, customer/jay
+
+|`customer/*/id`
+|customer/adam/id, com/amy/id
+
+|`customer/**`
+|customer/adam, customer/adam/id, customer/adam/name
+
+|`customer/**/*.html`
+|customer/index.html, customer/adam/profile.html, customer/adam/job/description.html
+|===
+
+The other option is regular expression based matching. To use regular expressions, set `patternStyle = FilterPatternStyle.REGEX`. The `pattern` attribute is expected to contain a regular expression which will be expected to match the provided URLs exactly (using link:{jdkapi}/java/util/regex/Matcher.html#matches--[Matcher#matches]).
+
+NOTE: Using `FilterPatternStyle.ANT` is preferred as the pattern matching is more performant than using regular expressions. `FilterPatternStyle.REGEX` should be used when your pattern cannot be written properly using Ant.

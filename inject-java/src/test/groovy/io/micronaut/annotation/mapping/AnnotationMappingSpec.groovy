@@ -34,11 +34,11 @@ class MyEntity {
     public MyEntity(final Key id) {
         this.id = id;
     }
-    
+
     public Key getId() {
         return this.id;
     }
-    
+
     public void setId(final Key id) {
         this.id = id;
     }
@@ -60,11 +60,11 @@ class MyEntity {
     public MyEntity(final Key id) {
         this.id = id;
     }
-    
+
     public Key getId() {
         return this.id;
     }
-    
+
     public void setId(final Key id) {
         this.id = id;
     }
@@ -81,7 +81,7 @@ class Key {
             idWithoutMapped.hasStereotype(Id.class)
             idWithoutMapped.hasStereotype(EmbeddedId.class)
             idWithMapped.getAnnotationNames() == (idWithoutMapped.getAnnotationNames() + ["io.micronaut.annotation.mapping.CustomEmbeddedId"])
-            idWithMapped.getDeclaredAnnotationNames() == idWithoutMapped.getDeclaredAnnotationNames()
+            idWithMapped.getDeclaredAnnotationNames() == (idWithoutMapped.getDeclaredAnnotationNames() + ["io.micronaut.annotation.mapping.CustomEmbeddedId"])
     }
 
     void "test @NonNull stereotype from @Nullable"() {

@@ -40,6 +40,7 @@ import java.util.Optional;
 public class CorsOriginConverter implements TypeConverter<Map<String, Object>, CorsOriginConfiguration> {
 
     private static final String ALLOWED_ORIGINS = "allowed-origins";
+    private static final String ALLOWED_ORIGINS_REGEX = "allowed-origins-regex";
     private static final String ALLOWED_METHODS = "allowed-methods";
     private static final String ALLOWED_HEADERS = "allowed-headers";
     private static final String EXPOSED_HEADERS = "exposed-headers";
@@ -56,6 +57,10 @@ public class CorsOriginConverter implements TypeConverter<Map<String, Object>, C
         convertibleValues
             .get(ALLOWED_ORIGINS, ConversionContext.LIST_OF_STRING)
             .ifPresent(configuration::setAllowedOrigins);
+
+        convertibleValues
+            .get(ALLOWED_ORIGINS_REGEX, ConversionContext.STRING)
+            .ifPresent(configuration::setAllowedOriginsRegex);
 
         convertibleValues
             .get(ALLOWED_METHODS, CONVERSION_CONTEXT_LIST_OF_HTTP_METHOD)

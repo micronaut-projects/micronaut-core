@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.FieldInjectionPoint;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
@@ -101,7 +102,7 @@ class DefaultFieldInjectionPoint<B, T> implements FieldInjectionPoint<B, T>, Env
 
     @Override
     public int hashCode() {
-        return Objects.hash(declaringType, fieldType, field);
+        return ObjectUtils.hash(declaringType, fieldType, field);
     }
 
     @Override
@@ -125,16 +126,6 @@ class DefaultFieldInjectionPoint<B, T> implements FieldInjectionPoint<B, T>, Env
     }
 
     @Override
-    public void set(T instance, Object object) {
-        Field field = getField();
-        ReflectionUtils.setField(
-            field,
-            instance,
-            object
-        );
-    }
-
-    @Override
     @NonNull
     public Argument<T> asArgument() {
         return Argument.of(
@@ -148,11 +139,6 @@ class DefaultFieldInjectionPoint<B, T> implements FieldInjectionPoint<B, T>, Env
     @Override
     public BeanDefinition getDeclaringBean() {
         return declaringBean;
-    }
-
-    @Override
-    public boolean requiresReflection() {
-        return false;
     }
 
     @Override

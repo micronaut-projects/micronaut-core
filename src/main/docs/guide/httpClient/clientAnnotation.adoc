@@ -10,15 +10,15 @@ You can define a common interface for saving new `Pet` instances:
 
 snippet::io.micronaut.docs.annotation.PetOperations[tags="imports, class", indent=0, title="PetOperations.java"]
 
-Note how the interface uses Micronaut's HTTP annotations which are usable on both the server and client side. You can also use `javax.validation` constraints to validate arguments.
+Note how the interface uses Micronaut's HTTP annotations which are usable on both the server and client side. You can also use `jakarta.validation` constraints to validate arguments.
 
 TIP: Be aware that some annotations, such as api:http.annotation.Produces[] and api:http.annotation.Consumes[], have different semantics between server and client side usage. For example, `@Produces` on a controller method (server side) indicates how the method's *return value* is formatted, while `@Produces` on a client indicates how the method's *parameters* are formatted when sent to the server. While this may seem a little confusing, it is logical considering the different semantics between a server producing/consuming vs a client: a server consumes an argument and *returns* a response to the client, whereas a client consumes an argument and *sends* output to a server.
 
-Additionally, to use the `javax.validation` features, add the `validation` module to your build:
+Additionally, to use the `jakarta.validation` features, add the `validation` module to your build:
 
 dependency:micronaut-validation[]
 
-On the server-side of Micronaut you can implement the `PetOperations` interface:
+On the server-side of the Micronaut framework you can implement the `PetOperations` interface:
 
 snippet::io.micronaut.docs.annotation.PetController[tags="imports, class", indent=0, title="PetController.java"]
 

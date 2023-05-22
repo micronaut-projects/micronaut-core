@@ -1,4 +1,4 @@
-The examples in the previous section demonstrate how Micronaut lets you bind method parameters from URI path variables. This section shows how to bind arguments from other parts of the request.
+The examples in the previous section demonstrate how the Micronaut framework lets you bind method parameters from URI path variables. This section shows how to bind arguments from other parts of the request.
 
 == Binding Annotations
 
@@ -53,7 +53,7 @@ snippet::io.micronaut.docs.server.binding.BindingController[tags="header1,header
 
 == Stream Support
 
-Micronaut also supports binding the body to an `InputStream`. If the method is reading the stream, the method execution must be offloaded to another thread pool to avoid blocking the event loop.
+The Micronaut framework also supports binding the body to an `InputStream`. If the method is reading the stream, the method execution must be offloaded to another thread pool to avoid blocking the event loop.
 
 snippet::io.micronaut.docs.http.server.stream.StreamController[tags="read", indent=0, title="Performing Blocking I/O With InputStream"]
 
@@ -90,7 +90,7 @@ WARNING: Since Java does not retain argument names in bytecode, you must compile
 
 Generally any type that can be converted from a String representation to a Java type via the link:{api}/io/micronaut/core/convert/ConversionService.html[ConversionService] API can be bound to.
 
-This includes most common Java types, however additional link:{api}/io/micronaut/core/convert/TypeConverter.html[TypeConverter] instances can be registered by creating `@Singleton` beans of type `TypeConverter`.
+This includes most common Java types, however additional link:{api}/io/micronaut/core/convert/TypeConverter.html[TypeConverter] instances can be registered via the service loader or by creating beans of type `TypeConverter`,
 
 The handling of nullability deserves special mention. Consider for example the following example:
 
@@ -125,7 +125,7 @@ Some parameters are recognized by their type instead of their annotation. The fo
 
 == Variable resolution
 
-Micronaut tries to populate method arguments in the following order:
+The Micronaut framework tries to populate method arguments in the following order:
 
 . URI variables like `/{id}`.
 . From query parameters if the request is a `GET` request (e.g. `?foo=bar`).

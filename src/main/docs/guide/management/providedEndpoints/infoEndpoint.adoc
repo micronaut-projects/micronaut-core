@@ -7,7 +7,7 @@ To execute the info endpoint, send a GET request to /info.
 To configure the info endpoint, supply configuration through `endpoints.info`.
 
 .Info Endpoint Configuration Example
-[source,yaml]
+[configuration]
 ----
 endpoints:
   info:

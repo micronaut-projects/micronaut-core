@@ -72,6 +72,12 @@ public interface TypeConverter<S, T> {
      * @return The converter instance
      */
     static <ST, TT> TypeConverter<ST, TT> of(Class<ST> sourceType, Class<TT> targetType, Function<ST, TT> converter) {
-        return (object, targetType1, context) -> Optional.ofNullable(converter.apply(object));
+        // Keep the anonymous class instead of Lambda to reduce the Lambda invocation overhead during the startup
+        return new TypeConverter<ST, TT>() {
+            @Override
+            public Optional<TT> convert(ST object, Class<TT> targetType1, ConversionContext context) {
+                return Optional.ofNullable(converter.apply(object));
+            }
+        };
     }
 }

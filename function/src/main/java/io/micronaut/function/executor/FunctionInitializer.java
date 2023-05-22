@@ -16,14 +16,18 @@
 package io.micronaut.function.executor;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.RuntimeBeanDefinition;
+import io.micronaut.context.annotation.Secondary;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.cli.CommandLine;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.function.Function;
 
 /**
@@ -44,7 +48,15 @@ public class FunctionInitializer extends AbstractExecutor {
         ApplicationContext applicationContext = buildApplicationContext(null);
         startThis(applicationContext);
         injectThis(applicationContext);
-        applicationContext.registerSingleton(this, false);
+        MutableAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
+        // the runtime registered bean should be lower priority than the existing bean
+        // used for dependency injecting the instance
+        annotationMetadata.addDeclaredAnnotation(Secondary.class.getName(), Collections.emptyMap());
+        applicationContext.registerBeanDefinition(
+            RuntimeBeanDefinition.builder(this)
+                                 .annotationMetadata(annotationMetadata)
+                                 .build()
+        );
         this.closeContext = true;
     }
 

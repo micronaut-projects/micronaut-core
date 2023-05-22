@@ -36,7 +36,7 @@ public class BinaryChatServerWebSocket {
             if(isValid(topic, session, openSession)) {
                 String msg = "[" + username + "] Joined!";
                 System.out.println("Server sending msg = " + msg);
-                openSession.sendSync(msg.getBytes());
+                openSession.sendAsync(msg.getBytes());
             }
         }
     }
@@ -55,7 +55,7 @@ public class BinaryChatServerWebSocket {
             if(isValid(topic, session, openSession)) {
                 String msg = "[" + username + "] " + new String(message);
                 System.out.println("Server sending msg = " + msg);
-                openSession.sendSync(msg.getBytes());
+                openSession.sendAsync(msg.getBytes());
             }
         }
     }
@@ -72,7 +72,7 @@ public class BinaryChatServerWebSocket {
             if(isValid(topic, session, openSession)) {
                 String msg = "[" + username + "] Disconnected!";
                 System.out.println("Server sending msg = " + msg);
-                openSession.sendSync(msg.getBytes());
+                openSession.sendAsync(msg.getBytes());
             }
         }
     }

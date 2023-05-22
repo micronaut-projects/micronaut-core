@@ -1,2 +1,3 @@
 io.micronaut.validation.websocket.WebSocketVisitor
 io.micronaut.validation.routes.RouteValidationVisitor
+io.micronaut.validation.routes.FilterVisitor

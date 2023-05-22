@@ -37,13 +37,13 @@ import java.util.concurrent.Future;
 @Internal
 @Experimental
 class CompletionStageInterceptedMethod implements InterceptedMethod {
-    private final ConversionService<?> conversionService = ConversionService.SHARED;
-
     private final MethodInvocationContext<?, ?> context;
+    private final ConversionService conversionService;
     private final Argument<?> returnTypeValue;
 
-    CompletionStageInterceptedMethod(MethodInvocationContext<?, ?> context) {
+    CompletionStageInterceptedMethod(MethodInvocationContext<?, ?> context, ConversionService conversionService) {
         this.context = context;
+        this.conversionService = conversionService;
         this.returnTypeValue = context.getReturnType().asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
     }
 

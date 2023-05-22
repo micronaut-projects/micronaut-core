@@ -25,8 +25,7 @@ class FieldFactorySpec extends Specification {
 
     void "test injection with field supplied by a provider"() {
         given:
-        BeanContext context = new DefaultBeanContext()
-        context.start()
+        BeanContext context = BeanContext.run()
 
         when:"A bean is obtained which has a field that depends on a bean provided by a provider"
         B b =  context.getBean(B)
@@ -36,7 +35,10 @@ class FieldFactorySpec extends Specification {
         b.a instanceof AImpl
         b.a.c != null
         b.a.c2 != null
-        b.a.is(context.getBean(AImpl))
+        b.a.is(context.getBean(A))
+
+        cleanup:
+        context.close()
     }
 
 

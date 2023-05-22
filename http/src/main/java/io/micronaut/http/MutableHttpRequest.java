@@ -16,6 +16,7 @@
 package io.micronaut.http;
 
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.convert.ConversionServiceAware;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.uri.UriBuilder;
@@ -33,7 +34,7 @@ import java.util.function.Consumer;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessage<B> {
+public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessage<B>, ConversionServiceAware {
 
     /**
      * Sets the specified cookie on the request.

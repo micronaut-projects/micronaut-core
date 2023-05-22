@@ -8,10 +8,16 @@ import jakarta.inject.Singleton;
 @Singleton
 public class OffendingConstructorListener implements BeanCreatedEventListener<B> {
 
-    OffendingConstructorListener(A a, Provider<C> cProvider) {}
+    static boolean initialized;
+    static boolean executed;
+
+    OffendingConstructorListener(A a, Provider<C> cProvider) {
+        initialized = true;
+    }
 
     @Override
     public B onCreated(BeanCreatedEvent<B> event) {
+        executed = true;
         return event.getBean();
     }
 }

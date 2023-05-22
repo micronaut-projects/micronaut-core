@@ -53,6 +53,11 @@ public abstract class AbstractCompositeCustomizer<C, R> {
         this(new CopyOnWriteArrayList<>());
     }
 
+    /**
+     * Add customizer.
+     *
+     * @param customizer Customizer
+     */
     public synchronized void add(C customizer) {
         assert members instanceof CopyOnWriteArrayList : "only allow adding to root customizer";
         // do the insertion in one operation, so that concurrent readers don't see an inconsistent

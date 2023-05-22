@@ -24,39 +24,31 @@ import io.netty.buffer.ByteBufHolder;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.multipart.Attribute;
-import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
 import io.netty.handler.codec.http.multipart.FileUpload;
-import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.handler.codec.http.multipart.HttpDataFactory;
+import io.netty.handler.codec.http.multipart.HttpPostMultipartRequestDecoder;
 import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
 import io.netty.handler.codec.http.multipart.HttpPostStandardRequestDecoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.handler.codec.http.multipart.InterfaceHttpPostRequestDecoder;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
-import reactor.core.publisher.Operators;
-import reactor.util.context.Context;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
+import java.util.Collection;
 
 /**
  * <p>Decodes {@link MediaType#MULTIPART_FORM_DATA} in a non-blocking manner.</p>
- * <p>
+ *
  * <p>Designed to be used by a single thread</p>
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Internal
-public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<HttpData> {
+public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor {
 
     private final InterfaceHttpPostRequestDecoder decoder;
     private final boolean enabled;
-    private final AtomicLong extraMessages = new AtomicLong(0);
     private final long partMaxSize;
 
     /**
@@ -64,7 +56,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
      */
     private volatile boolean pleaseDestroy = false;
     /**
-     * {@code true} during {@link #doOnNext}, can't destroy while that's running.
+     * {@code true} during {@link #onData}, can't destroy while that's running.
      */
     private volatile boolean inFlight = false;
     /**
@@ -76,22 +68,15 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
      * @param nettyHttpRequest The {@link NettyHttpRequest}
      * @param configuration    The {@link NettyHttpServerConfiguration}
      */
-    FormDataHttpContentProcessor(NettyHttpRequest<?> nettyHttpRequest, NettyHttpServerConfiguration configuration) {
+    public FormDataHttpContentProcessor(NettyHttpRequest<?> nettyHttpRequest, HttpServerConfiguration configuration) {
         super(nettyHttpRequest, configuration);
         Charset characterEncoding = nettyHttpRequest.getCharacterEncoding();
         HttpServerConfiguration.MultipartConfiguration multipart = configuration.getMultipart();
-        HttpDataFactory factory;
-        if (multipart.isDisk()) {
-            factory = new DefaultHttpDataFactory(true, characterEncoding);
-        } else if (multipart.isMixed()) {
-            factory = new DefaultHttpDataFactory(multipart.getThreshold(), characterEncoding);
-        } else {
-            factory = new DefaultHttpDataFactory(false, characterEncoding);
-        }
-        factory.setMaxLimit(multipart.getMaxFileSize());
-        final HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
+        HttpDataFactory factory = new MicronautHttpData.Factory(multipart, characterEncoding);
+        // prevent the decoders from immediately parsing the content
+        HttpRequest nativeRequest = nettyHttpRequest.toHttpRequestWithoutBody();
         if (HttpPostRequestDecoder.isMultipart(nativeRequest)) {
-            this.decoder = new MicronautHttpPostMultipartRequestDecoder(factory, nativeRequest, characterEncoding);
+            this.decoder = new HttpPostMultipartRequestDecoder(factory, nativeRequest, characterEncoding);
         } else {
             this.decoder = new HttpPostStandardRequestDecoder(factory, nativeRequest, characterEncoding);
         }
@@ -106,33 +91,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
     }
 
     @Override
-    protected void doOnSubscribe(Subscription subscription, Subscriber<? super HttpData> subscriber) {
-        subscriber.onSubscribe(new Subscription() {
-
-            @Override
-            public void request(long n) {
-                extraMessages.updateAndGet(p -> {
-                    long newVal = p - n;
-                    if (newVal < 0) {
-                        subscription.request(n - p);
-                        return 0;
-                    } else {
-                        return newVal;
-                    }
-                });
-            }
-
-            @Override
-            public void cancel() {
-                subscription.cancel();
-                pleaseDestroy = true;
-                destroyIfRequested();
-            }
-        });
-    }
-
-    @Override
-    protected void onData(ByteBufHolder message) {
+    protected void onData(ByteBufHolder message, Collection<Object> out) {
         boolean skip;
         synchronized (this) {
             if (destroyed) {
@@ -147,12 +106,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
             return;
         }
         try {
-            Subscriber<? super HttpData> subscriber = getSubscriber();
-
-            if (message instanceof HttpContent) {
-                HttpContent httpContent = (HttpContent) message;
-                List<InterfaceHttpData> messages = new ArrayList<>(1);
-
+            if (message instanceof HttpContent httpContent) {
                 try {
                     InterfaceHttpPostRequestDecoder postRequestDecoder = this.decoder;
                     postRequestDecoder.offer(httpContent);
@@ -161,29 +115,30 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
                         InterfaceHttpData data = postRequestDecoder.next();
                         data.touch();
                         switch (data.getHttpDataType()) {
-                            case Attribute:
+                            case Attribute -> {
                                 Attribute attribute = (Attribute) data;
                                 // bodyListHttpData keeps a copy and releases it later
-                                messages.add(attribute.retain());
+                                out.add(attribute.retain());
                                 postRequestDecoder.removeHttpDataFromClean(attribute);
-                                break;
-                            case FileUpload:
+                            }
+                            case FileUpload -> {
                                 FileUpload fileUpload = (FileUpload) data;
                                 if (fileUpload.isCompleted()) {
                                     // bodyListHttpData keeps a copy and releases it later
-                                    messages.add(fileUpload.retain());
+                                    out.add(fileUpload.retain());
                                     postRequestDecoder.removeHttpDataFromClean(fileUpload);
                                 }
-                                break;
-                            default:
-                                // no-op
+                            }
+                            default -> {
+                                // ignore
+                            }
                         }
                     }
 
                     InterfaceHttpData currentPartialHttpData = postRequestDecoder.currentPartialHttpData();
-                    if (currentPartialHttpData instanceof HttpData) {
-                        // can't give away ownership of this data yet, so retain it
-                        messages.add(currentPartialHttpData.retain());
+                    if (currentPartialHttpData != null) {
+                        out.add(currentPartialHttpData);
+                        postRequestDecoder.removeHttpDataFromClean(currentPartialHttpData);
                     }
 
                 } catch (HttpPostRequestDecoder.EndOfDataDecoderException e) {
@@ -192,30 +147,11 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
                     Throwable cause = e.getCause();
                     if (cause instanceof IOException && cause.getMessage().equals("Size exceed allowed maximum capacity")) {
                         String partName = decoder.currentPartialHttpData().getName();
-                        try {
-                            onError(new ContentLengthExceededException("The part named [" + partName + "] exceeds the maximum allowed content length [" + partMaxSize + "]"));
-                        } finally {
-                            parentSubscription.cancel();
-                        }
+                        throw new ContentLengthExceededException("The part named [" + partName + "] exceeds the maximum allowed content length [" + partMaxSize + "]");
                     } else {
-                        onError(e);
+                        throw e;
                     }
-                } catch (Throwable e) {
-                    onError(e);
                 } finally {
-                    if (messages.isEmpty()) {
-                        subscription.request(1);
-                    } else {
-                        extraMessages.updateAndGet(p -> p + messages.size() - 1);
-                        messages.stream().map(HttpData.class::cast).forEach(data -> {
-                            try {
-                                subscriber.onNext(data);
-                            } catch (Throwable e) {
-                                subscriber.onError(Operators.onOperatorError(subscription, e, data, Context.empty()));
-                            }
-                        });
-                    }
-
                     httpContent.release();
                 }
             } else {
@@ -228,13 +164,22 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
     }
 
     @Override
-    protected void doAfterOnError(Throwable throwable) {
-        pleaseDestroy = true;
-        destroyIfRequested();
+    public void add(ByteBufHolder message, Collection<Object> out) throws Throwable {
+        try {
+            super.add(message, out);
+        } catch (Throwable e) {
+            cancel();
+            throw e;
+        }
     }
 
     @Override
-    protected void doAfterComplete() {
+    public void complete(Collection<Object> out) {
+        cancel();
+    }
+
+    @Override
+    public void cancel() {
         pleaseDestroy = true;
         destroyIfRequested();
     }

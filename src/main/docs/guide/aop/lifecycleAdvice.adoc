@@ -4,7 +4,7 @@ Sometimes you may need to apply advice to a bean's lifecycle. There are 3 types 
 * Interception of the bean's `@PostConstruct` invocation
 * Interception of a bean's `@PreDestroy` invocation
 
-Micronaut supports these 3 use cases by allowing the definition of additional ann:aop.InterceptorBinding[] meta-annotations.
+The Micronaut framework supports these 3 use cases by allowing the definition of additional ann:aop.InterceptorBinding[] meta-annotations.
 
 Consider the following annotation definition:
 

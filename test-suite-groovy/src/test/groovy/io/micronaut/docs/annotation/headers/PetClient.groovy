@@ -23,8 +23,8 @@ import io.micronaut.http.client.annotation.Client
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
 import io.micronaut.core.async.annotation.SingleResult
-import javax.validation.constraints.Min
-import javax.validation.constraints.NotBlank
+import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.NotBlank
 
 // tag::class[]
 @Client("/pets")

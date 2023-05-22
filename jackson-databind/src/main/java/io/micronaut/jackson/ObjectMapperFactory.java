@@ -38,8 +38,10 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.jackson.serialize.MicronautDeserializers;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
@@ -64,6 +66,9 @@ public class ObjectMapperFactory {
      * Name for Micronaut module.
      */
     public static final String MICRONAUT_MODULE = "micronaut";
+
+    @Inject
+    protected ConversionService conversionService;
 
     @Inject
     // have to be fully qualified due to JDK Module type
@@ -100,6 +105,24 @@ public class ObjectMapperFactory {
     }
 
     /**
+     * Set additional serializers.
+     * @param serializers The serializers
+     * @since 4.0
+     */
+    public void setSerializers(JsonSerializer... serializers) {
+        this.serializers = serializers;
+    }
+
+    /**
+     * Set additional deserializers.
+     * @param deserializers The deserializers
+     * @since 4.0
+     */
+    public void setDeserializers(JsonDeserializer... deserializers) {
+        this.deserializers = deserializers;
+    }
+
+    /**
      * Builds the core Jackson {@link ObjectMapper} from the optional configuration and {@link JsonFactory}.
      *
      * @param jacksonConfiguration The configuration
@@ -121,16 +144,18 @@ public class ObjectMapperFactory {
         }
         objectMapper.registerModules(jacksonModules);
         SimpleModule module = new SimpleModule(MICRONAUT_MODULE);
+        module.setDeserializers(new MicronautDeserializers(conversionService));
+
         for (JsonSerializer serializer : serializers) {
             Class<? extends JsonSerializer> type = serializer.getClass();
             Type annotation = type.getAnnotation(Type.class);
             if (annotation != null) {
-                Class[] value = annotation.value();
-                for (Class aClass : value) {
+                Class<?>[] value = annotation.value();
+                for (Class<?> aClass : value) {
                     module.addSerializer(aClass, serializer);
                 }
             } else {
-                Optional<Class> targetType = GenericTypeUtils.resolveSuperGenericTypeArgument(type);
+                Optional<Class<?>> targetType = GenericTypeUtils.resolveSuperGenericTypeArgument(type);
                 if (targetType.isPresent()) {
                     module.addSerializer(targetType.get(), serializer);
                 } else {
@@ -143,12 +168,12 @@ public class ObjectMapperFactory {
             Class<? extends JsonDeserializer> type = deserializer.getClass();
             Type annotation = type.getAnnotation(Type.class);
             if (annotation != null) {
-                Class[] value = annotation.value();
-                for (Class aClass : value) {
+                Class<?>[] value = annotation.value();
+                for (Class<?> aClass : value) {
                     module.addDeserializer(aClass, deserializer);
                 }
             } else {
-                Optional<Class> targetType = GenericTypeUtils.resolveSuperGenericTypeArgument(type);
+                Optional<Class<?>> targetType = GenericTypeUtils.resolveSuperGenericTypeArgument(type);
                 targetType.ifPresent(aClass -> module.addDeserializer(aClass, deserializer));
             }
         }
@@ -167,8 +192,8 @@ public class ObjectMapperFactory {
             Class<? extends KeyDeserializer> type = keyDeserializer.getClass();
             Type annotation = type.getAnnotation(Type.class);
             if (annotation != null) {
-                Class[] value = annotation.value();
-                for (Class clazz : value) {
+                Class<?>[] value = annotation.value();
+                for (Class<?> clazz : value) {
                     module.addKeyDeserializer(clazz, keyDeserializer);
                 }
             }

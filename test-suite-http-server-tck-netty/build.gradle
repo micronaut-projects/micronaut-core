@@ -1,0 +1,70 @@
+plugins {
+    id "java"
+    id("org.graalvm.buildtools.native")
+}
+
+
+repositories {
+    mavenCentral()
+    maven {
+        url "https://s01.oss.sonatype.org/content/repositories/snapshots/"
+        mavenContent {
+            snapshotsOnly()
+        }
+    }
+}
+
+micronautBuild {
+    enableBom = false
+    enableProcessing = false
+}
+
+dependencies {
+    implementation(projects.httpServerTck)
+    testImplementation(projects.httpServerNetty)
+    testImplementation(projects.httpClient)
+    testImplementation(libs.junit.platform.engine)
+    testImplementation(libs.logback.classic)
+    testImplementation(platform(libs.test.boms.micronaut.validation))
+    testImplementation(libs.micronaut.validation) {
+        exclude(group: "io.micronaut")
+    }
+
+}
+
+configurations {
+    all {
+        // Stop serde pulling in AOP
+        exclude group: 'io.micronaut', module: 'micronaut-aop'
+        // Stop pulling in inject-groovy from maven
+        exclude group: 'io.micronaut', module: 'micronaut-inject-groovy'
+    }
+    nativeImageTestClasspath {
+        exclude module: 'groovy-test'
+    }
+}
+
+tasks.named("test") {
+    useJUnitPlatform()
+}
+
+def openGraalModules = [
+        "org.graalvm.nativeimage.builder/com.oracle.svm.core.jdk",
+        "org.graalvm.nativeimage.builder/com.oracle.svm.core.configure",
+        "org.graalvm.sdk/org.graalvm.nativeimage.impl"
+]
+
+graalvmNative {
+    toolchainDetection = false
+    metadataRepository {
+        enabled = true
+    }
+    binaries {
+        all {
+            resources.autodetect()
+            openGraalModules.each { module ->
+                jvmArgs.add("--add-exports=" + module + "=ALL-UNNAMED")
+            }
+        }
+    }
+}

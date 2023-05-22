@@ -53,6 +53,7 @@ public class AllClassesVisitor implements TypeElementVisitor<Object, Object> {
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
+        element.getBeanProperties();
         visitedClassElements.add(element);
     }
 

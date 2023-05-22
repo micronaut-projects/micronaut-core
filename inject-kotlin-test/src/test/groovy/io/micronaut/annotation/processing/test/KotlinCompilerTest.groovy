@@ -2,14 +2,11 @@ package io.micronaut.annotation.processing.test
 
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.version.SemanticVersion
+import spock.lang.Ignore
+import spock.lang.IgnoreIf
 import spock.lang.Requires
 import spock.util.environment.Jvm
 
-// fails due to https://issues.apache.org/jira/browse/GROOVY-10145
-@Requires({
-    SemanticVersion.isAtLeastMajorMinor(GroovySystem.version, 4, 0) ||
-            !Jvm.current.isJava16Compatible()
-})
 class KotlinCompilerTest extends AbstractKotlinCompilerSpec {
     void "simple class"() {
         given:
@@ -31,7 +28,7 @@ import io.micronaut.core.annotation.Introspected
 
 @Introspected
 class Test {
-    val a: String
+    val a: String = "test"
 }
 ''')
         expect:
@@ -53,7 +50,7 @@ class Foo {
 
 @Singleton
 class Bar {
-    
+
 }
 ''')
         def bean = getBean(context, "example.Foo")
@@ -90,6 +87,7 @@ class Test(
         var name: String,
         var getSurname: String,
         var isDeleted: Boolean,
+        var isOptional: Boolean?,
         val isImportant: Boolean,
         var corrected: Boolean,
         val upgraded: Boolean,
@@ -108,6 +106,6 @@ class Test(
 }
 ''')
         expect:
-        introspection.propertyNames.toList() == ['id', 'name', 'getSurname', 'isDeleted', 'isImportant', 'corrected', 'upgraded', 'isMyBool', 'isMyBool2', 'myBool3', 'myBool4', 'myBool5']
+        introspection.propertyNames as Set == ['id', 'name', 'getSurname', 'isDeleted', 'isOptional', 'isImportant', 'corrected', 'upgraded', 'isMyBool', 'isMyBool2', 'myBool3', 'myBool4', 'myBool5'] as Set
     }
 }

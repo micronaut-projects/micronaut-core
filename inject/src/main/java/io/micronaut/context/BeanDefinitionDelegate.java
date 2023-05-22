@@ -15,31 +15,30 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.annotation.EachBean;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.context.exceptions.BeanInstantiationException;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameResolver;
-import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.value.ValueResolver;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.BeanFactory;
 import io.micronaut.inject.DelegatingBeanDefinition;
 import io.micronaut.inject.DisposableBeanDefinition;
 import io.micronaut.inject.InitializingBeanDefinition;
+import io.micronaut.inject.InjectableBeanDefinition;
 import io.micronaut.inject.InjectionPoint;
-import io.micronaut.inject.ParametrizedBeanFactory;
+import io.micronaut.inject.InstantiatableBeanDefinition;
+import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
 import io.micronaut.inject.ValidatedBeanDefinition;
+import io.micronaut.inject.qualifiers.PrimaryQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -53,55 +52,45 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implements DelegatingBeanDefinition<T>, BeanFactory<T>, NameResolver, ValueResolver<String> {
-
-    static final String PRIMARY_ATTRIBUTE = Primary.class.getName();
+sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
+    implements DelegatingBeanDefinition<T>, InstantiatableBeanDefinition<T>,
+    InjectableBeanDefinition<T>, NameResolver {
 
     protected final BeanDefinition<T> definition;
     @Nullable
-    protected Map<String, Object> attributes;
+    protected final Qualifier<T> qualifier;
+
     @Nullable
-    protected final Qualifier qualifier;
+    private final ConfigurationPath configurationPath;
 
-    private BeanDefinitionDelegate(BeanDefinition<T> definition) {
-        this(definition, null);
-    }
 
-    private BeanDefinitionDelegate(BeanDefinition<T> definition, @Nullable Qualifier qualifier) {
+    private BeanDefinitionDelegate(BeanDefinition<T> definition, @Nullable Qualifier<T> qualifier, @Nullable ConfigurationPath configurationPath) {
         this.definition = definition;
         this.qualifier = qualifier;
+        this.configurationPath = configurationPath;
+    }
+
+    public Optional<ConfigurationPath> getConfigurationPath() {
+        return Optional.ofNullable(configurationPath);
+    }
+
+    @Override
+    public Qualifier<T> getDeclaredQualifier() {
+        return qualifier;
     }
 
     /**
      * @return the qualifier
      */
     @Nullable
-    public Qualifier getQualifier() {
+    public Qualifier<T> getQualifier() {
         return qualifier;
-    }
-
-    /**
-     * @return the attributes
-     */
-    @Nullable
-    public Map<String, Object> getAttributes() {
-        return attributes;
     }
 
     @Nullable
     @Override
     public Qualifier<T> resolveDynamicQualifier() {
-        if (qualifier != null) {
-            return qualifier;
-        }
-        if (attributes == null) {
-            return null;
-        }
-        Object o = attributes.get(NAMED_ATTRIBUTE);
-        if (o instanceof CharSequence) {
-            return Qualifiers.byName(o.toString());
-        }
-        return null;
+        return qualifier;
     }
 
     /**
@@ -123,54 +112,55 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
 
     @Override
     public boolean isPrimary() {
-        return definition.isPrimary() || isPrimaryThroughAttribute();
+        return isQualifiedAsPrimary(qualifier) || definition.isPrimary() || isPrimaryThroughAttribute();
+    }
+
+    private boolean isQualifiedAsPrimary(Qualifier<?> q) {
+        return q != null && (q == PrimaryQualifier.INSTANCE || q.contains(PrimaryQualifier.INSTANCE));
     }
 
     private boolean isPrimaryThroughAttribute() {
-        if (attributes == null) {
-            return false;
-        }
-        Object o = attributes.get(PRIMARY_ATTRIBUTE);
-        if (o instanceof Boolean) {
-            return (Boolean) o;
+        if (configurationPath != null) {
+            return configurationPath.isPrimary();
         }
         return false;
     }
 
     @Override
-    public T build(BeanResolutionContext resolutionContext, BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException {
-        LinkedHashMap<String, Object> oldAttributes = null;
-        if (CollectionUtils.isNotEmpty(attributes)) {
-            LinkedHashMap<String, Object> oldAttrs = new LinkedHashMap<>(attributes.size());
-            attributes.forEach((key, value) -> {
-                Object previous = resolutionContext.setAttribute(key, value);
-                if (previous != null) {
-                    oldAttrs.put(key, previous);
-                }
-            });
-            oldAttributes = oldAttrs;
+    public T inject(BeanContext context, T bean) {
+        if (definition instanceof InjectableBeanDefinition<T> injectableBeanDefinition) {
+            return injectableBeanDefinition.inject(context, bean);
         }
+        return bean;
+    }
 
+    @Override
+    public T inject(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
+        if (definition instanceof InjectableBeanDefinition<T> injectableBeanDefinition) {
+            return injectableBeanDefinition.inject(resolutionContext, context, bean);
+        }
+        return bean;
+    }
+
+    @Override
+    public T instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException {
+        ConfigurationPath oldPath = null;
+        if (configurationPath != null) {
+            oldPath = resolutionContext.getConfigurationPath();
+            resolutionContext.setConfigurationPath(configurationPath);
+        }
         try {
-            if (this.definition instanceof ParametrizedBeanFactory) {
-                ParametrizedBeanFactory<T> parametrizedBeanFactory = (ParametrizedBeanFactory<T>) this.definition;
-                Map<String, Object> fulfilled = getParametersValues(resolutionContext, (DefaultBeanContext) context, definition, parametrizedBeanFactory);
-                return parametrizedBeanFactory.build(resolutionContext, context, definition, fulfilled);
+            if (this.definition instanceof ParametrizedInstantiatableBeanDefinition<T> parametrizedInstantiatableBeanDefinition) {
+                Argument<Object>[] requiredArguments = parametrizedInstantiatableBeanDefinition.getRequiredArguments();
+                Map<String, Object> fulfilled = getParametersValues(resolutionContext, (DefaultBeanContext) context, definition, requiredArguments);
+                return parametrizedInstantiatableBeanDefinition.instantiate(resolutionContext, context, fulfilled);
             }
-            if (this.definition instanceof BeanFactory) {
-                return ((BeanFactory<T>) this.definition).build(resolutionContext, context, definition);
-            } else {
-                throw new IllegalStateException("Cannot construct a dynamically registered singleton");
+            if (this.definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
+                return instantiatableBeanDefinition.instantiate(resolutionContext, context);
             }
+            throw new IllegalStateException("Cannot construct a dynamically registered singleton");
         } finally {
-            if (attributes != null) {
-                for (String key : attributes.keySet()) {
-                    resolutionContext.removeAttribute(key);
-                }
-            }
-            if (oldAttributes != null) {
-                oldAttributes.forEach(resolutionContext::setAttribute);
-            }
+            resolutionContext.setConfigurationPath(oldPath);
         }
     }
 
@@ -178,54 +168,75 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     private Map<String, Object> getParametersValues(BeanResolutionContext resolutionContext,
                                                     DefaultBeanContext context,
                                                     BeanDefinition<T> definition,
-                                                    ParametrizedBeanFactory<T> parametrizedBeanFactory) {
-        Argument<Object>[] requiredArguments = (Argument<Object>[]) parametrizedBeanFactory.getRequiredArguments();
-        Map<String, Object> fulfilled = new LinkedHashMap<>(requiredArguments.length);
+                                                    Argument<Object>[] requiredArguments) {
+        if (requiredArguments.length == 0) {
+            return Collections.emptyMap();
+        }
+        Map<String, Object> fulfilled = new LinkedHashMap<>(requiredArguments.length, 1);
+        ConfigurationPath configurationPath = resolutionContext.getConfigurationPath();
         for (Argument<Object> argument : requiredArguments) {
             String argumentName = argument.getName();
-            Object value = resolveValueAsName(argument);
-            if (value == null) {
-                Qualifier<Object> qualifier = resolveQualifier(argument);
-                if (qualifier == null) {
-                    if (!isPrimary()) {
-                        continue;
+            if (argument.isAnnotationPresent(Parameter.class)) {
+                Class<Object> type = (Class<Object>) argument.getWrapperType();
+                if (CharSequence.class.isAssignableFrom(type)) {
+                    String simpleName = configurationPath.simpleName();
+                    if (simpleName != null) {
+                        fulfilled.put(argumentName, simpleName);
+                    } else {
+                        String name = findName(resolutionContext.getCurrentQualifier());
+                        if (name != null) {
+                            fulfilled.put(argumentName, name);
+                        }
+                    }
+                } else if (Number.class.isAssignableFrom(type)) {
+                    fulfilled.put(argumentName, context.getConversionService().convertRequired(configurationPath.index(), argument));
+                } else if (qualifier != null && hasDeclaredAnnotation(EachBean.class) && String.class.equals(type) && "name".equals(argumentName)) {
+                    String name = findName(qualifier);
+                    if (name != null) {
+                        fulfilled.put(argumentName, name);
+                    }
+                } else {
+                    if (argument.isProvider()) {
+                        Argument<?> pt = argument.getFirstTypeVariable().orElse(null);
+                        if (pt != null) {
+                            type = (Class<Object>) pt.getType();
+                        }
+                    }
+
+                    try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(definition, argument)) {
+                        if (type.equals(configurationPath.configurationType())) {
+                            Object bean = context.findBean(resolutionContext, argument, configurationPath.beanQualifier()).orElse(null);
+                            fulfilled.put(argumentName, bean);
+                        } else {
+                            ConfigurationPath old = resolutionContext.setConfigurationPath(null);// reset
+                            try {
+                                Qualifier<Object> q = qualifier != null ? (Qualifier<Object>) qualifier : configurationPath.beanQualifier();
+                                Object bean = context.findBean(resolutionContext, argument, q).orElse(null);
+                                fulfilled.put(argumentName, bean);
+                            } finally {
+                                resolutionContext.setConfigurationPath(old);
+                            }
+                        }
                     }
                 }
-                try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(definition, argument)) {
-                    value = context.findBean(resolutionContext, argument, qualifier).orElse(null);
-                }
-            }
-            if (value != null) {
-                fulfilled.put(argumentName, value);
             }
         }
         return fulfilled;
     }
 
     @Nullable
-    private <K> Qualifier<K> resolveQualifier(Argument<K> argument) {
-        Object qualifierMapValue = attributes == null ? Collections.emptyMap() : attributes.get(AnnotationUtil.QUALIFIER);
-        if (qualifierMapValue instanceof Map) {
-            Qualifier<K> qualifier = ((Map<Argument, Qualifier>) qualifierMapValue).get(argument);
-            if (qualifier != null) {
-                return qualifier;
-            }
+    private String findName(@Nullable Qualifier<?> q) {
+        if (q == null) {
+            return null;
         }
-        return (Qualifier<K>) resolveDynamicQualifier();
-    }
-
-    @Nullable
-    private Object resolveValueAsName(Argument<?> argument) {
-        Object named = attributes == null ? null : attributes.get(Named.class.getName());
-        Object value = null;
-        if (named != null) {
-            value = ConversionService.SHARED.convert(named, argument).orElse(null);
+        String name = Qualifiers.findName(q);
+        if (name != null) {
+            return name;
         }
-        if (value == null && isPrimary()) {
-            // Backwards compatibility, all qualifiers where "Named" before
-            value = ConversionService.SHARED.convert("Primary", argument).orElse(null);
+        if (isQualifiedAsPrimary(q)) {
+            return Primary.SIMPLE_NAME;
         }
-        return value;
+        return null;
     }
 
     @Override
@@ -238,12 +249,12 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
         }
         BeanDefinitionDelegate<?> that = (BeanDefinitionDelegate<?>) o;
         return Objects.equals(definition, that.definition) &&
-            Objects.equals(resolveName().orElse(null), that.resolveName().orElse(null));
+            Objects.equals(qualifier, that.qualifier);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(definition, resolveName().orElse(null));
+        return ObjectUtils.hash(definition, qualifier);
     }
 
     /**
@@ -256,32 +267,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
 
     @Override
     public Optional<String> resolveName() {
-        return get(Named.class.getName(), String.class);
-    }
-
-    /**
-     * Adds a new attribute.
-     *
-     * @param name  The name
-     * @param value The value
-     */
-    public void put(String name, Object value) {
-        if (attributes == null) {
-            attributes = new HashMap<>(2, 1);
-        }
-        this.attributes.put(name, value);
-    }
-
-    @Override
-    public <K> Optional<K> get(String name, ArgumentConversionContext<K> conversionContext) {
-        if (attributes == null) {
-            return Optional.empty();
-        }
-        Object value = attributes.get(name);
-        if (value != null && conversionContext.getArgument().getType().isInstance(value)) {
-            return Optional.of((K) value);
-        }
-        return Optional.empty();
+        return Optional.ofNullable(findName(qualifier));
     }
 
     @Override
@@ -304,17 +290,28 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
      * @param <T>        The type
      * @return The new bean definition
      */
-    static <T> BeanDefinitionDelegate<T> create(BeanDefinition<T> definition, Qualifier qualifier) {
+    static <T> BeanDefinitionDelegate<T> create(BeanDefinition<T> definition, Qualifier<T> qualifier) {
+        return create(definition, qualifier, null);
+    }
+
+    /**
+     * @param definition The bean definition type
+     * @param qualifier The bean qualifier
+     * @param path The configuration path.
+     * @param <T>        The type
+     * @return The new bean definition
+     */
+    static <T> BeanDefinitionDelegate<T> create(BeanDefinition<T> definition, Qualifier<T> qualifier, ConfigurationPath path) {
         if (definition instanceof InitializingBeanDefinition || definition instanceof DisposableBeanDefinition) {
             if (definition instanceof ValidatedBeanDefinition) {
-                return new LifeCycleValidatingDelegate<>(definition, qualifier);
+                return new LifeCycleValidatingDelegate<>(definition, qualifier, path);
             } else {
-                return new LifeCycleDelegate<>(definition, qualifier);
+                return new LifeCycleDelegate<>(definition, qualifier, path);
             }
         } else if (definition instanceof ValidatedBeanDefinition) {
-            return new ValidatingDelegate<>(definition, qualifier);
+            return new ValidatingDelegate<>(definition, qualifier, path);
         }
-        return new BeanDefinitionDelegate<>(definition, qualifier);
+        return new BeanDefinitionDelegate<>(definition, qualifier, path);
     }
 
     @Override
@@ -326,7 +323,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     /**
      * @param <T> The bean definition type
      */
-    interface ProxyInitializingBeanDefinition<T> extends DelegatingBeanDefinition<T>, InitializingBeanDefinition<T> {
+    sealed interface ProxyInitializingBeanDefinition<T> extends DelegatingBeanDefinition<T>, InitializingBeanDefinition<T> {
         @Override
         default T initialize(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
             BeanDefinition<T> definition = getTarget();
@@ -340,7 +337,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     /**
      * @param <T> The bean definition type
      */
-    interface ProxyDisposableBeanDefinition<T> extends DelegatingBeanDefinition<T>, DisposableBeanDefinition<T> {
+    sealed interface ProxyDisposableBeanDefinition<T> extends DelegatingBeanDefinition<T>, DisposableBeanDefinition<T> {
         @Override
         default T dispose(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
             BeanDefinition<T> definition = getTarget();
@@ -354,7 +351,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     /**
      * @param <T> The bean definition type
      */
-    interface ProxyValidatingBeanDefinition<T> extends DelegatingBeanDefinition<T>, ValidatedBeanDefinition<T> {
+    sealed interface ProxyValidatingBeanDefinition<T> extends DelegatingBeanDefinition<T>, ValidatedBeanDefinition<T> {
         @Override
         default T validate(BeanResolutionContext resolutionContext, T instance) {
             BeanDefinition<T> definition = getTarget();
@@ -383,8 +380,8 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
      * @param <T> The bean definition type
      */
     private static final class LifeCycleDelegate<T> extends BeanDefinitionDelegate<T> implements ProxyInitializingBeanDefinition<T>, ProxyDisposableBeanDefinition<T> {
-        private LifeCycleDelegate(BeanDefinition<T> definition, Qualifier qualifier) {
-            super(definition, qualifier);
+        private LifeCycleDelegate(BeanDefinition<T> definition, Qualifier qualifier, ConfigurationPath path) {
+            super(definition, qualifier, path);
         }
     }
 
@@ -392,8 +389,8 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
      * @param <T> The bean definition type
      */
     private static final class ValidatingDelegate<T> extends BeanDefinitionDelegate<T> implements ProxyValidatingBeanDefinition<T> {
-        private ValidatingDelegate(BeanDefinition<T> definition, Qualifier qualifier) {
-            super(definition, qualifier);
+        private ValidatingDelegate(BeanDefinition<T> definition, Qualifier qualifier, ConfigurationPath path) {
+            super(definition, qualifier, path);
         }
     }
 
@@ -401,8 +398,8 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
      * @param <T> The bean definition type
      */
     private static final class LifeCycleValidatingDelegate<T> extends BeanDefinitionDelegate<T> implements ProxyValidatingBeanDefinition<T>, ProxyInitializingBeanDefinition<T>, ProxyDisposableBeanDefinition<T> {
-        private LifeCycleValidatingDelegate(BeanDefinition<T> definition, Qualifier qualifier) {
-            super(definition, qualifier);
+        private LifeCycleValidatingDelegate(BeanDefinition<T> definition, Qualifier qualifier, ConfigurationPath path) {
+            super(definition, qualifier, path);
         }
     }
 }

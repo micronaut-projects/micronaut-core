@@ -3,7 +3,6 @@ package io.micronaut.http.server.netty.resources
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.HttpHeaders
-import io.micronaut.http.netty.AbstractNettyHttpRequest
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.bootstrap.Bootstrap
 import io.netty.channel.ChannelHandlerContext
@@ -102,7 +101,7 @@ class Http2StaticResourceCacheSpec extends Specification {
 
                                         def request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/' + tempFile.getName())
                                         request.headers().add(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), 'https')
-                                        request.headers().add(AbstractNettyHttpRequest.STREAM_ID, 3)
+                                        request.headers().add(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), 3)
                                         request.headers().add(HttpHeaders.IF_MODIFIED_SINCE, Instant.ofEpochMilli(tempFile.lastModified()).atZone(ZoneOffset.UTC).format(DateTimeFormatter.RFC_1123_DATE_TIME))
                                         ctx.channel().writeAndFlush(request)
                                     }
@@ -115,7 +114,7 @@ class Http2StaticResourceCacheSpec extends Specification {
         def response = completion.get()
         then:
         response.status() == HttpResponseStatus.NOT_MODIFIED
-        response.headers().get(AbstractNettyHttpRequest.STREAM_ID) == '3'
+        response.headers().get(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text()) == '3'
 
         cleanup:
         tempFile.delete()

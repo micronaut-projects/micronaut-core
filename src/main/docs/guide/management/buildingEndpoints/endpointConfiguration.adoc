@@ -17,7 +17,7 @@ The configuration values for the endpoint override those for `all`. If `endpoint
 
 For all endpoints, the following configuration values can be set.
 
-[source,yaml]
+[configuration]
 ----
 endpoints:
   <any endpoint id>:

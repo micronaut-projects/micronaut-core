@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,27 +16,31 @@
 package io.micronaut.docs.config.converters
 
 // tag::imports[]
+import io.micronaut.context.annotation.Prototype
 import io.micronaut.core.convert.ConversionContext
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.convert.TypeConverter
 import java.time.DateTimeException
 import java.time.LocalDate
 import java.util.Optional
-import jakarta.inject.Singleton
 // end::imports[]
 
 // tag::class[]
-@Singleton
-class MapToLocalDateConverter : TypeConverter<Map<*, *>, LocalDate> { // <1>
+@Prototype
+class MapToLocalDateConverter(
+    private val conversionService: ConversionService // <2>
+)
+    : TypeConverter<Map<*, *>, LocalDate> { // <1>
+
     override fun convert(propertyMap: Map<*, *>, targetType: Class<LocalDate>, context: ConversionContext): Optional<LocalDate> {
-        val day = ConversionService.SHARED.convert(propertyMap["day"], Int::class.java)
-        val month = ConversionService.SHARED.convert(propertyMap["month"], Int::class.java)
-        val year = ConversionService.SHARED.convert(propertyMap["year"], Int::class.java)
+        val day = conversionService.convert(propertyMap["day"], Int::class.java)
+        val month = conversionService.convert(propertyMap["month"], Int::class.java)
+        val year = conversionService.convert(propertyMap["year"], Int::class.java)
         if (day.isPresent && month.isPresent && year.isPresent) {
             try {
-                return Optional.of(LocalDate.of(year.get(), month.get(), day.get())) // <2>
+                return Optional.of(LocalDate.of(year.get(), month.get(), day.get())) // <3>
             } catch (e: DateTimeException) {
-                context.reject(propertyMap, e) // <3>
+                context.reject(propertyMap, e) // <4>
                 return Optional.empty()
             }
         }

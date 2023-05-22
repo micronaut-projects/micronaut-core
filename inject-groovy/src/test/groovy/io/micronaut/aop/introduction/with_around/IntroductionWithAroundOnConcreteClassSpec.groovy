@@ -35,9 +35,8 @@ class Test {}
     @Unroll
     void "test introduction with around for #clazz.simpleName"(Class clazz) {
         when:
-        def proxyTargetBeanDefinition = applicationContext.getProxyTargetBeanDefinition(clazz, null)
         def beanDefinition = applicationContext.getBeanDefinition(clazz, null)
-        def bean = applicationContext.getBean(proxyTargetBeanDefinition)
+        def bean = applicationContext.getBean(beanDefinition)
 
         then:
         bean instanceof CustomProxy
@@ -46,7 +45,7 @@ class Test {}
         bean.getName() == null
 
         when:
-        bean = applicationContext.getProxyTargetBean(clazz, null)
+        bean = applicationContext.getBean(clazz, null)
 
         then:
         bean instanceof CustomProxy
@@ -56,7 +55,6 @@ class Test {}
 
         and:
         beanDefinition.getExecutableMethods().size() == 5
-        proxyTargetBeanDefinition.getExecutableMethods().size() == 5
 
         where:
         clazz << [MyBean1, MyBean2, MyBean3, MyBean4, MyBean5, MyBean6]
@@ -75,21 +73,17 @@ class Test {}
     void "test executable methods count for introduction with executable"() {
         when:
         def clazz = MyBean7.class
-        def proxyTargetBeanDefinition = applicationContext.getProxyTargetBeanDefinition(clazz, null)
         def beanDefinition = applicationContext.getBeanDefinition(clazz, null)
         then:
-        proxyTargetBeanDefinition.getExecutableMethods().size() == 1
         beanDefinition.getExecutableMethods().size() == 1
     }
 
     void "test executable methods count for around with executable"() {
         when:
         def clazz = MyBean8.class
-        def proxyTargetBeanDefinition = applicationContext.getProxyTargetBeanDefinition(clazz, null)
         def beanDefinition = applicationContext.getBeanDefinition(clazz, null)
 
         then:
-        proxyTargetBeanDefinition.getExecutableMethods().size() == 4
         beanDefinition.getExecutableMethods().size() == 4
 
         when:
@@ -102,11 +96,9 @@ class Test {}
     void "test a multidimensional array property"() {
         when:
         def clazz = MyBean9.class
-        def proxyTargetBeanDefinition = applicationContext.getProxyTargetBeanDefinition(clazz, null)
         def beanDefinition = applicationContext.getBeanDefinition(clazz, null)
 
         then:
-        proxyTargetBeanDefinition.getExecutableMethods().size() == 5
         beanDefinition.getExecutableMethods().size() == 5
         beanDefinition.findMethod("getMultidim").get().getReturnType().asArgument().getType() == String[][].class
         beanDefinition.findMethod("setMultidim", String[][].class).isPresent()
@@ -114,7 +106,7 @@ class Test {}
         beanDefinition.findMethod("setPrimitiveMultidim", int[][].class).isPresent()
 
         when:
-        MyBean9 bean = applicationContext.getBean(proxyTargetBeanDefinition)
+        MyBean9 bean = applicationContext.getBean(beanDefinition)
         ExecutableMethod getMultiDim = beanDefinition.findMethod('getMultidim').get()
         ExecutableMethod setMultiDim = beanDefinition.findMethod('setMultidim', String[][].class).get()
         ExecutableMethod getPrimitiveMultidim = beanDefinition.findMethod('getPrimitiveMultidim').get()

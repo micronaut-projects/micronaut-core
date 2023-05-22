@@ -47,14 +47,14 @@ import java.util.function.Consumer;
 public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements ExecutableMethodProcessor<Controller> {
 
     private static final MediaType[] DEFAULT_MEDIA_TYPES = {MediaType.APPLICATION_JSON_TYPE};
-    private final Map<Class, Consumer<RouteDefinition>> httpMethodsHandlers = new LinkedHashMap<>();
+    private final Map<Class<?>, Consumer<RouteDefinition>> httpMethodsHandlers = new LinkedHashMap<>();
 
     /**
      * @param executionHandleLocator The execution handler locator
      * @param uriNamingStrategy The URI naming strategy
      * @param conversionService The conversion service
      */
-    public AnnotatedMethodRouteBuilder(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
+    public AnnotatedMethodRouteBuilder(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService conversionService) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
         httpMethodsHandlers.put(Get.class, (RouteDefinition definition) -> {
             final BeanDefinition bean = definition.beanDefinition;
@@ -283,7 +283,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             final BeanDefinition bean = definition.beanDefinition;
 
             boolean isGlobal = method.isTrue(Error.class, "global");
-                Class declaringType = bean.getBeanType();
+                Class<?> declaringType = bean.getBeanType();
                 if (method.isPresent(Error.class, "status")) {
                     Optional<HttpStatus> value = method.enumValue(Error.class, "status", HttpStatus.class);
                     value.ifPresent(httpStatus -> {
@@ -294,11 +294,11 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
                         }
                     });
                 } else {
-                    Class exceptionType = null;
+                    Class<? extends Throwable> exceptionType = null;
                     if (method.isPresent(Error.class, AnnotationMetadata.VALUE_MEMBER)) {
                         Optional<Class> annotationValue = method.classValue(Error.class);
                         if (annotationValue.isPresent() && Throwable.class.isAssignableFrom(annotationValue.get())) {
-                            exceptionType = annotationValue.get();
+                            exceptionType = (Class<? extends Throwable>) annotationValue.get();
                         }
                     }
                     if (exceptionType == null) {

@@ -15,10 +15,10 @@
  */
 package io.micronaut.http.client.aop
 
-import io.micronaut.context.annotation.Requires
-import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.context.exceptions.ConfigurationException
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -35,11 +35,12 @@ import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
+import spock.lang.PendingFeature
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import javax.annotation.Nullable
+import jakarta.annotation.Nullable
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CountDownLatch
 
@@ -134,7 +135,16 @@ class StreamSpec extends Specification {
         expect:
         myClient.someJson(n) == '{"key":"value"}'
         where:
-        n << [1, 2, 3]
+        n << [1, 2]
+    }
+
+    @PendingFeature
+    void "JSON is still just text (variation 3)"() {
+        // variation 3 uses ByteBuf, which is not supported anymore by RouteInfo.isResponseBodyJsonFormattable
+        given:
+        StreamEchoClient myClient = context.getBean(StreamEchoClient)
+        expect:
+        myClient.someJson(3) == '{"key":"value"}'
     }
 
     void "JSON can still be streamed using reactive sequence as container"() {

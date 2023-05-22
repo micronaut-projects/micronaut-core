@@ -21,7 +21,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
-import javax.validation.constraints.Size;
+import jakarta.validation.constraints.Size;
 // end::imports[]
 // tag::importsreactive[]
 import org.reactivestreams.Publisher;

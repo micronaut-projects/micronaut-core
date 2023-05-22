@@ -19,6 +19,7 @@ package io.micronaut.http.server.netty.jackson
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
+import io.micronaut.context.env.PropertySource
 import io.micronaut.jackson.JacksonConfiguration
 import spock.lang.Specification
 
@@ -43,7 +44,7 @@ class JsonViewSetupSpec extends Specification {
 
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
-        applicationContext.environment.addPropertySource(MapPropertySource.of(
+        applicationContext.environment.addPropertySource((MapPropertySource) PropertySource.of(
                 'jackson.json-view.enabled': true
         ))
         applicationContext.start()

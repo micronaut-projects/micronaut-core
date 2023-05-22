@@ -22,7 +22,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionWriter
 /**
  * @author graemerocher
@@ -44,11 +44,11 @@ import io.micronaut.context.annotation.*;
 class MyBean {
 
     private String myValue;
-    
+
     MyBean(@Value("${foo.bar}") String val) {
         this.myValue = val;
     }
-    
+
     public String someMethod(String someVal) {
         return myValue + ' ' + someVal;
     }
@@ -76,7 +76,7 @@ class MyBean {
 
         when:
         def context = ApplicationContext.run('foo.bar':'test')
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
 
         then:
@@ -98,11 +98,11 @@ import io.micronaut.context.annotation.*;
 class MyBean {
 
     private String myValue;
-    
+
     MyBean(@Value("${foo.bar}") String val) {
         this.myValue = val;
     }
-    
+
     @Mutating("someVal")
     public String someMethod(String someVal) {
         return myValue+ ' ' + someVal;
@@ -132,7 +132,7 @@ class MyBean {
 
         when:
         def context = ApplicationContext.run('foo.bar':'test')
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
 
         then:

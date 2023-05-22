@@ -293,16 +293,15 @@ class ReadTimeoutSpec extends Specification {
             } catch (Throwable e){ }
         }
 
-        def clients = clientContext.getBean(DefaultNettyHttpClientRegistry).clients
+        def clients = clientContext.getBean(DefaultNettyHttpClientRegistry).unbalancedClients
         def clientKey = clients.keySet().stream()
                 .filter { it.clientId == "http://localhost:${embeddedServer.getPort()}" }
                 .findFirst()
                 .get()
-        def pool = getPool(clients.get(clientKey))
 
         then:"Connections are not leaked"
         conditions.eventually {
-            pool.acquiredChannelCount() == 0
+            clients.get(clientKey).connectionManager.liveRequestCount() == 0
         }
 
         cleanup:

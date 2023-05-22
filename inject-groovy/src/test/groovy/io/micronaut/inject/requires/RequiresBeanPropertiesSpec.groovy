@@ -132,6 +132,39 @@ class DependantBean
         context.close()
     }
 
+    void "test requires not equals property value with primitive value set"() {
+        given:
+        ApplicationContext context = buildContext('''
+package test
+import io.micronaut.context.annotation.*
+import io.micronaut.core.annotation.*
+import jakarta.inject.Singleton
+
+@ConfigurationProperties("test")
+class Config
+{
+    boolean boolProperty
+}
+
+@Singleton
+@Requires(bean = Config.class, beanProperty = "boolProperty", notEquals = "true")
+class DependantBean
+{
+}
+''')
+        def type = context.classLoader.loadClass('test.DependantBean')
+
+        when:
+        context.environment.addPropertySource(PropertySource.of("test", ['test.bool-property': "true"]))
+        context.getBean(type)
+
+        then:
+        thrown(NoSuchBeanException.class)
+
+        cleanup:
+        context.close()
+    }
+
     void "test requires bean property value with getters and setters"() {
         given:
         ApplicationContext context = buildContext('''
@@ -143,11 +176,11 @@ import jakarta.inject.Singleton
 @ConfigurationProperties("config.properties")
 class Config {
     private String property
-    
+
     public String getProperty() {
         return property;
     }
-    
+
     public void setProperty(String property) {
         this.property = property;
     }
@@ -561,7 +594,7 @@ class Config
 {
     Integer intProperty
     String stringProperty
-    
+
     @ConfigurationProperties("inner")
     static class InnerConfig {
         String innerProperty = "default value"
@@ -615,7 +648,7 @@ interface Configuration extends Toggleable {}
 class ConfigurationImpl implements Configuration
 {
     boolean enabled = false;
-    
+
     @Override
     boolean isEnabled() {
         return enabled;

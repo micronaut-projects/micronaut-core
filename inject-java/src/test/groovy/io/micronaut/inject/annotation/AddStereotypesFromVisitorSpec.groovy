@@ -3,7 +3,6 @@ package io.micronaut.inject.annotation
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.Intercepted
 import io.micronaut.aop.InterceptorBinding
-import io.micronaut.aop.simple.Mutating
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValueBuilder
 import io.micronaut.inject.ast.ClassElement
@@ -33,7 +32,7 @@ import java.util.Locale;
 
 @MyScope
 class TestBean {
-    @MyQualifier public Other other; 
+    @MyQualifier public Other other;
 }
 
 @MyQualifier

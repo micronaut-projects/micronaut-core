@@ -27,7 +27,7 @@ import io.micronaut.http.server.netty.AbstractMicronautSpec
 import reactor.core.publisher.Flux
 import spock.lang.Unroll
 
-import javax.annotation.Nullable
+import jakarta.annotation.Nullable
 
 /**
  * Created by graemerocher on 25/08/2017.

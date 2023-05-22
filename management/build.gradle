@@ -7,28 +7,35 @@ dependencies {
     annotationProcessor project(":graal")
 
     api project(":router")
-    api project(":runtime")
-    compileOnly(libs.managed.micronaut.sql.jdbc) {
-        exclude module:'micronaut-inject'
-        exclude module:'micronaut-bom'
+    api project(":discovery-core")
+    compileOnly project(":jackson-databind")
+    compileOnly(libs.micronaut.sql.jdbc) {
+        exclude group: 'io.micronaut'
     }
+
+    // Support validation annotations
+    compileOnly platform(libs.test.boms.micronaut.validation)
+    compileOnly (libs.micronaut.validation) {
+        exclude group: 'io.micronaut'
+    }
+    compileOnly project(":http-client-core")
 
     implementation libs.managed.reactor
 
     testImplementation project(":http-client")
     testImplementation project(":inject-groovy")
     testImplementation project(":http-server-netty")
-    testImplementation(libs.managed.micronaut.sql.jdbc.tomcat) {
-        exclude module:'micronaut-inject'
-        exclude module:'micronaut-bom'
+    testImplementation project(":jackson-databind")
+    testImplementation(libs.micronaut.sql.jdbc.tomcat) {
+        exclude group: 'io.micronaut'
     }
     testImplementation libs.managed.groovy.json
 
-    testRuntimeOnly(platform(libs.boms.micronaut.sql))
-    testRuntimeOnly libs.managed.h2
+    testRuntimeOnly(platform(libs.test.boms.micronaut.sql))
+    testRuntimeOnly libs.h2
     testRuntimeOnly libs.mysql.driver
 
-    compileOnly libs.managed.logback
+    compileOnly libs.logback.classic
     compileOnly libs.log4j
 
 }

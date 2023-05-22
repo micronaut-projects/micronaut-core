@@ -1,0 +1,27 @@
+if (System.getProperty('geb.env')) {
+    apply plugin:"com.energizedwork.webdriver-binaries"
+
+    webdriverBinaries {
+        chromedriver "${chromedriverVersion}"
+        geckodriver "${geckodriverVersion}"
+    }
+}
+
+tasks.named("test") {
+    systemProperty "geb.env", System.getProperty('geb.env')
+    systemProperty "webdriver.chrome.driver", System.getProperty('webdriver.chrome.driver')
+    systemProperty "webdriver.gecko.driver", System.getProperty('webdriver.gecko.driver')
+}
+
+dependencies {
+    // Geb currently requires Groovy 3, and Spock for Groovy 3
+    testImplementation libs.geb.spock
+    testImplementation libs.selenium.driver.htmlunit
+    testImplementation libs.selenium.remote.driver
+    testImplementation libs.selenium.api
+    testImplementation libs.selenium.support
+
+    testRuntimeOnly libs.htmlunit
+    testRuntimeOnly libs.selenium.driver.chrome
+    testRuntimeOnly libs.selenium.driver.firefox
+}

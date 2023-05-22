@@ -1,5 +1,9 @@
 Recovering from failure is critical for HTTP clients, and that is where Micronaut's integrated <<retry, Retry Advice>> comes in handy.
 
+NOTE: Since Micronaut Framework 4.0, declarative clients annotated with ann:http.client.annotation.Client[] no longer invoke fallbacks by default. To restore the previous behaviour add the following dependency and annotate any declarative clients with ann:retry.annotation.Recoverable[].
+
+dependency::micronaut-retry[]
+
 You can declare the ann:retry.annotation.Retryable[] or ann:retry.annotation.CircuitBreaker[] annotations on any ann:http.client.annotation.Client[] interface and the retry policy will be applied, for example:
 
 snippet::io.micronaut.docs.annotation.retry.PetClient[tags="class", indent=0, title="Declaring @Retryable"]

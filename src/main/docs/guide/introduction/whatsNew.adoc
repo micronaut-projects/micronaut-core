@@ -1,717 +1,85 @@
 //Micronaut {version} includes the following changes:
+== 4.0.0
 
-== 3.7.0
+=== Kotlin 1.8
 
-Several improvements:
+Micronaut framework 4.0 supports https://kotlinlang.org/docs/whatsnew18.html[Kotlin 1.8]
 
-- If you want complete control of where your application loads configuration from, for example, due to security restrictions, you can disable the default https://docs.micronaut.io/snapshot/guide/#propertySource[`PropertySourceLoader`] implementations by calling `ApplicationContextBuilder::enableDefaultPropertySources(false)` when starting your application.
+=== Experimental Support for Kotlin Symbol Processing (KSP)
 
-- Better `java.time` conversion for YAML configuration
+Micronaut framework has offered support for Kotlin via <<kapt, KAPT>>. With version 4.0, Micronaut framework supports Kotlin also via <<ksp, Kotlin Symbol Processing (KSP) API>>.
 
-- Client SSL inner configuration is https://docs.micronaut.io/latest/guide/#bootstrap[Bootstrap] context compatible.
+=== Apache Groovy 4.0
 
-- https://docs.micronaut.io/snapshot/api/io/micronaut/http/uri/UriBuilder.html[`UriBuilder`] methods `queryParam` and `replaceQueryParam` ignore null values.
+Micronaut framework 4.x supports https://groovy-lang.org/releasenotes/groovy-4.0.html[Apache Groovy 4.0].
 
-- It is possible to stop the Netty server without stopping the Application context.
+=== Core Changes
 
-- You can declare beans at runtime using interfaces.
+==== Java 17 Baseline
 
-- You can mark static methods as `@Executable`.
+Micronaut 4 now requires a minimum of Java 17 for building and running applications.
 
-- A big HTTP client refactor.
+==== Improved Modularity
 
-**Spring integration improvements**
+The core of Micronaut has been further refactored to improve modularity and reduce the footprint of a Micronaut application, including:
 
-- https://micronaut-projects.github.io/micronaut-spring/latest/guide/[Micronaut Spring] contains improvements for developers who want to use Micronaut modules with a Spring application or consume Spring libraries from a Micronaut application.
+* Third-party dependencies on SnakeYAML and Jackson Databind are now optional and can be removed if other implementations are present.
+* The runtime and compiler code has been split, allowing the removal of the re-packaging of ASM and Caffeine and reduction of the runtime footprint.
+* The built in <<validation, Validation>>, <<retry, Retry>>, <<serviceDiscovery, Service Discovery>>, <<sessions, HTTP Session>> and <<websocket, WebSocket>> features have been split into separate modules allowing removal of this functionality if not needed.
 
-**New modules**:
+==== GraalVM Metadata Repository and Runtime Initialization
 
-- https://micronaut-projects.github.io/micronaut-object-storage/latest/guide/[Object Storage].
+The https://graalvm.github.io/native-build-tools/latest/gradle-plugin.html#metadata-support[GraalVM Metadata Repository] in Micronaut's Gradle and Maven plugins is now enabled by default and Micronaut has been altered to by default primarily initialize at runtime to ensure consistency in behaviour between JIT and Native applications.
 
-- https://micronaut-projects.github.io/micronaut-crac/latest/guide/[Micronaut CRaC].
+==== Completed `javax` to `jakarta` Migration
 
-Please read the https://micronaut.io/2022/09/21/micronaut-framework-3-7-0-released/[Micronaut Framework 3.7.0 announcement blog post]. You will find a detailed overview of what’s new in Micronaut 3.7.0.
+The remaining functionality depending on the `javax` specification has been migrated to `jakarta` including the validation module (for `jakarta.validation`) and support for Hibernate 6 (for `jakarta.persistence`).
 
-== 3.6.0
+==== Expression Language
 
-Key features:
+A new fully compilation time, type-safe and reflection-free <<evaluatedExpressions, Expression Language>> has been added to the framework which unlocks a number of new possibilities (like conditional job scheduling). It is expected that sub-modules will adopt the new EL over time to add features and capabilities.
 
-- https://micronaut-projects.github.io/micronaut-test-resources/latest/guide/#introduction[Test Resources]
-- https://micronaut-projects.github.io/micronaut-sql/latest/guide/#hibernate-reactive[Hibernate Reactive]
-- https://micronaut-projects.github.io/micronaut-tracing/latest/guide/#opentelemetry[OpenTelemetry]
-- https://micronaut-projects.github.io/micronaut-azure/latest/guide/#azureKeyVault[Azure Vault]
-- https://www.graalvm.org/release-notes/22_2/[GraalVM 22.2 Support]
-- https://nubesgen.com/[NubesGen integration]
+==== Injection of Maps
 
-Please read the https://micronaut.io/2022/08/04/micronaut-framework-3-6-0-released/[Micronaut Framework 3.6.0 announcement blog post]. You will find a detailed overview of what’s new in Micronaut 3.6.0.
+It is now possible to inject a `java.util.Map` of beans where the key is the bean name. The name of the bean is derived from the <<qualifiers, qualifier>> or (if not present) the simple name of the class.
 
-Micronaut Core features:
+==== Arbitrary Nesting of Configuration Properties
 
-=== Don't apply a @Filter for services
+With Micronaut 4 it is now possible to arbitrarily nest ann:context.annotation.ConfigurationProperties[] and ann:context.annotation.EachProperty[] annotations allowing for more dynamic configuration possibilities.
 
-It is possible to exclude services from an HTTP Client Filter with the member `excludeServiceId` of `@Filter.`
+==== Improved Error Messages for Missing Configuration
 
-```java
-@Filter(patterns = '/**', excludeServiceId = 'authClient')
-public class AppHttpClientFilter implements HttpClientFilter {
-```
+When a bean is not present due to missing configuration (such as a bean that uses ann:context.annotation.EachProperty[]) error messages have been improved to display the configuration that is required to activate the bean.
 
-=== Netty runtime
+==== Improved Error Messages for Missing Beans
 
-This version upgrades https://netty.io[Netty] from 4.1.77 to 4.1.79. Moreover, it contains improvements to the API to https://docs.micronaut.io/snapshot/guide/#nettyClientPipeline[configure the Netty Client Pipeline] and to https://docs.micronaut.io/snapshot/guide/#nettyServerPipeline[configure the Netty Server Pipeline].
+When a bean annotated with ann:context.annotation.EachProperty[] or ann:context.annotation.Bean[] is not found due to missing configuration an error is thrown showing the configuration prefix necessary to resolve the issue.
 
-=== Improvements to HttpClientException
+==== Tracking of Disabled Beans
 
-If present a `serviceId` field is populated in the `HttpClientException` and shown in the exception message.
+Beans that are disabled via <<conditionalBeans, Bean Requirements>> are now tracked and an appropriate error thrown if a bean has been disabled.
 
-=== Modules Upgrades
+The disabled beans are also now visible via the <<beansEndpoint, Beans Endpoint>> in the <<management, Management module>> aiding in understanding the state of your application configuration.
 
-- Micronaut AWS 3.5.3 to 3.7.0
-- Micronaut Azure 3.2.3 to 3.3.0
-- Micronaut Cache 3.4.1 to 3.5.0
-- Micronaut Cassandra 4.0.0 to 5.1.1
-- Micronaut Coherence 3.4.1 to 3.5.1
-- Micronaut Data 3.4.3 to 3.7.2
-- Micronaut Elasticsearch 4.2.0 to 4.3.0
-- Micronaut Email 1.2.3 to 1.3.1
-- Micronaut Flyway 5.3.0 to 5.4.0
-- Micronaut GCP 4.2.1 to 4.4.0
-- Micronaut GraphQL 3.0.0 to 3.1.0
-- Micronaut Groovy 3.1.0 to 3.2.0
-- Micronaut JaxRS 3.3.0 to 3.4.0
-- Micronaut JMX 3.0.0 to 3.1.0
-- Micronaut Kafka 4.3.1 to 4.4.0
-- Micronaut Micrometer 4.3.0 to 4.4.0
-- Micronaut Microstream 1.0.0-M1 to 1.0.0
-- Micronaut Liquibase 5.3.0 to 5.4.1
-- Micronaut Mongo 4.2.0 to 4.4.0
-- Micronaut Neo4J 5.0.0 to 5.1.0
-- Micronaut Nats 3.0.0 to 3.1.0
-- Micronaut OpenAPI 4.2.2 to 4.4.3
-- Micronaut Picocli 4.2.1 to 4.3.0
-- Micronaut Problem 2.3.1 to 2.4.0
-- Micronaut RabbitMQ 3.1.0 to 3.3.0
-- Micronaut R2DBC 3.0.0 to 3.0.1
-- Micronaut Reactor 2.2.3 to 2.3.1
-- Micronaut Redis 5.2.0 to 5.3.0
-- Micronaut RxJava3 2.2.1 to 2.3.0
-- Micronaut Serialization 1.1.1 to 1.3.0
-- Micronaut Servlet 3.2.3 to 3.3.0
-- Micronaut Spring 4.1.1 to 4.2.1
-- Micronaut SQL 4.4.1 to 4.6.3
-- Micronaut Test 3.3.1 to 3.4.0
-- Micronaut TOML 1.0.0 to 1.1.1
-- Micronaut Tracing 4.1.1 to 4.2.1
-- Micronaut Views 3.4.0 to 3.5.0
-- Micronaut Jackson XML 3.0.1 to 3.1.0
+=== HTTP Changes
 
-== 3.5.0
+==== Initial Support for Virtual Threads (Loom)
 
-=== GraalVM 22.1.0
+Preview <<virtualThreads, support for Virtual Threads>> has been added. When using JDK 19 or above with preview features enabled you can off load processing to a virtual thread pool.
 
-Micronaut framework 3.5 supports https://www.graalvm.org/release-notes/22_1/[GraalVM 22.1.0].
+==== Rewritten HTTP layer
 
-https://micronaut-projects.github.io/micronaut-gradle-plugin/latest/[Micronaut Gradle Plugin v3.4.0] and https://github.com/micronaut-projects/micronaut-maven-plugin/releases/tag/v3.3.0[Micronaut Maven Plugin v3.3.0] support GraalVM 22.1.0.
+The HTTP layer has been rewritten to improve performance and reduce the presence of reactive stack frames if reactive is not used (such as with Virtual threads).
 
-=== Incremental Compilation for Gradle Builds
+==== Annotation-Based HTTP Filters
 
-Micronaut framework 3.5 supports fully incremental compilation, including GraalVM metadata for Gradle Builds.
+See <<filtermethods, Filter Methods>>
 
-=== Micronaut Data
+==== JDK HTTP Client
 
-https://github.com/micronaut-projects/micronaut-data/releases/tag/v3.4.0[Micronaut Data 3.4.0] supports:
+<<javanetClient, Additional implementation of the HTTP Client based on Java HTTP Client>>
 
-- Postgres enums for JDBC.
-- Pagination for reactive repositories and specifications.
-- Pagination for async, coroutines repositories, and specifications.
+=== Breaking Changes
 
-=== Turbo Integration
+<<breaks, Breaking changes in Micronaut framework 4.0>>
 
-Micronaut Views adds https://micronaut-projects.github.io/micronaut-views/latest/guide/#turbo[integration with Turbo]
-
-=== New Module - Micronaut Microstream
-
-https://micronaut-projects.github.io/micronaut-microstream/snapshot/guide/[Micronaut Microstream] eases working with https://microstream.one[MicroStream], a native Java object graph storage engine.
-
-=== @Scheduled with Time Zones
-
-Optionally, you can specify a time zone when using the <<scheduling,`@Scheduled` annotation>>.
-
-[source,java]
-----
-@Scheduled(cron = '1/33 0/1 * 1/1 * ?', zoneId = "America/Chicago")
-void runCron() {
-...
-..
-----
-
-=== Support validation groups with `@Validated`
-
-You can enforce a subset of constraints using <<validationGroups,validation groups>> using groups on the `@Validated`.
-
-=== Advanced Listener Configuration
-
-Micronaut framework 3.5.0 offers more flexibility in configuring the HTTP Server. Instead of configuring a single port, you
-<<listener,can specify each listener manually>>.
-
-=== EPHEMERAL FACTORIES
-
-A <<factories,Factory>> has the default scope `@Singleton`, and it is destroyed with the context. Since Micronaut framework v3.5.0, you can dispose of the factory after producing a bean by annotating your factory class with `@Prototype` and `@Factory`
-
-=== Module upgrades
-
-- https://github.com/micronaut-projects/micronaut-test/releases/tag/v3.2.0[Micronaut Test 3.2.0] adds support for KoTest 5.
-- https://github.com/micronaut-projects/micronaut-aws/releases/tag/v3.5.0[Micronaut AWS 3.5.0] adds a new module https://micronaut-projects.github.io/micronaut-aws/latest/guide/#cdk[Micronaut AWS CDK]. It also upgrades to the latest versions of the AWS SDKs.
-- https://github.com/micronaut-projects/micronaut-micrometer/releases/tag/v4.3.0[Micronaut Micrometer 4.3.0] updates to Micrometer 1.9.0.
-- https://github.com/micronaut-projects/micronaut-gcp/releases/tag/v4.2.0[Micronaut GCP 4.2.0] updates to `grpc-auth`
-1.45.1 and `grpc-netty-shaded`. Moreover, we have clarified the documentation to support GraalVM Native Images when using the GCP libraries, and the Micronaut GCP Bom now includes the `com.google.cloud:native-image-support` dependency.
-- https://github.com/micronaut-projects/micronaut-aot/releases/tag/v1.1.0[Micronaut AOT 1.1.0]
-- https://github.com/micronaut-projects/micronaut-sql/releases/tag/v4.4.0[Micronaut SQL to 4.4.0]
-- https://github.com/micronaut-projects/micronaut-problem-json/releases/tag/v2.3.0[Micronaut Problem JSON to 2.3.0]
-- https://github.com/micronaut-projects/micronaut-grpc/releases/tag/v3.3.0[Micronaut GRPC to 3.3.0] allows exposing a gRPC Health Check for a grpc-server.
-- https://github.com/micronaut-projects/micronaut-serialization/releases/tag/v1.1.0[Micronaut Serialization to 1.1.0]. It allows the serialization and deserialization of object arrays.
-- https://github.com/micronaut-projects/micronaut-openapi/releases/tag/v4.1.0[Micronaut OpenAPI to 4.1.0] updates to Swagger 2.2.0.
-- https://github.com/micronaut-projects/micronaut-r2dbc/releases/tag/v3.0.0[Micronaut R2DBC to 3.0.0] updates to R2DBC `1.0.0.RELEASE`.
-- https://github.com/micronaut-projects/micronaut-security/releases/tag/v3.6.0[Micronaut Security to 3.6.0].
-- https://github.com/micronaut-projects/micronaut-cache/releases/tag/v3.4.1[Micronaut Cache to 3.4.1].
-- https://github.com/micronaut-projects/micronaut-coherence/releases/tag/v3.4.1[Micronaut Coherence to 3.4.1].
-
-Several modules publish a BOM (Bill of Materials) or use a  Gradle Version Catalogs:
-
-- https://github.com/micronaut-projects/micronaut-jaxrs/releases/tag/v3.3.0[Micronaut JAX-RS to 3.3.0]
-- https://github.com/micronaut-projects/micronaut-picocli/releases/tag/v4.2.1[Micronaut Picocli to 4.2.1]
-- https://github.com/micronaut-projects/micronaut-acme/releases/tag/v3.2.0[Micronaut ACME to 3.2.0].
-- https://github.com/micronaut-projects/micronaut-mongodb/releases/tag/v4.2.0[Micronaut MongoDB to 4.2.0]
-- https://github.com/micronaut-projects/micronaut-mqtt/releases/tag/v2.2.0[Micronaut MQTT to 2.2.0].
-- https://github.com/micronaut-projects/micronaut-kafka/releases/tag/v4.3.0[Micronaut Kafka to 4.3.0].
-
-=== Schema Migration Modules
-
-* https://github.com/micronaut-projects/micronaut-flyway/releases/tag/v5.3.0[Micronaut Flyway 5.3.0] updates Flyway to 8.5.8.
-* https://github.com/micronaut-projects/micronaut-liquibase/releases/tag/v5.3.0[Micronaut Liquibase 5.3.0] updates Liquibase to 4.9.1
-
-
-== 3.4.0
-
-=== Localized Message Source
-
-You can now inject <<localizedMessageSource, `LocalizedMessageSource`>>, a `@RequestScope` bean, in your controllers to resolve localized messages for the current HTTP Request. It works in combination with <<localeResolution, Micronaut Locale Resolution>> capabilities.
-
-=== Referencing bean properties in @Requires.
-
-With 3.4.0, you can https://docs.micronaut.io/latest/guide/#_referencing_bean_properties_in_requires[reference other beans properties in `@Requires` to load beans conditionally].
-
-[source, java]
-----
-@Requires(bean=Config.class, beanProperty="foo", value="John")
-----
-
-=== Micronaut Data MongoDB
-
-https://github.com/micronaut-projects/micronaut-data/releases/tag/v3.3.0[Micronaut Data 3.3.0] includes https://micronaut-projects.github.io/micronaut-data/latest/guide/index.html#mongo[Micronaut Data MongoDB].
-
-=== Micronaut AOT and Maven
-
-https://micronaut-projects.github.io/micronaut-aot/latest/guide/[Micronaut AOT] is now fully supported for Maven users. Enabling AOT is as simply as passing `-Dmicronaut.aot.enabled` when running, testing, or packaging your application.
-
-For more details, check the https://micronaut-projects.github.io/micronaut-maven-plugin/latest/examples/aot.html[Micronaut Maven Plugin documentation].
-
-=== Micronaut TOML
-
-https://micronaut-projects.github.io/micronaut-toml/latest/guide/[Micronaut TOML] allows you to write your application configuration with https://toml.io/en/[TOML] in addition to `Properties`, `YAML`, `Groovy` or `Config4k`.
-
-=== Micronaut Security
-
-https://github.com/micronaut-projects/micronaut-security/releases/tag/v3.4.0[Micronaut Security 3.4.1] responds with an error when an authenticated user visits a sensitive endpoint. This forces the developer to define how they want their application to behave in that scenario. Read the https://github.com/micronaut-projects/micronaut-security/releases/tag/v3.4.0[release notes] and the https://micronaut-projects.github.io/micronaut-security/latest/guide/#builtInEndpointsAccess[documentation] to learn more.
-
-=== BOM Modules
-
-Several projects include a BOM (Bills of Materials) module:
-
-- https://github.com/micronaut-projects/micronaut-azure/releases/tag/v3.1.0[Micronaut Azure 3.1.0]
-- https://github.com/micronaut-projects/micronaut-gcp/releases/tag/v4.1.0[Micronaut GCP 4.1.0]. It includes updates to the latest versions of Google Cloud dependencies.
-- https://github.com/micronaut-projects/micronaut-kotlin/releases/tag/v3.2.0[Micronaut Kotlin 3.2.0]
-- https://github.com/micronaut-projects/micronaut-mongodb/releases/tag/v4.1.0[Micronaut MongoDB 4.1.0]
-- https://github.com/micronaut-projects/micronaut-mqtt/releases/tag/v2.1.0[Micronaut MQTT 2.1.0]
-- https://github.com/micronaut-projects/micronaut-reactor/releases/tag/v2.2.1[Micronaut Reactor 2.2.1]. It includes updates to the Project Reactor dependencies.
-- https://github.com/micronaut-projects/micronaut-redis/releases/tag/v5.2.0[Micronaut Redis 5.2.0]
-- https://github.com/micronaut-projects/micronaut-rxjava2/releases/tag/v1.2.0[Micronaut RxJava2 1.2.0]
-- https://github.com/micronaut-projects/micronaut-rxjava3/releases/tag/v2.2.0[Micronaut RxJava3 2.2.0]
-- https://github.com/micronaut-projects/micronaut-security/releases/tag/v3.4.0[Micronaut Security 3.4.1]
-- https://github.com/micronaut-projects/micronaut-servlet/releases/tag/v3.2.0[Micronaut Servlet 3.2.0]. It includes updates to Tomcat and Undertow dependencies.
-
-=== Other Module Upgrades
-
-- https://github.com/micronaut-projects/micronaut-aws/releases/tag/v3.2.0[Micronaut AWS 3.2.0] updates to the latest version of AWS SDK, ASK SDK and AWS Serverless Java Container.
-- https://github.com/micronaut-projects/micronaut-email/releases/tag/v1.1.0[Micronaut Email 1.1.0] updates to the Sendgrid 4.8.3 and contains improvements for `javamail` module users.
-- https://github.com/micronaut-projects/micronaut-test/releases/tag/v3.1.0[Micronaut Test 3.1.0] updates the underlying testing dependencies.
-
-== 3.3.0
-
-=== GraalVM 22.0.0.2
-
-Micronaut now supports the latest GraalVM 22.0.0.2 release.
-
-=== Environment Endpoint
-
-A new API api:management.endpoint.env.EnvironmentEndpointFilter[] has been created to allow applications to customize which keys should have their values masked and which keys should not have their values masked. See the <<environmentEndpoint, documentation>> for full details.
-
-=== AOP Interceptor Binding
-
-When binding an AOP annotation to an interceptor, only the presence of the annotation is used to determine if the interceptor should be applied. Now it's possible to also bind based on the values of the annotation. To enable this feature, set the `bindMembers` member of the ann:aop.InterceptorBinding[] annotation to `true`.
-
-=== Netty Buffer Allocation
-
-It is now possible to configure the default Netty buffer allocator. See the https://docs.micronaut.io/3.3.x/guide/configurationreference.html#io.micronaut.buffer.netty.DefaultByteBufAllocatorConfiguration[configuration reference].
-
-=== Improved Flexibility in Class Style
-
-Many features of the Micronaut framework rely on the convention of getters and setters. Due to things like records and builders, the method names we look for are now configurable with the ann:core.annotation.AccessorsStyle[] annotation. For example, the annotation can be placed on ann:context.annotation.ConfigurationProperties[] beans to allow for binding configuration to methods that do not begin with `set`. It can also be used with classes annotated with ann:core.annotation.Introspected[].
-
-=== Access Log Exclusions
-
-The Netty access logger now supports excluding requests based on a set of regular expression patterns that match against the URI. See the <<accessLogger,AccessLogger documentation>>.
-
-=== New Serialization/Deserialization Module
-
-https://micronaut-projects.github.io/micronaut-serialization/1.0.x/guide/[Micronaut Serialization] is a new module created as an alternative to Jackson. It supports serializing and deserializing Java types (including Java 17 records) to and from JSON and other formats.
-
-Users now have the choice of an alternative implementation that's largely compatible with existing Jackson annotations but contains many benefits, including the elimination of reflection, compile-time validation, greater security because only explicit types are serializable, and reduction of native image build sizes, build times, and memory usage.
-
-=== New Email Module
-
-https://micronaut-projects.github.io/micronaut-email/latest/guide/[Micronaut Email] is a new module to ease sending emails from a Micronaut application. It provides integration with transactional email providers such as Amazon Simple Email Service, Postmark, Mailjet or SendGrid.
-
-=== Micronaut AOT
-
-During this minor cycle, we released a milestone release of a new module Micronaut AOT. You can use Micronaut AOT and use the build-time optimizations provided by the module to achieve faster startup times via the Micronaut Gradle Plugin. Please, read more about it in the https://micronaut.io/2021/12/20/micronaut-aot-build-time-optimizations-for-micronaut-applications/[announcement blog post].
-
-=== Micronaut Kubernetes 3.3.0
-
-Micronaut Kubernetes 3.3 adds support to easily create the Kubernetes Operator. The Kubernetes Operator is a known pattern used to extend the capabilities of Kubernetes by creating application specific controllers for both native and custom resources. See more on https://micronaut-projects.github.io/micronaut-kubernetes/latest/guide/#kubernetes-operator[Kubernetes Operator].
-
-The version of Micronaut Kubernetes 3.3.0 also adds new Kubernetes reactive client for RxJava3.
-
-=== Other Module Upgrades
-
-- Micronaut Cache 3.1.0
-- Micronaut Discovery Client 3.1.0
-- Micronaut Elasticsearch 4.2.0
-- Micronaut Flyway 5.1.1
-- Micronaut Kafka 4.1.1
-- Micronaut Kotlin 3.1.0
-- Micronaut Liquibase 5.1.1
-- Micronaut Openapi 4.0.0
-- Micronaut Picocli 4.1.0
-- Micronaut Problem 2.2.0
-- Micronaut Security 3.3.0
-- Micronaut Sql 4.1.1
-- Micronaut Toml 1.0.0-M2
-- Micronaut Views 3.1.2
-
-=== Other Dependency Upgrades
-
-- Apache Commons DBCP 2.9.0
-- Elasticsearch 7.16.3
-- Flyway 8.4.2
-- Hibernate 5.5.9.Final
-- Kotlin 1.6.10
-- Liquibase 4.7.1
-- Logback 1.2.10
-- Swagger 2.1.12
-
-== 3.2.0
-
-=== GraalVM 21.3.0
-
-Micronaut has been updated to support the latest GraalVM 21.3.0 release. Please keep in mind that starting with 21.3.0 GraalVM doesn't release a version based on JDK 8. If you still use Java 8 use the GraalVM JDK 11 distribution.
-
-The official GraalVM Maven plugin has new GAV coordinates so if you have declared it in your `pom.xml` update the coordinates to:
-
-[source,xml]
-----
-<plugin>
-    <groupId>org.graalvm.buildtools</groupId>
-    <artifactId>native-maven-plugin</artifactId>
-...
-</plugin>
-----
-
-Please check https://graalvm.github.io/native-build-tools/0.9.7.1/maven-plugin.html[the official documentation] about how to customize the plugin.
-
-=== Gradle Plugin 3.0.0
-
-A new major version of the Gradle plugin has been released, including internal changes to use Gradle's lazy configuration APIs.
-In the process, https://micronaut-projects.github.io/micronaut-gradle-plugin/latest/[documentation] has been rewritten.
-
-Support for GraalVM now delegates to https://graalvm.github.io/native-build-tools/0.9.7.1/gradle-plugin.html[the official GraalVM plugin].
-We recommend to upgrade in order to get the latest bugfixes, but this constitutes a breaking change for some users:
-
-- the `nativeImage` task is now replaced with `nativeCompile`
-- native image configuration happens in the `graalvmNative` DSL extension instead of the `nativeCompile` task
-- native image building makes use of Gradle's toolchain support. Please refer to the https://micronaut-projects.github.io/micronaut-gradle-plugin/latest/[documentation] for help.
-
-NOTE: You can still build existing applications or libraries using the 2.x version of the Gradle plugin. Documentation for this version can be found https://github.com/micronaut-projects/micronaut-gradle-plugin/blob/2.0.x/README.md[here].
-
-=== Kotlin 1.6.0
-
-Micronaut 3.2.0 includes support for Kotlin 1.6.0.
-
-=== HTTP Features
-
-==== WebSocket Ping API
-
-WebSocket ann:websocket.annotation.OnMessage[] methods can now accept a api:websocket.WebSocketPongMessage[] parameter that will receive a WebSocket pong sent as a response to a ping submitted using the new `sendPingAsync` method on api:websocket.WebSocketSession[].
-
-==== HTTP2 Server Push
-
-It is now possible to send resources, e.g. stylesheets required by a HTML page, to the client alongside the request for the page using the HTTP2 server push protocol. See the <<http2Server, HTTP/2 documentation>> for information on how to use this feature.
-
-==== JsonView on request bodies
-
-You can now specify the Jackson `@JsonView` annotation on `@Body` parameters to controller methods.
-
-==== WebSocket ws/wss protocol support
-
-The WebSocket clients now support the ws/wss protocol. To implement this change, the api:websocket.WebSocketClient[] `create` methods now take a `URI` instead of a `URL`. The `URL` methods have been deprecated.
-
-Note: Should you be calling `WebSocketClient.create(null)`, the method call is now ambiguous. Insert a cast in that case: `WebSocketClient.create((URI) null)`
-
-==== SSL handshake timeout configuration
-
-The SSL handshake timeout can now be configured using the `micronaut.ssl.handshakeTimeout` and `micronaut.http.client.ssl.handshakeTimeout` configurations for the server and client respectively.
-
-=== Module Upgrades
-
-==== Micronaut Data 3.2.0
-
-- Repositories with JPA Criteria API specification for Micronaut JDBC/R2DBC
-- Expandable query parameters optimizations
-
-==== Reactive Modules
-
-- The RxJava2, RxJava3, and Reactor modules have been updated with the equivalent static `create` methods on their core counterparts.
-
-==== Micronaut Micrometer 4.1.0
-
-- Adds support for metrics with gRPC
-
-==== Micronaut Security 3.2.0
-
-- The way JSON Web Key Sets are being cached has been greatly improved for scenarios where there are multiple key sets.
-
-==== Other Module Upgrades
-
-- Elasticsearch 7.15.2
-- Flyway 8.0.2
-- gRPC 1.39.0
-- Liquibase 4.6.1
-- Micronaut Elasticsearch 4.0.0
-- Micronaut Flyway 5.0.0
-- Micronaut gRPC 3.1.1
-- Micronaut Liquibase 5.0.0
-- Micronaut OpenAPI 3.2.0
-- Micronaut Redis 5.1.0
-- Testcontainers 1.16.1
-
-== 3.1.0
-
-=== Core Features
-
-==== Primitive Beans
-
-<<factories, Factory Beans>> can now create beans that are primitive types or primitive array types.
-
-See the section on <<factories, Primitive Beans and Arrays>> in the documentation for more information.
-
-==== Repeatable Qualifiers
-
-<<qualifiers, Qualifiers>> can now be repeatable (an annotation annotated with `java.lang.annotation.Repeatable`) allowing narrowing bean resolution by a complete or partial match of the qualifiers declared on the injection point.
-
-==== InjectScope
-
-A new ann:context.annotation.InjectScope[] annotation has been added which destroys any beans with no defined scope and injected into a method or constructor annotated with `@Inject` after the method or constructor completes.
-
-==== More Build Time Optimizations
-
-Further build time metadata optimizations have been added included reducing the number and size of the classes generated to support <<introspection, Bean Introspection>> and including knowledge of repeatable annotations in generated metadata avoiding further reflective calls and optimizing Micronaut's memory usage, in particular with GraalVM.
-
-==== Improvements to Context Propagation
-
-Support for <<context,Reactive context propagation>> has been further improved by inclusion of request context information in the https://projectreactor.io/docs/core/release/reference/#context[Reactor context] and <<kotlinContextPropagation, documentation on how to effectively propagate the context across reactive flows>> when using Kotlin coroutines.
-
-==== Improvements to the Element API
-
-The build-time api:inject.ast.Element[] API has been improved in a number of ways:
-
-* New methods were added to the api:inject.ast.MethodElement[] API to resolve the retriever type and throws declaration
-* A new experimental API has been added to the api:inject.ast.ClassElement[] API  to resolve generic placeholders and resolve the generic bound to the element
-
-=== HTTP Features
-
-==== Filter By Regex
-
-HTTP filters now support matching URLs by a regular expression. Set the `patternStyle` member of the annotation to `REGEX` and the value will be treated as a regular expression.
-
-==== Random Port Binding
-
-The way the server binds to random ports has improved and should result in fewer port binding exceptions in tests.
-
-==== Client Data Formatting
-
-The ann:core.convert.format.Format[] annotation now supports several new values that can be used in conjunction with the declarative HTTP client to support formatting data in several new ways. See the <<clientParameters, client parameters>> documentation for more information.
-
-==== StreamingFileUpload
-
-The api:http.multipart.StreamingFileUpload[] API has been improved to support streaming directly to an output stream. As with the other `transferTo` methods, the write to the stream is offloaded to the IO pool automatically.
-
-==== Server SSL Configuration
-
-The SSL configuration for the Netty server now responds to refresh events. This allows for swapping out certificates without having to restart the server. See the <<https, https documentation>> for information on how to trigger the refresh.
-
-==== New Netty Server API
-
-If you wish to programmatically start additional Netty servers on different ports with potentially different configurations, new APIs have been added to do so including a new api:http.server.netty.NettyEmbeddedServerFactory[] interface.
-
-See the documentation on <<secondaryServers, Starting Secondary Servers>> for more information.
-
-=== Deprecations
-
-The `netty.responses.file.\*` configuration is deprecated in favor of `micronaut.server.netty.responses.file.*`. The old configuration key will be removed in the next major version of the framework.
-
-=== Module Upgrades
-
-==== Micronaut Data 3.1.0
-
-- Kotlin's coroutines support. New repository interface `CoroutineCrudRepository`.
-- Support for `AttributeConverter`
-- R2DBC upgraded to `Arabba-SR11`
-- JPA Criteria specifications
-
-==== Micronaut JAX-RS 3.1
-
-The https://micronaut-projects.github.io/micronaut-jaxrs/latest/guide/[JAX-RS module] now integrated with Micronaut Security allowing binding of the JAX-RS `SecurityContext`
-
-==== Micronaut Kubernetes 3.1.0
-
-Micronaut Kubernetes 3.1 introduces new annotation https://micronaut-projects.github.io/micronaut-kubernetes/latest/api/io/micronaut/kubernetes/client/informer/Informer.html[@Informer]. By using the annotation on the https://javadoc.io/doc/io.kubernetes/client-java/latest/io/kubernetes/client/informer/ResourceEventHandler.html[ResourceEventHandler] the Micronaut will instantiate the https://javadoc.io/doc/io.kubernetes/client-java/latest/io/kubernetes/client/informer/SharedIndexInformer.html[SharedInformer] from the official https://github.com/kubernetes-client/java[Kubernetes Java SDK]. Then you only need to take care of handling the changes of the watched Kubernetes resource. See more on https://micronaut-projects.github.io/micronaut-kubernetes/latest/guide/#kubernetes-informer[Kubernetes Informer].
-
-==== Micronaut Oracle Coherence 3.0.0
-
-The https://micronaut-projects.github.io/micronaut-coherence/latest/guide/[Micronaut Oracle Coherence] module is now out of preview status and includes broad integration with Oracle Coherence including support for caching, messaging and Micronaut Data.
-
-== 3.0.0
-
-=== Core Features
-
-==== Optimized Build-Time Metadata
-
-Micronaut 3.0 introduces a new build time metadata format that is more efficient in terms of startup and code size.
-
-The result is significant improvements to startup and native image sizes when building native images with GraalVM Native Image.
-
-It is recommended that users re-compile their applications and libraries with Micronaut 3.0 to benefit from these changes.
-
-==== Support for GraalVM 21.2
-
-Micronaut has been updated to support the latest GraalVM 21.2 release.
-
-==== Jakarta Inject
-
-The `jakarta.inject` annotations are now the default injection annotations for Micronaut 3
-
-==== Support for JSR-330 Bean Import
-
-Using the ann:context.annotation.Import[] annotation it is now possible to import bean definitions into your application where JSR-330 (either `javax.inject` or `jakarta.inject` annotations) are used in an external library.
-
-See the documentation on <<beanImport, Bean Import>> for more information.
-
-==== Support for Controlling Annotation Inheritance
-
-api:core.annotation.AnnotationMetadata[] inheritance can now be controlled via Java's `@Inherited` annotation. If an annotation is not explicitly annotated with `@Inherited` it will not be included in the metadata. See the <<annotationMetadata, Annotation Inheritance>> section of the documentation for more information.
-
-NOTE: This is an important behavioural change from Micronaut 2.x, see the <<breaks, Breaking Changes>> section for information on how to upgrade.
-
-==== Support Narrowing Injection by Generic Type Arguments
-
-Micronaut can now resolve the correct bean to inject based on the generic type arguments specified on the injection point:
-
-snippet::io.micronaut.docs.inject.generics.Vehicle[tags="constructor",indent=0]
-
-For more information see the section on <<qualifiers, Qualifying by Generic Type Arguments>>.
-
-==== Support for using Annotation Members in Qualifiers
-
-You can now use annotation members in qualifiers and specify which members should be excluded with the new ann:context.annotation.NonBinding[] annotation.
-
-For more information see the section on <<qualifiers, Qualifying By Annotation Members>>.
-
-==== Support for Limiting the Injectable Types
-
-You can now limit the exposed types of a bean using the `typed` member of the ann:context.annotation.Bean[] annotation:
-
-snippet::io.micronaut.docs.inject.typed.V8Engine[tags="class",indent=0]
-
-For more information see the section on <<typed, Limiting Injectable Types>>.
-
-==== Factories can produce bean from fields
-
-Beans defined with the ann:context.annotation.Factory[] annotation can now produce beans from public or package protected fields, for example:
-
-snippet::io.micronaut.docs.factories.VehicleMockSpec[tags="class",indent=0]
-
-For more information see the <<factories, Bean Factories>> section of the documentation.
-
-==== Enhanced `BeanProvider` Interface
-
-The api:context.BeanProvider[] interface has been enhanced with new methods such as `iterator()` and `stream()` as well as methods to check for bean existence and uniqueness.
-
-==== New `@Any` Qualifier for use in Bean Factories
-
-A new ann:context.annotation.Any[] qualifier has been introduced to allow injecting any available instance into an injection point and can be used in combination with the new `BeanProvider` interface mentioned above to allow more dynamic behaviour.
-
-snippet::io.micronaut.docs.qualifiers.any.Vehicle[tags="imports,clazz", indent=0, title="Using BeanProvider with Any"]
-
-The annotation can also be used on ann:context.annotation.Factory[] methods to allow customization of how objects are injected via the api:inject.InjectionPoint[] API.
-
-==== Support for Fields in Bean Introspections
-
-Bean introspections on public or package protected fields are now supported:
-
-snippet::io.micronaut.docs.ioc.beans.User[tags="class", indent=0]
-
-For more information see the "Bean Fields" section of the <<introspection, Bean Introspections>> documentation.
-
-==== `ApplicationEventPublisher` has now a generic event type
-
-For the performance reasons it's advised to inject an instance of `ApplicationEventPublisher` with a generic type parameter - `ApplicationEventPublisher<MyEvent>`.
-
-=== AOP Features
-
-==== Support for Constructor Interception
-
-It is now possible to intercept bean construction invocations through the api:aop.ConstructorInterceptor[] interface and ann:aop.AroundConstruct[] annotation.
-
-See the section on <<lifecycleAdvice, Bean Life Cycle Advice>> for more information.
-
-==== Support for `@PostConstruct` & `@PreDestroy` Interception
-
-It is now possible to intercept `@PostConstruct` and `@PreDestroy` method invocations through the api:aop.MethodInterceptor[] interface and ann:aop.InterceptorBinding[] annotation.
-
-See the section on <<lifecycleAdvice, Bean Life Cycle Advice>> for more information.
-
-
-==== Random Configuration Values
-
-It is now possible to set a max and a range for random numbers in configuration. For example to set an integer between 0 and 9, `${random.int(10)}` can be used as the configuration value. See the <<propertySource, documentation>> under "Using Random Properties" for more information.
-
-==== Project Reactor used internally instead of RxJava2
-
-Micronaut 3 uses internally https://projectreactor.io[Project Reactor] instead https://github.com/ReactiveX/RxJava[RxJava 2]. Project Reactor allows
-Micronaut 3 to simplify instrumentation, thanks to https://projectreactor.io/docs/core/release/api/reactor/util/context/Context.html[Reactor's Context],  simplifies conversion login and eases the integration with R2DBC drivers. We recommend users to migrate to Reactor. However, it is possible to continue to use RxJava. See <<reactiveConfigs, Reactive Programming section>>.
-
-=== Module Upgrades
-
-==== Micronaut Data 3.1.0
-
-- Kotlin's coroutines support. New repository interface `CoroutineCrudRepository`.
-- Support for `AttributeConverter`
-- R2DBC upgraded to `Arabba-SR11`
-- JPA Criteria specifications
-
-==== Micronaut Micrometer 4.0.0
-
-The https://micronaut-projects.github.io/micronaut-micrometer/latest/guide/[Micrometer module] has been upgraded and now supports repeated definitions of the https://micrometer.io/?/docs/concepts#_the_timed_annotation[@Timed] annotation as well as also supporting the `@Counted` annotation for counters when you add the `micronaut-micrometer-annotation` dependency to your annotation processor classpath.
-
-==== Micronaut Oracle Cloud 2.0.0
-
-Micronaut's https://micronaut-projects.github.io/micronaut-oracle-cloud/latest/guide/[Oracle Cloud Integration] has been updated with support for Cloud Monitoring and Tracing.
-
-
-==== Micronaut Cassandra 4.0.0
-
-The https://micronaut-projects.github.io/micronaut-cassandra/latest/guide/[Micronaut Cassandra] integration now includes support for GraalVM out of the box.
-
-==== Other Modules
-
-- Micronaut Acme 3.0.0
-- Micronaut Aws 3.0.0
-- Micronaut Azure 3.0.0
-- Micronaut Cache 3.0.0
-- Micronaut Discovery Client 3.0.0
-- Micronaut ElasticSearch 3.0.0
-- Micronaut Flyway 4.1.0
-- Micronaut GCP 4.0.0
-- Micronaut GraphQL 3.0.0
-- Micronaut Groovy 3.0.0
-- Micronaut Grpc 3.0.0
-- Micronaut Jackson XML 3.0.0
-- Micronaut Jaxrs 3.0.0
-- Micronaut JMX 3.0.0
-- Micronaut Kafka 4.0.0
-- Micronaut Kotlin 3.0.0
-- Micronaut Kubernetes 3.0.0
-- Micronaut Liquibase 4.0.2
-- Micronaut Mongo 4.0.0
-- Micronaut MQTT 2.0.0
-- Micronaut Multitenancy 4.0.0
-- Micronaut Nats Io 3.0.0
-- Micronaut Neo4j 5.0.0
-- Micronaut OpenApi 3.0.1
-- Micronaut Picocli 4.0.0
-- Micronaut Problem Json 2.0.0
-- Micronaut R2DBC 2.0.0
-- Micronaut RabbitMQ 3.0.0
-- Micronaut Reactor 2.0.0
-- Micronaut Redis 5.0.0
-- Micronaut RSS 3.0.0
-- Micronaut RxJava2 1.0.0 (new)
-- Micronaut RxJava3 2.0.0
-- Micronaut Security 3.0.0
-- Micronaut Servlet 3.0.0
-- Micronaut Spring 4.0.0
-- Micronaut SQL 4.0.0
-- Micronaut Test 3.0.0
-- Micronaut Views 3.0.0
-
-=== Dependency Upgrades
-
-- Caffeine 2.9.1
-- Cassandra 4.11.1
-- Elasticsearch 7.12.0
-- Flyway 7.12.1
-- GraalVM 21.2.0
-- H2 Database 1.4.200
-- Hazelcast 4.2.1
-- Hibernate 5.5.3.Final
-- Hikari 4.0.3
-- Infinispan 12.1.6.Final
-- Jackson 2.12.4
-- Jaeger 1.6.0
-- Jakarta Annotation API 2.0.0
-- JAsync 1.2.2
-- JDBI 3.20.1
-- JOOQ 3.14.12
-- JUnit 5.7.2
-- Kafka 2.8.0
-- Kotlin 1.5.21
-- Kotlin Coroutines 1.5.1
-- Ktor 1.6.1
-- Liquibase 4.4.3
-- MariaDB Driver 2.7.3
-- Micrometer 1.7.1
-- MongoDB 4.3.0
-- MS SQL Driver 9.2.1.jre8
-- MySQL Driver 8.0.25
-- Neo4j Driver 4.2.7
-- Postgres Driver 42.2.23
-- Reactor 3.4.8
-- RxJava3 3.0.13
-- SLF4J 1.7.29
-- Snake YAML 1.29
-- Spock 2.0-groovy-3.0
-- Spring 5.3.9
-- Spring Boot 2.5.3
-- Testcontainers 1.15.3
-- Tomcat JDBC 10.0.8
-- Vertx SQL Drivers 4.1.1

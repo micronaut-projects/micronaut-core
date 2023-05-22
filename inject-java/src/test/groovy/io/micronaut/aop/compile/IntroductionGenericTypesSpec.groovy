@@ -19,9 +19,8 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.core.type.ReturnType
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
-
 /**
  * @author graemerocher
  * @since 1.0
@@ -40,7 +39,7 @@ import java.net.*;
 interface MyInterface<T extends URL> {
 
     T getURL();
-    
+
     java.util.List<T> getURLs();
 }
 
@@ -57,12 +56,14 @@ interface MyBean extends MyInterface<URL> {
         beanDefinition != null
         beanDefinition.injectedFields.size() == 0
         beanDefinition.executableMethods.size() == 2
-        beanDefinition.executableMethods[0].methodName == 'getURL'
-        beanDefinition.executableMethods[0].targetMethod.returnType == URL
-        beanDefinition.executableMethods[0].returnType.type == URL
-        beanDefinition.executableMethods[1].returnType.type == List
-        beanDefinition.executableMethods[1].returnType.asArgument().hasTypeVariables()
-        beanDefinition.executableMethods[1].returnType.asArgument().typeVariables['E'].type == URL
+        def getUrlMethod = beanDefinition.executableMethods.find { it.name == "getURL" }
+        getUrlMethod.methodName == 'getURL'
+        getUrlMethod.targetMethod.returnType == URL
+        getUrlMethod.returnType.type == URL
+        def getUrlsMethod = beanDefinition.executableMethods.find { it.name == "getURLs" }
+        getUrlsMethod.returnType.type == List
+        getUrlsMethod.returnType.asArgument().hasTypeVariables()
+        getUrlsMethod.returnType.asArgument().typeVariables['E'].type == URL
     }
 
 
@@ -78,21 +79,21 @@ import java.net.*;
 interface MyInterface<T extends Person> {
 
     reactor.core.publisher.Mono<java.util.List<T>> getPeopleSingle();
-    
+
     T getPerson();
-    
+
     java.util.List<T> getPeople();
-    
+
     void save(T person);
-    
+
     void saveAll(java.util.List<T> person);
-    
+
     T[] getPeopleArray();
-    
+
     java.util.List<T[]> getPeopleListArray();
-    
+
     <V extends java.net.URL> java.util.Map<T,V> getPeopleMap();
-    
+
 }
 
 
@@ -130,7 +131,7 @@ class SubPerson extends Person {}
         when:
         def context = new DefaultBeanContext()
         context.start()
-        def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition)beanDefinition).instantiate(context)
 
 
         then:"the methods are invocable"

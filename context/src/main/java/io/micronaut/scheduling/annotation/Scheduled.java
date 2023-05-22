@@ -82,4 +82,13 @@ public @interface Scheduled {
      * {@link java.util.concurrent.ScheduledExecutorService} to use to schedule the task
      */
     String scheduler() default TaskExecutors.SCHEDULED;
+
+    /**
+     * A custom expression that can be used to indicate whether the job should run.
+     * Will be evaluated each time the job is scheduled to run and if the condition evaluates to false the job will not run.
+     *
+     * @return The condition
+     * @since 4.0.0
+     */
+    String condition() default "";
 }

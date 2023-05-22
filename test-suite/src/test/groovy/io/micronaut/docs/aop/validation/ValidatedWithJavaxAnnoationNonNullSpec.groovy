@@ -24,8 +24,8 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 import jakarta.inject.Singleton
-import javax.validation.ConstraintViolationException
-import javax.validation.constraints.NotNull
+import jakarta.validation.ConstraintViolationException
+import jakarta.validation.constraints.NotNull
 
 class ValidatedWithJavaxAnnoationNonNullSpec extends Specification {
 
@@ -35,7 +35,7 @@ class ValidatedWithJavaxAnnoationNonNullSpec extends Specification {
             'spec.name': 'nonnull'
     ], Environment.TEST)
 
-    void "javax.annotation.NonNull does not fails validation"() {
+    void "jakarta.annotation.Nonnull does not fails validation"() {
         given:
         NonNullService nonNullService = applicationContext.getBean(NonNullService)
 

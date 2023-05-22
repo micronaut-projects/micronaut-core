@@ -27,13 +27,13 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
-import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
+import spock.lang.Issue
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import javax.annotation.Nullable
+import jakarta.annotation.Nullable
 
 class QueryParametersSpec extends Specification {
 
@@ -60,6 +60,18 @@ class QueryParametersSpec extends Specification {
         client.searchExplodedMap(flavour, [term: "Riverside"]).albums.size() == 2
         where:
         flavour << [ "pojo", "singlePojo", "list", "map" ]
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/8338')
+    void "test client mappping URL parameters appended through a Map does not modify the Map"() {
+        when:
+        // this modification is relatively benign, but if the user passed a Map.of, then trying to remove null leads to
+        // an exception. Unfortunately we can't test with Map.of.
+        def map = [term: "Riverside", foo: null]
+        def result = client.searchExplodedMap("map", map)
+        then:
+        result.albums.size() == 2
+        map.containsValue(null)
     }
 
     @Unroll

@@ -123,6 +123,7 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
         try {
             sendAsync(message, mediaType).get();
         } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             throw new WebSocketSessionException("Send Interrupted");
         } catch (ExecutionException e) {
             throw new WebSocketSessionException("Send Failure: " + e.getMessage(), e);

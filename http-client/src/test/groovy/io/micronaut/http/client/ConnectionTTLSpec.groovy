@@ -8,14 +8,11 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.channel.Channel
-import io.netty.channel.pool.AbstractChannelPoolMap
 import spock.lang.AutoCleanup
 import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
-
-import java.lang.reflect.Field
 
 @Retry
 class ConnectionTTLSpec extends Specification {
@@ -37,7 +34,7 @@ class ConnectionTTLSpec extends Specification {
 
     when:"make first request"
     httpClient.toBlocking().retrieve(HttpRequest.GET('/connectTTL/'),String)
-    Channel ch = getQueuedChannels(httpClient).first
+    Channel ch = getQueuedChannels(httpClient).get(0)
 
     then:"ensure that connection is open as connect-ttl is not reached"
     getQueuedChannels(httpClient).size() == 1
@@ -67,11 +64,11 @@ class ConnectionTTLSpec extends Specification {
 
     when:"make first request"
     httpClient.toBlocking().retrieve(HttpRequest.GET('/connectTTL/'),String)
-    Deque<Channel> deque = getQueuedChannels(httpClient)
+    List<Channel> deque = getQueuedChannels(httpClient)
 
     then:"ensure that connection is open as connect-ttl is not reached"
     new PollingConditions().eventually {
-      deque.first.isOpen()
+      deque.get(0).isOpen()
     }
 
     when:"make another request after some time"
@@ -80,7 +77,7 @@ class ConnectionTTLSpec extends Specification {
 
     then:"ensure channel is still open"
     new PollingConditions().eventually {
-      deque.first.isOpen()
+      deque.get(0).isOpen()
     }
 
     cleanup:
@@ -99,11 +96,11 @@ class ConnectionTTLSpec extends Specification {
 
     when:"make first request"
     httpClient.toBlocking().retrieve(HttpRequest.GET('/connectTTL/'),String)
-    Deque<Channel> deque = getQueuedChannels(httpClient)
+    Collection<Channel> deque = getQueuedChannels(httpClient)
 
     then:"ensure that connection is open as connect-ttl is not reached"
     new PollingConditions().eventually {
-      deque.first.isOpen()
+      deque.get(0).isOpen()
     }
 
     when:"make another request"
@@ -111,7 +108,7 @@ class ConnectionTTLSpec extends Specification {
 
     then:"ensure channel is still open"
     new PollingConditions().eventually {
-      deque.first.isOpen()
+      deque.get(0).isOpen()
     }
 
     cleanup:
@@ -130,7 +127,7 @@ class ConnectionTTLSpec extends Specification {
 
     when:"make first request"
     httpClient.toBlocking().retrieve(HttpRequest.GET('/connectTTL/'),String)
-    Channel ch = getQueuedChannels(httpClient).first
+    Channel ch = getQueuedChannels(httpClient).get(0)
 
     then:"ensure that connection is open as connect-ttl is not reached"
     getQueuedChannels(httpClient).size() == 1
@@ -149,12 +146,8 @@ class ConnectionTTLSpec extends Specification {
     clientContext.close()
   }
 
-  Deque getQueuedChannels(HttpClient client) {
-    AbstractChannelPoolMap poolMap = client.connectionManager.poolMap
-    Field mapField = AbstractChannelPoolMap.getDeclaredField("map")
-    mapField.setAccessible(true)
-    Map innerMap = mapField.get(poolMap)
-    return innerMap.values().first().deque
+  List<Channel> getQueuedChannels(HttpClient client) {
+    return client.connectionManager.channels
   }
 
   @Requires(property = 'spec.name', value = 'ConnectionTTLSpec')

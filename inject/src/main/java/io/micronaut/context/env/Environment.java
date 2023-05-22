@@ -17,7 +17,7 @@ package io.micronaut.context.env;
 
 import io.micronaut.context.LifeCycle;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.BeanIntrospectionScanner;
 import io.micronaut.core.reflect.ClassUtils;
@@ -53,7 +53,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Environment extends PropertyResolver, LifeCycle<Environment>, ConversionService<Environment>, ResourceLoader {
+public interface Environment extends PropertyResolver, LifeCycle<Environment>, MutableConversionService, ResourceLoader {
 
     /**
      * Constant for the name micronaut.

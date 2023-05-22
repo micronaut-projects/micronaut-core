@@ -15,25 +15,31 @@
  */
 package io.micronaut.http.client
 
-import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
-import io.micronaut.http.*
+import io.micronaut.core.async.annotation.SingleResult
+import io.micronaut.http.HttpHeaders
+import io.micronaut.http.HttpMethod
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
+import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.sse.Event
 import io.micronaut.http.uri.UriBuilder
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
-import spock.lang.Specification
-import spock.lang.Shared
 import spock.lang.AutoCleanup
 import spock.lang.Issue
+import spock.lang.Shared
+import spock.lang.Specification
 import spock.lang.Unroll
 
 /**
@@ -326,7 +332,7 @@ class ServerRedirectSpec extends Specification {
         @Produces([MediaType.TEXT_EVENT_STREAM, MediaType.APPLICATION_JSON_STREAM])
         HttpResponse<Flux<?>> title(final HttpHeaders headers) {
             if (headers.accept().contains(MediaType.TEXT_EVENT_STREAM_TYPE)) {
-                return HttpResponse.ok(Flux.just("The Stand")).contentType(MediaType.TEXT_EVENT_STREAM)
+                return HttpResponse.ok(Flux.just(Event.of("The Stand"))).contentType(MediaType.TEXT_EVENT_STREAM)
             }
             return HttpResponse.ok(Flux.just(new Book(title: "The Stand"))).contentType(MediaType.APPLICATION_JSON_STREAM)
         }

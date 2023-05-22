@@ -31,15 +31,15 @@ import java.util.regex.Pattern;
  */
 public class UriTypeMatchTemplate extends UriMatchTemplate {
 
-    private Class[] variableTypes;
+    private Class<?>[] variableTypes;
 
     /**
      * @param templateString The template
      * @param variableTypes  The variable types
      */
-    public UriTypeMatchTemplate(CharSequence templateString, Class... variableTypes) {
+    public UriTypeMatchTemplate(CharSequence templateString, Class<?>... variableTypes) {
         super(templateString, new Object[] {variableTypes});
-        this.variableTypes = variableTypes == null ? new Class[0] : variableTypes;
+        this.variableTypes = variableTypes == null ? new Class<?>[0] : variableTypes;
     }
 
     /**
@@ -49,7 +49,7 @@ public class UriTypeMatchTemplate extends UriMatchTemplate {
      * @param variableTypes     The variable types
      * @param variables         The variables
      */
-    protected UriTypeMatchTemplate(CharSequence templateString, List<PathSegment> segments, Pattern matchPattern, Class[] variableTypes, List<UriMatchVariable> variables) {
+    protected UriTypeMatchTemplate(CharSequence templateString, List<PathSegment> segments, Pattern matchPattern, Class<?>[] variableTypes, List<UriMatchVariable> variables) {
         super(templateString, segments, matchPattern, variables);
         this.variableTypes = variableTypes;
     }
@@ -64,7 +64,7 @@ public class UriTypeMatchTemplate extends UriMatchTemplate {
      * @param variableTypes The variable types
      * @return The new URI template
      */
-    public UriTypeMatchTemplate nest(CharSequence uriTemplate, Class... variableTypes) {
+    public UriTypeMatchTemplate nest(CharSequence uriTemplate, Class<?>... variableTypes) {
         return (UriTypeMatchTemplate) super.nest(uriTemplate, new Object[] {variableTypes});
     }
 
@@ -79,7 +79,7 @@ public class UriTypeMatchTemplate extends UriMatchTemplate {
         if (this.variables == null) {
             this.variables = new ArrayList<>();
         }
-        this.variableTypes = parserArguments != null && parserArguments.length > 0 ? (Class[]) parserArguments[0] : new Class[0];
+        this.variableTypes = parserArguments != null && parserArguments.length > 0 ? (Class<?>[]) parserArguments[0] : new Class<?>[0];
         return new TypedUriMatchTemplateParser(templateString, this);
     }
 
@@ -94,7 +94,7 @@ public class UriTypeMatchTemplate extends UriMatchTemplate {
      * @param operator     The operator
      * @return The variable match pattern
      */
-    protected String resolveTypePattern(Class variableType, String variable, char operator) {
+    protected String resolveTypePattern(Class<?> variableType, String variable, char operator) {
         if (Number.class.isAssignableFrom(variableType)) {
             if (Double.class == variableType || Float.class == variableType || BigDecimal.class == variableType) {
                 return "([\\d\\.+]";
@@ -128,10 +128,10 @@ public class UriTypeMatchTemplate extends UriMatchTemplate {
         @Override
         protected String getVariablePattern(String variable, char operator) {
             UriTypeMatchTemplate matchTemplate = getMatchTemplate();
-            Class[] variableTypes = matchTemplate.variableTypes;
+            Class<?>[] variableTypes = matchTemplate.variableTypes;
             try {
                 if (variableIndex < variableTypes.length) {
-                    Class variableType = variableTypes[variableIndex];
+                    Class<?> variableType = variableTypes[variableIndex];
                     return matchTemplate.resolveTypePattern(variableType, variable, operator);
                 } else {
                     return super.getVariablePattern(variable, operator);

@@ -66,8 +66,7 @@ public class DefaultExecutableBinder<S> implements ExecutableBinder<S> {
             if (preBound.containsKey(argument)) {
                 boundArguments[i] = preBound.get(argument);
             } else {
-                Optional<? extends ArgumentBinder<?, S>> argumentBinder =
-                        registry.findArgumentBinder(argument, source);
+                Optional<? extends ArgumentBinder<?, S>> argumentBinder = registry.findArgumentBinder(argument);
 
                 if (argumentBinder.isPresent()) {
                     ArgumentBinder<?, S> binder = argumentBinder.get();
@@ -131,9 +130,7 @@ public class DefaultExecutableBinder<S> implements ExecutableBinder<S> {
                 boundArguments[i] = preBound.get(argument);
 
             } else {
-                Optional<? extends ArgumentBinder<?, S>> argumentBinder =
-                        registry.findArgumentBinder(argument, source);
-
+                Optional<? extends ArgumentBinder<?, S>> argumentBinder = registry.findArgumentBinder(argument);
                 if (argumentBinder.isPresent()) {
                     ArgumentBinder<?, S> binder = argumentBinder.get();
                     ArgumentConversionContext conversionContext = ConversionContext.of(argument);

@@ -1,3 +1,6 @@
 io.micronaut.inject.beanbuilder.TestInterceptorBindingTransformer
 io.micronaut.aop.compile.AroundCompileSpec$TestStereotypeAnnTransformer
 io.micronaut.aop.compile.AroundConstructCompileSpec$TestStereotypeAnnTransformer
+io.micronaut.annotation.mapping.TransformsToRepeatableAnnotationSpec$TheAnnotationTransformer
+io.micronaut.annotation.mapping.TransformNotInheritedAnnotationSpec$TheAnnotationMapper
+io.micronaut.annotation.mapping.TransformToInheritedAnnotationSpec$TheAnnotationMapper

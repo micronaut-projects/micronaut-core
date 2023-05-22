@@ -15,72 +15,141 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
-import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.ElementModifier;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MemberElement;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
-import org.codehaus.groovy.ast.AnnotatedNode;
-import org.codehaus.groovy.ast.PropertyNode;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.ast.annotation.PropertyElementAnnotationMetadata;
 
-import java.util.Collections;
-import java.util.Set;
+import java.util.Optional;
 
 /**
  * Implementation of {@link PropertyElement} for Groovy.
  *
  * @author graemerocher
+ * @author Denis Stepanov
  * @since 1.0
  */
 @Internal
-abstract class GroovyPropertyElement extends AbstractGroovyElement implements PropertyElement {
-
+final class GroovyPropertyElement extends AbstractGroovyElement implements PropertyElement {
+    private final ClassElement type;
     private final String name;
-    private final boolean readOnly;
-    private final Object nativeType;
-    private final GroovyClassElement declaringClass;
-    private ClassElement declaringElement;
+    private final AccessKind readAccessKind;
+    private final AccessKind writeAccessKind;
+    private final ClassElement owningElement;
+    @Nullable
+    private final MethodElement getter;
+    @Nullable
+    private final MethodElement setter;
+    @Nullable
+    private final FieldElement field;
+    private final boolean excluded;
+    private final ElementAnnotationMetadata annotationMetadata;
 
-    /**
-     * Default constructor.
-     *
-     * @param visitorContext The visitor context
-     * @param declaringClass The declaring class
-     * @param annotatedNode    The annotated node
-     * @param annotationMetadata the annotation metadata
-     * @param name the name
-     * @param readOnly Whether it is read only
-     * @param nativeType the native underlying type
-     */
-    GroovyPropertyElement(
-            GroovyVisitorContext visitorContext,
-            GroovyClassElement declaringClass,
-            AnnotatedNode annotatedNode,
-            AnnotationMetadata annotationMetadata,
-            String name,
-            boolean readOnly,
-            Object nativeType) {
-        super(visitorContext, annotatedNode, annotationMetadata);
+    GroovyPropertyElement(GroovyVisitorContext visitorContext,
+                          ClassElement owningElement,
+                          ClassElement type,
+                          MethodElement getter,
+                          MethodElement setter,
+                          FieldElement field,
+                          ElementAnnotationMetadataFactory annotationMetadataFactory,
+                          String name,
+                          AccessKind readAccessKind,
+                          AccessKind writeAccessKind,
+                          boolean excluded) {
+        super(visitorContext, selectNativeType(getter, setter, field), annotationMetadataFactory);
+        this.type = type;
+        this.getter = getter;
+        this.setter = setter;
+        this.field = field;
         this.name = name;
-        this.readOnly = readOnly;
-        this.nativeType = nativeType;
-        this.declaringClass = declaringClass;
+        this.readAccessKind = readAccessKind;
+        this.writeAccessKind = writeAccessKind;
+        this.owningElement = owningElement;
+        this.excluded = excluded;
+        this.annotationMetadata = new PropertyElementAnnotationMetadata(this, getter, setter, field, null, false);
     }
 
     @Override
-    public Set<ElementModifier> getModifiers() {
-        if (isReadOnly()) {
-            return CollectionUtils.setOf(ElementModifier.FINAL, ElementModifier.PUBLIC);
-        } else {
-            return Collections.singleton(ElementModifier.PUBLIC);
+    protected AbstractGroovyElement copyConstructor() {
+        return new GroovyPropertyElement(visitorContext, owningElement, type, getter, setter, field,
+            elementAnnotationMetadataFactory, name, readAccessKind, writeAccessKind, excluded);
+    }
+
+    @Override
+    public MemberElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+        return (MemberElement) super.withAnnotationMetadata(annotationMetadata);
+    }
+
+    private static GroovyNativeElement selectNativeType(MethodElement getter,
+                                                  MethodElement setter,
+                                                  FieldElement field) {
+        if (getter instanceof AbstractGroovyElement) {
+            return (GroovyNativeElement) getter.getNativeType();
         }
+        if (setter instanceof AbstractGroovyElement) {
+            return (GroovyNativeElement) setter.getNativeType();
+        }
+        if (field instanceof AbstractGroovyElement) {
+            return (GroovyNativeElement) field.getNativeType();
+        }
+        throw new IllegalStateException();
     }
 
     @Override
-    public boolean isReadOnly() {
-        return readOnly;
+    public boolean isExcluded() {
+        return excluded;
+    }
+
+    @Override
+    protected ElementAnnotationMetadata getElementAnnotationMetadata() {
+        return annotationMetadata;
+    }
+
+    @Override
+    public ClassElement getType() {
+        return type;
+    }
+
+    @Override
+    public ClassElement getGenericType() {
+        return type; // Already generic
+    }
+
+    @Override
+    public Optional<FieldElement> getField() {
+        return Optional.ofNullable(field);
+    }
+
+    @Override
+    public Optional<MethodElement> getWriteMethod() {
+        return Optional.ofNullable(setter);
+    }
+
+    @Override
+    public Optional<MethodElement> getReadMethod() {
+        return Optional.ofNullable(getter);
+    }
+
+    @Override
+    public boolean isPrimitive() {
+        return getType().isPrimitive();
+    }
+
+    @Override
+    public boolean isArray() {
+        return getType().isArray();
+    }
+
+    @Override
+    public int getArrayDimensions() {
+        return getType().getArrayDimensions();
     }
 
     @Override
@@ -99,37 +168,53 @@ abstract class GroovyPropertyElement extends AbstractGroovyElement implements Pr
     }
 
     @Override
-    public Object getNativeType() {
-        return nativeType;
+    public String toString() {
+        return getDeclaringType().getName() + "." + name;
     }
 
     @Override
-    public String toString() {
-        return getName();
+    public AccessKind getReadAccessKind() {
+        return readAccessKind;
+    }
+
+    @Override
+    public AccessKind getWriteAccessKind() {
+        return writeAccessKind;
+    }
+
+    @Override
+    public boolean isReadOnly() {
+        return switch (writeAccessKind) {
+            case METHOD -> setter == null;
+            case FIELD -> field == null || field.isFinal();
+        };
+    }
+
+    @Override
+    public boolean isWriteOnly() {
+        return switch (readAccessKind) {
+            case METHOD -> getter == null;
+            case FIELD -> field == null;
+        };
     }
 
     @Override
     public ClassElement getDeclaringType() {
-        if (declaringElement == null && nativeType instanceof PropertyNode) {
-            PropertyNode propertyNode = (PropertyNode) nativeType;
-            declaringElement = visitorContext.getElementFactory().newClassElement(
-                propertyNode.getDeclaringClass(),
-                AstAnnotationUtils.getAnnotationMetadata(
-                    sourceUnit,
-                    compilationUnit,
-                    propertyNode.getDeclaringClass()
-                )
-            );
+        if (field != null) {
+            return field.getDeclaringType();
         }
-        if (declaringElement != null) {
-            return declaringElement;
+        if (getter != null) {
+            return getter.getDeclaringType();
         }
-        return declaringClass;
+        if (setter != null) {
+            return setter.getDeclaringType();
+        }
+        throw new IllegalStateException();
     }
 
     @Override
     public ClassElement getOwningType() {
-        return declaringClass;
+        return owningElement;
     }
 
 }

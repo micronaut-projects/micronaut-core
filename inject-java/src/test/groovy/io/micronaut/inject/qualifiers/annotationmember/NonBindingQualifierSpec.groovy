@@ -1,11 +1,7 @@
 package io.micronaut.inject.qualifiers.annotationmember
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
-import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.AnnotationUtil
-import io.micronaut.inject.BeanDefinition
-
-import jakarta.inject.Qualifier
 
 class NonBindingQualifierSpec extends AbstractTypeElementSpec {
 
@@ -28,7 +24,7 @@ class Test {
 
 @Singleton
 @Cylinders(value = 6, description = "6-cylinder V6 engine")
-class V6Engine implements Engine { 
+class V6Engine implements Engine {
 
     @Override
     public int getCylinders() {
@@ -37,8 +33,8 @@ class V6Engine implements Engine {
 }
 
 @Singleton
-@Cylinders(value = 8, description = "8-cylinder V8 engine") 
-class V8Engine implements Engine { 
+@Cylinders(value = 8, description = "8-cylinder V8 engine")
+class V8Engine implements Engine {
     @Override
     public int getCylinders() {
         return 8;
@@ -49,12 +45,12 @@ interface Engine {
     int getCylinders();
 }
 
-@Qualifier 
+@Qualifier
 @Retention(RUNTIME)
 @interface Cylinders {
     int value();
 
-    @NonBinding 
+    @NonBinding
     String description() default "";
 }
 ''')
@@ -90,7 +86,7 @@ class Test {
 
     @NonBinding
     String description() default "";
-    
+
 }
 
 ''')
@@ -100,7 +96,7 @@ class Test {
         definition
                 .getAnnotationMetadata()
                 .getAnnotation(AnnotationUtil.QUALIFIER)
-                .stringValues("nonBinding") as Set == ['description'] as Set
+                .stringValues(AnnotationUtil.NON_BINDING_ATTRIBUTE) as Set == ['description', AnnotationUtil.NON_BINDING_ATTRIBUTE] as Set
         definition
             .annotationMetadata
             .getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).get() == 'annotationmember.Cylinders'

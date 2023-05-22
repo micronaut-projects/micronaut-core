@@ -43,6 +43,7 @@ public interface FieldInjectionPoint<B, T> extends InjectionPoint<B>, Annotation
      *
      * @return The target field
      */
+    @Deprecated(since = "4", forRemoval = true)
     Field getField();
 
     /**
@@ -50,12 +51,4 @@ public interface FieldInjectionPoint<B, T> extends InjectionPoint<B>, Annotation
      */
     Class<T> getType();
 
-    /**
-     * Sets the value of the field. Note that this method will cause reflection
-     * metadata to be initialized and should be avoided.
-     *
-     * @param instance the instance
-     * @param object   The the field on the target object
-     */
-    void set(T instance, Object object);
 }

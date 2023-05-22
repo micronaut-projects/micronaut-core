@@ -15,15 +15,13 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.uri.UriMatchTemplate;
-import io.micronaut.http.uri.UriMatcher;
 
-import io.micronaut.core.annotation.Nullable;
 import java.net.URI;
-import java.util.Optional;
 import java.util.function.Predicate;
 
 /**
@@ -32,7 +30,10 @@ import java.util.function.Predicate;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface UriRoute extends Route, UriMatcher, Comparable<UriRoute> {
+public interface UriRoute extends Route, Comparable<UriRoute> {
+
+    @Override
+    UriRouteInfo<Object, Object> toRouteInfo();
 
     /**
      * Defines routes nested within this route.
@@ -52,26 +53,6 @@ public interface UriRoute extends Route, UriMatcher, Comparable<UriRoute> {
      * @return The {@link UriMatchTemplate} used to match URIs
      */
     UriMatchTemplate getUriMatchTemplate();
-
-    /**
-     * Match this route within the given URI and produce a {@link RouteMatch} if a match is found.
-     *
-     * @param uri The URI The URI
-     * @return An {@link Optional} of {@link RouteMatch}
-     */
-    @Override
-    default Optional<UriRouteMatch> match(URI uri) {
-        return match(uri.toString());
-    }
-
-    /**
-     * Match this route within the given URI and produce a {@link RouteMatch} if a match is found.
-     *
-     * @param uri The URI The URI
-     * @return An {@link Optional} of {@link RouteMatch}
-     */
-    @Override
-    Optional<UriRouteMatch> match(String uri);
 
     @Override
     UriRoute consumes(MediaType... mediaType);

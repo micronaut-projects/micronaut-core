@@ -4,8 +4,8 @@ plugins {
 
 dependencies {
     api libs.managed.groovy
-    api(libs.managed.spock) {
+    api(libs.spock) {
         exclude module:'groovy-all'
     }
-    api project(":inject")
+    api project(":core-processor")
 }

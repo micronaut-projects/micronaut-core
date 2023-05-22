@@ -17,24 +17,23 @@ package io.micronaut.context;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.attr.MutableAttributeHolder;
+import io.micronaut.core.convert.ConversionServiceProvider;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.validation.BeanDefinitionValidator;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
-
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.Future;
 
 /**
  * <p>The core BeanContext abstraction which allows for dependency injection of classes annotated with
- * {@link javax.inject.Inject}.</p>
+ * {@link jakarta.inject.Inject}.</p>
  *
- * <p>Apart of the standard {@code javax.inject} annotations for dependency injection, additional annotations within
+ * <p>Apart of the standard {@code jakarta.inject} annotations for dependency injection, additional annotations within
  * the {@code io.micronaut.context.annotation} package allow control over configuration of the bean context.</p>
  *
  * @author Graeme Rocher
@@ -47,7 +46,8 @@ public interface BeanContext extends
         BeanDefinitionRegistry,
         ApplicationEventPublisher<Object>,
         AnnotationMetadataResolver,
-        MutableAttributeHolder {
+        MutableAttributeHolder,
+    ConversionServiceProvider {
 
     /**
      * Obtains the configuration for this context.
@@ -66,29 +66,6 @@ public interface BeanContext extends
     default @NonNull <E> ApplicationEventPublisher<E> getEventPublisher(@NonNull Class<E> eventType) {
         Objects.requireNonNull(eventType, "Event type cannot be null");
         return getBean(Argument.of(ApplicationEventPublisher.class, eventType));
-    }
-
-    /**
-     * Publish the given event. The event will be published synchronously and only return once all listeners have consumed the event.
-     *
-     * @deprecated Preferred way is to use event typed {@code ApplicationEventPublisher<MyEventType>}
-     * @param event The event to publish
-     */
-    @Override
-    @Deprecated
-    void publishEvent(Object event);
-
-    /**
-     * Publish the given event. The event will be published asynchronously. A future is returned that can be used to check whether the event completed successfully or not.
-     *
-     * @deprecated Preferred way is to use event typed {@code ApplicationEventPublisher<MyEventType>}
-     * @param event The event to publish
-     * @return A future that completes when the event is published
-     */
-    @Override
-    @Deprecated
-    default Future<Void> publishEventAsync(Object event) {
-        return ApplicationEventPublisher.super.publishEventAsync(event);
     }
 
     /**

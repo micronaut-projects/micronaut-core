@@ -15,17 +15,17 @@
  */
 package io.micronaut.web.router.filter;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.filter.HttpFilter;
+import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
-import io.micronaut.web.router.UriRoute;
+import io.micronaut.web.router.UriRouteInfo;
 import io.micronaut.web.router.UriRouteMatch;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -73,6 +73,11 @@ public class FilteredRouter implements Router {
     }
 
     @Override
+    public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request) {
+        return router.<T, R>findAny(request).stream().filter(routeFilter.filter(request)).toList();
+    }
+
+    @Override
     public Set<Integer> getExposedPorts() {
         return router.getExposedPorts();
     }
@@ -108,7 +113,7 @@ public class FilteredRouter implements Router {
 
     @NonNull
     @Override
-    public Stream<UriRoute> uriRoutes() {
+    public Stream<UriRouteInfo<?, ?>> uriRoutes() {
         return router.uriRoutes();
     }
 
@@ -123,7 +128,7 @@ public class FilteredRouter implements Router {
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(@NonNull Class originatingClass, @NonNull HttpStatus status) {
+    public <R> Optional<RouteMatch<R>> route(@NonNull Class<?> originatingClass, @NonNull HttpStatus status) {
         return router.route(originatingClass, status);
     }
 
@@ -133,7 +138,7 @@ public class FilteredRouter implements Router {
     }
 
     @Override
-    public <R> Optional<RouteMatch<R>> route(@NonNull Class originatingClass, @NonNull Throwable error) {
+    public <R> Optional<RouteMatch<R>> route(@NonNull Class<?> originatingClass, @NonNull Throwable error) {
         return router.route(originatingClass, error);
     }
 
@@ -159,7 +164,7 @@ public class FilteredRouter implements Router {
 
     @NonNull
     @Override
-    public List<HttpFilter> findFilters(@NonNull HttpRequest<?> request) {
+    public List<GenericHttpFilter> findFilters(@NonNull HttpRequest<?> request) {
         return router.findFilters(request);
     }
 

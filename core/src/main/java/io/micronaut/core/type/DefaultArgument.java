@@ -19,13 +19,27 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.ObjectUtils;
 
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.lang.reflect.TypeVariable;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Queue;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.Vector;
 
 /**
  * Represents an argument to a constructor or method.
@@ -37,15 +51,15 @@ import java.util.*;
 @Internal
 public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
 
-    public static final Set<Class<?>> CONTAINER_TYPES = CollectionUtils.setOf(
-        List.class,
-        Set.class,
-        Collection.class,
-        Queue.class,
-        SortedSet.class,
-        Deque.class,
-        Vector.class,
-        ArrayList.class
+    public static final Set<String> CONTAINER_TYPES = CollectionUtils.setOf(
+        List.class.getName(),
+        Set.class.getName(),
+        Collection.class.getName(),
+        Queue.class.getName(),
+        SortedSet.class.getName(),
+        Deque.class.getName(),
+        Vector.class.getName(),
+        ArrayList.class.getName()
     );
     public static final Set<String> PROVIDER_TYPES = CollectionUtils.setOf(
             "io.micronaut.context.BeanProvider",
@@ -59,6 +73,8 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     private final Argument<?>[] typeParameterArray;
     private final AnnotationMetadata annotationMetadata;
     private final boolean isTypeVar;
+    private String namePrecalculated;
+    private Boolean reactive;
 
     /**
      * @param type               The type
@@ -211,12 +227,25 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
     }
 
     @Override
+    public boolean isReactive() {
+        Boolean reactive = this.reactive;
+        if (reactive == null) {
+            reactive = Argument.super.isReactive();
+            this.reactive = reactive;
+        }
+        return reactive;
+    }
+
+    @Override
     @NonNull
     public String getName() {
-        if (name == null) {
-            return getType().getSimpleName();
+        if (name != null) {
+            return name;
         }
-        return name;
+        if (namePrecalculated == null) {
+            namePrecalculated = NameUtils.decapitalize(type.getSimpleName());
+        }
+        return namePrecalculated;
     }
 
     @Override
@@ -256,12 +285,12 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
 
     @Override
     public int typeHashCode() {
-        return Objects.hash(type, typeParameters);
+        return ObjectUtils.hash(type, typeParameters);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(type, getName(), typeParameters);
+        return ObjectUtils.hash(type, getName(), typeParameters);
     }
 
     private static Map<String, Argument<?>> initializeTypeParameters(Argument<?>[] genericTypes) {

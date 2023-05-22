@@ -40,9 +40,9 @@ public class DefaultChannelOptionFactory implements ChannelOptionFactory {
     private static Object processChannelOptionValue(Class<? extends ChannelOption> cls, String name, Object value, Environment env) {
         Optional<Field> declaredField = ReflectionUtils.findField(cls, name);
         if (declaredField.isPresent()) {
-            Optional<Class> typeArg = GenericTypeUtils.resolveGenericTypeArgument(declaredField.get());
+            Optional<Class<?>> typeArg = GenericTypeUtils.resolveGenericTypeArgument(declaredField.get());
             if (typeArg.isPresent()) {
-                Optional<Object> converted = env.convert(value, typeArg.get());
+                Optional<Object> converted = (Optional<Object>) env.convert(value, typeArg.get());
                 value = converted.orElse(value);
             }
         }

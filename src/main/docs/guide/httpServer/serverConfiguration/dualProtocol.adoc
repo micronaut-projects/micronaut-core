@@ -1,23 +1,7 @@
-Micronaut supports binding both HTTP and HTTPS. To enable dual protocol support, modify your configuration. For example with `application.yml`:
+The Micronaut framework supports binding both HTTP and HTTPS. To enable dual protocol support, modify your configuration. For example:
 
 .Dual Protocol Configuration Example
-[source,yaml]
-----
-micronaut:
-  server:
-    ssl:
-      enabled: true
-      build-self-signed: true # <1>
-    dual-protocol : true #<2>
-----
-<1> You must configure SSL for HTTPS to work. In this example we are just using a self-signed certificate, but see <<https, Securing the Server with HTTPS>> for other configurations
-<2> Enabling both HTTP and HTTPS is an opt-in feature - setting the `dualProtocol` flag enables it. By default Micronaut only enables one
-
-
-It is also possible to redirect automatically all HTTP request to HTTPS. Besides the previous configuration, you need to enable this option. For example, with `application.yml`:
-
-.Enable HTTP to HTTPS Redirects
-[source,yaml]
+[configuration]
 ----
 micronaut:
   server:
@@ -25,6 +9,22 @@ micronaut:
       enabled: true
       build-self-signed: true
     dual-protocol : true
-    http-to-https-redirect: true # <1>
 ----
-<1> Enable HTTP to HTTPS redirects
+- You must configure SSL for HTTPS to work. In this example we are just using a self-signed certificate with `build-self-signed`, but see <<https, Securing the Server with HTTPS>> for other configurations
+- `dual-protocol` enables both HTTP and HTTPS is an opt-in feature - setting the `dualProtocol` flag enables it. By default, the Micronaut framework only enables one.
+
+It is also possible to redirect automatically all HTTP request to HTTPS. Besides the previous configuration, you need to enable this option. For example:
+
+.Enable HTTP to HTTPS Redirects
+[configuration]
+----
+micronaut:
+  server:
+    ssl:
+      enabled: true
+      build-self-signed: true
+    dual-protocol : true
+    http-to-https-redirect: true
+----
+
+- `http-to-https-redirect` enables HTTP to HTTPS redirects

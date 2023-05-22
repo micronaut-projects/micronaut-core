@@ -15,18 +15,22 @@
  */
 package io.micronaut.management.endpoint.beans.impl;
 
+import io.micronaut.context.BeanContext;
+import io.micronaut.context.DisabledBean;
+import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.management.endpoint.beans.BeanDefinitionData;
 import io.micronaut.management.endpoint.beans.BeanDefinitionDataCollector;
 import io.micronaut.management.endpoint.beans.BeansEndpoint;
 import jakarta.inject.Singleton;
-import org.reactivestreams.Publisher;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
+
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * The default {@link BeanDefinitionDataCollector} implementation. Returns a {@link Map} with
@@ -39,33 +43,56 @@ import java.util.Map;
 @Requires(beans = BeansEndpoint.class)
 public class DefaultBeanDefinitionDataCollector implements BeanDefinitionDataCollector<Map<String, Object>> {
 
-    private BeanDefinitionData beanDefinitionData;
+    private final BeanContext beanContext;
+    private final BeanDefinitionData<Map<String, Object>> beanDefinitionData;
 
     /**
+     * @param beanContext        The bean context
      * @param beanDefinitionData The {@link BeanDefinitionData}
      */
-    DefaultBeanDefinitionDataCollector(BeanDefinitionData beanDefinitionData) {
+    DefaultBeanDefinitionDataCollector(BeanContext beanContext, BeanDefinitionData<Map<String, Object>> beanDefinitionData) {
+        this.beanContext = beanContext;
         this.beanDefinitionData = beanDefinitionData;
     }
 
     @Override
-    public Publisher<Map<String, Object>> getData(Collection<BeanDefinition<?>> beanDefinitions) {
-        return Mono.from(getBeans(beanDefinitions)).map(beans -> {
-            Map<String, Object> beanData = new LinkedHashMap<>(1);
-            beanData.put("beans", beans);
-            return beanData;
-        });
+    public Map<String, Object> getData() {
+        Map<String, Object> beanData = new LinkedHashMap<>(1);
+        List<BeanDefinition<?>> beanDefinitions = beanContext.getAllBeanDefinitions()
+            .stream()
+            .sorted(Comparator.comparing((BeanDefinition<?> bd) -> bd.getClass().getName()))
+            .toList();
+
+        beanData.put("beans", getBeans(beanDefinitions));
+        beanData.put("disabled", getDisabledBeans());
+        return beanData;
     }
 
     /**
      * @param definitions The bean definitions
-     * @return A {@link Publisher} that wraps a Map
+     * @return A map of bean information.
      */
-    protected Publisher<Map<String, Object>> getBeans(Collection<BeanDefinition<?>> definitions) {
-        return Flux.fromIterable(definitions)
-                .collectMap(definition -> definition.getClass().getName(),
-                        definition -> {
-                    return beanDefinitionData.getData(definition);
-                });
+    protected Map<String, Map<String, Object>> getBeans(Collection<BeanDefinition<?>> definitions) {
+        return definitions.stream()
+            .collect(Collectors.toMap(definition -> definition.getClass().getName(), beanDefinitionData::getData));
+    }
+
+    /**
+     * @return Information about the disabled beans.
+     */
+    protected List<Map<String, Object>> getDisabledBeans() {
+        Collection<DisabledBean<?>> disabledBeans = beanContext.getDisabledBeans();
+
+        return disabledBeans.stream()
+            .map(disabledBean -> {
+                Map<String, Object> data = new LinkedHashMap<>();
+                data.put("type", disabledBean.type().getTypeName());
+                Qualifier<?> q = disabledBean.qualifier();
+                if (q != null) {
+                    data.put("qualifier", q.toString());
+                }
+                data.put("reasons", disabledBean.reasons());
+                return data;
+            }).toList();
     }
 }

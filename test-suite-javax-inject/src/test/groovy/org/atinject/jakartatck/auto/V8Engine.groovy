@@ -18,8 +18,8 @@ package org.atinject.jakartatck.auto
 import groovy.transform.PackageScope
 import org.atinject.jakartatck.auto.accessories.SpareTire
 
-import javax.inject.Inject
-import javax.inject.Named
+import jakarta.inject.Inject
+import jakarta.inject.Named
 
 class V8Engine extends GasEngine {
 

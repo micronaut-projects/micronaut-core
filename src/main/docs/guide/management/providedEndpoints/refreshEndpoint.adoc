@@ -19,7 +19,7 @@ $ curl -X POST http://localhost:8080/refresh -H 'Content-Type: application/json'
 To configure the refresh endpoint, supply configuration through `endpoints.refresh`.
 
 .Beans Endpoint Configuration Example
-[source,yaml]
+[configuration]
 ----
 endpoints:
   refresh:

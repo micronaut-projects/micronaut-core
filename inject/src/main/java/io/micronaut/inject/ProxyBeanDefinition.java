@@ -29,9 +29,13 @@ public interface ProxyBeanDefinition<T> extends BeanDefinition<T> {
      */
     Class<BeanDefinition<T>> getTargetDefinitionType();
 
-
     /**
      * @return The target type
      */
     Class<T> getTargetType();
+
+    @Override
+    default boolean isProxy() {
+        return true;
+    }
 }

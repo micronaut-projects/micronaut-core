@@ -12,7 +12,7 @@ import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
 import spock.lang.Unroll
 
-import javax.annotation.Nullable
+import jakarta.annotation.Nullable
 
 class CustomParameterBindingSpec extends AbstractMicronautSpec {
 

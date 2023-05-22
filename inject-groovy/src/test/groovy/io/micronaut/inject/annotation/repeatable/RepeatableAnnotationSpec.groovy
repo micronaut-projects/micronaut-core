@@ -36,10 +36,10 @@ import io.micronaut.context.annotation.*
 
 @OneRequires(properties = @Property(name="prop1", value="value1"))
 @SomeOther(properties = @Property(name="prop2", value="value2"))
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
-    @OneRequires(properties = @Property(name="prop2", value="value2"))    
+    @OneRequires(properties = @Property(name="prop2", value="value2"))
     void someMethod() {}
 }
 ''')
@@ -68,13 +68,13 @@ import io.micronaut.context.annotation.*
 @Property(name="prop1", value="value1")
 @Property(name="prop2", value="value2")
 @Property(name="prop3", value="value3")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
-    @Property(name="prop2", value="value2")    
-    @Property(name="prop3", value="value33")    
+    @Property(name="prop2", value="value2")
+    @Property(name="prop3", value="value33")
     @Property(name="prop4", value="value4")
-    @Executable    
+    @Executable
     void someMethod() {}
 }
 ''').getRequiredMethod("someMethod").getAnnotationMetadata()
@@ -104,7 +104,7 @@ import io.micronaut.context.annotation.*
 
 @OneRequires
 @Requires(property="bar")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }
@@ -132,7 +132,7 @@ import io.micronaut.context.annotation.*
 
 @Requires(property="bar")
 @OneRequires
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }
@@ -160,7 +160,7 @@ import io.micronaut.context.annotation.*
 
 @OneRequires
 @TwoRequires
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }
@@ -190,7 +190,7 @@ import io.micronaut.context.annotation.*
 
 @TwoRequires
 @OneRequires
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }
@@ -222,7 +222,7 @@ import io.micronaut.context.annotation.*
 @OneRequires
 @Requires(property="bar")
 @Requires(property="another")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }
@@ -250,7 +250,7 @@ import io.micronaut.context.annotation.*
 @Requires(property="bar")
 @Requires(property="another")
 @OneRequires
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }
@@ -278,7 +278,7 @@ import io.micronaut.context.annotation.*
 @TwoRequires
 @Requires(property="bar")
 @Requires(property="another")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }
@@ -303,7 +303,7 @@ import io.micronaut.context.annotation.*
 
 @TwoRequires
 @Requires(property="bar")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }
@@ -328,7 +328,7 @@ import io.micronaut.context.annotation.*;
 
 @Requires(property="bar")
 @TwoRequires
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }
@@ -352,7 +352,7 @@ import io.micronaut.inject.annotation.repeatable.*
 import io.micronaut.context.annotation.*
 
 @Topics(connectionName = "test", value = [@Topic("hello"), @Topic("world")])
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class Test {
 
 }

@@ -71,7 +71,8 @@ final class ImmutableSortedStringsArrayMap<V> implements Map<String, V> {
     }
 
     private int findKeyIndex(Object key) {
-        if (!(key instanceof Comparable)) {
+        // Performance optimization to check for the String first to avoid the type-check pollution
+        if (!(key instanceof String) && !(key instanceof Comparable)) {
             return -1;
         }
         int v = index[reduceHashCode(key.hashCode(), keys.length)];

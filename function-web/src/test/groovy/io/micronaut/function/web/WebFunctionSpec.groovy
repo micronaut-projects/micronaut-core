@@ -24,9 +24,12 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Body
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.PendingFeature
 import spock.lang.Specification
+import spock.lang.Unroll
 
 import java.util.function.Consumer
 import java.util.function.Supplier
@@ -43,20 +46,25 @@ class WebFunctionSpec extends Specification {
 
         expect:
         registry.findConsumer("consumer/string").isPresent()
+        registry.findConsumer("consumer/string2").isPresent()
         registry.findSupplier("supplier/string").isPresent()
+        registry.findSupplier("supplier/string2").isPresent()
         registry.findConsumer("consumer/pojo").isPresent()
         registry.findSupplier("supplier/pojo").isPresent()
         !registry.findConsumer("consumer/junk").isPresent()
         !registry.findSupplier("supplier/junk").isPresent()
+        registry.findSupplier("supplier/custom-method").isEmpty() // FunctionBean registered with non supplier method
+        registry.findSupplier("consumer/custom-method").isEmpty() // FunctionBean registered with non consumer method
     }
 
+    @Unroll
     void "test string supplier"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
         HttpClient client = embeddedServer.applicationContext.createBean(HttpClient, embeddedServer.getURL())
 
         when:
-        HttpResponse<String> response = client.toBlocking().exchange('/supplier/string', String)
+        HttpResponse<String> response = client.toBlocking().exchange(uri, String)
 
         then:
         response.code() == HttpStatus.OK.code
@@ -64,6 +72,9 @@ class WebFunctionSpec extends Specification {
 
         cleanup:
         embeddedServer.stop()
+
+        where:
+        uri << ['/supplier/string', '/supplier/string2', '/supplier/custom-method']
     }
 
     void "test string supplier with HEAD"() {
@@ -100,6 +111,7 @@ class WebFunctionSpec extends Specification {
     }
 
 
+    @Unroll
     void "test string consumer with JSON"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
@@ -107,7 +119,7 @@ class WebFunctionSpec extends Specification {
         def data = '{"title":"The Stand"}'
 
         when:
-        HttpResponse<?> response = client.toBlocking().exchange(HttpRequest.POST('/consumer/string', data))
+        HttpResponse<?> response = client.toBlocking().exchange(HttpRequest.POST(uri, data))
 
         then:
         response.code() == HttpStatus.OK.code
@@ -115,6 +127,9 @@ class WebFunctionSpec extends Specification {
 
         cleanup:
         embeddedServer.stop()
+
+        where:
+        uri << ['/consumer/string', '/consumer/string2', '/consumer/custom-method']
     }
 
     void 'test camel cased function bean'() {
@@ -133,6 +148,7 @@ class WebFunctionSpec extends Specification {
         embeddedServer.stop()
     }
 
+    @PendingFeature(reason = "the controller accepts application/json only now, there is no more dynamic reading based on request content type")
     void "test string consumer with text plain"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
@@ -181,6 +197,29 @@ class WebFunctionSpec extends Specification {
         }
     }
 
+    @FunctionBean(name = "supplier/string2", method = "get")
+    static class StringSupplier2 implements Supplier<String> {
+        String getValue() {
+            return "value"
+        }
+        @Override
+        String get() {
+            return getValue()
+        }
+    }
+
+    @FunctionBean(name = "supplier/custom-method", method = "getValue")
+    static class NotStringSupplier implements Supplier<String> {
+        String getValue() {
+            return "value"
+        }
+        @Override
+        String get() {
+            return getValue()
+        }
+    }
+
+
     @FunctionBean("helloWorld")
     static class CamelCaseSupplier implements Supplier<String> {
         String getValue() {
@@ -212,12 +251,36 @@ class WebFunctionSpec extends Specification {
         }
     }
 
+    @FunctionBean(name = "consumer/string2", method = "accept")
+    static class StringConsumer2 implements Consumer<String> {
+
+        static String LAST_VALUE
+        @Override
+        void accept(String title) {
+            LAST_VALUE = title
+        }
+    }
+
+    @FunctionBean(name = "consumer/custom-method", method = "myAccept")
+    static class NonStringConsumer implements Consumer<String> {
+
+        static String LAST_VALUE
+        @Override
+        void accept(String title) {
+            myAccept(title)
+        }
+
+        void myAccept(String title) {
+            LAST_VALUE = title
+        }
+    }
+
     @FunctionBean("consumer/pojo")
     static class PojoConsumer implements Consumer<Book> {
 
         static Book LAST_VALUE
         @Override
-        void accept(Book book) {
+        void accept(@Body Book book) {
             LAST_VALUE = book
         }
     }

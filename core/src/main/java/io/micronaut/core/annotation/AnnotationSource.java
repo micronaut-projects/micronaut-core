@@ -56,7 +56,7 @@ public interface AnnotationSource {
     /**
      * Synthesizes a new annotation for the given annotation type using the member values of the given source annotation.
      *
-     * <p>This method allows supporting synthesizing annotations that have been renamed, for example a {@code jakarta.inject.Named} annotation an be synthesized from the metadata of the a {@code javax.inject.Named} annotation.</p>
+     * <p>This method allows supporting synthesizing annotations that have been renamed, for example a {@code jakarta.inject.Named} annotation an be synthesized from the metadata of the a {@code jakarta.inject.Named} annotation.</p>
      *
      * @param annotationClass The annotation class
      * @param sourceAnnotation The source annotation that provides the member values
@@ -75,7 +75,7 @@ public interface AnnotationSource {
     /**
      * Synthesizes a new annotation declared for the given annotation type using the member values of the given source annotation.
      *
-     * <p>This method allows supporting synthesizing annotations that have been renamed, for example a {@code jakarta.inject.Named} annotation an be synthesized from the metadata of the a {@code javax.inject.Named} annotation.</p>
+     * <p>This method allows supporting synthesizing annotations that have been renamed, for example a {@code jakarta.inject.Named} annotation an be synthesized from the metadata of the a {@code jakarta.inject.Named} annotation.</p>
      *
      * @param annotationClass The annotation class
      * @param sourceAnnotation The source annotation that provides the member values
@@ -298,5 +298,14 @@ public interface AnnotationSource {
     default boolean isDeclaredAnnotationPresent(@NonNull String annotationName) {
         ArgumentUtils.requireNonNull("annotationClass", annotationName);
         return false;
+    }
+
+    /**
+     * Unwraps possible delegate or provider.
+     * @return unwrapped
+     * @since 4.0.0
+     */
+    default AnnotationSource getTargetAnnotationMetadata() {
+        return this;
     }
 }

@@ -16,7 +16,6 @@
 
 package io.micronaut.core.util.clhm;
 
-import javax.annotation.concurrent.NotThreadSafe;
 import java.util.AbstractCollection;
 import java.util.Collection;
 import java.util.Deque;
@@ -45,7 +44,7 @@ import java.util.NoSuchElementException;
  * @see <a href="https://code.google.com/p/concurrentlinkedhashmap/">
  *      https://code.google.com/p/concurrentlinkedhashmap/</a>
  */
-@NotThreadSafe
+//@NotThreadSafe
 final class LinkedDeque<E extends Linked<E>> extends AbstractCollection<E> implements Deque<E> {
 
     // This class provides a doubly-linked list that is optimized for the virtual

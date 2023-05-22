@@ -15,10 +15,10 @@
  */
 package io.micronaut.web.router;
 
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.processor.BeanDefinitionProcessor;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
@@ -46,7 +46,6 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder implements 
     /**
      * Constructor.
      *
-     * @param beanContext The bean context
      * @param executionHandleLocator The execution handler locator
      * @param uriNamingStrategy The URI naming strategy
      * @param conversionService The conversion service
@@ -54,10 +53,9 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder implements 
      */
     @Inject
     public AnnotatedFilterRouteBuilder(
-            BeanContext beanContext,
             ExecutionHandleLocator executionHandleLocator,
             UriNamingStrategy uriNamingStrategy,
-            ConversionService<?> conversionService,
+            ConversionService conversionService,
             @Nullable ServerContextPathProvider contextPathProvider) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
         this.contextPathProvider = contextPathProvider;
@@ -95,7 +93,7 @@ public class AnnotatedFilterRouteBuilder extends DefaultRouteBuilder implements 
      * @return The array of patterns that should match request URLs for the bean to
      * be invoked.
      */
-    protected String[] getPatterns(BeanDefinition<?> beanDefinition) {
+    private String[] getPatterns(BeanDefinition<?> beanDefinition) {
         String[] values = beanDefinition.stringValues(Filter.class);
         String contextPath = contextPathProvider != null ? contextPathProvider.getContextPath() : null;
         if (contextPath != null) {

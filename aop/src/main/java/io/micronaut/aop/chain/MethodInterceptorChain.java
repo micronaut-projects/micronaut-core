@@ -147,7 +147,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     }
 
     @Override
-    public Class[] getArgumentTypes() {
+    public Class<?>[] getArgumentTypes() {
         return executionHandle.getArgumentTypes();
     }
 

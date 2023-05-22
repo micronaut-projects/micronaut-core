@@ -17,8 +17,10 @@ package io.micronaut.http.client.netty.ssl;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
+import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.SslBuilder;
@@ -26,13 +28,15 @@ import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.http.ssl.SslConfigurationException;
 import io.netty.handler.codec.http2.Http2SecurityUtil;
 import io.netty.handler.ssl.ApplicationProtocolConfig;
-import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.handler.ssl.util.InsecureTrustManagerFactory;
+import io.netty.incubator.codec.http3.Http3;
+import io.netty.incubator.codec.quic.QuicSslContext;
+import io.netty.incubator.codec.quic.QuicSslContextBuilder;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,7 +57,7 @@ import java.util.Optional;
 @Singleton
 @Internal
 @BootstrapContextCompatible
-public class NettyClientSslBuilder extends SslBuilder<SslContext> {
+public final class NettyClientSslBuilder extends SslBuilder<SslContext> {
     private static final Logger LOG = LoggerFactory.getLogger(NettyClientSslBuilder.class);
 
     /**
@@ -71,47 +75,71 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> {
 
     @Override
     public Optional<SslContext> build(SslConfiguration ssl, HttpVersion httpVersion) {
+        return Optional.ofNullable(build(ssl, HttpVersionSelection.forLegacyVersion(httpVersion)));
+    }
+
+    @Nullable
+    public SslContext build(SslConfiguration ssl, HttpVersionSelection versionSelection) {
         if (!ssl.isEnabled()) {
-            return Optional.empty();
+            return null;
         }
-        final boolean isHttp2 = httpVersion == HttpVersion.HTTP_2_0;
         SslContextBuilder sslBuilder = SslContextBuilder
-                .forClient()
-                .keyManager(getKeyManagerFactory(ssl))
-                .trustManager(getTrustManagerFactory(ssl));
-        if (ssl.getProtocols().isPresent()) {
-            sslBuilder.protocols(ssl.getProtocols().get());
+            .forClient()
+            .keyManager(getKeyManagerFactory(ssl))
+            .trustManager(getTrustManagerFactory(ssl));
+        Optional<String[]> protocols = ssl.getProtocols();
+        if (protocols.isPresent()) {
+            sslBuilder.protocols(protocols.get());
         }
-        if (ssl.getCiphers().isPresent()) {
-            sslBuilder = sslBuilder.ciphers(Arrays.asList(ssl.getCiphers().get()));
-        } else if (isHttp2) {
+        Optional<String[]> ciphers = ssl.getCiphers();
+        if (ciphers.isPresent()) {
+            sslBuilder = sslBuilder.ciphers(Arrays.asList(ciphers.get()));
+        } else if (versionSelection.isHttp2CipherSuites()) {
             sslBuilder.ciphers(Http2SecurityUtil.CIPHERS, SupportedCipherSuiteFilter.INSTANCE);
         }
-        if (ssl.getClientAuthentication().isPresent()) {
-            ClientAuthentication clientAuth = ssl.getClientAuthentication().get();
+        Optional<ClientAuthentication> clientAuthentication = ssl.getClientAuthentication();
+        if (clientAuthentication.isPresent()) {
+            ClientAuthentication clientAuth = clientAuthentication.get();
             if (clientAuth == ClientAuthentication.NEED) {
                 sslBuilder = sslBuilder.clientAuth(ClientAuth.REQUIRE);
             } else if (clientAuth == ClientAuthentication.WANT) {
                 sslBuilder = sslBuilder.clientAuth(ClientAuth.OPTIONAL);
             }
         }
-        if (isHttp2) {
+        if (versionSelection.isAlpn()) {
             SslProvider provider = SslProvider.isAlpnSupported(SslProvider.OPENSSL) ? SslProvider.OPENSSL : SslProvider.JDK;
             sslBuilder.sslProvider(provider);
             sslBuilder.applicationProtocolConfig(new ApplicationProtocolConfig(
-                    ApplicationProtocolConfig.Protocol.ALPN,
-                    ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
-                    ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
-                    ApplicationProtocolNames.HTTP_1_1,
-                    ApplicationProtocolNames.HTTP_2
+                ApplicationProtocolConfig.Protocol.ALPN,
+                ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
+                ApplicationProtocolConfig.SelectedListenerFailureBehavior.ACCEPT,
+                versionSelection.getAlpnSupportedProtocols()
             ));
         }
 
         try {
-            return Optional.of(sslBuilder.build());
+            return sslBuilder.build();
         } catch (SSLException ex) {
             throw new SslConfigurationException("An error occurred while setting up SSL", ex);
         }
+    }
+
+    public QuicSslContext buildHttp3(SslConfiguration ssl) {
+        QuicSslContextBuilder sslBuilder = QuicSslContextBuilder.forClient()
+            .keyManager(getKeyManagerFactory(ssl), ssl.getKeyStore().getPassword().orElse(null))
+            .trustManager(getTrustManagerFactory(ssl))
+            .applicationProtocols(Http3.supportedApplicationProtocols());
+        Optional<ClientAuthentication> clientAuthentication = ssl.getClientAuthentication();
+        if (clientAuthentication.isPresent()) {
+            ClientAuthentication clientAuth = clientAuthentication.get();
+            if (clientAuth == ClientAuthentication.NEED) {
+                sslBuilder.clientAuth(ClientAuth.REQUIRE);
+            } else if (clientAuth == ClientAuthentication.WANT) {
+                sslBuilder.clientAuth(ClientAuth.OPTIONAL);
+            }
+        }
+
+        return sslBuilder.build();
     }
 
     @Override

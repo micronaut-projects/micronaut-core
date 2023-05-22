@@ -143,7 +143,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
      * @param output outputstream
      * @throws IOException input/output exception
      */
-    static void encode(Environment environment, LocalFunctionRegistry registry, Class returnType, Object result, OutputStream output) throws IOException {
+    static void encode(Environment environment, LocalFunctionRegistry registry, Class<?> returnType, Object result, OutputStream output) throws IOException {
         if (ClassUtils.isJavaLangType(returnType)) {
             if (result instanceof Byte) {
                 output.write((Byte) result);
@@ -178,7 +178,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
     }
 
     private Object decodeInputArgument(
-        ConversionService<?> conversionService,
+        ConversionService conversionService,
         LocalFunctionRegistry localFunctionRegistry,
         Argument<?> arg,
         InputStream input) {
@@ -204,7 +204,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
     }
 
     private Object decodeContext(
-        ConversionService<?> conversionService,
+        ConversionService conversionService,
         Argument<?> arg,
         Object context) {
         if (ClassUtils.isJavaLangType(arg.getType())) {
@@ -216,7 +216,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
         throw new CodecException("Unable to decode argument from stream: " + arg);
     }
 
-    private Object doConvertInput(ConversionService<?> conversionService, Argument<?> arg, Object object) {
+    private Object doConvertInput(ConversionService conversionService, Argument<?> arg, Object object) {
         ArgumentConversionContext conversionContext = ConversionContext.of(arg);
         Optional<?> convert = conversionService.convert(object, conversionContext);
         if (convert.isPresent()) {

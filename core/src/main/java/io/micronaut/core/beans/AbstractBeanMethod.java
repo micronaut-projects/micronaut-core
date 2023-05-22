@@ -72,8 +72,7 @@ public abstract class AbstractBeanMethod<B, T> implements BeanMethod<B, T> {
 
     @Override
     public final @NonNull ReturnType<T> getReturnType() {
-        //noinspection unchecked
-        return new ReturnType() {
+        return new ReturnType<>() {
             @Override
             public Class<T> getType() {
                 return returnType.getType();
@@ -115,6 +114,7 @@ public abstract class AbstractBeanMethod<B, T> implements BeanMethod<B, T> {
         return arguments;
     }
 
+    @SuppressWarnings("java:S2638")
     @Override
     public T invoke(@NonNull B instance, Object... arguments) {
         return invokeInternal(instance, arguments);

@@ -20,7 +20,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanType;
 
 import java.lang.annotation.Annotation;
-import java.util.Objects;
 import java.util.stream.Stream;
 
 /**
@@ -65,6 +64,6 @@ final class AnnotationStereotypeQualifier<T> implements Qualifier<T> {
 
     @Override
     public int hashCode() {
-        return Objects.hash(stereotype.getName());
+        return stereotype.getName().hashCode();
     }
 }

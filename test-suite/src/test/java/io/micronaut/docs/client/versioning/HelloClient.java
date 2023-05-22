@@ -26,7 +26,7 @@ import io.micronaut.core.async.annotation.SingleResult;
 // tag::clazz[]
 @Client("/hello")
 @Version("1") // <1>
-public interface HelloClient {
+public  interface HelloClient {
 
     @Get("/greeting/{name}")
     String sayHello(String name);

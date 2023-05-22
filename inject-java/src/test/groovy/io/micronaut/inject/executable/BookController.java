@@ -112,7 +112,6 @@ public class BookController {
         return String.format("%d - The Stand", id);
     }
 
-    @Executable
     static private String showPrivateStatic(Long id) {
         return String.format("%d - The Stand", id);
     }

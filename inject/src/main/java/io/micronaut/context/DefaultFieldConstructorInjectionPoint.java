@@ -53,8 +53,4 @@ final class DefaultFieldConstructorInjectionPoint<T> extends DefaultFieldInjecti
         return Argument.ZERO_ARGUMENTS;
     }
 
-    @Override
-    public T invoke(Object... args) {
-        throw new UnsupportedOperationException("Use BeanFactory.instantiate(..) instead");
-    }
 }

@@ -1,8 +1,8 @@
-Micronaut supports a general event system through the context. The api:context.event.ApplicationEventPublisher[] API publishes events and the api:context.event.ApplicationEventListener[] API is used to listen to events. The event system is not limited to events that Micronaut publishes and supports custom events created by users.
+The Micronaut framework supports a general event system through the context. The api:context.event.ApplicationEventPublisher[] API publishes events and the api:context.event.ApplicationEventListener[] API is used to listen to events. The event system is not limited to events that Micronaut publishes and supports custom events created by users.
 
 === Publishing Events
 
-The api:context.event.ApplicationEventPublisher[] API supports events of any type, although all events that Micronaut publishes extend api:context.event.ApplicationEvent[].
+The api:context.event.ApplicationEventPublisher[] API supports events of any type, although all events that the Micronaut framework publishes extend api:context.event.ApplicationEvent[].
 
 To publish an event, use dependency injection to obtain an instance of api:context.event.ApplicationEventPublisher[] where the generic type is the type of event and invoke the `publishEvent` method with your event object.
 
@@ -26,11 +26,11 @@ If your listener performs work that might take a while, use the ann:scheduling.a
 
 snippet::io.micronaut.docs.context.events.async.SampleEventListener,io.micronaut.docs.context.events.async.SampleEventListenerSpec[tags="imports,class",indent=0,title="Asynchronously listening for Events with `@EventListener`"]
 
-The event listener by default runs on the `scheduled` executor. You can configure this thread pool as required in `application.yml`:
+The event listener by default runs on the `scheduled` executor. You can configure this thread pool as required in your configuration file (e.g `application.yml`):
 
 //TODO: Move YAML snippet to ExecutorServiceConfigSpec
 .Configuring Scheduled Task Thread Pool
-[source,yaml]
+[configuration]
 ----
 micronaut:
   executors:

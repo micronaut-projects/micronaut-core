@@ -32,11 +32,11 @@ import io.micronaut.context.annotation.*;
 final class FinalModifierMyBean1 {
 
     private String myValue;
-    
+
     FinalModifierMyBean1(String val) {
         this.myValue = val;
     }
-    
+
     public String someMethod() {
         return myValue;
     }
@@ -61,11 +61,11 @@ import io.micronaut.context.annotation.*;
 class FinalModifierMyBean2 {
 
     private String myValue;
-    
+
     FinalModifierMyBean2(String val) {
         this.myValue = val;
     }
-    
+
     public final String someMethod() {
         return myValue;
     }
@@ -74,7 +74,7 @@ class FinalModifierMyBean2 {
 ''')
         then:
         def e = thrown(RuntimeException)
-        e.message.contains 'Public method inherits AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.'
+        e.message.contains 'Public method inherits AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on the class.'
     }
 
     void "test final modifier on method with explicit AOP advice doesn't compile"() {
@@ -89,11 +89,11 @@ import io.micronaut.context.annotation.*;
 class FinalModifierMyBean2 {
 
     private String myValue;
-    
+
     FinalModifierMyBean2(String val) {
         this.myValue = val;
     }
-    
+
     @Mutating("someVal")
     public final String someMethod() {
         return myValue;

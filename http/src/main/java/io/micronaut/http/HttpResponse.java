@@ -15,11 +15,11 @@
  */
 package io.micronaut.http;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.exceptions.UriSyntaxException;
 
-import io.micronaut.core.annotation.Nullable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Optional;
@@ -37,7 +37,9 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     /**
      * @return The current status
      */
-    HttpStatus getStatus();
+    default HttpStatus getStatus() {
+        return HttpStatus.valueOf(code());
+    }
 
     @Override
     default HttpResponse<B> setAttribute(CharSequence name, Object value) {
@@ -74,16 +76,12 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     /**
      * @return The response status code
      */
-    default int code() {
-        return getStatus().getCode();
-    }
+    int code();
 
     /**
      * @return The HTTP status reason phrase
      */
-    default String reason() {
-        return getStatus().getReason();
-    }
+    String reason();
 
     /**
      * Return an {@link io.micronaut.http.HttpStatus#OK} response with an empty body.
@@ -389,6 +387,18 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
+     * Return a response for the given status.
+     *
+     * @param status The status
+     * @param reason An alternatively reason message
+     * @param <T>    The response type
+     * @return The response
+     */
+    static <T> MutableHttpResponse<T> status(int status, String reason) {
+        return HttpResponseFactory.INSTANCE.status(status, reason);
+    }
+
+    /**
      * Helper method for defining URIs. Rethrows checked exceptions as.
      *
      * @param uri The URI char sequence
@@ -418,4 +428,25 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     default Optional<Cookie> getCookie(String name) {
         throw new UnsupportedOperationException("Operation not supported on a " + this.getClass() + " response.");
     }
+
+    /**
+     * Returns a mutable response based on this response.
+     * @return the mutable response
+     * @since 4.0.0
+     */
+    default MutableHttpResponse<?> toMutableResponse() {
+        if (this instanceof MutableHttpResponse<?> mutableHttpResponse) {
+            return mutableHttpResponse;
+        }
+        MutableHttpResponse<?> mutableHttpResponse = HttpResponse.status(code(), reason());
+        mutableHttpResponse.body(body());
+        getHeaders().forEach((name, value) -> {
+            for (String val : value) {
+                mutableHttpResponse.header(name, val);
+            }
+        });
+        mutableHttpResponse.getAttributes().putAll(getAttributes());
+        return mutableHttpResponse;
+    }
+
 }

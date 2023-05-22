@@ -21,7 +21,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.core.annotation.Nullable;
 
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 // end::imports[]
 
 // tag::class[]

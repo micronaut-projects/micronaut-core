@@ -12,7 +12,9 @@ class TraceFilterSpec: StringSpec() {
 
     val embeddedServer = autoClose(
             ApplicationContext.run(EmbeddedServer::class.java,
-                    mapOf("spec.name" to HelloControllerSpec::class.java.simpleName, "spec.lang" to "java"))
+                    mapOf("spec.name" to HelloControllerSpec::class.java.simpleName,
+                        "spec.filter" to "TraceFilter",
+                        "spec.lang" to "java"))
     )
 
     val client = autoClose(

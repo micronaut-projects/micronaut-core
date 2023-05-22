@@ -26,8 +26,8 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
-import io.micronaut.json.JsonMapper;
 import io.micronaut.json.JsonFeatures;
+import io.micronaut.json.JsonMapper;
 import io.micronaut.json.tree.JsonNode;
 import io.micronaut.runtime.ApplicationConfiguration;
 
@@ -174,7 +174,7 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
             if (CharSequence.class.isAssignableFrom(type.getType())) {
                 return (T) buffer.toString(applicationConfiguration.getDefaultCharset());
             } else {
-                return getJsonMapper().readValue(buffer.toByteArray(), type);
+                return getJsonMapper().readValue(buffer, type);
             }
         } catch (IOException e) {
             throw new CodecException("Error decoding stream for type [" + type.getType() + "]: " + e.getMessage(), e);
@@ -254,8 +254,15 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
             return allocator.copiedBuffer((byte[]) object);
         }
         ByteBuffer<B> buffer = allocator.buffer();
-        OutputStream outputStream = buffer.toOutputStream();
-        encode(object, outputStream);
+        try {
+            OutputStream outputStream = buffer.toOutputStream();
+            encode(object, outputStream);
+        } catch (Throwable t) {
+            if (buffer instanceof ReferenceCounted) {
+                ((ReferenceCounted) buffer).release();
+            }
+            throw t;
+        }
         return buffer;
     }
 

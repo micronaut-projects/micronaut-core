@@ -44,7 +44,7 @@ package test;
 
 enum MyEnum {
     @io.micronaut.annotation.EnumConstantAnn("C")
-    A, 
+    A,
     B
 }
 """)

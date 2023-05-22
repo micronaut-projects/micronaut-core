@@ -29,7 +29,7 @@ import io.micronaut.context.annotation.Bean;
 @Bean
 class Test {
 
-}    
+}
 ''')
         expect:
         definition
@@ -54,7 +54,7 @@ import io.micronaut.context.annotation.Bean;
 @Bean
 class Test {
 
-}    
+}
 ''')
         expect:
         definition
@@ -78,7 +78,7 @@ import io.micronaut.context.annotation.Bean;
 @Bean
 class Test {
 
-}    
+}
 ''')
         expect:"The ScopeOne stereotype was removed but Scope remains as it was not removed"
         definition
@@ -103,7 +103,7 @@ import io.micronaut.context.annotation.Bean;
 @Bean
 class Test {
 
-}    
+}
 ''')
         expect:
         definition
@@ -123,11 +123,11 @@ package removeann;
 import io.micronaut.inject.annotation.Trace;
 import io.micronaut.context.annotation.Bean;
 
-@Trace(type = String.class, types = String.class) 
+@Trace(type = String.class, types = String.class)
 @Bean
 class Test {
 
-}    
+}
 ''')
         expect:
         definition
@@ -146,10 +146,10 @@ package removeann;
 import io.micronaut.inject.annotation.Trace;
 import io.micronaut.context.annotation.Bean;
 
-@Trace(type = String.class, types = String.class) 
+@Trace(type = String.class, types = String.class)
 class Test {
 
-}    
+}
 ''')
         expect:
         definition == null
@@ -170,7 +170,7 @@ import io.micronaut.inject.annotation.repeatable.Topic;
 @Bean
 class Test {
 
-}    
+}
 ''')
         expect:
         definition

@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.NonNull
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
@@ -15,8 +16,10 @@ import io.micronaut.http.server.netty.NettyHttpServer
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
+import io.netty.channel.ChannelId
 import io.netty.channel.ChannelOutboundHandlerAdapter
 import io.netty.channel.ChannelPromise
+import io.netty.channel.ServerChannel
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.handler.codec.http.DefaultFullHttpRequest
 import io.netty.handler.codec.http.FullHttpResponse
@@ -344,8 +347,13 @@ class LogbookNettyServerCustomizerSpec extends Specification {
                 'spec.name'                    : 'LogbookNettyServerCustomizerSpec'
         ])
 
-
-        def serverEmbeddedChannel = ((NettyHttpServer) ctx.getBean(EmbeddedServer)).buildEmbeddedChannel(false)
+        // Http2MultiplexHandler doesn't work properly without a ServerChannel parent (https://github.com/netty/netty/pull/12546)
+        def serverEmbeddedChannel = new EmbeddedChannel(
+                new EmbeddedServerChannel(),
+                new EmbeddedChannelId(),
+                true, false
+        )
+        ((NettyHttpServer) ctx.getBean(EmbeddedServer)).buildEmbeddedChannel(serverEmbeddedChannel, false)
         def clientEmbeddedChannel = connectClientEmbeddedChannel(serverEmbeddedChannel)
 
         def http2Connection = new DefaultHttp2Connection(false)
@@ -413,8 +421,7 @@ class LogbookNettyServerCustomizerSpec extends Specification {
                 'POST /logbook/logged',
                 'bar',
                 '200',
-                // second response body not included because of logbook bug: https://github.com/zalando/logbook/issues/1216
-                //'bar',
+                'bar',
         ]
     }
 
@@ -473,5 +480,26 @@ class LogbookNettyServerCustomizerSpec extends Specification {
         String index(@Body String body) {
             return body
         }
+    }
+
+    private static class EmbeddedChannelId implements ChannelId {
+        @Override
+        String asShortText() {
+            return toString()
+        }
+
+        @Override
+        String asLongText() {
+            return toString()
+        }
+
+        @Override
+        int compareTo(@NonNull ChannelId o) {
+            throw new UnsupportedOperationException()
+        }
+    }
+
+    private static class EmbeddedServerChannel extends EmbeddedChannel implements ServerChannel {
+
     }
 }

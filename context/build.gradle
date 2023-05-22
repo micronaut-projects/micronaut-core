@@ -7,8 +7,18 @@ dependencies {
     annotationProcessor project(":graal")
     api project(':inject')
     api project(':aop')
-    api libs.managed.validation
+
     compileOnly project(':core-reactive')
+    compileOnly project(':core-processor')
+    compileOnly libs.log4j
+    compileOnly libs.logback.classic
+
+    // Support validation annotations
+    compileOnly platform(libs.test.boms.micronaut.validation)
+    compileOnly (libs.micronaut.validation) {
+        exclude group: 'io.micronaut'
+    }
+
     testCompileOnly project(":inject-groovy")
     testAnnotationProcessor project(":inject-java")
     testImplementation project(":core-reactive")

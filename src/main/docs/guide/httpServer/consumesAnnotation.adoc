@@ -10,12 +10,12 @@ snippet::io.micronaut.docs.server.consumes.ConsumesController[tags="imports,claz
 
 Normally JSON parsing only happens if the content type is `application/json`. The other api:io.micronaut.http.codec.MediaTypeCodec[] classes behave similarly in that they have predefined content types they can process. To extend the list of media types that a given codec processes, provide configuration that will be stored in api:io.micronaut.http.codec.CodecConfiguration[]:
 
-[source,yaml]
+[configuration]
 ----
 micronaut:
   codec:
     json:
-      additionalTypes:
+      additional-types:
         - text/javascript
         - ...
 ----

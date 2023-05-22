@@ -20,7 +20,7 @@ import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.core.convert.ConversionService
 import spock.lang.Specification
 
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 /**
  * @author Graeme Rocher
@@ -43,15 +43,15 @@ class InjectWithWildcardSpec extends Specification {
     static class WildCardInject {
         // tests injecting field
         @Inject
-        protected ConversionService<?> conversionService
+        protected ConversionService conversionService
 
         // tests injecting constructor
-        WildCardInject(ConversionService<?> conversionService) {
+        WildCardInject(ConversionService conversionService) {
         }
 
         // tests injection method
         @Inject
-        void setConversionService(ConversionService<?> conversionService) {
+        void setConversionService(ConversionService conversionService) {
             this.conversionService = conversionService
         }
     }

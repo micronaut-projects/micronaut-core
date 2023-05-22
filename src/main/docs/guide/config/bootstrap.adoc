@@ -1,4 +1,4 @@
-Most application configuration is stored in `application.yml`, environment-specific files like `application-{environment}.{extension}`, environment and system properties, etc.
+Most application configuration is stored in your configuration file (e.g `application.yml`), environment-specific files like `application-{environment}.{extension}`, environment and system properties, etc.
 These configure the application context.
 But during application startup, before the application context is created, a "bootstrap" context can be created to store configuration necessary to retrieve additional configuration for the main context. Typically that additional configuration is in some remote source.
 

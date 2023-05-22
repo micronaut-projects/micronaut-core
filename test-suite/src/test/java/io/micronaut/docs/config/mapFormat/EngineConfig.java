@@ -19,7 +19,7 @@ package io.micronaut.docs.config.mapFormat;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.convert.format.MapFormat;
 
-import javax.validation.constraints.Min;
+import jakarta.validation.constraints.Min;
 import java.util.Map;
 // end::imports[]
 

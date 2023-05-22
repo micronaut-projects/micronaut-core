@@ -96,11 +96,13 @@
         <!-- Checks for Javadoc comments.                     -->
         <!-- See https://checkstyle.org/config_javadoc.html -->
         <module name="JavadocMethod">
-            <property name="excludeScope" value="private"/>
+            <property name="accessModifiers" value="public, protected"/>
         </module>
         <module name="JavadocType"/>
         <module name="JavadocStyle"/>
-        <module name="MissingJavadocType"/>
+        <module name="MissingJavadocType">
+            <property name="severity" value="warning"/>
+        </module>
 
         <!-- Checks for Naming Conventions.                  -->
         <!-- See https://checkstyle.org/config_naming.html -->
@@ -118,7 +120,7 @@
         <module name="IllegalImport"/> <!-- defaults to sun.* packages -->
         <module name="RedundantImport"/>
         <module name="UnusedImports">
-            <property name="processJavadoc" value="false"/>
+            <property name="processJavadoc" value="true"/>
         </module>
 
         <!-- Checks for Size Violations.                    -->

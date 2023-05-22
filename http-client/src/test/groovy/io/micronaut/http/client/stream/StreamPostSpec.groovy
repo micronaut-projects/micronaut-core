@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.stream
 
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.async.annotation.SingleResult
 import groovy.transform.EqualsAndHashCode
 import io.micronaut.context.ApplicationContext
@@ -30,10 +31,12 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.BlockingHttpClient
 import io.micronaut.http.client.HttpPostSpec
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.StreamingHttpClient
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
@@ -44,8 +47,8 @@ import spock.lang.IgnoreIf
 import spock.lang.Shared
 import spock.lang.Specification
 
-import javax.validation.Valid
-import javax.validation.constraints.NotNull
+import jakarta.validation.Valid
+import jakarta.validation.constraints.NotNull
 import java.util.function.Function
 
 /**
@@ -221,6 +224,19 @@ class StreamPostSpec extends Specification {
         ex.response.getBody(String).get() == "illegal.argument"
     }
 
+    void "test streaming with declarative client and optional query param"() {
+        given:
+        ReactiveClient client = context.getBean(ReactiveClient)
+
+        when:
+        Publisher<HttpResponse<User>> responsePublisher = client.postUser(Flux.just(new User(userName: "test")), null)
+        HttpResponse<User> response = Flux.from(responsePublisher).blockFirst()
+
+        then:
+        response.body().userName == "test"
+        response.header("QueryParam") == "null"
+    }
+
     @EqualsAndHashCode
     @Introspected
     static class Book {
@@ -262,6 +278,14 @@ class StreamPostSpec extends Specification {
             })
         }
 
+        @Post("/user/param{?queryParam}")
+        @SingleResult
+        Publisher<HttpResponse<User>> postUser(@Body Publisher<User> user, @QueryValue @Nullable String queryParam) {
+            return Mono.from(user).map({ User u->
+                return HttpResponse.ok(u).header("QueryParam", queryParam ?: "null")
+            })
+        }
+
         @Post("/user-error")
         @SingleResult
         Publisher<HttpResponse<User>> postUserError(@Body Publisher<User> user) {
@@ -292,5 +316,13 @@ class StreamPostSpec extends Specification {
         Publisher<HttpResponse<String>> illegalArgument(HttpRequest request, IllegalArgumentException e) {
             Mono.just(HttpResponse.notFound("illegal.argument"))
         }
+    }
+
+    @Requires(property = 'spec.name', value = 'StreamPostSpec')
+    @Client('/reactive/post')
+    static interface ReactiveClient {
+
+        @Post("/user/param{?queryParam}")
+        Publisher<HttpResponse<User>> postUser(@Body Publisher<User> user, @QueryValue @Nullable String queryParam)
     }
 }

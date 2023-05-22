@@ -15,10 +15,9 @@
  */
 package io.micronaut.inject.lifecycle.proxybeanwithpredestroy
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification
-
 // proxyTarget = false proxies are always destroyed
 class ProxyBeanWithPreDestroySpec extends Specification {
 
@@ -42,7 +41,7 @@ class ProxyBeanWithPreDestroySpec extends Specification {
 
     void "test cannot destroyed a proxy bean by the class name"() {
         given:
-            BeanContext context = new DefaultBeanContext()
+            BeanContext context = ApplicationContext.builder().properties("spec": getClass().getSimpleName()).build()
             context.start()
 
         when:
@@ -60,7 +59,7 @@ class ProxyBeanWithPreDestroySpec extends Specification {
 
     void "test that a pre-destroy hook works"() {
         given:
-            BeanContext context = new DefaultBeanContext()
+            BeanContext context = ApplicationContext.builder().properties("spec": getClass().getSimpleName()).build()
             context.start()
 
         when:
@@ -89,7 +88,7 @@ class ProxyBeanWithPreDestroySpec extends Specification {
 
     void "test that a pre-destroy hook works when destroyed by registration"() {
         given:
-            BeanContext context = new DefaultBeanContext()
+            BeanContext context = ApplicationContext.builder().properties("spec": getClass().getSimpleName()).build()
             context.start()
 
         when:
@@ -121,7 +120,7 @@ class ProxyBeanWithPreDestroySpec extends Specification {
 
     void "test that a bean with a pre-destroy hook works closed on close"() {
         given:
-            BeanContext context = new DefaultBeanContext()
+            BeanContext context = ApplicationContext.builder().properties("spec": getClass().getSimpleName()).build()
             context.start()
 
         when:
@@ -147,7 +146,7 @@ class ProxyBeanWithPreDestroySpec extends Specification {
 
     void "test that destroy events run in the right phase"() {
         given:
-            BeanContext context = new DefaultBeanContext()
+            BeanContext context = ApplicationContext.builder().properties("spec": getClass().getSimpleName()).build()
             context.start()
 
 

@@ -5,7 +5,7 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import spock.lang.Specification
 
 import jakarta.inject.Inject
-import javax.validation.ConstraintViolationException
+import jakarta.validation.ConstraintViolationException
 // end::imports[]
 
 // tag::test[]

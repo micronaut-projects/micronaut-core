@@ -32,6 +32,12 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE})
 @Repeatable(InterceptorBindingDefinitions.class)
 public @interface InterceptorBinding {
+
+    /**
+     * The bind members name.
+     */
+    String META_BIND_MEMBERS = "bindMembers";
+
     /**
      * When declared on an interceptor, the value of this annotation can be used to indicate the annotation the
      * {@link MethodInterceptor} binds to at runtime.

@@ -15,7 +15,12 @@
  */
 package io.micronaut.core.annotation;
 
-import java.lang.annotation.*;
+import java.lang.annotation.Annotation;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Inherited;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
@@ -52,13 +57,30 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 public @interface Introspected {
 
     /**
-     * By default {@link Introspected} applies to the class it is applied on. However if classes are specified
+     * The default values for the access kind attribute.
+     */
+     Introspected.AccessKind[] DEFAULT_ACCESS_KIND = {Introspected.AccessKind.METHOD};
+
+    /**
+     * The default values for the visibility attribute.
+     */
+     Introspected.Visibility[] DEFAULT_VISIBILITY = {Introspected.Visibility.DEFAULT};
+
+    /**
+     * By default {@link Introspected} applies to the class it is applied on. However, if classes are specified
      * introspections will instead be generated for each class specified. This is useful in cases where you cannot
      * alter the source code and wish to generate introspections for already compiled classes.
      *
      * @return The classes to generate introspections for
      */
     Class<?>[] classes() default {};
+
+    /**
+     * Alternative way to specify the value for `classes` when the class cannot be referenced.
+     *
+     * @return The class names to generate introspections for
+     */
+    String[] classNames() default {};
 
     /**
      * <p>The default access type is {@link AccessKind#METHOD} which treats only public JavaBean getters or Java record components as properties. By specifying {@link AccessKind#FIELD}, public or package-protected fields will be used instead. </p>
@@ -157,6 +179,13 @@ public @interface Introspected {
     String withPrefix() default "with";
 
     /**
+     * @return The package to write introspections to. By default, uses the class package.
+     * @since 3.9.0
+     */
+    @Experimental
+    String targetPackage() default "";
+
+    /**
      * Allow pre-computed indexes for property lookups based on an annotation and a member.
      *
      * @see io.micronaut.core.beans.BeanIntrospection#getIndexedProperty(Class, String)
@@ -208,6 +237,13 @@ public @interface Introspected {
          * The default behaviour which in addition to public getters and setters will also include package protected fields if an {@link io.micronaut.core.annotation.Introspected.AccessKind} of {@link io.micronaut.core.annotation.Introspected.AccessKind#FIELD} is specified.
          *
          */
-        DEFAULT
+        DEFAULT,
+
+        /**
+         * All methods and/or fields are included.
+         *
+         * @since 4.0.0
+         */
+        ANY
     }
 }

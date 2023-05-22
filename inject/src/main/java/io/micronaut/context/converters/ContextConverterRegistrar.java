@@ -16,11 +16,11 @@
 package io.micronaut.context.converters;
 
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.reflect.ClassUtils;
-import jakarta.inject.Singleton;
 
 import java.util.Arrays;
 import java.util.Map;
@@ -33,12 +33,12 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author graemerocher
  * @since 2.0
  */
-@Singleton
+@Prototype
 @Internal
 public class ContextConverterRegistrar implements TypeConverterRegistrar {
 
     private final BeanContext beanContext;
-    private final Map<String, Class> classCache = new ConcurrentHashMap<>(10);
+    private final Map<String, Class<?>> classCache = new ConcurrentHashMap<>(10);
 
     /**
      * Default constructor.
@@ -49,9 +49,9 @@ public class ContextConverterRegistrar implements TypeConverterRegistrar {
     }
 
     @Override
-    public void register(ConversionService<?> conversionService) {
+    public void register(MutableConversionService conversionService) {
         conversionService.addConverter(String[].class, Class[].class, (object, targetType, context) -> {
-            Class[] classes = Arrays
+            Class<?>[] classes = Arrays
                     .stream(object)
                     .map(str -> conversionService.convert(str, Class.class))
                     .filter(Optional::isPresent)
@@ -62,7 +62,7 @@ public class ContextConverterRegistrar implements TypeConverterRegistrar {
         });
 
         conversionService.addConverter(String.class, Class.class, (object, targetType, context) -> {
-                    final Class result =
+                    final Class<?> result =
                             classCache.computeIfAbsent(object, s -> ClassUtils.forName(s, beanContext.getClassLoader()).orElse(MissingClass.class));
                     if (result == MissingClass.class) {
                         return Optional.empty();

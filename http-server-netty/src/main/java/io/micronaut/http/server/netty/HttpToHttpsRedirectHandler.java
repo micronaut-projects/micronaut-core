@@ -16,66 +16,64 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.HttpRequest;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
+import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
+import io.micronaut.http.server.netty.handler.RequestHandler;
 import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.http.uri.UriBuilder;
-import io.netty.channel.ChannelDuplexHandler;
-import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
-import io.netty.handler.ssl.SslHandler;
 
 /**
  * Handler to automatically redirect HTTP to HTTPS request when using dual protocol.
  *
+ * @param conversionService   The conversion service
+ * @param serverConfiguration The server configuration
+ * @param sslConfiguration    The SSL configuration
+ * @param hostResolver        The host resolver
  * @author Iván López
  * @since 2.5.0
  */
-@ChannelHandler.Sharable
 @Internal
-final class HttpToHttpsRedirectHandler extends ChannelDuplexHandler {
+record HttpToHttpsRedirectHandler(
+    ConversionService conversionService,
+    NettyHttpServerConfiguration serverConfiguration,
+    ServerSslConfiguration sslConfiguration,
+    HttpHostResolver hostResolver
+) implements RequestHandler {
 
-    private final ServerSslConfiguration sslConfiguration;
-    private final HttpHostResolver hostResolver;
+    @Override
+    public void accept(ChannelHandlerContext ctx, io.netty.handler.codec.http.HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
+        NettyHttpRequest<?> strippedRequest = NettyHttpRequest.createSafe(request, ctx, conversionService, serverConfiguration);
 
-    /**
-     * Construct HttpToHttpsRedirectHandler for the given arguments.
-     *
-     * @param sslConfiguration The {@link ServerSslConfiguration}
-     * @param hostResolver     The {@link HttpHostResolver}
-     */
-    public HttpToHttpsRedirectHandler(ServerSslConfiguration sslConfiguration,
-                                      HttpHostResolver hostResolver) {
-        this.hostResolver = hostResolver;
-        this.sslConfiguration = sslConfiguration;
+        UriBuilder uriBuilder = UriBuilder.of(hostResolver.resolve(strippedRequest));
+        strippedRequest.release();
+        uriBuilder.scheme("https");
+        int port = sslConfiguration.getPort();
+        if (port == 443) {
+            uriBuilder.port(-1);
+        } else {
+            uriBuilder.port(port);
+        }
+        uriBuilder.path(strippedRequest.getPath());
+
+        MutableHttpResponse<?> response = HttpResponse
+            .permanentRedirect(uriBuilder.build())
+            .header(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+        io.netty.handler.codec.http.HttpResponse nettyResponse = NettyHttpResponseBuilder.toHttpResponse(response);
+        outboundAccess.closeAfterWrite();
+        outboundAccess.writeFull((FullHttpResponse) nettyResponse);
     }
 
     @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        if (msg instanceof HttpRequest && ctx.pipeline().get(SslHandler.class) == null) {
-            HttpRequest<?> request = (HttpRequest<?>) msg;
-            UriBuilder uriBuilder = UriBuilder.of(hostResolver.resolve(request));
-            uriBuilder.scheme("https");
-            int port = sslConfiguration.getPort();
-            if (port == 443) {
-                uriBuilder.port(-1);
-            } else {
-                uriBuilder.port(port);
-            }
-            uriBuilder.path(request.getPath());
-
-            MutableHttpResponse<?> response = HttpResponse
-                    .permanentRedirect(uriBuilder.build())
-                    .header(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-            io.netty.handler.codec.http.HttpResponse nettyResponse = NettyHttpResponseBuilder.toHttpResponse(response);
-            ctx.writeAndFlush(nettyResponse);
-        } else {
-            ctx.fireChannelRead(msg);
-        }
+    public void handleUnboundError(Throwable cause) {
+        // this connection doesn't process requests, so just ignore errors
     }
 }

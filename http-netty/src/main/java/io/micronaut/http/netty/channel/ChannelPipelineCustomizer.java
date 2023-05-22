@@ -56,6 +56,12 @@ public interface ChannelPipelineCustomizer {
     String HANDLER_WEBSOCKET_UPGRADE = "websocket-upgrade-handler";
     String HANDLER_MICRONAUT_INBOUND = "micronaut-inbound-handler";
     String HANDLER_ACCESS_LOGGER = "http-access-logger";
+    String HANDLER_INITIAL_ERROR = "initial-error";
+    /**
+     * Handler that listens for channelActive to trigger, which will finish up the connection
+     * setup.
+     */
+    String HANDLER_ACTIVITY_LISTENER = "activity-listener";
 
     /**
      * @return Is this customizer the client.

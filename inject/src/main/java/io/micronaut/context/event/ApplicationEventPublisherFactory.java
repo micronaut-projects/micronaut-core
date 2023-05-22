@@ -15,19 +15,6 @@
  */
 package io.micronaut.context.event;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.Future;
-import java.util.function.Supplier;
-
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
@@ -42,12 +29,23 @@ import io.micronaut.core.type.ArgumentCoercible;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
-import io.micronaut.inject.BeanFactory;
 import io.micronaut.inject.InjectionPoint;
+import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.Future;
+import java.util.function.Supplier;
 
 /**
  * Constructs instances of {@link io.micronaut.context.event.ApplicationEventPublisher}.
@@ -58,9 +56,9 @@ import org.slf4j.LoggerFactory;
  */
 @Internal
 public final class ApplicationEventPublisherFactory<T>
-        implements BeanDefinition<ApplicationEventPublisher<T>>, BeanFactory<ApplicationEventPublisher<T>>,
+        implements InstantiatableBeanDefinition<ApplicationEventPublisher<T>>,
                    BeanDefinitionReference<ApplicationEventPublisher<T>> {
-    private static final Logger EVENT_LOGGER = LoggerFactory.getLogger(ApplicationEventPublisher.class);
+
     private static final Argument<Object> TYPE_VARIABLE = Argument.ofTypeVariable(Object.class, "T");
     private final AnnotationMetadata annotationMetadata;
     private ApplicationEventPublisher applicationObjectEventPublisher;
@@ -73,7 +71,7 @@ public final class ApplicationEventPublisherFactory<T>
         try {
             metadata.addDeclaredAnnotation(Indexes.class.getName(), Collections.singletonMap(AnnotationMetadata.VALUE_MEMBER, getBeanType()));
         } catch (NoClassDefFoundError e) {
-            // ignore, might happen if javax.inject is not the classpath
+            // ignore, might happen if jakarta.inject is not the classpath
         }
         annotationMetadata = metadata;
     }
@@ -85,7 +83,12 @@ public final class ApplicationEventPublisherFactory<T>
 
     @Override
     public boolean isCandidateBean(Argument<?> beanType) {
-        return BeanDefinition.super.isCandidateBean(beanType);
+        return beanType.isAssignableFrom(ApplicationEventPublisher.class);
+    }
+
+    @Override
+    public boolean isConfigurationProperties() {
+        return false;
     }
 
     @Override
@@ -130,17 +133,14 @@ public final class ApplicationEventPublisherFactory<T>
     }
 
     @Override
-    public ApplicationEventPublisher<T> build(BeanResolutionContext resolutionContext,
-                                              BeanContext context,
-                                              BeanDefinition<ApplicationEventPublisher<T>> definition)
-            throws BeanInstantiationException {
+    public ApplicationEventPublisher<T> instantiate(BeanResolutionContext resolutionContext, BeanContext context) throws BeanInstantiationException {
         if (executorSupplier == null) {
             executorSupplier = SupplierUtil.memoized(() ->
                  context.findBean(Executor.class, Qualifiers.byName("scheduled")).orElseGet(ForkJoinPool::commonPool)
             );
         }
         Argument<?> eventType = Argument.OBJECT_ARGUMENT;
-        final BeanResolutionContext.Segment<?> segment = resolutionContext.getPath().currentSegment().orElse(null);
+        final BeanResolutionContext.Segment<?, ?> segment = resolutionContext.getPath().currentSegment().orElse(null);
         if (segment != null) {
             final InjectionPoint<?> injectionPoint = segment.getInjectionPoint();
             if (injectionPoint instanceof ArgumentCoercible) {
@@ -210,21 +210,18 @@ public final class ApplicationEventPublisherFactory<T>
     }
 
     private ApplicationEventPublisher<Object> createEventPublisher(Argument<?> eventType, BeanContext beanContext) {
-        return new ApplicationEventPublisher<Object>() {
+        return new ApplicationEventPublisher<>() {
 
-            private final Supplier<List<ApplicationEventListener>> lazyListeners = SupplierUtil.memoizedNonEmpty(() -> {
-                List<ApplicationEventListener> listeners = new ArrayList<>(
-                        beanContext.getBeansOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(eventType.getType()))
-                );
-                listeners.sort(OrderUtil.COMPARATOR);
-                return listeners;
-            });
+            private final Supplier<ApplicationEventListener[]> lazyListeners = SupplierUtil.memoized(() -> beanContext.getBeansOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(eventType.getType()))
+                .stream()
+                .sorted(OrderUtil.COMPARATOR)
+                .toArray(ApplicationEventListener[]::new));
 
             @Override
             public void publishEvent(Object event) {
                 if (event != null) {
-                    if (EVENT_LOGGER.isDebugEnabled()) {
-                        EVENT_LOGGER.debug("Publishing event: {}", event);
+                    if (EventLogger.LOG.isDebugEnabled()) {
+                        EventLogger.LOG.debug("Publishing event: {}", event);
                     }
                     notifyEventListeners(event, lazyListeners.get());
                 }
@@ -234,7 +231,7 @@ public final class ApplicationEventPublisherFactory<T>
             public Future<Void> publishEventAsync(Object event) {
                 Objects.requireNonNull(event, "Event cannot be null");
                 CompletableFuture<Void> future = new CompletableFuture<>();
-                List<ApplicationEventListener> eventListeners = lazyListeners.get();
+                ApplicationEventListener[] eventListeners = lazyListeners.get();
                 executorSupplier.get().execute(() -> {
                     try {
                         notifyEventListeners(event, eventListeners);
@@ -245,33 +242,46 @@ public final class ApplicationEventPublisherFactory<T>
                 });
                 return future;
             }
+
+            @Override
+            public boolean isEmpty() {
+                return lazyListeners.get().length == 0;
+            }
         };
     }
 
-    private void notifyEventListeners(@NonNull Object event, Collection<ApplicationEventListener> eventListeners) {
-        if (!eventListeners.isEmpty()) {
-            if (EVENT_LOGGER.isTraceEnabled()) {
-                EVENT_LOGGER.trace("Established event listeners {} for event: {}", eventListeners, event);
-            }
-            for (ApplicationEventListener listener : eventListeners) {
-                if (listener.supports(event)) {
-                    try {
-                        if (EVENT_LOGGER.isTraceEnabled()) {
-                            EVENT_LOGGER.trace("Invoking event listener [{}] for event: {}", listener, event);
+    private void notifyEventListeners(@NonNull Object event, ApplicationEventListener[] eventListeners) {
+        if (eventListeners.length == 0) {
+            return;
+        }
+        if (EventLogger.LOG.isTraceEnabled()) {
+            EventLogger.LOG.trace("Established event listeners {} for event: {}", eventListeners, event);
+        }
+        for (ApplicationEventListener listener : eventListeners) {
+            if (listener.supports(event)) {
+                try {
+                    if (EventLogger.LOG.isTraceEnabled()) {
+                        EventLogger.LOG.trace("Invoking event listener [{}] for event: {}", listener, event);
+                    }
+                    listener.onApplicationEvent(event);
+                } catch (ClassCastException ex) {
+                    String msg = ex.getMessage();
+                    if (msg == null || msg.startsWith(event.getClass().getName())) {
+                        if (EventLogger.LOG.isDebugEnabled()) {
+                            EventLogger.LOG.debug("Incompatible listener for event: " + listener, ex);
                         }
-                        listener.onApplicationEvent(event);
-                    } catch (ClassCastException ex) {
-                        String msg = ex.getMessage();
-                        if (msg == null || msg.startsWith(event.getClass().getName())) {
-                            if (EVENT_LOGGER.isDebugEnabled()) {
-                                EVENT_LOGGER.debug("Incompatible listener for event: " + listener, ex);
-                            }
-                        } else {
-                            throw ex;
-                        }
+                    } else {
+                        throw ex;
                     }
                 }
             }
+        }
+    }
+
+    private static final class EventLogger {
+        private static final Logger LOG = LoggerFactory.getLogger(ApplicationEventPublisher.class);
+
+        private EventLogger() {
         }
     }
 }

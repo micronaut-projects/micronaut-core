@@ -16,11 +16,13 @@
 package io.micronaut.management.health.indicator;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.health.HealthStatus;
+import jakarta.validation.constraints.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.validation.constraints.NotNull;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -30,6 +32,8 @@ import java.util.Map;
  * @author James Kleeh
  * @since 1.0
  */
+@Introspected
+@ReflectiveAccess
 @JsonDeserialize(as = DefaultHealthResult.class)
 public interface HealthResult {
 

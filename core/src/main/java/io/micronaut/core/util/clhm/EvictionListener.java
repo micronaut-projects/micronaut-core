@@ -16,8 +16,6 @@
 
 package io.micronaut.core.util.clhm;
 
-import javax.annotation.concurrent.ThreadSafe;
-
 /**
  * A listener registered for notification when an entry is evicted. An instance
  * may be called concurrently by multiple threads to process entries. An
@@ -38,7 +36,7 @@ import javax.annotation.concurrent.ThreadSafe;
  * @see <a href="https://code.google.com/p/concurrentlinkedhashmap/">
  *      https://code.google.com/p/concurrentlinkedhashmap/</a>
  */
-@ThreadSafe
+//@ThreadSafe
 public interface EvictionListener<K, V> {
 
     /**

@@ -29,7 +29,7 @@ class Test {
         !nullableMethod.parameters[0].isNonNull()
 
         where:
-        packageName << ["io.micronaut.core.annotation", "javax.annotation", "org.jetbrains.annotations", "edu.umd.cs.findbugs.annotations"]
+        packageName << ["io.micronaut.core.annotation", "javax.annotation", "org.jetbrains.annotations", "jakarta.annotation","edu.umd.cs.findbugs.annotations"]
     }
 
     void "test map nullable annotation for #packageName in introspections"() {
@@ -59,6 +59,6 @@ class Test {
         !nullableMethod.arguments[0].isNonNull()
 
         where:
-        packageName << ["io.micronaut.core.annotation", "javax.annotation", "org.jetbrains.annotations", "edu.umd.cs.findbugs.annotations"]
+        packageName << ["io.micronaut.core.annotation", "javax.annotation", "org.jetbrains.annotations", "jakarta.annotation","edu.umd.cs.findbugs.annotations"]
     }
 }

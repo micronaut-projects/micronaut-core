@@ -5,12 +5,13 @@ plugins {
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":graal")
-    compileOnly libs.managed.graal
+    compileOnly libs.graal
     compileOnly libs.managed.netty.transport.native.epoll
     compileOnly libs.managed.netty.transport.native.kqueue
+    compileOnly libs.managed.netty.transport.native.iouring
+    compileOnly project(":websocket")
 
     api project(":http")
-    api project(":websocket")
     api project(":buffer-netty")
 
     api libs.managed.netty.codec.http
@@ -20,6 +21,8 @@ dependencies {
     implementation libs.managed.reactor
 
     testImplementation project(":runtime")
+    testImplementation project(":websocket")
+    testImplementation project(":jackson-databind")
 }
 
 spotless {

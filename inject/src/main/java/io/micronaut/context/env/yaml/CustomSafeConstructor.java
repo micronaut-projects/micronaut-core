@@ -16,6 +16,7 @@
 package io.micronaut.context.env.yaml;
 
 import io.micronaut.core.annotation.Internal;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.constructor.SafeConstructor;
 import org.yaml.snakeyaml.nodes.MappingNode;
 import org.yaml.snakeyaml.nodes.SequenceNode;
@@ -34,6 +35,7 @@ import java.util.Map;
 @Internal
 class CustomSafeConstructor extends SafeConstructor {
     CustomSafeConstructor() {
+        super(new LoaderOptions());
         yamlConstructors.put(Tag.TIMESTAMP, new ConstructIsoTimestampString());
     }
 

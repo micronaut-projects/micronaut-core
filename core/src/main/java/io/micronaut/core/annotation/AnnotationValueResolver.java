@@ -59,6 +59,19 @@ public interface AnnotationValueResolver extends ValueResolver<CharSequence> {
     /**
      * Return the enum value of the given member of the given enum type.
      *
+     * @param member The annotation member
+     * @param enumType The required type
+     * @return An {@link Optional} of the enum value
+     * @param <E> The enum type
+     */
+    default <E extends Enum<E>> EnumSet<E> enumValuesSet(@NonNull String member, @NonNull Class<E> enumType) {
+        E[] values = enumValues(member, enumType);
+        return values.length == 0 ? EnumSet.noneOf(enumType) : EnumSet.copyOf(Arrays.asList(values));
+    }
+
+    /**
+     * Return the enum value of the given member of the given enum type.
+     *
      * @param enumType The required type
      * @return An {@link Optional} of the enum value
      * @param <E> The enum type

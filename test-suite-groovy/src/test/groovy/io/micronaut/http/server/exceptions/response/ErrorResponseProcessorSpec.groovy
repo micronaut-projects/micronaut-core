@@ -10,20 +10,6 @@ import jakarta.inject.Singleton
 
 class ErrorResponseProcessorSpec extends Specification {
 
-    def "by default you get a hateoas replacement under groovy"() {
-        given:
-        def ctx = ApplicationContext.run()
-
-        when:
-        def bean = ctx.getBean(ErrorResponseProcessor)
-
-        then:
-        bean instanceof HateoasErrorResponseProcessorReplacement
-
-        cleanup:
-        ctx.close()
-    }
-
     def "default can simply be replaced by binding a different processor"() {
         given:
         def ctx = ApplicationContext.run(

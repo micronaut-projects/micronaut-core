@@ -26,52 +26,60 @@ public enum HttpMethod implements CharSequence {
     /**
      * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.2.
      */
-    OPTIONS,
+    OPTIONS(false, true),
 
     /**
      * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.3.
      */
-    GET,
+    GET(false, false),
 
     /**
      * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.4.
      */
-    HEAD,
+    HEAD(false, false),
 
     /**
      * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.5.
      */
-    POST,
+    POST(true, true),
 
     /**
      * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.6.
      */
-    PUT,
+    PUT(true, true),
 
     /**
      * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.7.
      */
-    DELETE,
+    DELETE(false, true),
 
     /**
      * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.8.
      */
-    TRACE,
+    TRACE(false, false),
 
     /**
      * See https://www.w3.org/Protocols/rfc2616/rfc2616-sec9.html#sec9.9.
      */
-    CONNECT,
+    CONNECT(false, false),
 
     /**
      * See https://tools.ietf.org/html/rfc5789.
      */
-    PATCH,
+    PATCH(true, true),
 
     /**
      * A custom non-standard HTTP method.
      */
-    CUSTOM;
+    CUSTOM(false, true);
+
+    private final boolean requiresRequestBody;
+    private final boolean permitsRequestBody;
+
+    HttpMethod(boolean requiresRequestBody, boolean permitsRequestBody) {
+        this.requiresRequestBody = requiresRequestBody;
+        this.permitsRequestBody = permitsRequestBody;
+    }
 
     @Override
     public int length() {
@@ -86,6 +94,36 @@ public enum HttpMethod implements CharSequence {
     @Override
     public CharSequence subSequence(int start, int end) {
         return name().subSequence(start, end);
+    }
+
+    /**
+     * Whether the given method requires a request body.
+     *
+     * @return Does the method require a request body.
+     * @since 4.0.0
+     */
+    public boolean requiresRequestBody() {
+        return requiresRequestBody;
+    }
+
+    /**
+     * Whether the given method allows a request body.
+     *
+     * @return Does the method allows a request body.
+     * @since 4.0.0
+     */
+    public boolean permitsRequestBody() {
+        return permitsRequestBody;
+    }
+
+    /**
+     * Whether the given method allows a request body.
+     *
+     * @return Does the method allows a request body.
+     * @since 4.0.0
+     */
+    public boolean permitsResponseBody() {
+        return permitsRequestBody;
     }
 
     /**

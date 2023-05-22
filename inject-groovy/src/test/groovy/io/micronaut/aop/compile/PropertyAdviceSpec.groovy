@@ -3,7 +3,7 @@ package io.micronaut.aop.compile
 import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionWriter
 
 class PropertyAdviceSpec extends AbstractBeanDefinitionSpec {
@@ -14,14 +14,14 @@ package test;
 
 import io.micronaut.aop.interceptors.*;
 import io.micronaut.context.annotation.*;
-import javax.validation.constraints.*;
-import javax.inject.Singleton;
+import jakarta.validation.constraints.*;
+import jakarta.inject.Singleton;
 
 @Mutating("name")
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class MyPropertyBean {
     String name
-    
+
     void test(String name) {}
 }
 
@@ -32,7 +32,7 @@ class MyPropertyBean {
 
         when:
         ApplicationContext context = ApplicationContext.run()
-        def instance = ((BeanFactory) beanDefinition).build(context, beanDefinition)
+        def instance = ((InstantiatableBeanDefinition) beanDefinition).instantiate(context)
         instance.setName("test")
 
         then:

@@ -19,10 +19,4 @@
  * @author Graeme Rocher
  * @since 1.0
  */
-@Configuration
-@Requires(property = "micronaut.server.cors.enabled", value = StringUtils.TRUE)
 package io.micronaut.http.server.cors;
-
-import io.micronaut.context.annotation.Configuration;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.util.StringUtils;

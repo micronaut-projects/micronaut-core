@@ -30,5 +30,5 @@ public interface OutgoingHttpRequestProcessor {
      * @param request The request
      * @return true if the request should be processed
      */
-    boolean shouldProcessRequest(OutgointRequestProcessorMatcher matcher, HttpRequest<?> request);
+    boolean shouldProcessRequest(OutgoingRequestProcessorMatcher matcher, HttpRequest<?> request);
 }

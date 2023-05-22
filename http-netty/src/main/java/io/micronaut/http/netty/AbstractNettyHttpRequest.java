@@ -22,7 +22,6 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpParameters;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpVersion;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpRequest;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
@@ -30,8 +29,6 @@ import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.codec.http.QueryStringDecoder;
-import io.netty.handler.codec.http2.HttpConversionUtil;
-import io.netty.util.AsciiString;
 import io.netty.util.DefaultAttributeMap;
 
 import java.net.URI;
@@ -51,10 +48,8 @@ import java.util.Optional;
 @Internal
 public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap implements HttpRequest<B>, NettyHttpRequestBuilder {
 
-    public static final AsciiString STREAM_ID = HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text();
-    public static final AsciiString HTTP2_SCHEME = HttpConversionUtil.ExtensionHeaderNames.SCHEME.text();
     protected final io.netty.handler.codec.http.HttpRequest nettyRequest;
-    protected final ConversionService<?> conversionService;
+    protected final ConversionService conversionService;
     protected final HttpMethod httpMethod;
     protected final URI uri;
     protected final String httpMethodName;
@@ -146,14 +141,6 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
         return this.nettyRequest instanceof StreamedHttpRequest;
     }
 
-    @Override
-    public HttpVersion getHttpVersion() {
-        if (nettyRequest.headers().contains(STREAM_ID)) {
-            return HttpVersion.HTTP_2_0;
-        }
-        return HttpVersion.HTTP_1_1;
-    }
-
     /**
      * @return The native netty request
      */
@@ -163,17 +150,17 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
 
     @Override
     public HttpParameters getParameters() {
-        NettyHttpParameters httpParameters = this.httpParameters;
-        if (httpParameters == null) {
+        NettyHttpParameters params = this.httpParameters;
+        if (params == null) {
             synchronized (this) { // double check
-                httpParameters = this.httpParameters;
-                if (httpParameters == null) {
-                    httpParameters = decodeParameters();
-                    this.httpParameters = httpParameters;
+                params = this.httpParameters;
+                if (params == null) {
+                    params = decodeParameters();
+                    this.httpParameters = params;
                 }
             }
         }
-        return httpParameters;
+        return params;
     }
 
     @Override
@@ -185,6 +172,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     }
 
     @Override
+    @SuppressWarnings("java:S2789") // performance opt
     public Optional<MediaType> getContentType() {
         if (mediaType == null) {
             mediaType = HttpRequest.super.getContentType();
@@ -201,6 +189,7 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
     }
 
     @Override
+    @SuppressWarnings("java:S2789") // performance opt
     public Optional<Locale> getLocale() {
         if (locale == null) {
             locale = HttpRequest.super.getLocale();
@@ -220,17 +209,17 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
 
     @Override
     public String getPath() {
-        String path = this.path;
-        if (path == null) {
+        String p = this.path;
+        if (p == null) {
             synchronized (this) { // double check
-                path = this.path;
-                if (path == null) {
-                    path = decodePath();
-                    this.path = path;
+                p = this.path;
+                if (p == null) {
+                    p = decodePath();
+                    this.path = p;
                 }
             }
         }
-        return path;
+        return p;
     }
 
     /**
@@ -243,9 +232,10 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
      * @param uri The URI
      * @return The query string decoder
      */
+    @SuppressWarnings("ConstantConditions")
     protected final QueryStringDecoder createDecoder(URI uri) {
-        Charset charset = getCharacterEncoding();
-        return charset != null ? new QueryStringDecoder(uri, charset) : new QueryStringDecoder(uri);
+        Charset cs = getCharacterEncoding();
+        return cs != null ? new QueryStringDecoder(uri, cs) : new QueryStringDecoder(uri);
     }
 
     private String decodePath() {

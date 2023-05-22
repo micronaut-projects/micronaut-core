@@ -63,5 +63,5 @@ public @interface EachBean {
     /**
      * @return The bean type that this bean is driven by
      */
-    Class value();
+    Class<?> value();
 }

@@ -1,16 +1,266 @@
 package io.micronaut.inject.configproperties
 
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.ApplicationContextBuilder
 import io.micronaut.context.BeanContext
 import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.PropertySource
 import io.micronaut.core.convert.format.ReadableBytes
-import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
+import io.micronaut.inject.InstantiatableBeanDefinition
 import io.micronaut.inject.configuration.Engine
+import spock.lang.Issue
+
+import java.time.Duration
 
 class ConfigPropertiesParseSpec extends AbstractTypeElementSpec {
+
+    void "test configuration properties implementing interface"() {
+        when:
+        def context = buildContext('''
+package jdbctest;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+
+@ConfigurationProperties("jdbc")
+class TestConfiguration extends AbstractConfiguration implements BasicJdbcConfiguration {
+    private String url;
+    @Override public void setUrl(String url) {
+        this.url = url;
+    }
+    @Override public String getUrl() {
+        return url;
+    }
+}
+class AbstractConfiguration {
+    private String username;
+    public String getUsername() {
+        return username;
+    }
+    public void setUsername(String username) {
+        this.username = username;
+    }
+}
+interface BasicJdbcConfiguration {
+    String getUrl();
+    void setUrl(String url);
+    String getUsername();
+    void setUsername(String username);
+}
+''')
+        def bean = getBean(context, 'jdbctest.TestConfiguration')
+
+        then:
+        bean.url == 'test'
+        bean.username == 'foo'
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/8574")
+    void "test configuration properties inherited from parent with multiple overloads"() {
+        when:
+        def context = buildContext('''
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.convert.format.MapFormat;
+import io.micronaut.core.naming.conventions.StringConvention;
+import java.io.InputStream;
+import java.util.*;
+
+@ConfigurationProperties("freemarker")
+class TestConfiguration extends ParentConfiguration {
+    @Override
+    public void setSettings(
+            @MapFormat(keyFormat = StringConvention.UNDER_SCORE_SEPARATED_LOWER_CASE) Properties props){
+        super.setSettings(props);
+    }
+
+}
+class ParentConfiguration {
+    private Properties properties;
+    public void setSettings(InputStream inputStream) {
+    }
+    public void setSettings(Properties properties) {
+        this.properties = properties;
+    }
+
+    public Properties properties() {
+        return properties;
+    }
+}
+''')
+        def bean = getBean(context, 'test.TestConfiguration')
+
+        then:
+        bean != null
+        bean.properties() as Map == [url_escaping_charset:'UTF-8']
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/8480")
+    void "test configuration properties inheritance for compiled classes - inherited props"() {
+        when:
+        def context = buildContext('''
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.http.server.HttpServerConfiguration;
+
+@ConfigurationProperties("netty")
+class NettyHttpServerConfiguration extends
+ HttpServerConfiguration {
+    private Parent parent;
+    private Child child;
+    public test.NettyHttpServerConfiguration.Parent getParent() {
+        return parent;
+    }
+
+    public void setParent(test.NettyHttpServerConfiguration.Parent parent) {
+        this.parent = parent;
+    }
+
+    public void setChild(test.NettyHttpServerConfiguration.Child child) {
+        this.child = child;
+    }
+    public test.NettyHttpServerConfiguration.Child getChild() {
+        return child;
+    }
+    @ConfigurationProperties("child")
+    public static class Child extends EventLoopConfig {
+
+    }
+    @ConfigurationProperties("parent")
+    public static class Parent extends EventLoopConfig {
+
+    }
+    public abstract static class EventLoopConfig {
+        private Integer ioRatio;
+        private int threads;
+        public void setIoRatio(Integer ioRatio) {
+            this.ioRatio = ioRatio;
+        }
+        public Integer getIoRatio() {
+            return ioRatio;
+        }
+        public void setThreads(int threads) {
+            this.threads = threads;
+        }
+        public int getNumOfThreads() {
+            return threads;
+        }
+    }
+}
+''')
+        def config = getBean(context, "test.NettyHttpServerConfiguration")
+
+        then:
+        config.idleTimeout == Duration.ofSeconds(2)
+        config.parent.ioRatio == 10
+        config.parent.numOfThreads == 5
+        config.child.ioRatio == 15
+        config.child.numOfThreads == 55
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/8480")
+    void "test configuration properties inheritance for compiled classes"() {
+        when:
+        def context = buildContext('''
+package test;
+
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.session.http.HttpSessionConfiguration;
+import java.net.URI;
+import java.util.Optional;
+import java.util.List;
+
+@ConfigurationProperties("test")
+class RedisHttpSessionConfiguration extends
+ HttpSessionConfiguration {
+    private String writeMode;
+    private URI uri;
+    private List<URI> uris;
+
+    public void setWriteMode(String writeMode) {
+        this.writeMode = writeMode;
+    }
+    public String getWriteMode() {
+        return writeMode;
+    }
+
+    public Optional<URI> getUri() {
+        return Optional.ofNullable(uri);
+    }
+    public void setUri(String uri) {
+        this.uri = URI.create(uri);
+    }
+
+    public List<URI> getUris() {
+        return uris;
+    }
+
+    public void setUris(URI... uris) {
+        this.uris = List.of(uris);
+    }
+}
+''')
+        def config = getBean(context, "test.RedisHttpSessionConfiguration")
+
+        then:
+        config.writeMode == 'test'
+        config.uri.isPresent()
+        config.uri.get() == URI.create('http://localhost:9999')
+        config.uris == List.of(URI.create('http://localhost:9999'))
+    }
+
+    void "test configuration properties with mixed getters/setters"() {
+        when:
+        def context = buildContext('''
+package test;
+
+import io.micronaut.context.annotation.*;
+import io.micronaut.core.annotation.Nullable;
+import java.time.Duration;
+import java.util.Optional;
+
+@ConfigurationProperties("foo.bar")
+class MyConfig {
+    String host;
+
+
+    public Optional<String> getHost() {
+        return Optional.ofNullable(host);
+    }
+
+    public void setHost(@Nullable String host) {
+        this.host = host;
+    }
+}
+
+''')
+        def config = getBean(context, 'test.MyConfig')
+
+        then:
+        config.host.get() == 'bar'
+    }
+
+    @Override
+    protected void configureContext(ApplicationContextBuilder contextBuilder) {
+        contextBuilder.properties(
+                'foo.bar.host':'bar',
+                'jdbc.url':'test',
+                'jdbc.username':'foo',
+                "micronaut.session.http.test.write-mode": "test",
+                "micronaut.session.http.test.uri": "http://localhost:9999",
+                "micronaut.session.http.test.uris": "http://localhost:9999",
+                "micronaut.server.idle-timeout": "2s",
+                "micronaut.server.netty.parent.io-ratio": "10",
+                "micronaut.server.netty.parent.threads": "5",
+                "micronaut.server.netty.child.io-ratio": "15",
+                "micronaut.server.netty.child.threads": "55",
+                "freemarker.settings.urlEscapingCharset": 'UTF-8'
+        )
+    }
 
     void "test inner class paths - pojo inheritance"() {
         when:
@@ -32,7 +282,7 @@ class MyConfig {
     public void setHost(String host) {
         this.host = host;
     }
-    
+
     @ConfigurationProperties("baz")
     static class ChildConfig extends ParentConfig {
         protected String stuff;
@@ -41,7 +291,7 @@ class MyConfig {
 
 class ParentConfig {
     private String foo;
-    
+
     public void setFoo(String foo) {
         this.foo = foo;
     }
@@ -80,7 +330,7 @@ class MyConfig {
     public void setHost(String host) {
         this.host = host;
     }
-    
+
     @ConfigurationProperties("baz")
     static class ChildConfig {
         protected String stuff;
@@ -116,15 +366,15 @@ class MyConfig {
     public void setHost(String host) {
         this.host = host;
     }
-    
+
     @ConfigurationProperties("baz")
     static class ChildConfig {
         String stuff;
-    
+
         public String getStuff() {
             return stuff;
         }
-    
+
         public void setStuff(String stuff) {
             this.stuff = stuff;
         }
@@ -160,27 +410,27 @@ class MyConfig {
     public void setHost(String host) {
         this.host = host;
     }
-    
+
     @ConfigurationProperties("baz")
     static class ChildConfig {
         String stuff;
-    
+
         public String getStuff() {
             return stuff;
         }
-    
+
         public void setStuff(String stuff) {
             this.stuff = stuff;
         }
-        
+
         @ConfigurationProperties("more")
         static class MoreConfig {
             String stuff;
-        
+
             public String getStuff() {
                 return stuff;
             }
-        
+
             public void setStuff(String stuff) {
                 this.stuff = stuff;
             }
@@ -216,15 +466,15 @@ class MyConfig extends ParentConfig {
     public void setHost(String host) {
         this.host = host;
     }
-    
+
     @ConfigurationProperties("baz")
     static class ChildConfig {
         String stuff;
-    
+
         public String getStuff() {
             return stuff;
         }
-    
+
         public void setStuff(String stuff) {
             this.stuff = stuff;
         }
@@ -379,7 +629,7 @@ import java.time.Duration;
 @ConfigurationProperties("http.client")
 public class HttpClientConfiguration {
     private int maxContentLength = 1024 * 1024 * 10; // 10MB;
-    
+
     void setMaxContentLength(@ReadableBytes int maxContentLength) {
         this.maxContentLength = maxContentLength;
     }
@@ -407,7 +657,7 @@ import java.time.Duration;
 @ConfigurationProperties("http.client")
 public class HttpClientConfiguration {
     private int maxContentLength = 1024 * 1024 * 10; // 10MB;
-    
+
     public void setMaxContentLength(@ReadableBytes int maxContentLength) {
         this.maxContentLength = maxContentLength;
     }
@@ -420,8 +670,10 @@ public class HttpClientConfiguration {
         then:
         beanDefinition.injectedFields.size() == 0
         beanDefinition.injectedMethods.size() == 1
-        beanDefinition.injectedMethods[0].arguments[0].synthesizeAll().size() == 1
+        beanDefinition.injectedMethods[0].arguments[0].synthesizeAll().size() == 2
         beanDefinition.injectedMethods[0].arguments[0].synthesize(ReadableBytes)
+        // This should be removed in Micronaut 4
+        beanDefinition.injectedMethods[0].arguments[0].synthesize(PropertySource)
     }
 
     void "test different inject types for config properties"() {
@@ -441,8 +693,8 @@ class MyProperties {
     public void setSetterTest(String s) {
         this.internalField = s;
     }
-    
-    public String getSetter() { return this.internalField; } 
+
+    public String getSetter() { return this.internalField; }
 }
 ''')
         then:
@@ -451,9 +703,9 @@ class MyProperties {
         beanDefinition.injectedMethods.size() == 1
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.builder().start()
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -466,7 +718,7 @@ class MyProperties {
                 ['foo.setterTest' :'foo',
                 'foo.fieldTest' :'bar']
         )
-        bean = factory.build(applicationContext, beanDefinition)
+        bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -492,18 +744,18 @@ class MyProperties extends Parent {
     public void setSetterTest(String s) {
         this.internalField = s;
     }
-    
-    public String getSetter() { return this.internalField; } 
+
+    public String getSetter() { return this.internalField; }
 }
 
 class Parent {
     private String parentField;
-    
+
     public void setParentTest(String s) {
         this.parentField = s;
     }
-    
-    public String getParentTest() { return this.parentField; } 
+
+    public String getParentTest() { return this.parentField; }
 }
 ''')
         then:
@@ -519,9 +771,9 @@ class Parent {
 
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.builder().start()
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -534,7 +786,7 @@ class Parent {
                 ['foo.setterTest' :'foo',
                 'foo.fieldTest' :'bar']
         )
-        bean = factory.build(applicationContext, beanDefinition)
+        bean = factory.instantiate(applicationContext)
 
         then:
         bean != null
@@ -560,12 +812,12 @@ public class FooConfigurationProperties {
     public void setIssuer(String issuer) {
         this.issuer = issuer;
     }
-    
+
     //isEnabled field maps to setEnabled method
     public void setEnabled(boolean enabled) {
         this.isEnabled = enabled;
     }
-    
+
     //isOther field does not map to setOther method because its the class and not primitive
     public void setOther(Boolean other) {
         this.isOther = other;
@@ -598,9 +850,9 @@ class MyConfig {
         return this;
     }
 }''')
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.builder(["my.host": "abc"]).start()
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         bean.getHost() == "abc"
@@ -612,7 +864,7 @@ class MyConfig {
 package test;
 
 import io.micronaut.context.annotation.*;
-        
+
 @ConfigurationProperties(value = "foo", includes = {"publicField", "parentPublicField"})
 class MyProperties extends Parent {
     public String publicField;
@@ -719,16 +971,16 @@ import io.micronaut.inject.configuration.Engine;
 @ConfigurationProperties(value = "foo", excludes = {"engine", "engine2"})
 class MyProperties extends Parent {
 
-    @ConfigurationBuilder(prefixes = "with") 
+    @ConfigurationBuilder(prefixes = "with")
     Engine.Builder engine = Engine.builder();
-    
+
     private Engine.Builder engine2 = Engine.builder();
-    
-    @ConfigurationBuilder(configurationPrefix = "two", prefixes = "with") 
+
+    @ConfigurationBuilder(configurationPrefix = "two", prefixes = "with")
     public void setEngine2(Engine.Builder engine3) {
         this.engine2 = engine3;
     }
-    
+
     public Engine.Builder getEngine2() {
         return engine2;
     }
@@ -744,12 +996,12 @@ class Parent {
         beanDefinition.injectedFields.isEmpty()
 
         when:
-        BeanFactory factory = beanDefinition
+        InstantiatableBeanDefinition factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'foo.manufacturer':'Subaru',
                 'foo.two.manufacturer':'Subaru'
         )
-        def bean = factory.build(applicationContext, beanDefinition)
+        def bean = factory.instantiate(applicationContext)
 
         then:
         ((Engine.Builder) bean.engine).build().manufacturer == 'Subaru'
@@ -885,16 +1137,16 @@ import jakarta.annotation.PostConstruct;
 public class EntityProperties {
 
     private String prop;
-    
+
     @PostConstruct
     public void init() {
         System.out.println("prop = " + prop);
     }
-    
+
     public String getProp() {
         return prop;
     }
-    
+
     public void setProp(String prop) {
         this.prop = prop;
     }

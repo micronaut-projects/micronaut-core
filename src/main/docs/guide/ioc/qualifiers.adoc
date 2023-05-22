@@ -1,6 +1,6 @@
 If you have multiple possible implementations for a given interface to inject, you need to use a qualifier.
 
-Once again Micronaut leverages JSR-330 and the link:{jeeapi}/javax/inject/Qualifier.html[Qualifier] and link:{jeeapi}/javax/inject/Named.html[Named] annotations to support this use case.
+Once again Micronaut framework leverages JSR-330 and the link:{jeeapi}/javax/inject/Qualifier.html[Qualifier] and link:{jeeapi}/javax/inject/Named.html[Named] annotations to support this use case.
 
 == Qualifying By Name
 
@@ -11,10 +11,10 @@ snippet::io.micronaut.docs.inject.qualifiers.named.Engine,io.micronaut.docs.inje
 <1> The `Engine` interface defines the common contract
 <2> The `V6Engine` class is the first implementation
 <3> The `V8Engine` class is the second implementation
-<4> The link:{jeeapi}/javax/inject/Named.html[javax.inject.Named] annotation indicates that the `V8Engine` implementation is required
+<4> The link:{jeeapi}/javax/inject/Named.html[jakarta.inject.Named] annotation indicates that the `V8Engine` implementation is required
 <5> Calling the start method prints: `"Starting V8"`
 
-Micronaut is capable of injecting `V8Engine` in the previous example, because:
+Micronaut framework is capable of injecting `V8Engine` in the previous example, because:
 
 `@Named` qualifier value (`v8`) + type being injected simple name (`Engine`) == (case-insensitive) == The simple name of a bean of type `Engine` (`V8Engine`)
 
@@ -32,7 +32,7 @@ snippet::io.micronaut.docs.qualifiers.annotation.Vehicle[tags="constructor",inde
 
 == Qualifying By Annotation Members
 
-Since Micronaut 3.0, annotation qualifiers can also use annotation members to resolve the correct bean to inject. For example, consider the following annotation:
+Since Micronaut framework 3.0, annotation qualifiers can also use annotation members to resolve the correct bean to inject. For example, consider the following annotation:
 
 snippet::io.micronaut.docs.qualifiers.annotationmember.Cylinders[tags="imports,class",indent=0]
 
@@ -57,7 +57,7 @@ snippet::io.micronaut.docs.qualifiers.annotationmember.Vehicle[tags="constructor
 
 == Qualifying by Generic Type Arguments
 
-Since Micronaut 3.0, it is possible to select which bean to inject based on the generic type arguments of the class or interface. Consider the following example:
+Since Micronaut framework 3.0, it is possible to select which bean to inject based on the generic type arguments of the class or interface. Consider the following example:
 
 snippet::io.micronaut.docs.inject.generics.CylinderProvider[tags="class",indent=0]
 
@@ -87,7 +87,7 @@ snippet::io.micronaut.docs.inject.generics.V8Engine[tags="class",indent=0]
 
 <1> The `V8Engine` implements `Engine` providing `V8` as a generic type parameter
 
-You can then use the generic arguments when defining the injection point and Micronaut will pick the correct bean
+You can then use the generic arguments when defining the injection point and Micronaut framework will pick the correct bean
 to inject based on the specific generic type arguments:
 
 snippet::io.micronaut.docs.inject.generics.Vehicle[tags="constructor",indent=0]

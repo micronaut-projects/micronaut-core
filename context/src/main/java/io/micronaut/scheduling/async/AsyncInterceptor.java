@@ -23,6 +23,7 @@ import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.scheduling.TaskExecutors;
@@ -51,6 +52,7 @@ import java.util.function.Function;
 public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
 
     private static final Logger LOG = LoggerFactory.getLogger(TaskExecutors.class);
+    private final ConversionService conversionService;
     private final BeanLocator beanLocator;
     private final Optional<BeanProvider<ExecutorService>> scheduledExecutorService;
     private final Map<String, ExecutorService> scheduledExecutorServices = new ConcurrentHashMap<>();
@@ -58,10 +60,14 @@ public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
     /**
      * Default constructor.
      *
+     * @param conversionService        The conversion service
      * @param beanLocator              The bean constructor
      * @param scheduledExecutorService The scheduled executor service
      */
-    AsyncInterceptor(BeanLocator beanLocator, @Named(TaskExecutors.SCHEDULED) Optional<BeanProvider<ExecutorService>> scheduledExecutorService) {
+    AsyncInterceptor(ConversionService conversionService,
+                     BeanLocator beanLocator,
+                     @Named(TaskExecutors.SCHEDULED) Optional<BeanProvider<ExecutorService>> scheduledExecutorService) {
+        this.conversionService = conversionService;
         this.beanLocator = beanLocator;
         this.scheduledExecutorService = scheduledExecutorService;
     }
@@ -83,18 +89,20 @@ public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
                     beanLocator.findBean(ExecutorService.class, Qualifiers.byName(name))
                             .orElseThrow(() -> new TaskExecutionException("No ExecutorService named [" + name + "] configured in application context")));
         }
-        InterceptedMethod interceptedMethod = InterceptedMethod.of(context);
+        InterceptedMethod interceptedMethod = InterceptedMethod.of(context, conversionService);
         try {
             switch (interceptedMethod.resultType()) {
-                case PUBLISHER:
+                case PUBLISHER -> {
                     return interceptedMethod.handleResult(
                             interceptedMethod.interceptResultAsPublisher(executorService)
                     );
-                case COMPLETION_STAGE:
+                }
+                case COMPLETION_STAGE -> {
                     return interceptedMethod.handleResult(
                             CompletableFuture.supplyAsync(() -> interceptedMethod.interceptResultAsCompletionStage(), executorService).thenCompose(Function.identity())
                     );
-                case SYNCHRONOUS:
+                }
+                case SYNCHRONOUS -> {
                     ReturnType<Object> rt = context.getReturnType();
                     Class<?> returnType = rt.getType();
                     if (void.class == returnType) {
@@ -110,8 +118,10 @@ public class AsyncInterceptor implements MethodInterceptor<Object, Object> {
                         return null;
                     }
                     throw new TaskExecutionException("Method [" + context.getExecutableMethod() + "] must return either void, or an instance of Publisher or CompletionStage");
-                default:
+                }
+                default -> {
                     return interceptedMethod.unsupported();
+                }
             }
         } catch (Exception e) {
             return interceptedMethod.handleException(e);

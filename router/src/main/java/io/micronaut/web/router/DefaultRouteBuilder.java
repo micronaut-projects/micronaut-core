@@ -15,38 +15,51 @@
  */
 package io.micronaut.web.router;
 
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
-import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.ReturnType;
-import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.Status;
+import io.micronaut.http.annotation.RouteCondition;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpFilter;
-import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.inject.MethodReference;
+import io.micronaut.inject.annotation.EvaluatedAnnotationValue;
+import io.micronaut.scheduling.executor.ExecutorSelector;
+import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.web.router.exceptions.RoutingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -66,18 +79,20 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultRouteBuilder.class);
 
-    static final Object NO_VALUE = new Object();
     protected final ExecutionHandleLocator executionHandleLocator;
     protected final UriNamingStrategy uriNamingStrategy;
-    protected final ConversionService<?> conversionService;
+    protected final ConversionService conversionService;
     protected final Charset defaultCharset;
+    private final ExecutorSelector executorSelector;
 
-    private DefaultUriRoute currentParentRoute = null;
-    private List<UriRoute> uriRoutes = new ArrayList<>();
-    private List<StatusRoute> statusRoutes = new ArrayList<>();
-    private List<ErrorRoute> errorRoutes = new ArrayList<>();
-    private List<FilterRoute> filterRoutes = new ArrayList<>();
-    private Set<Integer> exposedPorts = new HashSet<>(5);
+    private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
+
+    private DefaultUriRoute currentParentRoute;
+    private final List<UriRoute> uriRoutes = new ArrayList<>();
+    private final List<StatusRoute> statusRoutes = new ArrayList<>();
+    private final List<ErrorRoute> errorRoutes = new ArrayList<>();
+    private final List<FilterRoute> filterRoutes = new ArrayList<>();
+    private final Set<Integer> exposedPorts = new HashSet<>(5);
 
     /**
      * @param executionHandleLocator The execution handler locator
@@ -99,16 +114,19 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
      * @param uriNamingStrategy The URI naming strategy
      * @param conversionService The conversion service
      */
-    public DefaultRouteBuilder(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
+    public DefaultRouteBuilder(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService conversionService) {
         this.executionHandleLocator = executionHandleLocator;
         this.uriNamingStrategy = uriNamingStrategy;
         this.conversionService = conversionService;
-        if (executionHandleLocator instanceof ApplicationContext) {
-            ApplicationContext applicationContext = (ApplicationContext) executionHandleLocator;
+        if (executionHandleLocator instanceof ApplicationContext applicationContext) {
             Environment environment = applicationContext.getEnvironment();
             defaultCharset = environment.get("micronaut.application.default-charset", Charset.class, StandardCharsets.UTF_8);
+            this.executorSelector = applicationContext.findBean(ExecutorSelector.class).orElse(null);
+            this.messageBodyHandlerRegistry = applicationContext.findBean(MessageBodyHandlerRegistry.class).orElse(MessageBodyHandlerRegistry.EMPTY);
         } else {
             defaultCharset = StandardCharsets.UTF_8;
+            this.executorSelector = null;
+            this.messageBodyHandlerRegistry = MessageBodyHandlerRegistry.EMPTY;
         }
     }
 
@@ -123,17 +141,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     @Override
-    public FilterRoute addFilter(String pathPattern, Supplier<HttpFilter> filter) {
-        DefaultFilterRoute route = new DefaultFilterRoute(
-                pathPattern,
-                filter,
-                (AnnotationMetadataResolver) executionHandleLocator
-        );
-        filterRoutes.add(route);
-        return route;
-    }
-
-    @Override
     public FilterRoute addFilter(String pathPattern, BeanLocator beanLocator, BeanDefinition<? extends HttpFilter> beanDefinition) {
         DefaultFilterRoute route = new BeanDefinitionFilterRoute(
                 pathPattern,
@@ -142,6 +149,17 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         );
         filterRoutes.add(route);
         return route;
+    }
+
+    final FilterRoute addFilter(Supplier<GenericHttpFilter> internalFilter, AnnotationMetadata annotationMetadata) {
+        FilterRoute fr = new DefaultFilterRoute(internalFilter, AnnotationMetadataResolver.DEFAULT) {
+            @Override
+            public AnnotationMetadata getAnnotationMetadata() {
+                return annotationMetadata;
+            }
+        };
+        filterRoutes.add(fr);
+        return fr;
     }
 
     @Override
@@ -165,20 +183,20 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     @Override
-    public ResourceRoute resources(Class cls) {
+    public ResourceRoute resources(Class<?> cls) {
         return new DefaultResourceRoute(cls);
     }
 
     @Override
-    public ResourceRoute single(Class cls) {
+    public ResourceRoute single(Class<?> cls) {
         return new DefaultSingleRoute(cls);
     }
 
     @Override
-    public StatusRoute status(Class originatingClass, HttpStatus status, Class type, String method, Class[] parameterTypes) {
-        Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
+    public StatusRoute status(Class<?> originatingClass, HttpStatus status, Class<?> type, String method, Class<?>[] parameterTypes) {
+        Optional<MethodExecutionHandle<Object, Object>> executionHandle = executionHandleLocator.findExecutionHandle((Class<Object>) type, method, parameterTypes);
 
-        MethodExecutionHandle<?, Object> executableHandle = executionHandle.orElseThrow(() ->
+        MethodExecutionHandle<Object, Object> executableHandle = executionHandle.orElseThrow(() ->
                 new RoutingException("No such route: " + type.getName() + "." + method)
         );
 
@@ -188,10 +206,10 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     @Override
-    public StatusRoute status(HttpStatus status, Class type, String method, Class[] parameterTypes) {
-        Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
+    public StatusRoute status(HttpStatus status, Class<?> type, String method, Class<?>[] parameterTypes) {
+        Optional<MethodExecutionHandle<Object, Object>> executionHandle = executionHandleLocator.findExecutionHandle((Class<Object>) type, method, parameterTypes);
 
-        MethodExecutionHandle<?, Object> executableHandle = executionHandle.orElseThrow(() ->
+        MethodExecutionHandle<Object, Object> executableHandle = executionHandle.orElseThrow(() ->
             new RoutingException("No such route: " + type.getName() + "." + method)
         );
 
@@ -201,10 +219,10 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     @Override
-    public ErrorRoute error(Class originatingClass, Class<? extends Throwable> error, Class type, String method, Class[] parameterTypes) {
-        Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
+    public ErrorRoute error(Class<?> originatingClass, Class<? extends Throwable> error, Class<?> type, String method, Class<?>[] parameterTypes) {
+        Optional<MethodExecutionHandle<Object, Object>> executionHandle = executionHandleLocator.findExecutionHandle((Class<Object>) type, method, parameterTypes);
 
-        MethodExecutionHandle<?, Object> executableHandle = executionHandle.orElseThrow(() ->
+        MethodExecutionHandle<Object, Object> executableHandle = executionHandle.orElseThrow(() ->
             new RoutingException("No such route: " + type.getName() + "." + method)
         );
 
@@ -214,10 +232,10 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     @Override
-    public ErrorRoute error(Class<? extends Throwable> error, Class type, String method, Class[] parameterTypes) {
-        Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
+    public ErrorRoute error(Class<? extends Throwable> error, Class<?> type, String method, Class<?>[] parameterTypes) {
+        Optional<MethodExecutionHandle<Object, Object>> executionHandle = executionHandleLocator.findExecutionHandle((Class<Object>) type, method, parameterTypes);
 
-        MethodExecutionHandle<?, Object> executableHandle = executionHandle.orElseThrow(() ->
+        MethodExecutionHandle<Object, Object> executableHandle = executionHandle.orElseThrow(() ->
             new RoutingException("No such route: " + type.getName() + "." + method)
         );
 
@@ -227,82 +245,82 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     @Override
-    public UriRoute GET(String uri, Object target, String method, Class... parameterTypes) {
+    public UriRoute GET(String uri, Object target, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.GET, uri, target.getClass(), method, parameterTypes);
     }
 
     @Override
-    public UriRoute GET(String uri, Class<?> type, String method, Class... parameterTypes) {
+    public UriRoute GET(String uri, Class<?> type, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.GET, uri, type, method, parameterTypes);
     }
 
     @Override
-    public UriRoute POST(String uri, Object target, String method, Class... parameterTypes) {
+    public UriRoute POST(String uri, Object target, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.POST, uri, target.getClass(), method, parameterTypes);
     }
 
     @Override
-    public UriRoute POST(String uri, Class type, String method, Class... parameterTypes) {
+    public UriRoute POST(String uri, Class<?> type, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.POST, uri, type, method, parameterTypes);
     }
 
     @Override
-    public UriRoute PUT(String uri, Object target, String method, Class... parameterTypes) {
+    public UriRoute PUT(String uri, Object target, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.PUT, uri, target.getClass(), method, parameterTypes);
     }
 
     @Override
-    public UriRoute PUT(String uri, Class type, String method, Class... parameterTypes) {
+    public UriRoute PUT(String uri, Class<?> type, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.PUT, uri, type, method, parameterTypes);
     }
 
     @Override
-    public UriRoute PATCH(String uri, Object target, String method, Class... parameterTypes) {
+    public UriRoute PATCH(String uri, Object target, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.PATCH, uri, target.getClass(), method, parameterTypes);
     }
 
     @Override
-    public UriRoute PATCH(String uri, Class type, String method, Class... parameterTypes) {
+    public UriRoute PATCH(String uri, Class<?> type, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.PATCH, uri, type, method, parameterTypes);
     }
 
     @Override
-    public UriRoute DELETE(String uri, Object target, String method, Class... parameterTypes) {
+    public UriRoute DELETE(String uri, Object target, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.DELETE, uri, target.getClass(), method, parameterTypes);
     }
 
     @Override
-    public UriRoute DELETE(String uri, Class type, String method, Class... parameterTypes) {
+    public UriRoute DELETE(String uri, Class<?> type, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.DELETE, uri, type, method, parameterTypes);
     }
 
     @Override
-    public UriRoute OPTIONS(String uri, Object target, String method, Class... parameterTypes) {
+    public UriRoute OPTIONS(String uri, Object target, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.OPTIONS, uri, target.getClass(), method, parameterTypes);
     }
 
     @Override
-    public UriRoute OPTIONS(String uri, Class type, String method, Class... parameterTypes) {
+    public UriRoute OPTIONS(String uri, Class<?> type, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.OPTIONS, uri, type, method, parameterTypes);
     }
 
     @Override
-    public UriRoute HEAD(String uri, Object target, String method, Class... parameterTypes) {
+    public UriRoute HEAD(String uri, Object target, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.HEAD, uri, target.getClass(), method, parameterTypes);
     }
 
     @Override
-    public UriRoute HEAD(String uri, Class type, String method, Class... parameterTypes) {
+    public UriRoute HEAD(String uri, Class<?> type, String method, Class<?>... parameterTypes) {
         return buildRoute(HttpMethod.HEAD, uri, type, method, parameterTypes);
     }
 
     @Override
-    public UriRoute TRACE(String uri, Object target, String method, Class[] parameterTypes) {
+    public UriRoute TRACE(String uri, Object target, String method, Class<?>[] parameterTypes) {
         return buildRoute(HttpMethod.TRACE, uri, target.getClass(), method, parameterTypes);
     }
 
     @Override
-    public UriRoute TRACE(String uri, Class type, String method, Class[] parameterTypes) {
+    public UriRoute TRACE(String uri, Class<?> type, String method, Class<?>[] parameterTypes) {
         return buildRoute(HttpMethod.TRACE, uri, type, method, parameterTypes);
     }
 
@@ -357,10 +375,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
      *
      * @return an {@link UriRoute}
      */
-    protected UriRoute buildRoute(HttpMethod httpMethod, String uri, Class<?> type, String method, Class... parameterTypes) {
-        Optional<? extends MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
+    protected UriRoute buildRoute(HttpMethod httpMethod, String uri, Class<?> type, String method, Class<?>... parameterTypes) {
+        Optional<? extends MethodExecutionHandle<Object, Object>> executionHandle =
+                executionHandleLocator.findExecutionHandle((Class<Object>) type, method, parameterTypes);
 
-        MethodExecutionHandle<?, Object> executableHandle = executionHandle.orElseThrow(() ->
+        MethodExecutionHandle<Object, Object> executableHandle = executionHandle.orElseThrow(() ->
             new RoutingException("No such route: " + type.getName() + "." + method)
         );
 
@@ -376,17 +395,23 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
      *
      * @return an {@link UriRoute}
      */
-    protected UriRoute buildRoute(HttpMethod httpMethod, String uri, MethodExecutionHandle<?, Object> executableHandle) {
+    protected UriRoute buildRoute(HttpMethod httpMethod, String uri, MethodExecutionHandle<Object, Object> executableHandle) {
         return buildRoute(httpMethod.name(), httpMethod, uri, executableHandle);
     }
 
-    private UriRoute buildRoute(String httpMethodName, HttpMethod httpMethod, String uri, MethodExecutionHandle<?, Object> executableHandle) {
+    private UriRoute buildRoute(String httpMethodName, HttpMethod httpMethod, String uri, MethodExecutionHandle<Object, Object> executableHandle) {
         UriRoute route;
         if (currentParentRoute != null) {
-            route = new DefaultUriRoute(httpMethod, currentParentRoute.uriMatchTemplate.nest(uri), executableHandle, httpMethodName);
+            route = new DefaultUriRoute(
+                httpMethod,
+                currentParentRoute.uriMatchTemplate.nest(uri),
+                executableHandle,
+                httpMethodName,
+                conversionService
+            );
             currentParentRoute.nestedRoutes.add((DefaultUriRoute) route);
         } else {
-            route = new DefaultUriRoute(httpMethod, uri, executableHandle, httpMethodName);
+            route = new DefaultUriRoute(httpMethod, uri, executableHandle, httpMethodName, conversionService);
         }
 
         this.uriRoutes.add(route);
@@ -407,155 +432,43 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
      * @return The uri route corresponding to the method.
      */
     protected UriRoute buildBeanRoute(String httpMethodName, HttpMethod httpMethod, String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        MethodExecutionHandle<?, Object> executionHandle = executionHandleLocator
-                                                                .createExecutionHandle(beanDefinition, (ExecutableMethod<Object, ?>) method);
+        MethodExecutionHandle<Object, Object> executionHandle = (MethodExecutionHandle<Object, Object>) executionHandleLocator
+                                                                .createExecutionHandle(beanDefinition, (ExecutableMethod<Object, Object>) method);
         return buildRoute(httpMethodName, httpMethod, uri, executionHandle);
     }
 
     /**
-     * Abstract class for base {@link MethodBasedRoute}.
+     * Abstract class for base {@link MethodBasedRouteInfo}.
      */
-    abstract class AbstractRoute implements MethodBasedRoute, RouteInfo<Object> {
+    abstract class AbstractRoute implements Route {
         protected final List<Predicate<HttpRequest<?>>> conditions = new ArrayList<>();
-        protected final MethodExecutionHandle<?, ?> targetMethod;
-        protected final ConversionService<?> conversionService;
-        protected List<MediaType> consumesMediaTypes;
-        protected List<MediaType> producesMediaTypes;
+        protected final MethodExecutionHandle<Object, Object> targetMethod;
+        protected final ConversionService conversionService;
+        protected List<MediaType> consumesMediaTypes = List.of();
+        protected List<MediaType> producesMediaTypes = List.of();
         protected String bodyArgumentName;
         protected Argument<?> bodyArgument;
-        protected final Map<String, Argument> requiredInputs;
-        protected final Class<?> declaringType;
-        protected boolean consumesMediaTypesContainsAll;
-        protected boolean producesMediaTypesContainsAll;
-        protected final HttpStatus definedStatus;
-        protected final boolean isWebSocketRoute;
-        private final boolean isVoid;
-        private final boolean suspended;
-        private final boolean reactive;
-        private final boolean single;
-        private final boolean async;
-        private final boolean specifiedSingle;
-        private final boolean isAsyncOrReactive;
 
         /**
          * @param targetMethod The target method execution handle
          * @param conversionService The conversion service
          * @param mediaTypes The media types
          */
-        AbstractRoute(MethodExecutionHandle targetMethod, ConversionService<?> conversionService, List<MediaType> mediaTypes) {
+        AbstractRoute(MethodExecutionHandle<Object, Object> targetMethod, ConversionService conversionService, List<MediaType> mediaTypes) {
             this.targetMethod = targetMethod;
             this.conversionService = conversionService;
             this.consumesMediaTypes = mediaTypes;
-            this.declaringType = targetMethod.getDeclaringType();
-            this.producesMediaTypes = RouteInfo.super.getProduces();
-            this.consumesMediaTypes = RouteInfo.super.getConsumes();
-            suspended = targetMethod.getExecutableMethod().isSuspend();
-            reactive = RouteInfo.super.isReactive();
-            async = RouteInfo.super.isAsync();
-            single = RouteInfo.super.isSingleResult();
-            isVoid = RouteInfo.super.isVoid();
-            specifiedSingle = RouteInfo.super.isSpecifiedSingle();
-            isAsyncOrReactive = RouteInfo.super.isAsyncOrReactive();
-            for (Argument argument : targetMethod.getArguments()) {
+            for (Argument<?> argument : targetMethod.getArguments()) {
                 if (argument.getAnnotationMetadata().hasAnnotation(Body.class)) {
                     this.bodyArgument = argument;
                 }
             }
-            Argument[] requiredArguments = targetMethod.getArguments();
-            if (requiredArguments.length > 0) {
-                Map<String, Argument> requiredInputs = new LinkedHashMap<>(requiredArguments.length);
-                for (Argument requiredArgument : requiredArguments) {
-                    String inputName = resolveInputName(requiredArgument);
-                    requiredInputs.put(inputName, requiredArgument);
-                }
-                this.requiredInputs = Collections.unmodifiableMap(requiredInputs);
-            } else {
-                this.requiredInputs = Collections.emptyMap();
-            }
-            setConsumesMediaTypesContainsAll();
-            setProducesMediaTypesContainsAll();
-            this.definedStatus = targetMethod.enumValue(Status.class, HttpStatus.class).orElse(null);
-            this.isWebSocketRoute = targetMethod.hasAnnotation("io.micronaut.websocket.annotation.OnMessage");
-        }
-
-        @Override
-        public Class<?> getDeclaringType() {
-            return declaringType;
-        }
-
-        private void setConsumesMediaTypesContainsAll() {
-            this.consumesMediaTypesContainsAll = consumesMediaTypes == null || consumesMediaTypes.isEmpty() || consumesMediaTypes.contains(MediaType.ALL_TYPE);
-        }
-
-        private void setProducesMediaTypesContainsAll() {
-            this.producesMediaTypesContainsAll = producesMediaTypes == null || producesMediaTypes.isEmpty() || producesMediaTypes.contains(MediaType.ALL_TYPE);
-        }
-
-        /**
-         * Resolves the name for an argument.
-         *
-         * @param argument the argument
-         * @return the name
-         */
-        protected @NonNull String resolveInputName(@NonNull Argument argument) {
-            String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(null);
-            if (StringUtils.isEmpty(inputName)) {
-                inputName = argument.getName();
-            }
-            return inputName;
-        }
-
-        @NonNull
-        @Override
-        public AnnotationMetadata getAnnotationMetadata() {
-            return targetMethod.getAnnotationMetadata();
-        }
-
-        @Override
-        public ReturnType<?> getReturnType() {
-            return targetMethod.getReturnType();
-        }
-
-        @Override
-        public boolean isSuspended() {
-            return suspended;
-        }
-
-        @Override
-        public boolean isReactive() {
-            return reactive;
-        }
-
-        @Override
-        public boolean isSingleResult() {
-            return single;
-        }
-
-        @Override
-        public boolean isSpecifiedSingle() {
-            return specifiedSingle;
-        }
-
-        @Override
-        public boolean isAsync() {
-            return async;
-        }
-
-        @Override
-        public boolean isAsyncOrReactive() {
-            return isAsyncOrReactive;
-        }
-
-        @Override
-        public boolean isVoid() {
-            return isVoid;
         }
 
         @Override
         public Route consumes(MediaType... mediaTypes) {
             if (mediaTypes != null) {
-                this.consumesMediaTypes = Collections.unmodifiableList(Arrays.asList(mediaTypes));
-                setConsumesMediaTypesContainsAll();
+                this.consumesMediaTypes = List.of(mediaTypes);
             }
             return this;
         }
@@ -568,7 +481,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public Route consumesAll() {
             this.consumesMediaTypes = Collections.emptyList();
-            setConsumesMediaTypesContainsAll();
             return this;
         }
 
@@ -595,8 +507,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public Route produces(MediaType... mediaType) {
             if (mediaType != null) {
-                this.producesMediaTypes = Collections.unmodifiableList(Arrays.asList(mediaType));
-                setProducesMediaTypesContainsAll();
+                this.producesMediaTypes = List.of(mediaType);
             }
             return this;
         }
@@ -607,51 +518,37 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public MethodExecutionHandle getTargetMethod() {
-            return this.targetMethod;
-        }
-
-        /**
-         * Whether the route permits a request body.
-         * @return True if the route permits a request body
-         */
-        protected boolean permitsRequestBody() {
-            return true;
-        }
-
-        @Override
         public boolean equals(Object o) {
             if (this == o) {
                 return true;
             }
-            if (!(o instanceof AbstractRoute)) {
+            if (!(o instanceof AbstractRoute that)) {
                 return false;
             }
-            AbstractRoute that = (AbstractRoute) o;
             return Objects.equals(consumesMediaTypes, that.consumesMediaTypes) &&
                     Objects.equals(producesMediaTypes, that.producesMediaTypes);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(consumesMediaTypes, producesMediaTypes);
+            return ObjectUtils.hash(consumesMediaTypes, producesMediaTypes);
         }
     }
 
     /**
      * Default Error Route.
      */
-    class DefaultErrorRoute extends AbstractRoute implements ErrorRoute {
+    final class DefaultErrorRoute extends AbstractRoute implements ErrorRoute {
 
         private final Class<? extends Throwable> error;
-        private final Class originatingClass;
+        private final Class<?> originatingClass;
 
         /**
          * @param error The throwable
          * @param targetMethod The target method execution handle
          * @param conversionService The conversion service
          */
-        public DefaultErrorRoute(Class<? extends Throwable> error, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
+        public DefaultErrorRoute(Class<? extends Throwable> error, MethodExecutionHandle<Object, Object> targetMethod, ConversionService conversionService) {
             this(null, error, targetMethod, conversionService);
         }
 
@@ -661,13 +558,28 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param targetMethod The target method execution handle
          * @param conversionService The conversion service
          */
-        public DefaultErrorRoute(
-                Class originatingClass, Class<? extends Throwable> error,
-                MethodExecutionHandle targetMethod,
-                ConversionService<?> conversionService) {
+        public DefaultErrorRoute(Class<?> originatingClass,
+                                 Class<? extends Throwable> error,
+                                 MethodExecutionHandle<Object, Object> targetMethod,
+                                 ConversionService conversionService) {
             super(targetMethod, conversionService, Collections.emptyList());
             this.originatingClass = originatingClass;
             this.error = error;
+        }
+
+        @Override
+        public ErrorRouteInfo<Object, Object> toRouteInfo() {
+            return new DefaultErrorRouteInfo<>(
+                    originatingClass,
+                    error,
+                    targetMethod,
+                    bodyArgumentName,
+                    bodyArgument,
+                    consumesMediaTypes,
+                    producesMediaTypes,
+                    conditions,
+                    conversionService,
+                    messageBodyHandlerRegistry);
         }
 
         @Override
@@ -679,24 +591,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public Class<? extends Throwable> exceptionType() {
             return error;
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public <T> Optional<RouteMatch<T>> match(Class originatingClass, Throwable exception) {
-            if (originatingClass == this.originatingClass && error.isInstance(exception)) {
-                return Optional.of(new ErrorRouteMatch(exception, this, conversionService));
-            }
-            return Optional.empty();
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public <T> Optional<RouteMatch<T>> match(Throwable exception) {
-            if (originatingClass == null && error.isInstance(exception)) {
-                return Optional.of(new ErrorRouteMatch(exception, this, conversionService));
-            }
-            return Optional.empty();
         }
 
         @Override
@@ -743,13 +637,12 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public int hashCode() {
-            return Objects.hash(super.hashCode(), error, originatingClass);
+            return ObjectUtils.hash(super.hashCode(), error, originatingClass);
         }
 
         @Override
         public String toString() {
-            StringBuilder builder = new StringBuilder();
-            return builder.append(' ')
+            return new StringBuilder().append(' ')
                 .append(error.getSimpleName())
                 .append(" -> ")
                 .append(targetMethod.getDeclaringType().getSimpleName())
@@ -762,17 +655,17 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     /**
      * Represents a route for an {@link io.micronaut.http.HttpStatus} code.
      */
-    class DefaultStatusRoute extends AbstractRoute implements StatusRoute {
+    final class DefaultStatusRoute extends AbstractRoute implements StatusRoute {
 
         private final HttpStatus status;
-        private final Class originatingClass;
+        private final Class<?> originatingClass;
 
         /**
          * @param status The HTTP Status
          * @param targetMethod The target method execution handle
          * @param conversionService The conversion service
          */
-        public DefaultStatusRoute(HttpStatus status, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
+        public DefaultStatusRoute(HttpStatus status, MethodExecutionHandle<Object, Object> targetMethod, ConversionService conversionService) {
             this(null, status, targetMethod, conversionService);
         }
 
@@ -782,10 +675,26 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param targetMethod The target method execution handle
          * @param conversionService The conversion service
          */
-        public DefaultStatusRoute(Class originatingClass, HttpStatus status, MethodExecutionHandle targetMethod, ConversionService<?> conversionService) {
+        public DefaultStatusRoute(Class<?> originatingClass, HttpStatus status, MethodExecutionHandle<Object, Object> targetMethod, ConversionService conversionService) {
             super(targetMethod, conversionService, Collections.emptyList());
             this.originatingClass = originatingClass;
             this.status = status;
+        }
+
+        @Override
+        public StatusRouteInfo<Object, Object> toRouteInfo() {
+            return new DefaultStatusRouteInfo<>(
+                    originatingClass,
+                    status,
+                    targetMethod,
+                    bodyArgumentName,
+                    bodyArgument,
+                    consumesMediaTypes,
+                    producesMediaTypes,
+                    conditions,
+                    conversionService,
+                    messageBodyHandlerRegistry
+            );
         }
 
         @Override
@@ -797,24 +706,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public HttpStatus status() {
             return status;
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public <T> Optional<RouteMatch<T>> match(Class originatingClass, HttpStatus status) {
-            if (originatingClass == this.originatingClass && this.status == status) {
-                return Optional.of(new StatusRouteMatch(status, this, conversionService));
-            }
-            return Optional.empty();
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public <T> Optional<RouteMatch<T>> match(HttpStatus status) {
-            if (this.originatingClass == null && this.status == status) {
-                return Optional.of(new StatusRouteMatch(status, this, conversionService));
-            }
-            return Optional.empty();
         }
 
         @Override
@@ -849,60 +740,46 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             if (this == o) {
                 return true;
             }
-            if (!(o instanceof DefaultStatusRoute)) {
+            if (!(o instanceof DefaultStatusRoute that)) {
                 return false;
             }
             if (!super.equals(o)) {
                 return false;
             }
-            DefaultStatusRoute that = (DefaultStatusRoute) o;
             return status == that.status &&
                     Objects.equals(originatingClass, that.originatingClass);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(super.hashCode(), status, originatingClass);
+            return ObjectUtils.hash(super.hashCode(), status, originatingClass);
         }
     }
 
     /**
      * The default route impl.
      */
-    class DefaultUriRoute extends AbstractRoute implements UriRoute {
+    final class DefaultUriRoute extends AbstractRoute implements UriRoute {
         final String httpMethodName;
         final HttpMethod httpMethod;
         final UriMatchTemplate uriMatchTemplate;
         final List<DefaultUriRoute> nestedRoutes = new ArrayList<>(2);
         private Integer port;
-
-        /**
-         * @param httpMethod The HTTP method
-         * @param uriTemplate The URI Template as a {@link CharSequence}
-         * @param targetMethod The target method execution handle
-         */
-        DefaultUriRoute(HttpMethod httpMethod, CharSequence uriTemplate, MethodExecutionHandle targetMethod) {
-            this(httpMethod, uriTemplate, targetMethod, httpMethod.name());
-        }
+        private final RouteExecutorSelector executorSelector = new RouteExecutorSelector();
 
         /**
          * @param httpMethod The HTTP method
          * @param uriTemplate The URI Template as a {@link CharSequence}
          * @param targetMethod The target method execution handle
          * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+         * @param conversionService The conversion service
          */
-        DefaultUriRoute(HttpMethod httpMethod, CharSequence uriTemplate, MethodExecutionHandle targetMethod, String httpMethodName) {
-            this(httpMethod, uriTemplate, MediaType.APPLICATION_JSON_TYPE, targetMethod, httpMethodName);
-        }
-
-        /**
-         * @param httpMethod The HTTP method
-         * @param uriTemplate The URI Template as a {@link CharSequence}
-         * @param mediaType The Media type
-         * @param targetMethod The target method execution handle
-         */
-        DefaultUriRoute(HttpMethod httpMethod, CharSequence uriTemplate, MediaType mediaType, MethodExecutionHandle targetMethod) {
-            this(httpMethod, uriTemplate, mediaType, targetMethod, httpMethod.name());
+        DefaultUriRoute(HttpMethod httpMethod,
+                        CharSequence uriTemplate,
+                        MethodExecutionHandle<Object, Object> targetMethod,
+                        String httpMethodName,
+                        ConversionService conversionService) {
+            this(httpMethod, uriTemplate, MediaType.APPLICATION_JSON_TYPE, targetMethod, httpMethodName, conversionService);
         }
 
         /**
@@ -911,18 +788,15 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param mediaType The Media type
          * @param targetMethod The target method execution handle
          * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+         * @param conversionService The conversion service
          */
-        DefaultUriRoute(HttpMethod httpMethod, CharSequence uriTemplate, MediaType mediaType, MethodExecutionHandle targetMethod, String httpMethodName) {
-            this(httpMethod, new UriMatchTemplate(uriTemplate), Collections.singletonList(mediaType), targetMethod, httpMethodName);
-        }
-
-        /**
-         * @param httpMethod The HTTP method
-         * @param uriTemplate The URI Template as a {@link UriMatchTemplate}
-         * @param targetMethod The target method execution handle
-         */
-        DefaultUriRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, MethodExecutionHandle targetMethod) {
-            this(httpMethod, uriTemplate, targetMethod, httpMethod.name());
+        DefaultUriRoute(HttpMethod httpMethod,
+                        CharSequence uriTemplate,
+                        MediaType mediaType,
+                        MethodExecutionHandle<Object, Object> targetMethod,
+                        String httpMethodName,
+                        ConversionService conversionService) {
+            this(httpMethod, new UriMatchTemplate(uriTemplate), Collections.singletonList(mediaType), targetMethod, httpMethodName, conversionService);
         }
 
         /**
@@ -930,19 +804,14 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param uriTemplate The URI Template as a {@link UriMatchTemplate}
          * @param targetMethod The target method execution handle
          * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+         * @param conversionService The conversion service
          */
-        DefaultUriRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, MethodExecutionHandle targetMethod, String httpMethodName) {
-            this(httpMethod, uriTemplate, Collections.singletonList(MediaType.APPLICATION_JSON_TYPE), targetMethod, httpMethodName);
-        }
-
-        /**
-         * @param httpMethod The HTTP method
-         * @param uriTemplate The URI Template as a {@link UriMatchTemplate}
-         * @param mediaTypes The media types
-         * @param targetMethod The target method execution handle
-         */
-        DefaultUriRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, List<MediaType> mediaTypes, MethodExecutionHandle targetMethod) {
-            this(httpMethod, uriTemplate, mediaTypes, targetMethod, httpMethod.name());
+        DefaultUriRoute(HttpMethod httpMethod,
+                        UriMatchTemplate uriTemplate,
+                        MethodExecutionHandle<Object, Object> targetMethod,
+                        String httpMethodName,
+                        ConversionService conversionService) {
+            this(httpMethod, uriTemplate, Collections.singletonList(MediaType.APPLICATION_JSON_TYPE), targetMethod, httpMethodName, conversionService);
         }
 
         /**
@@ -951,12 +820,43 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param mediaTypes The media types
          * @param targetMethod The target method execution handle
          * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+         * @param conversionService The conversion service
          */
-        DefaultUriRoute(HttpMethod httpMethod, UriMatchTemplate uriTemplate, List<MediaType> mediaTypes, MethodExecutionHandle targetMethod, String httpMethodName) {
-            super(targetMethod, ConversionService.SHARED, mediaTypes);
+        DefaultUriRoute(HttpMethod httpMethod,
+                        UriMatchTemplate uriTemplate,
+                        List<MediaType> mediaTypes,
+                        MethodExecutionHandle<Object, Object> targetMethod,
+                        String httpMethodName,
+                        ConversionService conversionService) {
+            super(targetMethod, conversionService, mediaTypes);
             this.httpMethod = httpMethod;
             this.uriMatchTemplate = uriTemplate;
             this.httpMethodName = httpMethodName;
+            if (targetMethod.isPresent(RouteCondition.class, AnnotationMetadata.VALUE_MEMBER)) {
+                AnnotationValue<RouteCondition> annotation = targetMethod.getAnnotation(RouteCondition.class);
+                if (annotation instanceof EvaluatedAnnotationValue<RouteCondition>) {
+                    where(request -> annotation.booleanValue().orElse(false));
+                }
+            }
+        }
+
+        @Override
+        public UriRouteInfo<Object, Object> toRouteInfo() {
+            return new DefaultUrlRouteInfo<>(
+                httpMethod,
+                uriMatchTemplate,
+                defaultCharset,
+                targetMethod,
+                bodyArgumentName,
+                bodyArgument,
+                consumesMediaTypes,
+                producesMediaTypes,
+                conditions,
+                port,
+                conversionService,
+                executorSelector,
+                messageBodyHandlerRegistry
+            );
         }
 
         @Override
@@ -966,8 +866,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public String toString() {
-            StringBuilder builder = new StringBuilder(getHttpMethodName());
-            return builder.append(' ')
+            return new StringBuilder(getHttpMethodName()).append(' ')
                 .append(uriMatchTemplate)
                 .append(" -> ")
                 .append(targetMethod.getDeclaringType().getSimpleName())
@@ -1034,13 +933,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return (UriRoute) super.where(condition);
         }
 
-        @SuppressWarnings("unchecked")
-        @Override
-        public Optional<UriRouteMatch> match(String uri) {
-            Optional<UriMatchInfo> matchInfo = uriMatchTemplate.match(uri);
-            return matchInfo.map(info -> new DefaultUriRouteMatch(info, this, defaultCharset, conversionService));
-        }
-
         @Override
         public UriMatchTemplate getUriMatchTemplate() {
             return this.uriMatchTemplate;
@@ -1051,16 +943,31 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return uriMatchTemplate.compareTo(o.getUriMatchTemplate());
         }
 
-        @Override
-        protected boolean permitsRequestBody() {
-            return HttpMethod.permitsRequestBody(httpMethod);
+        private final class RouteExecutorSelector implements ExecutorSelector {
+            @Override
+            public Optional<ExecutorService> select(MethodReference<?, ?> method, ThreadSelection threadSelection) {
+                if (DefaultRouteBuilder.this.executorSelector != null) {
+                    return DefaultRouteBuilder.this.executorSelector.select(targetMethod.getExecutableMethod(), threadSelection);
+                } else {
+                    return Optional.empty();
+                }
+            }
+
+            @Override
+            public Optional<ExecutorService> select(String name) {
+                if (DefaultRouteBuilder.this.executorSelector != null) {
+                    return DefaultRouteBuilder.this.executorSelector.select(name);
+                } else {
+                    return Optional.empty();
+                }
+            }
         }
     }
 
     /**
      * Define a single route.
      */
-    class DefaultSingleRoute extends DefaultResourceRoute {
+    final class DefaultSingleRoute extends DefaultResourceRoute {
 
         /**
          * @param resourceRoutes The resource routes
@@ -1073,7 +980,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         /**
          * @param type The class
          */
-        DefaultSingleRoute(Class type) {
+        DefaultSingleRoute(Class<?> type) {
             super(type);
         }
 
@@ -1083,7 +990,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        protected DefaultUriRoute buildGetRoute(Class type, Map<HttpMethod, Route> routeMap) {
+        protected DefaultUriRoute buildGetRoute(Class<?> type, Map<HttpMethod, Route> routeMap) {
             DefaultUriRoute getRoute = (DefaultUriRoute) DefaultRouteBuilder.this.GET(type);
             routeMap.put(
                 HttpMethod.GET, getRoute
@@ -1092,7 +999,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        protected void buildRemainingRoutes(Class type, Map<HttpMethod, Route> routeMap) {
+        protected void buildRemainingRoutes(Class<?> type, Map<HttpMethod, Route> routeMap) {
             // POST /foo
             routeMap.put(
                 HttpMethod.POST, DefaultRouteBuilder.this.POST(type)
@@ -1132,7 +1039,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         /**
          * @param type The class
          */
-        DefaultResourceRoute(Class type) {
+        DefaultResourceRoute(Class<?> type) {
             this.resourceRoutes = new LinkedHashMap<>();
             // GET /foo/1
             Map<HttpMethod, Route> routeMap = this.resourceRoutes;
@@ -1141,10 +1048,15 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
+        public RouteInfo<Object> toRouteInfo() {
+            throw new IllegalStateException("Not implemented!");
+        }
+
+        @Override
         public ResourceRoute consumes(MediaType... mediaTypes) {
             if (mediaTypes != null) {
                 for (Route route : resourceRoutes.values()) {
-                    route.produces(mediaTypes);
+                    route.consumes(mediaTypes);
                 }
             }
             return this;
@@ -1222,7 +1134,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          *
          * @return The {@link DefaultUriRoute}
          */
-        protected DefaultUriRoute buildGetRoute(Class type, Map<HttpMethod, Route> routeMap) {
+        protected DefaultUriRoute buildGetRoute(Class<?> type, Map<HttpMethod, Route> routeMap) {
             DefaultUriRoute getRoute = (DefaultUriRoute) DefaultRouteBuilder.this.GET(type, ID);
             routeMap.put(
                 HttpMethod.GET, getRoute
@@ -1236,7 +1148,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          * @param type The class
          * @param routeMap The route info
          */
-        protected void buildRemainingRoutes(Class type, Map<HttpMethod, Route> routeMap) {
+        protected void buildRemainingRoutes(Class<?> type, Map<HttpMethod, Route> routeMap) {
             // GET /foo
             routeMap.put(
                 HttpMethod.GET, DefaultRouteBuilder.this.GET(type)

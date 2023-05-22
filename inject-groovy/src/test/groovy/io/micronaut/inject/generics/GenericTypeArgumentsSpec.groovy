@@ -22,7 +22,7 @@ import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import spock.lang.Unroll
 
-import javax.validation.ConstraintViolationException
+import jakarta.validation.ConstraintViolationException
 import java.util.function.Function
 import java.util.function.Supplier
 
@@ -35,7 +35,7 @@ package exceptionhandler;
 
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
-import javax.validation.ConstraintViolationException;
+import jakarta.validation.ConstraintViolationException;
 
 @Context
 class Test implements ExceptionHandler<ConstraintViolationException, java.util.function.Supplier<Foo>> {
@@ -178,7 +178,7 @@ package generictest3;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class GenericsTest3 extends Foo {
 
     public Integer apply(String str) {
@@ -205,7 +205,7 @@ package generictest4;
 import io.micronaut.inject.annotation.*;
 import io.micronaut.context.annotation.*;
 
-@javax.inject.Singleton
+@jakarta.inject.Singleton
 class GenericsTest4 extends Foo<String, Integer> {
 
     public Integer apply(String str) {
@@ -332,5 +332,25 @@ class FactoryReplace {
 
         expect:
         definition != null
+    }
+
+    void "test recusive generic type parameter"() {
+        given:
+            BeanDefinition definition = buildBeanDefinition('test.TrackedSortedSet', '''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+@jakarta.inject.Singleton
+final class TrackedSortedSet<T extends java.lang.Comparable<? super T>> {
+ public TrackedSortedSet(java.util.Collection<? extends T> initial) {
+        super();
+    }
+}
+
+''')
+        expect:
+            definition != null
     }
 }

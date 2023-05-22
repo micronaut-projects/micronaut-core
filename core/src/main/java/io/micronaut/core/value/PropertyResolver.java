@@ -25,6 +25,7 @@ import io.micronaut.core.annotation.Nullable;
 
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -193,4 +194,13 @@ public interface PropertyResolver extends ValueResolver<String> {
     static String nameOf(String... path) {
         return String.join(".", path);
     }
+
+    /**
+     * Will return for a given pattern such as {@code foo.*.bar.*} and array of arrays containing the variable names that match the pattern.
+     * @param pathPattern The path pattern
+     * @return An array of arrays.
+     * @since 4.0.0
+     */
+    @NonNull
+    Collection<List<String>> getPropertyPathMatches(@NonNull String pathPattern);
 }

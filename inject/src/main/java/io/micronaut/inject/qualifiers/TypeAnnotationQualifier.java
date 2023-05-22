@@ -38,7 +38,7 @@ import java.util.stream.Stream;
 @Internal
 public class TypeAnnotationQualifier<T> implements Qualifier<T> {
 
-    private final List<Class> types;
+    private final List<Class<?>> types;
 
     /**
      * @param types The types
