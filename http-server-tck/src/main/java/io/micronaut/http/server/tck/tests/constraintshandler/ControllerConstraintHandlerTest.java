@@ -29,21 +29,21 @@ import io.micronaut.http.annotation.Error;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Status;
-import io.micronaut.http.server.tck.AssertionUtils;
-import io.micronaut.http.server.tck.HttpResponseAssertion;
+import io.micronaut.http.tck.AssertionUtils;
+import io.micronaut.http.tck.HttpResponseAssertion;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
-import javax.validation.ConstraintViolationException;
-import javax.validation.Valid;
-import javax.validation.constraints.Email;
-import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
+import jakarta.validation.ConstraintViolationException;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
 
-import static io.micronaut.http.server.tck.TestScenario.asserts;
+import static io.micronaut.http.tck.TestScenario.asserts;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SuppressWarnings({
