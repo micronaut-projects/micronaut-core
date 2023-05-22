@@ -90,14 +90,12 @@ public class ControllerConstraintHandlerTest {
             HttpRequest.POST("/constraints-via-handler", "{\"username\":\"invalidemail\",\"password\":\"secret\"}"),
             (server, request) -> AssertionUtils.assertThrows(server, request, constraintAssertion("must be a well-formed email address")));
         asserts(SPEC_NAME,
-            HttpRequest.POST("/constraints-via-handler", "{\"username\":\"\",\"password\":\"secret\"}"),
-        asserts(SPEC_NAME,
             HttpRequest.POST("/constraints-via-handler", "{\"username\":\"invalidemail\",\"password\":\"secret\"}"),
             (server, request) -> AssertionUtils.assertThrows(server, request, constraintAssertion("must be a well-formed email address")));
         asserts(SPEC_NAME,
             HttpRequest.POST("/constraints-via-handler", "{\"username\":\"\",\"password\":\"secret\"}"),
             (server, request) -> AssertionUtils.assertThrows(server, request, constraintAssertion("must not be blank\"")));
-    
+
         asserts(SPEC_NAME,
             HttpRequest.POST("/constraints-via-on-error-method", "{\"username\":\"\",\"password\":\"secret\"}"),
             (server, request) -> AssertionUtils.assertThrows(server, request, TEAPOT_ASSERTION));
@@ -107,7 +105,6 @@ public class ControllerConstraintHandlerTest {
             (server, request) -> AssertionUtils.assertThrows(server, request, TEAPOT_ASSERTION));
     }
 
-    @Disabled("currently not supported")
     @Test
     void testPojoWithNonNullAnnotation() throws IOException {
         asserts(SPEC_NAME,
