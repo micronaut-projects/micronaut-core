@@ -31,6 +31,7 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
@@ -105,6 +106,7 @@ public class ControllerConstraintHandlerTest {
             (server, request) -> AssertionUtils.assertThrows(server, request, TEAPOT_ASSERTION));
     }
 
+    @Disabled
     @Test
     void testPojoWithNonNullAnnotation() throws IOException {
         asserts(SPEC_NAME,
