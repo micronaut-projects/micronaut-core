@@ -29,24 +29,21 @@ import io.micronaut.http.annotation.Error;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Status;
-
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
-
+import io.micronaut.http.tck.AssertionUtils;
+import io.micronaut.http.tck.HttpResponseAssertion;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
-import io.micronaut.http.tck.AssertionUtils;
-import io.micronaut.http.tck.HttpResponseAssertion;
-import io.micronaut.http.tck.ServerUnderTest;
-import io.micronaut.http.tck.ServerUnderTestProviderUtils;
-import static io.micronaut.http.tck.TestScenario.asserts;
 
+import static io.micronaut.http.tck.TestScenario.asserts;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SuppressWarnings({
@@ -190,7 +187,20 @@ public class ControllerConstraintHandlerTest {
         @Error(exception = ConstraintViolationException.class)
         @Status(HttpStatus.I_AM_A_TEAPOT)
         Optional<Map> constraintsEx(ConstraintViolationException e, HttpRequest<?> request) {
-            return request.getBody(Map.class);
+            Optional<?> objectOptional = request.getBody();
+            if (objectOptional.isEmpty()) {
+                return Optional.empty();
+            }
+            Object obj = objectOptional.get();
+            String password = null;
+            if (obj instanceof CredentialsWithoutNullabilityAnnotation credentials) {
+                password = credentials.getPassword();
+            } else if (obj instanceof CredentialsWithNullable credentials) {
+                password = credentials.getPassword();
+            } else if (obj instanceof CredentialsWithNonNull credentials) {
+                password = credentials.getPassword();
+            }
+            return password != null ? Optional.of(Map.of("password", password)) : Optional.empty();
         }
     }
 

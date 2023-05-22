@@ -183,6 +183,12 @@ body that is already bound to `bean`.
 
 These changes also apply to functions that are exposed using `micronaut-function-web`.
 
+==== Delayed body access
+
+When accessing the request body in two places, for example once as a normal controller `@Body` parameter and then in an
+error handler, Micronaut HTTP is now stricter about allowed types. In doubt, for the second body access, call
+`HttpRequest.getBody()` and you will get the same body type the first access requested.
+
 ==== `text/plain` messages are more restrictive about allowed types
 
 For `text/plain` request and response body writing, in 3.x, any type would be allowed and would be "serialized" using
