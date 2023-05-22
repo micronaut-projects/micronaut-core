@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.codec;
 
+import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
@@ -33,6 +34,7 @@ import java.util.Collection;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Indexed(MediaTypeCodec.class)
 public interface MediaTypeCodec {
 
     /**

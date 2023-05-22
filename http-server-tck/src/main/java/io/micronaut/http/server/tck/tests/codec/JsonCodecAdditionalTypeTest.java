@@ -18,7 +18,6 @@ package io.micronaut.http.server.tck.tests.codec;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
@@ -29,7 +28,6 @@ import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.BodyAssertion;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import org.junit.jupiter.api.Test;
-import org.reactivestreams.Publisher;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -44,8 +42,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
     "checkstyle:MissingJavadocType",
     "checkstyle:DesignForExtension"
 })
-public class JsonCodeAdditionalTypeTest {
-    public static final String SPEC_NAME = "JsonCodeAdditionalTypeTest";
+public class JsonCodecAdditionalTypeTest {
+    public static final String SPEC_NAME = "JsonCodecAdditionalTypeTest";
     public static final String APPLICATION_JSON_FEED = "application/json+feed";
 
     @Test
