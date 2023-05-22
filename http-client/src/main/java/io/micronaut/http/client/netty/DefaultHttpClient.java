@@ -93,6 +93,7 @@ import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.body.ByteBufRawMessageBodyHandler;
 import io.micronaut.http.netty.body.NettyJsonHandler;
 import io.micronaut.http.netty.body.NettyJsonStreamHandler;
+import io.micronaut.http.netty.body.NettyWritableBodyWriter;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
 import io.micronaut.http.netty.stream.DelegateStreamedHttpRequest;
@@ -1802,7 +1803,8 @@ public class DefaultHttpClient implements
     }
 
     private static MessageBodyHandlerRegistry createDefaultMessageBodyHandlerRegistry() {
-        ContextlessMessageBodyHandlerRegistry registry = new ContextlessMessageBodyHandlerRegistry(new ApplicationConfiguration(), NettyByteBufferFactory.DEFAULT, new ByteBufRawMessageBodyHandler());
+        ApplicationConfiguration applicationConfiguration = new ApplicationConfiguration();
+        ContextlessMessageBodyHandlerRegistry registry = new ContextlessMessageBodyHandlerRegistry(applicationConfiguration, NettyByteBufferFactory.DEFAULT, new ByteBufRawMessageBodyHandler(), new NettyWritableBodyWriter(applicationConfiguration));
         JsonMapper mapper = JsonMapper.createDefault();
         registry.add(MediaType.APPLICATION_JSON_TYPE, new NettyJsonHandler<>(mapper));
         registry.add(MediaType.APPLICATION_JSON_STREAM_TYPE, new NettyJsonStreamHandler<>(mapper));
