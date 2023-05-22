@@ -93,6 +93,11 @@ public class HttpResponseAdapter<O> implements HttpResponse<O> {
         return convertBytes(getContentType().orElse(null), httpResponse.body(), bodyType);
     }
 
+    @Override
+    public <T> Optional<T> getBody(Argument<T> type) {
+        return convertBytes(getContentType().orElse(null), httpResponse.body(), type);
+    }
+
     private <T> Optional convertBytes(@Nullable MediaType contentType, byte[] bytes, Argument<T> type) {
         if (type != null && mediaTypeCodecRegistry != null && contentType != null) {
             if (CharSequence.class.isAssignableFrom(type.getType())) {
