@@ -15,10 +15,12 @@
  */
 package io.micronaut.docs.aop.scheduled
 
+import io.micronaut.context.annotation.Requires
 import io.micronaut.scheduling.annotation.Scheduled
 
 import jakarta.inject.Singleton
 
+@Requires(property = "spec.name", value = "ScheduledExampleTest")
 @Singleton
 class ScheduledExample {
 
