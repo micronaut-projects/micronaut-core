@@ -257,9 +257,5 @@ class SuspendControllerSpec : StringSpec() {
             beforeTraceId shouldBe afterTraceId
             response.status shouldBe HttpStatus.OK
         }
-<<<<<<< Updated upstream
-
-=======
->>>>>>> Stashed changes
     }
 }
