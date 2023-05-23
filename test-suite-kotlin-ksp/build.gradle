@@ -13,14 +13,7 @@ micronautBuild {
 }
 
 repositories {
-    mavenLocal()
     mavenCentral()
-    maven {
-        url "https://s01.oss.sonatype.org/content/repositories/snapshots/"
-        mavenContent {
-            snapshotsOnly()
-        }
-    }
 }
 
 dependencies {
@@ -68,10 +61,6 @@ dependencies {
         exclude group: 'io.micronaut'
     }
     testImplementation libs.javax.inject
-    testImplementation(platform(libs.test.boms.micronaut.tracing))
-    testImplementation(libs.micronaut.tracing.zipkin) {
-        exclude group: 'io.micronaut'
-    }
 
     testRuntimeOnly libs.junit.jupiter.engine
     testRuntimeOnly(platform(libs.test.boms.micronaut.aws))

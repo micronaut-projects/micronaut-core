@@ -11,7 +11,7 @@ import static org.awaitility.Awaitility.await
 class ExampleJobSpec extends Specification {
     @Shared
     @AutoCleanup
-    ApplicationContext ctx = ApplicationContext.run()
+    ApplicationContext ctx = ApplicationContext.run(["spec.name":  "ExampleJobTest"])
 
     void testJobCondition(){
         given:

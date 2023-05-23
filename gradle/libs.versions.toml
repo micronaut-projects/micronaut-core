@@ -31,7 +31,6 @@ jakarta-el-impl = "5.0.0-M1"
 jcache = "1.1.1"
 junit5 = "5.9.3"
 junit-platform="1.9.3"
-ktor = "1.6.8"
 logback = "1.4.7"
 logbook-netty = "2.14.0"
 log4j = "2.19.0"
@@ -40,13 +39,10 @@ micronaut-groovy = "4.0.0-M1"
 micronaut-session = "4.0.0-M1"
 micronaut-sql = "5.0.0-M4"
 micronaut-test = "4.0.0-M3"
-micronaut-serde = "2.0.0-M1"
-micronaut-tracing = "5.0.0-SNAPSHOT"
 micronaut-validation = "4.0.0-M7"
-micronaut-rxjava2 = "2.0.0-SNAPSHOT"
-micronaut-rxjava3 = "3.0.0-SNAPSHOT"
-micronaut-reactor = "3.0.0-SNAPSHOT"
-micrometer = "1.11.0"
+micronaut-rxjava2 = "2.0.0-M1"
+micronaut-rxjava3 = "3.0.0-M1"
+micronaut-reactor = "3.0.0-M1"
 neo4j-java-driver = "1.4.5"
 selenium = "4.7.2"
 slf4j = "2.0.7"
@@ -68,7 +64,6 @@ managed-jackson = "2.14.2"
 managed-jackson-databind = "2.15.1"
 managed-kotlin = "1.8.21"
 managed-kotlin-coroutines = "1.7.1"
-managed-maven-native-plugin = "0.9.13"
 managed-methvin-directory-watcher = "0.18.0"
 managed-netty = "4.1.92.Final"
 managed-netty-iouring = "0.0.21.Final"
@@ -85,7 +80,6 @@ micronaut-docs = "2.0.0"
 # Libraries prefixed with bom- are BOM files
 test-boms-micronaut-aws = { module = "io.micronaut.aws:micronaut-aws-bom", version.ref = "micronaut-aws" }
 test-boms-micronaut-sql = { module = "io.micronaut.sql:micronaut-sql-bom", version.ref = "micronaut-sql" }
-test-boms-micronaut-tracing = { module = "io.micronaut.tracing:micronaut-tracing-bom", version.ref = "micronaut-tracing" }
 test-boms-micronaut-validation = { module = "io.micronaut.validation:micronaut-validation-bom", version.ref = "micronaut-validation" }
 test-boms-micronaut-rxjava2 = { module = "io.micronaut.rxjava2:micronaut-rxjava2-bom", version.ref = "micronaut-rxjava2" }
 test-boms-micronaut-rxjava3 = { module = "io.micronaut.rxjava3:micronaut-rxjava3-bom", version.ref = "micronaut-rxjava3" }
@@ -223,7 +217,6 @@ logbook-netty = { module = "org.zalando:logbook-netty", version.ref = "logbook-n
 
 micronaut-docs = { module = "io.micronaut.docs:micronaut-docs-asciidoc-config-props", version.ref = "micronaut-docs" }
 micronaut-runtime-groovy = { module = "io.micronaut.groovy:micronaut-runtime-groovy", version.ref = "micronaut-groovy" }
-micronaut-serde-jackson = { module = "io.micronaut.serde:micronaut-serde-jackson", version.ref = "micronaut-serde" }
 micronaut-session = { module = "io.micronaut.session:micronaut-session", version.ref = "micronaut-session" }
 micronaut-test-bom = { module = "io.micronaut.test:micronaut-test-bom", version.ref = "micronaut-test" }
 micronaut-test-core = { module = "io.micronaut.test:micronaut-test-core", version.ref = "micronaut-test" }
@@ -234,9 +227,6 @@ micronaut-test-spock = { module = "io.micronaut.test:micronaut-test-spock", vers
 
 micronaut-sql-jdbc = { module = "io.micronaut.sql:micronaut-jdbc", version.ref = "micronaut-sql" }
 micronaut-sql-jdbc-tomcat = { module = "io.micronaut.sql:micronaut-jdbc-tomcat", version.ref = "micronaut-sql" }
-
-micrometer-core = { module = "io.micrometer:micrometer-core", version.ref = "micrometer" }
-
 mysql-driver = { module = "mysql:mysql-connector-java" }
 
 neo4j-bolt = { module = "org.neo4j.driver:neo4j-java-driver", version.ref = "neo4j-java-driver" }
@@ -260,7 +250,7 @@ spotbugs = { module = "com.github.spotbugs:spotbugs-annotations", version.ref = 
 systemlambda = { module = "com.github.stefanbirkner:system-lambda", version.ref = "systemlambda" }
 
 micronaut-tracing-jaeger = { module = "io.micronaut.tracing:micronaut-tracing-jaeger" }
-micronaut-tracing-zipkin = { module = "io.micronaut.tracing:micronaut-tracing-zipkin" }
+micronaut-tracing-brave = { module = "io.micronaut.tracing:micronaut-tracing-brave" }
 
 micronaut-validation = { module = "io.micronaut.validation:micronaut-validation" }
 micronaut-validation-processor = { module = "io.micronaut.validation:micronaut-validation-processor" }

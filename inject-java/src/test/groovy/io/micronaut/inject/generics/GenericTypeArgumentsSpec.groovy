@@ -21,9 +21,6 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import spock.lang.Unroll
-import zipkin2.Span
-import zipkin2.reporter.AsyncReporter
-import zipkin2.reporter.Reporter
 
 import jakarta.validation.ConstraintViolationException
 import java.util.function.Function
@@ -456,33 +453,6 @@ interface Foo extends java.util.function.Function<String, Integer> {}
         definition.getTypeArguments(Function)[1].name == 'R'
         definition.getTypeArguments(Function)[0].type == String
         definition.getTypeArguments(Function)[1].type == Integer
-    }
-
-    void "test type arguments for factory with interface"() {
-        given:
-        BeanDefinition definition = buildBeanDefinition('test.Test$AsyncReporter0', '''\
-package test;
-
-import io.micronaut.inject.annotation.*;
-import io.micronaut.context.annotation.*;
-import zipkin2.reporter.*;
-import zipkin2.*;
-
-@Factory
-class Test {
-
-    @jakarta.inject.Singleton
-    AsyncReporter<Span> asyncReporter() {
-        return null;
-    }
-}
-
-''')
-        expect:
-        definition != null
-        definition.getTypeParameters(AsyncReporter) == [Span] as Class[]
-        definition.getTypeParameters(Reporter) == [Span] as Class[]
-
     }
 
     void "test type arguments for factory with AOP advice applied"() {
