@@ -15,7 +15,6 @@
  */
 package io.micronaut.inject.annotation
 
-import io.micrometer.core.annotation.Timed
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.Around
 import io.micronaut.aop.introduction.StubIntroducer
@@ -122,31 +121,6 @@ class Test {
         metadata.annotationNames.size() == 1
     }
 
-    void "test write annotation metadata with primitive arrays"() {
-        given:
-        AnnotationMetadata toWrite = new MutableAnnotationMetadata(
-                [
-                        "io.micrometer.core.annotation.Timed": [
-                                percentiles: [1.1d] as double[]
-                        ]
-
-                ], null, null, [
-                "io.micrometer.core.annotation.Timed": [
-                        percentiles: [1.1d] as double[]
-                ]
-
-        ], null, false
-        )
-        when:
-        def className = "test"
-        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
-
-        then:
-        metadata != null
-        metadata.getValue(Timed.name, "percentiles", double[].class).get() == [1.1d] as double[]
-    }
-
-
     void "test annotation metadata with instantiated member"() {
         given:
         AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\
@@ -201,7 +175,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import io.micronaut.inject.annotation.*;
 
 @MyAnn(doubleArray={1.1d})
-@io.micrometer.core.annotation.Timed(percentiles={1.1d})
 class Test {
 }
 
@@ -223,9 +196,8 @@ class Test {
 
         then:
         metadata != null
-        metadata.getValue(Timed, "percentiles", double[].class).get() == [1.1d] as double[]
-        metadata.doubleValue(Timed, "percentiles").asDouble == 1.1d
         metadata.getValue("test.MyAnn", "doubleArray", double[].class).get() == [1.1d] as double[]
+        metadata.doubleValue("test.MyAnn", "doubleArray").asDouble == 1.1d
     }
 
     void "test annotation metadata inherited stereotypes"() {

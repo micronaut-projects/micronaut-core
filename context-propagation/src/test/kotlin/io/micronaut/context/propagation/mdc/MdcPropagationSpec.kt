@@ -25,6 +25,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.single
 import kotlinx.coroutines.reactive.asFlow
 import kotlinx.coroutines.withContext
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.reactivestreams.Publisher
 import org.slf4j.LoggerFactory
@@ -37,6 +38,7 @@ import java.util.*
 class MdcPropagationSpec {
 
     @Test
+    @Disabled("Move to micronaut-tracing")
     fun testKotlinPropagation() {
         val embeddedServer = ApplicationContext.run(
             EmbeddedServer::class.java,

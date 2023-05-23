@@ -65,7 +65,6 @@ managed-jackson = "2.14.2"
 managed-jackson-databind = "2.15.1"
 managed-kotlin = "1.8.21"
 managed-kotlin-coroutines = "1.7.1"
-managed-maven-native-plugin = "0.9.13"
 managed-methvin-directory-watcher = "0.18.0"
 managed-netty = "4.1.92.Final"
 managed-netty-iouring = "0.0.21.Final"
@@ -82,7 +81,6 @@ micronaut-docs = "2.0.0"
 # Libraries prefixed with bom- are BOM files
 test-boms-micronaut-aws = { module = "io.micronaut.aws:micronaut-aws-bom", version.ref = "micronaut-aws" }
 test-boms-micronaut-sql = { module = "io.micronaut.sql:micronaut-sql-bom", version.ref = "micronaut-sql" }
-test-boms-micronaut-tracing = { module = "io.micronaut.tracing:micronaut-tracing-bom", version.ref = "micronaut-tracing" }
 test-boms-micronaut-validation = { module = "io.micronaut.validation:micronaut-validation-bom", version.ref = "micronaut-validation" }
 test-boms-micronaut-rxjava2 = { module = "io.micronaut.rxjava2:micronaut-rxjava2-bom", version.ref = "micronaut-rxjava2" }
 test-boms-micronaut-rxjava3 = { module = "io.micronaut.rxjava3:micronaut-rxjava3-bom", version.ref = "micronaut-rxjava3" }
@@ -219,7 +217,6 @@ logbook-netty = { module = "org.zalando:logbook-netty", version.ref = "logbook-n
 
 micronaut-docs = { module = "io.micronaut.docs:micronaut-docs-asciidoc-config-props", version.ref = "micronaut-docs" }
 micronaut-runtime-groovy = { module = "io.micronaut.groovy:micronaut-runtime-groovy", version.ref = "micronaut-groovy" }
-micronaut-serde-jackson = { module = "io.micronaut.serde:micronaut-serde-jackson", version.ref = "micronaut-serde" }
 micronaut-session = { module = "io.micronaut.session:micronaut-session", version.ref = "micronaut-session" }
 micronaut-test-bom = { module = "io.micronaut.test:micronaut-test-bom", version.ref = "micronaut-test" }
 micronaut-test-core = { module = "io.micronaut.test:micronaut-test-core", version.ref = "micronaut-test" }
@@ -230,9 +227,6 @@ micronaut-test-spock = { module = "io.micronaut.test:micronaut-test-spock", vers
 
 micronaut-sql-jdbc = { module = "io.micronaut.sql:micronaut-jdbc", version.ref = "micronaut-sql" }
 micronaut-sql-jdbc-tomcat = { module = "io.micronaut.sql:micronaut-jdbc-tomcat", version.ref = "micronaut-sql" }
-
-micrometer-core = { module = "io.micrometer:micrometer-core", version.ref = "micrometer" }
-
 mysql-driver = { module = "mysql:mysql-connector-java" }
 
 neo4j-bolt = { module = "org.neo4j.driver:neo4j-java-driver", version.ref = "neo4j-java-driver" }

@@ -21,11 +21,6 @@ micronautBuild {
 
 repositories {
     mavenCentral()
-    maven {
-        mavenContent {
-            snapshotsOnly()
-        }
-    }
 }
 
 dependencies {
@@ -66,10 +61,6 @@ dependencies {
     testImplementation libs.junit.jupiter.api
 
     testImplementation libs.jcache
-    testImplementation(platform(libs.test.boms.micronaut.tracing))
-    testImplementation(libs.micronaut.tracing.jaeger) {
-        exclude group: 'io.micronaut'
-    }
     testImplementation libs.managed.groovy.json
     testImplementation libs.managed.groovy.templates
     // tag::testcontainers-dependencies[]

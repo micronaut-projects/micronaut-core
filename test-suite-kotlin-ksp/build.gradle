@@ -13,13 +13,7 @@ micronautBuild {
 }
 
 repositories {
-    mavenLocal()
     mavenCentral()
-    maven {
-        mavenContent {
-            snapshotsOnly()
-        }
-    }
 }
 
 dependencies {
@@ -67,10 +61,13 @@ dependencies {
         exclude group: 'io.micronaut'
     }
     testImplementation libs.javax.inject
+<<<<<<< HEAD
     testImplementation(platform(libs.test.boms.micronaut.tracing))
     testImplementation(libs.micronaut.tracing.brave) {
         exclude group: 'io.micronaut'
     }
+=======
+>>>>>>> 4.0.x
 
     testRuntimeOnly libs.junit.jupiter.engine
     testRuntimeOnly(platform(libs.test.boms.micronaut.aws))
