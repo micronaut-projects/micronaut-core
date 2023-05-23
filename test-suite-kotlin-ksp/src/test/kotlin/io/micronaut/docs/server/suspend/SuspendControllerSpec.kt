@@ -259,14 +259,5 @@ class SuspendControllerSpec : StringSpec() {
             response.status shouldBe HttpStatus.OK
         }
 
-// TODO: HttpCoroutineTracingDispatcherFactory#create should eliminate nulls
-//        "test keeping tracing context using CoroutineTracingDispatcher explicitly" {
-//            val response = client.exchange(GET<Any>("/suspend/keepTracingContextUsingCoroutineTracingDispatcherExplicitly"), String::class.java).awaitSingle()
-//            val body = response.body.get()
-//
-//            val (beforeTraceId, afterTraceId) = body.split(',')
-//            beforeTraceId shouldBe afterTraceId
-//            response.status shouldBe HttpStatus.OK
-//        }
     }
 }
