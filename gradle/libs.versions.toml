@@ -256,7 +256,7 @@ spotbugs = { module = "com.github.spotbugs:spotbugs-annotations", version.ref = 
 systemlambda = { module = "com.github.stefanbirkner:system-lambda", version.ref = "systemlambda" }
 
 micronaut-tracing-jaeger = { module = "io.micronaut.tracing:micronaut-tracing-jaeger" }
-micronaut-tracing-zipkin = { module = "io.micronaut.tracing:micronaut-tracing-zipkin" }
+micronaut-tracing-brave = { module = "io.micronaut.tracing:micronaut-tracing-brave" }
 
 micronaut-validation = { module = "io.micronaut.validation:micronaut-validation" }
 micronaut-validation-processor = { module = "io.micronaut.validation:micronaut-validation-processor" }
