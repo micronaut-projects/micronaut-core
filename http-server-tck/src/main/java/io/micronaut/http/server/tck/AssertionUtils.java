@@ -18,6 +18,7 @@ package io.micronaut.http.server.tck;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -88,8 +89,15 @@ public final class AssertionUtils {
     public static <T> void assertDoesNotThrow(@NonNull ServerUnderTest server,
                                               @NonNull HttpRequest<T> request,
                                               @NonNull HttpResponseAssertion assertion) {
-        ThrowingSupplier<HttpResponse<?>> executable = assertion.getBody() != null ?
-            () -> server.exchange(request, String.class) :
+        assertDoesNotThrow(server, request, assertion.getBody() != null ? Argument.of(String.class) : null, assertion);
+    }
+
+    public static <T, B> void assertDoesNotThrow(@NonNull ServerUnderTest server,
+                                              @NonNull HttpRequest<T> request,
+                                              @Nullable Argument<B> bodyType,
+                                              @NonNull HttpResponseAssertion assertion) {
+        ThrowingSupplier<HttpResponse<?>> executable = bodyType != null ?
+            () -> server.exchange(request, bodyType) :
             () -> server.exchange(request);
         HttpResponse<?> response = Assertions.assertDoesNotThrow(executable);
         assertEquals(assertion.getHttpStatus(), response.getStatus());
