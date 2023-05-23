@@ -72,7 +72,7 @@ dependencies {
 
     testImplementation libs.javax.inject
     testImplementation(platform(libs.test.boms.micronaut.tracing))
-    testImplementation(libs.micronaut.tracing.zipkin) {
+    testImplementation(libs.micronaut.tracing.brave) {
         exclude group: 'io.micronaut'
     }
 
