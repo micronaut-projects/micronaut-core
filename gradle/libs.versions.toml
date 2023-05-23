@@ -12,7 +12,6 @@ gorm = "7.3.4"
 graal-svm = "22.3.2"
 h2 = "2.1.214"
 hibernate = "5.5.9.Final"
-hibernate-validator = "6.1.6.Final"
 htmlSanityCheck = "1.1.6"
 htmlunit = "2.68.0"
 httpcomponents-client = "4.5.14"
@@ -181,7 +180,6 @@ groovy-test-junit5 = { module = "org.apache.groovy:groovy-test-junit5", version.
 
 h2 = { module = "com.h2database:h2", version.ref = "h2" }
 hibernate = { module = "org.hibernate:hibernate-core", version.ref = "hibernate" }
-hibernate-validator = { module = "org.hibernate:hibernate-validator", version.ref = "hibernate-validator" }
 
 htmlunit = { module = "net.sourceforge.htmlunit:htmlunit", version.ref = "htmlunit" }
 
