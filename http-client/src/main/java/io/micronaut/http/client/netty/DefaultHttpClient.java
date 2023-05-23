@@ -2049,7 +2049,7 @@ public class DefaultHttpClient implements
                 String location = headers1.get(HttpHeaderNames.LOCATION);
 
                 MutableHttpRequest<Object> redirectRequest;
-                if (code == 307) {
+                if (code == 307 || code == 308) {
                     redirectRequest = io.micronaut.http.HttpRequest.create(finalRequest.getMethod(), location);
                     finalRequest.getBody().ifPresent(redirectRequest::body);
                 } else {
