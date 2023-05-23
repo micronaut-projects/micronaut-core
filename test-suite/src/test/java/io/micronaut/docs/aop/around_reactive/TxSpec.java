@@ -18,6 +18,7 @@ package io.micronaut.docs.aop.around_reactive;
 import io.micronaut.context.ApplicationContext;
 import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Disabled;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -44,6 +45,7 @@ public class TxSpec {
     }
 
     @Test
+    @Disabled("Move to micronaut-tracing")
     public void testTwoFluxReactiveTx() {
         try (ApplicationContext applicationContext = ApplicationContext.run()) {
             TxManager txManager = applicationContext.getBean(TxManager.class);

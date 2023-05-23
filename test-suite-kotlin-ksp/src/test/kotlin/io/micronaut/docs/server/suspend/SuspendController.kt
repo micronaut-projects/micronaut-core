@@ -29,8 +29,12 @@ import org.slf4j.MDC
 class SuspendController(
     @Named(TaskExecutors.IO) private val executor: ExecutorService,
     private val suspendService: SuspendService,
+<<<<<<< Updated upstream
     private val suspendRequestScopedService: SuspendRequestScopedService
 ) {
+=======
+    private val suspendRequestScopedService: SuspendRequestScopedService) {
+>>>>>>> Stashed changes
 
     private val coroutineDispatcher: CoroutineDispatcher
 

@@ -21,12 +21,6 @@ micronautBuild {
 
 repositories {
     mavenCentral()
-    maven {
-        url "https://s01.oss.sonatype.org/content/repositories/snapshots/"
-        mavenContent {
-            snapshotsOnly()
-        }
-    }
 }
 
 dependencies {
@@ -67,10 +61,6 @@ dependencies {
     testImplementation libs.junit.jupiter.api
 
     testImplementation libs.jcache
-    testImplementation(platform(libs.test.boms.micronaut.tracing))
-    testImplementation(libs.micronaut.tracing.jaeger) {
-        exclude group: 'io.micronaut'
-    }
     testImplementation libs.managed.groovy.json
     testImplementation libs.managed.groovy.templates
     // tag::testcontainers-dependencies[]

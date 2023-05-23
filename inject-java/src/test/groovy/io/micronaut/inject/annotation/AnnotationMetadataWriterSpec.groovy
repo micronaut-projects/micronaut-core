@@ -201,7 +201,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import io.micronaut.inject.annotation.*;
 
 @MyAnn(doubleArray={1.1d})
-@io.micrometer.core.annotation.Timed(percentiles={1.1d})
+@Timed(percentiles={1.1d})
 class Test {
 }
 
@@ -223,9 +223,8 @@ class Test {
 
         then:
         metadata != null
-        metadata.getValue(Timed, "percentiles", double[].class).get() == [1.1d] as double[]
-        metadata.doubleValue(Timed, "percentiles").asDouble == 1.1d
         metadata.getValue("test.MyAnn", "doubleArray", double[].class).get() == [1.1d] as double[]
+        metadata.doubleValue("test.MyAnn", "doubleArray").asDouble == 1.1d
     }
 
     void "test annotation metadata inherited stereotypes"() {

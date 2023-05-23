@@ -17,10 +17,12 @@ package io.micronaut.docs.server.suspend
 
 import io.micronaut.http.*
 import io.micronaut.http.annotation.*
-import io.micronaut.http.bind.binders.HttpCoroutineContextFactory
 import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.scheduling.TaskExecutors
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
 import kotlinx.coroutines.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.atomic.AtomicInteger
@@ -31,8 +33,12 @@ import org.slf4j.MDC
 class SuspendController(
     @Named(TaskExecutors.IO) private val executor: ExecutorService,
     private val suspendService: SuspendService,
+<<<<<<< Updated upstream
     private val suspendRequestScopedService: SuspendRequestScopedService
 ) {
+=======
+    private val suspendRequestScopedService: SuspendRequestScopedService) {
+>>>>>>> Stashed changes
 
     private val coroutineDispatcher: CoroutineDispatcher
 

@@ -39,8 +39,7 @@ class SuspendControllerSpec : StringSpec() {
                 "micronaut.server.cors.enabled" to true,
                 "micronaut.server.cors.configurations.dev.allowedOrigins" to listOf("foo.com"),
                 "micronaut.server.cors.configurations.dev.allowedMethods" to listOf("GET"),
-                "micronaut.server.cors.configurations.dev.allowedHeaders" to listOf(ACCEPT, CONTENT_TYPE),
-                "tracing.zipkin.enabled" to true
+                "micronaut.server.cors.configurations.dev.allowedHeaders" to listOf(ACCEPT, CONTENT_TYPE)
             )
         )
     )
@@ -258,6 +257,9 @@ class SuspendControllerSpec : StringSpec() {
             beforeTraceId shouldBe afterTraceId
             response.status shouldBe HttpStatus.OK
         }
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
     }
 }
