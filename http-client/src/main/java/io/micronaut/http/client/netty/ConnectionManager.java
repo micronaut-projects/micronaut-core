@@ -25,7 +25,7 @@ import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
-import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
+import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.scheduling.instrument.Instrumentation;
@@ -133,7 +133,7 @@ public class ConnectionManager {
     private final HttpVersionSelection httpVersion;
     private final Logger log;
     private final Map<DefaultHttpClient.RequestKey, Pool> pools = new ConcurrentHashMap<>();
-    private final NettyClientSslBuilder nettyClientSslBuilder;
+    private final ClientSslBuilder nettyClientSslBuilder;
     private EventLoopGroup group;
     private final boolean shutdownGroup;
     private final ThreadFactory threadFactory;
@@ -180,7 +180,7 @@ public class ConnectionManager {
         InvocationInstrumenter instrumenter,
         ChannelFactory<? extends Channel> socketChannelFactory,
         ChannelFactory<? extends Channel> udpChannelFactory,
-        NettyClientSslBuilder nettyClientSslBuilder,
+        ClientSslBuilder nettyClientSslBuilder,
         NettyClientCustomizer clientCustomizer,
         String informationalServiceId) {
 
@@ -211,7 +211,11 @@ public class ConnectionManager {
     }
 
     final void refresh() {
-        sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration(), httpVersion);
+        if (configuration.getSslConfiguration().isEnabled()) {
+            sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration(), httpVersion);
+        } else {
+            sslContext = null;
+        }
         if (httpVersion.isHttp3()) {
             http3SslContext = nettyClientSslBuilder.buildHttp3(configuration.getSslConfiguration());
         } else {
