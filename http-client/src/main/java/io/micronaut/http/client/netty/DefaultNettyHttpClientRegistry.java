@@ -50,7 +50,7 @@ import io.micronaut.http.client.StreamingHttpClientRegistry;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
-import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
+import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.client.sse.SseClientRegistry;
 import io.micronaut.http.codec.MediaTypeCodec;
@@ -120,7 +120,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     private final Map<ClientKey, DefaultHttpClient> unbalancedClients = new ConcurrentHashMap<>(10);
     private final List<DefaultHttpClient> balancedClients = Collections.synchronizedList(new ArrayList<>());
     private final LoadBalancerResolver loadBalancerResolver;
-    private final NettyClientSslBuilder nettyClientSslBuilder;
+    private final ClientSslBuilder nettyClientSslBuilder;
     private final ThreadFactory threadFactory;
     private final MediaTypeCodecRegistry codecRegistry;
     private final MessageBodyHandlerRegistry handlerRegistry;
@@ -154,7 +154,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             HttpClientConfiguration defaultHttpClientConfiguration,
             HttpClientFilterResolver httpClientFilterResolver,
             LoadBalancerResolver loadBalancerResolver,
-            NettyClientSslBuilder nettyClientSslBuilder,
+            ClientSslBuilder nettyClientSslBuilder,
             ThreadFactory threadFactory,
             MediaTypeCodecRegistry codecRegistry,
             MessageBodyHandlerRegistry handlerRegistry,

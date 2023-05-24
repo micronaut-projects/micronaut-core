@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,33 +13,41 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty.ssl;
+package io.micronaut.http.client.netty.ssl;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.http.ssl.ServerSslConfiguration;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.http.client.HttpVersionSelection;
+import io.micronaut.http.ssl.SslConfiguration;
 import io.netty.handler.ssl.SslContext;
 import io.netty.incubator.codec.quic.QuicSslContext;
 
-import java.util.Optional;
-
 /**
- * Interface that allows for different builder instances to be able to create
- * an the SSLContext supplied later to the micronaut http server.
+ * Interface used by the netty HTTP client to construct the SSL context.
+ *
+ * @since 4.0.0
+ * @author Jonas Konrad
  */
-public interface ServerSslBuilder {
+public interface ClientSslBuilder {
+    /**
+     * Build the ssl context.
+     *
+     * @param ssl              The configuration
+     * @param versionSelection The HTTP versions to support
+     * @return The ssl context
+     */
+    @NonNull
+    SslContext build(SslConfiguration ssl, HttpVersionSelection versionSelection);
 
     /**
-     * @return The SSL configuration
+     * Build the ssl context for QUIC.
+     *
+     * @param ssl The configuration
+     * @return The ssl context
      */
-    ServerSslConfiguration getSslConfiguration();
-
-    /**
-     * @return Builds the SSL configuration wrapped inside an optional
-     */
-    Optional<SslContext> build();
-
     @Experimental
-    default Optional<QuicSslContext> buildQuic() {
+    @NonNull
+    default QuicSslContext buildHttp3(SslConfiguration ssl) {
         throw new UnsupportedOperationException("QUIC not supported");
     }
 }

@@ -16,8 +16,9 @@
 package io.micronaut.http.client.netty.ssl;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
+import io.micronaut.context.annotation.Secondary;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.client.HttpVersionSelection;
@@ -57,7 +58,8 @@ import java.util.Optional;
 @Singleton
 @Internal
 @BootstrapContextCompatible
-public final class NettyClientSslBuilder extends SslBuilder<SslContext> {
+@Secondary
+public final class NettyClientSslBuilder extends SslBuilder<SslContext> implements ClientSslBuilder {
     private static final Logger LOG = LoggerFactory.getLogger(NettyClientSslBuilder.class);
 
     /**
@@ -75,14 +77,15 @@ public final class NettyClientSslBuilder extends SslBuilder<SslContext> {
 
     @Override
     public Optional<SslContext> build(SslConfiguration ssl, HttpVersion httpVersion) {
-        return Optional.ofNullable(build(ssl, HttpVersionSelection.forLegacyVersion(httpVersion)));
+        if (!ssl.isEnabled()) {
+            return Optional.empty();
+        }
+        return Optional.of(build(ssl, HttpVersionSelection.forLegacyVersion(httpVersion)));
     }
 
-    @Nullable
+    @NonNull
+    @Override
     public SslContext build(SslConfiguration ssl, HttpVersionSelection versionSelection) {
-        if (!ssl.isEnabled()) {
-            return null;
-        }
         SslContextBuilder sslBuilder = SslContextBuilder
             .forClient()
             .keyManager(getKeyManagerFactory(ssl))
@@ -124,6 +127,7 @@ public final class NettyClientSslBuilder extends SslBuilder<SslContext> {
         }
     }
 
+    @Override
     public QuicSslContext buildHttp3(SslConfiguration ssl) {
         QuicSslContextBuilder sslBuilder = QuicSslContextBuilder.forClient()
             .keyManager(getKeyManagerFactory(ssl), ssl.getKeyStore().getPassword().orElse(null))
