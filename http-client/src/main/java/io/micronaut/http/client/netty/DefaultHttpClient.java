@@ -73,6 +73,7 @@ import io.micronaut.http.client.filter.DefaultHttpClientFilterResolver;
 import io.micronaut.http.client.filters.ClientServerContextFilter;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.client.multipart.MultipartDataFactory;
+import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
 import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
 import io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler;
 import io.micronaut.http.client.sse.SseClient;
@@ -285,7 +286,7 @@ public class DefaultHttpClient implements
                              @NonNull HttpClientConfiguration configuration,
                              @Nullable String contextPath,
                              @Nullable ThreadFactory threadFactory,
-                             NettyClientSslBuilder nettyClientSslBuilder,
+                             ClientSslBuilder nettyClientSslBuilder,
                              @NonNull MediaTypeCodecRegistry codecRegistry,
                              @NonNull MessageBodyHandlerRegistry handlerRegistry,
                              @Nullable AnnotationMetadataResolver annotationMetadataResolver,
@@ -342,7 +343,7 @@ public class DefaultHttpClient implements
                              @NonNull HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
                              @NonNull List<HttpFilterResolver.FilterEntry> clientFilterEntries,
                              @Nullable ThreadFactory threadFactory,
-                             @NonNull NettyClientSslBuilder nettyClientSslBuilder,
+                             @NonNull ClientSslBuilder nettyClientSslBuilder,
                              @NonNull MediaTypeCodecRegistry codecRegistry,
                              @NonNull MessageBodyHandlerRegistry handlerRegistry,
                              @NonNull WebSocketBeanRegistry webSocketBeanRegistry,
