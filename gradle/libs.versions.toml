@@ -12,8 +12,6 @@ gorm = "7.3.4"
 graal-svm = "22.3.2"
 h2 = "2.1.214"
 hibernate = "5.5.9.Final"
-hibernate-validator = "6.1.6.Final"
-htmlSanityCheck = "1.1.6"
 htmlunit = "2.68.0"
 httpcomponents-client = "4.5.14"
 jakarta-inject-api = "2.0.1"
@@ -34,15 +32,15 @@ junit-platform="1.9.3"
 logback = "1.4.7"
 logbook-netty = "2.14.0"
 log4j = "2.19.0"
-micronaut-aws = "3.9.2"
+micronaut-aws = "4.0.0-M3"
 micronaut-groovy = "4.0.0-M1"
-micronaut-session = "4.0.0-M1"
-micronaut-sql = "5.0.0-M4"
-micronaut-test = "4.0.0-M3"
+micronaut-session = "4.0.0-M2"
+micronaut-sql = "5.0.0-M6"
+micronaut-test = "4.0.0-M4"
 micronaut-validation = "4.0.0-M7"
 micronaut-rxjava2 = "2.0.0-M1"
 micronaut-rxjava3 = "3.0.0-M1"
-micronaut-reactor = "3.0.0-M1"
+micronaut-reactor = "3.0.0-M2"
 neo4j-java-driver = "1.4.5"
 selenium = "4.7.2"
 slf4j = "2.0.7"
@@ -175,7 +173,6 @@ groovy-test-junit5 = { module = "org.apache.groovy:groovy-test-junit5", version.
 
 h2 = { module = "com.h2database:h2", version.ref = "h2" }
 hibernate = { module = "org.hibernate:hibernate-core", version.ref = "hibernate" }
-hibernate-validator = { module = "org.hibernate:hibernate-validator", version.ref = "hibernate-validator" }
 
 htmlunit = { module = "net.sourceforge.htmlunit:htmlunit", version.ref = "htmlunit" }
 
