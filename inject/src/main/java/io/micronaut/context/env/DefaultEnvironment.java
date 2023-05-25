@@ -816,6 +816,23 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 }
             }
         }
+        if (!changes.isEmpty()) {
+            Map<String, Object> placeholdersAltered = new LinkedHashMap<>();
+            for (Map<String, Object> map : newCatalog) {
+                if (map != null) {
+                    map.forEach((key, v) -> {
+                        if (v instanceof String val) {
+                            for (String changed : changes.keySet()) {
+                                if (val.contains(changed)) {
+                                    placeholdersAltered.put(key, v);
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+            changes.putAll(placeholdersAltered);
+        }
         return changes;
     }
 

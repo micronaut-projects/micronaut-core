@@ -13,7 +13,7 @@ import spock.lang.Specification
 import java.nio.charset.StandardCharsets
 
 class RefreshEventListenerSpec extends Specification {
-    @Shared Map<String, Object> config = ['foo.bar': 'initial-value', 'secret.value': "foo".getBytes(StandardCharsets.UTF_8)]
+    @Shared Map<String, Object> config = ['foo.bar': 'initial-value', 'secret.value': "foo".getBytes(StandardCharsets.UTF_8), 'other.config':'${secret.value}']
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext
             .builder()
             .propertySources(PropertySource.of(config))
@@ -34,6 +34,17 @@ class RefreshEventListenerSpec extends Specification {
 
         then:
         result.isEmpty()
+
+        when:
+        config.put("secret.value", "bar".getBytes(StandardCharsets.UTF_8))
+        result = env.refreshAndDiff()
+
+        then:
+        !result.isEmpty()
+        result.size() == 2
+        result.containsKey("secret.value")
+        result.containsKey("other.config")
+
     }
     void 'test refresh event listener'() {
         given:
