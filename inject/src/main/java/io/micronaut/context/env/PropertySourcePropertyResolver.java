@@ -318,7 +318,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         } else {
             Objects.requireNonNull(conversionContext, "Conversion context should not be null");
             Class<T> requiredType = conversionContext.getArgument().getType();
-            boolean cacheableType = ClassUtils.isJavaLangType(requiredType);
+            boolean cacheableType = ClassUtils.isJavaLangType(requiredType) || requiredType == Object.class;
             Object cached = cacheableType ? resolvedValueCache.get(cacheKey(name, requiredType)) : null;
             if (cached != null) {
                 return cached == NO_VALUE ? Optional.empty() : Optional.of((T) cached);
