@@ -833,11 +833,33 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                     changes.put(key, null);
                 } else if (hasOld && !hasNew) {
                     changes.put(key, oldValue);
-                } else if (hasNew && hasOld && !newValue.equals(oldValue)) {
+                } else if (hasNew && hasOld && hasChanged(newValue, oldValue)) {
                     changes.put(key, oldValue);
                 }
             }
         }
+    }
+
+    @SuppressWarnings({"java:S1871", "java:S3776" })
+    private static boolean hasChanged(Object newValue, Object oldValue) {
+        if (newValue instanceof byte[] a1 && oldValue instanceof byte[] a2) {
+            return !Arrays.equals(a1, a2);
+        } else if (newValue instanceof Object[] a1 && oldValue instanceof Object[] a2) {
+            return !Arrays.equals(a1, a2);
+        } else if (newValue instanceof int[] a1 && oldValue instanceof int[] a2) {
+            return !Arrays.equals(a1, a2);
+        } else if (newValue instanceof long[] a1 && oldValue instanceof long[] a2) {
+            return !Arrays.equals(a1, a2);
+        } else if (newValue instanceof char[] a1 && oldValue instanceof char[] a2) {
+            return !Arrays.equals(a1, a2);
+        } else if (newValue instanceof double[] a1 && oldValue instanceof double[] a2) {
+            return !Arrays.equals(a1, a2);
+        } else if (newValue instanceof float[] a1 && oldValue instanceof float[] a2) {
+            return !Arrays.equals(a1, a2);
+        } else if (newValue instanceof short[] a1 && oldValue instanceof short[] a2) {
+            return !Arrays.equals(a1, a2);
+        }
+        return !newValue.equals(oldValue);
     }
 
     private Map<String, Object>[] copyCatalog() {
@@ -931,7 +953,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 stdout.append(line);
             }
         } catch (IOException e) {
-
+            // ignore
         }
 
         return stdout;
