@@ -32,7 +32,6 @@ import io.micronaut.core.util.EnvironmentProperties;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.MapPropertyResolver;
 import io.micronaut.core.value.PropertyResolver;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.helpers.NOPLogger;
@@ -782,7 +781,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     private Object resolvePlaceHoldersIfNecessary(Object value) {
         if (value instanceof CharSequence) {
-            return propertyPlaceholderResolver.resolveRequiredPlaceholders(value.toString());
+            return propertyPlaceholderResolver.resolveRequiredPlaceholdersObject(value.toString());
         } else if (value instanceof List) {
             List<?> list = (List) value;
             List<?> newList = new ArrayList<>(list);
