@@ -57,6 +57,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -857,26 +858,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
     }
 
-    @SuppressWarnings({"java:S1871", "java:S3776" })
     private static boolean hasChanged(Object newValue, Object oldValue) {
-        if (newValue instanceof byte[] a1 && oldValue instanceof byte[] a2) {
-            return !Arrays.equals(a1, a2);
-        } else if (newValue instanceof Object[] a1 && oldValue instanceof Object[] a2) {
-            return !Arrays.equals(a1, a2);
-        } else if (newValue instanceof int[] a1 && oldValue instanceof int[] a2) {
-            return !Arrays.equals(a1, a2);
-        } else if (newValue instanceof long[] a1 && oldValue instanceof long[] a2) {
-            return !Arrays.equals(a1, a2);
-        } else if (newValue instanceof char[] a1 && oldValue instanceof char[] a2) {
-            return !Arrays.equals(a1, a2);
-        } else if (newValue instanceof double[] a1 && oldValue instanceof double[] a2) {
-            return !Arrays.equals(a1, a2);
-        } else if (newValue instanceof float[] a1 && oldValue instanceof float[] a2) {
-            return !Arrays.equals(a1, a2);
-        } else if (newValue instanceof short[] a1 && oldValue instanceof short[] a2) {
-            return !Arrays.equals(a1, a2);
-        }
-        return !newValue.equals(oldValue);
+        return !Objects.deepEquals(newValue, oldValue);
     }
 
     private Map<String, Object>[] copyCatalog() {
