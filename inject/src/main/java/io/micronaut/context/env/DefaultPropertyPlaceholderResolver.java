@@ -101,6 +101,19 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     @Override
     public String resolveRequiredPlaceholders(String str) throws ConfigurationException {
         List<Segment> segments = buildSegments(str);
+        return resolveRequiredPlaceholdersString(segments);
+    }
+
+    @Override
+    public Object resolveRequiredPlaceholdersObject(String str) throws ConfigurationException {
+        List<Segment> segments = buildSegments(str);
+        if (segments.size() == 1) {
+            return segments.get(0).getValue(Object.class);
+        }
+        return resolveRequiredPlaceholdersString(segments);
+    }
+
+    private static String resolveRequiredPlaceholdersString(List<Segment> segments) {
         StringBuilder value = new StringBuilder();
         for (Segment segment: segments) {
             value.append(segment.getValue(String.class));

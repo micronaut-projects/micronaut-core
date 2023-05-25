@@ -57,6 +57,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -816,6 +817,23 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 }
             }
         }
+        if (!changes.isEmpty()) {
+            Map<String, Object> placeholdersAltered = new LinkedHashMap<>();
+            for (Map<String, Object> map : newCatalog) {
+                if (map != null) {
+                    map.forEach((key, v) -> {
+                        if (v instanceof String val) {
+                            for (String changed : changes.keySet()) {
+                                if (val.contains(changed)) {
+                                    placeholdersAltered.put(key, v);
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+            changes.putAll(placeholdersAltered);
+        }
         return changes;
     }
 
@@ -833,11 +851,15 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                     changes.put(key, null);
                 } else if (hasOld && !hasNew) {
                     changes.put(key, oldValue);
-                } else if (hasNew && hasOld && !newValue.equals(oldValue)) {
+                } else if (hasNew && hasOld && hasChanged(newValue, oldValue)) {
                     changes.put(key, oldValue);
                 }
             }
         }
+    }
+
+    private static boolean hasChanged(Object newValue, Object oldValue) {
+        return !Objects.deepEquals(newValue, oldValue);
     }
 
     private Map<String, Object>[] copyCatalog() {
@@ -931,7 +953,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 stdout.append(line);
             }
         } catch (IOException e) {
-
+            // ignore
         }
 
         return stdout;
