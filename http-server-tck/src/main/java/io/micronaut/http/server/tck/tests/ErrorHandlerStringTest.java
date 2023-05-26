@@ -49,7 +49,7 @@ public class ErrorHandlerStringTest {
                 request,
                 HttpStatus.OK,
                 "hello",
-                Map.of(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
+                Map.of(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN)
             )
         );
     }
