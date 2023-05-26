@@ -22,6 +22,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.tck.AssertionUtils;
 import jakarta.inject.Singleton;
@@ -72,6 +73,7 @@ public class ErrorHandlerStringTest {
 
     @Requires(property = "spec.name", value = SPEC_NAME)
     @Singleton
+    @Produces(MediaType.TEXT_PLAIN)
     static class MyExceptionHandler implements ExceptionHandler<MyException, String> {
 
         @Override
