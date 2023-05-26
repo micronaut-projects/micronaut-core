@@ -99,7 +99,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * Creates a new, initially empty, {@link PropertySourcePropertyResolver} for the given {@link ConversionService}.
      *
      * @param conversionService The {@link ConversionService}
-     * @param logEnabled        logEnabled flag to enable or disable logger
+     * @param logEnabled        flag to enable or disable logger
      */
     public PropertySourcePropertyResolver(ConversionService conversionService, boolean logEnabled) {
         this.log = logEnabled ? LoggerFactory.getLogger(getClass()) : NOPLogger.NOP_LOGGER;
