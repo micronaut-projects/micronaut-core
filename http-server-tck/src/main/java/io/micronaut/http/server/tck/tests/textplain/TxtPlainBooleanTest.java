@@ -16,6 +16,7 @@
 package io.micronaut.http.server.tck.tests.textplain;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -26,6 +27,9 @@ import io.micronaut.http.server.tck.AssertionUtils;
 import io.micronaut.http.server.tck.BodyAssertion;
 import io.micronaut.http.server.tck.HttpResponseAssertion;
 import org.junit.jupiter.api.Test;
+import org.reactivestreams.Publisher;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 
@@ -39,7 +43,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
     "checkstyle:DesignForExtension"
 })
 public class TxtPlainBooleanTest {
-    public static final String SPEC_NAME = "ControllerConstraintHandlerTest";
+    public static final String SPEC_NAME = "TxtPlainBooleanTest";
     private static final HttpResponseAssertion ASSERTION = HttpResponseAssertion.builder()
         .status(HttpStatus.OK)
         .body(BodyAssertion.builder().body("true").equals())
@@ -51,9 +55,24 @@ public class TxtPlainBooleanTest {
     @Test
     void txtBoolean() throws IOException {
         asserts(SPEC_NAME,
-            HttpRequest.GET("/txt/boolean"),
+            HttpRequest.GET("/txt/boolean").accept(MediaType.TEXT_PLAIN),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, ASSERTION));
     }
+
+    @Test
+    void txtBooleanMono() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/txt/boolean/mono").accept(MediaType.TEXT_PLAIN),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, ASSERTION));
+    }
+
+    @Test
+    void txtBooleanFlux() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.GET("/txt/boolean/flux").accept(MediaType.TEXT_PLAIN),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, ASSERTION));
+    }
+
 
     @Controller("/txt")
     @Requires(property = "spec.name", value = SPEC_NAME)
@@ -62,6 +81,20 @@ public class TxtPlainBooleanTest {
         @Produces(MediaType.TEXT_PLAIN)
         Boolean index() {
             return Boolean.TRUE;
+        }
+
+        @Get("/boolean/mono")
+        @Produces(MediaType.TEXT_PLAIN)
+        @SingleResult
+        Publisher<Boolean> mono() {
+            return Mono.just(Boolean.TRUE);
+        }
+
+        @Get("/boolean/flux")
+        @Produces(MediaType.TEXT_PLAIN)
+        @SingleResult
+        Publisher<Boolean> flux() {
+            return Flux.just(Boolean.TRUE);
         }
     }
 }
