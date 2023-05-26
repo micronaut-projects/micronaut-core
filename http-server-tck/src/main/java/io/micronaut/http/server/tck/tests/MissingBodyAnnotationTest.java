@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.server.tck.AssertionUtils;
@@ -42,13 +43,23 @@ public class MissingBodyAnnotationTest {
      * Test that we can use a body argument without the @Body annotation. for 3.x.x.
      * This will not work in 4.x.x as the @Body annotation is required.
      *
-     * @see <a href="https://github.com/micronaut-projects/micronaut-core/blob/37874c634202233f35b7c9376a5edfd5d49861f2/src/main/docs/guide/appendix/breaks.adoc#body-annotation-on-controller-parameters">the breaking changes</a>
      * @throws IOException
+     * @see <a href="https://github.com/micronaut-projects/micronaut-core/blob/37874c634202233f35b7c9376a5edfd5d49861f2/src/main/docs/guide/appendix/breaks.adoc#body-annotation-on-controller-parameters">the breaking changes</a>
      */
     @Test
-    void testBodyArguments() throws IOException {
+    void testBodyAnnotationMissing() throws IOException {
         asserts(SPEC_NAME,
-            HttpRequest.POST("/missing-body-annotation-test", new Dto("tim")),
+            HttpRequest.POST("/missing-body-annotation-test/absent", new Dto("tim")),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("tim")
+                .build()));
+    }
+
+    @Test
+    void testBodyAnnotationPresent() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/missing-body-annotation-test/present", new Dto("tim")),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("tim")
@@ -59,8 +70,13 @@ public class MissingBodyAnnotationTest {
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class BodyController {
 
-        @Post
-        String getA(Dto dto) {
+        @Post("/absent")
+        String absent(Dto dto) {
+            return dto.getValue();
+        }
+
+        @Post("/present")
+        String present(@Body Dto dto) {
             return dto.getValue();
         }
     }
