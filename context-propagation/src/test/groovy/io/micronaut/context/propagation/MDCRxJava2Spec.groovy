@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.propagation.slf4j.MdcPropagationContext
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.core.propagation.PropagatedContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -61,14 +62,14 @@ class MDCRxJava2Spec extends Specification {
 
     void "test MDC propagates"() {
         expect:
-        List<Tuple2> result = Flux.range(1, 100)
+        List<Tuple2> result = Flux.range(1, 1000)
                 .flatMap {
                     String tracingId = UUID.randomUUID()
                     HttpRequest<Object> request = HttpRequest
                             .POST("/mdc/enter", new SomeBody())
                             .header("X-TrackingId", tracingId)
                     return Mono.from(client.retrieve(request)).map(response -> {
-                        Tuples.of(tracingId, response.substring(1, response.length() - 1))
+                        Tuples.of(tracingId, response)
                     })
                 }
                 .collectList()
@@ -77,10 +78,7 @@ class MDCRxJava2Spec extends Specification {
             for (Tuple2 t : result) {
                 String expected = t.getT1()
                 String actual = t.getT2()
-                if (expected != actual) {
-                    print("INVESTIGATE: Trace ID is missing last digit!!!")
-                }
-                assert expected.contains(actual)
+                assert expected == actual
             }
     }
 
@@ -121,6 +119,7 @@ class MDCRxJava2Spec extends Specification {
             }.delayElement(Duration.ofMillis(50))
         }
 
+        @SingleResult
         @Put("/test3")
         Publisher<String> test3(@Header("X-TrackingId") String tracingId, @Body SomeBody body) {
             return Flowable.just("x").delay(50, TimeUnit.MILLISECONDS).flatMap {

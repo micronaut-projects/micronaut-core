@@ -38,7 +38,6 @@ import java.util.*
 class MdcPropagationSpec {
 
     @Test
-    @Disabled("Move to micronaut-tracing")
     fun testKotlinPropagation() {
         val embeddedServer = ApplicationContext.run(
             EmbeddedServer::class.java,
@@ -46,7 +45,7 @@ class MdcPropagationSpec {
         )
         val client = embeddedServer.applicationContext.getBean(HttpClient::class.java)
 
-        Flux.range(1, 1)
+        Flux.range(1, 1000)
             .flatMap {
                 val tracingId = UUID.randomUUID().toString()
                 val get = HttpRequest.POST<Any>(
