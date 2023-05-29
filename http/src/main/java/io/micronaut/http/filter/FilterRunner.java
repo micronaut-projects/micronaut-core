@@ -834,6 +834,7 @@ public class FilterRunner {
 
         @Override
         public Publisher<HttpResponse<?>> proceed() {
+            filterContext = filterContext.withPropagatedContext(PropagatedContext.getOrEmpty());
             return ReactiveExecutionFlow.fromFlow(
                 downstream.apply(filterContext).<HttpResponse<?>>map(newFilterContext -> {
                     filterContext = newFilterContext;
@@ -874,7 +875,7 @@ public class FilterRunner {
 
         @Override
         public Publisher<? extends HttpResponse<?>> proceed(MutableHttpRequest<?> request) {
-            filterContext = filterContext.withRequest(request);
+            filterContext = filterContext.withRequest(request).withPropagatedContext(PropagatedContext.getOrEmpty());
             return ReactiveExecutionFlow.fromFlow(
                 downstream.apply(filterContext).<HttpResponse<?>>map(newFilterContext -> {
                     filterContext = newFilterContext;
@@ -885,7 +886,7 @@ public class FilterRunner {
 
         @Override
         public Publisher<MutableHttpResponse<?>> proceed(HttpRequest<?> request) {
-            filterContext = filterContext.withRequest(request);
+            filterContext = filterContext.withRequest(request).withPropagatedContext(PropagatedContext.getOrEmpty());
             return ReactiveExecutionFlow.fromFlow(
                 downstream.apply(filterContext).<MutableHttpResponse<?>>map(newFilterContext -> {
                     filterContext = newFilterContext;
