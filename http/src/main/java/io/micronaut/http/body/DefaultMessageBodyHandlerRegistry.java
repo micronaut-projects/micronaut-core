@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.GenericPlaceholder;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
@@ -172,7 +173,9 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
                 if (type.getType() == MessageBodyWriter.class && c instanceof BeanDefinition<?> definition) {
                     List<Argument<?>> consumedType = definition.getTypeArguments(type.getType());
                     Argument<?> requiredType = type.getTypeParameters()[0];
-                    if (consumedType.isEmpty() || !consumedType.get(0).isAssignableFrom(requiredType)){
+                    if (consumedType.isEmpty() ||
+                        !(consumedType.get(0).isTypeVariable() || consumedType.get(0).isAssignableFrom(requiredType.getType()))
+                    ){
                         return false;
                     }
                 }
