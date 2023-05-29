@@ -25,20 +25,16 @@ dependencies {
     compileOnly platform(libs.test.boms.micronaut.rxjava3)
     compileOnly platform(libs.test.boms.micronaut.reactor)
 
+    compileOnly 'io.reactivex.rxjava2:rxjava'
+    compileOnly 'io.reactivex.rxjava3:rxjava'
+
+    testAnnotationProcessor project(":inject-java")
+
     testImplementation platform(libs.test.boms.micronaut.rxjava2)
     testImplementation platform(libs.test.boms.micronaut.rxjava3)
     testImplementation platform(libs.test.boms.micronaut.reactor)
 
-    compileOnly ("io.micronaut.rxjava2:micronaut-rxjava2-http-client") {
-        exclude group: "io.micronaut"
-    }
-    compileOnly ("io.micronaut.rxjava3:micronaut-rxjava3-http-client") {
-        exclude group: "io.micronaut"
-    }
-
     testImplementation project(":inject-groovy")
-    testAnnotationProcessor project(":inject-java")
-
     testImplementation project(":runtime")
     testImplementation project(":jackson-databind")
     testImplementation project(":core-reactive")
@@ -46,15 +42,10 @@ dependencies {
     testImplementation project(":http-client")
     testImplementation project(':http-server-netty')
 
-    testImplementation ("io.micronaut.rxjava2:micronaut-rxjava2-http-client") {
-        exclude group: "io.micronaut"
-    }
-    testImplementation ("io.micronaut.rxjava3:micronaut-rxjava3-http-client") {
-        exclude group: "io.micronaut"
-    }
-    testImplementation ("io.micronaut.reactor:micronaut-reactor-http-client") {
-        exclude group: "io.micronaut"
-    }
+    // Don't use the reactive integration til the old propagation is removed
+    testImplementation 'io.reactivex.rxjava2:rxjava'
+    testImplementation 'io.reactivex.rxjava3:rxjava'
+    testImplementation "io.projectreactor:reactor-core"
 }
 
 // Kotlin
