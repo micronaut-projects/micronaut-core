@@ -92,10 +92,10 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
             if (exactMatch.size() == 1) {
                 return beanLocator.getBean(exactMatch.iterator().next());
             } else {
-                // pick highest priority
-                return OrderUtil.sort(beanDefinitions.stream())
-                    .findFirst()
+                // Pick the highest priority
+                return beanDefinitions.stream()
                     .map(beanLocator::getBean)
+                    .max(OrderUtil.COMPARATOR)
                     .orElse(null);
             }
         }
@@ -150,10 +150,10 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
             if (exactMatch.size() == 1) {
                 return beanLocator.getBean(exactMatch.iterator().next());
             } else {
-                // pick highest priority
-                return OrderUtil.sort(beanDefinitions.stream())
-                    .findFirst()
+                // Pick the highest priority
+                return beanDefinitions.stream()
                     .map(beanLocator::getBean)
+                    .max(OrderUtil.COMPARATOR)
                     .orElse(null);
             }
         }
