@@ -75,7 +75,7 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
     protected <T> MessageBodyReader<T> findReaderImpl(Argument<T> type, List<MediaType> mediaTypes) {
         Collection<BeanDefinition<MessageBodyReader>> beanDefinitions = beanLocator.getBeanDefinitions(
             Argument.of(MessageBodyReader.class, type),
-            newMediaTypeQualifier(type, mediaTypes, Consumes.class)
+            newMediaTypeQualifier(Argument.of(MessageBodyReader.class), mediaTypes, Consumes.class)
         );
         if (beanDefinitions.size() == 1) {
             return beanLocator.getBean(beanDefinitions.iterator().next());
@@ -132,8 +132,10 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
     @Override
     protected <T> MessageBodyWriter<T> findWriterImpl(Argument<T> type, List<MediaType> mediaTypes) {
         Collection<BeanDefinition<MessageBodyWriter>> beanDefinitions = beanLocator.getBeanDefinitions(
-            Argument.of(MessageBodyWriter.class, type),
-            newMediaTypeQualifier(type, mediaTypes, Produces.class)
+            // Do not put the type here since we are looking for writers that can process the type
+            //      but beanLocator will provide types that can be injected into the searched type
+            Argument.of(MessageBodyWriter.class),
+            newMediaTypeQualifier(Argument.of(MessageBodyWriter.class, type), mediaTypes, Produces.class)
         );
         if (beanDefinitions.size() == 1) {
             return beanLocator.getBean(beanDefinitions.iterator().next());
@@ -166,6 +168,14 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
         @Override
         public <B extends BeanType<T>> Stream<B> reduce(Class<T> beanType, Stream<B> candidates) {
             return candidates.filter(c -> {
+                // Only for writer, verify that the writer can consume the required type
+                if (type.getType() == MessageBodyWriter.class && c instanceof BeanDefinition<?> definition) {
+                    List<Argument<?>> consumedType = definition.getTypeArguments(type.getType());
+                    Argument<?> requiredType = type.getTypeParameters()[0];
+                    if (consumedType.isEmpty() || !consumedType.get(0).isAssignableFrom(requiredType)){
+                        return false;
+                    }
+                }
                 String[] applicableTypes = c.getAnnotationMetadata().stringValues(annotationType);
                 return ((applicableTypes.length == 0) || Arrays.stream(applicableTypes)
                     .anyMatch(mt -> mediaTypes.contains(new MediaType(mt)))

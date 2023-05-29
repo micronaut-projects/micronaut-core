@@ -1,0 +1,89 @@
+package io.micronaut.http.netty.body
+
+import io.micronaut.core.annotation.NonNull
+import io.micronaut.core.annotation.Nullable
+import io.micronaut.core.type.Argument
+import io.micronaut.core.type.Headers
+import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Produces
+import io.micronaut.http.body.DefaultMessageBodyHandlerRegistry
+import io.micronaut.http.body.MessageBodyReader
+import io.micronaut.http.codec.CodecException
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import jakarta.inject.Inject
+import jakarta.inject.Singleton
+import spock.lang.Specification
+
+@MicronautTest
+class CustomBodyReaderSpec extends Specification {
+
+    @Inject
+    DefaultMessageBodyHandlerRegistry bodyHandlerRegistry
+
+    void "test message reader ordering works correctly"() {
+        when:
+        def reader = bodyHandlerRegistry.findReader(Argument.of(A), List.of(MediaType.APPLICATION_JSON_TYPE))
+
+        then:
+        // The implementation with highest order is chosen out of all: ABodyReader
+        reader.isPresent()
+        reader.get() instanceof ABodyReader
+    }
+
+    void "test do not select un-assignable message body reader"() {
+        when:
+        def reader = bodyHandlerRegistry.findReader(Argument.of(B), List.of(MediaType.APPLICATION_JSON_TYPE))
+
+        then:
+        reader.isPresent()
+        // ABodyReader can only create instances of class A, so we use the CBodyReader
+        reader.get() instanceof CBodyReader
+    }
+
+    void "test reader order works correctly for subtypes"() {
+        when:
+        def reader = bodyHandlerRegistry.findReader(Argument.of(C), List.of(MediaType.APPLICATION_JSON_TYPE))
+
+        then:
+        reader.isPresent()
+        // ABodyReader can only create instances of class A, so we use the CBodyReader
+        reader.get() instanceof CBodyReader
+    }
+
+    static class A {
+        String myHeader
+    }
+
+    static class B extends A {}
+
+    static class C extends B {
+        String anotherHeader
+    }
+
+    @Singleton
+    @Produces(MediaType.APPLICATION_JSON)
+    static class ABodyReader implements MessageBodyReader<A> {
+
+        // Higher than NettyJsonHandler
+        int order = 2
+
+        @Override
+        A read(@NonNull Argument<A> type, @Nullable MediaType mediaType, @NonNull Headers httpHeaders, @NonNull InputStream inputStream) throws CodecException {
+            return new A(String.valueOf(httpHeaders.get("my-header")))
+        }
+    }
+
+    @Singleton
+    @Produces(MediaType.APPLICATION_JSON)
+    static class CBodyReader implements MessageBodyReader<C> {
+
+        // Higher than ABodyWriter
+        int order = 1
+
+        @Override
+        C read(@NonNull Argument<C> type, @Nullable MediaType mediaType, @NonNull Headers httpHeaders, @NonNull InputStream inputStream) throws CodecException {
+            return new C(String.valueOf(httpHeaders.get("my-header"), String.valueOf(httpHeaders.get("another-header"))))
+        }
+    }
+
+}
