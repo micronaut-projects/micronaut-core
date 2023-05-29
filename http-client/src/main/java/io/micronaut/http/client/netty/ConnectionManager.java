@@ -18,6 +18,7 @@ package io.micronaut.http.client.netty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.SupplierUtil;
@@ -28,8 +29,6 @@ import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
-import io.micronaut.scheduling.instrument.Instrumentation;
-import io.micronaut.scheduling.instrument.InvocationInstrumenter;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBufAllocator;
@@ -128,7 +127,6 @@ import java.util.function.Supplier;
  */
 @Internal
 public class ConnectionManager {
-    final InvocationInstrumenter instrumenter;
 
     private final HttpVersionSelection httpVersion;
     private final Logger log;
@@ -153,7 +151,6 @@ public class ConnectionManager {
      * @param from Original connection manager
      */
     ConnectionManager(ConnectionManager from) {
-        this.instrumenter = from.instrumenter;
         this.httpVersion = from.httpVersion;
         this.log = from.log;
         this.group = from.group;
@@ -177,7 +174,6 @@ public class ConnectionManager {
         @Nullable ThreadFactory threadFactory,
         HttpClientConfiguration configuration,
         @Nullable HttpVersionSelection httpVersion,
-        InvocationInstrumenter instrumenter,
         ChannelFactory<? extends Channel> socketChannelFactory,
         ChannelFactory<? extends Channel> udpChannelFactory,
         ClientSslBuilder nettyClientSslBuilder,
@@ -194,7 +190,6 @@ public class ConnectionManager {
         this.socketChannelFactory = socketChannelFactory;
         this.udpChannelFactory = udpChannelFactory;
         this.configuration = configuration;
-        this.instrumenter = instrumenter;
         this.clientCustomizer = clientCustomizer;
         this.informationalServiceId = informationalServiceId;
         this.nettyClientSslBuilder = nettyClientSslBuilder;
@@ -479,7 +474,7 @@ public class ConnectionManager {
                 ch.close();
             }
         });
-        addInstrumentedListener(connectFuture, future -> {
+        withPropagation(connectFuture, future -> {
             if (!future.isSuccess()) {
                 initial.tryEmitError(future.cause());
             }
@@ -530,10 +525,10 @@ public class ConnectionManager {
         }
     }
 
-    final <V, C extends Future<V>> void addInstrumentedListener(
-        Future<? extends V> channelFuture, GenericFutureListener<C> listener) {
+    final <V, C extends Future<V>> void withPropagation(Future<? extends V> channelFuture, GenericFutureListener<C> listener) {
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         channelFuture.addListener(f -> {
-            try (Instrumentation ignored = instrumenter.newInstrumentation()) {
+            try (PropagatedContext.Scope ignored = propagatedContext.propagate()) {
                 //noinspection unchecked
                 listener.operationComplete((C) f);
             }
@@ -1003,7 +998,7 @@ public class ConnectionManager {
                 onNewConnectionFailure(BlockHint.createException());
                 return;
             }
-            addInstrumentedListener(channelFuture, future -> {
+            withPropagation(channelFuture, future -> {
                 if (!future.isSuccess()) {
                     onNewConnectionFailure(future.cause());
                 }
@@ -1357,7 +1352,7 @@ public class ConnectionManager {
                     returnPendingRequest(sink);
                     return;
                 }
-                addInstrumentedListener(openStreamChannel(), (Future<Channel> future) -> {
+                withPropagation(openStreamChannel(), (Future<Channel> future) -> {
                     if (future.isSuccess()) {
                         Channel streamChannel = future.get();
                         streamChannel.pipeline()
