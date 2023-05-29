@@ -143,7 +143,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
             WebsocketRequestLifecycle requestLifecycle = new WebsocketRequestLifecycle(routeExecutor, msg, optionalRoute.orElse(null));
             ExecutionFlow<MutableHttpResponse<?>> responseFlow = ExecutionFlow.async(ctx.channel().eventLoop(), () -> {
-                try (PropagatedContext.Scope ignore = PropagatedContext.newContext(new ServerHttpRequestContext(msg)).propagate()) {
+                try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(msg)).propagate()) {
                     return requestLifecycle.handle();
                 }
             });
