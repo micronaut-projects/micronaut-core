@@ -35,6 +35,7 @@ public interface MutablePropagatedContext {
      * @param propagatedContext The initial context
      * @return new mutable propagated context
      */
+    @NonNull
     static MutablePropagatedContext of(@NonNull PropagatedContext propagatedContext) {
         return new MutablePropagatedContextImpl(propagatedContext);
     }
