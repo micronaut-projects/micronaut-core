@@ -21,7 +21,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
-import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
+import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.inject.ExecutableMethod;
@@ -40,7 +40,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Filter(Filter.MATCH_ALL_PATTERN)
-public class EndpointsFilter extends OncePerRequestHttpServerFilter {
+public class EndpointsFilter implements HttpServerFilter {
 
     private final Map<ExecutableMethod, Boolean> endpointMethods;
 
@@ -60,10 +60,10 @@ public class EndpointsFilter extends OncePerRequestHttpServerFilter {
      * @return A {@link Publisher} for the Http response
      */
     @Override
-    protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
+    public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
         Optional<RouteMatch> routeMatch = RouteMatchUtils.findRouteMatch(request);
-        if (routeMatch.isPresent() && routeMatch.get() instanceof MethodBasedRouteMatch) {
-            ExecutableMethod method = ((MethodBasedRouteMatch) routeMatch.get()).getExecutableMethod();
+        if (routeMatch.isPresent() && routeMatch.get() instanceof MethodBasedRouteMatch<?, ?> methodBasedRouteMatch) {
+            ExecutableMethod<?, ?> method = methodBasedRouteMatch.getExecutableMethod();
             if (endpointMethods.getOrDefault(method, false)) {
                 return Publishers.just(HttpResponse.status(HttpStatus.UNAUTHORIZED));
             }
