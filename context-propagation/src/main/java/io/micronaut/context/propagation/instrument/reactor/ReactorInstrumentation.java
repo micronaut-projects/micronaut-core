@@ -43,7 +43,7 @@ final class ReactorInstrumentation {
 
     @PreDestroy
     void removeInstrumentation() {
-        Schedulers.removeExecutorServiceDecorator(KEY);
+        Schedulers.resetOnScheduleHook(KEY);
     }
 
 }
