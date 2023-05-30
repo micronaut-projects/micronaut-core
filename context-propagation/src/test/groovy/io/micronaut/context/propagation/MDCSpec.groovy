@@ -112,11 +112,8 @@ class MDCSpec extends Specification {
             MDC.put(TRACE_ID_MDC_KEY, traceIdHeader)
             LOG.info('MDC updated')
 
-            try {
-                return ReactivePropagation.propagate(
-                        PropagatedContext.get() + new MdcPropagationContext(),
-                        chain.proceed(request)
-                )
+            try (PropagatedContext.Scope ignore = (PropagatedContext.get() + new MdcPropagationContext()).propagate()) {
+                chain.proceed(request)
             } finally {
                 MDC.clear()
             }
