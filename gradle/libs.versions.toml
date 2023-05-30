@@ -218,7 +218,6 @@ micronaut-session = { module = "io.micronaut.session:micronaut-session", version
 micronaut-test-bom = { module = "io.micronaut.test:micronaut-test-bom", version.ref = "micronaut-test" }
 micronaut-test-core = { module = "io.micronaut.test:micronaut-test-core", version.ref = "micronaut-test" }
 micronaut-test-junit5 = { module = "io.micronaut.test:micronaut-test-junit5", version.ref = "micronaut-test" }
-micronaut-test-kotest = { module = "io.micronaut.test:micronaut-test-kotest", version.ref = "micronaut-test" }
 micronaut-test-kotest5 = { module = "io.micronaut.test:micronaut-test-kotest5", version.ref = "micronaut-test" }
 micronaut-test-spock = { module = "io.micronaut.test:micronaut-test-spock", version.ref = "micronaut-test" }
 
