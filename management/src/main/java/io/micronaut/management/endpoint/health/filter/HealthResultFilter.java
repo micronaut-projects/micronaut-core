@@ -22,7 +22,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
-import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
+import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
 import io.micronaut.management.endpoint.health.HealthEndpoint;
@@ -43,7 +43,7 @@ import org.reactivestreams.Publisher;
     HealthResultFilter.READINESS_PROBE_MAPPING
 })
 @Requires(beans = HealthEndpoint.class)
-public class HealthResultFilter extends OncePerRequestHttpServerFilter {
+public class HealthResultFilter implements HttpServerFilter {
 
     /**
      * Configurable default mapping for filter.
@@ -67,7 +67,7 @@ public class HealthResultFilter extends OncePerRequestHttpServerFilter {
     }
 
     @Override
-    protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
+    public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
         return Publishers.map(chain.proceed(request), response -> {
             Object body = response.body();
             if (body instanceof HealthResult) {
