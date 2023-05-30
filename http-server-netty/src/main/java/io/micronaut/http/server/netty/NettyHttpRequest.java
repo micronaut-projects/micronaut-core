@@ -24,6 +24,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
@@ -50,6 +51,7 @@ import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.body.ByteBody;
 import io.micronaut.http.server.netty.body.HttpBody;
+import io.micronaut.http.server.netty.body.ImmediateByteBody;
 import io.micronaut.http.server.netty.body.ImmediateMultiObjectBody;
 import io.micronaut.http.server.netty.body.ImmediateSingleObjectBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
@@ -101,7 +103,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Internal
-public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T> {
+public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T>, io.micronaut.http.FullHttpRequest<T> {
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpRequest.class);
 
     /**
@@ -662,6 +664,19 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         } else {
             return contentLength;
         }
+    }
+
+    @Override
+    public boolean isFull() {
+        return body instanceof ImmediateByteBody;
+    }
+
+    @Override
+    public ByteBuffer<?> contents() {
+        if (body instanceof ImmediateByteBody immediateByteBody) {
+            return immediateByteBody;
+        }
+        return null;
     }
 
     /**
