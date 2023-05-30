@@ -15,14 +15,15 @@
  */
 package io.micronaut.management.endpoint;
 
-import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
-import io.micronaut.http.filter.HttpServerFilter;
-import io.micronaut.http.filter.ServerFilterChain;
+import io.micronaut.http.annotation.RequestFilter;
+import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.web.router.MethodBasedRouteMatch;
@@ -39,8 +40,9 @@ import java.util.Optional;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Filter(Filter.MATCH_ALL_PATTERN)
-public class EndpointsFilter implements HttpServerFilter {
+@ServerFilter(Filter.MATCH_ALL_PATTERN)
+@Internal
+public class EndpointsFilter implements Ordered {
 
     private final Map<ExecutableMethod, Boolean> endpointMethods;
 
@@ -56,19 +58,19 @@ public class EndpointsFilter implements HttpServerFilter {
      * Returns 401 if the route is a match for an endpoint with sensitive true.
      *
      * @param request The {@link HttpRequest} instance
-     * @param chain   The {@link ServerFilterChain} instance
      * @return A {@link Publisher} for the Http response
      */
-    @Override
-    public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
+    @RequestFilter
+    @Nullable
+    public HttpResponse<?> doFilter(HttpRequest<?> request) {
         Optional<RouteMatch> routeMatch = RouteMatchUtils.findRouteMatch(request);
         if (routeMatch.isPresent() && routeMatch.get() instanceof MethodBasedRouteMatch<?, ?> methodBasedRouteMatch) {
             ExecutableMethod<?, ?> method = methodBasedRouteMatch.getExecutableMethod();
             if (endpointMethods.getOrDefault(method, false)) {
-                return Publishers.just(HttpResponse.status(HttpStatus.UNAUTHORIZED));
+                return HttpResponse.status(HttpStatus.UNAUTHORIZED);
             }
         }
-        return chain.proceed(request);
+        return null;
     }
 
     @Override
