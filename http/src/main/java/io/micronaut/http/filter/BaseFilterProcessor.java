@@ -65,6 +65,7 @@ import java.util.function.Supplier;
  */
 @Internal
 public abstract class BaseFilterProcessor<A extends Annotation> implements ExecutableMethodProcessor<A> {
+    @Nullable
     private final BeanContext beanContext;
     private final Class<A> filterAnnotation;
     private final RequestBinderRegistry argumentBinderRegistry;
@@ -76,10 +77,10 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
         PathVariable.class.getName()
     );
 
-    public BaseFilterProcessor(BeanContext beanContext, Class<A> filterAnnotation) {
+    public BaseFilterProcessor(@Nullable BeanContext beanContext, Class<A> filterAnnotation) {
         this.beanContext = beanContext;
         this.filterAnnotation = filterAnnotation;
-        Optional<RequestBinderRegistry> requestBinderRegistry = beanContext.findBean(RequestBinderRegistry.class);
+        Optional<RequestBinderRegistry> requestBinderRegistry = beanContext != null ? beanContext.findBean(RequestBinderRegistry.class) : Optional.empty();
         this.argumentBinderRegistry = new RequestBinderRegistry() {
             @Override
             public <T> Optional<ArgumentBinder<T, HttpRequest<?>>> findArgumentBinder(Argument<T> argument) {
@@ -129,16 +130,18 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
     protected abstract void addFilter(Supplier<GenericHttpFilter> factory, AnnotationMetadata methodAnnotations, FilterMetadata metadata);
 
     private <T> void process0(BeanDefinition<T> beanDefinition, ExecutableMethod<T, ?> method) {
-        FilterMetadata beanLevel = metadata(beanDefinition, filterAnnotation);
-        if (method.isAnnotationPresent(RequestFilter.class)) {
-            FilterMetadata methodLevel = metadata(method, RequestFilter.class);
-            FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
-            addFilter(() -> withAsync(combined, FilterRunner.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, false, combined.order, argumentBinderRegistry)), method, combined);
-        }
-        if (method.isAnnotationPresent(ResponseFilter.class)) {
-            FilterMetadata methodLevel = metadata(method, ResponseFilter.class);
-            FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
-            addFilter(() -> withAsync(combined, FilterRunner.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, true, combined.order, argumentBinderRegistry)), method, combined);
+        if (beanContext != null) {
+            FilterMetadata beanLevel = metadata(beanDefinition, filterAnnotation);
+            if (method.isAnnotationPresent(RequestFilter.class)) {
+                FilterMetadata methodLevel = metadata(method, RequestFilter.class);
+                FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
+                addFilter(() -> withAsync(combined, FilterRunner.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, false, combined.order, argumentBinderRegistry)), method, combined);
+            }
+            if (method.isAnnotationPresent(ResponseFilter.class)) {
+                FilterMetadata methodLevel = metadata(method, ResponseFilter.class);
+                FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
+                addFilter(() -> withAsync(combined, FilterRunner.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, true, combined.order, argumentBinderRegistry)), method, combined);
+            }
         }
     }
 
