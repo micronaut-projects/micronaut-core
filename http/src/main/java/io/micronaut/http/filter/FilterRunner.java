@@ -15,11 +15,18 @@
  */
 package io.micronaut.http.filter;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.bind.ArgumentBinder;
+import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
@@ -34,6 +41,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.inject.ExecutableMethod;
 import org.reactivestreams.Publisher;
@@ -353,26 +361,21 @@ public class FilterRunner {
                                                           T bean,
                                                           ExecutableMethod<T, ?> method,
                                                           boolean isResponseFilter,
-                                                          FilterOrder order) throws IllegalArgumentException {
-        return prepareFilterMethod(conversionService, bean, method, method.getArguments(), method.getReturnType().asArgument(), isResponseFilter, order);
-    }
-
-    @Internal
-    public static void validateFilterMethod(Argument<?>[] arguments,
-                                            Argument<?> returnType,
-                                            boolean isResponseFilter) throws IllegalArgumentException {
-        prepareFilterMethod(ConversionService.SHARED, null, null, arguments, returnType, isResponseFilter, null);
+                                                          FilterOrder order,
+                                                          RequestBinderRegistry argumentBinderRegistry) throws IllegalArgumentException {
+        return prepareFilterMethod(conversionService, bean, method, method.getArguments(), method.getReturnType().asArgument(), isResponseFilter, order, argumentBinderRegistry);
     }
 
     @Internal
     @SuppressWarnings("java:S3776") // performance
-    public static <T> FilterMethod<T> prepareFilterMethod(ConversionService conversionService,
-                                                          T bean,
-                                                          ExecutableMethod<T, ?> method,
-                                                          Argument<?>[] arguments,
-                                                          Argument<?> returnType,
-                                                          boolean isResponseFilter,
-                                                          FilterOrder order) throws IllegalArgumentException {
+    private static <T> FilterMethod<T> prepareFilterMethod(ConversionService conversionService,
+                                                           @Nullable T bean,
+                                                           @Nullable ExecutableMethod<T, ?> method,
+                                                           Argument<?>[] arguments,
+                                                           Argument<?> returnType,
+                                                           boolean isResponseFilter,
+                                                           FilterOrder order,
+                                                           RequestBinderRegistry argumentBinderRegistry) throws IllegalArgumentException {
         FilterArgBinder[] fulfilled = new FilterArgBinder[arguments.length];
         Predicate<FilterMethodContext> filterCondition = FILTER_CONDITION_ALWAYS_TRUE;
         boolean skipOnError = isResponseFilter;
@@ -380,9 +383,32 @@ public class FilterRunner {
         ContinuationCreator continuationCreator = null;
         for (int i = 0; i < arguments.length; i++) {
             Argument<?> argument = arguments[i];
-            if (argument.getType().isAssignableFrom(HttpRequest.class)) {
+            Class<?> argumentType = argument.getType();
+            AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+            if (annotationMetadata.hasStereotype(Bindable.class)) {
+                ArgumentBinder<Object, HttpRequest<?>> argumentBinder = (ArgumentBinder<Object, HttpRequest<?>>) argumentBinderRegistry.findArgumentBinder(argument).orElse(null);
+                if (argumentBinder != null) {
+                    fulfilled[i] = ctx -> {
+                        HttpRequest<?> request = ctx.request;
+                        ArgumentConversionContext<Object> conversionContext = (ArgumentConversionContext<Object>) ConversionContext.of(argument);
+                        ArgumentBinder.BindingResult<Object> result = argumentBinder.bind(conversionContext, request);
+                        if (result.isPresentAndSatisfied()) {
+                            return result.get();
+                        } else {
+                            List<ConversionError> conversionErrors = result.getConversionErrors();
+                            if (!conversionErrors.isEmpty()) {
+                                throw new ConversionErrorException(argument, conversionErrors.get(0));
+                            } else {
+                                throw new IllegalArgumentException("Unbindable argument [" + argument + "] to method [" + method.getDescription(true) + "]");
+                            }
+                        }
+                    };
+                } else {
+                    throw new IllegalArgumentException("Unsupported binding annotation in filter method [" + method.getDescription(true) + "]: " + annotationMetadata.getAnnotationNameByStereotype(Bindable.class).orElse(null));
+                }
+            } else if (argumentType.isAssignableFrom(HttpRequest.class)) {
                 fulfilled[i] = ctx -> ctx.request;
-            } else if (argument.getType().isAssignableFrom(MutableHttpRequest.class)) {
+            } else if (argumentType.isAssignableFrom(MutableHttpRequest.class)) {
                 fulfilled[i] = ctx -> {
                     HttpRequest<?> request = ctx.request;
                     if (!(ctx.request instanceof MutableHttpRequest<?>)) {
@@ -390,12 +416,12 @@ public class FilterRunner {
                     }
                     return request;
                 };
-            } else if (argument.getType().isAssignableFrom(MutableHttpResponse.class)) {
+            } else if (argumentType.isAssignableFrom(MutableHttpResponse.class)) {
                 if (!isResponseFilter) {
                     throw new IllegalArgumentException("Filter is called before the response is known, can't have a response argument");
                 }
                 fulfilled[i] = ctx -> ctx.response;
-            } else if (Throwable.class.isAssignableFrom(argument.getType())) {
+            } else if (Throwable.class.isAssignableFrom(argumentType)) {
                 if (!isResponseFilter) {
                     throw new IllegalArgumentException("Request filters cannot handle exceptions");
                 }
@@ -412,7 +438,7 @@ public class FilterRunner {
                 }
                 filtersException = true;
                 skipOnError = false;
-            } else if (argument.getType() == FilterContinuation.class) {
+            } else if (argumentType == FilterContinuation.class) {
                 if (isResponseFilter) {
                     throw new IllegalArgumentException("Response filters cannot use filter continuations");
                 }
@@ -433,7 +459,7 @@ public class FilterRunner {
                 } else {
                     throw new IllegalArgumentException("Unsupported continuation type: " + continuationReturnType);
                 }
-            } else if (argument.getType() == MutablePropagatedContext.class) {
+            } else if (argumentType == MutablePropagatedContext.class) {
                 fulfilled[i] = ctx -> ctx.mutablePropagatedContext;
             } else {
                 throw new IllegalArgumentException("Unsupported filter argument type: " + argument);

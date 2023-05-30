@@ -15,52 +15,40 @@
  */
 package io.micronaut.http;
 
-import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.ConversionError;
-import io.micronaut.core.convert.exceptions.ConversionErrorException;
-import io.micronaut.core.type.Argument;
-
-import java.util.Optional;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.io.buffer.ByteBuffer;
 
 /**
- * A request wrapper with knowledge of the body argument.
+ * Allows introspecting whether the request is a full http request.
  *
  * @param <B> The body type
  * @author James Kleeh
  * @since 1.1.0
  */
-public class FullHttpRequest<B> extends HttpRequestWrapper<B> {
-
-    private final Argument<B> bodyType;
+@Internal
+public interface FullHttpRequest<B> extends HttpRequest<B> {
+    /**
+     * @return Is the request full.
+     */
+    default boolean isFull() {
+        return false;
+    }
 
     /**
-     * @param delegate The Http Request
-     * @param bodyType The Body Type
+     * @return The body contents or null if there are none or they are not obtainable.
      */
-    public FullHttpRequest(HttpRequest<B> delegate,
-                           Argument<B> bodyType) {
-        super(delegate);
-        this.bodyType = bodyType;
-    }
+    @Nullable
+    ByteBuffer<?> contents();
 
-    @Override
-    public Optional<B> getBody() {
-        ArgumentConversionContext<B> conversionContext = ConversionContext.of(bodyType);
-        Optional<B> body = getBody(conversionContext);
-        if (conversionContext.hasErrors()) {
-            Exception cause = null;
-            Optional<ConversionError> lastError = conversionContext.getLastError();
-            if (lastError.isPresent()) {
-                ConversionError conversionError = lastError.get();
-                cause = conversionError.getCause();
-            }
-            if (cause instanceof RuntimeException runtimeException) {
-                throw runtimeException;
-            } else if (cause != null) {
-                throw new ConversionErrorException(bodyType, cause);
-            }
-        }
-        return body;
-    }
+    /**
+     * Get the contents of this request as a buffer. If this is a streaming request, the returned
+     * flow may be delayed.
+     *
+     * @return The request content
+     */
+    @NonNull
+    ExecutionFlow<ByteBuffer<?>> bufferContents();
 }

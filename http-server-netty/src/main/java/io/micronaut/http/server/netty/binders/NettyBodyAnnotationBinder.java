@@ -82,11 +82,11 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         if (!(source instanceof NettyHttpRequest<?> nhr)) {
             return super.bindFullBody(context, source);
         }
-        if (nhr.rootBody() instanceof ImmediateByteBody imm && imm.empty()) {
+        if (nhr.byteBody() instanceof ImmediateByteBody imm && imm.empty()) {
             return BindingResult.empty();
         }
 
-        ExecutionFlow<ImmediateByteBody> buffered = nhr.rootBody()
+        ExecutionFlow<ImmediateByteBody> buffered = nhr.byteBody()
             .buffer(nhr.getChannelHandlerContext().alloc());
 
         return new PendingRequestBindingResult<T>() {
