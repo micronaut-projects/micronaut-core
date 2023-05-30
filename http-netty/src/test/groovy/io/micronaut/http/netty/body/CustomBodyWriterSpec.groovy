@@ -75,7 +75,7 @@ class CustomBodyWriterSpec extends Specification {
     @Singleton
     @Produces(MediaType.APPLICATION_JSON)
     // Higher than NettyJsonHandler
-    @Order(1)
+    @Order(-1)
     static class ABodyWriter implements MessageBodyWriter<A> {
 
         @Override
@@ -87,7 +87,7 @@ class CustomBodyWriterSpec extends Specification {
     @Singleton
     @Produces(MediaType.APPLICATION_JSON)
     // Higher than ABodyWriter
-    @Order(2)
+    @Order(-2)
     static class CBodyWriter implements MessageBodyWriter<C> {
 
         @Override

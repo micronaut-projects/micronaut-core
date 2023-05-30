@@ -96,7 +96,7 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
             } else {
                 // Pick the highest priority
                 return beanDefinitions.stream()
-                    .max(OrderUtil.COMPARATOR)
+                    .max(OrderUtil.REVERSE_COMPARATOR)
                     .map(beanLocator::getBean)
                     .orElse(null);
             }
@@ -156,7 +156,7 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
             } else {
                 // Pick the highest priority
                 return beanDefinitions.stream()
-                    .max(OrderUtil.COMPARATOR)
+                    .max(OrderUtil.REVERSE_COMPARATOR)
                     .map(beanLocator::getBean)
                     .orElse(null);
             }
