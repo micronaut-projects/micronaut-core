@@ -21,7 +21,6 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
-import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.http.MediaType;
@@ -41,7 +40,7 @@ import java.io.InputStream;
  */
 @Experimental
 @Indexed(MessageBodyReader.class)
-public interface MessageBodyReader<T> extends Ordered {
+public interface MessageBodyReader<T> {
     /**
      * Is the type readable.
      * @param type The type

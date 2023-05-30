@@ -156,8 +156,8 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
             } else {
                 // Pick the highest priority
                 return beanDefinitions.stream()
-                    .map(beanLocator::getBean)
                     .max(OrderUtil.COMPARATOR)
+                    .map(beanLocator::getBean)
                     .orElse(null);
             }
         }

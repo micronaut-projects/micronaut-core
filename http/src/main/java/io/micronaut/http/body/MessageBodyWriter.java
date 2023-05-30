@@ -22,7 +22,6 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReferenceCounted;
-import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
@@ -45,7 +44,7 @@ import java.nio.charset.StandardCharsets;
  */
 @Experimental
 @Indexed(MessageBodyWriter.class)
-public interface MessageBodyWriter<T> extends Ordered {
+public interface MessageBodyWriter<T> {
     /**
      * Is the type writeable.
      *

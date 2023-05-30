@@ -2,6 +2,7 @@ package io.micronaut.http.netty.body
 
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.annotation.Nullable
+import io.micronaut.core.annotation.Order
 import io.micronaut.core.type.Argument
 import io.micronaut.core.type.Headers
 import io.micronaut.http.MediaType
@@ -62,10 +63,8 @@ class CustomBodyReaderSpec extends Specification {
 
     @Singleton
     @Produces(MediaType.APPLICATION_JSON)
+    @Order(2)
     static class ABodyReader implements MessageBodyReader<A> {
-
-        // Higher than NettyJsonHandler
-        int order = 2
 
         @Override
         A read(@NonNull Argument<A> type, @Nullable MediaType mediaType, @NonNull Headers httpHeaders, @NonNull InputStream inputStream) throws CodecException {
@@ -75,10 +74,9 @@ class CustomBodyReaderSpec extends Specification {
 
     @Singleton
     @Produces(MediaType.APPLICATION_JSON)
+    // Higher than ABodyWriter
+    @Order(1)
     static class CBodyReader implements MessageBodyReader<C> {
-
-        // Higher than ABodyWriter
-        int order = 1
 
         @Override
         C read(@NonNull Argument<C> type, @Nullable MediaType mediaType, @NonNull Headers httpHeaders, @NonNull InputStream inputStream) throws CodecException {

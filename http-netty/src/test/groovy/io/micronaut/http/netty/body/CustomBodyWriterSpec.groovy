@@ -1,6 +1,7 @@
 package io.micronaut.http.netty.body
 
 import io.micronaut.core.annotation.NonNull
+import io.micronaut.core.annotation.Order
 import io.micronaut.core.type.Argument
 import io.micronaut.core.type.MutableHeaders
 import io.micronaut.http.MediaType
@@ -73,10 +74,9 @@ class CustomBodyWriterSpec extends Specification {
 
     @Singleton
     @Produces(MediaType.APPLICATION_JSON)
+    // Higher than NettyJsonHandler
+    @Order(1)
     static class ABodyWriter implements MessageBodyWriter<A> {
-
-        // Higher than NettyJsonHandler
-        int order = 1
 
         @Override
         void writeTo(@NonNull Argument<A> type, @NonNull MediaType mediaType, A object, @NonNull MutableHeaders outgoingHeaders, @NonNull OutputStream outputStream) throws CodecException {
@@ -86,10 +86,9 @@ class CustomBodyWriterSpec extends Specification {
 
     @Singleton
     @Produces(MediaType.APPLICATION_JSON)
+    // Higher than ABodyWriter
+    @Order(2)
     static class CBodyWriter implements MessageBodyWriter<C> {
-
-        // Higher than ABodyWriter
-        int order = 2
 
         @Override
         void writeTo(@NonNull Argument<C> type, @NonNull MediaType mediaType, C object, @NonNull MutableHeaders outgoingHeaders, @NonNull OutputStream outputStream) throws CodecException {
