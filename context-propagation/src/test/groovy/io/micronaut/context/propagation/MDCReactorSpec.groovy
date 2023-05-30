@@ -94,7 +94,7 @@ class MDCReactorSpec extends Specification {
         @Post("/enter")
         @ExecuteOn(IO)
         String test(@Header("X-TrackingId") String tracingId, @Body SomeBody body) {
-            LOG.info("test1")
+            LOG.debug("test1")
             checkTracing(tracingId)
 
             return mdcClient.test2(tracingId)
@@ -103,7 +103,7 @@ class MDCReactorSpec extends Specification {
         @ExecuteOn(IO)
         @Get("/test2")
         Mono<String> test2(@Header("X-TrackingId") String tracingId) {
-            LOG.info("test2")
+            LOG.debug("test2")
             checkTracing(tracingId)
 
             return Mono<String>.fromCallable {
@@ -114,7 +114,7 @@ class MDCReactorSpec extends Specification {
 
         @Put("/test3")
         Mono<String> test3(@Header("X-TrackingId") String tracingId, @Body SomeBody body) {
-            LOG.info("test3")
+            LOG.debug("test3")
             checkTracing(tracingId)
 
             return Mono.just("x").delayElement(Duration.ofMillis(10)).flatMap {
@@ -127,7 +127,7 @@ class MDCReactorSpec extends Specification {
         @ExecuteOn(IO)
         @Post("/test4")
         String test4(@Header("X-TrackingId") String tracingId, @Body SomeBody body) {
-            LOG.info("test4")
+            LOG.debug("test4")
 
             return httpClient.toBlocking().retrieve(HttpRequest
                     .PATCH("/mdc/test5", body)
@@ -137,7 +137,7 @@ class MDCReactorSpec extends Specification {
         @Patch("/test5")
         String test5(@Header("X-TrackingId") String tracingId, @Body SomeBody body) {
             checkTracing(tracingId)
-            LOG.info("test5")
+            LOG.debug("test5")
 
             return MDC.get("trackingId")
         }
