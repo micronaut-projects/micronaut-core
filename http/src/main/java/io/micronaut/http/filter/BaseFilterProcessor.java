@@ -65,10 +65,6 @@ import java.util.function.Supplier;
  */
 @Internal
 public abstract class BaseFilterProcessor<A extends Annotation> implements ExecutableMethodProcessor<A> {
-    @Nullable
-    private final BeanContext beanContext;
-    private final Class<A> filterAnnotation;
-    private final RequestBinderRegistry argumentBinderRegistry;
     private static final Set<String> PERMITTED_BINDING_ANNOTATIONS = Set.of(
         Body.class.getName(),
         Header.class.getName(),
@@ -76,6 +72,10 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
         CookieValue.class.getName(),
         PathVariable.class.getName()
     );
+    @Nullable
+    private final BeanContext beanContext;
+    private final Class<A> filterAnnotation;
+    private final RequestBinderRegistry argumentBinderRegistry;
 
     public BaseFilterProcessor(@Nullable BeanContext beanContext, Class<A> filterAnnotation) {
         this.beanContext = beanContext;
