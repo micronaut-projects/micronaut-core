@@ -19,6 +19,8 @@ import groovy.json.JsonSlurper
 import io.micronaut.context.annotation.Property
 import io.micronaut.core.annotation.NonNull
 import io.micronaut.core.async.annotation.SingleResult
+import io.micronaut.core.type.Argument
+import io.micronaut.core.type.MutableHeaders
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -29,7 +31,9 @@ import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
+import io.micronaut.http.body.MessageBodyWriter
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.http.codec.CodecException
 import io.micronaut.http.server.exceptions.ExceptionHandler
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.netty.bootstrap.Bootstrap
@@ -51,6 +55,8 @@ import spock.lang.Issue
 import spock.lang.Timeout
 
 import java.nio.charset.StandardCharsets
+import java.time.Instant
+
 /**
  * Tests for different kinds of errors and the expected responses
  *
@@ -316,6 +322,22 @@ X-Long-Header: $longString\r
         response.release()
     }
 
+    def 'missing writer'() {
+        given:
+        HttpResponse response = Flux.from(rxClient.exchange(
+                HttpRequest.GET('/errors/media-type')
+        )).onErrorResume(t -> {
+            if (t instanceof HttpClientResponseException) {
+                return Flux.just(((HttpClientResponseException) t).response)
+            }
+            throw t
+        }).blockFirst()
+
+        expect:
+        response.code() == HttpStatus.INTERNAL_SERVER_ERROR.code
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.APPLICATION_JSON
+    }
+
     @Controller('/errors')
     static class ErrorController {
 
@@ -434,6 +456,22 @@ X-Long-Header: $longString\r
         }
     }
 
+    @Controller('/errors/media-type')
+    static class MediaTypeErrorController {
+        @Get
+        HttpResponse<Instant> ok() {
+            return HttpResponse.ok(Instant.now()).contentType("my/mediatype")
+        }
+    }
+
+    @Singleton
+    @Produces("my/mediatype")
+    static class ThrowingWriter implements MessageBodyWriter<Instant> {
+        @Override
+        void writeTo(@NonNull Argument<Instant> type, @NonNull MediaType mediaType, Instant object, @NonNull MutableHeaders outgoingHeaders, @NonNull OutputStream outputStream) throws CodecException {
+            throw new RuntimeException("foo")
+        }
+    }
 
     @Produces(value = MediaType.TEXT_HTML)
     @Singleton
