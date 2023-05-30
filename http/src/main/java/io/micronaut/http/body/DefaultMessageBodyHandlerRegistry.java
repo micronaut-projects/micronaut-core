@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.GenericPlaceholder;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
@@ -95,8 +96,8 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
             } else {
                 // Pick the highest priority
                 return beanDefinitions.stream()
-                    .map(beanLocator::getBean)
                     .max(OrderUtil.COMPARATOR)
+                    .map(beanLocator::getBean)
                     .orElse(null);
             }
         }
@@ -172,10 +173,13 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
                 // Only for writer, verify that the writer can consume the required type
                 if (type.getType() == MessageBodyWriter.class && c instanceof BeanDefinition<?> definition) {
                     List<Argument<?>> consumedType = definition.getTypeArguments(type.getType());
-                    Argument<?> requiredType = type.getTypeParameters()[0];
-                    if (consumedType.isEmpty() ||
-                        !(consumedType.get(0).isTypeVariable() || consumedType.get(0).isAssignableFrom(requiredType.getType()))
-                    ){
+                    Argument<?>[] typeParameters = type.getTypeParameters();
+                    if (ArrayUtils.isEmpty(typeParameters)) {
+                        return false;
+                    }
+
+                    Argument<?> requiredType = typeParameters[0];
+                    if (consumedType.isEmpty() || isInvalidType(consumedType, requiredType)) {
                         return false;
                     }
                 }
@@ -184,6 +188,11 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
                     .anyMatch(mt -> mediaTypes.contains(new MediaType(mt)))
                 );
             });
+        }
+
+        private static boolean isInvalidType(List<Argument<?>> consumedType, Argument<?> requiredType) {
+            Argument<?> argument = consumedType.get(0);
+            return !(argument.isTypeVariable() || argument.isAssignableFrom(requiredType.getType()));
         }
 
         @Override
