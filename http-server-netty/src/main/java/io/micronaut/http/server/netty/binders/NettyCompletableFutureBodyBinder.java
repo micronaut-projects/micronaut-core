@@ -67,7 +67,7 @@ final class NettyCompletableFutureBodyBinder
     @Override
     public BindingResult<CompletableFuture<?>> bind(ArgumentConversionContext<CompletableFuture<?>> context, HttpRequest<?> source) {
         if (source instanceof NettyHttpRequest<?> nhr) {
-            ByteBody rootBody = nhr.rootBody();
+            ByteBody rootBody = nhr.byteBody();
             if (rootBody instanceof ImmediateByteBody immediate && immediate.empty()) {
                 return BindingResult.empty();
             }

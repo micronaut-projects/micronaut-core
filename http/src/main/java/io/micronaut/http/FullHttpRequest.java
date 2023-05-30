@@ -16,7 +16,9 @@
 package io.micronaut.http;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 
 /**
@@ -40,4 +42,13 @@ public interface FullHttpRequest<B> extends HttpRequest<B> {
      */
     @Nullable
     ByteBuffer<?> contents();
+
+    /**
+     * Get the contents of this request as a buffer. If this is a streaming request, the returned
+     * flow may be delayed.
+     *
+     * @return The request content
+     */
+    @NonNull
+    ExecutionFlow<ByteBuffer<?>> bufferContents();
 }
