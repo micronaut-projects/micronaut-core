@@ -54,9 +54,7 @@ abstract class ManagedBody<T> implements HttpBody {
      * @throws IllegalStateException if the value has already been claimed
      */
     final T claim() {
-        if (claimed) {
-            throw new IllegalStateException("Already claimed");
-        }
+        checkUnclaimed();
         claimed = true;
         return value;
     }
@@ -69,10 +67,14 @@ abstract class ManagedBody<T> implements HttpBody {
      * @return The value that will be claimed
      */
     final T prepareClaim() {
+        checkUnclaimed();
+        return value;
+    }
+
+    final void checkUnclaimed() {
         if (claimed) {
             throw new IllegalStateException("Already claimed");
         }
-        return value;
     }
 
     /**

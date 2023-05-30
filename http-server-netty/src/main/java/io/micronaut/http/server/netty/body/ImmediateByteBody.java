@@ -34,10 +34,7 @@ import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.LastHttpContent;
 
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -48,14 +45,12 @@ import java.util.List;
  * @author Jonas Konrad
  */
 @Internal
-public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements ByteBody, ByteBuffer<ByteBuf> {
+public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements ByteBody {
     private final boolean empty;
-    private final ByteBuffer<ByteBuf> byteBuffer;
 
     ImmediateByteBody(ByteBuf buf) {
         super(buf);
         this.empty = !buf.isReadable();
-        this.byteBuffer = NettyByteBufferFactory.DEFAULT.wrap(buf);
     }
 
     @Override
@@ -138,6 +133,11 @@ public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements Byt
         return ExecutionFlow.just(this);
     }
 
+    public ByteBuf contentUnclaimed() {
+        checkUnclaimed();
+        return value();
+    }
+
     @Override
     public HttpRequest claimForReuse(HttpRequest request) {
         DefaultFullHttpRequest copy = new DefaultFullHttpRequest(
@@ -155,145 +155,5 @@ public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements Byt
 
     public boolean empty() {
         return empty;
-    }
-
-    @Override
-    public ByteBuf asNativeBuffer() {
-        return byteBuffer.asNativeBuffer();
-    }
-
-    @Override
-    public int readableBytes() {
-        return byteBuffer.readableBytes();
-    }
-
-    @Override
-    public int writableBytes() {
-        return byteBuffer.writableBytes();
-    }
-
-    @Override
-    public int maxCapacity() {
-        return byteBuffer.maxCapacity();
-    }
-
-    @Override
-    public ByteBuffer capacity(int capacity) {
-        return byteBuffer.capacity(capacity);
-    }
-
-    @Override
-    public int readerIndex() {
-        return byteBuffer.readerIndex();
-    }
-
-    @Override
-    public ByteBuffer readerIndex(int readPosition) {
-        return byteBuffer.readerIndex(readPosition);
-    }
-
-    @Override
-    public int writerIndex() {
-        return byteBuffer.writerIndex();
-    }
-
-    @Override
-    public ByteBuffer writerIndex(int position) {
-        return byteBuffer.writerIndex(position);
-    }
-
-    @Override
-    public byte read() {
-        return byteBuffer.read();
-    }
-
-    @Override
-    public CharSequence readCharSequence(int length, Charset charset) {
-        return byteBuffer.readCharSequence(length, charset);
-    }
-
-    @Override
-    public ByteBuffer read(byte[] destination) {
-        return byteBuffer.read(destination);
-    }
-
-    @Override
-    public ByteBuffer read(byte[] destination, int offset, int length) {
-        return byteBuffer.read(destination, offset, length);
-    }
-
-    @Override
-    public ByteBuffer write(byte b) {
-        return byteBuffer.write(b);
-    }
-
-    @Override
-    public ByteBuffer write(byte[] source) {
-        return byteBuffer.write(source);
-    }
-
-    @Override
-    public ByteBuffer write(CharSequence source, Charset charset) {
-        return byteBuffer.write(source, charset);
-    }
-
-    @Override
-    public ByteBuffer write(byte[] source, int offset, int length) {
-        return byteBuffer.write(source, offset, length);
-    }
-
-    @Override
-    public ByteBuffer write(ByteBuffer... buffers) {
-        return byteBuffer.write(buffers);
-    }
-
-    @Override
-    public ByteBuffer write(java.nio.ByteBuffer... buffers) {
-        return byteBuffer.write(buffers);
-    }
-
-    @Override
-    public ByteBuffer slice(int index, int length) {
-        return byteBuffer.slice(index, length);
-    }
-
-    @Override
-    public java.nio.ByteBuffer asNioBuffer() {
-        return byteBuffer.asNioBuffer();
-    }
-
-    @Override
-    public java.nio.ByteBuffer asNioBuffer(int index, int length) {
-        return byteBuffer.asNioBuffer(index, length);
-    }
-
-    @Override
-    public InputStream toInputStream() {
-        return byteBuffer.toInputStream();
-    }
-
-    @Override
-    public OutputStream toOutputStream() {
-        return byteBuffer.toOutputStream();
-    }
-
-    @Override
-    public byte[] toByteArray() {
-        return byteBuffer.toByteArray();
-    }
-
-    @Override
-    public String toString(Charset charset) {
-        return byteBuffer.toString(StandardCharsets.UTF_8);
-    }
-
-    @Override
-    public int indexOf(byte b) {
-        return byteBuffer.indexOf(b);
-    }
-
-    @Override
-    public byte getByte(int index) {
-        return byteBuffer.getByte(index);
     }
 }

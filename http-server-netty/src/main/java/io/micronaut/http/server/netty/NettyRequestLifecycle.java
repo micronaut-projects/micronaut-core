@@ -131,7 +131,7 @@ final class NettyRequestLifecycle extends RequestLifecycle {
         // the FormRouteCompleter can process data.
         if (nettyRequest.hasFormRouteCompleter()) {
             FormDataHttpContentProcessor processor = new FormDataHttpContentProcessor(nettyRequest, rib.serverConfiguration);
-            ByteBody rootBody = nettyRequest.rootBody();
+            ByteBody rootBody = nettyRequest.byteBody();
             FormRouteCompleter formRouteCompleter = nettyRequest.formRouteCompleter();
             try {
                 rootBody.processMulti(processor).handleForm(formRouteCompleter);

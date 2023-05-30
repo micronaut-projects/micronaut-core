@@ -70,7 +70,7 @@ public class MultipartBodyArgumentBinder implements NonBlockingBodyArgumentBinde
             FormDataHttpContentProcessor processor = new FormDataHttpContentProcessor(nhr, httpServerConfiguration.get());
             MultiObjectBody multiObjectBody;
             try {
-                multiObjectBody = nhr.rootBody()
+                multiObjectBody = nhr.byteBody()
                     .processMulti(processor);
             } catch (Throwable e) {
                 return () -> Optional.of(Flux.<CompletedPart>error(e)::subscribe);
