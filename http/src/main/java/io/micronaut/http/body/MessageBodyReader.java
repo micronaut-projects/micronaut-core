@@ -33,6 +33,7 @@ import java.io.InputStream;
  * An interface that allows reading a message body from the client or the server.
  *
  * <p>Implementors can defined beans that are annotated with {@link io.micronaut.http.annotation.Consumes} to restrict the applicable content types.</p>
+ * <p>Use {@link io.micronaut.core.annotation.Order} to specify the precedence of the reader with lower order corresponding to higher precedence.</p>
  *
  * @see io.micronaut.http.annotation.Consumes
  * @param <T> The generic type.
