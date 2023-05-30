@@ -16,11 +16,11 @@
 package io.micronaut.http.netty.channel;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
-import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.Order;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.ServerChannel;
@@ -49,7 +49,7 @@ import java.util.concurrent.ThreadFactory;
 @Internal
 @Named(EventLoopGroupFactory.NATIVE)
 @BootstrapContextCompatible
-@Primary
+@Order(100)
 public class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**

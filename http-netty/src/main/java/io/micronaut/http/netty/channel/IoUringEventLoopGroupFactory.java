@@ -17,10 +17,10 @@ package io.micronaut.http.netty.channel;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.annotation.Secondary;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.Order;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
@@ -48,7 +48,7 @@ import java.util.concurrent.ThreadFactory;
 @Named(EventLoopGroupFactory.NATIVE)
 @BootstrapContextCompatible
 // avoid collision with epoll. we prefer epoll because it supports more features (domain socket).
-@Secondary
+@Order(200)
 public class IoUringEventLoopGroupFactory implements EventLoopGroupFactory {
 
     /**
