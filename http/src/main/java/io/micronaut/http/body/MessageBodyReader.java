@@ -21,7 +21,6 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ReferenceCounted;
-import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.http.MediaType;
@@ -34,6 +33,7 @@ import java.io.InputStream;
  * An interface that allows reading a message body from the client or the server.
  *
  * <p>Implementors can defined beans that are annotated with {@link io.micronaut.http.annotation.Consumes} to restrict the applicable content types.</p>
+ * <p>Use {@link io.micronaut.core.annotation.Order} to specify the precedence of the reader with lower order corresponding to higher precedence.</p>
  *
  * @see io.micronaut.http.annotation.Consumes
  * @param <T> The generic type.
@@ -41,7 +41,7 @@ import java.io.InputStream;
  */
 @Experimental
 @Indexed(MessageBodyReader.class)
-public interface MessageBodyReader<T> extends Ordered {
+public interface MessageBodyReader<T> {
     /**
      * Is the type readable.
      * @param type The type
