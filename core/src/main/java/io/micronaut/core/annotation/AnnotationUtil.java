@@ -256,7 +256,6 @@ public class AnnotationUtil {
             || annotationMetadata.hasDeclaredAnnotation("javax.inject.Qualifier");
     }
 
-
     /**
      * Resolve non-binding members.
      * @param annotationMetadata The annotation metadata
