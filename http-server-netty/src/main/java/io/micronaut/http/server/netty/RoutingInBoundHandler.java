@@ -60,6 +60,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
@@ -234,13 +235,28 @@ public final class RoutingInBoundHandler implements RequestHandler {
                     response.body()
                 );
             } catch (Throwable e) {
-                response = routeExecutor.createDefaultErrorResponse(nettyHttpRequest, e);
-                encodeHttpResponse(
-                    outboundAccess,
-                    nettyHttpRequest,
-                    response,
-                    response.body()
-                );
+                try {
+                    response = routeExecutor.createDefaultErrorResponse(nettyHttpRequest, e);
+                    encodeHttpResponse(
+                        outboundAccess,
+                        nettyHttpRequest,
+                        response,
+                        response.body()
+                    );
+                } catch (Throwable f) {
+                    f.addSuppressed(e);
+                    outboundAccess.closeAfterWrite();
+                    try {
+                        outboundAccess.writeFull(new DefaultFullHttpResponse(
+                            HttpVersion.HTTP_1_1,
+                            HttpResponseStatus.INTERNAL_SERVER_ERROR,
+                            Unpooled.EMPTY_BUFFER
+                        ));
+                    } catch (Throwable g) {
+                        f.addSuppressed(g);
+                    }
+                    LOG.warn("Failed to encode error response", f);
+                }
             }
         }
     }
