@@ -1,28 +1,28 @@
 If you have multiple possible implementations for a given interface to inject, you need to use a qualifier.
 
-Once again Micronaut framework leverages JSR-330 and the link:{jeeapi}/javax/inject/Qualifier.html[Qualifier] and link:{jeeapi}/javax/inject/Named.html[Named] annotations to support this use case.
+Once again Micronaut framework leverages JSR-330 and the link:{jakartaapi}/jakarta/inject/Qualifier.html[Qualifier] and link:{jakartaapi}/jakarta/inject/Named.html[Named] annotations to support this use case.
 
 == Qualifying By Name
 
-To qualify by name, use the link:{jeeapi}/javax/inject/Named.html[Named] annotation. For example, consider the following classes:
+To qualify by name, use the link:{jakartaapi}/jakarta/inject/Named.html[Named] annotation. For example, consider the following classes:
 
 snippet::io.micronaut.docs.inject.qualifiers.named.Engine,io.micronaut.docs.inject.qualifiers.named.V6Engine,io.micronaut.docs.inject.qualifiers.named.V8Engine,io.micronaut.docs.inject.qualifiers.named.Vehicle[tags="class",indent=0]
 
 <1> The `Engine` interface defines the common contract
 <2> The `V6Engine` class is the first implementation
 <3> The `V8Engine` class is the second implementation
-<4> The link:{jeeapi}/javax/inject/Named.html[jakarta.inject.Named] annotation indicates that the `V8Engine` implementation is required
+<4> The link:{jakartaapi}/jakarta/inject/Named.html[jakarta.inject.Named] annotation indicates that the `V8Engine` implementation is required
 <5> Calling the start method prints: `"Starting V8"`
 
 Micronaut framework is capable of injecting `V8Engine` in the previous example, because:
 
 `@Named` qualifier value (`v8`) + type being injected simple name (`Engine`) == (case-insensitive) == The simple name of a bean of type `Engine` (`V8Engine`)
 
-You can also declare link:{jeeapi}/javax/inject/Named.html[@Named] at the class level of a bean to explicitly define the name of the bean.
+You can also declare link:{jakartaapi}/jakarta/inject/Named.html[@Named] at the class level of a bean to explicitly define the name of the bean.
 
 == Qualifying By Annotation
 
-In addition to being able to qualify by name, you can build your own qualifiers using the link:{jeeapi}/javax/inject/Qualifier.html[Qualifier] annotation. For example, consider the following annotation:
+In addition to being able to qualify by name, you can build your own qualifiers using the link:{jakartaapi}/jakarta/inject/Qualifier.html[Qualifier] annotation. For example, consider the following annotation:
 
 snippet::io.micronaut.docs.qualifiers.annotation.V8[tags="imports,class",indent=0]
 

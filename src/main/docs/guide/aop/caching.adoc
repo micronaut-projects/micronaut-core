@@ -14,7 +14,7 @@ The following cache annotations are supported:
 
 Using one of these annotations activates the link:{micronautcacheapi}/io/micronaut/cache/interceptor/CacheInterceptor[CacheInterceptor], which in the case of `@Cacheable` caches the return value of the method.
 
-The emitted result is cached if the method return type is a non-blocking type (either link:{jdkapi}/java/util/concurrent/CompletableFuture.html[CompletableFuture] or an instance of rs:Publisher[]) .
+The emitted result is cached if the method return type is a non-blocking type (either link:{jdkapi}/java.base/java/util/concurrent/CompletableFuture.html[CompletableFuture] or an instance of rs:Publisher[]) .
 
 In addition, if the underlying Cache implementation supports non-blocking cache operations, cache values are read without blocking, resulting in non-blocking cache operations.
 

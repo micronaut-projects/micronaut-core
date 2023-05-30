@@ -1,4 +1,4 @@
-The methods provided by Java's link:{jdkapi}/java/lang/reflect/AnnotatedElement.html[AnnotatedElement] API in general don't provide the ability to introspect annotations without loading the annotations themselves. Nor do they provide any ability to introspect annotation stereotypes (often called meta-annotations; an annotation stereotype is where an annotation is annotated with another annotation, essentially inheriting its behaviour).
+The methods provided by Java's link:{jdkapi}/java.base/java/lang/reflect/AnnotatedElement.html[AnnotatedElement] API in general don't provide the ability to introspect annotations without loading the annotations themselves. Nor do they provide any ability to introspect annotation stereotypes (often called meta-annotations; an annotation stereotype is where an annotation is annotated with another annotation, essentially inheriting its behaviour).
 
 To solve this problem many frameworks produce runtime metadata or perform expensive reflection to analyze the annotations of a class.
 
