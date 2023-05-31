@@ -573,9 +573,11 @@ public final class RoutingInBoundHandler implements RequestHandler {
             s.onSubscribe(new Subscription() {
                 @Override
                 public void request(long n) {
+                    HttpContent first = LazySendingSubscriber.this.first;
                     if (first != null) {
+                        LazySendingSubscriber.this.first = null;
+                        // onNext may trigger further request calls
                         s.onNext(first);
-                        first = null;
                         if (n != Long.MAX_VALUE) {
                             n--;
                             if (n == 0) {
