@@ -627,7 +627,11 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 MutableHttpResponse<?> response;
                 if (t instanceof HttpStatusException hse) {
                     response = HttpResponse.status(hse.getStatus());
-                    hse.getBody().ifPresent(response::body);
+                    if (hse.getBody().isPresent()) {
+                        response.body(hse.getBody().get());
+                    } else if (hse.getMessage() != null) {
+                        response.body(hse.getMessage());
+                    }
                 } else {
                     response = routeExecutor.createDefaultErrorResponse(request, t);
                 }
