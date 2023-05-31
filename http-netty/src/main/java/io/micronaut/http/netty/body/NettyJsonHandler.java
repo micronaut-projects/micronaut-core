@@ -54,7 +54,7 @@ import java.io.OutputStream;
 @Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_HAL_JSON})
 @Consumes({MediaType.APPLICATION_JSON, MediaType.APPLICATION_HAL_JSON})
 @BootstrapContextCompatible
-@Requires(beans=JsonMapper.class)
+@Requires(beans = JsonMapper.class)
 public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, ChunkedMessageBodyReader<T>, CustomizableNettyJsonHandler {
     private final JsonMessageHandler<T> jsonMessageHandler;
 
