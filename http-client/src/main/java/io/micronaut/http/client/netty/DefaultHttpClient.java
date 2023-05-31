@@ -34,7 +34,6 @@ import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
@@ -110,8 +109,6 @@ import io.micronaut.json.JsonMapper;
 import io.micronaut.json.codec.JsonMediaTypeCodec;
 import io.micronaut.json.codec.JsonStreamMediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
-import io.micronaut.scheduling.instrument.InvocationInstrumenter;
-import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.websocket.WebSocketClient;
 import io.micronaut.websocket.annotation.ClientWebSocket;
 import io.micronaut.websocket.annotation.OnMessage;
@@ -190,7 +187,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -201,8 +197,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
-
-import static io.micronaut.scheduling.instrument.InvocationInstrumenter.NOOP;
 
 /**
  * Default implementation of the {@link HttpClient} interface based on Netty.
@@ -263,7 +257,6 @@ public class DefaultHttpClient implements
     private final HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver;
     private final WebSocketBeanRegistry webSocketRegistry;
     private final RequestBinderRegistry requestBinderRegistry;
-    private final List<InvocationInstrumenterFactory> invocationInstrumenterFactories;
     private final String informationalServiceId;
     private final ConversionService conversionService;
 
@@ -278,7 +271,6 @@ public class DefaultHttpClient implements
      * @param codecRegistry                   The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
      * @param handlerRegistry                 The handler registry for encoding and decoding
      * @param annotationMetadataResolver      The annotation metadata resolver
-     * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument netty handlers execution with
      * @param conversionService               The conversion service
      * @param filters                         The filters to use
      */
@@ -290,7 +282,6 @@ public class DefaultHttpClient implements
                              @NonNull MediaTypeCodecRegistry codecRegistry,
                              @NonNull MessageBodyHandlerRegistry handlerRegistry,
                              @Nullable AnnotationMetadataResolver annotationMetadataResolver,
-                             List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
                              ConversionService conversionService,
                              HttpClientFilter... filters) {
         this(loadBalancer,
@@ -309,7 +300,6 @@ public class DefaultHttpClient implements
             NioSocketChannel::new,
             NioDatagramChannel::new,
             CompositeNettyClientCustomizer.EMPTY,
-            invocationInstrumenterFactories,
             null,
             conversionService);
     }
@@ -332,7 +322,6 @@ public class DefaultHttpClient implements
      * @param socketChannelFactory            The socket channel factory
      * @param udpChannelFactory               The UDP channel factory
      * @param clientCustomizer                The pipeline customizer
-     * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument netty handlers execution with
      * @param informationalServiceId          Optional service ID that will be passed to exceptions created by this client
      * @param conversionService               The conversion service
      */
@@ -352,7 +341,6 @@ public class DefaultHttpClient implements
                              @NonNull ChannelFactory<? extends SocketChannel> socketChannelFactory,
                              @NonNull ChannelFactory<? extends DatagramChannel> udpChannelFactory,
                              NettyClientCustomizer clientCustomizer,
-                             List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
                              @Nullable String informationalServiceId,
                              ConversionService conversionService
     ) {
@@ -374,9 +362,6 @@ public class DefaultHttpClient implements
             this.contextPath = null;
         }
         this.configuration = configuration;
-
-        this.invocationInstrumenterFactories =
-                invocationInstrumenterFactories == null ? Collections.emptyList() : invocationInstrumenterFactories;
 
         this.mediaTypeCodecRegistry = codecRegistry;
         this.handlerRegistry = handlerRegistry;
@@ -400,7 +385,6 @@ public class DefaultHttpClient implements
             threadFactory,
             configuration,
             explicitHttpVersion,
-            combineFactories(),
             socketChannelFactory,
             udpChannelFactory,
             nettyClientSslBuilder,
@@ -419,7 +403,7 @@ public class DefaultHttpClient implements
      *
      */
     public DefaultHttpClient() {
-        this(null, new DefaultHttpClientConfiguration(), Collections.emptyList());
+        this((URI) null, new DefaultHttpClientConfiguration());
     }
 
     /**
@@ -433,22 +417,21 @@ public class DefaultHttpClient implements
             createDefaultMediaTypeRegistry(),
             createDefaultMessageBodyHandlerRegistry(),
             AnnotationMetadataResolver.DEFAULT,
-            Collections.emptyList(), ConversionService.SHARED);
+            ConversionService.SHARED);
     }
 
     /**
      * @param loadBalancer  The {@link LoadBalancer} to use for selecting servers
      * @param configuration The {@link HttpClientConfiguration} object
-     * @param invocationInstrumenterFactories The invocation instrumeter factories to instrument netty handlers execution with
      */
-    public DefaultHttpClient(@Nullable LoadBalancer loadBalancer, HttpClientConfiguration configuration, List<InvocationInstrumenterFactory> invocationInstrumenterFactories) {
+    public DefaultHttpClient(@Nullable LoadBalancer loadBalancer, HttpClientConfiguration configuration) {
         this(loadBalancer,
             configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
             new NettyClientSslBuilder(new ResourceResolver()),
             createDefaultMediaTypeRegistry(),
             createDefaultMessageBodyHandlerRegistry(),
             AnnotationMetadataResolver.DEFAULT,
-            invocationInstrumenterFactories, ConversionService.SHARED);
+            ConversionService.SHARED);
     }
 
     static boolean isAcceptEvents(io.micronaut.http.HttpRequest<?> request) {
@@ -1812,16 +1795,6 @@ public class DefaultHttpClient implements
         return registry;
     }
 
-    private @NonNull InvocationInstrumenter combineFactories() {
-        if (CollectionUtils.isEmpty(invocationInstrumenterFactories)) {
-            return NOOP;
-        }
-        return InvocationInstrumenter.combine(invocationInstrumenterFactories.stream()
-            .map(InvocationInstrumenterFactory::newInvocationInstrumenter)
-            .filter(Objects::nonNull)
-            .toList());
-    }
-
     static boolean isSecureScheme(String scheme) {
         return io.micronaut.http.HttpRequest.SCHEME_HTTPS.equalsIgnoreCase(scheme) || SCHEME_WSS.equalsIgnoreCase(scheme);
     }
@@ -1952,7 +1925,7 @@ public class DefaultHttpClient implements
                 writeFuture = channel.writeAndFlush(nettyRequest);
             }
 
-            connectionManager.addInstrumentedListener(writeFuture, f -> {
+            connectionManager.withPropagation(writeFuture, f -> {
                 try {
                     if (!f.isSuccess()) {
                         poolHandle.taint();
@@ -1996,7 +1969,7 @@ public class DefaultHttpClient implements
         private final io.micronaut.http.HttpRequest<?> finalRequest;
 
         public BaseHttpResponseHandler(Promise<? super O> responsePromise, io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<?> finalRequest) {
-            super(connectionManager.instrumenter);
+            super();
             this.responsePromise = responsePromise;
             this.parentRequest = parentRequest;
             this.finalRequest = finalRequest;
