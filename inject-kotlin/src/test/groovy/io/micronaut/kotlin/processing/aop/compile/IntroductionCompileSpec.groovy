@@ -3,6 +3,7 @@ package io.micronaut.kotlin.processing.aop.compile
 import io.micronaut.annotation.processing.test.KotlinCompiler
 import io.micronaut.aop.Intercepted
 import io.micronaut.context.ApplicationContext
+import spock.lang.PendingFeature
 import spock.lang.Specification
 
 import static io.micronaut.annotation.processing.test.KotlinCompiler.buildContext
@@ -74,6 +75,8 @@ class StubIntroduction : Interceptor<Any, Any> {
             interceptor.invoked == 1
     }
 
+    @PendingFeature(reason = "KSP can detect ony one overriden method")
+    // https://github.com/google/ksp/issues/1396
     void "test inherited default or abstract methods are not overridden"() {
         given:
             ApplicationContext context = KotlinCompiler.buildContext('''
