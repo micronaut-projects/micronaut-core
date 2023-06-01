@@ -3,16 +3,148 @@ package io.micronaut.kotlin.processing.aop.compile
 import io.micronaut.annotation.processing.test.KotlinCompiler
 import io.micronaut.aop.Intercepted
 import io.micronaut.context.ApplicationContext
-import io.micronaut.inject.BeanDefinition
 import spock.lang.Specification
 
-import static io.micronaut.annotation.processing.test.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.buildContext
+import static io.micronaut.annotation.processing.test.KotlinCompiler.getBean
+import static io.micronaut.annotation.processing.test.KotlinCompiler.getBeanDefinition
 
 class IntroductionCompileSpec extends Specification {
 
+    void "test inherited default methods are not overridden"() {
+        given:
+            ApplicationContext context = KotlinCompiler.buildContext('''
+package introductiontest
+
+import java.lang.annotation.*
+import io.micronaut.aop.*
+import jakarta.inject.*
+
+@TestAnn
+interface MyBean : Parent {
+
+    fun test(): Int
+
+    fun getName() : String {
+        return "my-bean"
+    }
+
+    @Override
+    override fun getDescription() : String {
+        return "description"
+    }
+}
+
+interface Parent {
+     fun getParentName() : String {
+        return "parent"
+    }
+
+    fun getDescription() : String
+}
+
+@Retention(AnnotationRetention.RUNTIME)
+@Target(AnnotationTarget.FUNCTION, AnnotationTarget.TYPE, AnnotationTarget.CLASS)
+@Introduction
+annotation class TestAnn
+
+@InterceptorBean(TestAnn::class)
+class StubIntroduction : Interceptor<Any, Any> {
+    var invoked: Int = 0
+
+    override fun intercept(context: InvocationContext<Any, Any>) : Any {
+        invoked++
+        return 10
+    }
+}
+
+''')
+            def instance = getBean(context, 'introductiontest.MyBean')
+            def interceptor = getBean(context, 'introductiontest.StubIntroduction')
+
+        when:
+            def result = instance.test()
+
+        then:"the interceptor was invoked"
+            instance instanceof Intercepted
+            instance.name == 'my-bean'
+            instance.description == 'description'
+            instance.parentName == 'parent'
+            result == 10
+            interceptor.invoked == 1
+    }
+
+    void "test inherited default or abstract methods are not overridden"() {
+        given:
+            ApplicationContext context = KotlinCompiler.buildContext('''
+package introductiontest2
+
+import java.lang.annotation.*
+import io.micronaut.aop.*
+import jakarta.inject.*
+
+@TestAnn
+abstract class MyBean : Parent(), MyInterface {
+
+    abstract fun test() : Int
+
+    fun getName() : String {
+        return "my-bean"
+    }
+
+    @Override
+    override fun getDescription() : String {
+        return "description"
+    }
+}
+
+abstract class Parent {
+    fun getParentName() : String {
+        return "parent"
+    }
+
+    abstract fun getDescription() : String
+}
+
+interface MyInterface {
+
+    fun getDescription() : String
+}
+
+@Retention(AnnotationRetention.RUNTIME)
+@Target(AnnotationTarget.FUNCTION, AnnotationTarget.TYPE, AnnotationTarget.CLASS)
+@Introduction
+annotation class TestAnn
+
+@InterceptorBean(TestAnn::class)
+class StubIntroduction : Interceptor<Any, Any> {
+    var invoked: Int = 0
+
+    override fun intercept(context: InvocationContext<Any, Any>) : Any {
+        invoked++
+        return 10
+    }
+}
+
+''')
+            def instance = getBean(context, 'introductiontest2.MyBean')
+            def interceptor = getBean(context, 'introductiontest2.StubIntroduction')
+
+        when:
+            def result = instance.test()
+
+        then:"the interceptor was invoked"
+            instance instanceof Intercepted
+            instance.name == 'my-bean'
+            instance.description == 'description'
+            instance.parentName == 'parent'
+            result == 10
+            interceptor.invoked == 1
+    }
+
     void 'test coroutine repository'() {
         given:
-        def context = KotlinCompiler.buildContext('''
+        def context = buildContext('''
 package test
 
 import io.micronaut.aop.Introduction
@@ -55,7 +187,7 @@ interface CustomRepository : CoroutineCrudRepository<SomeEntity, Long> {
 }
 
 @MustBeDocumented
-@kotlin.annotation.Retention(AnnotationRetention.RUNTIME)
+@Retention(AnnotationRetention.RUNTIME)
 @Introduction
 @Singleton
 annotation class MyRepository
