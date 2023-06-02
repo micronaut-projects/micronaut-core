@@ -1952,6 +1952,155 @@ data class Cart(
             isAssignable
     }
 
+    void "test override and default methods"() {
+        when:
+            def result = buildClassElementMapped('test.MyBean', '''
+package test
+
+interface MyBean : Parent {
+
+    fun test(): Int
+
+    fun getName() : String {
+        return "my-bean"
+    }
+
+    @Override
+    override fun getDescription() : String {
+        return "description"
+    }
+}
+
+interface Parent {
+     fun getParentName() : String {
+        return "parent"
+    }
+
+    fun getDescription() : String
+}
+
+''', cl -> {
+
+                if (!cl.getMethods().stream().map { me -> me.name }.toList().equals(["getParentName", "test", "getName", "getDescription"] as List)) {
+                    throw new IllegalStateException("Doesn't match")
+                }
+                MethodElement getName = cl.getMethods()[2]
+                if (getName.isAbstract()) {
+                    throw new IllegalStateException("Expected not abstract!")
+                }
+                if (!getName.isDefault()) {
+                    throw new IllegalStateException("Expected default!")
+                }
+                MethodElement getDescription = cl.getMethods()[3]
+                if (getDescription.isAbstract()) {
+                    throw new IllegalStateException("Expected not abstract!")
+                }
+                if (!getDescription.isDefault()) {
+                    throw new IllegalStateException("Expected default!")
+                }
+                return true
+            })
+        then:
+            result
+    }
+
+    void "test abstract and overridden methods"() {
+        when:
+            def result = buildClassElementMapped('test.MyBean2', '''
+package test
+
+import java.lang.annotation.*
+import io.micronaut.aop.*
+import jakarta.inject.*
+
+abstract class MyBean2 : Parent() {
+
+    abstract fun test() : Int
+
+    fun getName() : String {
+        return "my-bean"
+    }
+
+    @Override
+    override fun getDescription() : String {
+        return "description"
+    }
+}
+
+abstract class Parent {
+    fun getParentName() : String {
+        return "parent"
+    }
+
+    abstract fun getDescription() : String
+}
+
+interface MyInterface {
+
+    fun getDescription() : String
+}
+
+
+''', cl -> {
+
+                if (!cl.getMethods().stream().map { me -> me.name }.toList().equals(["getParentName", "test", "getName", "getDescription"] as List)) {
+                    throw new IllegalStateException("Doesn't match")
+                }
+                return true
+            })
+        then:
+            result
+    }
+
+    @PendingFeature
+    void "test abstract and interface and overridden methods"() {
+        when:
+            def result = buildClassElementMapped('test.MyBean2', '''
+package test
+
+import java.lang.annotation.*
+import io.micronaut.aop.*
+import jakarta.inject.*
+
+abstract class MyBean2 : Parent(), MyInterface {
+
+    abstract fun test() : Int
+
+    fun getName() : String {
+        return "my-bean"
+    }
+
+    @Override
+    override fun getDescription() : String {
+        return "description"
+    }
+}
+
+abstract class Parent {
+    fun getParentName() : String {
+        return "parent"
+    }
+
+    abstract fun getDescription() : String
+}
+
+interface MyInterface {
+
+    fun getDescription() : String
+}
+
+
+''', cl -> {
+
+                if (!cl.getMethods().stream().map { me -> me.name }.toList().equals(["getParentName", "test", "getName", "getDescription"] as List)) {
+                    throw new IllegalStateException("Doesn't match")
+                }
+                return true
+            })
+        then:
+            result
+    }
+
     void "test interface type annotations"() {
         ClassElement ce = buildClassElement('test.MyRepo', '''
 package test
