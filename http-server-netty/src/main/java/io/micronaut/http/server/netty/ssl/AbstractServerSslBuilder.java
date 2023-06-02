@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.ssl;
 
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.server.HttpServerConfiguration;
@@ -51,6 +52,12 @@ import java.util.Optional;
 public abstract class AbstractServerSslBuilder extends SslBuilder<SslContext> implements ServerSslBuilder {
     private final HttpServerConfiguration httpServerConfiguration;
 
+    /**
+     * Create a new server SSL builder.
+     *
+     * @param resourceResolver        Resource resolver for default key/trust store loading implementation
+     * @param httpServerConfiguration Server configuration for determining HTTP version
+     */
     public AbstractServerSslBuilder(ResourceResolver resourceResolver, HttpServerConfiguration httpServerConfiguration) {
         super(resourceResolver);
         this.httpServerConfiguration = httpServerConfiguration;
@@ -91,7 +98,8 @@ public abstract class AbstractServerSslBuilder extends SslBuilder<SslContext> im
      * @param ssl         The ssl configuration
      * @param httpVersion The http version
      */
-    protected void processBuilder(SslContextBuilder sslBuilder, SslConfiguration ssl, HttpVersion httpVersion) {
+    protected void processBuilder(@NonNull SslContextBuilder sslBuilder, @NonNull SslConfiguration ssl, @NonNull HttpVersion httpVersion) {
+        // no additional processing by default
     }
 
     private static void setupSslBuilder(SslContextBuilder sslBuilder, SslConfiguration ssl, HttpVersion httpVersion) {
