@@ -17,6 +17,7 @@ package io.micronaut.scheduling.processor;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.Qualifier;
 import io.micronaut.context.bind.DefaultExecutableBeanContextBinder;
 import io.micronaut.context.bind.ExecutableBeanContextBinder;
 import io.micronaut.context.exceptions.NoSuchBeanException;
@@ -120,7 +121,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                 try {
                     ExecutableBeanContextBinder binder = new DefaultExecutableBeanContextBinder();
                     BoundExecutable<?, ?> boundExecutable = binder.bind(method, beanContext);
-                    Object bean = beanContext.getBean(beanDefinition);
+                    Object bean = beanContext.getBean((Argument<Object>) beanDefinition.asArgument(), (Qualifier<Object>) beanDefinition.getDeclaredQualifier());
                     AnnotationValue<Scheduled> finalAnnotationValue = scheduledAnnotation;
                     if (finalAnnotationValue instanceof EvaluatedAnnotationValue<Scheduled> evaluated) {
                         finalAnnotationValue = evaluated.withArguments(bean, boundExecutable.getBoundArguments());
@@ -136,6 +137,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                 } catch (NoSuchBeanException noSuchBeanException) {
                    // ignore: a timing issue can occur when the context is being shutdown. If a scheduled job runs and the context
                    // is shutdown and available beans cleared then the bean is no longer available. The best thing to do here is just ignore the failure.
+                   LOG.debug("Scheduled job skipped for context shutdown: {}.{}", beanDefinition.getBeanType().getSimpleName(), method.getDescription(true));
                 } catch (Exception e) {
                     TaskExceptionHandler finalHandler = findHandler(beanDefinition.getBeanType(), e);
                     finalHandler.handleCreationFailure(beanDefinition, e);
