@@ -4,7 +4,7 @@ awaitility = "4.2.0"
 bcpkix = "1.70"
 blaze = "1.6.8"
 caffeine = "2.9.3"
-compile-testing = "0.19"
+compile-testing = "0.21.0"
 
 geb = "7.0"
 gorm = "7.3.4"
