@@ -17,7 +17,6 @@ package io.micronaut.expressions.context;
 
 import io.micronaut.context.annotation.AnnotationExpressionContext;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
