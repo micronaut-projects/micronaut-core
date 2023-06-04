@@ -19,24 +19,16 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceResolver;
-import io.micronaut.http.HttpVersion;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.http.ssl.SslBuilder;
 import io.micronaut.http.ssl.SslConfiguration;
-import io.micronaut.http.ssl.SslConfigurationException;
 import io.netty.handler.ssl.SslContext;
-import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.util.SelfSignedCertificate;
-import io.netty.incubator.codec.http3.Http3;
-import io.netty.incubator.codec.quic.QuicSslContext;
-import io.netty.incubator.codec.quic.QuicSslContextBuilder;
 import jakarta.inject.Singleton;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import javax.net.ssl.SSLException;
-import java.security.cert.CertificateException;
+import java.security.KeyStore;
+import java.security.cert.Certificate;
 import java.util.Optional;
 
 /**
@@ -47,10 +39,8 @@ import java.util.Optional;
 @Requires(condition = SelfSignedSslBuilder.SelfSignedConfigured.class)
 @Singleton
 @Internal
-public class SelfSignedSslBuilder extends SslBuilder<SslContext> implements ServerSslBuilder {
-    private static final Logger LOG = LoggerFactory.getLogger(SelfSignedSslBuilder.class);
+public class SelfSignedSslBuilder extends AbstractServerSslBuilder implements ServerSslBuilder {
     private final ServerSslConfiguration ssl;
-    private final HttpServerConfiguration serverConfiguration;
 
     /**
      * @param serverConfiguration The server configuration
@@ -61,9 +51,8 @@ public class SelfSignedSslBuilder extends SslBuilder<SslContext> implements Serv
             HttpServerConfiguration serverConfiguration,
             ServerSslConfiguration ssl,
             ResourceResolver resourceResolver) {
-        super(resourceResolver);
+        super(resourceResolver, serverConfiguration);
         this.ssl = ssl;
-        this.serverConfiguration = serverConfiguration;
     }
 
     @Override
@@ -72,44 +61,12 @@ public class SelfSignedSslBuilder extends SslBuilder<SslContext> implements Serv
     }
 
     @Override
-    public Optional<SslContext> build() {
-        return build(ssl);
-    }
-
-    @SuppressWarnings("Duplicates")
-    @Override
-    public Optional<SslContext> build(SslConfiguration ssl) {
-        final HttpVersion httpVersion = serverConfiguration.getHttpVersion();
-        return build(ssl, httpVersion);
-    }
-
-    @Override
-    public Optional<SslContext> build(SslConfiguration ssl, HttpVersion httpVersion) {
-        try {
-            if (LOG.isWarnEnabled()) {
-                LOG.warn("HTTP Server is configured to use a self-signed certificate ('build-self-signed' is set to true). This configuration should not be used in a production environment as self-signed certificates are inherently insecure.");
-            }
-            SelfSignedCertificate ssc = new SelfSignedCertificate();
-            final SslContextBuilder sslBuilder = SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey())
-                .trustManager(getTrustManagerFactory(ssl));
-            CertificateProvidedSslBuilder.setupSslBuilder(sslBuilder, ssl, httpVersion);
-            return Optional.of(sslBuilder.build());
-        } catch (CertificateException | SSLException e) {
-            throw new SslConfigurationException("Encountered an error while building a self signed certificate", e);
-        }
-    }
-
-    @Override
-    public Optional<QuicSslContext> buildQuic() {
-        SelfSignedCertificate ssc;
-        try {
-            ssc = new SelfSignedCertificate();
-        } catch (CertificateException e) {
-            throw new SslConfigurationException("Encountered an error while building a self signed certificate", e);
-        }
-        return Optional.of(QuicSslContextBuilder.forServer(ssc.privateKey(), null, ssc.certificate())
-            .applicationProtocols(Http3.supportedApplicationProtocols())
-            .build());
+    protected Optional<KeyStore> getKeyStore(SslConfiguration ssl) throws Exception {
+        KeyStore store = KeyStore.getInstance(KeyStore.getDefaultType());
+        store.load(null, null);
+        SelfSignedCertificate ssc = new SelfSignedCertificate();
+        store.setKeyEntry("key", ssc.key(), null, new Certificate[]{ssc.cert()});
+        return Optional.of(store);
     }
 
     static class SelfSignedConfigured extends BuildSelfSignedCondition {
