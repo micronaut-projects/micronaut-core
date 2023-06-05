@@ -108,7 +108,7 @@ final class PropagatedContextImpl implements PropagatedContext {
 
     @Override
     public PropagatedContextImpl plus(PropagatedContextElement element) {
-        PropagatedContextElement[] newElements =  Arrays.copyOf(elements, elements.length + 1);
+        PropagatedContextElement[] newElements = Arrays.copyOf(elements, elements.length + 1);
         newElements[newElements.length - 1] = element;
         return new PropagatedContextImpl(newElements, containsThreadElements || isThreadElement(element));
     }
@@ -116,10 +116,7 @@ final class PropagatedContextImpl implements PropagatedContext {
     @Override
     public PropagatedContextImpl minus(PropagatedContextElement element) {
         int index = findElement(element);
-        if (index == -1) {
-            throw new NoSuchElementException("Element is not contained in the current context!");
-        }
-        PropagatedContextElement[] newElements =  new PropagatedContextElement[elements.length - 1];
+        PropagatedContextElement[] newElements = new PropagatedContextElement[elements.length - 1];
         if (index > 0) {
             System.arraycopy(elements, 0, newElements, 0, index);
         }
@@ -133,13 +130,7 @@ final class PropagatedContextImpl implements PropagatedContext {
     @Override
     public PropagatedContext replace(PropagatedContextElement oldElement, PropagatedContextElement newElement) {
         int index = findElement(oldElement);
-        if (index == -1) {
-            throw new NoSuchElementException("Element is not contained in the current context!");
-        }
-        if (index < 0) {
-            throw new NoSuchElementException("Element is not contained in the current context!");
-        }
-        PropagatedContextElement[] newElements =  new PropagatedContextElement[elements.length];
+        PropagatedContextElement[] newElements = new PropagatedContextElement[elements.length];
         System.arraycopy(elements, 0, newElements, 0, elements.length);
         newElements[index] = newElement;
         return new PropagatedContextImpl(newElements);
@@ -151,7 +142,7 @@ final class PropagatedContextImpl implements PropagatedContext {
                 return i;
             }
         }
-        return -1;
+        throw new NoSuchElementException("Element is not contained in the current context!");
     }
 
     @Override
