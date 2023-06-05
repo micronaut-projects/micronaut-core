@@ -15,6 +15,7 @@
  */
 package io.micronaut.management.endpoint;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.order.Ordered;
@@ -40,6 +41,7 @@ import java.util.Optional;
  * @author Sergio del Amo
  * @since 1.0
  */
+@Requires(missingBeans = EndpointSensitivityHandler.class)
 @ServerFilter(Filter.MATCH_ALL_PATTERN)
 @Internal
 public class EndpointsFilter implements Ordered {
