@@ -1,8 +1,6 @@
 package io.micronaut.http.server.netty.handler
 
-
 import io.micronaut.http.netty.stream.StreamedHttpRequest
-import io.micronaut.http.server.netty.DelegateStreamedHttpResponse
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelOutboundHandlerAdapter
@@ -81,7 +79,7 @@ class PipeliningServerHandlerSpec extends Specification {
         def ch = new EmbeddedChannel(mon, new PipeliningServerHandler(new RequestHandler() {
             @Override
             void accept(ChannelHandlerContext ctx, HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
-                outboundAccess.writeStreamed(new DelegateStreamedHttpResponse(resp, sink.asFlux()))
+                outboundAccess.writeStreamed(resp, sink.asFlux())
             }
 
             @Override

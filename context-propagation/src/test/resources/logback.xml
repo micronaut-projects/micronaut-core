@@ -10,6 +10,6 @@
         <appender-ref ref='STDOUT' />
     </root>
 
-    <logger name="io.micronaut" level="DEBUG" />
+    <logger name="io.micronaut" level="INFO" />
 
 </configuration>

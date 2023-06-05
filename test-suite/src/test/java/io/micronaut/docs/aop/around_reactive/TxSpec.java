@@ -16,9 +16,8 @@
 package io.micronaut.docs.aop.around_reactive;
 
 import io.micronaut.context.ApplicationContext;
-import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.RepeatedTest;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -27,7 +26,7 @@ import java.util.List;
 
 public class TxSpec {
 
-    @Test
+    @RepeatedTest(10)
     public void testReactiveTx() {
         try (ApplicationContext applicationContext = ApplicationContext.run()) {
             TxManager txManager = applicationContext.getBean(TxManager.class);
@@ -44,30 +43,29 @@ public class TxSpec {
         }
     }
 
-//    @Test
-//    TODO: move to micronaut-tracing
-//    public void testTwoFluxReactiveTx() {
-//        try (ApplicationContext applicationContext = ApplicationContext.run()) {
-//            TxManager txManager = applicationContext.getBean(TxManager.class);
-//            TxExample exampleBean = applicationContext.getBean(TxExample.class);
-//
-//            Assertions.assertTrue(txManager.getTransactionsLog().isEmpty());
-//            List<String> results = new ArrayList<>();
-//
-//            Flux.from(
-//                exampleBean.doWorkFlux("job1").doOnNext(results::add)
-//            ).thenMany(
-//                Mono.from(
-//                    exampleBean.doWorkFlux("job2").doOnNext(results::add)
-//                )
-//            ).collectList().block();
-//
-//            Assertions.assertEquals(List.of("OPEN TX1", "IN TX1", "COMMIT TX1", "OPEN TX2", "IN TX2", "COMMIT TX2"), txManager.getTransactionsLog());
-//            Assertions.assertEquals(List.of("Doing job: job1 in transaction: TX1", "Doing job: job2 in transaction: TX2"), results);
-//        }
-//    }
+    @RepeatedTest(10)
+    public void testTwoFluxReactiveTx() {
+        try (ApplicationContext applicationContext = ApplicationContext.run()) {
+            TxManager txManager = applicationContext.getBean(TxManager.class);
+            TxExample exampleBean = applicationContext.getBean(TxExample.class);
 
-    @Test
+            Assertions.assertTrue(txManager.getTransactionsLog().isEmpty());
+            List<String> results = new ArrayList<>();
+
+            Flux.from(
+                exampleBean.doWorkFlux("job1").doOnNext(results::add)
+            ).thenMany(
+                Flux.from(
+                    exampleBean.doWorkFlux("job2").doOnNext(results::add)
+                )
+            ).collectList().block();
+
+            Assertions.assertEquals(List.of("OPEN TX1", "IN TX1", "COMMIT TX1", "OPEN TX2", "IN TX2", "COMMIT TX2"), txManager.getTransactionsLog());
+            Assertions.assertEquals(List.of("Doing job: job1 in transaction: TX1", "Doing job: job2 in transaction: TX2"), results);
+        }
+    }
+
+    @RepeatedTest(10)
     public void testTwoMonoReactiveTx() {
         try (ApplicationContext applicationContext = ApplicationContext.run()) {
             TxManager txManager = applicationContext.getBean(TxManager.class);
@@ -89,7 +87,7 @@ public class TxSpec {
         }
     }
 
-    @Test
+    @RepeatedTest(10)
     public void testTwoMonoReactiveTx2() {
         try (ApplicationContext applicationContext = ApplicationContext.run()) {
             TxManager txManager = applicationContext.getBean(TxManager.class);

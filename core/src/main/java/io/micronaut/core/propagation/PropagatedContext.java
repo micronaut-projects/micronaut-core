@@ -36,17 +36,6 @@ import java.util.stream.Stream;
 public interface PropagatedContext {
 
     /**
-     * Creates a new context using one element.
-     *
-     * @param element The element to be included
-     * @return the new context
-     */
-    @NonNull
-    static PropagatedContext newContext(@NonNull PropagatedContextElement element) {
-        return PropagatedContextImpl.newContext(element);
-    }
-
-    /**
      * Returns the current context or an empty one.
      *
      * @return the current context or an empty one

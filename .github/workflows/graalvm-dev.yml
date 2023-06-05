@@ -8,13 +8,30 @@ on:
   schedule:
     - cron: "0 1 * * 1-5" # Mon-Fri at 1am UTC
 jobs:
+  build_matrix:
+    if: github.repository != 'micronaut-projects/micronaut-project-template'
+    runs-on: ubuntu-latest
+    env:
+      GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
+      GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
+      GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
+    outputs:
+      matrix: ${{ steps.build-matrix.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build Matrix
+        uses: micronaut-projects/github-actions/graalvm/build-matrix@parallel-native-tests
+        id: build-matrix
+        with:
+          graalvm: 'dev'
+          java: '17'
   build:
+    needs: build_matrix
     if: github.repository != 'micronaut-projects/micronaut-project-template'
     runs-on: ubuntu-latest
     strategy:
-      matrix:
-        graalvm: [ 'dev' ]
-        java: [ '17' ]
+      max-parallel: 6
+      matrix: ${{ fromJson(needs.build_matrix.outputs.matrix) }}
     env:
       GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
       GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
@@ -28,11 +45,13 @@ jobs:
           graalvm: ${{ matrix.graalvm }}
           java: ${{ matrix.java }}
       - name: Build Steps
-        uses: micronaut-projects/github-actions/graalvm/build@master
+        uses: micronaut-projects/github-actions/graalvm/build@parallel-native-tests
         id: build
         env:
           GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
           GH_USERNAME: ${{ secrets.GH_USERNAME }}
+        with:
+          nativeTestTask: ${{ matrix.native_test_task }}
       - name: Post-Build Steps
         uses: micronaut-projects/github-actions/graalvm/post-build@master
         id: post-build

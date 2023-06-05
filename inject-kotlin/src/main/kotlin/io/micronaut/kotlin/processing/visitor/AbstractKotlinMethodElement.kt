@@ -65,6 +65,10 @@ internal abstract class AbstractKotlinMethodElement<T : KotlinNativeElement>(
     override fun getDeclaredTypeVariables() =
         declaredTypeArguments.values.map { it as GenericPlaceholderElement }.toMutableList()
 
+    override fun isDefault(): Boolean {
+        return !isAbstract && declaringType.isAbstract
+    }
+
     override fun isSuspend(): Boolean {
         val nativeType = nativeType
         return if (nativeType is KSModifierListOwner) {

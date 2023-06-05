@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -24,6 +25,8 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.DelegateByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
@@ -50,11 +53,13 @@ import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.body.ByteBody;
 import io.micronaut.http.server.netty.body.HttpBody;
+import io.micronaut.http.server.netty.body.ImmediateByteBody;
 import io.micronaut.http.server.netty.body.ImmediateMultiObjectBody;
 import io.micronaut.http.server.netty.body.ImmediateSingleObjectBody;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.web.router.RouteMatch;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
@@ -101,7 +106,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Internal
-public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T> {
+public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T>, PushCapableHttpRequest<T>, io.micronaut.http.FullHttpRequest<T> {
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpRequest.class);
 
     /**
@@ -225,10 +230,51 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         }
     }
 
+    /**
+     * Get the initial body of this request. This is always a {@link ByteBody}. In most cases you
+     * should use {@link #byteBody()} instead.
+     *
+     * @return The root body
+     */
     public final ByteBody rootBody() {
         return body;
     }
 
+    /**
+     * Get the <i>last</i> byte body of this request, be it claimed or unclaimed. Basically, there
+     * are two options: For buffered requests (rootBody is immediate), this is just the root body.
+     * For streaming requests (rootBody is streaming), this can be that root body, or if someone
+     * called {@link ByteBody#buffer} (and the buffering has completed), it can be the buffered
+     * immediate body.<br>
+     * The returned byte body may have been claimed already.
+     *
+     * @return The byte body of this request
+     */
+    public final ByteBody byteBody() {
+        ByteBody byteBody = rootBody();
+        HttpBody httpBody = byteBody;
+        while (true) {
+            HttpBody next = httpBody.next();
+            if (next == null) {
+                break;
+            }
+            if (httpBody instanceof ByteBody bb) {
+                byteBody = bb;
+            }
+            httpBody = next;
+        }
+        return byteBody;
+    }
+
+    /**
+     * Get the <i>last</i> body of this request, of any type. This is a weird method to use, avoid
+     * it. It's sometimes necessary to "piggy-back" off other code that parses the body. For
+     * example in {@link #getBody()}, we want to return whatever we can, even if the body has
+     * already been claimed for a {@code @Body} parameter or form parsing or something. So we take
+     * the last step in the parse chain and do our best with it.
+     *
+     * @return The last body of this request
+     */
     public final HttpBody lastBody() {
         HttpBody body = rootBody();
         while (true) {
@@ -596,7 +642,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
     @Override
     public Optional<io.netty.handler.codec.http.HttpRequest> toHttpRequestDirect() {
-        return Optional.of(rootBody().claimForReuse(nettyRequest));
+        return Optional.of(byteBody().claimForReuse(nettyRequest));
     }
 
     @Override
@@ -662,6 +708,29 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         } else {
             return contentLength;
         }
+    }
+
+    @Override
+    public boolean isFull() {
+        return body instanceof ImmediateByteBody;
+    }
+
+    @Override
+    public ByteBuffer<?> contents() {
+        if (byteBody() instanceof ImmediateByteBody immediateByteBody) {
+            return toByteBuffer(immediateByteBody);
+        }
+        return null;
+    }
+
+    @Override
+    public ExecutionFlow<ByteBuffer<?>> bufferContents() {
+        return byteBody().buffer(getChannelHandlerContext().alloc()).map(NettyHttpRequest::toByteBuffer);
+    }
+
+    private static ByteBuffer<ByteBuf> toByteBuffer(ImmediateByteBody immediateByteBody) {
+        // use delegate because we don't want to implement ReferenceCounted
+        return new DelegateByteBuffer<>(NettyByteBufferFactory.DEFAULT.wrap(immediateByteBody.contentUnclaimed()));
     }
 
     /**

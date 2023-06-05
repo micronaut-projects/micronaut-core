@@ -11,7 +11,7 @@ import io.micronaut.http.annotation.*
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.http.filter.OncePerRequestHttpServerFilter
+import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Singleton
@@ -424,9 +424,9 @@ class RequestBeanSpec extends Specification {
     }
 
     @Filter("/request/bean/**")
-    static class TestFilter extends OncePerRequestHttpServerFilter {
+    static class TestFilter implements HttpServerFilter {
         @Override
-        protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
+        Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             request.getAttributes().put("filter.value", "Filter Test Value")
             return chain.proceed(request)
         }

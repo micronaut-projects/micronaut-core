@@ -51,6 +51,16 @@ public class ConsumesTest {
                 .build()));
     }
 
+    @Test
+    void testTextJson() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/consumes-test/text-json", "{\"name\":\"Fred\"}").header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_JSON),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("{\"name\":\"Fred\"}")
+                .build()));
+    }
+
     @Controller("/consumes-test")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class ConsumesController {
@@ -58,6 +68,12 @@ public class ConsumesTest {
         @Post("/")
         @Consumes({MediaType.APPLICATION_FORM_URLENCODED, MediaType.APPLICATION_JSON})
         Pojo save(@Body Pojo pojo) {
+            return pojo;
+        }
+
+        @Post("/text-json")
+        @Consumes({MediaType.TEXT_JSON})
+        Pojo textJson(@Body Pojo pojo) {
             return pojo;
         }
     }

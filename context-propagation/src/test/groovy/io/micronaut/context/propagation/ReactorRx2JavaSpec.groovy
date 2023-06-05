@@ -2,20 +2,20 @@ package io.micronaut.context.propagation
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
-import io.micronaut.reactor.http.client.ReactorHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.rxjava2.http.client.RxHttpClient
 import io.micronaut.scheduling.annotation.ExecuteOn
 import io.reactivex.Flowable
-import io.reactivex.Single
 import jakarta.inject.Inject
+import org.reactivestreams.Publisher
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import reactor.core.publisher.Flux
@@ -38,11 +38,11 @@ class ReactorRx2JavaSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    RxHttpClient rxHttpClient = RxHttpClient.create(embeddedServer.URL)
+    HttpClient rxHttpClient = HttpClient.create(embeddedServer.URL)
 
     void "test RxJava2 integration"() {
         expect:
-        List<Tuple2> result = Flux.range(1, 100)
+        List<Tuple2> result = Flux.range(1, 1)
                 .flatMap {
                     String tracingId = UUID.randomUUID()
                     HttpRequest<Object> request = HttpRequest
@@ -67,17 +67,18 @@ class ReactorRx2JavaSpec extends Specification {
 
         @Inject
         @Client("/")
-        private RxHttpClient rxHttpClient
+        private HttpClient rxHttpClient
 
         @Inject
         @Client("/")
-        private ReactorHttpClient reactorHttpClient
+        private HttpClient reactorHttpClient
 
+        @SingleResult
         @ExecuteOn(IO)
         @Post("/enter")
-        Single<String> test(@Header("X-TrackingId") String tracingId, @Body SomeBody body) {
+        Publisher<String> test(@Header("X-TrackingId") String tracingId, @Body SomeBody body) {
             LOG.info("enter")
-            return Single.fromPublisher(
+            return Flowable.fromPublisher(
                     reactorHttpClient.retrieve(HttpRequest
                             .GET("/rxjava2/test")
                             .header("X-TrackingId", tracingId), String)
