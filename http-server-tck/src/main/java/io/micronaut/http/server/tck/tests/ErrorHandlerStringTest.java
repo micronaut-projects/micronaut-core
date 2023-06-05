@@ -76,7 +76,7 @@ public class ErrorHandlerStringTest {
 
         @Override
         public String handle(HttpRequest request, MyException exception) {
-            return ""{\"message\":\"hello\"}"";
+            return "{\"message\":\"hello\"}";
         }
     }
 }
