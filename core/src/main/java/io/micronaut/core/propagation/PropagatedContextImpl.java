@@ -20,9 +20,9 @@ import io.micronaut.core.annotation.NonNull;
 
 import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -50,25 +50,31 @@ final class PropagatedContextImpl implements PropagatedContext {
 
     private static final Scope CLEANUP = THREAD_CONTEXT::remove;
 
-    private static final PropagatedContextImpl EMPTY = new PropagatedContextImpl(Collections.emptyList());
+    private static final PropagatedContextImpl EMPTY = new PropagatedContextImpl(new PropagatedContextElement[0], false);
 
-    private final List<PropagatedContextElement> elements;
+    private final PropagatedContextElement[] elements;
     private final boolean containsThreadElements;
 
-    private PropagatedContextImpl(List<PropagatedContextElement> elements) {
+    private PropagatedContextImpl(PropagatedContextElement[] elements) {
+        this(elements, containsThreadElements(elements));
+    }
+
+    private PropagatedContextImpl(PropagatedContextElement[] elements, boolean containsThreadElements) {
         this.elements = elements;
-        boolean containsThreadElements = false;
-        for (PropagatedContextElement element : elements) {
-            if (element instanceof ThreadPropagatedContextElement) {
-                containsThreadElements = true;
-                break;
-            }
-        }
         this.containsThreadElements = containsThreadElements;
     }
 
-    public static PropagatedContextImpl newContext(PropagatedContextElement element) {
-        return new PropagatedContextImpl(Collections.singletonList(element));
+    private static boolean containsThreadElements(PropagatedContextElement[] elements) {
+        for (PropagatedContextElement element : elements) {
+            if (isThreadElement(element)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isThreadElement(PropagatedContextElement element) {
+        return element instanceof ThreadPropagatedContextElement;
     }
 
     public static boolean exists() {
@@ -76,7 +82,7 @@ final class PropagatedContextImpl implements PropagatedContext {
         if (propagatedContext == null) {
             return false;
         }
-        return !propagatedContext.elements.isEmpty();
+        return propagatedContext.elements.length != 0;
     }
 
     public static PropagatedContextImpl get() {
@@ -102,30 +108,50 @@ final class PropagatedContextImpl implements PropagatedContext {
 
     @Override
     public PropagatedContextImpl plus(PropagatedContextElement element) {
-        ArrayList<PropagatedContextElement> newElements = new ArrayList<>(elements.size() + 1);
-        newElements.addAll(elements);
-        newElements.add(element);
-        return new PropagatedContextImpl(Collections.unmodifiableList(newElements));
+        PropagatedContextElement[] newElements =  Arrays.copyOf(elements, elements.length + 1);
+        newElements[newElements.length - 1] = element;
+        return new PropagatedContextImpl(newElements, containsThreadElements || isThreadElement(element));
     }
 
     @Override
     public PropagatedContextImpl minus(PropagatedContextElement element) {
-        ArrayList<PropagatedContextElement> newElements = new ArrayList<>(elements);
-        if (!newElements.remove(element)) {
+        int index = findElement(element);
+        if (index == -1) {
             throw new NoSuchElementException("Element is not contained in the current context!");
         }
-        return new PropagatedContextImpl(Collections.unmodifiableList(newElements));
+        PropagatedContextElement[] newElements =  new PropagatedContextElement[elements.length - 1];
+        if (index > 0) {
+            System.arraycopy(elements, 0, newElements, 0, index);
+        }
+        int next = index + 1;
+        if (next != elements.length) {
+            System.arraycopy(elements, next, newElements, index, elements.length - next);
+        }
+        return new PropagatedContextImpl(newElements);
     }
 
     @Override
     public PropagatedContext replace(PropagatedContextElement oldElement, PropagatedContextElement newElement) {
-        ArrayList<PropagatedContextElement> newElements = new ArrayList<>(elements);
-        int index = newElements.indexOf(oldElement);
+        int index = findElement(oldElement);
+        if (index == -1) {
+            throw new NoSuchElementException("Element is not contained in the current context!");
+        }
         if (index < 0) {
             throw new NoSuchElementException("Element is not contained in the current context!");
         }
-        newElements.set(index, newElement);
-        return new PropagatedContextImpl(Collections.unmodifiableList(newElements));
+        PropagatedContextElement[] newElements =  new PropagatedContextElement[elements.length];
+        System.arraycopy(elements, 0, newElements, 0, elements.length);
+        newElements[index] = newElement;
+        return new PropagatedContextImpl(newElements);
+    }
+
+    private int findElement(PropagatedContextElement element) {
+        for (int i = 0, elementsLength = elements.length; i < elementsLength; i++) {
+            if (elements[i].equals(element)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     @Override
@@ -135,7 +161,7 @@ final class PropagatedContextImpl implements PropagatedContext {
 
     @Override
     public <T extends PropagatedContextElement> Stream<T> findAll(Class<T> elementType) {
-        List<PropagatedContextElement> reverseElements = new ArrayList<>(this.elements);
+        List<PropagatedContextElement> reverseElements = new ArrayList<>(Arrays.asList(elements));
         Collections.reverse(reverseElements);
         return reverseElements.stream()
             .filter(elementType::isInstance)
@@ -152,9 +178,8 @@ final class PropagatedContextImpl implements PropagatedContext {
     }
 
     private <T extends PropagatedContextElement> T findElement(Class<T> elementType) {
-        ListIterator<PropagatedContextElement> listIterator = elements.listIterator(elements.size());
-        while (listIterator.hasPrevious()) {
-            PropagatedContextElement element = listIterator.previous();
+        for (int i = elements.length - 1; i >= 0; i--) {
+            PropagatedContextElement element = elements[i];
             if (elementType.isInstance(element)) {
                 return (T) element;
             }
@@ -164,14 +189,14 @@ final class PropagatedContextImpl implements PropagatedContext {
 
     @Override
     public List<PropagatedContextElement> getAllElements() {
-        return elements;
+        return new ArrayList<>(Arrays.asList(elements));
     }
 
     @Override
     public Scope propagate() {
         PropagatedContextImpl prevCtx = THREAD_CONTEXT.get();
         Scope restore = prevCtx == null ? CLEANUP : () -> THREAD_CONTEXT.set(prevCtx);
-        if (prevCtx == this || elements.isEmpty()) {
+        if (prevCtx == this || elements.length == 0) {
             return restore;
         }
         PropagatedContextImpl ctx = this;
@@ -191,9 +216,9 @@ final class PropagatedContextImpl implements PropagatedContext {
     }
 
     private List<Map.Entry<ThreadPropagatedContextElement<Object>, Object>> updateThreadState() {
-        List<Map.Entry<ThreadPropagatedContextElement<Object>, Object>> threadState = new ArrayList<>(elements.size());
+        List<Map.Entry<ThreadPropagatedContextElement<Object>, Object>> threadState = new ArrayList<>(elements.length);
         for (PropagatedContextElement element : elements) {
-            if (element instanceof ThreadPropagatedContextElement) {
+            if (isThreadElement(element)) {
                 ThreadPropagatedContextElement<Object> threadPropagatedContextElement = (ThreadPropagatedContextElement<Object>) element;
                 Object state = threadPropagatedContextElement.updateThreadContext();
                 threadState.add(new AbstractMap.SimpleEntry<>(threadPropagatedContextElement, state));
