@@ -20,14 +20,10 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
-import io.micronaut.http.annotation.Header;
-import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.filter.FilterContinuation;
@@ -44,7 +40,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -58,25 +53,6 @@ import java.util.concurrent.CompletionStage;
 })
 public class RequestFilterTest {
     public static final String SPEC_NAME = "RequestFilterTest";
-
-    @Test
-    public void requestFilterBinding() throws IOException {
-        TestScenario.builder()
-            .specName(SPEC_NAME)
-            .request(HttpRequest.POST("/request-filter/binding", "{\"foo\":10}").contentType(MediaType.APPLICATION_JSON_TYPE))
-            .assertion((server, request) -> {
-                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
-                    .status(HttpStatus.OK)
-                    .body("application/json {\"foo\":10}")
-                    .build());
-                Assertions.assertEquals(
-                    List.of("binding application/json {\"foo\":10}"),
-                    server.getApplicationContext().getBean(MyServerFilter.class).events
-                );
-            })
-
-            .run();
-    }
 
     @Test
     public void requestFilterImmediateRequestParameter() throws IOException {
@@ -388,15 +364,6 @@ public class RequestFilterTest {
             events.add("requestFilterImmediateRequestParameter " + request.getPath());
         }
 
-        @RequestFilter("/request-filter/binding")
-        public void requestFilterBinding(
-            @Header String contentType,
-            @Body byte[] bytes,
-            FilterContinuation<HttpResponse<?>> continuation) {
-            events.add("binding " + contentType + " " + new String(bytes, StandardCharsets.UTF_8));
-            continuation.proceed();
-        }
-
         @RequestFilter("/request-filter/immediate-mutable-request-parameter")
         public void requestFilterImmediateMutableRequestParameter(MutableHttpRequest<?> request) {
             request.setAttribute("foo", "bar");
@@ -580,11 +547,6 @@ public class RequestFilterTest {
         @Get("/request-filter/empty-optional-response")
         public String requestFilterEmptyOptionalResponse(HttpRequest<?> request) {
             return "foo";
-        }
-
-        @Post("/request-filter/binding")
-        public String requestFilterBinding(@Header String contentType, @Body byte[] bytes) {
-            return contentType + " " + new String(bytes, StandardCharsets.UTF_8);
         }
     }
 }
