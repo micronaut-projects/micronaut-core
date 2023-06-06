@@ -17,7 +17,6 @@ package io.micronaut.http.client.netty.ssl;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Secondary;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
@@ -50,16 +49,17 @@ import java.util.Optional;
 
 /**
  * The Netty implementation of {@link SslBuilder} that generates an {@link SslContext} to create a client that
- * supports SSL.
+ * supports SSL.<br>
+ * This class is not final, so you can extend and replace it to implement alternate mechanisms for loading the
+ * key and trust stores.
  *
  * @author James Kleeh
  * @since 1.0
  */
 @Singleton
-@Internal
 @BootstrapContextCompatible
 @Secondary
-public final class NettyClientSslBuilder extends SslBuilder<SslContext> implements ClientSslBuilder {
+public class NettyClientSslBuilder extends SslBuilder<SslContext> implements ClientSslBuilder {
     private static final Logger LOG = LoggerFactory.getLogger(NettyClientSslBuilder.class);
 
     /**
@@ -71,12 +71,12 @@ public final class NettyClientSslBuilder extends SslBuilder<SslContext> implemen
 
     @SuppressWarnings("Duplicates")
     @Override
-    public Optional<SslContext> build(SslConfiguration ssl) {
+    public final Optional<SslContext> build(SslConfiguration ssl) {
         return build(ssl, HttpVersion.HTTP_1_1);
     }
 
     @Override
-    public Optional<SslContext> build(SslConfiguration ssl, HttpVersion httpVersion) {
+    public final Optional<SslContext> build(SslConfiguration ssl, HttpVersion httpVersion) {
         if (!ssl.isEnabled()) {
             return Optional.empty();
         }
@@ -85,7 +85,7 @@ public final class NettyClientSslBuilder extends SslBuilder<SslContext> implemen
 
     @NonNull
     @Override
-    public SslContext build(SslConfiguration ssl, HttpVersionSelection versionSelection) {
+    public final SslContext build(SslConfiguration ssl, HttpVersionSelection versionSelection) {
         SslContextBuilder sslBuilder = SslContextBuilder
             .forClient()
             .keyManager(getKeyManagerFactory(ssl))
@@ -128,7 +128,7 @@ public final class NettyClientSslBuilder extends SslBuilder<SslContext> implemen
     }
 
     @Override
-    public QuicSslContext buildHttp3(SslConfiguration ssl) {
+    public final QuicSslContext buildHttp3(SslConfiguration ssl) {
         QuicSslContextBuilder sslBuilder = QuicSslContextBuilder.forClient()
             .keyManager(getKeyManagerFactory(ssl), ssl.getKeyStore().getPassword().orElse(null))
             .trustManager(getTrustManagerFactory(ssl))
