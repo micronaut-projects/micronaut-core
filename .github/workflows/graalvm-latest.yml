@@ -26,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Build Matrix
-        uses: micronaut-projects/github-actions/graalvm/build-matrix@parallel-native-tests
+        uses: micronaut-projects/github-actions/graalvm/build-matrix@master
         id: build-matrix
         with:
           graalvm: 'latest'
@@ -51,7 +51,7 @@ jobs:
           graalvm: ${{ matrix.graalvm }}
           java: ${{ matrix.java }}
       - name: Build Steps
-        uses: micronaut-projects/github-actions/graalvm/build@parallel-native-tests
+        uses: micronaut-projects/github-actions/graalvm/build@master
         id: build
         env:
           GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
