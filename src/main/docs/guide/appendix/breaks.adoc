@@ -191,6 +191,14 @@ error handler, Micronaut HTTP is now stricter about allowed types. In doubt, for
 
 ==== `text/plain` messages are more restrictive about allowed types
 
-For `text/plain` request and response body writing, in 3.x, any type would be allowed and would be "serialized" using
-`toString()`. This is not permitted anymore. The body must be a `CharSequence` or one of a few standard library types
-(e.g. number types).
+For `text/plain` request and response body reading and writing, in 3.x, any type was allowed. For writing, the object
+would be converted using `toString`, and for reading, the object would be converted using `ConversionService`. For
+example, if you have a controller that returns an `Instant` as `text/plain`, it would write it using `toString` like
+`2023-05-25T13:25:02.925Z`. In the other direction, if you have a controller with a `@Body Instant instant`
+parameter, the same text would be converted to `Instant` using `ConversionService`.
+
+This is not permitted anymore for 4.x, except for some restricted types. The recommended fix is to move to
+`application/json` as the content type. `toString` is not a stable serialization format, JSON is more reliable.
+
+Alternatively, you can set the `micronaut.http.legacy-text-conversion` configuration option to `true` to restore the
+old behavior.
