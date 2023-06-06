@@ -43,12 +43,12 @@ public class ErrorHandlerStringTest {
     @Test
     void testErrorHandlerWithStringReturn() throws IOException {
         asserts(SPEC_NAME,
-            HttpRequest.GET("/exception/my").header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON),
+            HttpRequest.GET("/exception/my"),
             (server, request) -> AssertionUtils.assertDoesNotThrow(
                 server,
                 request,
                 HttpStatus.OK,
-                "hello",
+                "{\"message\":\"hello\"}",
                 Map.of(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON)
             )
         );
@@ -76,7 +76,7 @@ public class ErrorHandlerStringTest {
 
         @Override
         public String handle(HttpRequest request, MyException exception) {
-            return "hello";
+            return "{\"message\":\"hello\"}";
         }
     }
 }
