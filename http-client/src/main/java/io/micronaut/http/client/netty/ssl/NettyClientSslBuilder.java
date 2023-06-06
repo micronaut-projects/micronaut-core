@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.client.HttpVersionSelection;
+import io.micronaut.http.netty.NettyTlsUtils;
 import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.SslBuilder;
@@ -45,6 +46,7 @@ import org.slf4j.LoggerFactory;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
+import java.security.KeyStore;
 import java.util.Arrays;
 import java.util.Optional;
 
@@ -89,7 +91,8 @@ public final class NettyClientSslBuilder extends SslBuilder<SslContext> implemen
         SslContextBuilder sslBuilder = SslContextBuilder
             .forClient()
             .keyManager(getKeyManagerFactory(ssl))
-            .trustManager(getTrustManagerFactory(ssl));
+            .trustManager(getTrustManagerFactory(ssl))
+            .sslProvider(NettyTlsUtils.sslProvider());
         Optional<String[]> protocols = ssl.getProtocols();
         if (protocols.isPresent()) {
             sslBuilder.protocols(protocols.get());
@@ -149,8 +152,9 @@ public final class NettyClientSslBuilder extends SslBuilder<SslContext> implemen
     @Override
     protected KeyManagerFactory getKeyManagerFactory(SslConfiguration ssl) {
         try {
-            if (this.getKeyStore(ssl).isPresent()) {
-                return super.getKeyManagerFactory(ssl);
+            Optional<KeyStore> ks = this.getKeyStore(ssl);
+            if (ks.isPresent()) {
+                return NettyTlsUtils.storeToFactory(ssl, ks.orElse(null));
             } else {
                 return null;
             }

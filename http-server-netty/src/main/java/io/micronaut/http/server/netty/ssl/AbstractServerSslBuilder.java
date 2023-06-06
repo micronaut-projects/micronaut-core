@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.ssl;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
+import io.micronaut.http.netty.NettyTlsUtils;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.ServerSslConfiguration;
@@ -30,12 +31,12 @@ import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.SslProvider;
 import io.netty.handler.ssl.SupportedCipherSuiteFilter;
 import io.netty.incubator.codec.http3.Http3;
 import io.netty.incubator.codec.quic.QuicSslContext;
 import io.netty.incubator.codec.quic.QuicSslContextBuilder;
 
+import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import java.util.Arrays;
 import java.util.Optional;
@@ -103,6 +104,7 @@ public abstract class AbstractServerSslBuilder extends SslBuilder<SslContext> im
     }
 
     private static void setupSslBuilder(SslContextBuilder sslBuilder, SslConfiguration ssl, HttpVersion httpVersion) {
+        sslBuilder.sslProvider(NettyTlsUtils.sslProvider());
         Optional<String[]> protocols = ssl.getProtocols();
         if (protocols.isPresent()) {
             sslBuilder.protocols(protocols.get());
@@ -125,8 +127,6 @@ public abstract class AbstractServerSslBuilder extends SslBuilder<SslContext> im
         }
 
         if (isHttp2) {
-            SslProvider provider = SslProvider.isAlpnSupported(SslProvider.OPENSSL) ? SslProvider.OPENSSL : SslProvider.JDK;
-            sslBuilder.sslProvider(provider);
             sslBuilder.applicationProtocolConfig(new ApplicationProtocolConfig(
                 ApplicationProtocolConfig.Protocol.ALPN,
                 ApplicationProtocolConfig.SelectorFailureBehavior.NO_ADVERTISE,
@@ -153,5 +153,14 @@ public abstract class AbstractServerSslBuilder extends SslBuilder<SslContext> im
             }
         }
         return Optional.of(sslBuilder.build());
+    }
+
+    @Override
+    protected KeyManagerFactory getKeyManagerFactory(SslConfiguration ssl) {
+        try {
+            return NettyTlsUtils.storeToFactory(ssl, getKeyStore(ssl).orElse(null));
+        } catch (Exception ex) {
+            throw new SslConfigurationException(ex);
+        }
     }
 }
