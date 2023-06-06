@@ -90,6 +90,11 @@ dependencies {
             classifier = Os.isArch("aarch64") ? "osx-aarch_64" : "osx-x86_64"
         }
     }
+    testImplementation(libs.managed.netty.tcnative.boringssl.static) {
+        artifact {
+            classifier = Os.isArch("aarch64") ? "osx-aarch_64" : "osx-x86_64"
+        }
+    }
     testImplementation libs.logback.classic
 
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
