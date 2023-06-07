@@ -13,57 +13,53 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.tck.tests;
+package io.micronaut.http.server.tck.tests.mediatype;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
-import io.micronaut.http.annotation.RouteCondition;
 import io.micronaut.http.tck.AssertionUtils;
+import io.micronaut.http.tck.BodyAssertion;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
     "checkstyle:DesignForExtension"
 })
-public class ExpressionTest {
-    public static final String SPEC_NAME = "ExpressionTest";
+public class StringDefaultMediaTypeTest {
+    public static final String SPEC_NAME = "StringDefaultMediaTypeTest";
+    private static final HttpResponseAssertion ASSERTION = HttpResponseAssertion.builder()
+        .status(HttpStatus.OK)
+        .body(BodyAssertion.builder().body("Hello World").equals())
+        .assertResponse(response -> {
+            assertTrue(response.getContentType().isPresent());
+            assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getContentType().get());
+        }).build();
 
     @Test
-    void testConditionalGetRequest() throws IOException {
+    void jsonIsDefaultMediaTypeForString() throws IOException {
         asserts(SPEC_NAME,
-            HttpRequest.GET("/expr/test"),
-            (server, request) -> AssertionUtils.assertThrows(server, request,
-                HttpResponseAssertion.builder()
-                    .status(HttpStatus.NOT_FOUND)
-                    .build()));
-
-        asserts(SPEC_NAME,
-            HttpRequest.GET("/expr/test")
-                .header(HttpHeaders.AUTHORIZATION, "foo"),
-            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
-                HttpResponseAssertion.builder()
-                    .status(HttpStatus.OK)
-                    .body("ok")
-                    .build()));
+            HttpRequest.GET("/str"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, ASSERTION));
     }
 
-    @Controller("/expr")
+    @Controller("/str")
     @Requires(property = "spec.name", value = SPEC_NAME)
-    static class ExpressionController {
-        @Get(value = "/test")
-        @RouteCondition("#{request.headers.getFirst('Authorization')?.contains('foo')}")
-        String testGet() {
-            return "ok";
+    static class StrDefaultEncoding {
+        @Get
+        String index() {
+            return "Hello World";
         }
     }
 }

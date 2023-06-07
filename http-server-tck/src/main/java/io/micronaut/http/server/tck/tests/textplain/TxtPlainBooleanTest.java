@@ -13,20 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.tck.tests.bodywritable;
+package io.micronaut.http.server.tck.tests.textplain;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.io.Writable;
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.filter.HttpServerFilter;
-import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.BodyAssertion;
 import io.micronaut.http.tck.HttpResponseAssertion;
@@ -36,8 +32,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.io.IOException;
-import java.util.Collections;
-import java.util.Map;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -48,71 +42,59 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
     "checkstyle:MissingJavadocType",
     "checkstyle:DesignForExtension"
 })
-public class HtmlBodyWritableTest {
-    public static final String SPEC_NAME = "ControllerConstraintHandlerTest";
+public class TxtPlainBooleanTest {
+    public static final String SPEC_NAME = "TxtPlainBooleanTest";
     private static final HttpResponseAssertion ASSERTION = HttpResponseAssertion.builder()
         .status(HttpStatus.OK)
-        .body(BodyAssertion.builder().body("<!DOCTYPE html><html></html>").equals())
+        .body(BodyAssertion.builder().body("true").equals())
         .assertResponse(response -> {
             assertTrue(response.getContentType().isPresent());
-            assertEquals(MediaType.TEXT_HTML_TYPE, response.getContentType().get());
+            assertEquals(MediaType.TEXT_PLAIN_TYPE, response.getContentType().get());
         }).build();
 
     @Test
-    void htmlWritable() throws IOException {
+    void txtBoolean() throws IOException {
         asserts(SPEC_NAME,
-            HttpRequest.GET("/html/writable"),
+            HttpRequest.GET("/txt/boolean").accept(MediaType.TEXT_PLAIN),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, ASSERTION));
     }
 
     @Test
-    void htmlWritableMono() throws IOException {
+    void txtBooleanMono() throws IOException {
         asserts(SPEC_NAME,
-            HttpRequest.GET("/html/writablemono"),
+            HttpRequest.GET("/txt/boolean/mono").accept(MediaType.TEXT_PLAIN),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, ASSERTION));
     }
 
     @Test
-    void htmlWritableFluxFilter() throws IOException {
+    void txtBooleanFlux() throws IOException {
         asserts(SPEC_NAME,
-            HttpRequest.GET("/html/writablefluxfilter"),
+            HttpRequest.GET("/txt/boolean/flux").accept(MediaType.TEXT_PLAIN),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, ASSERTION));
     }
 
-    @Controller("/html")
+
+    @Controller("/txt")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class OnErrorMethodController {
-        @Get("/writable")
-        @Produces(MediaType.TEXT_HTML)
-        Writable index() {
-            return out -> out.write("<!DOCTYPE html><html></html>");
+        @Get("/boolean")
+        @Produces(MediaType.TEXT_PLAIN)
+        Boolean index() {
+            return Boolean.TRUE;
         }
 
-        @Get("/writablemono")
-        @Produces(MediaType.TEXT_HTML)
-        Mono<Writable> indexmono() {
-            Writable writable = out -> out.write("<!DOCTYPE html><html></html>");
-            return Mono.just(writable);
+        @Get("/boolean/mono")
+        @Produces(MediaType.TEXT_PLAIN)
+        @SingleResult
+        Publisher<Boolean> mono() {
+            return Mono.just(Boolean.TRUE);
         }
 
-        @Get("/writablefluxfilter")
-        Map<String, Object> indexfluxfilter() {
-            return Collections.emptyMap();
-        }
-    }
-
-    @Requires(property = "spec.name", value = SPEC_NAME)
-    @Filter("/html/writablefluxfilter")
-    static class MockFilter implements HttpServerFilter {
-        @Override
-        public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-            return Flux.from(chain.proceed(request))
-                .switchMap(response -> {
-                Writable writable = out -> out.write("<!DOCTYPE html><html></html>");
-                response.body(writable);
-                response.contentType(MediaType.TEXT_HTML);
-                return Flux.just(response);
-            });
+        @Get("/boolean/flux")
+        @Produces(MediaType.TEXT_PLAIN)
+        @SingleResult
+        Publisher<Boolean> flux() {
+            return Flux.just(Boolean.TRUE);
         }
     }
 }
