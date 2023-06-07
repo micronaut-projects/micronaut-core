@@ -258,10 +258,10 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             if (next == null) {
                 break;
             }
+            httpBody = next;
             if (httpBody instanceof ByteBody bb) {
                 byteBody = bb;
             }
-            httpBody = next;
         }
         return byteBody;
     }
@@ -712,7 +712,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
     @Override
     public boolean isFull() {
-        return body instanceof ImmediateByteBody;
+        return byteBody() instanceof ImmediateByteBody;
     }
 
     @Override

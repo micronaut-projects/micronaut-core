@@ -16,7 +16,6 @@
 package io.micronaut.http;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -31,6 +30,8 @@ import io.micronaut.core.io.buffer.ByteBuffer;
 @Internal
 public interface FullHttpRequest<B> extends HttpRequest<B> {
     /**
+     * Shortcut for {@code contents() != null}.
+     *
      * @return Is the request full.
      */
     default boolean isFull() {
@@ -38,6 +39,9 @@ public interface FullHttpRequest<B> extends HttpRequest<B> {
     }
 
     /**
+     * Get the raw body of this request. May be called multiple times. Buffer ownership is not
+     * transferred to the caller.
+     *
      * @return The body contents or null if there are none or they are not obtainable.
      */
     @Nullable
@@ -45,10 +49,12 @@ public interface FullHttpRequest<B> extends HttpRequest<B> {
 
     /**
      * Get the contents of this request as a buffer. If this is a streaming request, the returned
-     * flow may be delayed.
+     * flow may be delayed. If buffering is not supported for this request, this may return
+     * {@code null}. Once the returned flow completes, {@link #contents()} must return the same
+     * value.
      *
-     * @return The request content
+     * @return The request content, or {@code null} if buffering is not supported
      */
-    @NonNull
+    @Nullable
     ExecutionFlow<ByteBuffer<?>> bufferContents();
 }
