@@ -28,6 +28,7 @@ import org.reactivestreams.Processor;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.ServiceLoader;
@@ -200,6 +201,29 @@ public interface JsonMapper {
      * @throws IOException IOException
      */
     <T> byte[] writeValueAsBytes(@NonNull Argument<T> type, @Nullable T object) throws IOException;
+
+    /**
+     * Write an object as String.
+     *
+     * @param object The object to serialize.
+     * @return The serialized encoded json.
+     * @throws IOException IOException
+     */
+    default String writeValueAsString(@Nullable Object object) throws IOException {
+        return writeValueAsString(object, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Write an object as String.
+     *
+     * @param object The object to serialize.
+     * @param  charset The {@linkplain java.nio.charset.Charset charset} to be used to decode the {@code bytes}.
+     * @return The serialized encoded json.
+     * @throws IOException IOException
+     */
+    default String writeValueAsString(@Nullable Object object, @NonNull Charset charset) throws IOException {
+        return new String(writeValueAsBytes(object), charset);
+    }
 
     /**
      * Update an object from json data.
