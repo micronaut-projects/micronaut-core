@@ -17,6 +17,7 @@ package io.micronaut.json.codec;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReferenceCounted;
@@ -34,10 +35,7 @@ import io.micronaut.runtime.ApplicationConfiguration;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 /**
  * A {@link MediaTypeCodec} for {@link JsonMapper} based implementations.
@@ -72,7 +70,7 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
             applicationConfiguration,
             codecConfiguration,
             mediaType,
-            codecConfiguration != null ? codecConfiguration.getAdditionalTypes() : null);
+            null);
     }
 
     /**
@@ -86,12 +84,20 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
                                 ApplicationConfiguration applicationConfiguration,
                                 CodecConfiguration codecConfiguration,
                                 MediaType mediaType,
-                                List<MediaType> additionalTypes) {
+                                @Nullable List<MediaType> additionalTypes) {
         this.mapperProvider = mapperProvider;
         this.applicationConfiguration = applicationConfiguration;
         this.codecConfiguration = codecConfiguration;
         this.mediaType = mediaType;
-        this.additionalTypes = additionalTypes == null ? Collections.emptyList() : additionalTypes;
+
+        Set<MediaType> mediaTypes = new HashSet<>();
+        if (codecConfiguration != null) {
+            mediaTypes.addAll(codecConfiguration.getAdditionalTypes());
+        }
+        if (additionalTypes != null) {
+            mediaTypes.addAll(additionalTypes);
+        }
+        this.additionalTypes = new ArrayList<>(mediaTypes);
     }
 
     /**
