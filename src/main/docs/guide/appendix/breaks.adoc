@@ -205,4 +205,4 @@ old behavior.
 
 ==== `OncePerRequestHttpServerFilter` removed
 
-Since Micronaut 3.0 server filters are executed once per request. The `OncePerRequestHttpServerFilter` class was deprecated and marked for removal. This class is now removed.
+Since Micronaut 3.0 the `OncePerRequestHttpServerFilter` class was deprecated and marked for removal. This class is now removed. Implement link:{api}/io/micronaut/http/filter/HttpServerFilter.html[HttpServerFilter] instead, and replace any usages of `micronaut.once` attributes with a custom attribute name.
