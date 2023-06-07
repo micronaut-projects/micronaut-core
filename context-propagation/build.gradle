@@ -25,10 +25,6 @@ dependencies {
     compileOnly platform(libs.test.boms.micronaut.rxjava3)
     compileOnly platform(libs.test.boms.micronaut.reactor)
 
-    testImplementation platform(libs.test.boms.micronaut.rxjava2)
-    testImplementation platform(libs.test.boms.micronaut.rxjava3)
-    testImplementation platform(libs.test.boms.micronaut.reactor)
-
     compileOnly ("io.micronaut.rxjava2:micronaut-rxjava2-http-client") {
         exclude group: "io.micronaut"
     }
@@ -36,15 +32,21 @@ dependencies {
         exclude group: "io.micronaut"
     }
 
-    testImplementation project(":inject-groovy")
+
     testAnnotationProcessor project(":inject-java")
 
+    testImplementation platform(libs.test.boms.micronaut.rxjava2)
+    testImplementation platform(libs.test.boms.micronaut.rxjava3)
+    testImplementation platform(libs.test.boms.micronaut.reactor)
+
+    testImplementation project(":inject-groovy")
     testImplementation project(":runtime")
     testImplementation project(":jackson-databind")
     testImplementation project(":core-reactive")
     testImplementation project(":inject-java-test")
     testImplementation project(":http-client")
     testImplementation project(':http-server-netty')
+    testImplementation libs.managed.snakeyaml
 
     testImplementation ("io.micronaut.rxjava2:micronaut-rxjava2-http-client") {
         exclude group: "io.micronaut"

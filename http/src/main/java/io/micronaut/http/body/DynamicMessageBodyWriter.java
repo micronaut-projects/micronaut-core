@@ -66,7 +66,7 @@ public final class DynamicMessageBodyWriter implements MessageBodyWriter<Object>
             //noinspection unchecked,OptionalGetWithoutIsPresent,rawtypes
             return (MessageBodyWriter) registry.findWriter(Argument.STRING, List.of(MediaType.TEXT_PLAIN_TYPE)).get();
         }
-        throw new CodecException("Cannot encode value [" + object + "]. No possible encoders found for medata type: " + mediaType);
+        throw new CodecException("Cannot encode value [" + object + "]. No possible encoders found for media type: " + mediaType);
     }
 
     @Override

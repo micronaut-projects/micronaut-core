@@ -49,7 +49,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
     SymbolProcessor {
 
     private lateinit var loadedVisitors: MutableList<LoadedVisitor>
-    private lateinit var typeElementVisitors: Collection<TypeElementVisitor<*, *>>
+    private var typeElementVisitors: Collection<TypeElementVisitor<*, *>>? = null
     private lateinit var visitorContext: KotlinVisitorContext
     private val processed: MutableSet<String> = mutableSetOf()
 
@@ -82,11 +82,12 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
                 )
             }
 
-        typeElementVisitors = findTypeElementVisitors()
-        loadedVisitors = ArrayList(typeElementVisitors.size)
-        visitorContext = KotlinVisitorContext(environment, resolver)
-
-        start()
+        if (typeElementVisitors == null) {
+            typeElementVisitors = findTypeElementVisitors()
+            loadedVisitors = ArrayList(typeElementVisitors!!.size)
+            visitorContext = KotlinVisitorContext(environment, resolver)
+            start()
+        }
 
         if (loadedVisitors.isNotEmpty()) {
 
@@ -114,7 +115,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
                         val className = typeElement.qualifiedName?.asString()
                         if (className != null && !processed.contains(className)) {
                             processed.add(className)
-                            
+
                             for (loadedVisitor in loadedVisitors) {
                                 if (!loadedVisitor.matches(typeElement)) {
                                     continue
@@ -158,7 +159,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
     }
 
     private fun start() {
-        for (visitor in typeElementVisitors) {
+        for (visitor in typeElementVisitors!!) {
             try {
                 loadedVisitors.add(
                     LoadedVisitor(

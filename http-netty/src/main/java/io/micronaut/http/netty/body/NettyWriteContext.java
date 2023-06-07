@@ -18,11 +18,12 @@ package io.micronaut.http.netty.body;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpChunkedInput;
+import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpResponse;
+import org.reactivestreams.Publisher;
 
 import java.io.RandomAccessFile;
 
@@ -48,12 +49,12 @@ public interface NettyWriteContext {
     void writeFull(@NonNull FullHttpResponse response);
 
     /**
-     * Write a streamed response. The actual response will only be written when the first item
-     * of the {@link org.reactivestreams.Publisher} is received, in order to handle errors.
+     * Write a streamed response.
      *
      * @param response The response to write
+     * @param content  The body
      */
-    void writeStreamed(@NonNull StreamedHttpResponse response);
+    void writeStreamed(@NonNull HttpResponse response, @NonNull Publisher<HttpContent> content);
 
     /**
      * Write a response with a {@link HttpChunkedInput} body.

@@ -107,7 +107,7 @@ class ServerRedirectSpec extends Specification {
 
         where:
         type        | result
-        'permanent' | 'good'
+        'permanent' | 'permanent hello good'
         'temporary' | 'temporary hello good'
         'moved'     | 'good'
         'seeOther'  | 'good'
@@ -148,7 +148,7 @@ class ServerRedirectSpec extends Specification {
 
         where:
         type        | result
-        'permanent' | 'The Stand'
+        'permanent' | 'permanent The Stand'
         'temporary' | 'temporary The Stand'
         'moved'     | 'The Stand'
         'seeOther'  | 'The Stand'

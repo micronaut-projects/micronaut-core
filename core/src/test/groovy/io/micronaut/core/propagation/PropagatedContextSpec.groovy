@@ -4,6 +4,27 @@ import spock.lang.Specification
 
 class PropagatedContextSpec extends Specification {
 
+    def "test minus"() {
+        given:
+            PropagatedElement e1 = new PropagatedElement()
+            PropagatedElement e2 = new PropagatedElement()
+            PropagatedElement e3 = new PropagatedElement()
+        expect:
+            try (PropagatedContext.Scope ignore1 = PropagatedContext.getOrEmpty().plus(e1).propagate()) {
+                try (PropagatedContext.Scope ignore2 = PropagatedContext.getOrEmpty().plus(e2).propagate()) {
+                    try (PropagatedContext.Scope ignore3 = PropagatedContext.getOrEmpty().plus(e3).propagate()) {
+                        PropagatedContext propagatedContext = PropagatedContext.get()
+                        assert propagatedContext.getAllElements() == [e1, e2, e3]
+                        assert propagatedContext.minus(e1).getAllElements() == [e2, e3]
+                        assert propagatedContext.minus(e2).getAllElements() == [e1, e3]
+                        assert propagatedContext.minus(e3).getAllElements() == [e1, e2]
+                        assert propagatedContext.minus(e1).minus(e2).getAllElements() == [e3]
+                        assert propagatedContext.minus(e1).minus(e2).minus(e3).getAllElements() == []
+                    }
+                }
+            }
+    }
+
     def "test multiple elements of the same type"() {
         given:
             PropagatedElement e1 = new PropagatedElement()

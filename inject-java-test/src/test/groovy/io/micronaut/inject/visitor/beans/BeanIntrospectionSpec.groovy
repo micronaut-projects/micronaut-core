@@ -31,6 +31,7 @@ import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.jackson.modules.BeanIntrospectionModule
+import io.micronaut.json.JsonMapper
 import io.micronaut.validation.visitor.ValidationVisitor
 import jakarta.inject.Singleton
 import spock.lang.IgnoreIf
@@ -1055,9 +1056,9 @@ public record Foo(@JsonProperty("other") String name, @JsonIgnore int y) {
 ''')
         when:
         def obj = introspection.instantiate("test", 10)
-        def result = ApplicationContext.run('bean.introspection.test':'true').withCloseable {
+        String result = ApplicationContext.run('bean.introspection.test':'true').withCloseable {
             it.getBean(StaticBeanIntrospectionModule).introspectionMap[introspection.beanType] = introspection
-            it.getBean(ObjectMapper).writeValueAsString(obj)
+            it.getBean(JsonMapper).writeValueAsString(obj)
         }
         then:
         result == '{"other":"test"}'

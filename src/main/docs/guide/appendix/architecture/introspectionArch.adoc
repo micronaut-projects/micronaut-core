@@ -12,14 +12,14 @@ This generation happens via the `io.micronaut.inject.beans.visitor.BeanIntrospec
 
 For example, given a class called `example.Person` the classes generated are:
 
-* `example.$Person$IntrospectionRef` - an implementation of api:core.beans.BeanIntrospectionReference[] that allows the application to soft load the introspection without loading all of the metadata or the class itself (in the case where the introspected class is itself not on the classpath). Since references are loaded via link:{jdkapi}/java/util/ServiceLoader.html[ServiceLoader] an entry in a generated `META-INF/services/io.micronaut.core.beans.BeanIntrospectionReference` referring to this type is also generated at compilation time.
+* `example.$Person$IntrospectionRef` - an implementation of api:core.beans.BeanIntrospectionReference[] that allows the application to soft load the introspection without loading all of the metadata or the class itself (in the case where the introspected class is itself not on the classpath). Since references are loaded via link:{jdkapi}/java.base/java/util/ServiceLoader.html[ServiceLoader] an entry in a generated `META-INF/services/io.micronaut.core.beans.BeanIntrospectionReference` referring to this type is also generated at compilation time.
 * `example.$Person$Introspection` - an implementation of api:core.beans.BeanIntrospection[] which contains the actual runtime introspection information.
 
 The following example demonstrates usage of the api:core.beans.BeanIntrospection[] API:
 
 snippet::io.micronaut.docs.ioc.beans.IntrospectionSpec[tags="usage", indent="0"]
 
-<1> A api:core.beans.BeanIntrospection[] is looked up by type. When this occurs the introspection will be searched for amongst the api:core.beans.BeanIntrospectionReference[] instances loaded via link:{jdkapi}/java/util/ServiceLoader.html[ServiceLoader].
+<1> A api:core.beans.BeanIntrospection[] is looked up by type. When this occurs the introspection will be searched for amongst the api:core.beans.BeanIntrospectionReference[] instances loaded via link:{jdkapi}/java.base/java/util/ServiceLoader.html[ServiceLoader].
 <2> The `instantiate` method allows creating instances
 <3> Properties for bean can be loaded via one of the available methods, in this case `getRequiredProperty`
 <4> The referenced api:core.beans.BeanProperty[] can be used to write mutable properties

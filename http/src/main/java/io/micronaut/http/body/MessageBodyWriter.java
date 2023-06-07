@@ -22,7 +22,6 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReferenceCounted;
-import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
@@ -38,6 +37,7 @@ import java.nio.charset.StandardCharsets;
  * An interface that allows writing a message body for the client or the server.
  *
  * <p>Implementors can define beans that use {@link io.micronaut.http.annotation.Produces} to restrict the applicable content types.</p>
+ * <p>Use {@link io.micronaut.core.annotation.Order} to specify the precedence of the writer with lower order corresponding to higher precedence.</p>
  *
  * @param <T> The generic type.
  * @see io.micronaut.http.annotation.Produces
@@ -45,7 +45,7 @@ import java.nio.charset.StandardCharsets;
  */
 @Experimental
 @Indexed(MessageBodyWriter.class)
-public interface MessageBodyWriter<T> extends Ordered {
+public interface MessageBodyWriter<T> {
     /**
      * Is the type writeable.
      *

@@ -20,6 +20,7 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.bind.DefaultExecutableBeanContextBinder;
 import io.micronaut.context.bind.ExecutableBeanContextBinder;
+import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.bind.BoundExecutable;
@@ -43,7 +44,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.time.Duration;
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
@@ -117,13 +117,11 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
             }
 
             TaskScheduler taskScheduler = optionalTaskScheduler.orElseThrow(() -> new SchedulerConfigurationException(method, "No scheduler of type TaskScheduler configured for name: " + scheduler));
-            Argument<Object> beanType = (Argument<Object>) beanDefinition.asArgument();
-            Qualifier<Object> declaredQualifier = (Qualifier<Object>) beanDefinition.getDeclaredQualifier();
             Runnable task = () -> {
                 try {
                     ExecutableBeanContextBinder binder = new DefaultExecutableBeanContextBinder();
                     BoundExecutable<?, ?> boundExecutable = binder.bind(method, beanContext);
-                    Object bean = beanContext.getBean(beanType, declaredQualifier);
+                    Object bean = beanContext.getBean((Argument<Object>) beanDefinition.asArgument(), (Qualifier<Object>) beanDefinition.getDeclaredQualifier());
                     AnnotationValue<Scheduled> finalAnnotationValue = scheduledAnnotation;
                     if (finalAnnotationValue instanceof EvaluatedAnnotationValue<Scheduled> evaluated) {
                         finalAnnotationValue = evaluated.withArguments(bean, boundExecutable.getBoundArguments());
@@ -133,9 +131,13 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                         try {
                             ((BoundExecutable<Object, Object>) boundExecutable).invoke(bean);
                         } catch (Throwable e) {
-                            handleException(beanType.getType(), bean, e);
+                            handleException((Class<Object>) beanDefinition.getBeanType(), bean, e);
                         }
                     }
+                } catch (NoSuchBeanException noSuchBeanException) {
+                   // ignore: a timing issue can occur when the context is being shutdown. If a scheduled job runs and the context
+                   // is shutdown and available beans cleared then the bean is no longer available. The best thing to do here is just ignore the failure.
+                   LOG.debug("Scheduled job skipped for context shutdown: {}.{}", beanDefinition.getBeanType().getSimpleName(), method.getDescription(true));
                 } catch (Exception e) {
                     TaskExceptionHandler finalHandler = findHandler(beanDefinition.getBeanType(), e);
                     finalHandler.handleCreationFailure(beanDefinition, e);
@@ -189,23 +191,14 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     }
 
     private void handleException(Class<Object> beanType, Object bean, Throwable e) {
-        TaskExceptionHandler finalHandler = findHandler(beanType, e);
+        TaskExceptionHandler<Object, Throwable> finalHandler = findHandler(beanType, e);
         finalHandler.handle(bean, e);
     }
 
-    private TaskExceptionHandler findHandler(Class<?> beanType, Throwable e) {
-        io.micronaut.context.Qualifier<TaskExceptionHandler> qualifier = Qualifiers.byTypeArguments(beanType, e.getClass());
-        Collection<BeanDefinition<TaskExceptionHandler>> definitions = beanContext.getBeanDefinitions(TaskExceptionHandler.class, qualifier);
-        Optional<BeanDefinition<TaskExceptionHandler>> mostSpecific = definitions.stream().filter(def -> {
-            List<Argument<?>> typeArguments = def.getTypeArguments(TaskExceptionHandler.class);
-            if (typeArguments.size() == 2) {
-                return typeArguments.get(0).getType() == beanType && typeArguments.get(1).getType() == e.getClass();
-            }
-            return false;
-        }).findFirst();
-
-        TaskExceptionHandler finalHandler = mostSpecific.map(bd -> beanContext.getBean(bd.getBeanType(), qualifier)).orElse(this.taskExceptionHandler);
-        return finalHandler;
+    @SuppressWarnings("unchecked")
+    private TaskExceptionHandler<Object, Throwable> findHandler(Class<?> beanType, Throwable e) {
+        return beanContext.findBean(Argument.of(TaskExceptionHandler.class, beanType, e.getClass()))
+                          .orElse(this.taskExceptionHandler);
     }
 
     @Override

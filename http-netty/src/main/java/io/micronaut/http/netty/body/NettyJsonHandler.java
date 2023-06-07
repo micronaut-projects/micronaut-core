@@ -17,6 +17,7 @@ package io.micronaut.http.netty.body;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Replaces;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
@@ -50,9 +51,10 @@ import java.io.OutputStream;
 @Singleton
 @Internal
 @Replaces(JsonMessageHandler.class)
-@Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_HAL_JSON})
-@Consumes({MediaType.APPLICATION_JSON, MediaType.APPLICATION_HAL_JSON})
+@Produces({MediaType.APPLICATION_JSON, MediaType.APPLICATION_HAL_JSON, MediaType.TEXT_JSON})
+@Consumes({MediaType.APPLICATION_JSON, MediaType.APPLICATION_HAL_JSON, MediaType.TEXT_JSON})
 @BootstrapContextCompatible
+@Requires(beans = JsonMapper.class)
 public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, ChunkedMessageBodyReader<T>, CustomizableNettyJsonHandler {
     private final JsonMessageHandler<T> jsonMessageHandler;
 

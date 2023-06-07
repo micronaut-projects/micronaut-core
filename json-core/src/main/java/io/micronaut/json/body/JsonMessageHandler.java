@@ -47,8 +47,8 @@ import java.io.OutputStream;
 @SuppressWarnings("DefaultAnnotationParam")
 @Experimental
 @Singleton
-@Produces(MediaType.APPLICATION_JSON)
-@Consumes(MediaType.APPLICATION_JSON)
+@Produces({MediaType.APPLICATION_JSON, MediaType.TEXT_JSON})
+@Consumes({MediaType.APPLICATION_JSON, MediaType.TEXT_JSON})
 @BootstrapContextCompatible
 public final class JsonMessageHandler<T> implements MessageBodyHandler<T> {
     private final JsonMapper jsonMapper;

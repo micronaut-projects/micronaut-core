@@ -60,11 +60,11 @@ final class NettyInputStreamBodyBinder implements NonBlockingBodyArgumentBinder<
     @Override
     public BindingResult<InputStream> bind(ArgumentConversionContext<InputStream> context, HttpRequest<?> source) {
         if (source instanceof NettyHttpRequest<?> nhr) {
-            if (nhr.rootBody() instanceof ImmediateByteBody imm && imm.empty()) {
+            if (nhr.byteBody() instanceof ImmediateByteBody imm && imm.empty()) {
                 return BindingResult.empty();
             }
             try {
-                InputStream s = nhr.rootBody().rawContent(httpServerConfiguration).coerceToInputStream(nhr.getChannelHandlerContext().alloc());
+                InputStream s = nhr.byteBody().rawContent(httpServerConfiguration).coerceToInputStream(nhr.getChannelHandlerContext().alloc());
                 return () -> Optional.of(s);
             } catch (ContentLengthExceededException t) {
                 if (LOG.isTraceEnabled()) {

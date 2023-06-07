@@ -105,7 +105,6 @@ public final class AssertionUtils {
             .headers(expectedHeaders)
             .build());
     }
-
     public static <T> void assertDoesNotThrow(@NonNull ServerUnderTest server,
                                               @NonNull HttpRequest<T> request,
                                               @NonNull HttpResponseAssertion assertion) {

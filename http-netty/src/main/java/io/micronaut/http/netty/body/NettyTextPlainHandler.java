@@ -25,6 +25,8 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.body.MessageBodyHandler;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.TextPlainHandler;
@@ -45,6 +47,8 @@ import java.io.OutputStream;
 
 @Singleton
 @Replaces(TextPlainHandler.class)
+@Produces(MediaType.TEXT_PLAIN)
+@Consumes(MediaType.TEXT_PLAIN)
 @Internal
 final class NettyTextPlainHandler implements MessageBodyHandler<CharSequence>, NettyBodyWriter<CharSequence> {
     private final TextPlainHandler defaultHandler = new TextPlainHandler();

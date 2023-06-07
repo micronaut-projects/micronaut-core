@@ -15,24 +15,34 @@
  */
 package io.micronaut.http.filter;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.bind.ArgumentBinder;
+import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.core.propagation.MutablePropagatedContext;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 import io.micronaut.core.type.UnsafeExecutable;
+import io.micronaut.http.FullHttpRequest;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.inject.ExecutableMethod;
 import org.reactivestreams.Publisher;
@@ -193,7 +203,7 @@ public class FilterRunner {
             return processResponseFilter(filter, context, exception)
                 .flatMap(newContext -> {
                     if (context != newContext) {
-                        return processResponse(newContext.request, newContext.response, context.propagatedContext).map(context::withResponse);
+                        return processResponse(newContext.request, newContext.response, newContext.propagatedContext).map(newContext::withResponse);
                     }
                     return ExecutionFlow.just(newContext);
                 })
@@ -231,14 +241,16 @@ public class FilterRunner {
                 // skip filter, only used for response
                 return downstream.apply(context);
             }
+            MutablePropagatedContext mutablePropagatedContext = MutablePropagatedContext.of(context.propagatedContext);
             ExecutionFlow<FilterContext> filterMethodFlow;
             InternalFilterContinuation<?> continuation;
             if (before.isSuspended()) {
-                continuation = before.createContinuation(downstream, context);
+                continuation = before.createContinuation(downstream, context, mutablePropagatedContext);
             } else {
                 continuation = null;
             }
             FilterMethodContext filterMethodContext = new FilterMethodContext(
+                mutablePropagatedContext,
                 context.request,
                 context.response,
                 null,
@@ -292,7 +304,9 @@ public class FilterRunner {
                 throw new IllegalStateException("Terminal filters cannot be suspended");
             }
             try {
-                return terminalFilter.execute(context.request).map(context::withResponse).flatMap(downstream);
+                try (PropagatedContext.Scope ignore = context.propagatedContext.propagate()) {
+                    return terminalFilter.execute(context.request).map(context::withResponse).flatMap(downstream);
+                }
             } catch (Throwable e) {
                 return ExecutionFlow.error(e);
             }
@@ -320,18 +334,21 @@ public class FilterRunner {
             if (after.isSuspended()) {
                 return ExecutionFlow.error(new IllegalStateException("Response filter cannot have a continuation!"));
             }
+            PropagatedContext propagatedContext = filterContext.propagatedContext;
+            MutablePropagatedContext mutablePropagatedContext = MutablePropagatedContext.of(propagatedContext);
             FilterMethodContext filterMethodContext = new FilterMethodContext(
+                mutablePropagatedContext,
                 filterContext.request,
                 filterContext.response,
                 exceptionToFilter,
                 null);
             if (executeOn == null) {
-                try (PropagatedContext.Scope ignore = filterContext.propagatedContext.propagate()) {
+                try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
                     return after.filter(filterContext, filterMethodContext);
                 }
             } else {
                 return ExecutionFlow.async(executeOn, () -> {
-                    try (PropagatedContext.Scope ignore = filterContext.propagatedContext.propagate()) {
+                    try (PropagatedContext.Scope ignore = propagatedContext.propagate()) {
                         return after.filter(filterContext, filterMethodContext);
                     }
                 });
@@ -345,36 +362,58 @@ public class FilterRunner {
                                                           T bean,
                                                           ExecutableMethod<T, ?> method,
                                                           boolean isResponseFilter,
-                                                          FilterOrder order) throws IllegalArgumentException {
-        return prepareFilterMethod(conversionService, bean, method, method.getArguments(), method.getReturnType().asArgument(), isResponseFilter, order);
-    }
-
-    @Internal
-    public static void validateFilterMethod(Argument<?>[] arguments,
-                                            Argument<?> returnType,
-                                            boolean isResponseFilter) throws IllegalArgumentException {
-        prepareFilterMethod(ConversionService.SHARED, null, null, arguments, returnType, isResponseFilter, null);
+                                                          FilterOrder order,
+                                                          RequestBinderRegistry argumentBinderRegistry) throws IllegalArgumentException {
+        return prepareFilterMethod(conversionService, bean, method, method.getArguments(), method.getReturnType().asArgument(), isResponseFilter, order, argumentBinderRegistry);
     }
 
     @Internal
     @SuppressWarnings("java:S3776") // performance
-    public static <T> FilterMethod<T> prepareFilterMethod(ConversionService conversionService,
-                                                          T bean,
-                                                          ExecutableMethod<T, ?> method,
-                                                          Argument<?>[] arguments,
-                                                          Argument<?> returnType,
-                                                          boolean isResponseFilter,
-                                                          FilterOrder order) throws IllegalArgumentException {
+    private static <T> FilterMethod<T> prepareFilterMethod(ConversionService conversionService,
+                                                           @Nullable T bean,
+                                                           @Nullable ExecutableMethod<T, ?> method,
+                                                           Argument<?>[] arguments,
+                                                           Argument<?> returnType,
+                                                           boolean isResponseFilter,
+                                                           FilterOrder order,
+                                                           RequestBinderRegistry argumentBinderRegistry) throws IllegalArgumentException {
         FilterArgBinder[] fulfilled = new FilterArgBinder[arguments.length];
         Predicate<FilterMethodContext> filterCondition = FILTER_CONDITION_ALWAYS_TRUE;
         boolean skipOnError = isResponseFilter;
         boolean filtersException = false;
+        boolean waitForBody = false;
         ContinuationCreator continuationCreator = null;
         for (int i = 0; i < arguments.length; i++) {
             Argument<?> argument = arguments[i];
-            if (argument.getType().isAssignableFrom(HttpRequest.class)) {
+            Class<?> argumentType = argument.getType();
+            AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+            if (annotationMetadata.hasStereotype(Bindable.class)) {
+                ArgumentBinder<Object, HttpRequest<?>> argumentBinder = (ArgumentBinder<Object, HttpRequest<?>>) argumentBinderRegistry.findArgumentBinder(argument).orElse(null);
+                if (argumentBinder != null) {
+                    if (argumentBinder instanceof BaseFilterProcessor.RequiresRequestBodyBinder<?>) {
+                        waitForBody = true;
+                    }
+                    fulfilled[i] = ctx -> {
+                        HttpRequest<?> request = ctx.request;
+                        ArgumentConversionContext<Object> conversionContext = (ArgumentConversionContext<Object>) ConversionContext.of(argument);
+                        ArgumentBinder.BindingResult<Object> result = argumentBinder.bind(conversionContext, request);
+                        if (result.isPresentAndSatisfied()) {
+                            return result.get();
+                        } else {
+                            List<ConversionError> conversionErrors = result.getConversionErrors();
+                            if (!conversionErrors.isEmpty()) {
+                                throw new ConversionErrorException(argument, conversionErrors.get(0));
+                            } else {
+                                throw new IllegalArgumentException("Unbindable argument [" + argument + "] to method [" + method.getDescription(true) + "]");
+                            }
+                        }
+                    };
+                } else {
+                    throw new IllegalArgumentException("Unsupported binding annotation in filter method [" + method.getDescription(true) + "]: " + annotationMetadata.getAnnotationNameByStereotype(Bindable.class).orElse(null));
+                }
+            } else if (argumentType.isAssignableFrom(HttpRequest.class)) {
                 fulfilled[i] = ctx -> ctx.request;
-            } else if (argument.getType().isAssignableFrom(MutableHttpRequest.class)) {
+            } else if (argumentType.isAssignableFrom(MutableHttpRequest.class)) {
                 fulfilled[i] = ctx -> {
                     HttpRequest<?> request = ctx.request;
                     if (!(ctx.request instanceof MutableHttpRequest<?>)) {
@@ -382,12 +421,12 @@ public class FilterRunner {
                     }
                     return request;
                 };
-            } else if (argument.getType().isAssignableFrom(MutableHttpResponse.class)) {
+            } else if (argumentType.isAssignableFrom(MutableHttpResponse.class)) {
                 if (!isResponseFilter) {
                     throw new IllegalArgumentException("Filter is called before the response is known, can't have a response argument");
                 }
                 fulfilled[i] = ctx -> ctx.response;
-            } else if (Throwable.class.isAssignableFrom(argument.getType())) {
+            } else if (Throwable.class.isAssignableFrom(argumentType)) {
                 if (!isResponseFilter) {
                     throw new IllegalArgumentException("Request filters cannot handle exceptions");
                 }
@@ -404,7 +443,7 @@ public class FilterRunner {
                 }
                 filtersException = true;
                 skipOnError = false;
-            } else if (argument.getType() == FilterContinuation.class) {
+            } else if (argumentType == FilterContinuation.class) {
                 if (isResponseFilter) {
                     throw new IllegalArgumentException("Response filters cannot use filter continuations");
                 }
@@ -425,6 +464,8 @@ public class FilterRunner {
                 } else {
                     throw new IllegalArgumentException("Unsupported continuation type: " + continuationReturnType);
                 }
+            } else if (argumentType == MutablePropagatedContext.class) {
+                fulfilled[i] = ctx -> ctx.mutablePropagatedContext;
             } else {
                 throw new IllegalArgumentException("Unsupported filter argument type: " + argument);
             }
@@ -444,6 +485,7 @@ public class FilterRunner {
             filterCondition,
             continuationCreator,
             filtersException,
+            waitForBody,
             returnHandler
         );
     }
@@ -507,7 +549,7 @@ public class FilterRunner {
                     return next.handle(context, null, continuation);
                 }
 
-                Mono publisher = Mono.from(Publishers.convertPublisher(conversionService, returnValue, Publisher.class));
+                Mono<?> publisher = Mono.from(Publishers.convertPublisher(conversionService, returnValue, Publisher.class));
 
                 if (continuation instanceof ResultAwareContinuation resultAwareContinuation) {
                     return resultAwareContinuation.processResult(publisher);
@@ -544,6 +586,7 @@ public class FilterRunner {
                            Predicate<FilterMethodContext> filterCondition,
                            ContinuationCreator continuationCreator,
                            boolean filtersException,
+                           boolean waitForBody,
                            FilterReturnHandler returnHandler
     ) implements GenericHttpFilter, Ordered {
 
@@ -563,8 +606,10 @@ public class FilterRunner {
         }
 
         @SuppressWarnings("java:S1452")
-        public InternalFilterContinuation<?> createContinuation(Function<FilterContext, ExecutionFlow<FilterContext>> downstream, FilterContext filterContext) {
-            return continuationCreator.create(downstream, filterContext);
+        public InternalFilterContinuation<?> createContinuation(Function<FilterContext, ExecutionFlow<FilterContext>> downstream,
+                                                                FilterContext filterContext,
+                                                                MutablePropagatedContext mutablePropagatedContext) {
+            return continuationCreator.create(downstream, filterContext, mutablePropagatedContext);
         }
 
         private ExecutionFlow<FilterContext> filter(FilterContext filterContext,
@@ -573,6 +618,20 @@ public class FilterRunner {
                 if (filterCondition != null && !filterCondition.test(methodContext)) {
                     return ExecutionFlow.just(filterContext);
                 }
+                if (waitForBody && filterContext.request instanceof FullHttpRequest<?> fhr && !fhr.isFull()) {
+                    ExecutionFlow<?> buffered = fhr.bufferContents();
+                    if (buffered != null && buffered.tryComplete() == null) {
+                        return buffered.then(() -> filter0(filterContext, methodContext));
+                    }
+                }
+                return filter0(filterContext, methodContext);
+            } catch (Throwable e) {
+                return ExecutionFlow.error(e);
+            }
+        }
+
+        private ExecutionFlow<FilterContext> filter0(FilterContext filterContext, FilterMethodContext methodContext) {
+            try {
                 Object[] args = bindArgs(methodContext);
                 Object returnValue;
                 if (method instanceof UnsafeExecutable<T, ?> unsafeExecutable) {
@@ -580,7 +639,12 @@ public class FilterRunner {
                 } else {
                     returnValue = method.invoke(bean, args);
                 }
-                return returnHandler.handle(filterContext, returnValue, methodContext.continuation);
+                ExecutionFlow<FilterContext> executionFlow = returnHandler.handle(filterContext, returnValue, methodContext.continuation);
+                PropagatedContext mutatedPropagatedContext = methodContext.mutablePropagatedContext.getContext();
+                if (mutatedPropagatedContext != filterContext.propagatedContext) {
+                    executionFlow = executionFlow.map(fc -> fc.withPropagatedContext(mutatedPropagatedContext));
+                }
+                return executionFlow;
             } catch (Throwable e) {
                 return ExecutionFlow.error(e);
             }
@@ -597,6 +661,7 @@ public class FilterRunner {
     }
 
     private record FilterMethodContext(
+        MutablePropagatedContext mutablePropagatedContext,
         HttpRequest<?> request,
         @Nullable HttpResponse<?> response,
         @Nullable Throwable failure,
@@ -696,7 +761,9 @@ public class FilterRunner {
      */
     private interface ContinuationCreator {
 
-        InternalFilterContinuation<?> create(Function<FilterContext, ExecutionFlow<FilterContext>> downstream, FilterContext filterContext);
+        InternalFilterContinuation<?> create(Function<FilterContext, ExecutionFlow<FilterContext>> downstream,
+                                             FilterContext filterContext,
+                                             MutablePropagatedContext mutablePropagatedContext);
 
     }
 
@@ -800,8 +867,9 @@ public class FilterRunner {
         implements ResultAwareContinuation<Publisher<HttpResponse<?>>> {
 
         private ResultAwareReactiveContinuationImpl(Function<FilterContext, ExecutionFlow<FilterContext>> next,
-                                                    FilterContext filterContext) {
-            super(next, filterContext);
+                                                    FilterContext filterContext,
+                                                    MutablePropagatedContext mutablePropagatedContext) {
+            super(next, filterContext, mutablePropagatedContext);
         }
 
         @Override
@@ -820,20 +888,30 @@ public class FilterRunner {
 
         protected FilterContext filterContext;
         private final Function<FilterContext, ExecutionFlow<FilterContext>> downstream;
+        private final MutablePropagatedContext mutablePropagatedContext;
 
         private ReactiveContinuationImpl(Function<FilterContext, ExecutionFlow<FilterContext>> downstream,
-                                         FilterContext filterContext) {
+                                         FilterContext filterContext,
+                                         MutablePropagatedContext mutablePropagatedContext) {
             this.downstream = downstream;
             this.filterContext = filterContext;
+            this.mutablePropagatedContext = mutablePropagatedContext;
         }
 
         @Override
         public FilterContinuation<Publisher<HttpResponse<?>>> request(HttpRequest<?> request) {
-            return new ReactiveContinuationImpl(downstream, filterContext.withRequest(request));
+            return new ReactiveContinuationImpl(downstream, filterContext.withRequest(request), mutablePropagatedContext);
         }
 
         @Override
         public Publisher<HttpResponse<?>> proceed() {
+            PropagatedContext propagatedContext = filterContext.propagatedContext;
+            PropagatedContext mutatedPropagatedContext = mutablePropagatedContext.getContext();
+            if (propagatedContext != mutatedPropagatedContext) {
+                filterContext = filterContext.withPropagatedContext(mutatedPropagatedContext);
+            } else {
+                filterContext = filterContext.withPropagatedContext(PropagatedContext.find().orElse(filterContext.propagatedContext));
+            }
             return ReactiveExecutionFlow.fromFlow(
                 downstream.apply(filterContext).<HttpResponse<?>>map(newFilterContext -> {
                     filterContext = newFilterContext;
@@ -874,7 +952,7 @@ public class FilterRunner {
 
         @Override
         public Publisher<? extends HttpResponse<?>> proceed(MutableHttpRequest<?> request) {
-            filterContext = filterContext.withRequest(request);
+            filterContext = filterContext.withRequest(request).withPropagatedContext(PropagatedContext.find().orElse(filterContext.propagatedContext));
             return ReactiveExecutionFlow.fromFlow(
                 downstream.apply(filterContext).<HttpResponse<?>>map(newFilterContext -> {
                     filterContext = newFilterContext;
@@ -885,7 +963,7 @@ public class FilterRunner {
 
         @Override
         public Publisher<MutableHttpResponse<?>> proceed(HttpRequest<?> request) {
-            filterContext = filterContext.withRequest(request);
+            filterContext = filterContext.withRequest(request).withPropagatedContext(PropagatedContext.find().orElse(filterContext.propagatedContext));
             return ReactiveExecutionFlow.fromFlow(
                 downstream.apply(filterContext).<MutableHttpResponse<?>>map(newFilterContext -> {
                     filterContext = newFilterContext;
@@ -908,16 +986,26 @@ public class FilterRunner {
 
         private final Function<FilterContext, ExecutionFlow<FilterContext>> downstream;
         private FilterContext filterContext;
+        private final MutablePropagatedContext mutablePropagatedContext;
 
-        private BlockingContinuationImpl(Function<FilterContext, ExecutionFlow<FilterContext>> downstream, FilterContext filterContext) {
+        private BlockingContinuationImpl(Function<FilterContext, ExecutionFlow<FilterContext>> downstream,
+                                         FilterContext filterContext, MutablePropagatedContext mutablePropagatedContext) {
             this.downstream = downstream;
             this.filterContext = filterContext;
+            this.mutablePropagatedContext = mutablePropagatedContext;
         }
 
         @Override
         public FilterContinuation<HttpResponse<?>> request(HttpRequest<?> request) {
             filterContext = filterContext.withRequest(request);
-            return new BlockingContinuationImpl(downstream, filterContext);
+            PropagatedContext propagatedContext = filterContext.propagatedContext;
+            PropagatedContext mutatedPropagatedContext = mutablePropagatedContext.getContext();
+            if (propagatedContext != mutatedPropagatedContext) {
+                filterContext = filterContext.withPropagatedContext(mutatedPropagatedContext);
+            } else {
+                filterContext = filterContext.withPropagatedContext(PropagatedContext.find().orElse(filterContext.propagatedContext));
+            }
+            return new BlockingContinuationImpl(downstream, filterContext, mutablePropagatedContext);
         }
 
         @Override
