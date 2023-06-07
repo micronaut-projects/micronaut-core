@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.tck.tests;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.util.CollectionUtils;
