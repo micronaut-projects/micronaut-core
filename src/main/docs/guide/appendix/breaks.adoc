@@ -202,3 +202,7 @@ This is not permitted anymore for 4.x, except for some restricted types. The rec
 
 Alternatively, you can set the `micronaut.http.legacy-text-conversion` configuration option to `true` to restore the
 old behavior.
+
+==== `OncePerRequestHttpServerFilter` removed
+
+Since Micronaut 3.0 server filters are executed once per request. The `OncePerRequestHttpServerFilter` class was deprecated and marked for removal. This class is now removed.
