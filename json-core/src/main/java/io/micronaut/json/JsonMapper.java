@@ -91,6 +91,19 @@ public interface JsonMapper {
     <T> T readValue(@NonNull InputStream inputStream, @NonNull Argument<T> type) throws IOException;
 
     /**
+     * Parse and map json from the given stream.
+     *
+     * @param inputStream The input data.
+     * @param type        The type to deserialize to.
+     * @param <T>         Type variable of the return type.
+     * @return The deserialized object.
+     * @throws IOException IOException
+     */
+    default <T> T readValue(@NonNull InputStream inputStream, @NonNull Class<T> type) throws IOException {
+        return readValue(inputStream, Argument.of(type));
+    }
+
+    /**
      * Parse and map json from the given byte array.
      *
      * @param byteArray The input data.
@@ -125,6 +138,19 @@ public interface JsonMapper {
      */
     default <T> T readValue(@NonNull String string, @NonNull Argument<T> type) throws IOException {
         return readValue(string.getBytes(StandardCharsets.UTF_8), type);
+    }
+
+    /**
+     * Parse and map json from the given string.
+     *
+     * @param string The input data.
+     * @param type   The type to deserialize to.
+     * @param <T>    Type variable of the return type.
+     * @return The deserialized object.
+     * @throws IOException IOException
+     */
+    default <T> T readValue(@NonNull String string, @NonNull Class<T> type) throws IOException {
+        return readValue(string, Argument.of(type));
     }
 
     /**
@@ -210,19 +236,7 @@ public interface JsonMapper {
      * @throws IOException IOException
      */
     default String writeValueAsString(@Nullable Object object) throws IOException {
-        return writeValueAsString(object, StandardCharsets.UTF_8);
-    }
-
-    /**
-     * Write an object as String.
-     *
-     * @param object The object to serialize.
-     * @param  charset The {@linkplain java.nio.charset.Charset charset} to be used to decode the {@code bytes}.
-     * @return The serialized encoded json.
-     * @throws IOException IOException
-     */
-    default String writeValueAsString(@Nullable Object object, @NonNull Charset charset) throws IOException {
-        return new String(writeValueAsBytes(object), charset);
+        return new String(writeValueAsBytes(object), StandardCharsets.UTF_8);
     }
 
     /**

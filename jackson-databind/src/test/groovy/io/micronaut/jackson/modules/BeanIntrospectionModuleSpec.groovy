@@ -40,6 +40,7 @@ import io.micronaut.jackson.modules.wrappers.IntWrapper
 import io.micronaut.jackson.modules.wrappers.IntegerWrapper
 import io.micronaut.jackson.modules.wrappers.LongWrapper
 import io.micronaut.jackson.modules.wrappers.StringWrapper
+import io.micronaut.json.JsonMapper
 import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Unroll
@@ -55,12 +56,12 @@ class BeanIntrospectionModuleSpec extends Specification {
                 'jackson.deserialization.UNWRAP_ROOT_VALUE': true,
                 'jackson.serialization.WRAP_ROOT_VALUE': true
         )
-        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+        JsonMapper objectMapper = ctx.getBean(JsonMapper)
 
         when:
         Author author = new Author(name:"Bob")
 
-        def result = objectMapper.writeValueAsString(author)
+        String result = objectMapper.writeValueAsString(author)
 
         then:
         result == '{"Author":{"name":"Bob"}}'
@@ -79,14 +80,14 @@ class BeanIntrospectionModuleSpec extends Specification {
                 'jackson.deserialization.UNWRAP_ROOT_VALUE': true,
                 'jackson.serialization.WRAP_ROOT_VALUE': true
         )
-        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+        JsonMapper objectMapper = ctx.getBean(JsonMapper)
 
         when:
         HTTPCheck check = new HTTPCheck(headers:[
                 Accept:['application/json', 'application/xml']
         ] )
 
-        def result = objectMapper.writeValueAsString(check)
+        String result = objectMapper.writeValueAsString(check)
 
         then:
         result == '{"HTTPCheck":{"Header":{"Accept":["application/json","application/xml"]}}}'
@@ -105,12 +106,12 @@ class BeanIntrospectionModuleSpec extends Specification {
                 'jackson.deserialization.UNWRAP_ROOT_VALUE': true,
                 'jackson.serialization.WRAP_ROOT_VALUE': true
         )
-        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+        JsonMapper objectMapper = ctx.getBean(JsonMapper)
 
         when:
         IntrospectionCreator check = new IntrospectionCreator("test")
 
-        def result = objectMapper.writeValueAsString(check)
+        String result = objectMapper.writeValueAsString(check)
 
         then:
         result == '{"IntrospectionCreator":{"label":"TEST"}}'
@@ -129,12 +130,12 @@ class BeanIntrospectionModuleSpec extends Specification {
                 'jackson.deserialization.UNWRAP_ROOT_VALUE': true,
                 'jackson.serialization.WRAP_ROOT_VALUE': true
         )
-        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+        JsonMapper objectMapper = ctx.getBean(JsonMapper)
 
         when:
         InstanceInfo check = new InstanceInfo("test")
 
-        def result = objectMapper.writeValueAsString(check)
+        String result = objectMapper.writeValueAsString(check)
 
         then:
         result == '{"instance":{"hostName":"test"}}'
@@ -151,14 +152,14 @@ class BeanIntrospectionModuleSpec extends Specification {
     void "test serialize/deserialize convertible values"() {
         given:
         ApplicationContext ctx = ApplicationContext.run()
-        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+        JsonMapper objectMapper = ctx.getBean(JsonMapper)
 
         when:
         HTTPCheck check = new HTTPCheck(headers:[
                 Accept:['application/json', 'application/xml']
         ] )
 
-        def result = objectMapper.writeValueAsString(check)
+        String result = objectMapper.writeValueAsString(check)
 
         then:
         result == '{"Header":{"Accept":["application/json","application/xml"]}}'
@@ -174,7 +175,7 @@ class BeanIntrospectionModuleSpec extends Specification {
     void "Bean introspection works with a bean without JsonIgnore annotations"() {
         given:
         ApplicationContext ctx = ApplicationContext.run()
-        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+        JsonMapper objectMapper = ctx.getBean(JsonMapper)
 
         when:
         IgnoreTest guide = new IgnoreTest(name:"Test", code: 9999)
@@ -192,7 +193,7 @@ class BeanIntrospectionModuleSpec extends Specification {
         given:
         ApplicationContext ctx = ApplicationContext.run()
         ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
-        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+        JsonMapper objectMapper = ctx.getBean(JsonMapper)
 
         when:
         GuideWithoutJsonIncludeAnnotations guide = new GuideWithoutJsonIncludeAnnotations()
@@ -215,7 +216,7 @@ class BeanIntrospectionModuleSpec extends Specification {
         ApplicationContext ctx = ApplicationContext.run(
                 'jackson.serializationInclusion':'ALWAYS'
         )
-        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+        JsonMapper objectMapper = ctx.getBean(JsonMapper)
 
         when:
         GuideWithoutJsonIncludeAnnotations guide = new GuideWithoutJsonIncludeAnnotations()
@@ -235,7 +236,7 @@ class BeanIntrospectionModuleSpec extends Specification {
         ApplicationContext ctx = ApplicationContext.run(
                 'jackson.serializationInclusion':'ALWAYS'
         )
-        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+        JsonMapper objectMapper = ctx.getBean(JsonMapper)
 
         when:
         Guide guide = new Guide()
@@ -255,7 +256,7 @@ class BeanIntrospectionModuleSpec extends Specification {
         ApplicationContext ctx = ApplicationContext.run(
                 'jackson.serializationInclusion':'ALWAYS'
         )
-        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+        JsonMapper objectMapper = ctx.getBean(JsonMapper)
 
         when:
         GuideWithNull guide = new GuideWithNull()
@@ -274,7 +275,7 @@ class BeanIntrospectionModuleSpec extends Specification {
         given:
         ApplicationContext ctx = ApplicationContext.run()
         ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
-        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+        JsonMapper objectMapper = ctx.getBean(JsonMapper)
 
         when:
         def value = new OptionalAuthor(name: Optional.<String>empty())
@@ -353,11 +354,11 @@ class BeanIntrospectionModuleSpec extends Specification {
     void "test that introspected serialization works with @JsonAnyGetter"() {
         given:
         ApplicationContext ctx = ApplicationContext.run()
-        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+        JsonMapper objectMapper = ctx.getBean(JsonMapper)
 
         when:
         def plant = new PlantWithAnyGetter(name: "Rose", attributes: [color: "green", hasFlowers: true])
-        def str = objectMapper.writeValueAsString(plant)
+        String str = objectMapper.writeValueAsString(plant)
 
         then:
         str == '{"name":"Rose","color":"green","hasFlowers":true}'
@@ -611,7 +612,7 @@ class BeanIntrospectionModuleSpec extends Specification {
         given:
         ApplicationContext ctx = ApplicationContext.run()
         ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
-        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+        JsonMapper objectMapper = ctx.getBean(JsonMapper)
 
         expect:
         objectMapper.readValue('{"bar":"baz"}', JsonPropertyOnSetter.class).foo == 'baz'
@@ -629,7 +630,7 @@ class BeanIntrospectionModuleSpec extends Specification {
       given:
       ApplicationContext ctx = ApplicationContext.run()
       ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
-      ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+      JsonMapper objectMapper = ctx.getBean(JsonMapper)
 
       expect:
       objectMapper.readValue('{"foo":"Bar"}', JsonSerializeAnnotated.class).foo == 'bar'
@@ -647,7 +648,7 @@ class BeanIntrospectionModuleSpec extends Specification {
         given:
         ApplicationContext ctx = ApplicationContext.run()
         ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
-        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+        JsonMapper objectMapper = ctx.getBean(JsonMapper)
 
         expect:
         objectMapper.writeValueAsString(new DifferentCreator('baz')) == '{"fooBar":"baz"}'
@@ -666,7 +667,7 @@ class BeanIntrospectionModuleSpec extends Specification {
         given:
         ApplicationContext ctx = ApplicationContext.run()
         ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
-        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+        JsonMapper objectMapper = ctx.getBean(JsonMapper)
 
         expect:
         objectMapper.writeValueAsString(new IntrospectionCreator('baz')) == '{"label":"BAZ"}'
@@ -974,8 +975,8 @@ class BeanIntrospectionModuleSpec extends Specification {
         given:
         ApplicationContext ctx = ApplicationContext.run()
         ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
-        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
-        def ldt = LocalDateTime.of(2021, 11, 22, 10, 37)
+        JsonMapper objectMapper = ctx.getBean(JsonMapper)
+        LocalDateTime ldt = LocalDateTime.of(2021, 11, 22, 10, 37)
 
         expect:
         objectMapper.writeValueAsString(new FormatBean(ldt: ldt)) == '{"ldt":"2021-11-22 10:37:00"}'
@@ -1007,7 +1008,7 @@ class BeanIntrospectionModuleSpec extends Specification {
         given:
         ApplicationContext ctx = ApplicationContext.run()
         ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
-        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+        JsonMapper objectMapper = ctx.getBean(JsonMapper)
 
         expect:
         objectMapper.writeValueAsString(new IgnoreBean()) == '{"foo":"bar"}'
@@ -1054,7 +1055,7 @@ class BeanIntrospectionModuleSpec extends Specification {
         given:
         ApplicationContext ctx = ApplicationContext.run()
         ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
-        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+        JsonMapper objectMapper = ctx.getBean(JsonMapper)
 
         expect:
         objectMapper.writeValueAsString(new IgnoreBean2(foo: 'x', bar: 'y')) == '{"bar":"y"}'
@@ -1128,7 +1129,7 @@ class BeanIntrospectionModuleSpec extends Specification {
         given:
         ApplicationContext ctx = ApplicationContext.run()
         ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
-        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+        JsonMapper objectMapper = ctx.getBean(JsonMapper)
 
         expect:
         objectMapper.writeValueAsString(new JsonPropertyBean(foo: 'x')) == '{"bar":"x"}'
@@ -1161,7 +1162,7 @@ class BeanIntrospectionModuleSpec extends Specification {
         given:
         ApplicationContext ctx = ApplicationContext.run()
         ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
-        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+        JsonMapper objectMapper = ctx.getBean(JsonMapper)
 
         expect:
         objectMapper.writeValueAsString(new JsonNamingBean(fooBar: 'x')) == '{"foo_bar":"x"}'
@@ -1194,7 +1195,7 @@ class BeanIntrospectionModuleSpec extends Specification {
         given:
         ApplicationContext ctx = ApplicationContext.run(["jackson.property-naming-strategy": "SNAKE_CASE"])
         ctx.getBean(BeanIntrospectionModule).ignoreReflectiveProperties = ignoreReflectiveProperties
-        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+        JsonMapper objectMapper = ctx.getBean(JsonMapper)
 
         expect:
         objectMapper.writeValueAsString(new JsonNamingBeanConfig(fooBar: 'x')) == '{"foo_bar":"x"}'

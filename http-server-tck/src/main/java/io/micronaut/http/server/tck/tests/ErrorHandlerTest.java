@@ -40,6 +40,7 @@ import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
+import io.micronaut.json.JsonMapper;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
@@ -99,7 +100,7 @@ public class ErrorHandlerTest {
             PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE
         );
         try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME, configuration)) {
-            ObjectMapper objectMapper = server.getApplicationContext().getBean(ObjectMapper.class);
+            JsonMapper objectMapper = server.getApplicationContext().getBean(JsonMapper.class);
             HttpRequest<?> request = HttpRequest.POST("/json/errors/global", objectMapper.writeValueAsString(new RequestObject(101)))
                 .header(HttpHeaders.CONTENT_TYPE, io.micronaut.http.MediaType.APPLICATION_JSON);
             AssertionUtils.assertDoesNotThrow(server, request,
