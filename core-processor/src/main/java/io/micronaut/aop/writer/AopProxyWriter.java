@@ -817,9 +817,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             writeWithQualifierMethod(proxyClassWriter);
             if (!lazy || cacheLazyTarget) {
                 // add the $target field for the target bean
-                int modifiers = hotswap ? ACC_PRIVATE : ACC_PRIVATE | ACC_FINAL;
                 proxyClassWriter.visitField(
-                        modifiers,
+                        ACC_PRIVATE,
                         FIELD_TARGET,
                         targetType.getDescriptor(),
                         null,
