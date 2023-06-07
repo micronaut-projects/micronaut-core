@@ -87,8 +87,8 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
                 Class<? extends Annotation> annotation = argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Bindable.class).orElse(null);
                 if (annotation != null && PERMITTED_BINDING_ANNOTATIONS.contains(annotation.getName())) {
                     if (annotation == Body.class) {
-                        return Optional.of((context, source) -> {
-                            if (source instanceof FullHttpRequest<?> fullHttpRequest && fullHttpRequest.isFull()) {
+                        return Optional.of((RequiresRequestBodyBinder<T>) (context, source) -> {
+                            if (source instanceof FullHttpRequest<?> fullHttpRequest) {
                                 ByteBuffer<?> contents = fullHttpRequest.contents();
                                 if (contents != null) {
                                     Argument<T> t = context.getArgument();
@@ -246,5 +246,14 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
         @Nullable List<String> serviceId,
         @Nullable List<String> excludeServiceId
     ) {
+    }
+
+    /**
+     * Interface that signals to {@link FilterRunner} that we should wait for the request body to
+     * arrive before running this binder.
+     *
+     * @param <T> Arg type
+     */
+    public interface RequiresRequestBodyBinder<T> extends ArgumentBinder<T, HttpRequest<?>> {
     }
 }

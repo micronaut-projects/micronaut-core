@@ -37,6 +37,7 @@ import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 import io.micronaut.core.type.UnsafeExecutable;
+import io.micronaut.http.FullHttpRequest;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
@@ -380,6 +381,7 @@ public class FilterRunner {
         Predicate<FilterMethodContext> filterCondition = FILTER_CONDITION_ALWAYS_TRUE;
         boolean skipOnError = isResponseFilter;
         boolean filtersException = false;
+        boolean waitForBody = false;
         ContinuationCreator continuationCreator = null;
         for (int i = 0; i < arguments.length; i++) {
             Argument<?> argument = arguments[i];
@@ -388,6 +390,9 @@ public class FilterRunner {
             if (annotationMetadata.hasStereotype(Bindable.class)) {
                 ArgumentBinder<Object, HttpRequest<?>> argumentBinder = (ArgumentBinder<Object, HttpRequest<?>>) argumentBinderRegistry.findArgumentBinder(argument).orElse(null);
                 if (argumentBinder != null) {
+                    if (argumentBinder instanceof BaseFilterProcessor.RequiresRequestBodyBinder<?>) {
+                        waitForBody = true;
+                    }
                     fulfilled[i] = ctx -> {
                         HttpRequest<?> request = ctx.request;
                         ArgumentConversionContext<Object> conversionContext = (ArgumentConversionContext<Object>) ConversionContext.of(argument);
@@ -480,6 +485,7 @@ public class FilterRunner {
             filterCondition,
             continuationCreator,
             filtersException,
+            waitForBody,
             returnHandler
         );
     }
@@ -580,6 +586,7 @@ public class FilterRunner {
                            Predicate<FilterMethodContext> filterCondition,
                            ContinuationCreator continuationCreator,
                            boolean filtersException,
+                           boolean waitForBody,
                            FilterReturnHandler returnHandler
     ) implements GenericHttpFilter, Ordered {
 
@@ -611,6 +618,20 @@ public class FilterRunner {
                 if (filterCondition != null && !filterCondition.test(methodContext)) {
                     return ExecutionFlow.just(filterContext);
                 }
+                if (waitForBody && filterContext.request instanceof FullHttpRequest<?> fhr && !fhr.isFull()) {
+                    ExecutionFlow<?> buffered = fhr.bufferContents();
+                    if (buffered != null && buffered.tryComplete() == null) {
+                        return buffered.then(() -> filter0(filterContext, methodContext));
+                    }
+                }
+                return filter0(filterContext, methodContext);
+            } catch (Throwable e) {
+                return ExecutionFlow.error(e);
+            }
+        }
+
+        private ExecutionFlow<FilterContext> filter0(FilterContext filterContext, FilterMethodContext methodContext) {
+            try {
                 Object[] args = bindArgs(methodContext);
                 Object returnValue;
                 if (method instanceof UnsafeExecutable<T, ?> unsafeExecutable) {
