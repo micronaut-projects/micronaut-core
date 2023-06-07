@@ -68,15 +68,30 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
                                 ApplicationConfiguration applicationConfiguration,
                                 CodecConfiguration codecConfiguration,
                                 MediaType mediaType) {
+        this(mapperProvider,
+            applicationConfiguration,
+            codecConfiguration,
+            mediaType,
+            codecConfiguration != null ? codecConfiguration.getAdditionalTypes() : null);
+    }
+
+    /**
+     * @param mapperProvider           To read/write JSON
+     * @param applicationConfiguration The common application configurations
+     * @param codecConfiguration       The configuration for the codec
+     * @param mediaType                Client request/response media type
+     * @param additionalTypes          Additional Media Types
+     */
+    public MapperMediaTypeCodec(BeanProvider<JsonMapper> mapperProvider,
+                                ApplicationConfiguration applicationConfiguration,
+                                CodecConfiguration codecConfiguration,
+                                MediaType mediaType,
+                                List<MediaType> additionalTypes) {
         this.mapperProvider = mapperProvider;
         this.applicationConfiguration = applicationConfiguration;
         this.codecConfiguration = codecConfiguration;
         this.mediaType = mediaType;
-        if (codecConfiguration != null) {
-            this.additionalTypes = codecConfiguration.getAdditionalTypes();
-        } else {
-            this.additionalTypes = Collections.emptyList();
-        }
+        this.additionalTypes = additionalTypes == null ? Collections.emptyList() : additionalTypes;
     }
 
     /**

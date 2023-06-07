@@ -28,6 +28,13 @@ import java.nio.charset.StandardCharsets
  */
 class MediaTypeSpec extends Specification {
 
+    void "test MediaType::of"() {
+        expect:
+        MediaType.of('application/vnd.github+json') == MediaType.APPLICATION_JSON_GITHUB_TYPE
+        MediaType.of('application/feed+json') == MediaType.APPLICATION_JSON_FEED_TYPE
+        MediaType.of('application/problem+json') == MediaType.APPLICATION_JSON_PROBLEM_TYPE
+    }
+
     void "test media type"() {
         given:
         MediaType mediaType = new MediaType(fullName, ext, parameters)
