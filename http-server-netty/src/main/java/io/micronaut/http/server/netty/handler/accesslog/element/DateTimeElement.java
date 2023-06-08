@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.handler.accesslog.element;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpHeaders;
 
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Collections;
@@ -72,7 +73,12 @@ final class DateTimeElement implements LogElement {
             }
         }
         this.dateFormat = dateFormat;
-        formatter = DateTimeFormatter.ofPattern(format, Locale.US);
+        String[] formatSplit = format.split(",");
+        switch (formatSplit.length) {
+            case 0, 1 -> formatter = DateTimeFormatter.ofPattern(format, Locale.US);
+            default ->
+                formatter = DateTimeFormatter.ofPattern(formatSplit[0], Locale.US).withZone(ZoneId.of(formatSplit[1].strip()));
+        }
         events = fromStart ? Event.REQUEST_HEADERS_EVENTS : LAST_RESPONSE_EVENTS;
     }
 
