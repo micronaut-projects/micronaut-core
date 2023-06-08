@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element
 
+import io.netty.channel.socket.SocketChannel
+import io.netty.handler.codec.http.DefaultHttpHeaders
 import spock.lang.Specification
 
 import java.time.DateTimeException
@@ -88,6 +90,19 @@ class AccessLogFormatParserSpec extends Specification {
         def e = thrown(DateTimeException)
         e.message == "Invalid ID for region-based ZoneId, invalid format: Invalid zone"
 
+    }
+
+    def 'Test string escaping from header value'() {
+        def headers = new DefaultHttpHeaders()
+        headers.add("User-Agent", "test string  \" \\")
+        def element = new HeaderElement(true, "User-Agent")
+
+        when:
+        def headerVal = element.onRequestHeaders(Mock(SocketChannel.class), "POST", headers, "/test", "http")
+
+        then:
+        headers.contains("User-Agent")
+        headerVal == "test string  \\\" \\\\"
     }
 
 }

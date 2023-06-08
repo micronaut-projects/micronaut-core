@@ -19,6 +19,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpHeaders;
 
+import java.util.HashSet;
 import java.util.Set;
 
 /**
@@ -37,6 +38,15 @@ abstract class AbstractHttpMessageLogElement implements LogElement {
      */
     protected abstract String value(HttpHeaders headers);
 
+    private static final Set<Character> keysToEscape = new HashSet<>(){{
+        add('\b');
+        add('\n');
+        add('\t');
+        add('\r');
+        add('\\');
+        add('"');
+    }};
+
     private static String wrapValue(String value) {
         // Does the value contain a " ? If so must encode it
         if (value == null || ConstantElement.UNKNOWN_VALUE.equals(value) || value.isEmpty()) {
@@ -45,21 +55,23 @@ abstract class AbstractHttpMessageLogElement implements LogElement {
 
         /* Wrap all quotes in double quotes. */
         StringBuilder buffer = new StringBuilder(value.length() + 2);
-        buffer.append('\'');
         int i = 0;
         while (i < value.length()) {
-            int j = value.indexOf('\'', i);
-            if (j == -1) {
-                buffer.append(value.substring(i));
-                i = value.length();
+            char currentChar = value.charAt(i);
+            if (keysToEscape.contains(currentChar)) {
+                buffer.append('\\');
+                switch (currentChar) {
+                    case '\b' -> buffer.append('b');
+                    case '\n' -> buffer.append('n');
+                    case '\r' -> buffer.append('r');
+                    case '\t' -> buffer.append('t');
+                    default -> buffer.append(currentChar);
+                }
             } else {
-                buffer.append(value.substring(i, j + 1));
-                buffer.append('"');
-                i = j + 2;
+                buffer.append(currentChar);
             }
+            i++;
         }
-
-        buffer.append('\'');
         return buffer.toString();
     }
 
