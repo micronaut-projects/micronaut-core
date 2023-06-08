@@ -79,7 +79,7 @@ public class JsonViewServerFilter implements Ordered {
     }
 
     @ResponseFilter
-    public Publisher<? extends MutableHttpResponse<?>> doFilter(HttpRequest<?> request, MutableHttpResponse<?> response) {
+    public final Publisher<? extends MutableHttpResponse<?>> doFilter(HttpRequest<?> request, MutableHttpResponse<?> response) {
         final RouteInfo<?> routeInfo = request.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class).orElse(null);
         if (routeInfo != null) {
             final Optional<Class<?>> viewClass = routeInfo.findAnnotation(JsonView.class)

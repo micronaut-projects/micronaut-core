@@ -17,6 +17,8 @@ package io.micronaut.http.server.netty.handler.accesslog.element
 
 import spock.lang.Specification
 
+import java.time.DateTimeException
+
 class AccessLogFormatParserSpec extends Specification {
 
     def "test access log format parser for predefined formats"() {
@@ -57,6 +59,13 @@ class AccessLogFormatParserSpec extends Specification {
 
         then:
         parser.toString() == "%h - - %t \"%r\" %s %b \"%{cookie1}C\" \"%{cookie2}c\""
+
+        when:
+        parser = new AccessLogFormatParser("%h %l %u [%{dd/MMM/yyyy:HH:mm:ss Z, UTC}t] \"%r\" %s %b \"%{cookie1}C\" \"%{cookie2}c\"")
+
+        then:
+        parser.toString() == "%h - - [%{dd/MMM/yyyy:HH:mm:ss Z, UTC}t] \"%r\" %s %b \"%{cookie1}C\" \"%{cookie2}c\""
+
     }
 
     def "test access log format parser for invalid formats"() {
@@ -72,7 +81,13 @@ class AccessLogFormatParserSpec extends Specification {
         then:
         parser.toString() == "%h - - %t \"%r\" - %b"
 
-    }
+        when:
+        new AccessLogFormatParser("%h %l %u [%{dd/MMM/yyyy:HH:mm:ss Z,Invalid zone}t] \"%r\" %s %b \"%{cookie1}C\" \"%{cookie2}c\"")
 
+        then:
+        def e = thrown(DateTimeException)
+        e.message == "Invalid ID for region-based ZoneId, invalid format: Invalid zone"
+
+    }
 
 }
