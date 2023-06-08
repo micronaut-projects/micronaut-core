@@ -68,9 +68,6 @@ public interface QualifiedBeanType<T> extends BeanType<T>, AnnotationMetadataDel
             Qualifier<T> qualifier = resolveDynamicQualifier();
             if (qualifier == null) {
                 String name = annotationMetadata.stringValue(AnnotationUtil.NAMED).orElse(null);
-                if (name == null) {
-                    name = annotationMetadata.stringValue("javax.inject.Named").orElse(null);
-                }
                 qualifier = name != null ? Qualifiers.byAnnotation(annotationMetadata, name) : null;
             }
             return qualifier;

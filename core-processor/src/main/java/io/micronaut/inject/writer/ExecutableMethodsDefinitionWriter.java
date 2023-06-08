@@ -232,7 +232,7 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
      */
     public final void visitDefinitionEnd() {
         classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-        classWriter.visit(V1_8, ACC_SYNTHETIC | ACC_FINAL,
+        classWriter.visit(V17, ACC_SYNTHETIC | ACC_FINAL,
                 internalName,
                 null,
                 SUPER_TYPE.getInternalName(),
