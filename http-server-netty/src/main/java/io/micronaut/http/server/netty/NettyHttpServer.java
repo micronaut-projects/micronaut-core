@@ -636,6 +636,12 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 applicationContext.stop();
             }
             serverConfiguration.getMultipart().getLocation().ifPresent(dir -> DiskFileUpload.baseDirectory = null);
+            for (Listener listener : activeListeners) {
+                if (listener.httpPipelineBuilder != null) {
+                    listener.httpPipelineBuilder.close();
+                    listener.httpPipelineBuilder = null;
+                }
+            }
             this.activeListeners = null;
         } catch (Throwable e) {
             if (LOG.isErrorEnabled()) {
@@ -755,7 +761,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      */
     @Internal
     public void buildEmbeddedChannel(EmbeddedChannel prototype, boolean ssl) {
-        createPipelineBuilder(rootCustomizer, false).new ConnectionPipeline(prototype, ssl, ssl).initChannel();
+        try (HttpPipelineBuilder builder = createPipelineBuilder(rootCustomizer, false)) {
+            builder.new ConnectionPipeline(prototype, ssl).initChannel();
+        }
     }
 
     static Predicate<String> inclusionPredicate(NettyHttpServerConfiguration.AccessLogger config) {
@@ -781,7 +789,11 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
 
         void refresh() {
+            HttpPipelineBuilder oldBuilder = httpPipelineBuilder;
             httpPipelineBuilder = createPipelineBuilder(listenerCustomizer, config.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC);
+            if (oldBuilder != null) {
+                oldBuilder.close();
+            }
             if (config.isSsl() && !httpPipelineBuilder.supportsSsl()) {
                 throw new IllegalStateException("Listener configured for SSL, but no SSL context available");
             }
@@ -795,7 +807,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         @Override
         protected void initChannel(@NonNull Channel ch) throws Exception {
-            httpPipelineBuilder.new ConnectionPipeline(ch, config.isSsl(), config.isSsl()).initChannel();
+            httpPipelineBuilder.new ConnectionPipeline(ch, config.isSsl()).initChannel();
         }
     }
 
@@ -808,7 +820,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         protected void initChannel(Channel ch) throws Exception {
             // udp does not have connection channels
             setServerChannel(ch);
-            httpPipelineBuilder.new ConnectionPipeline(ch, false, true).initHttp3Channel();
+            httpPipelineBuilder.new ConnectionPipeline(ch, true).initHttp3Channel();
         }
     }
 
