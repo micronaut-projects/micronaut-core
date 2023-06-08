@@ -200,9 +200,9 @@ parameter, the same text would be converted to `Instant` using `ConversionServic
 This is not permitted anymore for 4.x, except for some restricted types. The recommended fix is to move to
 `application/json` as the content type. `toString` is not a stable serialization format, JSON is more reliable.
 
+Alternatively, you can set the `micronaut.http.legacy-text-conversion` configuration option to `true` to restore the
+old behavior.
+
 ==== `OncePerRequestHttpServerFilter` removed
 
 Since Micronaut 3.0 the `OncePerRequestHttpServerFilter` class was deprecated and marked for removal. This class is now removed. Implement link:{api}/io/micronaut/http/filter/HttpServerFilter.html[HttpServerFilter] instead, and replace any usages of `micronaut.once` attributes with a custom attribute name.
-
-Alternatively, you can set the `micronaut.http.legacy-text-conversion` configuration option to `true` to restore the
-old behavior.
