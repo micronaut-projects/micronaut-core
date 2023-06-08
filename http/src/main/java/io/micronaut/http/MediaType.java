@@ -163,6 +163,36 @@ public class MediaType implements CharSequence {
     public static final MediaType APPLICATION_XML_TYPE = new MediaType(APPLICATION_XML);
 
     /**
+     * JSON GitHub: application/vnd.github+json.
+     */
+    public static final String APPLICATION_JSON_GITHUB = "application/vnd.github+json";
+
+    /**
+     * JSON GitHub: application/vnd.github+json.
+     */
+    public static final MediaType APPLICATION_JSON_GITHUB_TYPE = new MediaType(MediaType.APPLICATION_JSON_GITHUB);
+
+    /**
+     * JSON Feed: application/feed+json.
+     */
+    public static final String APPLICATION_JSON_FEED = "application/feed+json";
+
+    /**
+     * JSON Feed: application/feed+json.
+     */
+    public static final MediaType APPLICATION_JSON_FEED_TYPE = new MediaType(MediaType.APPLICATION_JSON_FEED);
+
+    /**
+     * JSON Feed: application/problem+json.
+     */
+    public static final String APPLICATION_JSON_PROBLEM = "application/problem+json";
+
+    /**
+     * JSON Feed: application/problem+json.
+     */
+    public static final MediaType APPLICATION_JSON_PROBLEM_TYPE = new MediaType(MediaType.APPLICATION_JSON_PROBLEM);
+
+    /**
      * JSON: application/json.
      */
     public static final String APPLICATION_JSON = "application/json";
@@ -537,6 +567,12 @@ public class MediaType implements CharSequence {
                 return APPLICATION_XML_TYPE;
             case APPLICATION_JSON:
                 return APPLICATION_JSON_TYPE;
+            case APPLICATION_JSON_FEED:
+                return APPLICATION_JSON_FEED_TYPE;
+            case APPLICATION_JSON_GITHUB:
+                return APPLICATION_JSON_GITHUB_TYPE;
+            case APPLICATION_JSON_PROBLEM:
+                return APPLICATION_JSON_PROBLEM_TYPE;
             case APPLICATION_YAML:
                 return APPLICATION_YAML_TYPE;
             case TEXT_XML:
