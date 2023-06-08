@@ -34,7 +34,6 @@ import java.util.Collections;
 import java.util.Map;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
@@ -49,21 +48,20 @@ public class JsonCodecAdditionalTypeTest {
 
     @Test
     void itIsPossibleToCanRegisterAdditionTypesForJsonCodec() throws IOException {
+        assertRequest("/json-additional-codec");
+        assertRequest("/json-additional-codec/pojo");
+    }
+
+    private void assertRequest(String uri) throws IOException {
         HttpResponseAssertion assertion = HttpResponseAssertion.builder()
             .body(BodyAssertion.builder().body("https://jsonfeed.org").contains())
             .status(HttpStatus.OK)
-            .assertResponse(response -> assertTrue(response.header("Content-Type").contains(APPLICATION_JSON_FEED)))
+            .assertResponse(response -> assertTrue(response.header("Content-Type").contains(CUSTOM_MEDIA_TYPE)))
             .build();
-
         Map<String, Object> config = Collections.singletonMap("micronaut.codec.json.additional-types", Collections.singletonList(CUSTOM_MEDIA_TYPE));
         asserts(SPEC_NAME,
             config,
-            HttpRequest.GET("/json-additional-codec").header(HttpHeaders.ACCEPT, CUSTOM_MEDIA_TYPE),
-            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, assertion));
-
-        asserts(SPEC_NAME,
-            config,
-            HttpRequest.GET("/json-additional-codec/pojo").header(HttpHeaders.ACCEPT, CUSTOM_MEDIA_TYPE),
+            HttpRequest.GET(uri).header(HttpHeaders.ACCEPT, CUSTOM_MEDIA_TYPE),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, assertion));
     }
 

@@ -43,6 +43,7 @@ import java.io.OutputStream;
  *
  * @since 4.0.0
  * @author Jonas Konrad
+ * @param <T> The tye
  */
 @Produces(MediaType.TEXT_PLAIN)
 @Consumes(MediaType.TEXT_PLAIN)

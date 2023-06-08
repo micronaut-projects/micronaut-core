@@ -33,7 +33,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 @SuppressWarnings({
@@ -49,7 +49,7 @@ public class JsonCodecAdditionalTypeAutomaticTest {
         HttpResponseAssertion assertion = HttpResponseAssertion.builder()
             .body(BodyAssertion.builder().body("https://jsonfeed.org").contains())
             .status(HttpStatus.OK)
-            .assertResponse(response -> assertTrue(response.header("Content-Type").contains(APPLICATION_JSON_FEED)))
+            .assertResponse(response -> assertTrue(response.header("Content-Type").contains(MediaType.APPLICATION_JSON_FEED)))
             .build();
 
         asserts(SPEC_NAME,
