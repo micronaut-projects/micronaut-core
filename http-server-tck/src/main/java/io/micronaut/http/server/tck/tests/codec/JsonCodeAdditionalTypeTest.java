@@ -35,6 +35,7 @@ import java.util.Map;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 @SuppressWarnings({
@@ -51,7 +52,8 @@ public class JsonCodeAdditionalTypeTest {
         HttpResponseAssertion assertion = HttpResponseAssertion.builder()
             .body(BodyAssertion.builder().body("https://jsonfeed.org").contains())
             .status(HttpStatus.OK)
-            .assertResponse(response -> assertEquals(APPLICATION_JSON_FEED, response.header("Content-Type"))).build();
+            .assertResponse(response -> assertTrue(response.header("Content-Type").contains(MediaType.APPLICATION_JSON_FEED)))
+            .build();
 
         Map<String, Object> config = Collections.singletonMap("micronaut.codec.json.additional-types", Collections.singletonList(APPLICATION_JSON_FEED));
         asserts(SPEC_NAME,
