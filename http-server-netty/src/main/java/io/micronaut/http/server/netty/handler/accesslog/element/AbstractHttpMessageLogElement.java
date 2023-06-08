@@ -29,14 +29,7 @@ import java.util.Set;
  * @since 2.0
  */
 abstract class AbstractHttpMessageLogElement implements LogElement {
-    private static final Set<Character> CHARACTERS_TO_ESCAPE = new HashSet<>(){{
-        add('\b');
-        add('\n');
-        add('\t');
-        add('\r');
-        add('\\');
-        add('"');
-    }};
+    private static final Set<Character> CHARACTERS_TO_ESCAPE = Set.of('\b', '\n', '\t', '\r', '\\', '"');
 
     protected Set<Event> events;
 
