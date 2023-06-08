@@ -29,6 +29,15 @@ import java.util.Set;
  * @since 2.0
  */
 abstract class AbstractHttpMessageLogElement implements LogElement {
+    private static final Set<Character> CHARACTERS_TO_ESCAPE = new HashSet<>(){{
+        add('\b');
+        add('\n');
+        add('\t');
+        add('\r');
+        add('\\');
+        add('"');
+    }};
+
     protected Set<Event> events;
 
     /**
@@ -37,15 +46,6 @@ abstract class AbstractHttpMessageLogElement implements LogElement {
      * @return The value.
      */
     protected abstract String value(HttpHeaders headers);
-
-    private static final Set<Character> keysToEscape = new HashSet<>(){{
-        add('\b');
-        add('\n');
-        add('\t');
-        add('\r');
-        add('\\');
-        add('"');
-    }};
 
     private static String wrapValue(String value) {
         // Does the value contain a " ? If so must encode it
@@ -58,7 +58,7 @@ abstract class AbstractHttpMessageLogElement implements LogElement {
         int i = 0;
         while (i < value.length()) {
             char currentChar = value.charAt(i);
-            if (keysToEscape.contains(currentChar)) {
+            if (CHARACTERS_TO_ESCAPE.contains(currentChar)) {
                 buffer.append('\\');
                 switch (currentChar) {
                     case '\b' -> buffer.append('b');
