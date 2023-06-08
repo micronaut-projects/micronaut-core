@@ -1046,7 +1046,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         }
 
         final String beanDefSignature = generateBeanDefSig(beanType);
-        classWriter.visit(V1_8, ACC_SYNTHETIC,
+        classWriter.visit(V17, ACC_SYNTHETIC,
                 beanDefinitionInternalName,
                 beanDefSignature,
                 isSuperFactory ? TYPE_ABSTRACT_BEAN_DEFINITION.getInternalName() : superType.getInternalName(),
@@ -3554,7 +3554,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         this.innerClasses.put(interceptedConstructorWriterName, interceptedConstructorWriter);
         final String constructorInternalName = getInternalName(interceptedConstructorWriterName);
         final Type interceptedConstructorType = getTypeReferenceForName(interceptedConstructorWriterName);
-        interceptedConstructorWriter.visit(V1_8, ACC_SYNTHETIC | ACC_FINAL | ACC_PRIVATE,
+        interceptedConstructorWriter.visit(V17, ACC_SYNTHETIC | ACC_FINAL | ACC_PRIVATE,
                 constructorInternalName,
                 null,
                 Type.getInternalName(superType),

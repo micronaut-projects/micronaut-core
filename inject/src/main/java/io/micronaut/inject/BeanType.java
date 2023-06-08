@@ -69,7 +69,7 @@ public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextCond
         AnnotationMetadata annotationMetadata = getAnnotationMetadata();
         // here we resolved the declared Qualifier of the bean
         return annotationMetadata
-            .findDeclaredAnnotation(AnnotationUtil.NAMED).or(() -> annotationMetadata.findDeclaredAnnotation("javax.inject.Named"))
+            .findDeclaredAnnotation(AnnotationUtil.NAMED)
             .flatMap(AnnotationValue::stringValue);
     }
 
