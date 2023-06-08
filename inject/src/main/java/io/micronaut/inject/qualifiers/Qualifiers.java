@@ -384,7 +384,7 @@ public class Qualifiers {
                 return byType(aClass.get());
             }
         } else if (Named.class == type) {
-            Optional<String> value = metadata.stringValue(type).or(() -> metadata.stringValue("javax.inject.Named"));
+            Optional<String> value = metadata.stringValue(type);
             if (value.isPresent()) {
                 return byName(value.get());
             }
@@ -405,8 +405,8 @@ public class Qualifiers {
         } else if (Qualifier.PRIMARY.equals(type)) {
             //noinspection unchecked
             return PrimaryQualifier.INSTANCE;
-        } else if (Named.class.getName().equals(type) || "javax.inject.Named".equals(type)) {
-            String n = metadata.stringValue(type).or(() -> metadata.stringValue("javax.inject.Named")).orElse(null);
+        } else if (Named.class.getName().equals(type)) {
+            String n = metadata.stringValue(type).orElse(null);
             if (n != null) {
                 return byName(n);
             }
