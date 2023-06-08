@@ -494,7 +494,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         final Type superType = Type.getType(AbstractInitializableBeanIntrospection.class);
 
         ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-        classWriter.visit(V1_8, ACC_SYNTHETIC | ACC_FINAL,
+        classWriter.visit(V17, ACC_SYNTHETIC | ACC_FINAL,
                 introspectionType.getInternalName(),
                 null,
                 superType.getInternalName(),

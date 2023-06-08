@@ -24,6 +24,7 @@ import java.util.Map;
 /**
  * MDC propagation.
  *
+ * @param state The MDC state as map
  * @author Denis Stepanov
  * @since 4.0.0
  */

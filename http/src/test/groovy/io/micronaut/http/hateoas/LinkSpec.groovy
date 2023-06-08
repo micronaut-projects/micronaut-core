@@ -2,6 +2,7 @@ package io.micronaut.http.hateoas
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.micronaut.context.ApplicationContext
+import io.micronaut.json.JsonMapper
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -25,12 +26,12 @@ class LinkSpec extends Specification {
 
     void "test resource serde"() {
         given:
-        def objectMapper = context.getBean(ObjectMapper)
+        JsonMapper objectMapper = context.getBean(JsonMapper)
         def test = new Test(name: "Fred")
         test.link(Link.SELF, Link.build("/test/{name}").templated(true).build())
 
         when:
-        def json = objectMapper.writeValueAsString(test)
+        String json = objectMapper.writeValueAsString(test)
 
         then:
         json == '{"name":"Fred","_links":{"self":{"href":"/test/{name}","templated":true}}}'

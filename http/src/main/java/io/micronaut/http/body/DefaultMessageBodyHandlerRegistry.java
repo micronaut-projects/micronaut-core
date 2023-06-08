@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
@@ -75,7 +76,7 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
     protected <T> MessageBodyReader<T> findReaderImpl(Argument<T> type, List<MediaType> mediaTypes) {
         Collection<BeanDefinition<MessageBodyReader>> beanDefinitions = beanLocator.getBeanDefinitions(
             Argument.of(MessageBodyReader.class, type),
-            newMediaTypeQualifier(type, mediaTypes, Consumes.class)
+            newMediaTypeQualifier(Argument.of(MessageBodyReader.class), mediaTypes, Consumes.class)
         );
         if (beanDefinitions.size() == 1) {
             return beanLocator.getBean(beanDefinitions.iterator().next());
@@ -92,9 +93,9 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
             if (exactMatch.size() == 1) {
                 return beanLocator.getBean(exactMatch.iterator().next());
             } else {
-                // pick highest priority
-                return OrderUtil.sort(beanDefinitions.stream())
-                    .findFirst()
+                // Pick the highest priority
+                return beanDefinitions.stream()
+                    .max(OrderUtil.REVERSE_COMPARATOR)
                     .map(beanLocator::getBean)
                     .orElse(null);
             }
@@ -132,8 +133,10 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
     @Override
     protected <T> MessageBodyWriter<T> findWriterImpl(Argument<T> type, List<MediaType> mediaTypes) {
         Collection<BeanDefinition<MessageBodyWriter>> beanDefinitions = beanLocator.getBeanDefinitions(
-            Argument.of(MessageBodyWriter.class, type),
-            newMediaTypeQualifier(type, mediaTypes, Produces.class)
+            // Do not put the type here since we are looking for writers that can process the type
+            //      but beanLocator will provide types that can be injected into the searched type
+            Argument.of(MessageBodyWriter.class),
+            newMediaTypeQualifier(Argument.of(MessageBodyWriter.class, type), mediaTypes, Produces.class)
         );
         if (beanDefinitions.size() == 1) {
             return beanLocator.getBean(beanDefinitions.iterator().next());
@@ -150,9 +153,9 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
             if (exactMatch.size() == 1) {
                 return beanLocator.getBean(exactMatch.iterator().next());
             } else {
-                // pick highest priority
-                return OrderUtil.sort(beanDefinitions.stream())
-                    .findFirst()
+                // Pick the highest priority
+                return beanDefinitions.stream()
+                    .max(OrderUtil.REVERSE_COMPARATOR)
                     .map(beanLocator::getBean)
                     .orElse(null);
             }
@@ -166,11 +169,29 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
         @Override
         public <B extends BeanType<T>> Stream<B> reduce(Class<T> beanType, Stream<B> candidates) {
             return candidates.filter(c -> {
+                // Only for writer, verify that the writer can consume the required type
+                if (type.getType() == MessageBodyWriter.class && c instanceof BeanDefinition<?> definition) {
+                    List<Argument<?>> consumedType = definition.getTypeArguments(type.getType());
+                    Argument<?>[] typeParameters = type.getTypeParameters();
+                    if (ArrayUtils.isEmpty(typeParameters)) {
+                        return false;
+                    }
+
+                    Argument<?> requiredType = typeParameters[0];
+                    if (consumedType.isEmpty() || isInvalidType(consumedType, requiredType)) {
+                        return false;
+                    }
+                }
                 String[] applicableTypes = c.getAnnotationMetadata().stringValues(annotationType);
                 return ((applicableTypes.length == 0) || Arrays.stream(applicableTypes)
                     .anyMatch(mt -> mediaTypes.contains(new MediaType(mt)))
                 );
             });
+        }
+
+        private static boolean isInvalidType(List<Argument<?>> consumedType, Argument<?> requiredType) {
+            Argument<?> argument = consumedType.get(0);
+            return !(argument.isTypeVariable() || argument.isAssignableFrom(requiredType.getType()));
         }
 
         @Override

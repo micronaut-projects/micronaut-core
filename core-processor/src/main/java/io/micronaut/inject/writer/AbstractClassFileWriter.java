@@ -1467,7 +1467,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param superType   The super type
      */
     protected void startClass(ClassVisitor classWriter, String className, Type superType) {
-        classWriter.visit(V1_8, ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
+        classWriter.visit(V17, ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
         classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
     }
 
@@ -1477,7 +1477,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param superType   The super type
      */
     protected void startPublicClass(ClassVisitor classWriter, String className, Type superType) {
-        classWriter.visit(V1_8, ACC_PUBLIC | ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
+        classWriter.visit(V17, ACC_PUBLIC | ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
         classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
     }
 
@@ -1499,7 +1499,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param interfaces        The interfaces
      */
     protected void startService(ClassVisitor classWriter, String serviceName, String internalClassName, Type superType, String... interfaces) {
-        classWriter.visit(V1_8, ACC_PUBLIC | ACC_FINAL | ACC_SYNTHETIC, internalClassName, null, superType.getInternalName(), interfaces);
+        classWriter.visit(V17, ACC_PUBLIC | ACC_FINAL | ACC_SYNTHETIC, internalClassName, null, superType.getInternalName(), interfaces);
         AnnotationVisitor annotationVisitor = classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
         annotationVisitor.visit("service", serviceName);
         annotationVisitor.visitEnd();
@@ -1511,7 +1511,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param superType   The super type
      */
     protected void startFinalClass(ClassVisitor classWriter, String className, Type superType) {
-        classWriter.visit(V1_8, ACC_FINAL | ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
+        classWriter.visit(V17, ACC_FINAL | ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
         classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
     }
 
@@ -1523,7 +1523,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param superType   The super type
      */
     protected void startPublicFinalClass(ClassVisitor classWriter, String className, Type superType) {
-        classWriter.visit(V1_8, ACC_PUBLIC | ACC_FINAL | ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
+        classWriter.visit(V17, ACC_PUBLIC | ACC_FINAL | ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
         classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
     }
 
@@ -1534,7 +1534,7 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @param genericSignature The generic signature
      */
     protected void startClass(ClassWriter classWriter, String className, Type superType, String genericSignature) {
-        classWriter.visit(V1_8, ACC_SYNTHETIC, className, genericSignature, superType.getInternalName(), null);
+        classWriter.visit(V17, ACC_SYNTHETIC, className, genericSignature, superType.getInternalName(), null);
         classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
     }
 

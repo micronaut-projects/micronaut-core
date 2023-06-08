@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.SupplierUtil;
-import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.exceptions.MessageBodyException;
 import io.micronaut.http.netty.body.NettyWriteContext;
 import io.micronaut.http.netty.stream.DelegateStreamedHttpRequest;
@@ -38,7 +37,6 @@ import io.netty.channel.EventLoop;
 import io.netty.channel.FileRegion;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.DefaultFullHttpResponse;
-import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpChunkedInput;
@@ -60,6 +58,7 @@ import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakDetectorFactory;
 import io.netty.util.ResourceLeakTracker;
+import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
@@ -646,16 +645,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             write(new FullOutboundHandler(this, response));
         }
 
-        /**
-         * Write a streamed response. The actual response will only be written when the first item
-         * of the {@link org.reactivestreams.Publisher} is received, in order to handle errors.
-         *
-         * @param response The response to write
-         */
         @Override
-        public void writeStreamed(StreamedHttpResponse response) {
+        public void writeStreamed(HttpResponse response, Publisher<HttpContent> content) {
             preprocess(response);
-            response.subscribe(new StreamingOutboundHandler(this, response));
+            content.subscribe(new StreamingOutboundHandler(this, response));
         }
 
         /**
@@ -780,11 +773,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     private final class StreamingOutboundHandler extends OutboundHandler implements Subscriber<HttpContent> {
         private final OutboundAccess outboundAccess;
-        private StreamedHttpResponse initialMessage;
+        private HttpResponse initialMessage;
         private Subscription subscription;
         private boolean writtenLast = false;
 
-        StreamingOutboundHandler(OutboundAccess outboundAccess, StreamedHttpResponse initialMessage) {
+        StreamingOutboundHandler(OutboundAccess outboundAccess, HttpResponse initialMessage) {
             super(outboundAccess);
             this.outboundAccess = outboundAccess;
             this.initialMessage = Objects.requireNonNull(initialMessage, "initialMessage");
@@ -792,6 +785,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void writeSome() {
+            if (initialMessage != null) {
+                write(initialMessage, false, false);
+                initialMessage = null;
+            }
             subscription.request(1);
         }
 
@@ -819,11 +816,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 throw new IllegalStateException("Already written a LastHttpContent");
             }
 
-            if (initialMessage != null) {
-                write(initialMessage, false, false);
-                initialMessage = null;
-            }
-
             if (!removed) {
                 if (httpContent instanceof LastHttpContent) {
                     writtenLast = true;
@@ -846,21 +838,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
 
             if (!removed) {
-                if (initialMessage != null) {
-                    initialMessage = null;
-                    HttpResponseStatus responseStatus;
-                    if (t instanceof HttpStatusException se) {
-                        responseStatus = HttpResponseStatus.valueOf(se.getStatus().getCode(), se.getMessage());
-                    } else {
-                        responseStatus = HttpResponseStatus.INTERNAL_SERVER_ERROR;
-                    }
-                    write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, responseStatus), true, true);
-                } else {
-                    if (LOG.isWarnEnabled()) {
-                        LOG.warn("Reactive response received an error after some data has already been written. This error cannot be forwarded to the client.", t);
-                    }
-                    ctx.close();
+                if (LOG.isWarnEnabled()) {
+                    LOG.warn("Reactive response received an error after some data has already been written. This error cannot be forwarded to the client.", t);
                 }
+                ctx.close();
 
                 requestHandler.responseWritten(outboundAccess.attachment);
             }

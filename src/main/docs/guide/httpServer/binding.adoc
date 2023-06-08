@@ -106,7 +106,7 @@ A `null` string is passed if the header is absent from the request.
 
 NOTE: `java.util.Optional` can also be used, but that is discouraged for method parameters.
 
-Additionally, any `DateTime` that conforms to link:{jdkapi}/java/time/format/DateTimeFormatter.html#RFC_1123_DATE_TIME[RFC-1123] can be bound to a parameter. Alternatively the format can be customized with the link:{api}/io/micronaut/core/convert/format/Format.html[Format] annotation:
+Additionally, any `DateTime` that conforms to link:{jdkapi}/java.base/java/time/format/DateTimeFormatter.html#RFC_1123_DATE_TIME[RFC-1123] can be bound to a parameter. Alternatively the format can be customized with the link:{api}/io/micronaut/core/convert/format/Format.html[Format] annotation:
 
 snippet::io.micronaut.docs.server.binding.BindingController[tags="format1,format2",indent=0]
 

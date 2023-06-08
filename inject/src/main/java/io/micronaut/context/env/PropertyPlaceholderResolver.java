@@ -16,8 +16,8 @@
 package io.micronaut.context.env;
 
 import io.micronaut.context.exceptions.ConfigurationException;
-
 import io.micronaut.core.annotation.NonNull;
+
 import java.util.Optional;
 
 /**
@@ -44,14 +44,27 @@ public interface PropertyPlaceholderResolver {
     }
 
     /**
-     * Resolve the placeholders and return an Optional String if it was possible to resolve them.
+     * Resolve the placeholders and return a string if it was possible to resolve them.
      *
      * @param str The placeholder to resolve
-     * @return The optional string or {@link Optional#empty()} if resolution was not possible
+     * @return The resolved string
      * @throws ConfigurationException If the placeholders could not be resolved
      */
     default @NonNull String resolveRequiredPlaceholders(String str) throws ConfigurationException {
         return resolvePlaceholders(str).orElseThrow(() -> new ConfigurationException("Unable to resolve placeholders for property: " + str));
+    }
+
+    /**
+     * Resolve the placeholders in the given string. This behaves like
+     * {@link #resolveRequiredPlaceholders(String)}, except that when the whole input is a
+     * placeholder, the value is not converted to String but returned as-is.
+     *
+     * @param str The placeholder to resolve
+     * @return The resolved object or string
+     * @throws ConfigurationException If the placeholders could not be resolved
+     */
+    default @NonNull Object resolveRequiredPlaceholdersObject(String str) throws ConfigurationException {
+        return resolveRequiredPlaceholders(str);
     }
 
     /**

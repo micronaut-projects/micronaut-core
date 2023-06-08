@@ -11,7 +11,7 @@ The `micronaut-runtime` module has been split into separate modules depending on
 
 ===== Micronaut Discovery Core
 
-`micronaut-discovery-core` - The base service discovery features are now a separate module. If you application listens for events such as api:discovery.event.ServiceReadyEvent[] or api:health.HeartBeatEvent[] this module should be added to the application classpath.
+`micronaut-discovery-core` - The base service discovery features are now a separate module. If your application listens for events such as api:discovery.event.ServiceReadyEvent[] or api:health.HeartBeatEvent[] this module should be added to the application classpath.
 
 dependency::micronaut-discovery[]
 
@@ -27,7 +27,7 @@ dependency::micronaut-retry[]
 
 ==== Calling `registerSingleton(bean)` no longer overrides existing beans
 
-If you call `registerSingleton(bean)` on the api:context.BeanContext[] this will no longer override existing beans if the type and qualifier match, instead two beans will now exist which may lead to a api:context.exceptions.NonUniqueBeanException[].
+If you call `registerSingleton(bean)` on the api:context.BeanContext[] it will no longer override existing beans if the type and qualifier match; instead, two beans will exist which may lead to a api:context.exceptions.NonUniqueBeanException[].
 
 If you require replacing an existing bean you must formalize the replacement using the api:context.RuntimeBeanDefinition[] API, for example:
 
@@ -65,7 +65,7 @@ dependency:micronaut-validation[groupId="io.micronaut.validation"]
 
 ==== Session Support Moved to Session Module
 
-The Session handling features link:{micronautsessiondocs}[have been moved to its own module]. If you use the HTTP session module, change the maven coordinates from `io.micronaut:micronaut-session` to `io.micronaut.session:micronaut-session`.
+The Session handling features link:{micronautsessiondocs}[have been moved to their own module]. If you use the HTTP session module, change the maven coordinates from `io.micronaut:micronaut-session` to `io.micronaut.session:micronaut-session`.
 
 dependency:micronaut-session[groupId="io.micronaut.session"]
 
@@ -93,7 +93,7 @@ https://github.com/ben-manes/caffeine[Caffeine] is no longer shaded into the `io
 
 ==== Environment Deduction Disabled by Default
 
-In previous versions of the Micronaut framework probes were used to attempt to deduce the running environment and establish whether the application was running in the Cloud. These probes involved network calls which resulted in issues with startup performance and security concerns. These probes have been disabled by default and can be re-enabled as necessary by calling `ApplicationContextBuilder.deduceCloudEnvironment(true)` if your application still requires this functionality.
+In previous versions of the Micronaut framework probes were used to attempt to deduce the running environment and establish whether the application was running in the Cloud. These probes involved network calls resulting in issues with startup performance and security concerns. These probes are disabled by default and can be re-enabled as necessary by calling `ApplicationContextBuilder.deduceCloudEnvironment(true)` if your application still requires this functionality.
 
 ==== Update to Groovy 4
 
@@ -123,7 +123,7 @@ Annotations with the retention CLASS are not available in the annotation metadat
 
 ==== Interceptors with multiple interceptor bindings annotations
 
-Interceptors with multiple interceptor bindings annotations now require the same set of annotations to be present at the intercepted point. In the Micronaut 3 an interceptor with multiple binding annotations would need at least one of the binding annotations to be present at the intercepted point.
+Interceptors with multiple interceptor binding annotations now require the same set of annotations to be present at the intercepted point. In the Micronaut 3 an interceptor with multiple binding annotations would need at least one of the binding annotations to be present at the intercepted point.
 
 ==== `ConversionService` and `ConversionService.SHARED` is no longer mutable
 
@@ -165,7 +165,7 @@ public class MyExceptionHandler implements ExceptionHandler<MyException, HttpRes
 ==== `HttpContentProcessor` superseded by `MessageBodyHandler` API
 
 The netty-specific `HttpContentProcessor` API has been replaced by a new, experimental `MessageBodyHandler` API that
-does not rely on netty and is more powerful. There is no compatibility layer, so old `HttpContentProcessor` will stop
+does not rely on netty and is more powerful. There is no compatibility layer, so the old `HttpContentProcessor` will stop
 working and need to be rewritten.
 
 ==== `@Body` annotation on controller parameters
@@ -178,7 +178,7 @@ Binding from the full body to these bare parameters is no longer supported. If y
 parameter _must_ be annotated with `@Body`.
 
 Additionally, it is no longer permitted to mix body component binding with full body binding. For example,
-`void test(@Body Bean bean, String title)` will not work anymore if the `title` if the title needs to come from the
+`void test(@Body Bean bean, String title)` will not work anymore if `title`  needs to come from the
 body that is already bound to `bean`.
 
 These changes also apply to functions that are exposed using `micronaut-function-web`.
@@ -186,11 +186,18 @@ These changes also apply to functions that are exposed using `micronaut-function
 ==== Delayed body access
 
 When accessing the request body in two places, for example once as a normal controller `@Body` parameter and then in an
-error handler, Micronaut HTTP is now stricter about allowed types. In doubt, for the second body access, call
+error handler, Micronaut HTTP is now stricter about allowed types. If in doubt, for the second body access, call
 `HttpRequest.getBody()` and you will get the same body type the first access requested.
 
 ==== `text/plain` messages are more restrictive about allowed types
 
-For `text/plain` request and response body writing, in 3.x, any type would be allowed and would be "serialized" using
-`toString()`. This is not permitted anymore. The body must be a `CharSequence` or one of a few standard library types
-(e.g. number types).
+For `text/plain` request and response body reading and writing, in 3.x any type was allowed. For writing, the object
+was converted using `toString`, and for reading, the object was converted using `ConversionService`. For
+example, if you have a controller that returns an `Instant` as `text/plain`, it would write it using `toString` like
+`2023-05-25T13:25:02.925Z`. In the other direction, if you have a controller with a `@Body Instant instant`
+parameter, the same text would be converted to `Instant` using `ConversionService`.
+
+This is not permitted anymore for 4.x, except for some restricted types. The recommended fix is to move to
+`application/json` as the content type. `toString` is not a stable serialization format, JSON is more reliable.
+
+Alternatively, you can set the `micronaut.http.legacy-text-conversion` configuration option to `true` to restore the old behavior.

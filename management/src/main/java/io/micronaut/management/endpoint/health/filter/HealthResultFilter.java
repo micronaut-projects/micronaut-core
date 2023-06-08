@@ -16,18 +16,15 @@
 package io.micronaut.management.endpoint.health.filter;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.health.HealthStatus;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.annotation.Filter;
-import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
-import io.micronaut.http.filter.ServerFilterChain;
+import io.micronaut.http.annotation.ResponseFilter;
+import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
 import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.health.indicator.HealthResult;
-import org.reactivestreams.Publisher;
 
 /**
  * A filter that matches the {@link io.micronaut.management.endpoint.health.HealthEndpoint}
@@ -37,13 +34,14 @@ import org.reactivestreams.Publisher;
  * @since 1.0
  *
  */
-@Filter({
+@ServerFilter({
     HealthResultFilter.DEFAULT_MAPPING,
     HealthResultFilter.LIVENESS_PROBE_MAPPING,
     HealthResultFilter.READINESS_PROBE_MAPPING
 })
 @Requires(beans = HealthEndpoint.class)
-public class HealthResultFilter extends OncePerRequestHttpServerFilter {
+@Internal
+public class HealthResultFilter {
 
     /**
      * Configurable default mapping for filter.
@@ -66,28 +64,25 @@ public class HealthResultFilter extends OncePerRequestHttpServerFilter {
         this.healthEndpoint = healthEndpoint;
     }
 
-    @Override
-    protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
-        return Publishers.map(chain.proceed(request), response -> {
-            Object body = response.body();
-            if (body instanceof HealthResult) {
-                HealthResult healthResult = (HealthResult) body;
-                HealthStatus status = healthResult.getStatus();
+    @ResponseFilter
+    public void doFilter(MutableHttpResponse<?> response) {
+        Object body = response.body();
+        if (body instanceof HealthResult) {
+            HealthResult healthResult = (HealthResult) body;
+            HealthStatus status = healthResult.getStatus();
 
-                HttpStatus httpStatus = healthEndpoint
-                                            .getStatusConfiguration()
-                                            .getHttpMapping()
-                                            .get(status.getName());
-                if (httpStatus != null) {
-                    response.status(httpStatus);
-                } else {
-                    boolean operational = status.getOperational().orElse(true);
-                    if (!operational) {
-                        response.status(HttpStatus.SERVICE_UNAVAILABLE);
-                    }
+            HttpStatus httpStatus = healthEndpoint
+                                        .getStatusConfiguration()
+                                        .getHttpMapping()
+                                        .get(status.getName());
+            if (httpStatus != null) {
+                response.status(httpStatus);
+            } else {
+                boolean operational = status.getOperational().orElse(true);
+                if (!operational) {
+                    response.status(HttpStatus.SERVICE_UNAVAILABLE);
                 }
             }
-            return response;
-        });
+        }
     }
 }

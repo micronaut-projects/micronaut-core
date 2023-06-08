@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.propagation.slf4j.MdcPropagationContext
 import io.micronaut.core.annotation.Introspected
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.core.propagation.PropagatedContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -61,14 +62,14 @@ class MDCRxJava3Spec extends Specification {
 
     void "test MDC propagates"() {
         expect:
-        List<Tuple2> result = Flux.range(1, 100)
+        List<Tuple2> result = Flux.range(1, 1000)
                 .flatMap {
                     String tracingId = UUID.randomUUID()
                     HttpRequest<Object> request = HttpRequest
                             .POST("/mdc/enter", new SomeBody())
                             .header("X-TrackingId", tracingId)
                     return Mono.from(client.retrieve(request)).map(response -> {
-                        Tuples.of(tracingId, response.substring(1, response.length() - 1))
+                        Tuples.of(tracingId, response)
                     })
                 }
                 .collectList()
@@ -96,7 +97,7 @@ class MDCRxJava3Spec extends Specification {
         @Post("/enter")
         @ExecuteOn(IO)
         String test(@Header("X-TrackingId") String tracingId, @Body SomeBody body) {
-            LOG.info("test1")
+            LOG.debug("test1")
             checkTracing(tracingId)
 
             return mdcClient.test2(tracingId)
@@ -105,7 +106,7 @@ class MDCRxJava3Spec extends Specification {
         @ExecuteOn(IO)
         @Get("/test2")
         Mono<String> test2(@Header("X-TrackingId") String tracingId) {
-            LOG.info("test2")
+            LOG.debug("test2")
             checkTracing(tracingId)
 
             return Mono<String>.fromCallable {
@@ -114,10 +115,11 @@ class MDCRxJava3Spec extends Specification {
             }.delayElement(Duration.ofMillis(50))
         }
 
+        @SingleResult
         @Put("/test3")
         Publisher<String> test3(@Header("X-TrackingId") String tracingId, @Body SomeBody body) {
             return Flowable.just("x").delay(50, TimeUnit.MILLISECONDS).flatMap {
-                LOG.info("test3")
+                LOG.debug("test3")
                 checkTracing(tracingId)
 
                 return Flowable.fromPublisher(
@@ -131,7 +133,7 @@ class MDCRxJava3Spec extends Specification {
         @ExecuteOn(IO)
         @Post("/test4")
         String test4(@Header("X-TrackingId") String tracingId, @Body SomeBody body) {
-            LOG.info("test4")
+            LOG.debug("test4")
             checkTracing(tracingId)
 
             return httpClient.toBlocking().retrieve(HttpRequest
@@ -142,7 +144,7 @@ class MDCRxJava3Spec extends Specification {
         @Patch("/test5")
         String test5(@Header("X-TrackingId") String tracingId, @Body SomeBody body) {
             checkTracing(tracingId)
-            LOG.info("test5")
+            LOG.debug("test5")
 
             return MDC.get("trackingId")
         }

@@ -37,14 +37,13 @@ import static io.micronaut.http.tck.TestScenario.asserts;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
     "checkstyle:DesignForExtension"
 })
 public class TxtPlainBooleanTest {
-    public static final String SPEC_NAME = "ControllerConstraintHandlerTest";
+    public static final String SPEC_NAME = "TxtPlainBooleanTest";
     private static final HttpResponseAssertion ASSERTION = HttpResponseAssertion.builder()
         .status(HttpStatus.OK)
         .body(BodyAssertion.builder().body("true").equals())

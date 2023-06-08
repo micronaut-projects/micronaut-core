@@ -4,7 +4,7 @@ awaitility = "4.2.0"
 bcpkix = "1.70"
 blaze = "1.6.8"
 caffeine = "2.9.3"
-compile-testing = "0.19"
+compile-testing = "0.21.0"
 
 geb = "7.0"
 gorm = "7.3.4"
@@ -12,7 +12,7 @@ gorm = "7.3.4"
 graal-svm = "22.3.2"
 h2 = "2.1.214"
 hibernate = "5.5.9.Final"
-htmlunit = "2.68.0"
+htmlunit = "2.70.0"
 httpcomponents-client = "4.5.14"
 jakarta-inject-api = "2.0.1"
 jakarta-inject-tck = "2.0.1"
@@ -21,7 +21,7 @@ javax-inject = "1"
 javax-persistence = "2.2"
 jetbrains-annotations = "23.0.0"
 jetty = "9.4.48.v20220622"
-jmh = "1.35"
+jmh = "1.36"
 jsr107 = "1.1.1"
 jsr305 = "3.0.2"
 jakarta-el = "5.0.1"
@@ -30,25 +30,25 @@ jcache = "1.1.1"
 junit5 = "5.9.3"
 junit-platform="1.9.3"
 logback = "1.4.7"
-logbook-netty = "2.14.0"
-log4j = "2.19.0"
-micronaut-aws = "4.0.0-M3"
-micronaut-groovy = "4.0.0-M1"
-micronaut-session = "4.0.0-M2"
-micronaut-sql = "5.0.0-M6"
+logbook-netty = "2.16.0"
+log4j = "2.20.0"
+micronaut-aws = "4.0.0-M8"
+micronaut-groovy = "4.0.0-M2"
+micronaut-session = "4.0.0-M3"
+micronaut-sql = "5.0.0-M7"
 micronaut-test = "4.0.0-M4"
-micronaut-validation = "4.0.0-M7"
-micronaut-rxjava2 = "2.0.0-M1"
-micronaut-rxjava3 = "3.0.0-M1"
-micronaut-reactor = "3.0.0-M2"
+micronaut-validation = "4.0.0-M9"
+micronaut-rxjava2 = "2.0.0-M3"
+micronaut-rxjava3 = "3.0.0-M3"
+micronaut-reactor = "3.0.0-M5"
 neo4j-java-driver = "1.4.5"
-selenium = "4.7.2"
+selenium = "4.9.1"
 slf4j = "2.0.7"
 smallrye = "5.5.0"
 spock = "2.3-groovy-4.0"
 spotbugs = "4.7.1"
 systemlambda = "1.2.1"
-testcontainers = "1.17.6"
+testcontainers = "1.18.1"
 vertx = "3.9.13"
 wiremock = "2.33.2"
 
@@ -58,14 +58,15 @@ wiremock = "2.33.2"
 #
 managed-groovy = "4.0.12"
 managed-jakarta-annotation-api = "2.1.1"
-managed-jackson = "2.14.2"
-managed-jackson-databind = "2.15.1"
+managed-jackson = "2.15.1"
+managed-jackson-databind = "2.15.2"
 managed-kotlin = "1.8.21"
 managed-kotlin-coroutines = "1.7.1"
 managed-methvin-directory-watcher = "0.18.0"
-managed-netty = "4.1.92.Final"
+managed-netty = "4.1.93.Final"
 managed-netty-iouring = "0.0.21.Final"
 managed-netty-http3 = "0.0.16.Final"
+managed-netty-tcnative = "2.0.61.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
 managed-reactor = "3.5.6"
@@ -139,6 +140,7 @@ managed-netty-transport-native-epoll = { module = "io.netty:netty-transport-nati
 managed-netty-transport-native-kqueue = { module = "io.netty:netty-transport-native-kqueue", version.ref = "managed-netty" }
 managed-netty-transport-native-iouring = { module = "io.netty.incubator:netty-incubator-transport-native-io_uring", version.ref = "managed-netty-iouring" }
 managed-netty-transport-native-unix-common = { module = "io.netty:netty-transport-native-unix-common", version.ref = "managed-netty" }
+managed-netty-tcnative-boringssl-static = { module = "io.netty:netty-tcnative-boringssl-static", version.ref = "managed-netty-tcnative" }
 
 managed-reactive-streams = { module = "org.reactivestreams:reactive-streams", version.ref = "managed-reactive-streams" }
 
@@ -218,7 +220,6 @@ micronaut-session = { module = "io.micronaut.session:micronaut-session", version
 micronaut-test-bom = { module = "io.micronaut.test:micronaut-test-bom", version.ref = "micronaut-test" }
 micronaut-test-core = { module = "io.micronaut.test:micronaut-test-core", version.ref = "micronaut-test" }
 micronaut-test-junit5 = { module = "io.micronaut.test:micronaut-test-junit5", version.ref = "micronaut-test" }
-micronaut-test-kotest = { module = "io.micronaut.test:micronaut-test-kotest", version.ref = "micronaut-test" }
 micronaut-test-kotest5 = { module = "io.micronaut.test:micronaut-test-kotest5", version.ref = "micronaut-test" }
 micronaut-test-spock = { module = "io.micronaut.test:micronaut-test-spock", version.ref = "micronaut-test" }
 

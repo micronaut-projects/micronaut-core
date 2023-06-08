@@ -26,10 +26,12 @@ import com.google.devtools.ksp.symbol.KSTypeArgument
 import com.google.devtools.ksp.symbol.KSTypeParameter
 import com.google.devtools.ksp.symbol.KSValueParameter
 import io.micronaut.core.annotation.Internal
+import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.core.reflect.ReflectionUtils.findMethod
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.FieldElement
 import io.micronaut.inject.ast.MethodElement
+import java.util.*
 
 @Internal
 open class KotlinNativeElement(
@@ -47,6 +49,19 @@ open class KotlinNativeElement(
     )
 
     companion object Helper {
+
+        private val classLoader = Helper::class.java.classLoader
+        private val descriptorWithSourceClass = ClassUtils.forName(
+            "org.jetbrains.kotlin.descriptors.DeclarationDescriptorWithSource",
+            classLoader
+        )
+        private val descriptorWithSourceGetSourceMethod = if (descriptorWithSourceClass.isEmpty) Optional.empty() else findMethod(descriptorWithSourceClass.get(), "getSource")
+        private val javaSourceElementCLass = ClassUtils.forName(
+            "org.jetbrains.kotlin.load.java.sources.JavaSourceElement",
+            classLoader
+        )
+        private val javaSourceElementGetJavaElementMethod = if (javaSourceElementCLass.isEmpty) Optional.empty() else findMethod(javaSourceElementCLass.get(), "getJavaElement")
+
         fun resolveKotlinNativeType(nativeType: Any): Any {
 
             val kind: String = when (nativeType) {
@@ -70,10 +85,34 @@ open class KotlinNativeElement(
                 }
 
             return if (method != null && method.canAccess(nativeType)) {
-                method.invoke(nativeType)
+                extractNativeElement(
+                    method.invoke(nativeType)
+                )
             } else {
-                nativeType
+                extractNativeElement(
+                    nativeType
+                )
             }
+        }
+
+        private fun extractNativeElement(descriptor: Any) : Any {
+            try {
+                if (descriptorWithSourceClass.isPresent) {
+                    val descriptorWithSourceClass = descriptorWithSourceClass.get()
+                    if (descriptorWithSourceClass.isInstance(descriptor)) {
+                        if (descriptorWithSourceGetSourceMethod.isPresent) {
+                            val source = descriptorWithSourceGetSourceMethod.get().invoke(descriptor)
+                            if (javaSourceElementCLass.isPresent && javaSourceElementCLass.get().isInstance(source)) {
+                                return javaSourceElementGetJavaElementMethod.get().invoke(source)
+                            }
+                        }
+
+                    }
+                }
+            } catch (e: Exception) {
+                // Ignore
+            }
+            return descriptor
         }
     }
 
@@ -81,8 +120,7 @@ open class KotlinNativeElement(
         if (this === other) return true
         if (other !is KotlinNativeElement) return false
         if (kotlinNativeType != other.kotlinNativeType) return false
-        if (owner != other.owner) return false
-        return true
+        return owner == other.owner
     }
 
     override fun hashCode(): Int {
@@ -108,8 +146,7 @@ internal class KotlinClassNativeElement(
         if (other !is KotlinClassNativeElement) return false
         if (kotlinNativeType != other.kotlinNativeType) return false
         if (owner != other.owner) return false
-        if (type != other.type) return false
-        return true
+        return type == other.type
     }
 
     override fun hashCode(): Int {

@@ -22,21 +22,36 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.Order;
+import io.micronaut.core.bind.ArgumentBinder;
+import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.AntPathMatcher;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.http.FullHttpRequest;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.CookieValue;
+import io.micronaut.http.annotation.Header;
+import io.micronaut.http.annotation.PathVariable;
+import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
+import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.scheduling.annotation.ExecuteOn;
 
 import java.lang.annotation.Annotation;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 
@@ -50,12 +65,53 @@ import java.util.function.Supplier;
  */
 @Internal
 public abstract class BaseFilterProcessor<A extends Annotation> implements ExecutableMethodProcessor<A> {
+    private static final Set<String> PERMITTED_BINDING_ANNOTATIONS = Set.of(
+        Body.class.getName(),
+        Header.class.getName(),
+        QueryValue.class.getName(),
+        CookieValue.class.getName(),
+        PathVariable.class.getName()
+    );
+    @Nullable
     private final BeanContext beanContext;
     private final Class<A> filterAnnotation;
+    private final RequestBinderRegistry argumentBinderRegistry;
 
-    public BaseFilterProcessor(BeanContext beanContext, Class<A> filterAnnotation) {
+    public BaseFilterProcessor(@Nullable BeanContext beanContext, Class<A> filterAnnotation) {
         this.beanContext = beanContext;
         this.filterAnnotation = filterAnnotation;
+        Optional<RequestBinderRegistry> requestBinderRegistry = beanContext != null ? beanContext.findBean(RequestBinderRegistry.class) : Optional.empty();
+        this.argumentBinderRegistry = new RequestBinderRegistry() {
+            @Override
+            public <T> Optional<ArgumentBinder<T, HttpRequest<?>>> findArgumentBinder(Argument<T> argument) {
+                Class<? extends Annotation> annotation = argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Bindable.class).orElse(null);
+                if (annotation != null && PERMITTED_BINDING_ANNOTATIONS.contains(annotation.getName())) {
+                    if (annotation == Body.class) {
+                        return Optional.of((RequiresRequestBodyBinder<T>) (context, source) -> {
+                            if (source instanceof FullHttpRequest<?> fullHttpRequest) {
+                                ByteBuffer<?> contents = fullHttpRequest.contents();
+                                if (contents != null) {
+                                    Argument<T> t = context.getArgument();
+                                    if (t.isAssignableFrom(ByteBuffer.class)) {
+                                        return () -> Optional.of((T) contents);
+                                    } else if (t.isAssignableFrom(byte[].class)) {
+                                        byte[] bytes = contents.toByteArray();
+                                        return () -> Optional.of((T) bytes);
+                                    } else if (t.isAssignableFrom(String.class)) {
+                                        String str = contents.toString(StandardCharsets.UTF_8);
+                                        return () -> Optional.of((T) str);
+                                    }
+                                }
+                            }
+                            return ArgumentBinder.BindingResult.UNSATISFIED;
+                        });
+                    } else {
+                        return requestBinderRegistry.flatMap(registry -> registry.findArgumentBinder(argument));
+                    }
+                }
+                return Optional.empty();
+            }
+        };
     }
 
     @Override
@@ -74,16 +130,18 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
     protected abstract void addFilter(Supplier<GenericHttpFilter> factory, AnnotationMetadata methodAnnotations, FilterMetadata metadata);
 
     private <T> void process0(BeanDefinition<T> beanDefinition, ExecutableMethod<T, ?> method) {
-        FilterMetadata beanLevel = metadata(beanDefinition, filterAnnotation);
-        if (method.isAnnotationPresent(RequestFilter.class)) {
-            FilterMetadata methodLevel = metadata(method, RequestFilter.class);
-            FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
-            addFilter(() -> withAsync(combined, FilterRunner.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, false, combined.order)), method, combined);
-        }
-        if (method.isAnnotationPresent(ResponseFilter.class)) {
-            FilterMetadata methodLevel = metadata(method, ResponseFilter.class);
-            FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
-            addFilter(() -> withAsync(combined, FilterRunner.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, true, combined.order)), method, combined);
+        if (beanContext != null) {
+            FilterMetadata beanLevel = metadata(beanDefinition, filterAnnotation);
+            if (method.isAnnotationPresent(RequestFilter.class)) {
+                FilterMetadata methodLevel = metadata(method, RequestFilter.class);
+                FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
+                addFilter(() -> withAsync(combined, FilterRunner.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, false, combined.order, argumentBinderRegistry)), method, combined);
+            }
+            if (method.isAnnotationPresent(ResponseFilter.class)) {
+                FilterMetadata methodLevel = metadata(method, ResponseFilter.class);
+                FilterMetadata combined = combineMetadata(beanLevel, methodLevel);
+                addFilter(() -> withAsync(combined, FilterRunner.prepareFilterMethod(beanContext.getConversionService(), beanContext.getBean(beanDefinition), method, true, combined.order, argumentBinderRegistry)), method, combined);
+            }
         }
     }
 
@@ -188,5 +246,14 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
         @Nullable List<String> serviceId,
         @Nullable List<String> excludeServiceId
     ) {
+    }
+
+    /**
+     * Interface that signals to {@link FilterRunner} that we should wait for the request body to
+     * arrive before running this binder.
+     *
+     * @param <T> Arg type
+     */
+    public interface RequiresRequestBodyBinder<T> extends ArgumentBinder<T, HttpRequest<?>> {
     }
 }

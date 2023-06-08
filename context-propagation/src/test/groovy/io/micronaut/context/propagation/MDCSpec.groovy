@@ -15,6 +15,9 @@ import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.core.async.propagation.ReactivePropagation
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.annotation.ExecuteOn
+import org.codehaus.groovy.tools.shell.IO
 import org.reactivestreams.Publisher
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -44,7 +47,7 @@ class MDCSpec extends Specification {
         LOG.info('MDC adapter: {}', MDC.getMDCAdapter())
 
         expect:
-        100.times {
+        1000.times {
             String traceId = UUID.randomUUID()
             HttpRequest<Object> request = HttpRequest
                     .GET('/mdc-test')
@@ -52,6 +55,17 @@ class MDCSpec extends Specification {
             String response = client.toBlocking().retrieve(request)
             assert response == traceId
         }
+    }
+
+    void 'test MDC propagation in another thread'() {
+        when:
+        String traceId = UUID.randomUUID()
+        HttpRequest<Object> request = HttpRequest
+                .GET('/another-thread')
+                .header('traceId', traceId)
+        String response = client.toBlocking().retrieve(request)
+        then:
+        response == "Not Empty"
     }
 
     @Controller
@@ -67,6 +81,13 @@ class MDCSpec extends Specification {
                 throw new IllegalStateException('Missing traceId')
             }
             HttpResponse.ok(traceId)
+        }
+
+        @Get('/another-thread')
+        @ExecuteOn(TaskExecutors.IO)
+        String anotherThread() {
+            Map<String, String> mdc = MDC.getCopyOfContextMap() ?: [:]
+            return mdc.size() == 0 ? "Empty" : "Not Empty"
         }
     }
 
@@ -91,11 +112,8 @@ class MDCSpec extends Specification {
             MDC.put(TRACE_ID_MDC_KEY, traceIdHeader)
             LOG.info('MDC updated')
 
-            try {
-                return ReactivePropagation.propagate(
-                        PropagatedContext.get() + new MdcPropagationContext(),
-                        chain.proceed(request)
-                )
+            try (PropagatedContext.Scope ignore = (PropagatedContext.get() + new MdcPropagationContext()).propagate()) {
+                chain.proceed(request)
             } finally {
                 MDC.clear()
             }

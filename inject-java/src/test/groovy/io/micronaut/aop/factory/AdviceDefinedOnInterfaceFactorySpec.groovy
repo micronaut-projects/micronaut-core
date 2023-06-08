@@ -105,9 +105,13 @@ class AdviceDefinedOnInterfaceFactorySpec extends Specification {
         def clazz = sessionFactory.getClass()
         int count = 1 // proxy methods
         def interfaces = ReflectionUtils.getAllInterfaces(SessionFactory.class)
+                .stream().filter {c -> !c.name.toLowerCase().contains("jacoco") }.toList()
         interfaces += SessionFactory.class
         for(i in interfaces) {
             for(m in i.declaredMethods) {
+                if (m.name.contains("jacoco")) {
+                    continue
+                }
                 count++
                 assert clazz.getDeclaredMethod(m.name, m.parameterTypes)
             }
