@@ -74,10 +74,10 @@ final class DateTimeElement implements LogElement {
         }
         this.dateFormat = dateFormat;
         String[] formatSplit = format.split(",");
-        switch (formatSplit.length) {
-            case 0, 1 -> formatter = DateTimeFormatter.ofPattern(format, Locale.US);
-            default ->
-                formatter = DateTimeFormatter.ofPattern(formatSplit[0], Locale.US).withZone(ZoneId.of(formatSplit[1].strip()));
+        if (formatSplit.length < 2) {
+            formatter = DateTimeFormatter.ofPattern(format, Locale.US);
+        } else {
+            formatter = DateTimeFormatter.ofPattern(formatSplit[0], Locale.US).withZone(ZoneId.of(formatSplit[1].strip()));
         }
         events = fromStart ? Event.REQUEST_HEADERS_EVENTS : LAST_RESPONSE_EVENTS;
     }

@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element
 
-import io.micronaut.http.client.exceptions.HttpClientResponseException
 import spock.lang.Specification
 
 import java.time.DateTimeException
@@ -90,6 +89,5 @@ class AccessLogFormatParserSpec extends Specification {
         e.message == "Invalid ID for region-based ZoneId, invalid format: Invalid zone"
 
     }
-
 
 }
