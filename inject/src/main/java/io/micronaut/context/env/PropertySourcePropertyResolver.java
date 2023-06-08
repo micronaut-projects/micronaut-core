@@ -500,11 +500,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         }
         String prefix = name + '.';
         entries.entrySet().stream()
-            .filter(map -> map.getKey().startsWith(prefix))
+            // NOTE: entries may have raw form while the prefix is normalized, so we also need to compare with a normalized key;
+            //  removing a matching prefix must then be done via counting dots since substring() won't work always
+            .filter(map -> map.getKey().startsWith(prefix) || normalizeKey(map.getKey()).startsWith(prefix))
             .forEach(entry -> {
                 Object value = entry.getValue();
                 if (value != null) {
-                    String key = entry.getKey().substring(prefix.length());
+                    String key = removePrefixByCountingDots(entry.getKey(), prefix);
                     key = keyConvention != null ? keyConvention.format(key) : key;
                     properties.put(key, resolvePlaceHoldersIfNecessary(value.toString()));
                 }
@@ -563,8 +565,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 continue;
             }
 
-            if (key.startsWith(prefix)) {
-                String subMapKey = key.substring(prefix.length());
+            // NOTE: entries may have raw form while the prefix is normalized, so we also need to compare with a normalized key;
+            //  removing a matching prefix must then be done via counting dots since substring() won't work always
+            if (key.startsWith(prefix) || normalizeKey(key).startsWith(prefix)) {
+                String subMapKey = removePrefixByCountingDots(key, prefix);
 
                 Object value = resolvePlaceHoldersIfNecessary(entry.getValue());
 
@@ -825,9 +829,19 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         if (convention == PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE) {
             return environmentProperties.findPropertyNamesForEnvironmentVariable(property);
         }
-        return Collections.singletonList(
-                NameUtils.hyphenate(property, true)
-        );
+        return Collections.singletonList(normalizeKey(property));
+    }
+
+    private String normalizeKey(String key) {
+        return NameUtils.hyphenate(key, true);
+    }
+
+    private String removePrefixByCountingDots(String key, String prefix) {
+        long numDots = prefix.chars().filter(c -> c == '.').count();
+        for (long i = 0; i < numDots; i++) {
+            key = key.substring(key.indexOf('.') + 1);
+        }
+        return key;
     }
 
     private void fill(List list, Integer toIndex, Object value) {

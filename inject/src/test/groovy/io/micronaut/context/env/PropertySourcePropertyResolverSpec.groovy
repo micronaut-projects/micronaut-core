@@ -92,6 +92,22 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.getProperty("camelCase.URL", URL).get() == new URL("http://localhost")
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/7290")
+    void "test resolve raw properties for maps via normalized name"() {
+        given:
+        def values = [
+                'datasources.default.dataSourceProperties.oneTest': 'a',
+                'datasources.default.dataSourceProperties.two-Test': 'b'
+        ]
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect:
+        resolver.getProperties('datasources.default.data-source-properties', StringConvention.RAW) == ['oneTest': 'a', 'two-Test': 'b']
+        resolver.getProperties('datasources.default.dataSourceProperties', StringConvention.RAW) == ['oneTest': 'a', 'two-Test': 'b']
+    }
+
     @Unroll
     void "test property resolution rules for key #key"() {
         given:
