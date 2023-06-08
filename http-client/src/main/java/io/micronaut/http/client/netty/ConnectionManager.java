@@ -206,6 +206,7 @@ public class ConnectionManager {
     }
 
     final void refresh() {
+        SslContext oldSslContext = sslContext;
         if (configuration.getSslConfiguration().isEnabled()) {
             sslContext = nettyClientSslBuilder.build(configuration.getSslConfiguration(), httpVersion);
         } else {
@@ -220,6 +221,7 @@ public class ConnectionManager {
         for (Pool pool : pools.values()) {
             pool.forEachConnection(c -> ((Pool.ConnectionHolder) c).windDownConnection());
         }
+        ReferenceCountUtil.release(oldSslContext);
     }
 
     /**
@@ -364,6 +366,8 @@ public class ConnectionManager {
                 Thread.currentThread().interrupt();
             }
         }
+        ReferenceCountUtil.release(sslContext);
+        sslContext = null;
     }
 
     /**
