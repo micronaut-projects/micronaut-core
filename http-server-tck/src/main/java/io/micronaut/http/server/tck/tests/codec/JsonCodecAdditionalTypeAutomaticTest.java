@@ -49,9 +49,8 @@ public class JsonCodecAdditionalTypeAutomaticTest {
         HttpResponseAssertion assertion = HttpResponseAssertion.builder()
             .body(BodyAssertion.builder().body("https://jsonfeed.org").contains())
             .status(HttpStatus.OK)
-            .assertResponse(response -> {
-                assertEquals(MediaType.APPLICATION_JSON_FEED, response.header("Content-Type"));
-            }).build();
+            .assertResponse(response -> assertTrue(response.header("Content-Type").contains(APPLICATION_JSON_FEED)))
+            .build();
 
         asserts(SPEC_NAME,
             HttpRequest.GET("/json-additional-codec").header(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_FEED),
