@@ -148,6 +148,7 @@ public interface JsonMapper {
      * @param <T> The generic type
      * @return The value or {@code null} if it decodes to null
      * @throws IOException If an unrecoverable error occurs
+     * @since 4.0.0
      */
     default @Nullable <T> T readValue(@NonNull byte[] byteArray, @NonNull Class<T> type) throws IOException {
         Objects.requireNonNull(type, "Type cannot be null");
@@ -248,6 +249,7 @@ public interface JsonMapper {
      * @param <T> The generic type
      * @return The string
      * @throws IOException If an unrecoverable error occurs
+     * @since 4.0.0
      */
     @SuppressWarnings("unchecked")
     default  @NonNull <T> String writeValueAsString(@NonNull T object) throws IOException {
@@ -262,6 +264,7 @@ public interface JsonMapper {
      * @param <T> The generic type
      * @return The string
      * @throws IOException If an unrecoverable error occurs
+     * @since 4.0.0
      */
     default  @NonNull <T> String writeValueAsString(@NonNull Argument<T> type, @Nullable T object) throws IOException {
         return writeValueAsString(type, object, StandardCharsets.UTF_8);
@@ -275,6 +278,7 @@ public interface JsonMapper {
      * @param <T> The generic type
      * @return The string
      * @throws IOException If an unrecoverable error occurs
+     * @since 4.0.0
      */
     default  @NonNull <T> String writeValueAsString(@NonNull Argument<T> type, @Nullable T object, Charset charset) throws IOException {
         Objects.requireNonNull(charset, "Charset cannot be null");
