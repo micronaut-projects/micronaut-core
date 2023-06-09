@@ -202,6 +202,37 @@ public class CorsSimpleRequestTest {
             });
     }
 
+    /**
+     * CORS Simple request for localhost can be allowed via configuration.
+     * @throws IOException may throw the try for resources
+     */
+    @Test
+    // "https://github.com/micronaut-projects/micronaut-core/issues/9423")
+    void corsSimpleRequestForLocalhostCanBeAllowedViaRegexConfiguration() throws IOException {
+        asserts(SPECNAME,
+            CollectionUtils.mapOf(
+                PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE,
+                "micronaut.server.cors.configurations.foo.allowed-origins-regex", Collections.singletonList("^http(|s):\\/\\/foo\\.com$")
+            ),
+            createRequest("https://foo.com"),
+            (server, request) -> {
+
+                RefreshCounter refreshCounter = server.getApplicationContext().getBean(RefreshCounter.class);
+                assertEquals(0, refreshCounter.getRefreshCount());
+
+                AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .assertResponse(response -> CorsAssertion.builder()
+                        .vary("Origin")
+                        .allowCredentials()
+                        .allowOrigin("https://foo.com")
+                        .build()
+                        .validate(response))
+                    .build());
+                assertEquals(1, refreshCounter.getRefreshCount());
+            });
+    }
+
     private RequestSupplier createRequestFor(String host, String origin) {
         return server -> createRequest(server.getPort().map(p -> "http://" + host + ":" + p + "/refresh").orElseThrow(() -> new RuntimeException("Unknown port for " + server)), origin);
     }
