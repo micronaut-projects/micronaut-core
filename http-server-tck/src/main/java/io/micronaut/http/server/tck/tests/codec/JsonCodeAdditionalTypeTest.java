@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Introspected;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Produces;
@@ -52,7 +53,7 @@ public class JsonCodeAdditionalTypeTest {
         HttpResponseAssertion assertion = HttpResponseAssertion.builder()
             .body(BodyAssertion.builder().body("https://jsonfeed.org").contains())
             .status(HttpStatus.OK)
-            .assertResponse(response -> assertTrue(response.header("Content-Type").contains(MediaType.APPLICATION_JSON_FEED)))
+            .assertResponse(response -> assertTrue(response.header(HttpHeaders.CONTENT_TYPE).contains(MediaType.APPLICATION_JSON_FEED)))
             .build();
 
         Map<String, Object> config = Collections.singletonMap("micronaut.codec.json.additional-types", Collections.singletonList(APPLICATION_JSON_FEED));
