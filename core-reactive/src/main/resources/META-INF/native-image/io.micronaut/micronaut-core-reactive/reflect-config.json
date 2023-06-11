@@ -1,4 +1,12 @@
 [ {
   "name" : "io.micronaut.core.async.publisher.Publishers",
   "allDeclaredConstructors" : true
-}]
+},
+  {
+    "name" : "io.micronaut.core.async.publisher.Publishers$JustPublisher",
+    "allDeclaredConstructors" : true
+  },
+  {
+    "name" : "io.micronaut.core.async.publisher.Publishers$JustThrowPublisher",
+    "allDeclaredConstructors" : true
+  }]

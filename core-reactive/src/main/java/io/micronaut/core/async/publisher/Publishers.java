@@ -99,6 +99,7 @@ public class Publishers {
         return List.of(
             "io.micronaut.core.async.publisher.CompletableFuturePublisher",
             "io.micronaut.core.async.publisher.Publishers$JustPublisher",
+            "io.micronaut.core.async.publisher.Publishers$JustThrowPublisher",
             "io.reactivex.Single",
             "reactor.core.publisher.Mono",
             "io.reactivex.Maybe",
