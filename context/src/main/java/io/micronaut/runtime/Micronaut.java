@@ -47,7 +47,7 @@ import java.util.function.Function;
  * @since 1.0
  */
 public class Micronaut extends DefaultApplicationContextBuilder implements ApplicationContextBuilder  {
-    private static final String MICRONAUT_PREFIX = "  Micronaut";
+    private static final String MICRONAUT_PREFIX = "  Micronaut Framework";
     private static final String BANNER_NAME = "micronaut-banner.txt";
     private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);
     private static final String SHUTDOWN_MONITOR_THREAD = "micronaut-shutdown-monitor-thread";
@@ -354,9 +354,9 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
     }
 
     private void printMicronautVersion(@NonNull PrintStream out) {
-        String version = VersionUtils.getMicronautVersion();
-        version = (version != null) ? " (v" + version + ")" : "";
-        out.println(MICRONAUT_PREFIX + version + "\n");
+        // TODO develop mechanism to display platform version instead, or update for Micronaut 5
+        String version = "4";
+        out.println(MICRONAUT_PREFIX + " " + version + "\n");
     }
 
     @NonNull
