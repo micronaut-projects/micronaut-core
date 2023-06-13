@@ -26,7 +26,6 @@ import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.ClientFilter;
 import io.micronaut.http.annotation.CookieValue;
 import io.micronaut.http.annotation.Header;
-import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
@@ -62,8 +61,7 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
         Body.class.getName(),
         Header.class.getName(),
         QueryValue.class.getName(),
-        CookieValue.class.getName(),
-        PathVariable.class.getName()
+        CookieValue.class.getName()
     );
 
     @Override
@@ -106,6 +104,9 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
                     String annotationName = parameter.getAnnotationNameByStereotype(Bindable.class).orElse(null);
                     if (!PERMITTED_BINDING_ANNOTATIONS.contains(annotationName)) {
                         context.fail("Unsupported binding annotation on filter method: " + annotationName, parameter);
+                        return;
+                    } else if (Body.class.getName().equals(annotationName) && isResponseFilter) {
+                        context.fail("Cannot bind @Body for response filter method", parameter);
                         return;
                     } else if (Body.class.getName().equals(annotationName) && !isPermittedRawType(parameterType)) {
                         context.fail("The @Body to a filter method can only be a raw type (byte[], String, ByteBuffer etc.)", parameter);

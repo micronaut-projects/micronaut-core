@@ -35,7 +35,6 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.CookieValue;
 import io.micronaut.http.annotation.Header;
-import io.micronaut.http.annotation.PathVariable;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
@@ -69,8 +68,7 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements Execu
         Body.class.getName(),
         Header.class.getName(),
         QueryValue.class.getName(),
-        CookieValue.class.getName(),
-        PathVariable.class.getName()
+        CookieValue.class.getName()
     );
     @Nullable
     private final BeanContext beanContext;

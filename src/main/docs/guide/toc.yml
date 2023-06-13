@@ -119,6 +119,7 @@ httpServer:
       filtermethodsexample: Server Filter with Filter Methods
       errorStates: Error States
       continuations: Continuations
+      order: Filter Order
     httpServerFilter:
       title: HttpServerFilter
       httpServerFilterExample: HttpServerFilter Example
