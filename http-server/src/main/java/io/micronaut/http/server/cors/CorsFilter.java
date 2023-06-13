@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -62,6 +62,7 @@ import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
  */
 @Filter(MATCH_ALL_PATTERN)
 public class CorsFilter implements HttpServerFilter {
+
     private static final Logger LOG = LoggerFactory.getLogger(CorsFilter.class);
     private static final ArgumentConversionContext<HttpMethod> CONVERSION_CONTEXT_HTTP_METHOD = ImmutableArgumentConversionContext.of(HttpMethod.class);
 
@@ -140,7 +141,7 @@ public class CorsFilter implements HttpServerFilter {
             return false;
         }
         String host = httpHostResolver.resolve(request);
-        return isAny(corsOriginConfiguration.getAllowedOrigins()) && isHostLocal(host);
+        return isAnyOrigin(corsOriginConfiguration.getAllowedOriginsRegex().isPresent(), corsOriginConfiguration.getAllowedOrigins()) && isHostLocal(host);
     }
 
     /**
@@ -349,6 +350,11 @@ public class CorsFilter implements HttpServerFilter {
         Pattern p = Pattern.compile(originRegex);
         Matcher m = p.matcher(requestOrigin);
         return m.matches();
+    }
+
+    private static boolean isAnyOrigin(boolean isAllowedOriginsRegexConfigured, List<String> values) {
+        // True if a regular expression has not been set for origin, and the allowed hosts are still ANY
+        return !isAllowedOriginsRegexConfigured && isAny(values);
     }
 
     private static boolean isAny(List<String> values) {
