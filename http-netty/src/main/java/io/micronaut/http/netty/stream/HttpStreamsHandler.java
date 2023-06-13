@@ -21,6 +21,7 @@ import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.reactive.HandlerPublisher;
 import io.micronaut.http.netty.reactive.HandlerSubscriber;
 import io.netty.channel.ChannelDuplexHandler;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -391,18 +392,37 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             StreamedHttpMessage streamed = (StreamedHttpMessage) message;
             HandlerSubscriber<HttpContent> subscriber = new HandlerSubscriber<HttpContent>(ctx.executor()) {
                 AtomicBoolean messageWritten = new AtomicBoolean();
+                ChannelFuture delayWrites;
 
                 @Override
                 public void onNext(HttpContent httpContent) {
+                    if (delayWrites != null && !delayWrites.isDone()) {
+                        delayWrites.addListener(future -> onNext(httpContent));
+                        return;
+                    }
+
                     if (messageWritten.compareAndSet(false, true)) {
                         ChannelPromise messageWritePromise = ctx.newPromise();
                         //if oncomplete gets called before the message is written the promise
                         //set to lastWriteFuture shouldn't complete until the first content is written
                         lastWriteFuture = messageWritePromise;
-                        ctx.writeAndFlush(message).addListener(f -> super.onNext(httpContent, messageWritePromise));
+                        delayWrites = ctx.writeAndFlush(message);
+                        delayWrites.addListener(f -> {
+                            delayWrites = null;
+                            super.onNext(httpContent, messageWritePromise);
+                        });
                     } else {
                         super.onNext(httpContent);
                     }
+                }
+
+                @Override
+                public void onError(Throwable error) {
+                    if (delayWrites != null && !delayWrites.isDone()) {
+                        delayWrites.addListener(future -> onError(error));
+                        return;
+                    }
+                    super.onError(error);
                 }
 
                 @Override
@@ -422,6 +442,15 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                     } finally {
                         ctx.read();
                     }
+                }
+
+                @Override
+                public void onComplete() {
+                    if (delayWrites != null && !delayWrites.isDone()) {
+                        delayWrites.addListener(future -> onComplete());
+                        return;
+                    }
+                    super.onComplete();
                 }
 
                 @Override
