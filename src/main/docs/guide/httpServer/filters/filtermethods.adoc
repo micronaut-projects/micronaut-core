@@ -1,6 +1,15 @@
 A filter method must be declared in a bean annotated with api:http.annotation.ServerFilter[], or api:http.annotation.ClientFilter[] if it should instead intercept requests made by the HTTP client. Each filter method must also be annotated with api:http.annotation.RequestFilter[], to run before the request is processed, or api:http.annotation.ResponseFilter[], to run after the request has completed to process the response.
 
-A filter method can take various parameters, such as the api:http.HttpRequest[] and the api:http.HttpResponse[] (only for response filters). The return type can be `void` or an updated api:http.HttpRequest[] (only for request filters) or api:http.HttpResponse[]. The different supported parameter and return types are described in the documentation of api:http.annotation.RequestFilter[] and api:http.annotation.ResponseFilter[].
+A filter method can take various parameters, such as the api:http.HttpRequest[] and the api:http.HttpResponse[] (only for response filters). The return type can be `void` or `null` to continue execution as normal, or an updated api:http.HttpRequest[] (only for request filters) or api:http.HttpResponse[]. The different supported parameter and return types are described in the documentation of api:http.annotation.RequestFilter[] and api:http.annotation.ResponseFilter[].
+
+Request filters can bind the full request body using the api:http.annotation.Body[] annotation. This is useful e.g. to
+verify a signed request body.
+
+IMPORTANT: Accessing the full body should be done with care. It forces the body to be fully buffered, even if the
+controller supports streaming (e.g. `@Body InputStream` parameter), leading to potential negative performance impact.
+
+IMPORTANT: Body binding is supported by the netty-based HTTP server, but may not be supported by all other HTTP server
+backends.
 
 To write asynchronous filters, you can return a reactive publisher.
 
