@@ -356,8 +356,15 @@ public interface JsonMapper {
                     return Stream.empty();
                 }
             })
-            .min(OrderUtil.COMPARATOR)
-            .orElseThrow(() -> new IllegalStateException("No JsonMapper implementation found"))
-            .get();
+            .sorted(OrderUtil.COMPARATOR)
+            .flatMap(jsonMapperSupplier -> {
+                try {
+                    return Stream.of(jsonMapperSupplier.get());
+                } catch (Exception e) {
+                    return Stream.empty();
+                }
+            })
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException("No JsonMapper implementation found"));
     }
 }
