@@ -15,18 +15,17 @@
  */
 package io.micronaut.runtime;
 
-import io.micronaut.context.banner.Banner;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.DefaultApplicationContextBuilder;
+import io.micronaut.context.banner.Banner;
 import io.micronaut.context.banner.MicronautBanner;
 import io.micronaut.context.banner.ResourceBanner;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.Described;
-import io.micronaut.core.version.VersionUtils;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.slf4j.Logger;
@@ -350,13 +349,6 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
         }
         PrintStream out = System.out;
         resolveBanner(out).print();
-        printMicronautVersion(out);
-    }
-
-    private void printMicronautVersion(@NonNull PrintStream out) {
-        // TODO develop mechanism to display platform version instead, or update for Micronaut 5
-        String version = "4";
-        out.println(MICRONAUT_PREFIX + " " + version + "\n");
     }
 
     @NonNull
