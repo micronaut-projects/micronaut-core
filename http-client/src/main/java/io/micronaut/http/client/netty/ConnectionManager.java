@@ -467,6 +467,7 @@ final class ConnectionManager {
                             Channel channel = future.get();
                             PoolHandle poolHandle = new PoolHandle(channelPool, channel);
                             Future<?> initFuture = channel.attr(STREAM_CHANNEL_INITIALIZED).get();
+                            emitter.onCancel(poolHandle::release);
                             if (initFuture == null) {
                                 emitter.success(poolHandle);
                             } else {
@@ -490,7 +491,9 @@ final class ConnectionManager {
                         Throwable cause = future.cause();
                         emitter.error(customizeException(new HttpClientException("Connect Error: " + cause.getMessage(), cause)));
                     } else {
-                        emitter.success(mockPoolHandle(connectionFuture.channel()));
+                        PoolHandle ph = mockPoolHandle(connectionFuture.channel());
+                        emitter.onCancel(ph::release);
+                        emitter.success(ph);
                     }
                 });
             }
