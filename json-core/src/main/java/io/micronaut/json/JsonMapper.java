@@ -246,7 +246,6 @@ public interface JsonMapper {
     /**
      * Write the given value as a string.
      * @param object The object
-     * @param <T> The generic type
      * @return The string
      * @throws IOException If an unrecoverable error occurs
      * @since 4.0.0
