@@ -111,6 +111,7 @@ public class HttpResponseAdapter<O> implements HttpResponse<O> {
             if (CharSequence.class.isAssignableFrom(finalArgument.getType())) {
                 Charset charset = contentType.getCharset().orElse(StandardCharsets.UTF_8);
                 var converted = Optional.of(new String(bytes, charset));
+                // If the requested type is an Optional, then we need to wrap the result again
                 return isOptional ? Optional.of(converted) : converted;
             } else if (finalArgument.getType() == byte[].class) {
                 var converted = Optional.of(bytes);
