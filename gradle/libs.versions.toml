@@ -70,6 +70,7 @@ managed-netty-tcnative = "2.0.61.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
 managed-reactor = "3.5.6"
+managed-micrometer-context-propagation = "1.0.3"
 managed-snakeyaml = "2.0"
 managed-java-parser-core = "3.25.3"
 managed-ksp = "1.8.21-1.0.11"
@@ -146,6 +147,7 @@ managed-reactive-streams = { module = "org.reactivestreams:reactive-streams", ve
 
 managed-reactor = { module = "io.projectreactor:reactor-core", version.ref = "managed-reactor" }
 managed-reactor-test = { module = "io.projectreactor:reactor-test", version.ref = "managed-reactor" }
+managed-micrometer-context-propagation = { module = "io.micrometer:context-propagation", version.ref = "managed-micrometer-context-propagation" }
 
 managed-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "managed-snakeyaml" }
 

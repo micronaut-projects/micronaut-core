@@ -20,6 +20,7 @@ dependencies {
 
     compileOnly project(':core-reactive')
     compileOnly libs.managed.reactor
+    compileOnly libs.managed.micrometer.context.propagation
 
     compileOnly platform(libs.test.boms.micronaut.rxjava2)
     compileOnly platform(libs.test.boms.micronaut.rxjava3)
@@ -34,6 +35,7 @@ dependencies {
 
 
     testAnnotationProcessor project(":inject-java")
+    testImplementation libs.managed.micrometer.context.propagation
 
     testImplementation platform(libs.test.boms.micronaut.rxjava2)
     testImplementation platform(libs.test.boms.micronaut.rxjava3)

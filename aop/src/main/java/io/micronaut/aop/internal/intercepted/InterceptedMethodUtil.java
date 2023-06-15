@@ -71,6 +71,9 @@ public final class InterceptedMethodUtil {
             } else if (CompletionStage.class.isAssignableFrom(returnTypeClass) || Future.class.isAssignableFrom(returnTypeClass)) {
                 return new CompletionStageInterceptedMethod(context, conversionService);
             } else if (PublisherInterceptedMethod.isConvertibleToPublisher(returnTypeClass)) {
+                if (ReactorInterceptedMethod.REACTOR_AVAILABLE) {
+                    return new ReactorInterceptedMethod(context, conversionService);
+                }
                 return new PublisherInterceptedMethod(context, conversionService);
             } else {
                 return new SynchronousInterceptedMethod(context);
