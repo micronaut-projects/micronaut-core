@@ -31,7 +31,7 @@ import reactor.core.publisher.Mono;
  * The Reactor method intercept.
  *
  * @author Denis Stepanov
- * @since 2.1.0
+ * @since 4.0.0
  */
 @Internal
 @Experimental
