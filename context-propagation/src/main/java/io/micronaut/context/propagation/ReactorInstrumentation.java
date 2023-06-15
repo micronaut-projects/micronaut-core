@@ -84,9 +84,5 @@ final class ReactorInstrumentation {
             currentScope.remove();
         }
 
-        @Override
-        public void reset() {
-            setValue();
-        }
     }
 }

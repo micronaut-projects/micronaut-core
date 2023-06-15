@@ -69,7 +69,7 @@ managed-netty-http3 = "0.0.16.Final"
 managed-netty-tcnative = "2.0.61.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
-managed-reactor = "3.5.6"
+managed-reactor = "3.5.7"
 managed-micrometer-context-propagation = "1.0.3"
 managed-snakeyaml = "2.0"
 managed-java-parser-core = "3.25.3"
