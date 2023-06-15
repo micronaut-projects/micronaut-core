@@ -28,10 +28,10 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
 
 /**
- * Instruments Reactor such that the thread factory used by Micronaut is used and instrumentations can be applied to the {@link java.util.concurrent.ScheduledExecutorService}.
+ *  Integrate {@link PropagatedContext} with Reactor and Micrometer Context Propagation.
  *
- * @author Graeme Rocher
- * @since 1.0
+ * @author Denis Stepanov
+ * @since 4.0.0
  */
 @Requires(classes = {Flux.class, ContextRegistry.class, PropagatedContext.class})
 @Context
@@ -54,6 +54,8 @@ final class ReactorInstrumentation {
 
     private static class PropagatedContextThreadLocalAccessor implements ThreadLocalAccessor<PropagatedContext> {
 
+        private final ThreadLocal<PropagatedContext.Scope> currentScope = new ThreadLocal<>();
+
         @Override
         public String key() {
             return ReactorPropagation.PROPAGATED_CONTEXT_REACTOR_CONTEXT_VIEW_KEY;
@@ -66,11 +68,25 @@ final class ReactorInstrumentation {
 
         @Override
         public void setValue(PropagatedContext propagatedContext) {
-            propagatedContext.propagate();
+            PropagatedContext.Scope scope = currentScope.get();
+            if (scope != null) {
+                scope.close();
+            }
+            currentScope.set(propagatedContext.propagate());
+        }
+
+        @Override
+        public void setValue() {
+            PropagatedContext.Scope scope = currentScope.get();
+            if (scope != null) {
+                scope.close();
+            }
+            currentScope.remove();
         }
 
         @Override
         public void reset() {
+            setValue();
         }
     }
 }

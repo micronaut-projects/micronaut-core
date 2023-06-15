@@ -11,7 +11,7 @@ import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
-class TraceInterceptorSpec2 extends Specification {
+class SimpleTraceInterceptorSpec extends Specification {
 
     @Shared
     @AutoCleanup

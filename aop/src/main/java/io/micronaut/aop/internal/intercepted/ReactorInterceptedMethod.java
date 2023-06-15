@@ -37,7 +37,6 @@ import reactor.core.publisher.Mono;
 @Experimental
 final class ReactorInterceptedMethod extends PublisherInterceptedMethod {
     public static final boolean REACTOR_AVAILABLE = ClassUtils.isPresent("reactor.core.publisher.Mono", ReactorInterceptedMethod.class.getClassLoader());
-    private static final boolean MICROMETER_PROPAGATION_AVAILABLE = ClassUtils.isPresent("io.micrometer.context.ContextRegistry", ReactorInterceptedMethod.class.getClassLoader());
 
     ReactorInterceptedMethod(MethodInvocationContext<?, ?> context, ConversionService conversionService) {
         super(context, conversionService);
@@ -54,18 +53,16 @@ final class ReactorInterceptedMethod extends PublisherInterceptedMethod {
     }
 
     private <T> T captureContext(T result) {
+        if (!PropagatedContext.exists()) {
+            return result;
+        }
         if (result instanceof Mono<?> mono) {
-            if (PropagatedContext.exists()) {
-                PropagatedContext propagatedContext = PropagatedContext.get();
-                return (T) mono.contextWrite(ctx -> ReactorPropagation.addPropagatedContext(ctx, propagatedContext));
-            }
+            PropagatedContext propagatedContext = PropagatedContext.get();
+            return (T) mono.contextWrite(ctx -> ReactorPropagation.addPropagatedContext(ctx, propagatedContext));
         }
         if (result instanceof Flux<?> flux) {
-            if (PropagatedContext.exists()) {
-                PropagatedContext propagatedContext = PropagatedContext.get();
-                return (T) flux.contextWrite(ctx -> ReactorPropagation.addPropagatedContext(ctx, propagatedContext));
-            }
-            return result;
+            PropagatedContext propagatedContext = PropagatedContext.get();
+            return (T) flux.contextWrite(ctx -> ReactorPropagation.addPropagatedContext(ctx, propagatedContext));
         }
         return result;
     }
