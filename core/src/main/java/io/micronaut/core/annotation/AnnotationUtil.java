@@ -15,7 +15,6 @@
  */
 package io.micronaut.core.annotation;
 
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 
 import java.lang.annotation.Annotation;
@@ -122,22 +121,6 @@ public class AnnotationUtil {
     public static final String NON_NULL = "jakarta.annotation.Nonnull";
 
     /**
-     * A legacy NULLABLE annotation name used for nullable.
-     * @deprecated Should be removed after all the modules are recompiled
-     */
-    @Deprecated(forRemoval = true)
-    @NextMajorVersion("Remove after next Milestone of platform")
-    public static final String JAVAX_NULLABLE = "javax.annotation.Nullable";
-
-    /**
-     * A legacy NON_NULL annotation name used for non-null.
-     * @deprecated Should be removed after all the modules are recompiled
-     */
-    @Deprecated(forRemoval = true)
-    @NextMajorVersion("Remove after next Milestone of platform")
-    public static final String JAVAX_NON_NULL = "javax.annotation.Nonnull";
-
-    /**
      * The around annotation type.
      */
     public static final String ANN_AROUND = "io.micronaut.aop.Around";
@@ -222,12 +205,7 @@ public class AnnotationUtil {
      * @since 4.0.0
      */
     public static List<AnnotationValue<Annotation>> findQualifierAnnotations(AnnotationMetadata annotationMetadata) {
-        List<AnnotationValue<Annotation>> qualifiers = annotationMetadata.getAnnotationValuesByStereotype(AnnotationUtil.QUALIFIER);
-        List<AnnotationValue<Annotation>> javaxQualifiers = annotationMetadata.getAnnotationValuesByStereotype("javax.inject.Qualifier");
-        if (!javaxQualifiers.isEmpty()) {
-            qualifiers = CollectionUtils.concat(qualifiers, javaxQualifiers);
-        }
-        return qualifiers;
+        return annotationMetadata.getAnnotationValuesByStereotype(AnnotationUtil.QUALIFIER);
     }
 
     /**
@@ -237,12 +215,7 @@ public class AnnotationUtil {
      * @since 4.0.0
      */
     public static List<String> findQualifierAnnotationsNames(AnnotationMetadata annotationMetadata) {
-        List<String> qualifiers = annotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER);
-        List<String> javaxQualifiers = annotationMetadata.getAnnotationNamesByStereotype("javax.inject.Qualifier");
-        if (!javaxQualifiers.isEmpty()) {
-            qualifiers = CollectionUtils.concat(qualifiers, javaxQualifiers);
-        }
-        return qualifiers;
+        return annotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER);
     }
 
     /**
@@ -252,10 +225,8 @@ public class AnnotationUtil {
      * @since 4.0.0
      */
     public static boolean hasDeclaredQualifierAnnotation(AnnotationMetadata annotationMetadata) {
-        return annotationMetadata.hasDeclaredAnnotation(AnnotationUtil.QUALIFIER)
-            || annotationMetadata.hasDeclaredAnnotation("javax.inject.Qualifier");
+        return annotationMetadata.hasDeclaredAnnotation(AnnotationUtil.QUALIFIER);
     }
-
 
     /**
      * Resolve non-binding members.
@@ -264,13 +235,7 @@ public class AnnotationUtil {
      * @since 4.0.0
      */
     public static String[] resolveNonBindingMembers(AnnotationMetadata annotationMetadata) {
-        String[] nonBindingArray = annotationMetadata
-            .stringValues(AnnotationUtil.QUALIFIER, AnnotationUtil.NON_BINDING_ATTRIBUTE);
-        if (nonBindingArray.length == 0) {
-            return annotationMetadata
-                .stringValues("javax.inject.Qualifier", AnnotationUtil.NON_BINDING_ATTRIBUTE);
-        }
-        return nonBindingArray;
+        return annotationMetadata.stringValues(AnnotationUtil.QUALIFIER, AnnotationUtil.NON_BINDING_ATTRIBUTE);
     }
 
     /**
@@ -280,8 +245,7 @@ public class AnnotationUtil {
      * @since 4.0.0
      */
     public static Optional<String> findQualifierAnnotation(AnnotationMetadata annotationMetadata) {
-        return annotationMetadata.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER).or(() ->
-            annotationMetadata.getAnnotationNameByStereotype("javax.inject.Qualifier"));
+        return annotationMetadata.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER);
     }
 
     /**

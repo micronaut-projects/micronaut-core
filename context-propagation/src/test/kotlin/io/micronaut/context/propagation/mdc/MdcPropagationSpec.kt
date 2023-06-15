@@ -25,6 +25,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.single
 import kotlinx.coroutines.reactive.asFlow
 import kotlinx.coroutines.withContext
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.reactivestreams.Publisher
 import org.slf4j.LoggerFactory
@@ -44,7 +45,7 @@ class MdcPropagationSpec {
         )
         val client = embeddedServer.applicationContext.getBean(HttpClient::class.java)
 
-        Flux.range(1, 1)
+        Flux.range(1, 1000)
             .flatMap {
                 val tracingId = UUID.randomUUID().toString()
                 val get = HttpRequest.POST<Any>(

@@ -36,8 +36,6 @@ public class TestEntityAnnotationMapper implements NamedAnnotationMapper {
     @Override
     public List<AnnotationValue<?>> map(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
         final AnnotationValueBuilder<Introspected> builder = AnnotationValue.builder(Introspected.class)
-                // don't bother with transients properties
-                .member("excludedAnnotations", "javax.persistence.Transient")
                 // following are indexed for fast lookups
                 .member("indexed",
                         AnnotationValue.builder(Introspected.IndexedAnnotation.class)

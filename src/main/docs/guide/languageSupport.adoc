@@ -1,4 +1,4 @@
-Micronaut framework supports any JVM language that implements the https://docs.oracle.com/javase/8/docs/api/javax/annotation/processing/package-summary.html[Java Annotation Processor] API.
+Micronaut framework supports any JVM language that implements the link:{jdkapi}/java.compiler/javax/annotation/processing/package-summary.html[Java Annotation Processor] API.
 
 Although Groovy does not support this API, special support has been built using AST transformations. The current list of supported languages is: Java, Groovy, and Kotlin (via the `kapt` tool).
 

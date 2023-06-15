@@ -17,7 +17,6 @@ package io.micronaut.expressions.context;
 
 import io.micronaut.context.annotation.AnnotationExpressionContext;
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -32,14 +31,11 @@ import io.micronaut.inject.visitor.VisitorContext;
 public interface ExpressionEvaluationContextRegistrar extends TypeElementVisitor<AnnotationExpressionContext, AnnotationExpressionContext> {
     @Override
     default void start(VisitorContext visitorContext) {
-        ClassElement contextClass = visitorContext.getClassElement(getContextClassName())
-            .orElse(null);
-        if (contextClass == null) {
-            visitorContext.fail("Evaluation context class is not on the compilation classpath: " + getContextClassName(), null);
-        } else {
-            visitorContext.getExpressionCompilationContextFactory()
-                .registerContextClass(contextClass);
-        }
+        visitorContext.getClassElement(getContextClassName())
+            .ifPresent(contextClass ->
+                visitorContext.getExpressionCompilationContextFactory()
+                              .registerContextClass(contextClass)
+            );
     }
 
     String getContextClassName();

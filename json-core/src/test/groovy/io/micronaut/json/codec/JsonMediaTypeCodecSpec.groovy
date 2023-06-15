@@ -24,16 +24,18 @@ class JsonMediaTypeCodecSpec extends Specification {
     void "test additional type configuration"() {
         given:
         ApplicationContext ctx = ApplicationContext.run([
-                'micronaut.codec.json.additional-types': ['text/javascript']
+                'micronaut.codec.json.additional-types': ['text/javascript', 'text/json']
         ])
 
         when:
         JsonMediaTypeCodec codec = ctx.getBean(JsonMediaTypeCodec)
 
         then:
-        codec.mediaTypes.size() == 2
-        codec.mediaTypes.contains(MediaType.of("text/javascript"))
         codec.mediaTypes.contains(MediaType.APPLICATION_JSON_TYPE)
+        codec.mediaTypes.contains(MediaType.of("text/javascript"))
+        codec.mediaTypes.size() == JsonMediaTypeCodec.JSON_ADDITIONAL_TYPES.size() + 2 // +2 for the application/json + text/javascript; text/json is already included
+
+
 
         cleanup:
         ctx.close()

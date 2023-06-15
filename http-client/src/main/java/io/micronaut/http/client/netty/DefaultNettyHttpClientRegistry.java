@@ -50,7 +50,7 @@ import io.micronaut.http.client.StreamingHttpClientRegistry;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
-import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
+import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.client.sse.SseClientRegistry;
 import io.micronaut.http.codec.MediaTypeCodec;
@@ -72,7 +72,6 @@ import io.micronaut.json.JsonMapper;
 import io.micronaut.json.codec.MapperMediaTypeCodec;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import io.micronaut.runtime.context.scope.refresh.RefreshEventListener;
-import io.micronaut.scheduling.instrument.InvocationInstrumenterFactory;
 import io.micronaut.websocket.WebSocketClient;
 import io.micronaut.websocket.WebSocketClientRegistry;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
@@ -120,14 +119,13 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     private final Map<ClientKey, DefaultHttpClient> unbalancedClients = new ConcurrentHashMap<>(10);
     private final List<DefaultHttpClient> balancedClients = Collections.synchronizedList(new ArrayList<>());
     private final LoadBalancerResolver loadBalancerResolver;
-    private final NettyClientSslBuilder nettyClientSslBuilder;
+    private final ClientSslBuilder nettyClientSslBuilder;
     private final ThreadFactory threadFactory;
     private final MediaTypeCodecRegistry codecRegistry;
     private final MessageBodyHandlerRegistry handlerRegistry;
     private final BeanContext beanContext;
     private final HttpClientConfiguration defaultHttpClientConfiguration;
     private final EventLoopGroupRegistry eventLoopGroupRegistry;
-    private final List<InvocationInstrumenterFactory> invocationInstrumenterFactories;
     private final EventLoopGroupFactory eventLoopGroupFactory;
     private final HttpClientFilterResolver<ClientFilterResolutionContext> clientFilterResolver;
     private final JsonMapper jsonMapper;
@@ -147,21 +145,19 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
      * @param eventLoopGroupRegistry          The event loop group registry
      * @param eventLoopGroupFactory           The event loop group factory
      * @param beanContext                     The bean context
-     * @param invocationInstrumenterFactories The invocation instrumenter factories
      * @param jsonMapper                      JSON Mapper
      */
     public DefaultNettyHttpClientRegistry(
             HttpClientConfiguration defaultHttpClientConfiguration,
             HttpClientFilterResolver httpClientFilterResolver,
             LoadBalancerResolver loadBalancerResolver,
-            NettyClientSslBuilder nettyClientSslBuilder,
+            ClientSslBuilder nettyClientSslBuilder,
             ThreadFactory threadFactory,
             MediaTypeCodecRegistry codecRegistry,
             MessageBodyHandlerRegistry handlerRegistry,
             EventLoopGroupRegistry eventLoopGroupRegistry,
             EventLoopGroupFactory eventLoopGroupFactory,
             BeanContext beanContext,
-            List<InvocationInstrumenterFactory> invocationInstrumenterFactories,
             JsonMapper jsonMapper) {
         this.clientFilterResolver = httpClientFilterResolver;
         this.defaultHttpClientConfiguration = defaultHttpClientConfiguration;
@@ -173,7 +169,6 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         this.beanContext = beanContext;
         this.eventLoopGroupFactory = eventLoopGroupFactory;
         this.eventLoopGroupRegistry = eventLoopGroupRegistry;
-        this.invocationInstrumenterFactories = invocationInstrumenterFactories;
         this.jsonMapper = jsonMapper;
     }
 
@@ -466,7 +461,6 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
                 resolveSocketChannelFactory(NettyChannelType.CLIENT_SOCKET, SocketChannel.class, configuration, beanContext),
                 resolveSocketChannelFactory(NettyChannelType.DATAGRAM_SOCKET, DatagramChannel.class, configuration, beanContext),
                 clientCustomizer,
-                invocationInstrumenterFactories,
                 clientId,
                 conversionService
         );

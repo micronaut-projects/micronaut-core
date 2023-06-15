@@ -133,6 +133,11 @@ public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements Byt
         return ExecutionFlow.just(this);
     }
 
+    public ByteBuf contentUnclaimed() {
+        checkUnclaimed();
+        return value();
+    }
+
     @Override
     public HttpRequest claimForReuse(HttpRequest request) {
         DefaultFullHttpRequest copy = new DefaultFullHttpRequest(

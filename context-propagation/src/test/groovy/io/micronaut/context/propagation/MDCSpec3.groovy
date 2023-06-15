@@ -46,7 +46,7 @@ class MDCSpec3 extends Specification {
         LOG.info('MDC adapter: {}', MDC.getMDCAdapter())
 
         expect:
-        100.times {
+        1000.times {
             String traceId = UUID.randomUUID()
             String response = client.toBlocking().retrieve(HttpRequest
                     .GET('/mdc-test')

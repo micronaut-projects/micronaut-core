@@ -16,8 +16,8 @@
 package io.micronaut.docs.aop.around_reactive;
 
 import io.micronaut.context.ApplicationContext;
-import org.junit.Test;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.RepeatedTest;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -26,7 +26,7 @@ import java.util.List;
 
 public class TxSpec {
 
-    @Test
+    @RepeatedTest(10)
     public void testReactiveTx() {
         try (ApplicationContext applicationContext = ApplicationContext.run()) {
             TxManager txManager = applicationContext.getBean(TxManager.class);
@@ -43,7 +43,7 @@ public class TxSpec {
         }
     }
 
-    @Test
+    @RepeatedTest(10)
     public void testTwoFluxReactiveTx() {
         try (ApplicationContext applicationContext = ApplicationContext.run()) {
             TxManager txManager = applicationContext.getBean(TxManager.class);
@@ -55,7 +55,7 @@ public class TxSpec {
             Flux.from(
                 exampleBean.doWorkFlux("job1").doOnNext(results::add)
             ).thenMany(
-                Mono.from(
+                Flux.from(
                     exampleBean.doWorkFlux("job2").doOnNext(results::add)
                 )
             ).collectList().block();
@@ -65,7 +65,7 @@ public class TxSpec {
         }
     }
 
-    @Test
+    @RepeatedTest(10)
     public void testTwoMonoReactiveTx() {
         try (ApplicationContext applicationContext = ApplicationContext.run()) {
             TxManager txManager = applicationContext.getBean(TxManager.class);
@@ -87,7 +87,7 @@ public class TxSpec {
         }
     }
 
-    @Test
+    @RepeatedTest(10)
     public void testTwoMonoReactiveTx2() {
         try (ApplicationContext applicationContext = ApplicationContext.run()) {
             TxManager txManager = applicationContext.getBean(TxManager.class);

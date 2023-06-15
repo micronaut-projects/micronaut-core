@@ -38,7 +38,6 @@ dependencies {
     if (!JavaVersion.current().isJava9Compatible()) {
         testImplementation files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     }
-    testImplementation libs.micrometer.core
     testImplementation (libs.micronaut.session) {
         exclude group: 'io.micronaut'
     }
@@ -52,10 +51,6 @@ dependencies {
     }
     testImplementation project(":jackson-databind")
     testImplementation libs.junit.jupiter.api
-    testImplementation(platform(libs.test.boms.micronaut.tracing))
-    testImplementation(libs.micronaut.tracing.zipkin) {
-        exclude group: 'io.micronaut'
-    }
     testImplementation libs.javax.annotation.api
     testImplementation libs.javax.inject
     testImplementation libs.managed.snakeyaml

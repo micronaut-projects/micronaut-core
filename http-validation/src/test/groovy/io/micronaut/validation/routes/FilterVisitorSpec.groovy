@@ -23,7 +23,28 @@ class Foo {
 
         then:
         def ex = thrown(RuntimeException)
-        ex.message.contains("Unsupported type for filter method: java.lang.String")
+        ex.message.contains("Unsupported filter method parameter type: java.lang.String")
+    }
+
+    def 'continuation parameter type'() {
+        expect:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.filter.FilterContinuation;
+
+@ServerFilter
+class Foo {
+    @RequestFilter
+    public void requestFilterContinuationBlocking(HttpRequest<?> request, FilterContinuation<HttpResponse<?>> continuation) {
+    }
+}
+
+""")
+
     }
 
     def 'unknown return type'() {
@@ -46,7 +67,7 @@ class Foo {
 
         then:
         def ex = thrown(RuntimeException)
-        ex.message.contains("Unsupported type for filter method: java.lang.String")
+        ex.message.contains("Unsupported filter return type: java.lang.String")
     }
 
     def 'response on request filter'() {
@@ -94,6 +115,6 @@ class Foo {
 
         then:
         def ex = thrown(RuntimeException)
-        ex.message.contains("Unsupported filter return type io.micronaut.http.HttpRequest")
+        ex.message.contains("Unsupported filter return type: io.micronaut.http.HttpRequest")
     }
 }

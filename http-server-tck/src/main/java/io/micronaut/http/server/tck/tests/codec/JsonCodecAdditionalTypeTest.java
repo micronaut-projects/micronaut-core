@@ -34,7 +34,7 @@ import java.util.Collections;
 import java.util.Map;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 @SuppressWarnings({
@@ -44,26 +44,24 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 })
 public class JsonCodecAdditionalTypeTest {
     public static final String SPEC_NAME = "JsonCodecAdditionalTypeTest";
-    public static final String APPLICATION_JSON_FEED = "application/json+feed";
+    public static final String CUSTOM_MEDIA_TYPE = "application/vnd.mycorp.mydatatype+json";
 
     @Test
     void itIsPossibleToCanRegisterAdditionTypesForJsonCodec() throws IOException {
+        assertRequest("/json-additional-codec");
+        assertRequest("/json-additional-codec/pojo");
+    }
+
+    private void assertRequest(String uri) throws IOException {
         HttpResponseAssertion assertion = HttpResponseAssertion.builder()
             .body(BodyAssertion.builder().body("https://jsonfeed.org").contains())
             .status(HttpStatus.OK)
-            .assertResponse(response -> {
-                assertEquals("application/json+feed", response.header("Content-Type"));
-            }).build();
-
-        Map<String, Object> config = Collections.singletonMap("micronaut.codec.json.additional-types", Collections.singletonList(APPLICATION_JSON_FEED));
+            .assertResponse(response -> assertTrue(response.header("Content-Type").contains(CUSTOM_MEDIA_TYPE)))
+            .build();
+        Map<String, Object> config = Collections.singletonMap("micronaut.codec.json.additional-types", Collections.singletonList(CUSTOM_MEDIA_TYPE));
         asserts(SPEC_NAME,
             config,
-            HttpRequest.GET("/json-additional-codec").header(HttpHeaders.ACCEPT, APPLICATION_JSON_FEED),
-            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, assertion));
-
-        asserts(SPEC_NAME,
-            config,
-            HttpRequest.GET("/json-additional-codec/pojo").header(HttpHeaders.ACCEPT, APPLICATION_JSON_FEED),
+            HttpRequest.GET(uri).header(HttpHeaders.ACCEPT, CUSTOM_MEDIA_TYPE),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, assertion));
     }
 
@@ -71,7 +69,7 @@ public class JsonCodecAdditionalTypeTest {
     @Controller
     static class JsonFeedController {
 
-        @Produces(APPLICATION_JSON_FEED)
+        @Produces(CUSTOM_MEDIA_TYPE)
         @Get("/json-additional-codec")
         String index() {
             return "{\n" +
@@ -83,7 +81,7 @@ public class JsonCodecAdditionalTypeTest {
                 "}";
         }
 
-        @Produces(APPLICATION_JSON_FEED)
+        @Produces(CUSTOM_MEDIA_TYPE)
         @Get("/json-additional-codec/pojo")
         JsonFeed pojo() {
             return new JsonFeed("https://jsonfeed.org/version/1", "My Example Feed", "https://example.org/", "https://example.org/feed.json");

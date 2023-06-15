@@ -76,7 +76,7 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
     @Override
     public BindingResult<Publisher<?>> bind(ArgumentConversionContext<Publisher<?>> context, HttpRequest<?> source) {
         if (source instanceof NettyHttpRequest<?> nhr) {
-            ByteBody rootBody = nhr.rootBody();
+            ByteBody rootBody = nhr.byteBody();
             if (rootBody instanceof ImmediateByteBody imm && imm.empty()) {
                 return BindingResult.empty();
             }

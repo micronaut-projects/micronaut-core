@@ -128,6 +128,7 @@ public interface ClassWriterOutputVisitor {
      * Visit a file that will be generated within the generated sources directory.
      *
      * @param path The path
+     * @param originatingElements  the originating elements
      * @return The file if it was possible to create it
      * @since 4.0.0
      */

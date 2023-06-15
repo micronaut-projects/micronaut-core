@@ -1,0 +1,11 @@
+Filters can be ordered in one of three ways:
+
+. An api:order.Order[] annotation on the filter method
+. Implementing api:order.Ordered[] in the filter class
+. An api:order.Order[] annotation on the filter class
+
+Request filters are executed in order from highest precedence (smallest integer value, as defined by `Ordered.HIGHEST_PRECEDENCE`) to lowest precedence (biggest integer value, as defined by `Ordered.LOWEST_PRECEDENCE`). Response filters are executed in reverse order.
+
+image::filter-order.svg[]
+
+Request filter A is executed first, because it has the higher precedence (-100), followed by request filter B with the lower precedence (100). Then the controller is executed. Response filter C is executed first, because it has the lower precedence (100), and finally response filter D with the higher precedence (-100) is executed last.

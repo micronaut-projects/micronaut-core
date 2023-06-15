@@ -104,7 +104,6 @@ public class HtmlBodyWritableTest {
     @Requires(property = "spec.name", value = SPEC_NAME)
     @Filter("/html/writablefluxfilter")
     static class MockFilter implements HttpServerFilter {
-
         @Override
         public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             return Flux.from(chain.proceed(request))

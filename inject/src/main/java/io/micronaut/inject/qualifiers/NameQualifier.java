@@ -68,7 +68,7 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
             AnnotationMetadata annotationMetadata = candidate.getAnnotationMetadata();
             // here we resolved the declared Qualifier of the bean
             String thisName = annotationMetadata
-                    .findDeclaredAnnotation(AnnotationUtil.NAMED).or(() -> annotationMetadata.findDeclaredAnnotation("javax.inject.Named"))
+                    .findDeclaredAnnotation(AnnotationUtil.NAMED)
                     .flatMap(AnnotationValue::stringValue)
                     .orElse(null);
 

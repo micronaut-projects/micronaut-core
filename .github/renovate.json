@@ -4,7 +4,7 @@
   ],
   "addLabels": ["type: dependency-upgrade"],
   "schedule": [
-    "every weekend"
+    "after 10pm every day"
   ],
   "prHourlyLimit": 1,
   "prConcurrentLimit": 20,

@@ -16,11 +16,12 @@
 package io.micronaut.http.client.netty.ssl;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.Nullable;
+import io.micronaut.context.annotation.Secondary;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.client.HttpVersionSelection;
+import io.micronaut.http.netty.NettyTlsUtils;
 import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.SslBuilder;
@@ -44,20 +45,23 @@ import org.slf4j.LoggerFactory;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLException;
 import javax.net.ssl.TrustManagerFactory;
+import java.security.KeyStore;
 import java.util.Arrays;
 import java.util.Optional;
 
 /**
  * The Netty implementation of {@link SslBuilder} that generates an {@link SslContext} to create a client that
- * supports SSL.
+ * supports SSL.<br>
+ * This class is not final, so you can extend and replace it to implement alternate mechanisms for loading the
+ * key and trust stores.
  *
  * @author James Kleeh
  * @since 1.0
  */
 @Singleton
-@Internal
 @BootstrapContextCompatible
-public final class NettyClientSslBuilder extends SslBuilder<SslContext> {
+@Secondary
+public class NettyClientSslBuilder extends SslBuilder<SslContext> implements ClientSslBuilder {
     private static final Logger LOG = LoggerFactory.getLogger(NettyClientSslBuilder.class);
 
     /**
@@ -69,24 +73,26 @@ public final class NettyClientSslBuilder extends SslBuilder<SslContext> {
 
     @SuppressWarnings("Duplicates")
     @Override
-    public Optional<SslContext> build(SslConfiguration ssl) {
+    public final Optional<SslContext> build(SslConfiguration ssl) {
         return build(ssl, HttpVersion.HTTP_1_1);
     }
 
     @Override
-    public Optional<SslContext> build(SslConfiguration ssl, HttpVersion httpVersion) {
-        return Optional.ofNullable(build(ssl, HttpVersionSelection.forLegacyVersion(httpVersion)));
+    public final Optional<SslContext> build(SslConfiguration ssl, HttpVersion httpVersion) {
+        if (!ssl.isEnabled()) {
+            return Optional.empty();
+        }
+        return Optional.of(build(ssl, HttpVersionSelection.forLegacyVersion(httpVersion)));
     }
 
-    @Nullable
-    public SslContext build(SslConfiguration ssl, HttpVersionSelection versionSelection) {
-        if (!ssl.isEnabled()) {
-            return null;
-        }
+    @NonNull
+    @Override
+    public final SslContext build(SslConfiguration ssl, HttpVersionSelection versionSelection) {
         SslContextBuilder sslBuilder = SslContextBuilder
             .forClient()
             .keyManager(getKeyManagerFactory(ssl))
-            .trustManager(getTrustManagerFactory(ssl));
+            .trustManager(getTrustManagerFactory(ssl))
+            .sslProvider(NettyTlsUtils.sslProvider());
         Optional<String[]> protocols = ssl.getProtocols();
         if (protocols.isPresent()) {
             sslBuilder.protocols(protocols.get());
@@ -124,7 +130,8 @@ public final class NettyClientSslBuilder extends SslBuilder<SslContext> {
         }
     }
 
-    public QuicSslContext buildHttp3(SslConfiguration ssl) {
+    @Override
+    public final QuicSslContext buildHttp3(SslConfiguration ssl) {
         QuicSslContextBuilder sslBuilder = QuicSslContextBuilder.forClient()
             .keyManager(getKeyManagerFactory(ssl), ssl.getKeyStore().getPassword().orElse(null))
             .trustManager(getTrustManagerFactory(ssl))
@@ -145,8 +152,9 @@ public final class NettyClientSslBuilder extends SslBuilder<SslContext> {
     @Override
     protected KeyManagerFactory getKeyManagerFactory(SslConfiguration ssl) {
         try {
-            if (this.getKeyStore(ssl).isPresent()) {
-                return super.getKeyManagerFactory(ssl);
+            Optional<KeyStore> ks = this.getKeyStore(ssl);
+            if (ks.isPresent()) {
+                return NettyTlsUtils.storeToFactory(ssl, ks.orElse(null));
             } else {
                 return null;
             }

@@ -19,6 +19,7 @@ import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -41,6 +42,7 @@ import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.body.NettyBodyWriter;
@@ -60,6 +62,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpContent;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
@@ -69,7 +72,10 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
+import org.reactivestreams.Processor;
 import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
@@ -202,7 +208,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 serverConfiguration
             );
             outboundAccess.attachment(errorRequest);
-            try (PropagatedContext.Scope ignore = PropagatedContext.newContext(new ServerHttpRequestContext(errorRequest)).propagate()) {
+            try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(errorRequest)).propagate()) {
                 new NettyRequestLifecycle(this, outboundAccess, errorRequest).handleException(e.getCause() == null ? e : e.getCause());
             }
             if (request instanceof StreamedHttpRequest streamed) {
@@ -213,7 +219,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             return;
         }
         outboundAccess.attachment(mnRequest);
-        try (PropagatedContext.Scope ignore = PropagatedContext.newContext(new ServerHttpRequestContext(mnRequest)).propagate()) {
+        try (PropagatedContext.Scope ignore = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(mnRequest)).propagate()) {
             new NettyRequestLifecycle(this, outboundAccess, mnRequest).handleNormal();
         }
     }
@@ -234,13 +240,28 @@ public final class RoutingInBoundHandler implements RequestHandler {
                     response.body()
                 );
             } catch (Throwable e) {
-                response = routeExecutor.createDefaultErrorResponse(nettyHttpRequest, e);
-                encodeHttpResponse(
-                    outboundAccess,
-                    nettyHttpRequest,
-                    response,
-                    response.body()
-                );
+                try {
+                    response = routeExecutor.createDefaultErrorResponse(nettyHttpRequest, e);
+                    encodeHttpResponse(
+                        outboundAccess,
+                        nettyHttpRequest,
+                        response,
+                        response.body()
+                    );
+                } catch (Throwable f) {
+                    f.addSuppressed(e);
+                    outboundAccess.closeAfterWrite();
+                    try {
+                        outboundAccess.writeFull(new DefaultFullHttpResponse(
+                            HttpVersion.HTTP_1_1,
+                            HttpResponseStatus.INTERNAL_SERVER_ERROR,
+                            Unpooled.EMPTY_BUFFER
+                        ));
+                    } catch (Throwable g) {
+                        f.addSuppressed(g);
+                    }
+                    LOG.warn("Failed to encode error response", f);
+                }
             }
         }
     }
@@ -274,7 +295,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                     toNettyResponse(response),
                     mapToHttpContent(nettyRequest, response, body, routeInfo, nettyRequest.getChannelHandlerContext())
                 );
-                outboundAccess.writeStreamed(streamedResponse);
+                writeStreamedWithErrorHandling(nettyRequest, outboundAccess, streamedResponse);
                 return;
             }
 
@@ -414,7 +435,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         }
         if (nettyResponse instanceof StreamedHttpResponse streamed) {
             nettyResponse.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
-            outboundAccess.writeStreamed(streamed);
+            writeStreamedWithErrorHandling(request, outboundAccess, streamed);
         } else {
             FullHttpResponse fullResponse = (FullHttpResponse) nettyResponse;
             if (PipeliningServerHandler.canHaveBody(fullResponse.status()) && request.getMethod() != HttpMethod.HEAD) {
@@ -429,6 +450,11 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 ((HttpRequest<?>) request).getMethodName(),
                 ((HttpRequest<?>) request).getUri());
         }
+    }
+
+    private void writeStreamedWithErrorHandling(NettyHttpRequest<?> request, PipeliningServerHandler.OutboundAccess outboundAccess, StreamedHttpResponse streamed) {
+        LazySendingSubscriber sub = new LazySendingSubscriber(request, streamed, outboundAccess);
+        streamed.subscribe(sub);
     }
 
     private void handleMissingConnectionHeader(MutableHttpResponse<?> message, HttpRequest<?> request, PipeliningServerHandler.OutboundAccess outboundAccess) {
@@ -534,6 +560,114 @@ public final class RoutingInBoundHandler implements RequestHandler {
         @Override
         public ByteBuffer<?> writeTo(Argument<T> type, MediaType mediaType, T object, MutableHeaders outgoingHeaders, ByteBufferFactory<?, ?> bufferFactory) throws CodecException {
             return delegate.writeTo(type, mediaType, object, outgoingHeaders, bufferFactory);
+        }
+    }
+
+    /**
+     * This processor waits for the first item before sending the response, and handles errors if they
+     * appear as the first item.
+     */
+    private final class LazySendingSubscriber implements Processor<HttpContent, HttpContent> {
+        boolean headersSent = false;
+        Subscription upstream;
+        Subscriber<? super HttpContent> downstream;
+        @Nullable
+        HttpContent first;
+
+        private final NettyHttpRequest<?> request;
+        private final io.netty.handler.codec.http.HttpResponse headers;
+        private final PipeliningServerHandler.OutboundAccess outboundAccess;
+
+        private LazySendingSubscriber(NettyHttpRequest<?> request, io.netty.handler.codec.http.HttpResponse headers, PipeliningServerHandler.OutboundAccess outboundAccess) {
+            this.request = request;
+            this.headers = headers;
+            this.outboundAccess = outboundAccess;
+        }
+
+        @Override
+        public void subscribe(Subscriber<? super HttpContent> s) {
+            s.onSubscribe(new Subscription() {
+                @Override
+                public void request(long n) {
+                    HttpContent first = LazySendingSubscriber.this.first;
+                    if (first != null) {
+                        LazySendingSubscriber.this.first = null;
+                        // onNext may trigger further request calls
+                        s.onNext(first);
+                        if (n != Long.MAX_VALUE) {
+                            n--;
+                            if (n == 0) {
+                                return;
+                            }
+                        }
+                    }
+                    upstream.request(n);
+                }
+
+                @Override
+                public void cancel() {
+                    if (first != null) {
+                        first.release();
+                        first = null;
+                    }
+                    upstream.cancel();
+                }
+            });
+            downstream = s;
+        }
+
+        @Override
+        public void onSubscribe(Subscription s) {
+            upstream = s;
+            s.request(1);
+        }
+
+        @Override
+        public void onNext(HttpContent httpContent) {
+            if (headersSent) {
+                downstream.onNext(httpContent);
+            } else {
+                first = httpContent;
+                headersSent = true;
+                outboundAccess.writeStreamed(headers, this);
+            }
+        }
+
+        @Override
+        public void onError(Throwable t) {
+            if (headersSent) {
+                // nothing we can do
+                downstream.onError(t);
+            } else {
+                // limited error handling
+                MutableHttpResponse<?> response;
+                if (t instanceof HttpStatusException hse) {
+                    response = HttpResponse.status(hse.getStatus());
+                    if (hse.getBody().isPresent()) {
+                        response.body(hse.getBody().get());
+                    } else if (hse.getMessage() != null) {
+                        response.body(hse.getMessage());
+                    }
+                } else {
+                    response = routeExecutor.createDefaultErrorResponse(request, t);
+                }
+                encodeHttpResponse(
+                    outboundAccess,
+                    request,
+                    response,
+                    response.body()
+                );
+            }
+        }
+
+        @Override
+        public void onComplete() {
+            if (headersSent) {
+                downstream.onComplete();
+            } else {
+                headersSent = true;
+                outboundAccess.writeStreamed(headers, Flux.empty());
+            }
         }
     }
 }

@@ -47,7 +47,7 @@ ways to achieve the same result.
 
 Expressions can be used anywhere throughout the Micronaut framework and associated modules, but as an example, you can use them to implement simple scheduled job control, for example:
 
-snippet::io.micronaut.docs.expressions.ExampleJob[title="Job Control with Expressions"]
+snippet::io.micronaut.docs.expressions.ExampleJob[tags="imports,clazz",title="Job Control with Expressions"]
 
 <1> Here the `condition` member of the ann:scheduling.annotation.Scheduled[] annotation is used to only execute the job if a pre-condition is met.
 <2> The `condition` invokes a method of the type that checks if the job is paused. Other methods can be used to pause and resume execution of the job as desired.

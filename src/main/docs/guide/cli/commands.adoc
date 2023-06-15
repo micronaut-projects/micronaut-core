@@ -74,7 +74,7 @@ These commands are always available within the context of a micronaut project.
 |
 |===
 
-The `create-bean` command generates a simple {jeeapi}/javax/inject/Singleton.html[Singleton] class. It does not create an associated test.
+The `create-bean` command generates a simple {jakartaapi}/jakarta/inject/Singleton.html[Singleton] class. It does not create an associated test.
 
 [source,bash]
 ----

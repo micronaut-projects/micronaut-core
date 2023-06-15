@@ -11,7 +11,7 @@ import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
-import io.micronaut.http.filter.OncePerRequestHttpServerFilter
+import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Singleton
@@ -72,12 +72,12 @@ class MalformedUriSpec extends Specification {
     @Requires(property = "spec.name", value = "MalformedUriSpec")
     @Singleton
     @Filter("/**")
-    static class OncePerFilter extends OncePerRequestHttpServerFilter {
+    static class OncePerFilter implements HttpServerFilter {
 
         boolean filterCalled = false
 
         @Override
-        protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
+        Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             filterCalled = true
             return chain.proceed(request)
         }
