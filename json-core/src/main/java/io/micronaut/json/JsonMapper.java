@@ -252,7 +252,7 @@ public interface JsonMapper {
      * @since 4.0.0
      */
     @SuppressWarnings("unchecked")
-    default  @NonNull <T> String writeValueAsString(@NonNull Object object) throws IOException {
+    default  @NonNull String writeValueAsString(@NonNull Object object) throws IOException {
         Objects.requireNonNull(object, "Object cannot be null");
         return new String(writeValueAsBytes(object), StandardCharsets.UTF_8);
     }
