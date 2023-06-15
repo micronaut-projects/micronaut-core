@@ -56,7 +56,7 @@ final class ReactorInstrumentation {
 
     private static class PropagatedContextThreadLocalAccessor implements ThreadLocalAccessor<PropagatedContext> {
 
-        private final ThreadLocal<ArrayDeque<PropagatedContext.Scope>> localScopes = ThreadLocal.withInitial(ArrayDeque::new);
+        private final ThreadLocal<ArrayDeque<PropagatedContext.Scope>> localScopes = new ThreadLocal<>();
 
         @Override
         public String key() {
@@ -71,18 +71,26 @@ final class ReactorInstrumentation {
         @Override
         public void setValue(PropagatedContext propagatedContext) {
             ArrayDeque<PropagatedContext.Scope> scopes = localScopes.get();
+            if (scopes == null) {
+                scopes = new ArrayDeque<>(5);
+                localScopes.set(scopes);
+            }
             scopes.push(propagatedContext.propagate());
         }
 
         @Override
         public void setValue() {
+            // Do nothing
         }
 
         @Override
         public void restore(PropagatedContext previousValue) {
             ArrayDeque<PropagatedContext.Scope> scopes = localScopes.get();
-            if (!scopes.isEmpty()) {
+            if (scopes != null && !scopes.isEmpty()) {
                 scopes.pop().close();
+                if (scopes.isEmpty()) {
+                    localScopes.remove();
+                }
             }
         }
 
