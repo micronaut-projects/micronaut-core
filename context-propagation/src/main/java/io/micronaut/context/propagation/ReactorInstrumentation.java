@@ -27,6 +27,8 @@ import jakarta.annotation.PreDestroy;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Hooks;
 
+import java.util.ArrayDeque;
+
 /**
  *  Integrate {@link PropagatedContext} with Reactor and Micrometer Context Propagation.
  *
@@ -54,7 +56,7 @@ final class ReactorInstrumentation {
 
     private static class PropagatedContextThreadLocalAccessor implements ThreadLocalAccessor<PropagatedContext> {
 
-        private final ThreadLocal<PropagatedContext.Scope> currentScope = new ThreadLocal<>();
+        private final ThreadLocal<ArrayDeque<PropagatedContext.Scope>> localScopes = ThreadLocal.withInitial(ArrayDeque::new);
 
         @Override
         public String key() {
@@ -68,21 +70,16 @@ final class ReactorInstrumentation {
 
         @Override
         public void setValue(PropagatedContext propagatedContext) {
-            PropagatedContext.Scope scope = currentScope.get();
-            if (scope != null) {
-                scope.close();
-            }
-            currentScope.set(propagatedContext.propagate());
+            ArrayDeque<PropagatedContext.Scope> scopes = localScopes.get();
+            scopes.push(propagatedContext.propagate());
         }
 
         @Override
-        public void setValue() {
-            PropagatedContext.Scope scope = currentScope.get();
-            if (scope != null) {
-                scope.close();
+        public void restore(PropagatedContext previousValue) {
+            ArrayDeque<PropagatedContext.Scope> scopes = localScopes.get();
+            if (!scopes.isEmpty()) {
+                scopes.pop().close();
             }
-            currentScope.remove();
         }
-
     }
 }
