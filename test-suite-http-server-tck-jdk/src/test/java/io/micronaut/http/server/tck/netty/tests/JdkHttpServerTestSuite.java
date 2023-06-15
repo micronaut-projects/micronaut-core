@@ -12,6 +12,7 @@ import org.junit.platform.suite.api.SuiteDisplayName;
 @ExcludeTags("multipart") // Multipart not supported by HttpClient
 @ExcludeClassNamePatterns({
     "io.micronaut.http.server.tck.tests.FilterErrorTest", // We expect Json as it's application/json, but it's text.
+    "io.micronaut.http.server.tck.tests.StreamTest", // We expect Json as it's application/json, but it's text.
 })
 public class JdkHttpServerTestSuite {
 }
