@@ -114,6 +114,7 @@ public class HttpResponseAdapter<O> implements HttpResponse<O> {
                 return isOptional ? Optional.of(converted) : converted;
             } else if (finalArgument.getType() == byte[].class) {
                 var converted = Optional.of(bytes);
+                // If the requested type is an Optional, then we need to wrap the result again
                 return isOptional ? Optional.of(converted) : converted;
             } else {
                 Optional<MediaTypeCodec> foundCodec = mediaTypeCodecRegistry.findCodec(contentType);
