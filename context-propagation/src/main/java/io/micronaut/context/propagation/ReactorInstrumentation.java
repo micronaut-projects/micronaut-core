@@ -75,11 +75,19 @@ final class ReactorInstrumentation {
         }
 
         @Override
+        public void setValue() {
+        }
+
+        @Override
         public void restore(PropagatedContext previousValue) {
             ArrayDeque<PropagatedContext.Scope> scopes = localScopes.get();
             if (!scopes.isEmpty()) {
                 scopes.pop().close();
             }
+        }
+
+        @Override
+        public void restore() {
         }
     }
 }
