@@ -15,8 +15,27 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
-import com.google.devtools.ksp.*
-import com.google.devtools.ksp.symbol.*
+import com.google.devtools.ksp.KspExperimental
+import com.google.devtools.ksp.getClassDeclarationByName
+import com.google.devtools.ksp.getVisibility
+import com.google.devtools.ksp.isJavaPackagePrivate
+import com.google.devtools.ksp.isOpen
+import com.google.devtools.ksp.symbol.ClassKind
+import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSDeclaration
+import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.google.devtools.ksp.symbol.KSModifierListOwner
+import com.google.devtools.ksp.symbol.KSPropertyDeclaration
+import com.google.devtools.ksp.symbol.KSType
+import com.google.devtools.ksp.symbol.KSTypeArgument
+import com.google.devtools.ksp.symbol.KSTypeParameter
+import com.google.devtools.ksp.symbol.Modifier
+import com.google.devtools.ksp.symbol.Variance
+import com.google.devtools.ksp.symbol.Visibility
+import io.micronaut.aop.Around
+import io.micronaut.aop.InterceptorBinding
+import io.micronaut.aop.InterceptorBindingDefinitions
+import io.micronaut.aop.Introduction
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
@@ -27,7 +46,7 @@ import io.micronaut.inject.ast.annotation.AbstractAnnotationElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.kotlin.processing.getBinaryName
 import io.micronaut.kotlin.processing.getClassDeclaration
-import java.util.*
+import java.util.Optional
 
 internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     private val nativeType: T,
@@ -94,7 +113,18 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
     }
 
     override fun isFinal() = if (annotatedInfo is KSDeclaration) {
-        !annotatedInfo.isOpen() || annotatedInfo.modifiers.contains(Modifier.FINAL)
+        if (annotatedInfo.modifiers.contains(Modifier.FINAL)) {
+            true
+        } else if (annotatedInfo.isOpen()) {
+            false
+        } else {
+            // ksp does not see when all-open opens up these classes
+            // https://github.com/micronaut-projects/micronaut-core/issues/9426
+            // this logic is similar to what all-opens does.
+            val cl = annotatedInfo as? KSClassDeclaration ?: annotatedInfo.parentDeclaration as? KSClassDeclaration
+            cl == null || !visitorContext.elementFactory.newClassElement(cl)
+                .hasDeclaredStereotype(Around::class.java, Introduction::class.java, InterceptorBinding::class.java, InterceptorBindingDefinitions::class.java)
+        }
     } else {
         false
     }
