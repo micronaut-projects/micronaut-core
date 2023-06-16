@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 import spock.lang.AutoCleanup
@@ -20,6 +21,7 @@ class ThreadLocalPropagatedTraceInterceptorSpec extends Specification {
     void "test trace mono"() {
         when:
             TracedService tracedService = embeddedServer.getApplicationContext().getBean(TracedService)
+            tracedService.tracingInterceptor.traces.clear()
             String result = tracedService.mono("test").block()
             PollingConditions conditions = new PollingConditions(timeout: 3)
 
@@ -27,7 +29,21 @@ class ThreadLocalPropagatedTraceInterceptorSpec extends Specification {
             conditions.eventually {
                 result == "test"
                 def traces = tracedService.tracingInterceptor.traces
-                traces[0].tags().get("foo") == "bar"
+                traces[0].tags().get("fooMono") == "bar"
+            }
+    }
+
+    void "test trace flux"() {
+        when:
+            TracedService tracedService = embeddedServer.getApplicationContext().getBean(TracedService)
+            tracedService.tracingInterceptor.traces.clear()
+            String result = tracedService.flux("test").collectList().block()
+            PollingConditions conditions = new PollingConditions(timeout: 3)
+
+        then:
+            conditions.eventually {
+                def traces = tracedService.tracingInterceptor.traces
+                traces[0].tags().get("fooFlux") == "bar"
             }
     }
 
@@ -40,9 +56,17 @@ class ThreadLocalPropagatedTraceInterceptorSpec extends Specification {
         @MyTrace
         Mono<String> mono(String name) {
             return Mono.fromCallable({
-                tracingInterceptor.getCurrectTrace().tag("foo", "bar")
+                tracingInterceptor.getCurrentTrace().tag("fooMono", "bar")
                 return name
             }).subscribeOn(Schedulers.boundedElastic())
+        }
+
+        @MyTrace
+        Flux<String> flux(String name) {
+            return Mono.fromCallable {
+                tracingInterceptor.getCurrentTrace().tag("fooFlux", "bar")
+                return name
+            }.flatMapMany { x -> Flux.just(x) }.subscribeOn(Schedulers.boundedElastic())
         }
     }
 

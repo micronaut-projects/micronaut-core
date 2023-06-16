@@ -13,6 +13,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Singleton
 @InterceptorBean(MyTrace.class)
@@ -39,8 +40,12 @@ class MyTracingInterceptor implements MethodInterceptor<Object, Object> {
         }
     }
 
-    public Trace getCurrectTrace() {
+    public Trace getCurrentTrace() {
         return PropagatedContext.getOrEmpty().find(TracePropagatedContext.class).orElseThrow().trace();
+    }
+
+    public Optional<Trace> findCurrentTrace() {
+        return PropagatedContext.getOrEmpty().find(TracePropagatedContext.class).map(TracePropagatedContext::trace);
     }
 
     private record TracePropagatedContext(Trace trace) implements PropagatedContextElement {

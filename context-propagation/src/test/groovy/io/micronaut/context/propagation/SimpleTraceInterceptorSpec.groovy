@@ -15,7 +15,7 @@ class SimpleTraceInterceptorSpec extends Specification {
 
     @Shared
     @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ["reactor.enableAutomaticContextPropagation": false])
 
     void "test trace mono"() {
         when:
@@ -39,8 +39,11 @@ class SimpleTraceInterceptorSpec extends Specification {
 
         @MyTrace
         Mono<String> mono(String name) {
-            def trace = tracingInterceptor.getCurrectTrace()
+            def trace = tracingInterceptor.getCurrentTrace()
             return Mono.fromCallable({
+                if (tracingInterceptor.findCurrentTrace().isPresent()) {
+                    throw new IllegalStateException("Not expected trace")
+                }
                 trace.tag("foo", "bar")
                 return name
             }).subscribeOn(Schedulers.boundedElastic())
