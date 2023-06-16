@@ -30,7 +30,7 @@ All the examples so far have used the same HTTP method i.e `GET`. The api:http.H
 
 | api:http.HttpRequest.DELETE(java.lang.String)[]
 | Constructs an HTTP `DELETE` request
-| `true`
+| `false`
 
 |===
 
