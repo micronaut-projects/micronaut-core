@@ -85,6 +85,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.jackson.JacksonConfiguration;
+import io.micronaut.jackson.JacksonDeserializationPreInstantiateCallback;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -123,9 +125,24 @@ public class BeanIntrospectionModule extends SimpleModule {
     boolean ignoreReflectiveProperties = false;
 
     /**
+     * The pre-instantiate callback.
+     */
+    @Nullable
+    private final JacksonDeserializationPreInstantiateCallback preInstantiateCallback;
+
+    /**
      * Default constructor.
      */
     public BeanIntrospectionModule() {
+        this(null);
+    }
+
+    /**
+     * The constructor.
+     */
+    @Inject
+    public BeanIntrospectionModule(@Nullable JacksonDeserializationPreInstantiateCallback preInstantiateCallback) {
+        this.preInstantiateCallback = preInstantiateCallback;
         setDeserializerModifier(new BeanIntrospectionDeserializerModifier());
         setSerializerModifier(new BeanIntrospectionSerializerModifier());
     }
@@ -638,25 +655,40 @@ public class BeanIntrospectionModule extends SimpleModule {
 
                     @Override
                     public Object createUsingDelegate(DeserializationContext ctxt, Object delegate) {
+                        if (preInstantiateCallback != null) {
+                            preInstantiateCallback.preInstantiate(introspection, delegate);
+                        }
                         return introspection.instantiate(false, new Object[] { delegate });
                     }
 
                     @Override
                     public Object createFromObjectWith(DeserializationContext ctxt, Object[] args) {
+                        if (preInstantiateCallback != null) {
+                            preInstantiateCallback.preInstantiate(introspection, args);
+                        }
                         return introspection.instantiate(false, args);
                     }
 
                     @Override
                     public Object createUsingArrayDelegate(DeserializationContext ctxt, Object delegate) {
+                        if (preInstantiateCallback != null) {
+                            preInstantiateCallback.preInstantiate(introspection, delegate);
+                        }
                         return introspection.instantiate(false, new Object[] { delegate });                    }
 
                     @Override
                     public Object createFromString(DeserializationContext ctxt, String value) {
+                        if (preInstantiateCallback != null) {
+                            preInstantiateCallback.preInstantiate(introspection, value);
+                        }
                         return introspection.instantiate(false, new Object[]{ value });
                     }
 
                     @Override
                     public Object createFromInt(DeserializationContext ctxt, int value) {
+                        if (preInstantiateCallback != null) {
+                            preInstantiateCallback.preInstantiate(introspection, value);
+                        }
                         InstantiationException originalException;
                         try {
                             return introspection.instantiate(false, new Object[]{value});
@@ -672,16 +704,25 @@ public class BeanIntrospectionModule extends SimpleModule {
 
                     @Override
                     public Object createFromLong(DeserializationContext ctxt, long value) {
+                        if (preInstantiateCallback != null) {
+                            preInstantiateCallback.preInstantiate(introspection, value);
+                        }
                         return introspection.instantiate(false, new Object[]{ value });
                     }
 
                     @Override
                     public Object createFromDouble(DeserializationContext ctxt, double value) {
+                        if (preInstantiateCallback != null) {
+                            preInstantiateCallback.preInstantiate(introspection, value);
+                        }
                         return introspection.instantiate(false, new Object[]{ value });
                     }
 
                     @Override
                     public Object createFromBoolean(DeserializationContext ctxt, boolean value) {
+                        if (preInstantiateCallback != null) {
+                            preInstantiateCallback.preInstantiate(introspection, value);
+                        }
                         return introspection.instantiate(false, new Object[]{ value });
                     }
 

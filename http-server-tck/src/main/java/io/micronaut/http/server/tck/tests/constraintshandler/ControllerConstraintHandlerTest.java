@@ -31,13 +31,14 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
+
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
@@ -264,7 +265,7 @@ public class ControllerConstraintHandlerTest {
         @NonNull
         private final String password;
 
-        CredentialsWithNonNull(@NonNull String username, @NonNull String password) {
+        CredentialsWithNonNull(String username, String password) {
             this.username = username;
             this.password = password;
         }
