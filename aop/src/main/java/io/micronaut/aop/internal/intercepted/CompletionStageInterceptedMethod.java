@@ -36,7 +36,7 @@ import java.util.concurrent.Future;
  */
 @Internal
 @Experimental
-class CompletionStageInterceptedMethod implements InterceptedMethod {
+final class CompletionStageInterceptedMethod implements InterceptedMethod {
     private final MethodInvocationContext<?, ?> context;
     private final ConversionService conversionService;
     private final Argument<?> returnTypeValue;

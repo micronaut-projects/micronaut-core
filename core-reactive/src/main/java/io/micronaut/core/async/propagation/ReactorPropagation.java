@@ -37,7 +37,7 @@ public final class ReactorPropagation {
     /**
      * The key to be used in the Reactor context.
      */
-    private static final String PROPAGATED_CONTEXT_REACTOR_CONTEXT_VIEW_KEY = "micronaut.propagated.context";
+    public static final String PROPAGATED_CONTEXT_REACTOR_CONTEXT_VIEW_KEY = "micronaut.propagated.context";
 
     private ReactorPropagation() {
     }

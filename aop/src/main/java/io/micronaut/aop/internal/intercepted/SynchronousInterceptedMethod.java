@@ -30,7 +30,7 @@ import io.micronaut.core.type.Argument;
  */
 @Internal
 @Experimental
-public class SynchronousInterceptedMethod implements InterceptedMethod {
+final class SynchronousInterceptedMethod implements InterceptedMethod {
 
     private final MethodInvocationContext<?, ?> context;
     private final Argument<?> returnTypeValue;
