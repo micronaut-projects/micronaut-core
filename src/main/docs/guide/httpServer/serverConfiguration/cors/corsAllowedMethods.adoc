@@ -1,4 +1,4 @@
-To allow any request method for a given configuration, don't include the `allowed-methods` key in your configuration.
+To allow any request method for a given configuration, include the `allowed-methods` key in your configuration.
 
 For multiple allowed methods, set the `allowed-methods` key of the configuration to a list of strings.
 
