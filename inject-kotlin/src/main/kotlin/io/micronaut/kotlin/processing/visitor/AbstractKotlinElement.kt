@@ -40,6 +40,7 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.ElementModifier
+import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.inject.ast.WildcardElement
 import io.micronaut.inject.ast.annotation.AbstractAnnotationElement
@@ -121,13 +122,22 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
             // ksp does not see when all-open opens up these classes
             // https://github.com/micronaut-projects/micronaut-core/issues/9426
             // this logic is similar to what all-opens does.
-            val cl = annotatedInfo as? KSClassDeclaration ?: annotatedInfo.parentDeclaration as? KSClassDeclaration
-            cl == null || !visitorContext.elementFactory.newClassElement(cl)
-                .hasDeclaredStereotype(Around::class.java, Introduction::class.java, InterceptorBinding::class.java, InterceptorBindingDefinitions::class.java)
+            if (this is MemberElement) {
+                !shouldBeOpen(owningType)
+            } else {
+                !shouldBeOpen(this)
+            }
         }
     } else {
         false
     }
+
+    private fun shouldBeOpen(annotationMetadata: AnnotationMetadata) = annotationMetadata.declaredMetadata.hasDeclaredStereotype(
+        Around::class.java,
+        Introduction::class.java,
+        InterceptorBinding::class.java,
+        InterceptorBindingDefinitions::class.java
+    )
 
     override fun isAbstract(): Boolean {
         return if (annotatedInfo is KSModifierListOwner) {
