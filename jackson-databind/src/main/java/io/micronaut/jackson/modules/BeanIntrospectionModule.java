@@ -139,6 +139,8 @@ public class BeanIntrospectionModule extends SimpleModule {
 
     /**
      * The constructor.
+     *
+     * @param preInstantiateCallback The optional instance {@link JacksonDeserializationPreInstantiateCallback}
      */
     @Inject
     public BeanIntrospectionModule(@Nullable JacksonDeserializationPreInstantiateCallback preInstantiateCallback) {
