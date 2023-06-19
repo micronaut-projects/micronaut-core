@@ -173,8 +173,7 @@ public class BeanIntrospectionModule extends SimpleModule {
     }
 
     private PropertyMetadata newPropertyMetadata(Argument<?> argument, AnnotationMetadata annotationMetadata) {
-        final Boolean required = argument.isNonNull() ||
-            annotationMetadata.booleanValue(JsonProperty.class, "required").orElse(false);
+        final Boolean required = annotationMetadata.booleanValue(JsonProperty.class, "required").orElse(false);
 
         int index = annotationMetadata.intValue(JsonProperty.class, "index").orElse(-1);
         return PropertyMetadata.construct(
