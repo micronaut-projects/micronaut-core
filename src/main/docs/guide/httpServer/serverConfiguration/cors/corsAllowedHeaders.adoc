@@ -1,4 +1,4 @@
-To allow any request header for a given configuration, don't include the `allowed-headers` key in your configuration.
+To allow any request header for a given configuration, include the `allowed-headers` key in your configuration.
 
 For multiple allowed headers, set the `allowed-headers` key of the configuration to a list of strings.
 
