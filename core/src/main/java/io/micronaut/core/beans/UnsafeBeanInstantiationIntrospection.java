@@ -34,7 +34,6 @@ public interface UnsafeBeanInstantiationIntrospection<T> extends BeanIntrospecti
      * @param arguments The arguments required to instantiate bean.
      * @return An instance
      */
-    @NonNull T instantiateUnsafe(@NonNull Object... arguments) ;
-
+    @NonNull T instantiateUnsafe(@NonNull Object... arguments);
 
 }
