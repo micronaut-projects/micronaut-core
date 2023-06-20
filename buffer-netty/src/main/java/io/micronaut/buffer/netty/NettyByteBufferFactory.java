@@ -20,9 +20,10 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufAllocator;
-import io.netty.buffer.Unpooled;
+import io.netty5.buffer.Buffer;
+import io.netty5.buffer.BufferAllocator;
+import io.netty5.buffer.DefaultBufferAllocators;
+import io.netty5.util.Send;
 import jakarta.annotation.PostConstruct;
 import jakarta.inject.Singleton;
 
@@ -37,80 +38,85 @@ import java.util.function.Supplier;
 @Internal
 @Singleton
 @BootstrapContextCompatible
-public class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocator, ByteBuf> {
+public class NettyByteBufferFactory implements ByteBufferFactory<BufferAllocator, Buffer> {
 
     /**
      * Default Netty ByteBuffer Factory.
      */
     public static final NettyByteBufferFactory DEFAULT = new NettyByteBufferFactory();
 
-    private final Supplier<ByteBufAllocator> allocatorSupplier;
+    private final Supplier<BufferAllocator> allocatorSupplier;
 
     /**
      * Default constructor.
      */
     public NettyByteBufferFactory() {
-        this.allocatorSupplier = () -> ByteBufAllocator.DEFAULT;
+        this.allocatorSupplier = DefaultBufferAllocators::preferredAllocator;
     }
 
     /**
      * @param allocator The {@link ByteBufAllocator}
      */
-    public NettyByteBufferFactory(ByteBufAllocator allocator) {
+    public NettyByteBufferFactory(BufferAllocator allocator) {
         this.allocatorSupplier = () -> allocator;
     }
 
     @PostConstruct
     final void register(MutableConversionService conversionService) {
-        conversionService.addConverter(ByteBuf.class, ByteBuffer.class, DEFAULT::wrap);
-        conversionService.addConverter(ByteBuffer.class, ByteBuf.class, byteBuffer -> {
-            if (byteBuffer instanceof NettyByteBuffer) {
-                return (ByteBuf) byteBuffer.asNativeBuffer();
+        conversionService.addConverter(Buffer.class, ByteBuffer.class, DEFAULT::wrap);
+        conversionService.addConverter(ByteBuffer.class, Buffer.class, byteBuffer -> {
+            if (byteBuffer instanceof NettyByteBuffer nbb) {
+                return nbb.asNativeBuffer();
             }
             throw new IllegalArgumentException("Unconvertible buffer type " + byteBuffer);
         });
     }
 
     @Override
-    public ByteBufAllocator getNativeAllocator() {
+    public BufferAllocator getNativeAllocator() {
         return allocatorSupplier.get();
     }
 
     @Override
-    public ByteBuffer<ByteBuf> buffer() {
-        return new NettyByteBuffer(allocatorSupplier.get().buffer());
+    public ByteBuffer<Buffer> buffer() {
+        return new NettyByteBuffer(allocatorSupplier.get().allocate(0));
     }
 
     @Override
-    public ByteBuffer<ByteBuf> buffer(int initialCapacity) {
-        return new NettyByteBuffer(allocatorSupplier.get().buffer(initialCapacity));
+    public ByteBuffer<Buffer> buffer(int initialCapacity) {
+        return new NettyByteBuffer(allocatorSupplier.get().allocate(initialCapacity));
     }
 
     @Override
-    public ByteBuffer<ByteBuf> buffer(int initialCapacity, int maxCapacity) {
-        return new NettyByteBuffer(allocatorSupplier.get().buffer(initialCapacity, maxCapacity));
+    public ByteBuffer<Buffer> buffer(int initialCapacity, int maxCapacity) {
+        return new NettyByteBuffer(allocatorSupplier.get().allocate(initialCapacity).implicitCapacityLimit(maxCapacity));
     }
 
     @Override
-    public ByteBuffer<ByteBuf> copiedBuffer(byte[] bytes) {
-        if (bytes.length == 0) {
-            return new NettyByteBuffer(Unpooled.EMPTY_BUFFER);
-        }
-        return new NettyByteBuffer(Unpooled.copiedBuffer(bytes));
+    public ByteBuffer<Buffer> copiedBuffer(byte[] bytes) {
+        Buffer buffer = allocatorSupplier.get().allocate(bytes.length);
+        buffer.writeBytes(bytes);
+        return new NettyByteBuffer(buffer);
     }
 
     @Override
-    public ByteBuffer<ByteBuf> copiedBuffer(java.nio.ByteBuffer nioBuffer) {
-        return new NettyByteBuffer(Unpooled.copiedBuffer(nioBuffer));
+    public ByteBuffer<Buffer> copiedBuffer(java.nio.ByteBuffer nioBuffer) {
+        Buffer buffer = allocatorSupplier.get().allocate(nioBuffer.remaining());
+        buffer.writeBytes(nioBuffer);
+        return new NettyByteBuffer(buffer);
     }
 
     @Override
-    public ByteBuffer<ByteBuf> wrap(ByteBuf existing) {
+    public ByteBuffer<Buffer> wrap(Buffer existing) {
         return new NettyByteBuffer(existing);
     }
 
+    public ByteBuffer<Buffer> wrap(Send<Buffer> existing) {
+        return new NettyByteBuffer(existing.receive());
+    }
+
     @Override
-    public ByteBuffer<ByteBuf> wrap(byte[] existing) {
-        return new NettyByteBuffer(Unpooled.wrappedBuffer(existing));
+    public ByteBuffer<Buffer> wrap(byte[] existing) {
+        throw new UnsupportedOperationException(); // todo
     }
 }

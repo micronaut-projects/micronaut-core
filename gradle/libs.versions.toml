@@ -64,6 +64,7 @@ managed-kotlin = "1.8.21"
 managed-kotlin-coroutines = "1.7.1"
 managed-methvin-directory-watcher = "0.18.0"
 managed-netty = "4.1.93.Final"
+managed-netty5 = "5.0.0.Alpha5"
 managed-netty-iouring = "0.0.21.Final"
 managed-netty-http3 = "0.0.16.Final"
 managed-netty-tcnative = "2.0.61.Final"
@@ -88,6 +89,7 @@ boms-groovy = { module = "org.apache.groovy:groovy-bom", version.ref = "managed-
 boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "managed-kotlin" }
 boms-kotlin-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-bom", version.ref = "managed-kotlin-coroutines" }
 boms-netty = { module = "io.netty:netty-bom", version.ref = "managed-netty" }
+boms-netty5 = { module = "io.netty:netty5-bom", version.ref = "managed-netty5" }
 boms-jackson = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "managed-jackson" }
 
 #
@@ -133,6 +135,9 @@ managed-methvin-directoryWatcher = { module = "io.methvin:directory-watcher", ve
 managed-netty-buffer = { module = "io.netty:netty-buffer", version.ref = "managed-netty" }
 managed-netty-codec-http = { module = "io.netty:netty-codec-http", version.ref = "managed-netty" }
 managed-netty-codec-http2 = { module = "io.netty:netty-codec-http2", version.ref = "managed-netty" }
+managed-netty5-buffer = { module = "io.netty:netty5-buffer", version.ref = "managed-netty5" }
+managed-netty5-codec-http = { module = "io.netty:netty5-codec-http", version.ref = "managed-netty5" }
+managed-netty5-codec-http2 = { module = "io.netty:netty5-codec-http2", version.ref = "managed-netty5" }
 managed-netty-incubator-codec-http3 = { module = "io.netty.incubator:netty-incubator-codec-http3", version.ref = "managed-netty-http3" }
 managed-netty-handler = { module = "io.netty:netty-handler", version.ref = "managed-netty" }
 managed-netty-handler-proxy = { module = "io.netty:netty-handler-proxy", version.ref = "managed-netty" }

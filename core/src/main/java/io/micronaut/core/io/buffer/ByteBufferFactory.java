@@ -80,6 +80,7 @@ public interface ByteBufferFactory<T, B> {
      * @param existing The buffer to wrap
      * @return The wrapped {@link ByteBuffer}
      */
+    @Deprecated
     ByteBuffer<B> wrap(B existing);
 
     /**

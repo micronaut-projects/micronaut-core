@@ -17,19 +17,14 @@ package io.micronaut.buffer.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.core.io.buffer.ReferenceCounted;
-import io.micronaut.core.util.ArrayUtils;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufInputStream;
-import io.netty.buffer.ByteBufOutputStream;
-import io.netty.buffer.ByteBufUtil;
-import io.netty.buffer.CompositeByteBuf;
-import io.netty.buffer.Unpooled;
+import io.netty5.buffer.Buffer;
+import io.netty5.buffer.BufferInputStream;
+import io.netty5.buffer.BufferOutputStream;
+import io.netty5.buffer.BufferUtil;
 
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
-import java.util.Arrays;
 
 /**
  * A {@link ByteBuffer} implementation for Netty.
@@ -38,31 +33,25 @@ import java.util.Arrays;
  * @since 1.0
  */
 @Internal
-class NettyByteBuffer implements ByteBuffer<ByteBuf>, ReferenceCounted {
+class NettyByteBuffer implements ByteBuffer<Buffer>, AutoCloseable {
 
-    private ByteBuf delegate;
+    private Buffer delegate;
 
     /**
-     * @param delegate The {@link ByteBuf}
+     * @param delegate The {@link Buffer}
      */
-    NettyByteBuffer(ByteBuf delegate) {
+    NettyByteBuffer(Buffer delegate) {
         this.delegate = delegate;
     }
 
     @Override
-    public NettyByteBuffer retain() {
-        delegate.retain();
-        return this;
-    }
-
-    @Override
-    public ByteBuf asNativeBuffer() {
+    public Buffer asNativeBuffer() {
         return delegate;
     }
 
     @Override
-    public boolean release() {
-        return delegate.release();
+    public void close() {
+        delegate.close();
     }
 
     @Override
@@ -77,34 +66,33 @@ class NettyByteBuffer implements ByteBuffer<ByteBuf>, ReferenceCounted {
 
     @Override
     public int maxCapacity() {
-        return delegate.maxCapacity();
+        return delegate.implicitCapacityLimit();
     }
 
     @Override
     public ByteBuffer capacity(int capacity) {
-        delegate.capacity(capacity);
-        return this;
+        throw new UnsupportedOperationException(); // todo
     }
 
     @Override
     public int readerIndex() {
-        return delegate.readerIndex();
+        return delegate.readerOffset();
     }
 
     @Override
     public ByteBuffer readerIndex(int readPosition) {
-        delegate.readerIndex(readPosition);
+        delegate.readerOffset(readPosition);
         return this;
     }
 
     @Override
     public int writerIndex() {
-        return delegate.writerIndex();
+        return delegate.writerOffset();
     }
 
     @Override
     public ByteBuffer writerIndex(int position) {
-        delegate.writerIndex(position);
+        delegate.writerOffset(position);
         return this;
     }
 
@@ -120,8 +108,7 @@ class NettyByteBuffer implements ByteBuffer<ByteBuf>, ReferenceCounted {
 
     @Override
     public ByteBuffer read(byte[] destination) {
-        delegate.readBytes(destination);
-        return this;
+        return read(destination, 0, destination.length);
     }
 
     @Override
@@ -156,76 +143,50 @@ class NettyByteBuffer implements ByteBuffer<ByteBuf>, ReferenceCounted {
 
     @Override
     public ByteBuffer write(ByteBuffer... buffers) {
-        if (ArrayUtils.isNotEmpty(buffers)) {
-            ByteBuf[] byteBufs = Arrays.stream(buffers)
-                .map(buffer -> {
-                    if (buffer instanceof NettyByteBuffer) {
-                        return ((NettyByteBuffer) buffer).asNativeBuffer();
-                    } else {
-                        return Unpooled.wrappedBuffer(buffer.asNioBuffer());
-                    }
-                }).toArray(ByteBuf[]::new);
-            return write(byteBufs);
-        }
-        return this;
+        throw new UnsupportedOperationException(); // todo
     }
 
     @Override
     public ByteBuffer write(java.nio.ByteBuffer... buffers) {
-        if (ArrayUtils.isNotEmpty(buffers)) {
-            ByteBuf[] byteBufs = Arrays.stream(buffers)
-                .map(Unpooled::wrappedBuffer).toArray(ByteBuf[]::new);
-            return write(byteBufs);
-        }
-        return this;
+        throw new UnsupportedOperationException(); // todo
     }
 
     /**
      * @param byteBufs The {@link ByteBuf}s
      * @return The {@link ByteBuffer}
      */
-    public ByteBuffer write(ByteBuf... byteBufs) {
-        if (this.delegate instanceof CompositeByteBuf) {
-            CompositeByteBuf compositeByteBuf = (CompositeByteBuf) this.delegate;
-            compositeByteBuf.addComponents(true, byteBufs);
-        } else {
-            ByteBuf current = this.delegate;
-            CompositeByteBuf composite = current.alloc().compositeBuffer(byteBufs.length + 1);
-            this.delegate = composite;
-            composite.addComponent(true, current);
-            composite.addComponents(true, byteBufs);
-        }
-        return this;
+    public ByteBuffer write(Buffer... byteBufs) {
+        throw new UnsupportedOperationException(); // todo
     }
 
     @Override
     public ByteBuffer slice(int index, int length) {
-        return new NettyByteBuffer(delegate.slice(index, length));
+        throw new UnsupportedOperationException(); // todo
     }
 
     @Override
     public java.nio.ByteBuffer asNioBuffer() {
-        return delegate.nioBuffer();
+        throw new UnsupportedOperationException(); // todo
     }
 
     @Override
     public java.nio.ByteBuffer asNioBuffer(int index, int length) {
-        return delegate.nioBuffer(index, length);
+        throw new UnsupportedOperationException(); // todo
     }
 
     @Override
     public InputStream toInputStream() {
-        return new ByteBufInputStream(delegate);
+        return new BufferInputStream(delegate.send());
     }
 
     @Override
     public OutputStream toOutputStream() {
-        return new ByteBufOutputStream(delegate);
+        return new BufferOutputStream(delegate);
     }
 
     @Override
     public byte[] toByteArray() {
-        return ByteBufUtil.getBytes(delegate);
+        return BufferUtil.getBytes(delegate);
     }
 
     @Override
