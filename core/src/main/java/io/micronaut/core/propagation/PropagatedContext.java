@@ -36,6 +36,15 @@ import java.util.stream.Stream;
 public interface PropagatedContext {
 
     /**
+     * Returns an empty context
+     *
+     * @return the empty context
+     */
+    @NonNull
+    static PropagatedContext empty() {
+        return PropagatedContextImpl.EMPTY;
+    }
+    /**
      * Returns the current context or an empty one.
      *
      * @return the current context or an empty one
