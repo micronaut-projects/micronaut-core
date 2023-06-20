@@ -36,7 +36,6 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -107,7 +106,6 @@ public class ControllerConstraintHandlerTest {
             (server, request) -> AssertionUtils.assertThrows(server, request, TEAPOT_ASSERTION));
     }
 
-    @Disabled
     @Test
     void testPojoWithNonNullAnnotation() throws IOException {
         asserts(SPEC_NAME,
@@ -265,7 +263,7 @@ public class ControllerConstraintHandlerTest {
         @NonNull
         private final String password;
 
-        CredentialsWithNonNull(String username, String password) {
+        CredentialsWithNonNull(@NonNull String username, @NonNull String password) {
             this.username = username;
             this.password = password;
         }
