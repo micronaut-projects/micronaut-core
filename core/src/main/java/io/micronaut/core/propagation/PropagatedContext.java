@@ -36,7 +36,7 @@ import java.util.stream.Stream;
 public interface PropagatedContext {
 
     /**
-     * Returns an empty context
+     * Returns an empty context.
      *
      * @return the empty context
      */
@@ -44,6 +44,7 @@ public interface PropagatedContext {
     static PropagatedContext empty() {
         return PropagatedContextImpl.EMPTY;
     }
+
     /**
      * Returns the current context or an empty one.
      *
