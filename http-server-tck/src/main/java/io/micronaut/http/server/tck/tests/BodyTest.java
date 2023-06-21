@@ -155,14 +155,14 @@ public class BodyTest {
         @Post(uri = "/args-no-body")
         @Status(HttpStatus.CREATED)
         Point postNoBody(Integer x, Integer y) {
-            return new Point(x,y);
+            return new Point(x, y);
         }
 
         @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
         @Post("/args-no-body-form")
         @Status(HttpStatus.CREATED)
         Point postNoBodyFormData(Integer x, Integer y) {
-            return new Point(x,y);
+            return new Point(x, y);
         }
 
         @Post(uri = "/part-pojo")
