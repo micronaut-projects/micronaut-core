@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2022 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Status;
@@ -116,6 +117,31 @@ public class BodyTest {
                     .build()));
     }
 
+    @Test
+    void testRequestBodyJsonNoBodyAnnotation() throws IOException {
+        String body = "{\"x\":10,\"y\":20}";
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/response-body/args-no-body", body)
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.CREATED)
+                    .body(BodyAssertion.builder().body(body).equals())
+                    .build()));
+    }
+
+    @Test
+    void testRequestBodyFormDataNoBodyAnnotation() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.POST("/response-body/args-no-body-form", "x=10&y=20")
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.CREATED)
+                    .body(BodyAssertion.builder().body("{\"x\":10,\"y\":20}").equals())
+                    .build()));
+    }
+
     @Controller("/response-body")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class BodyController {
@@ -124,6 +150,19 @@ public class BodyTest {
         @Status(HttpStatus.CREATED)
         Point post(@Body Point data) {
             return data;
+        }
+
+        @Post(uri = "/args-no-body")
+        @Status(HttpStatus.CREATED)
+        Point postNoBody(Integer x, Integer y) {
+            return new Point(x,y);
+        }
+
+        @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+        @Post("/args-no-body-form")
+        @Status(HttpStatus.CREATED)
+        Point postNoBodyFormData(Integer x, Integer y) {
+            return new Point(x,y);
         }
 
         @Post(uri = "/part-pojo")
@@ -162,6 +201,11 @@ public class BodyTest {
     static class Point {
         private Integer x;
         private Integer y;
+
+        public Point(Integer x, Integer y) {
+            this.x = x;
+            this.y = y;
+        }
 
         public Integer getX() {
             return x;
