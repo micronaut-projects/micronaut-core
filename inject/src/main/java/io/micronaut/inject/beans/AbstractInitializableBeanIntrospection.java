@@ -24,6 +24,7 @@ import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanMethod;
 import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.core.beans.UnsafeBeanInstantiationIntrospection;
 import io.micronaut.core.beans.UnsafeBeanProperty;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -57,7 +58,7 @@ import java.util.Optional;
  * @author Denis Stepanov
  * @since 3.1
  */
-public abstract class AbstractInitializableBeanIntrospection<B> implements BeanIntrospection<B> {
+public abstract class AbstractInitializableBeanIntrospection<B> implements UnsafeBeanInstantiationIntrospection<B> {
 
     private final Class<B> beanType;
     private final AnnotationMetadata annotationMetadata;
@@ -275,6 +276,11 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements BeanI
             }
         }
 
+        return instantiateInternal(arguments);
+    }
+
+    @Override
+    public B instantiateUnsafe(@NonNull Object... arguments) {
         return instantiateInternal(arguments);
     }
 

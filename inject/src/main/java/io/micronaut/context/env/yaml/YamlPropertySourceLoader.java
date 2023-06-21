@@ -56,8 +56,7 @@ public class YamlPropertySourceLoader extends AbstractPropertySourceLoader {
             System.setProperty("java.runtime.name", "Unknown");
         }
 
-        Yaml yaml = new Yaml(new CustomSafeConstructor());
-        Iterable<Object> objects = yaml.loadAll(input);
+        Iterable<Object> objects = Wrapper.loadObjects(input);
         Iterator<Object> i = objects.iterator();
         if (i.hasNext()) {
             while (i.hasNext()) {
@@ -83,4 +82,12 @@ public class YamlPropertySourceLoader extends AbstractPropertySourceLoader {
         }
     }
 
+    private static class Wrapper {
+        // in nested class to prevent NCDFE
+
+        private static Iterable<Object> loadObjects(InputStream input) {
+            Yaml yaml = new Yaml(new CustomSafeConstructor());
+            return yaml.loadAll(input);
+        }
+    }
 }

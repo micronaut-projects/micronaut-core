@@ -246,13 +246,12 @@ public interface JsonMapper {
     /**
      * Write the given value as a string.
      * @param object The object
-     * @param <T> The generic type
      * @return The string
      * @throws IOException If an unrecoverable error occurs
      * @since 4.0.0
      */
     @SuppressWarnings("unchecked")
-    default  @NonNull <T> String writeValueAsString(@NonNull Object object) throws IOException {
+    default  @NonNull String writeValueAsString(@NonNull Object object) throws IOException {
         Objects.requireNonNull(object, "Object cannot be null");
         return new String(writeValueAsBytes(object), StandardCharsets.UTF_8);
     }
