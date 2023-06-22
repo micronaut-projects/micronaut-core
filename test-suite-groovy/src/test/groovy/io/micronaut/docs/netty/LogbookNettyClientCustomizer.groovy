@@ -1,11 +1,11 @@
 package io.micronaut.docs.netty
 
 import io.micronaut.context.annotation.Requires
-import io.micronaut.context.event.BeanCreatedEvent;
+import io.micronaut.context.event.BeanCreatedEvent
+import io.micronaut.context.event.BeanCreatedEventListener;
 
 // tag::imports[]
 
-import io.micronaut.context.event.BeanCreatedEventListener
 import io.micronaut.http.client.netty.NettyClientCustomizer
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
 import io.netty.channel.Channel
@@ -50,7 +50,7 @@ class LogbookNettyClientCustomizer
         @Override
         void onRequestPipelineBuilt() {
             channel.pipeline().addBefore( // <5>
-                    ChannelPipelineCustomizer.HANDLER_HTTP_STREAM,
+                    ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE,
                     "logbook",
                     new LogbookClientHandler(logbook)
             )

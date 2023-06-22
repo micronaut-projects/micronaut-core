@@ -411,12 +411,11 @@ class ConnectionManagerSpec extends Specification {
         def req1Channel = tracker.requestPipelineBuilt.poll()
         req1Channel.channel == conn.clientChannel
         req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR)
-        req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_FULL_HTTP_RESPONSE)
+        req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE)
 
         def req2Channel = tracker.requestPipelineBuilt.poll()
         req2Channel.channel == conn.clientChannel
-        req2Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL)
-        req2Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM)
+        req2Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE)
 
         tracker.requestPipelineBuilt.isEmpty()
 
@@ -470,13 +469,12 @@ class ConnectionManagerSpec extends Specification {
         req1Channel.role == NettyClientCustomizer.ChannelRole.HTTP2_STREAM
         req1Channel.channel !== conn.clientChannel
         req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR)
-        req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_FULL_HTTP_RESPONSE)
+        req1Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE)
 
         def req2Channel = tracker.requestPipelineBuilt.poll()
         req2Channel.role == NettyClientCustomizer.ChannelRole.HTTP2_STREAM
         req2Channel.channel !== conn.clientChannel
-        req2Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_FULL)
-        req2Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM)
+        req2Channel.handlerNames.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE)
 
         tracker.requestPipelineBuilt.isEmpty()
 
