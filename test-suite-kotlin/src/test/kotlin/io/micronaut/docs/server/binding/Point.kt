@@ -18,32 +18,5 @@ package io.micronaut.docs.server.binding
 import io.micronaut.core.annotation.Introspected
 
 @Introspected
-class Point {
-    var x: Int? = null
-    var y: Int? = null
-
-    constructor(x: Int?, y: Int?) {
-        this.x = x
-        this.y = y
-    }
-
-    override fun equals(o: Any?): Boolean {
-        if (this === o) {
-            return true
-        }
-        if (o == null || javaClass != o.javaClass) {
-            return false
-        }
-        val point = o as Point
-        return if (x != point.x) {
-            false
-        } else y == point.y
-    }
-
-    override fun hashCode(): Int {
-        var result = if (x != null) x.hashCode() else 0
-        result = 31 * result + if (y != null) y.hashCode() else 0
-        return result
-    }
-}
+data class Point (val x: Int, val y: Int)
 
