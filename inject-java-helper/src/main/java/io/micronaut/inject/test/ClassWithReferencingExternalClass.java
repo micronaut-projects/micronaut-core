@@ -3,7 +3,8 @@ package io.micronaut.inject.test;
 import io.micronaut.core.reflect.ClassUtils;
 import io.vertx.core.VertxOptions;
 
-// This class is used to test method with classes that are
+// This class has a method parameter with unresolved class
+// JAVAC will report an ERROR type in this case
 public class ClassWithReferencingExternalClass {
 
     static {
