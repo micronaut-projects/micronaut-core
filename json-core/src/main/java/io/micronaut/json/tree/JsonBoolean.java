@@ -37,6 +37,11 @@ final class JsonBoolean extends JsonScalar {
         return value ? TRUE : FALSE;
     }
 
+    @Override
+    public Object getValue() {
+        return value;
+    }
+
     @NonNull
     @Override
     public String coerceStringValue() {

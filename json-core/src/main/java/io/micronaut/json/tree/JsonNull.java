@@ -29,6 +29,11 @@ final class JsonNull extends JsonScalar {
     private JsonNull() {
     }
 
+    @Override
+    public Object getValue() {
+        return null;
+    }
+
     @NonNull
     @Override
     public String coerceStringValue() {

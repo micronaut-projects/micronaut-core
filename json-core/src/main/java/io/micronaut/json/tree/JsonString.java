@@ -42,6 +42,11 @@ final class JsonString extends JsonScalar {
     }
 
     @Override
+    public Object getValue() {
+        return value;
+    }
+
+    @Override
     public boolean isString() {
         return true;
     }

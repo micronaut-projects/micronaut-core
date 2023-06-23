@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -38,6 +39,43 @@ public abstract class JsonNode {
     JsonNode() {
     }
 
+    /**
+     * Create a new {@link JsonNode} representing this value.
+     * @param value to be converted to {@link JsonNode}
+     * @return The {@link JsonNode} representing this value
+     * @since 4.0.0
+     */
+    @NonNull
+    public static JsonNode from(Object value) {
+        if (value == null) {
+            return JsonNull.INSTANCE;
+        }
+        if (value instanceof String s) {
+            return createStringNode(s);
+        }
+        if (value instanceof Number n) {
+            return createNumberNodeImpl(n);
+        }
+        if (value instanceof Boolean b) {
+            return createBooleanNode(b);
+        }
+        if (value instanceof List<?> list) {
+            return createArrayNode(list.stream().map(JsonNode::from).toList());
+        }
+        if (value instanceof Map<?, ?> map) {
+            Map<String, JsonNode> newMap = CollectionUtils.newLinkedHashMap(map.size());
+            for (Map.Entry<?, ?> e : map.entrySet()) {
+                Object key = e.getKey();
+                if (key instanceof String s) {
+                    newMap.put(s, from(e.getValue()));
+                } else {
+                    throw new IllegalStateException("Expected a String as a key in the map!");
+                }
+            }
+            return createObjectNode(newMap);
+        }
+        throw new IllegalStateException("Unrecognized value: " + value);
+    }
     /**
      * @return The singleton node representing {@code null}.
      */
@@ -150,6 +188,14 @@ public abstract class JsonNode {
     public static JsonNode createNumberNode(@NonNull BigInteger value) {
         return createNumberNodeImpl(value);
     }
+
+    /**
+     * Get the value reprinting this node.
+     * @return The value of the node
+     * @since 4.0.0
+     */
+    @Nullable
+    public abstract Object getValue();
 
     /**
      * @return {@code true} iff this is a number node.
