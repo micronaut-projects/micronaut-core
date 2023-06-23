@@ -626,6 +626,17 @@ internal open class KotlinClassElement(
     private inner class KotlinEnclosedElementsQuery :
         EnclosedElementsQuery<KSClassDeclaration, KSNode>() {
 
+        @OptIn(KspExperimental::class)
+        override fun getElementName(element: KSNode): String {
+            if (element is KSFunctionDeclaration) {
+                return visitorContext.resolver.getJvmName(element)!!
+            }
+            if (element is KSDeclaration) {
+                return element.getBinaryName(visitorContext.resolver, visitorContext)
+            }
+            return ""
+        }
+
         override fun getNativeClassType(classElement: ClassElement): KSClassDeclaration {
             return (classElement as KotlinClassElement).nativeType.declaration
         }
