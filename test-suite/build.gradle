@@ -4,9 +4,6 @@ buildscript {
     repositories {
         maven { url "https://plugins.gradle.org/m2/" }
     }
-    dependencies {
-        classpath "gradle.plugin.com.energizedwork.webdriver-binaries:webdriver-binaries-gradle-plugin:$webdriverBinariesVersion"
-    }
 }
 
 plugins {
@@ -23,7 +20,6 @@ micronautBuild {
 }
 
 apply from: "${rootProject.projectDir}/gradle/geb.gradle"
-apply from: "${rootProject.projectDir}/gradle/webdriverbinaries.gradle"
 
 dependencies {
     annotationProcessor project(":inject-java")
