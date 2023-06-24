@@ -53,7 +53,7 @@ final class BeanMapperFactory {
             if (inputType.getType().equals(Map.class)) {
                 Argument<?>[] mapParameters = inputType.getTypeParameters();
                 if (mapParameters.length == 2 && (!mapParameters[0].isAssignableFrom(String.class) || !mapParameters[1].getType().equals(Object.class))) {
-                    throw new BeanInstantiationException("Input map for BeanMapper must have be Map<String, Object>");
+                    throw new BeanInstantiationException("Input map for BeanMapper must be of type Map<String, Object>");
                 }
                 BeanIntrospection<?> introspection = BeanIntrospection.getIntrospection(outputType.getType());
                 return new MapBeanMapper<>(mapHandler, introspection);
