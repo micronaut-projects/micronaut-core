@@ -421,9 +421,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 if (isAcceptable(element)) {
                     List<? extends Element> enclosedElements = element.getEnclosedElements();
                     for (Element enclosedElement : enclosedElements) {
-                        if ((JavaModelUtils.isRecordComponent(enclosedElement)
-                            || enclosedElement instanceof ExecutableElement)
-                            && enclosedElement.getKind() != ElementKind.CONSTRUCTOR) {
+                        if (enclosedElement instanceof VariableElement) {
                             accept(type, enclosedElement, o);
                         }
                     }
