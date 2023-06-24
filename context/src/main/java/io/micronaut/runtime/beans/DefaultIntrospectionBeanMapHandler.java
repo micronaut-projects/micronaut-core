@@ -254,7 +254,7 @@ final class DefaultIntrospectionBeanMapHandler implements IntrospectionBeanMapHa
         } else if (conflictStrategy == BeanMapper.MapStrategy.ConflictStrategy.WARN) {
             LOG.warn("Unable bind property [{}}] to target bean [{}}]. No matching property found", key, output.getClass());
         } else if (conflictStrategy == BeanMapper.MapStrategy.ConflictStrategy.CONVERT) {
-            throw new IllegalArgumentException(PREFIX_UNABLE_BIND_PROPERTY + key + MSG_TO_TARGET_BEAN + output.getClass()+ "]. No matching property found");
+            throw new IllegalArgumentException(PREFIX_UNABLE_BIND_PROPERTY + key + MSG_TO_TARGET_BEAN + output.getClass() + "]. No matching property found");
         }
     }
 
