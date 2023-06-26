@@ -76,6 +76,7 @@ public abstract class JsonNode {
         }
         throw new IllegalStateException("Unrecognized value: " + value);
     }
+
     /**
      * @return The singleton node representing {@code null}.
      */
