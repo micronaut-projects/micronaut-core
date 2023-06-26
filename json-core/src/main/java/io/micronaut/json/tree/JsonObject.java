@@ -17,6 +17,7 @@ package io.micronaut.json.tree;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.util.CollectionUtils;
 
 import java.util.Map;
 
@@ -32,6 +33,15 @@ public class JsonObject extends JsonContainer {
 
     JsonObject(Map<String, JsonNode> values) {
         this.values = values;
+    }
+
+    @Override
+    public Object getValue() {
+        Map<String, Object> newMap = CollectionUtils.newLinkedHashMap(values.size());
+        for (Map.Entry<String, JsonNode> e : values.entrySet()) {
+            newMap.put(e.getKey(), e.getValue().getValue());
+        }
+        return newMap;
     }
 
     @Override
