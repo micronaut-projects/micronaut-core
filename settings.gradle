@@ -50,6 +50,7 @@ include "inject-groovy"
 include "inject-groovy-test"
 include "inject-java"
 include "inject-java-test"
+include "inject-java-helper"
 include 'inject-kotlin'
 include 'inject-kotlin-test'
 include "inject-test-utils"

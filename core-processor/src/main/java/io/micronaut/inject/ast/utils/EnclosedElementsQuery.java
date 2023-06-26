@@ -214,6 +214,13 @@ public abstract class EnclosedElementsQuery<C, N> {
             Set<T> addedFromClassElements = new LinkedHashSet<>();
             classElements:
             for (N element : classElements) {
+                String elementName = getElementName(element);
+                for (Predicate<String> namePredicate : result.getNamePredicates()) {
+                    if (!namePredicate.test(elementName)) {
+                        continue classElements;
+                    }
+                }
+
                 N nativeType = getCacheKey(element);
                 CacheKey cacheKey = new CacheKey(result.getElementType(), nativeType);
                 T newElement = (T) elementsCache.computeIfAbsent(cacheKey, ck -> toAstElement(nativeType, result.getElementType()));
@@ -260,6 +267,14 @@ public abstract class EnclosedElementsQuery<C, N> {
         }
         return elements;
     }
+
+
+    /**
+     * Gets the element name.
+     * @param element The element
+     * @return The name
+     */
+    protected abstract String getElementName(N element);
 
     /**
      * Get the cache key.

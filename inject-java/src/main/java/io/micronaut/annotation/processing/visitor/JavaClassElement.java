@@ -726,6 +726,11 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         }
 
         @Override
+        protected String getElementName(Element element) {
+            return element.getSimpleName().toString();
+        }
+
+        @Override
         protected Set<Element> getExcludedNativeElements(ElementQuery.Result<?> result) {
             if (result.isExcludePropertyElements()) {
                 Set<Element> excludeElements = new HashSet<>();

@@ -1320,7 +1320,7 @@ class Lst<E>
     }
 
     void "test generics model for wildcard"() {
-        ClassElement ce = buildClassElement('test.Test', '''
+        MethodElement method = buildClassElementMapped('test.Test', '''
 package test
 
 class Test<T> {
@@ -1332,9 +1332,8 @@ class Test<T> {
 
 class Lst<E>
 
-''')
+''', {ce -> ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()})
         expect:
-            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
             def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
             !genericTypeArgument.isGenericPlaceholder()
             genericTypeArgument.isRawType()
@@ -1347,7 +1346,7 @@ class Lst<E>
     }
 
     void "test generics model for placeholder"() {
-        ClassElement ce = buildClassElement('test.Test', '''
+        MethodElement method = buildClassElementMapped('test.Test', '''
 package test
 
 class Test<T> {
@@ -1359,9 +1358,8 @@ class Test<T> {
 
 class Lst<E>
 
-''')
+''', {ce -> ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()})
         expect:
-            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
             def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
             genericTypeArgument.isGenericPlaceholder()
             !genericTypeArgument.isRawType()
@@ -1374,7 +1372,7 @@ class Lst<E>
     }
 
     void "test generics model for class placeholder wildcard"() {
-        ClassElement ce = buildClassElement('test.Test', '''
+        def (ClassElement ce, MethodElement method)  = buildClassElementMapped('test.Test', '''
 package test
 
 class Test<T> {
@@ -1386,9 +1384,8 @@ class Test<T> {
 
 class Lst<E>
 
-''')
+''', {ce -> Tuple.tuple(ce, ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get())})
         expect:
-            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
             def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
             !genericTypeArgument.isGenericPlaceholder()
             !genericTypeArgument.isRawType()
@@ -1425,7 +1422,7 @@ class Lst<E>
     }
 
     void "test generics model for method placeholder wildcard"() {
-        ClassElement ce = buildClassElement('test.Test', '''
+        MethodElement method = buildClassElementMapped('test.Test', '''
 package test
 
 class Test {
@@ -1437,9 +1434,8 @@ class Test {
 
 class Lst<E>
 
-''')
+''', {ce -> ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()})
         expect:
-            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
             method.getDeclaredTypeVariables().size() == 1
             method.getDeclaredTypeVariables()[0].declaringElement.get() == method
             method.getDeclaredTypeVariables()[0].variableName == "T"
