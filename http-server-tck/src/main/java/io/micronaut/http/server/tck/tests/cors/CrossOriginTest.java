@@ -87,6 +87,20 @@ public class CrossOriginTest {
     }
 
     @Test
+    void crossOriginAnnotationWithAnyOriginAnyHeaderAllowedByDefault() throws IOException {
+        asserts(SPECNAME,
+            preflight(UriBuilder.of("/foo").path("all"), "https://foo.com", HttpMethod.GET)
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "foo"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .assertResponse(response -> {
+                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
+                    assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS));
+                })
+                .build()));
+    }
+
+    @Test
     void verifyHttpMethodIsValidatedInACorsRequest() {
         assertAll(
             () -> asserts(SPECNAME,
@@ -300,6 +314,13 @@ public class CrossOriginTest {
         @Produces(MediaType.TEXT_PLAIN)
         @Get("/bar")
         String index() {
+            return "bar";
+        }
+
+        @CrossOrigin // allows all origins, all headers, by default
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get("/all")
+        String defaults() {
             return "bar";
         }
     }

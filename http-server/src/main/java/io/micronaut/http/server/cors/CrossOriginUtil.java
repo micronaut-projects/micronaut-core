@@ -23,6 +23,7 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -60,16 +61,24 @@ public final class CrossOriginUtil {
         if (!annotationMetadata.hasAnnotation(CrossOrigin.class)) {
             return Optional.empty();
         }
+
         CorsOriginConfiguration config = new CorsOriginConfiguration();
-        config.setAllowedOrigins(Arrays.asList(annotationMetadata.stringValues(CrossOrigin.class, MEMBER_ALLOWED_ORIGINS)));
-        annotationMetadata.stringValue(CrossOrigin.class, MEMBER_ALLOWED_ORIGINS_REGEX)
-            .ifPresent(config::setAllowedOriginsRegex);
+        annotationMetadata.stringValue(CrossOrigin.class, MEMBER_ALLOWED_ORIGINS_REGEX).ifPresentOrElse(
+            regex -> {
+                config.setAllowedOriginsRegex(regex);
+                config.setAllowedOrigins(Collections.emptyList());
+            },
+            () -> {
+                String[] allowedOrigins = annotationMetadata.stringValues(CrossOrigin.class, MEMBER_ALLOWED_ORIGINS);
+                List<String> allowedOriginsList = allowedOrigins.length == 0 ? CorsOriginConfiguration.ANY : Arrays.asList(allowedOrigins);
+                config.setAllowedOrigins(allowedOriginsList);
+            }
+        );
 
         String[] allowedHeaders = annotationMetadata.stringValues(CrossOrigin.class, MEMBER_ALLOWED_HEADERS);
         List<String> allowedHeadersList = allowedHeaders.length == 0 ? CorsOriginConfiguration.ANY : Arrays.asList(allowedHeaders);
         config.setAllowedHeaders(allowedHeadersList);
         config.setExposedHeaders(Arrays.asList(annotationMetadata.stringValues(CrossOrigin.class, MEMBER_EXPOSED_HEADERS)));
-
 
         List<HttpMethod> allowedMethods = Stream.of(annotationMetadata.stringValues(CrossOrigin.class, MEMBER_ALLOWED_METHODS))
             .map(HttpMethod::parse)

@@ -206,3 +206,8 @@ old behavior.
 ==== `OncePerRequestHttpServerFilter` removed
 
 Since Micronaut 3.0 the `OncePerRequestHttpServerFilter` class was deprecated and marked for removal. This class is now removed. Implement link:{api}/io/micronaut/http/filter/HttpServerFilter.html[HttpServerFilter] instead, and replace any usages of `micronaut.once` attributes with a custom attribute name.
+
+==== CORS support with the `@CrossOrigin` annotation
+
+In previous and current versions of Micronaut Framework, configuration-based CORS defaults to allow all origins when CORS is enabled and `allowed-origins` is not set otherwise. However, in previous versions of Micronaut Framework using the `@CrossOrigin` annotation defaults to no origins allowed, requiring the `allowedOrigins` attribute to be set. In Micronaut 4, `@CrossOrigin` is changed to match the behavior of configuration-based CORS. In other words, enabling CORS with `@CrossOrigin` without specifying any attributes means all origins are allowed.
+
