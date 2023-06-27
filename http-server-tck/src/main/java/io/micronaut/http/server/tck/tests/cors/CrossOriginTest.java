@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -44,6 +45,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.Arrays;
 import java.util.function.BiConsumer;
 
 import static io.micronaut.http.server.tck.CorsUtils.*;
@@ -282,6 +284,62 @@ public class CrossOriginTest {
                 .build()));
     }
 
+    @Test
+    void testApiVersionOneEndpoint() {
+        assertAll(
+            ()-> asserts(SPECNAME,
+                CollectionUtils.mapOf(
+                    "micronaut.router.versioning.enabled", StringUtils.TRUE,
+                    "micronaut.router.versioning.default-version", 1,
+                    "micronaut.router.versioning.header.enabled", StringUtils.TRUE,
+                    "micronaut.router.versioning.header.names", Arrays.asList("x-api-version")
+                ),
+                preflight(UriBuilder.of("/version").path("common"), "https://foo.com", HttpMethod.GET),
+                (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
+                    .build())),
+            ()-> asserts(SPECNAME,
+                CollectionUtils.mapOf(
+                    "micronaut.router.versioning.enabled", StringUtils.TRUE,
+                    "micronaut.router.versioning.default-version", 2,
+                    "micronaut.router.versioning.header.enabled", StringUtils.TRUE,
+                    "micronaut.router.versioning.header.names", Arrays.asList("x-api-version")
+                ),
+                preflight(UriBuilder.of("/version").path("common"), "https://foo.com", HttpMethod.GET),
+                (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
+                    .build())),
+            // this one fails with a 404 error, see https://github.com/micronaut-projects/micronaut-core/issues/9375
+            ()-> asserts(SPECNAME,
+                CollectionUtils.mapOf(
+                    "micronaut.router.versioning.enabled", StringUtils.TRUE,
+                    "micronaut.router.versioning.default-version", 1,
+                    "micronaut.router.versioning.header.enabled", StringUtils.TRUE,
+                    "micronaut.router.versioning.header.names", Arrays.asList("x-api-version")
+                ),
+                preflight(UriBuilder.of("/version").path("new"), "https://foo.com", HttpMethod.GET),
+                (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
+                    .build())),
+            ()-> asserts(SPECNAME,
+                CollectionUtils.mapOf(
+                    "micronaut.router.versioning.enabled", StringUtils.TRUE,
+                    "micronaut.router.versioning.default-version", 2,
+                    "micronaut.router.versioning.header.enabled", StringUtils.TRUE,
+                    "micronaut.router.versioning.header.names", Arrays.asList("x-api-version")
+                ),
+                preflight(UriBuilder.of("/version").path("new"), "https://foo.com", HttpMethod.GET),
+                (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
+                    .build()))
+        );
+    }
+
+
     private static MutableHttpRequest<?> preflight(UriBuilder uriBuilder, String originValue, HttpMethod method) {
         return preflight(uriBuilder.build(), originValue, method);
     }
@@ -437,6 +495,32 @@ public class CrossOriginTest {
     }
 
     @Requires(property = "spec.name", value = SPECNAME)
+    @CrossOrigin("https://foo.com")
+    @Controller("/version")
+    static class ApiVersionController {
+        @Version("1")
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get(value = "common")
+        public String commonV1() {
+            return "This endpoint exists both in V1 and V2";
+        }
+
+        @Version("2")
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get(value = "common")
+        public String commonV2() {
+            return "This endpoint exists both in V1 and V2";
+        }
+
+        @Version("2")
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get(value = "new")
+        public String newV2() {
+            return "This is a new endpoint in V2 of the API";
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPECNAME)
     @Replaces(HttpHostResolver.class)
     @Singleton
     static class HttpHostResolverReplacement implements HttpHostResolver {
@@ -445,4 +529,5 @@ public class CrossOriginTest {
             return "https://micronautexample.com";
         }
     }
+
 }
