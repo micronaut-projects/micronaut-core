@@ -20,7 +20,8 @@ class PoolTimeoutSpec extends Specification {
         def ctx = ApplicationContext.run([
                 "spec.name": "PoolTimeoutSpec",
                 "micronaut.http.client.pool.enabled": true,
-                "micronaut.http.client.pool.max-connections": 1,
+                "micronaut.http.client.pool.max-pending-connections": 1,
+                "micronaut.http.client.pool.max-concurrent-http1-connections": 1,
                 "micronaut.http.client.read-timeout": "1s",
         ])
         def server = ctx.getBean(EmbeddedServer)
