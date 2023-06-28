@@ -387,19 +387,19 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @return Whether cloud environment should be deduced based on environment variable, system property or configuration
      */
     protected boolean shouldDeduceCloudEnvironment() {
-        String deduceProperty = CachedEnvironment.getProperty(Environment.DEDUCE_CLOUD_ENVIRONMENT_PROPERTY);
         String deduceEnv = CachedEnvironment.getenv(Environment.DEDUCE_CLOUD_ENVIRONMENT_ENV);
         if (StringUtils.isNotEmpty(deduceEnv)) {
             boolean deduce = Boolean.parseBoolean(deduceEnv);
             log.debug("Cloud environment deduction was set via environment variable to: {}", deduce);
             return deduce;
-        } else if (StringUtils.isNotEmpty(deduceProperty)) {
+        }
+        String deduceProperty = CachedEnvironment.getProperty(Environment.DEDUCE_CLOUD_ENVIRONMENT_PROPERTY);
+        if (StringUtils.isNotEmpty(deduceProperty)) {
             boolean deduce = Boolean.parseBoolean(deduceProperty);
             log.debug("Cloud environment deduction was set via system property to: {}", deduce);
             return deduce;
-        } else {
-            return configuration.isDeduceCloudEnvironment();
         }
+        return configuration.isDeduceCloudEnvironment();
     }
 
     /**
