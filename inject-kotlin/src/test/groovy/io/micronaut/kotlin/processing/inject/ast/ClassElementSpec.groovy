@@ -1723,7 +1723,6 @@ class MyBeanX {
             def element = ce.findMethod("save").get().getParameters()[0]
             element.getGenericType().simpleName == "MyBeanX"
             element.getType().simpleName == "Object"
-            element.getGenericType().isAssignable("test.MyBeanX")
         when:
             def genRepo = ce.getTypeArguments("test.GenericRepository")
         then:
@@ -1731,6 +1730,34 @@ class MyBeanX {
             genRepo.get("E").getSyntheticBeanProperties().size() == 1
             genRepo.get("E").getMethods().size() == 0
             genRepo.get("E").getFields().get(0).name == "name"
+    }
+
+    void "test interface placeholder 2 isAssignable"() {
+        when:
+        boolean isAssignable = buildClassElementMapped('test.MyRepoX', '''
+package test
+import io.micronaut.context.annotation.Prototype
+import java.util.List
+
+interface MyRepoX : RepoX<MyBeanX, Long>
+interface RepoX<E, ID> : GenericRepository<E, ID> {
+    fun <S : E> save(ent: S)
+}
+interface GenericRepository<E, ID>
+@Prototype
+class MyBeanX {
+    var name: String? = null
+}
+
+''', { ce ->
+            def element = ce.findMethod("save").get().getParameters()[0]
+            element.getGenericType().simpleName == "MyBeanX"
+            element.getType().simpleName == "Object"
+            element.getGenericType().isAssignable("test.MyBeanX")
+        })
+
+        then:
+            isAssignable
     }
 
     void "test abstract placeholder"() {

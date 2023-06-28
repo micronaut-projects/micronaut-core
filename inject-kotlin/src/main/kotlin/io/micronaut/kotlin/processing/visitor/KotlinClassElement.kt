@@ -139,9 +139,7 @@ internal open class KotlinClassElement(
         javaName?.asString() ?: declaration.qualifiedName!!.asString()
     }
 
-    private val internalName: String by lazy {
-        declaration.getBinaryName(visitorContext.resolver, visitorContext)
-    }
+    private val internalName = declaration.getBinaryName(visitorContext.resolver, visitorContext)
 
     private val resolvedInterfaces: Collection<ClassElement> by lazy {
         declaration.superTypes.map { it.resolve() }
@@ -509,14 +507,6 @@ internal open class KotlinClassElement(
             return type.kotlinType.starProjection().makeNullable().isAssignableFrom(kotlinType.starProjection().makeNullable())
         }
         return super.isAssignable(type)
-    }
-
-    override fun isPrimitive(): Boolean {
-        return isVoid
-    }
-
-    override fun isVoid(): Boolean {
-        return internalName == "kotlin.Unit"
     }
 
     override fun copyThis() = KotlinClassElement(

@@ -50,7 +50,7 @@ class Lst<in E> {
     @Unroll("type var is #decl")
     def 'type vars declared on method'() {
         given:
-            def method = buildClassElementMapped("test.Test", """
+            def methodDecl = buildClassElementMapped("test.Test", """
 package test;
 
 import java.util.*;
@@ -60,10 +60,13 @@ abstract class Test<A> {
 }
 class Lst<in E> {
 }
-""", element -> element.<MethodElement> getEnclosedElement(ElementQuery.ALL_METHODS.named(s -> s == 'method')).get())
+""", {
+                element ->
+                    def method = element.<MethodElement> getEnclosedElement(ElementQuery.ALL_METHODS.named(s -> s == 'method')).get()
+                    return reconstructTypeSignature(method.declaredTypeVariables[0], true)
+            })
         expect:
-            reconstructTypeSignature(method.declaredTypeVariables[0], true) == decl
-
+            methodDecl == decl
         where:
             decl << [
 //                    'T',
@@ -137,7 +140,7 @@ abstract class Test<T> : $superType {
     @Unroll("type var is #decl")
     def 'type vars declared on type'() {
         given:
-            def element = buildClassElement("test.Test", """
+            def elementDecl = buildClassElementMapped("test.Test", """
 package test;
 
 import java.util.*;
@@ -147,10 +150,12 @@ abstract class Test<A, $decl> {
 
 class Lst<in E> {
 }
-""")
+""", element -> {
+                reconstructTypeSignature(element.declaredGenericPlaceholders[1], true)
+            })
 
         expect:
-            reconstructTypeSignature(element.declaredGenericPlaceholders[1], true) == decl
+            elementDecl == decl
 
         where:
             decl << [
@@ -170,7 +175,7 @@ class Lst<in E> {
     @Unroll('declaration is #decl')
     def 'fold type variable to null'() {
         given:
-            def classElement = buildClassElement("test.Test", """
+            def classDecl = buildClassElementMapped("test.Test", """
 package test;
 
 import java.util.*;
@@ -181,17 +186,19 @@ class Test<T> {
 
 class Lst<in E> {
 }
-""")
-            def fieldType = classElement.fields[0].type
+""", {
+                def fieldType = it.fields[0].type
+                return reconstructTypeSignature(fieldType.foldBoundGenericTypes {
+                    if (it != null && it.isGenericPlaceholder() && ((GenericPlaceholderElement) it).variableName == 'T') {
+                        return null
+                    } else {
+                        return it
+                    }
+                })
+            })
 
         expect:
-            reconstructTypeSignature(fieldType.foldBoundGenericTypes {
-                if (it != null && it.isGenericPlaceholder() && ((GenericPlaceholderElement) it).variableName == 'T') {
-                    return null
-                } else {
-                    return it
-                }
-            }) == expected
+            classDecl == expected
 
         where:
             decl             | expected
