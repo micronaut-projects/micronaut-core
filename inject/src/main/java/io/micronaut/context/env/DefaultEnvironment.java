@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -384,6 +384,25 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     /**
+     * @return Whether cloud environment should be deduced based on environment variable, system property or configuration
+     */
+    protected boolean shouldDeduceCloudEnvironment() {
+        String deduceEnv = CachedEnvironment.getenv(Environment.DEDUCE_CLOUD_ENVIRONMENT_ENV);
+        if (StringUtils.isNotEmpty(deduceEnv)) {
+            boolean deduce = Boolean.parseBoolean(deduceEnv);
+            log.debug("Cloud environment deduction was set via environment variable to: {}", deduce);
+            return deduce;
+        }
+        String deduceProperty = CachedEnvironment.getProperty(Environment.DEDUCE_CLOUD_ENVIRONMENT_PROPERTY);
+        if (StringUtils.isNotEmpty(deduceProperty)) {
+            boolean deduce = Boolean.parseBoolean(deduceProperty);
+            log.debug("Cloud environment deduction was set via system property to: {}", deduce);
+            return deduce;
+        }
+        return configuration.isDeduceCloudEnvironment();
+    }
+
+    /**
      * Creates the default annotation scanner.
      *
      * @param classLoader The class loader
@@ -640,7 +659,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         EnvironmentsAndPackage environmentsAndPackage = this.environmentsAndPackage;
         boolean isNotFunction = !specifiedNames.contains(Environment.FUNCTION);
         final boolean deduceEnvironment = shouldDeduceEnvironments();
-        final boolean deduceCloudEnvironmentUsingProbes = isNotFunction && configuration.isDeduceCloudEnvironment();
+        final boolean deduceCloudEnvironmentUsingProbes = isNotFunction && shouldDeduceCloudEnvironment();
         if (environmentsAndPackage == null) {
             synchronized (EnvironmentsAndPackage.class) { // double check
                 environmentsAndPackage = this.environmentsAndPackage;
