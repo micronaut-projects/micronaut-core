@@ -23,6 +23,8 @@ import io.micronaut.core.optim.StaticOptimizations;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.function.UnaryOperator;
 
 /**
  * A "cached environment" is a performance optimization aimed at minimizing
@@ -44,6 +46,11 @@ public class CachedEnvironment {
     private static final boolean LOCKED = StaticOptimizations.isEnvironmentCached();
     private static final Map<String, String> CACHED_ENVIRONMENT;
     private static final Map<Object, String> CACHED_PROPERTIES;
+
+    /**
+     * Operator used to replace {@link System#getenv(String)} in testing.
+     */
+    private static UnaryOperator<String> getenv;
 
     static {
         if (LOCKED) {
@@ -67,7 +74,10 @@ public class CachedEnvironment {
      */
     @Nullable
     public static String getenv(String name) {
-        return LOCKED ? CACHED_ENVIRONMENT.get(name) : System.getenv(name);
+        if (LOCKED) {
+            return CACHED_ENVIRONMENT.get(name);
+        }
+        return getenv == null ? System.getenv(name) : getenv.apply(name);
     }
 
     /**
