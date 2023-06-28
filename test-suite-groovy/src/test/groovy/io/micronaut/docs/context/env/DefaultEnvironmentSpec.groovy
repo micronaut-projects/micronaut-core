@@ -81,23 +81,13 @@ class DefaultEnvironmentSpec extends Specification {
         when:
         Field field = CachedEnvironment.class.getDeclaredField("getenv")
         field.setAccessible(true)
-        field.set(null, new UnaryOperator<String>() {
-            @Override
-            String apply(String s) {
-                return s == "MICRONAUT_ENV_CLOUD_DEDUCTION" ? StringUtils.TRUE : null
-            }
-        })
+        field.set(null, generateOperator(StringUtils.TRUE))
 
         then:
         env.shouldDeduceCloudEnvironment()
 
         when:
-        field.set(null, new UnaryOperator<String>() {
-            @Override
-            String apply(String s) {
-                return s == "MICRONAUT_ENV_CLOUD_DEDUCTION" ? StringUtils.FALSE : null
-            }
-        })
+        field.set(null, generateOperator(StringUtils.FALSE))
 
         then:
         !env.shouldDeduceCloudEnvironment()
@@ -105,5 +95,9 @@ class DefaultEnvironmentSpec extends Specification {
         cleanup:
         field.set(null, null)
         field.setAccessible(false)
+    }
+
+    UnaryOperator<String> generateOperator(String value) {
+        { String s -> s == "MICRONAUT_ENV_CLOUD_DEDUCTION" ? value : null }
     }
 }
