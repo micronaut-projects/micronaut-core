@@ -19,28 +19,3 @@ micronautBuild {
         enabled = true
     }
 }
-
-// Workaround for https://github.com/micronaut-projects/micronaut-build/issues/584
-
-def writebaseline = tasks.register("writebaseline", WriteBaseline) {
-   baseline = micronautBuild.binaryCompatibility.baselineVersion
-   baselineFile = layout.buildDirectory.file("baseline.txt")
-}
-
-tasks.named("checkVersionCatalogCompatibility") {
-    baseline.set(writebaseline.flatMap { it.baselineFile })
-}
-
-abstract class WriteBaseline extends DefaultTask {
-   @Input
-   abstract Property<String> getBaseline()
-
-   @OutputFile
-   abstract RegularFileProperty getBaselineFile()
-
-   @TaskAction
-   void execute() {
-      baselineFile.get().asFile.text = baseline.get()
-   }
-}
-
