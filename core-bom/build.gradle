@@ -31,14 +31,13 @@ tasks.named("checkVersionCatalogCompatibility") {
     baseline.set(writebaseline.flatMap { it.baselineFile })
 }
 
-
 abstract class WriteBaseline extends DefaultTask {
    @Input
    abstract Property<String> getBaseline()
-   
+
    @OutputFile
    abstract RegularFileProperty getBaselineFile()
-   
+
    @TaskAction
    void execute() {
       baselineFile.get().asFile.text = baseline.get()
