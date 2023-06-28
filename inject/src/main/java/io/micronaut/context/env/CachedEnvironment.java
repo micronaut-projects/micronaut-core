@@ -23,7 +23,6 @@ import io.micronaut.core.optim.StaticOptimizations;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.function.UnaryOperator;
 
 /**
