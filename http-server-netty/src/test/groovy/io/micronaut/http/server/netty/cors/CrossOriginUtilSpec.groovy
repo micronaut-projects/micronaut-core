@@ -129,7 +129,23 @@ class CrossOriginUtilSpec extends Specification {
         embeddedServer.applicationContext.getBean(TestMethodController).config = null
     }
 
-    void "test CrossOrigin with allowedOriginsRegex has no allowedOrigins"() {
+    void "test CrossOrigin with allowedOriginsRegex and allowedOrigins"() {
+        when:
+        HttpRequest req = HttpRequest.GET("/regexandallowedorigins").accept(MediaType.TEXT_PLAIN)
+        client.toBlocking().retrieve(req, String.class)
+        CorsOriginConfiguration config = embeddedServer.applicationContext.getBean(TestMethodController).config
+
+        then:
+        config
+        config.allowedOrigins == ['https://foo.com']
+        config.allowedOriginsRegex
+        config.allowedOriginsRegex.get() == '^http(|s):\\/\\/bar\\.com$'
+
+        cleanup:
+        embeddedServer.applicationContext.getBean(TestMethodController).config = null
+    }
+
+    void "test CrossOrigin with allowedOriginsRegex has no allowed origins if not set"() {
         when:
         HttpRequest req = HttpRequest.GET("/regex").accept(MediaType.TEXT_PLAIN)
         client.toBlocking().retrieve(req, String.class)
@@ -139,7 +155,7 @@ class CrossOriginUtilSpec extends Specification {
         config
         config.allowedOrigins == []
         config.allowedOriginsRegex
-        config.allowedOriginsRegex.get() == '^http(|s):\\/\\/foo\\.com$'
+        config.allowedOriginsRegex.get() == '^http(|s):\\/\\/bar\\.com$'
 
         cleanup:
         embeddedServer.applicationContext.getBean(TestMethodController).config = null
@@ -173,10 +189,23 @@ class CrossOriginUtilSpec extends Specification {
             return "anothermethod"
         }
 
-        @CrossOrigin(allowedOriginsRegex = '^http(|s):\\/\\/foo\\.com$')
+        @CrossOrigin(
+                allowedOriginsRegex = '^http(|s):\\/\\/bar\\.com$'
+        )
         @Produces(MediaType.TEXT_PLAIN)
         @Get("/regex")
         String regex(HttpRequest req) {
+            this.config = CrossOriginUtil.getCorsOriginConfigurationForRequest(req).orElse(null)
+            return "regex"
+        }
+
+        @CrossOrigin(
+            allowedOrigins = 'https://foo.com',
+            allowedOriginsRegex = '^http(|s):\\/\\/bar\\.com$'
+        )
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get("/regexandallowedorigins")
+        String regexAndAllowedOrigins(HttpRequest req) {
             this.config = CrossOriginUtil.getCorsOriginConfigurationForRequest(req).orElse(null)
             return "regex"
         }

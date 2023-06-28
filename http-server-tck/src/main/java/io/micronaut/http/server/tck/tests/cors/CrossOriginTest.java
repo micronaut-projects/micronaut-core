@@ -18,7 +18,6 @@ package io.micronaut.http.server.tck.tests.cors;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
@@ -44,6 +43,7 @@ import io.micronaut.http.tck.HttpResponseAssertion;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.Map;
 import java.util.function.BiConsumer;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
@@ -139,6 +139,17 @@ public class CrossOriginTest {
         asserts(SPECNAME, preflight(uri, origin, HttpMethod.GET), happyPathAssertion(origin));
     }
 
+    @Test
+    void allowedOriginsAndAllowedOriginsRegexHappyPath() throws IOException {
+        URI uri = UriBuilder.of("/allowedoriginsregex").path("bar").build();
+        String origin = "https://foo.com";
+        asserts(SPECNAME, preflight(uri, origin, HttpMethod.GET), happyPathAssertion(origin));
+        origin = "https://bar.com";
+        asserts(SPECNAME, preflight(uri, origin, HttpMethod.GET), happyPathAssertion(origin));
+        origin = "http://bar.com";
+        asserts(SPECNAME, preflight(uri, origin, HttpMethod.GET), happyPathAssertion(origin));
+    }
+
     private static BiConsumer<ServerUnderTest, HttpRequest<?>> happyPathAssertion(String origin) {
         return (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
             .status(HttpStatus.OK)
@@ -152,7 +163,7 @@ public class CrossOriginTest {
     @Test
     void allowedOriginsRegexFailure() throws IOException {
         asserts(SPECNAME,
-            preflight(UriBuilder.of("/allowedoriginsregex").path("bar"), "https://foo.com", HttpMethod.GET),
+            preflight(UriBuilder.of("/allowedoriginsregex").path("foobar"), "https://foo.com", HttpMethod.GET),
             (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.METHOD_NOT_ALLOWED)
                 .assertResponse(CorsUtils::assertCorsHeadersNotPresent)
@@ -212,7 +223,7 @@ public class CrossOriginTest {
     @Test
     void httHeaderValueAccessControlExposeHeaderValueCanBeSetViaCrossOriginAnnotation() throws IOException {
         asserts(SPECNAME,
-            CollectionUtils.mapOf("micronaut.server.cors.single-header", StringUtils.TRUE),
+            Map.of("micronaut.server.cors.single-header", StringUtils.TRUE),
             preflight(UriBuilder.of("/exposedheaders").path("bar"), "https://foo.com", HttpMethod.GET)
                 .header(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, "foo"),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
@@ -339,13 +350,22 @@ public class CrossOriginTest {
         }
 
         @CrossOrigin(
-            value = "^http(|s):\\/\\/foo\\.com$"
-            // allowedOriginsRegex defaults to false
+            allowedOrigins = "https://foo.com",
+            allowedOriginsRegex = "^http(|s):\\/\\/bar\\.com$"
         )
         @Produces(MediaType.TEXT_PLAIN)
         @Get("/bar")
         String bar() {
             return "bar";
+        }
+
+        // regex is no longer allowed on value/allowedOrigins attribute
+        // must now use: allowedOriginsRegex attribute instead
+        @CrossOrigin(value = "^http(|s):\\/\\/foo\\.com$")
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get("/foobar")
+        String foobar() {
+            return "foobar";
         }
     }
 
