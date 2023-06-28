@@ -93,7 +93,7 @@ https://github.com/ben-manes/caffeine[Caffeine] is no longer shaded into the `io
 
 ==== Environment Deduction Disabled by Default
 
-In previous versions of the Micronaut framework probes were used to attempt to deduce the running environment and establish whether the application was running in the Cloud. These probes involved network calls resulting in issues with startup performance and security concerns. These probes are disabled by default and can be re-enabled as necessary by calling `ApplicationContextBuilder.deduceCloudEnvironment(true)` if your application still requires this functionality.
+In previous versions of the Micronaut framework, probes were used to attempt to deduce the running environment and establish whether the application was running in the Cloud. These probes involved network calls resulting in issues with startup performance and security concerns. These probes are disabled by default and can be re-enabled as necessary by calling `ApplicationContextBuilder.deduceCloudEnvironment(true)`, setting the system property `micronaut.env.cloud-deduction` to `true` or setting the environment `MICRONAUT_ENV_CLOUD_DEDUCTION` to `true` if your application still requires this functionality.
 
 ==== Update to Groovy 4
 
