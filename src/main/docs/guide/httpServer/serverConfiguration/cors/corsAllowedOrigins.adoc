@@ -19,3 +19,5 @@ micronaut:
 ----
 
 WARNING: Use the `allowed-origins-regex` configuration judiciously. You may accidentally make an insecure configuration which could be targeted by an attacker registering domains targeting the regular expression.
+
+NOTE: `allowed-origins-regex` and `allowed-origins` can be combined. However, if using the former and the latter is not set explicitly then `allowed-origins` defaults to _none_ rather than _any_ to avoid unexpected allowed origins.
