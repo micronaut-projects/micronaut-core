@@ -49,12 +49,15 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *     skipped, unless the parameter is {@link io.micronaut.core.annotation.Nullable}. <b>Note that
  *     for server filter execution, exceptions are transformed into non-exceptional responses with
  *     an error status code, between each filter.</b></li>
+ *     <li>A {@code @}{@link Header}, {@code @}{@link QueryValue} or {@code @}{@link CookieValue}
+ *     parameter</li>
  * </ul>
  *
  * The return value may be:
  *
  * <ul>
- *     <li>{@code void} to immediately continue execution</li>
+ *     <li>{@code void} or {@code null} to immediately continue execution, without changing the
+ *     response</li>
  *     <li>An updated {@link HttpResponse}</li>
  *     <li>A {@link Publisher} (or other reactive type) that produces any of these return types, to
  *     delay further execution</li>

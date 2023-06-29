@@ -391,6 +391,9 @@ public class FilterRunner {
                 ArgumentBinder<Object, HttpRequest<?>> argumentBinder = (ArgumentBinder<Object, HttpRequest<?>>) argumentBinderRegistry.findArgumentBinder(argument).orElse(null);
                 if (argumentBinder != null) {
                     if (argumentBinder instanceof BaseFilterProcessor.RequiresRequestBodyBinder<?>) {
+                        if (isResponseFilter) {
+                            throw new IllegalArgumentException("Cannot bind @Body in response filter method [" + method.getDescription(true) + "]");
+                        }
                         waitForBody = true;
                     }
                     fulfilled[i] = ctx -> {

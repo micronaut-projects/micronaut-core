@@ -421,9 +421,7 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                 if (isAcceptable(element)) {
                     List<? extends Element> enclosedElements = element.getEnclosedElements();
                     for (Element enclosedElement : enclosedElements) {
-                        if ((JavaModelUtils.isRecordComponent(enclosedElement)
-                            || enclosedElement instanceof ExecutableElement)
-                            && enclosedElement.getKind() != ElementKind.CONSTRUCTOR) {
+                        if (enclosedElement instanceof VariableElement) {
                             accept(type, enclosedElement, o);
                         }
                     }
@@ -725,6 +723,11 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         @Override
         protected Element getNativeType(io.micronaut.inject.ast.Element element) {
             return ((AbstractJavaElement) element).getNativeType().element();
+        }
+
+        @Override
+        protected String getElementName(Element element) {
+            return element.getSimpleName().toString();
         }
 
         @Override

@@ -1,3 +1,5 @@
+import org.apache.tools.ant.taskdefs.condition.Os
+
 plugins {
     id "io.micronaut.build.internal.convention-library"
 }
@@ -46,6 +48,11 @@ dependencies {
 
     if (JavaVersion.current().isCompatibleWith(JavaVersion.VERSION_15)) {
         testImplementation libs.bcpkix
+    }
+    testRuntimeOnly(libs.managed.netty.tcnative.boringssl.static) {
+        artifact {
+            classifier = Os.isArch("aarch64") ? "osx-aarch_64" : "osx-x86_64"
+        }
     }
 }
 

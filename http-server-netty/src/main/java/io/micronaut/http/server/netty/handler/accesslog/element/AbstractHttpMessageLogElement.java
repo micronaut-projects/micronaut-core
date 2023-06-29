@@ -28,6 +28,8 @@ import java.util.Set;
  * @since 2.0
  */
 abstract class AbstractHttpMessageLogElement implements LogElement {
+    private static final Set<Character> CHARACTERS_TO_ESCAPE = Set.of('\b', '\n', '\t', '\r', '\\', '"');
+
     protected Set<Event> events;
 
     /**
@@ -45,21 +47,23 @@ abstract class AbstractHttpMessageLogElement implements LogElement {
 
         /* Wrap all quotes in double quotes. */
         StringBuilder buffer = new StringBuilder(value.length() + 2);
-        buffer.append('\'');
         int i = 0;
         while (i < value.length()) {
-            int j = value.indexOf('\'', i);
-            if (j == -1) {
-                buffer.append(value.substring(i));
-                i = value.length();
+            char currentChar = value.charAt(i);
+            if (CHARACTERS_TO_ESCAPE.contains(currentChar)) {
+                buffer.append('\\');
+                switch (currentChar) {
+                    case '\b' -> buffer.append('b');
+                    case '\n' -> buffer.append('n');
+                    case '\r' -> buffer.append('r');
+                    case '\t' -> buffer.append('t');
+                    default -> buffer.append(currentChar);
+                }
             } else {
-                buffer.append(value.substring(i, j + 1));
-                buffer.append('"');
-                i = j + 2;
+                buffer.append(currentChar);
             }
+            i++;
         }
-
-        buffer.append('\'');
         return buffer.toString();
     }
 

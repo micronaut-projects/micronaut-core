@@ -50,7 +50,7 @@ class Lst<in E> {
     @Unroll("type var is #decl")
     def 'type vars declared on method'() {
         given:
-            def element = buildClassElement("test.Test", """
+            def method = buildClassElementMapped("test.Test", """
 package test;
 
 import java.util.*;
@@ -60,9 +60,7 @@ abstract class Test<A> {
 }
 class Lst<in E> {
 }
-""")
-            def method = element.<MethodElement> getEnclosedElement(ElementQuery.ALL_METHODS.named(s -> s == 'method')).get()
-
+""", element -> element.<MethodElement> getEnclosedElement(ElementQuery.ALL_METHODS.named(s -> s == 'method')).get())
         expect:
             reconstructTypeSignature(method.declaredTypeVariables[0], true) == decl
 

@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.netty;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.stream.Http2Content;
 import io.netty.handler.codec.http.LastHttpContent;
 
@@ -23,6 +24,9 @@ import io.netty.handler.codec.http.LastHttpContent;
  *
  * @author graemerocher
  * @since 2.1.3
+ * @deprecated Unused
  */
+@Internal
+@Deprecated
 public interface LastHttp2Content extends Http2Content, LastHttpContent {
 }

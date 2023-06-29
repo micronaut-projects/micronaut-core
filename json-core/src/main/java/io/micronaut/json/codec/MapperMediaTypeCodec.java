@@ -17,6 +17,7 @@ package io.micronaut.json.codec;
 
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.io.buffer.ReferenceCounted;
@@ -34,10 +35,7 @@ import io.micronaut.runtime.ApplicationConfiguration;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 /**
  * A {@link MediaTypeCodec} for {@link JsonMapper} based implementations.
@@ -68,15 +66,38 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
                                 ApplicationConfiguration applicationConfiguration,
                                 CodecConfiguration codecConfiguration,
                                 MediaType mediaType) {
+        this(mapperProvider,
+            applicationConfiguration,
+            codecConfiguration,
+            mediaType,
+            null);
+    }
+
+    /**
+     * @param mapperProvider           To read/write JSON
+     * @param applicationConfiguration The common application configurations
+     * @param codecConfiguration       The configuration for the codec
+     * @param mediaType                Client request/response media type
+     * @param additionalTypes          Additional Media Types
+     */
+    public MapperMediaTypeCodec(BeanProvider<JsonMapper> mapperProvider,
+                                ApplicationConfiguration applicationConfiguration,
+                                CodecConfiguration codecConfiguration,
+                                MediaType mediaType,
+                                @Nullable List<MediaType> additionalTypes) {
         this.mapperProvider = mapperProvider;
         this.applicationConfiguration = applicationConfiguration;
         this.codecConfiguration = codecConfiguration;
         this.mediaType = mediaType;
+
+        Set<MediaType> mediaTypes = new HashSet<>();
         if (codecConfiguration != null) {
-            this.additionalTypes = codecConfiguration.getAdditionalTypes();
-        } else {
-            this.additionalTypes = Collections.emptyList();
+            mediaTypes.addAll(codecConfiguration.getAdditionalTypes());
         }
+        if (additionalTypes != null) {
+            mediaTypes.addAll(additionalTypes);
+        }
+        this.additionalTypes = new ArrayList<>(mediaTypes);
     }
 
     /**
