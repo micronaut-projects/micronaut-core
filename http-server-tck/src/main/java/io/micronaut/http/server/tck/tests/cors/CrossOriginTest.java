@@ -286,7 +286,7 @@ public class CrossOriginTest {
     }
 
     @Test
-    void testApiVersionOneEndpoint() {
+    void testApiVersionedEndpoints() {
         Map<String, Object> config = CollectionUtils.mapOf(
             "micronaut.router.versioning.enabled", StringUtils.TRUE,
             "micronaut.router.versioning.header.enabled", StringUtils.TRUE,
