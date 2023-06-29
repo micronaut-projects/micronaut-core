@@ -17,7 +17,6 @@ package io.micronaut.http.client.tck.tests.textplain;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.annotation.SingleResult;
-import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
