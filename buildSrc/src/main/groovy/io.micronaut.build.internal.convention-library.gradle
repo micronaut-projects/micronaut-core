@@ -16,8 +16,8 @@ configurations {
 
 micronautBuild {
     binaryCompatibility {
-        // Enable before Micronaut 4 release
-        enabled.set(false)
+        enabled.set(true)
+        baselineVersion = "4.0.0-RC3"
     }
 }
 
