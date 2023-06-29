@@ -45,10 +45,11 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.net.URI;
-import java.util.Arrays;
+import java.util.Collections;
+import java.util.Map;
 import java.util.function.BiConsumer;
 
-import static io.micronaut.http.server.tck.CorsUtils.*;
+import static io.micronaut.http.server.tck.CorsUtils.assertCorsHeaders;
 import static io.micronaut.http.server.tck.TestScenario.asserts;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -286,56 +287,49 @@ public class CrossOriginTest {
 
     @Test
     void testApiVersionOneEndpoint() {
+        Map<String, Object> config = CollectionUtils.mapOf(
+            "micronaut.router.versioning.enabled", StringUtils.TRUE,
+            "micronaut.router.versioning.header.enabled", StringUtils.TRUE,
+            "micronaut.router.versioning.header.names", Collections.singletonList("x-api-version")
+        );
         assertAll(
-            ()-> asserts(SPECNAME,
-                CollectionUtils.mapOf(
-                    "micronaut.router.versioning.enabled", StringUtils.TRUE,
-                    "micronaut.router.versioning.default-version", 1,
-                    "micronaut.router.versioning.header.enabled", StringUtils.TRUE,
-                    "micronaut.router.versioning.header.names", Arrays.asList("x-api-version")
-                ),
+            () -> {
+                config.put("micronaut.router.versioning.default-version", 1);
+                asserts(SPECNAME, config,
                 preflight(UriBuilder.of("/version").path("common"), "https://foo.com", HttpMethod.GET),
                 (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                     .status(HttpStatus.OK)
                     .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
-                    .build())),
-            ()-> asserts(SPECNAME,
-                CollectionUtils.mapOf(
-                    "micronaut.router.versioning.enabled", StringUtils.TRUE,
-                    "micronaut.router.versioning.default-version", 2,
-                    "micronaut.router.versioning.header.enabled", StringUtils.TRUE,
-                    "micronaut.router.versioning.header.names", Arrays.asList("x-api-version")
-                ),
-                preflight(UriBuilder.of("/version").path("common"), "https://foo.com", HttpMethod.GET),
-                (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
-                    .status(HttpStatus.OK)
-                    .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
-                    .build())),
+                    .build()));
+            },
+            ()-> {
+                config.put("micronaut.router.versioning.default-version", 2);
+                asserts(SPECNAME, config,
+                    preflight(UriBuilder.of("/version").path("common"), "https://foo.com", HttpMethod.GET),
+                    (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                        .status(HttpStatus.OK)
+                        .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
+                        .build()));
+            },
             // this one fails with a 404 error, see https://github.com/micronaut-projects/micronaut-core/issues/9375
-            ()-> asserts(SPECNAME,
-                CollectionUtils.mapOf(
-                    "micronaut.router.versioning.enabled", StringUtils.TRUE,
-                    "micronaut.router.versioning.default-version", 1,
-                    "micronaut.router.versioning.header.enabled", StringUtils.TRUE,
-                    "micronaut.router.versioning.header.names", Arrays.asList("x-api-version")
-                ),
-                preflight(UriBuilder.of("/version").path("new"), "https://foo.com", HttpMethod.GET),
-                (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
-                    .status(HttpStatus.OK)
-                    .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
-                    .build())),
-            ()-> asserts(SPECNAME,
-                CollectionUtils.mapOf(
-                    "micronaut.router.versioning.enabled", StringUtils.TRUE,
-                    "micronaut.router.versioning.default-version", 2,
-                    "micronaut.router.versioning.header.enabled", StringUtils.TRUE,
-                    "micronaut.router.versioning.header.names", Arrays.asList("x-api-version")
-                ),
-                preflight(UriBuilder.of("/version").path("new"), "https://foo.com", HttpMethod.GET),
-                (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
-                    .status(HttpStatus.OK)
-                    .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
-                    .build()))
+            ()-> {
+                config.put("micronaut.router.versioning.default-version", 1);
+                asserts(SPECNAME, config,
+                    preflight(UriBuilder.of("/version").path("new"), "https://foo.com", HttpMethod.GET),
+                    (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                        .status(HttpStatus.OK)
+                        .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
+                        .build()));
+            },
+            ()-> {
+                config.put("micronaut.router.versioning.default-version", 2);
+                asserts(SPECNAME, config,
+                    preflight(UriBuilder.of("/version").path("new"), "https://foo.com", HttpMethod.GET),
+                    (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                        .status(HttpStatus.OK)
+                        .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
+                        .build()));
+            }
         );
     }
 
