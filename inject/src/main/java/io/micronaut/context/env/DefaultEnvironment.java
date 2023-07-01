@@ -134,7 +134,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @param logEnabled flag to enable or disable logger
      */
     public DefaultEnvironment(@NonNull ApplicationContextConfiguration configuration, boolean logEnabled) {
-        super(configuration.getConversionService().orElseGet(MutableConversionService::create));
+        super(configuration.getConversionService().orElseGet(MutableConversionService::create), logEnabled);
         this.mutableConversionService = (MutableConversionService) conversionService;
         this.configuration = configuration;
         this.resourceLoader = configuration.getResourceLoader();
