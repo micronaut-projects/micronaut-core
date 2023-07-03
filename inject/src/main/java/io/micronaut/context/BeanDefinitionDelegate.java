@@ -25,6 +25,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.DelegatingBeanDefinition;
@@ -39,7 +40,6 @@ import io.micronaut.inject.qualifiers.PrimaryQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -62,7 +62,6 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
 
     @Nullable
     private final ConfigurationPath configurationPath;
-
 
     private BeanDefinitionDelegate(BeanDefinition<T> definition, @Nullable Qualifier<T> qualifier, @Nullable ConfigurationPath configurationPath) {
         this.definition = definition;
@@ -172,7 +171,7 @@ sealed class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional
         if (requiredArguments.length == 0) {
             return Collections.emptyMap();
         }
-        Map<String, Object> fulfilled = new LinkedHashMap<>(requiredArguments.length, 1);
+        Map<String, Object> fulfilled = CollectionUtils.newLinkedHashMap(requiredArguments.length);
         ConfigurationPath configurationPath = resolutionContext.getConfigurationPath();
         for (Argument<Object> argument : requiredArguments) {
             String argumentName = argument.getName();

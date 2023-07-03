@@ -45,6 +45,7 @@ import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.qualifiers.PrimaryQualifier;
+import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -520,10 +521,15 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                     createAndAddDelegate(resolutionContext, candidate, transformedCandidates, dependentPath);
                 } else {
                     Qualifier<?> qualifier = dependentCandidate.getDeclaredQualifier();
-                    if (qualifier == null && dependentCandidate.isPrimary()) {
-                        // Backwards compatibility, `getDeclaredQualifier` strips @Primary
-                        // This should be removed if @Primary is no longer qualifier
-                        qualifier = PrimaryQualifier.INSTANCE;
+                    if (qualifier == null) {
+                        if (dependentCandidate.isPrimary()) {
+                            // Backwards compatibility, `getDeclaredQualifier` strips @Primary
+                            // This should be removed if @Primary is no longer qualifier
+                            qualifier = PrimaryQualifier.INSTANCE;
+                        } else {
+                            // If the qualifier is null we cannot properly recognize the connected each bean
+                            qualifier = Qualifiers.byType(dependentCandidate.getBeanType());
+                        }
                     }
                     BeanDefinitionDelegate<?> delegate = BeanDefinitionDelegate.create(candidate, (Qualifier<T>) qualifier);
                     if (delegate.isEnabled(this, resolutionContext)) {

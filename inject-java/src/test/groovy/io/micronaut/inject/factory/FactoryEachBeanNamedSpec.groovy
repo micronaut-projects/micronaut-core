@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.annotation.EachBean
 import io.micronaut.context.annotation.Factory
+import io.micronaut.context.annotation.Parameter
 import io.micronaut.context.annotation.Requires
 import io.micronaut.runtime.context.scope.Refreshable
 import jakarta.inject.Named
@@ -18,6 +19,7 @@ class FactoryEachBeanNamedSpec extends Specification {
         BeanContext beanContext = ApplicationContext.run(["spec.name": SPEC_NAME])
 
         expect:
+        beanContext.getBeansOfType(IntegerReturnerWrapper2).size() == 2
         beanContext.getBeansOfType(IntegerReturnerWrapper).size() == 2
 
         cleanup:
@@ -55,12 +57,22 @@ class FactoryEachBeanNamedSpec extends Specification {
         }
     }
 
+    @EachBean(IntegerReturner)
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class IntegerReturnerWrapper2 {
+        final IntegerReturner inty
+
+        IntegerReturnerWrapper2(@Parameter IntegerReturner inty) {
+            this.inty = inty
+        }
+    }
+
     @Factory
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class IntegerReturnerFactory {
 
         @EachBean(IntegerReturner)
-        IntegerReturnerWrapper buildWithFactory(IntegerReturner inty) {
+        IntegerReturnerWrapper buildWithFactory(@Parameter IntegerReturner inty) {
             new IntegerReturnerWrapper(inty)
         }
     }
