@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.http.HttpMethod
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Error
@@ -200,4 +201,72 @@ class GroovyRouteBuilderSpec extends Specification {
     static class C extends D {}
     static class D extends E {}
     static class E extends RuntimeException {}
+
+    def 'content negotiation on accept header'() {
+        given:
+        def context = new DefaultApplicationContext("test").start()
+        Router router = context.getBean(Router)
+
+        def request = HttpRequest.GET('/accept').header('Accept', accept)
+
+        expect:
+        router.findAllClosest(request).collectMany { it.produces }.collect { it.toString() }.toSet() == produced.toSet()
+
+        cleanup:
+        context.stop()
+
+        where:
+        accept                     | produced
+        'application/json'         | ['application/json']
+        'application/*'            | ['application/json']
+        'text/*'                   | ['text/plain', 'text/html']
+        // "If more than one media range applies to a given type, the most specific reference has precedence."
+        'text/*, text/plain'       | ['text/plain']
+        'text/*, text/plain;q=0.5' | ['text/html']
+        'text/*;q=0.5, */*'        | ['image/svg', 'application/json']
+    }
+
+    def 'content negotiation on accept header: wildcard'() {
+        given:
+        def context = new DefaultApplicationContext("test").start()
+        Router router = context.getBean(Router)
+
+        def request = HttpRequest.GET('/accept/wildcard').header('Accept', accept)
+
+        expect:
+        router.findAllClosest(request).collectMany { it.produces }.collect { it.toString() }.toSet() == produced.toSet()
+
+        cleanup:
+        context.stop()
+
+        where:
+        accept             | produced
+        'application/json' | ['application/json', '*/*']
+        'application/xml'  | ['application/xml']
+        'application/*'    | ['application/json', '*/*', 'application/xml']
+        '*/*'              | ['application/json', '*/*']
+    }
+
+    @Controller('/accept')
+    @Executable
+    static class AcceptController {
+        @Get(produces = 'application/json')
+        def json() {}
+
+        @Get(produces = 'text/html')
+        def html() {}
+
+        @Get(produces = 'text/plain')
+        def plain() {}
+
+        @Get(produces = 'image/svg')
+        def svg() {}
+
+        @Get(value = '/wildcard', produces = ['application/json', '*/*'])
+        def wildcardProducesJson() {}
+
+        @Get(value = '/wildcard', produces = ['application/xml'])
+        def wildcardProducesXml() {}
+    }
+
 }

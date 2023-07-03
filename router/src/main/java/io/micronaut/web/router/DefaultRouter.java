@@ -204,19 +204,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             return uriRoutes;
         }
 
-        if (CollectionUtils.isNotEmpty(acceptedProducedTypes)) {
-            // take the highest priority accepted type
-            final MediaType mediaType = acceptedProducedTypes.iterator().next();
-            List<UriRouteMatch<T, R>> mostSpecific = new ArrayList<>(uriRoutes.size());
-            for (UriRouteMatch<T, R> routeMatch : uriRoutes) {
-                if (routeMatch.explicitlyProduces(mediaType)) {
-                    mostSpecific.add(routeMatch);
-                }
-            }
-            if (!mostSpecific.isEmpty() || !acceptedProducedTypes.contains(MediaType.ALL_TYPE)) {
-                uriRoutes = mostSpecific;
-            }
-        }
+        uriRoutes = contentNegotiate(request, uriRoutes);
         routeCount = uriRoutes.size();
         if (routeCount > 1 && permitsBody) {
 
@@ -263,6 +251,88 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         }
 
         return uriRoutes;
+    }
+
+    /**
+     * Perform <a href='https://developer.mozilla.org/en-US/docs/Web/HTTP/Content_negotiation'>content negotiation</a>
+     * based on the {@code Accept} headers we support.
+     *
+     * @param request    The request
+     * @param candidates The route candidates that could match the request
+     * @return The subset of candidates that are the "best match" for the request.
+     */
+    private static <M extends UriRouteMatch<?, ?>> List<M> contentNegotiate(HttpRequest<?> request, List<M> candidates) {
+        Collection<MediaType> acceptCollection = request.accept();
+        if (acceptCollection.isEmpty()) {
+            return candidates;
+        }
+        // "The media type quality factor associated with a given type is determined by finding the media range
+        // with the highest precedence that matches the type."
+        // sort the `Accept` header by precedence.
+        List<MediaType> acceptList = new ArrayList<>(acceptCollection);
+        acceptList.sort(MediaType.PRECEDENCE_COMPARATOR);
+
+        double minReturnedQuality = 0;
+        MediaType minAcceptPrecedence = MediaType.ALL_TYPE;
+        MediaType maxProducePrecedence = null;
+        List<M> bestMatches = new ArrayList<>();
+        // for each route...
+        for (M route : candidates) {
+            boolean routeAdded = false; // whether this route is in `bestMatches`
+
+            // ... for each type the route can produce...
+            for (MediaType produceType : route.getProduces()) {
+                int producePrecedenceCmp = maxProducePrecedence == null ? 1 : MediaType.PRECEDENCE_COMPARATOR.compare(produceType, maxProducePrecedence);
+
+                // ... find the most specific match in the `Accept` header
+                for (MediaType acceptType : acceptList) {
+                    if (acceptType.matches(produceType)) {
+                        // compare accept precedence with previous matches. <0 means higher precedence, >0 means lower
+                        // precedence
+                        int acceptPrecedenceCmp = MediaType.PRECEDENCE_COMPARATOR.compare(acceptType, minAcceptPrecedence);
+                        // find the quality specified in the `Accept`
+                        double quality = acceptType.getQualityAsNumber().doubleValue();
+
+                        // is this match strictly better than previous matches?
+                        boolean better = false;
+                        if (quality >= minReturnedQuality) {
+                            // higher explicit quality always wins
+                            if (quality > minReturnedQuality) {
+                                better = true;
+                            } else if (acceptPrecedenceCmp <= 0) {
+                                // next, try to match more specific accept headers, i.e. `Accept: text/html, text/*`
+                                // should try to match text/html first
+                                if (acceptPrecedenceCmp < 0) {
+                                    better = true;
+                                } else if (producePrecedenceCmp > 0) {
+                                    // finally, try to select the controller with the most generic `produces`: For
+                                    // `Accept: */*`, the controller with `produces = */*` should match over
+                                    // `produces = text/html`.
+                                    better = true;
+                                }
+                            }
+                        }
+                        if (better) {
+                            minReturnedQuality = quality;
+                            minAcceptPrecedence = acceptType;
+                            maxProducePrecedence = produceType;
+                            bestMatches.clear();
+                            bestMatches.add(route);
+                            routeAdded = true;
+                        } else if (quality == minReturnedQuality && acceptPrecedenceCmp == 0 && producePrecedenceCmp == 0) {
+                            // if it's a similar match, add it to the candidates
+                            if (!routeAdded) {
+                                bestMatches.add(route);
+                                routeAdded = true;
+                            }
+                        }
+                        // acceptList is sorted, so this match was the type with the highest precedence.
+                        break;
+                    }
+                }
+            }
+        }
+        return bestMatches;
     }
 
     @NonNull
