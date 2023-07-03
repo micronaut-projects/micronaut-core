@@ -4,7 +4,6 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.annotation.EachBean
 import io.micronaut.context.annotation.Factory
-import io.micronaut.context.annotation.Parameter
 import io.micronaut.context.annotation.Requires
 import io.micronaut.runtime.context.scope.Refreshable
 import jakarta.inject.Named
@@ -62,7 +61,7 @@ class FactoryEachBeanNamedSpec extends Specification {
     static class IntegerReturnerWrapper2 {
         final IntegerReturner inty
 
-        IntegerReturnerWrapper2(@Parameter IntegerReturner inty) {
+        IntegerReturnerWrapper2(IntegerReturner inty) {
             this.inty = inty
         }
     }
@@ -72,7 +71,7 @@ class FactoryEachBeanNamedSpec extends Specification {
     static class IntegerReturnerFactory {
 
         @EachBean(IntegerReturner)
-        IntegerReturnerWrapper buildWithFactory(@Parameter IntegerReturner inty) {
+        IntegerReturnerWrapper buildWithFactory(IntegerReturner inty) {
             new IntegerReturnerWrapper(inty)
         }
     }
