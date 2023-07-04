@@ -31,7 +31,7 @@ internal fun KSDeclaration.getBinaryName(resolver: Resolver, visitorContext: Kot
             declaration = parent
         }
     }
-    val binaryName = resolver.mapKotlinNameToJava(declaration.qualifiedName!!)?.asString()
+    val binaryName = if (declaration.qualifiedName != null) resolver.mapKotlinNameToJava(declaration.qualifiedName!!)?.asString() else null
     if (binaryName != null) {
         return binaryName
     }
@@ -43,13 +43,17 @@ internal fun KSDeclaration.getBinaryName(resolver: Resolver, visitorContext: Kot
             return asString;
         }
     }
-    if (declaration is KSClassDeclaration) {
+    if (declaration is KSClassDeclaration && declaration.origin != Origin.SYNTHETIC) {
         val signature = resolver.mapToJvmSignature(declaration)
         if (signature != null) {
             return Type.getType(signature).className
         }
     }
-    return computeName(declaration)
+    return if (declaration.origin != Origin.SYNTHETIC) {
+        computeName(declaration)
+    } else {
+        declaration.simpleName.asString()
+    }
 }
 
 private fun computeName(declaration: KSDeclaration): String {

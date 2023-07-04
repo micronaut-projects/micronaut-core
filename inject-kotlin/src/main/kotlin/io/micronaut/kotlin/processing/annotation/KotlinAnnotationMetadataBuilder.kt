@@ -50,13 +50,9 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
         private fun getTypeForAnnotation(annotationMirror: KSAnnotation, visitorContext: KotlinVisitorContext): KSClassDeclaration {
             return annotationMirror.annotationType.resolve().declaration.getClassDeclaration(visitorContext)
         }
-        fun getAnnotationTypeName(annotationMirror: KSAnnotation, visitorContext: KotlinVisitorContext): String {
+        fun getAnnotationTypeName(resolver: Resolver, annotationMirror: KSAnnotation, visitorContext: KotlinVisitorContext): String {
             val type = getTypeForAnnotation(annotationMirror, visitorContext)
-            return if (type.qualifiedName != null) {
-                type.qualifiedName!!.asString()
-            } else {
-                annotationMirror.shortName.asString()
-            }
+            return type.getBinaryName(resolver, visitorContext)
         }
     }
 
@@ -86,7 +82,7 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
     }
 
     override fun getAnnotationTypeName(annotationMirror: KSAnnotation): String {
-        return Companion.getAnnotationTypeName(annotationMirror, visitorContext)
+        return Companion.getAnnotationTypeName(resolver, annotationMirror, visitorContext)
     }
 
     override fun getElementName(element: KSAnnotated): String {
