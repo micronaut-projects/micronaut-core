@@ -115,6 +115,7 @@ internal open class KotlinVisitorContext(
                 declaration.annotations.any { ann ->
                     stereotypes.contains(
                         KotlinAnnotationMetadataBuilder.getAnnotationTypeName(
+                            resolver,
                             ann,
                             this
                         )

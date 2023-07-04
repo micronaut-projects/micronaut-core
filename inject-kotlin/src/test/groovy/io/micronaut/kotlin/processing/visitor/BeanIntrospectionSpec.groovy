@@ -49,6 +49,35 @@ class Test
         introspection.instantiate().class.name == "test.Test"
     }
 
+    void 'test inner annotation'() {
+        when:
+        def introspection = buildBeanIntrospection("test.Test", """
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@MyAnn
+class Test
+
+@Introspected
+@Retention(AnnotationRetention.RUNTIME)
+@Target(AnnotationTarget.CLASS)
+@MyAnn.InnerAnn
+annotation class MyAnn {
+    @Retention(AnnotationRetention.RUNTIME)
+    @Target(AnnotationTarget.CLASS)
+    annotation class InnerAnn
+}
+""")
+
+        then:
+        noExceptionThrown()
+        introspection != null
+        introspection.instantiate().class.name == "test.Test"
+        introspection.hasAnnotation('test.MyAnn')
+        introspection.hasStereotype('test.MyAnn$InnerAnn')
+    }
+
     void "test generics in arrays don't stack overflow"() {
         given:
         def introspection = buildBeanIntrospection('arraygenerics.Test', '''
