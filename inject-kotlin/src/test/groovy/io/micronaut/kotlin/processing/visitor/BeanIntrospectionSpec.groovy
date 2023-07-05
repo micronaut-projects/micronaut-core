@@ -49,6 +49,27 @@ class Test
         introspection.instantiate().class.name == "test.Test"
     }
 
+    void "test non-null and null introspection"() {
+        when:
+        def introspection = buildBeanIntrospection("test.Test", """
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+data class Test(
+    val name: String,
+    val description: String? = null)
+""")
+
+        then:
+        noExceptionThrown()
+        introspection != null
+        introspection.constructorArguments.size() == 2
+        introspection.constructorArguments[0].isNonNull()
+        introspection.constructorArguments[1].isNullable()
+    }
+
     void 'test inner annotation'() {
         when:
         def introspection = buildBeanIntrospection("test.Test", """
