@@ -31,6 +31,7 @@ import java.util.Optional;
  */
 @Controller("/java/response")
 public class ResponseController {
+    public static final String LARGE_BODY = "a".repeat(15_000);
 
     @Get("/disallow")
     public HttpResponse disallow() {
@@ -70,6 +71,11 @@ public class ResponseController {
     @Get(value = "/ok-with-body", produces = MediaType.TEXT_PLAIN)
     public HttpResponse okWithBody() {
         return HttpResponse.ok("some text");
+    }
+
+    @Get(value = "/ok-with-large-body", produces = MediaType.TEXT_PLAIN)
+    public HttpResponse okWithLargeBody() {
+        return HttpResponse.ok(LARGE_BODY);
     }
 
     @Get(value = "/error-with-body", produces = MediaType.TEXT_PLAIN)

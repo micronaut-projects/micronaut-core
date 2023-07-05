@@ -53,6 +53,11 @@ dependencies {
         exclude group: 'io.micronaut'
     }
 
+    // Needed for Brotli compression
+    var brotli4jClassifier = Os.isFamily(Os.FAMILY_MAC) ? (Os.isArch("aarch64") ? "osx-aarch64" : "osx-x86_64") : 'linux-x86_64'
+    testImplementation libs.brotli4j
+    testRuntimeOnly "com.aayushatharva.brotli4j:native-${brotli4jClassifier}:${libs.versions.brotli4j.get()}"
+
     testImplementation project(":inject")
     testImplementation project(":inject-java-test")
     testImplementation project(":http-client")
