@@ -19,6 +19,8 @@ import spock.lang.Issue
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import java.nio.charset.StandardCharsets
+
 class UriBuilderSpec extends Specification {
 
     void "test uri builder expand"() {
@@ -157,4 +159,73 @@ class UriBuilderSpec extends Specification {
         expect:
         uri == 'myurl?%24top=10&%24filter=xyz'
     }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-jaxrs/issues/214")
+    void "spaces in URI paths"() {
+        given:
+        UriBuilder builder = UriBuilder.of("http://localhost:12345/root/this uri path has spaces?foo=bar#baz")
+
+        when:
+        String uri = builder.build().toString()
+
+        then:
+        uri == 'http://localhost:12345/root/this%20uri%20path%20has%20spaces?foo=bar#baz'
+    }
+
+    void "fragments in URIs"() {
+        System.out.println(Integer.toHexString((int) '£'));
+        given:
+        UriBuilder builder = UriBuilder.of("http://localhost:12345/#foo")
+
+        when:
+        String uri = builder.build().toString()
+
+        then:
+        uri == 'http://localhost:12345/#foo'
+    }
+
+    void "query params in URIs"() {
+        given:
+        UriBuilder builder = UriBuilder.of("http://localhost:12345/foo?foo=bar")
+
+        when:
+        String uri = builder.build().toString()
+
+        then:
+        uri == 'http://localhost:12345/foo?foo=bar'
+    }
+
+    void "query params and fragments in URIs"() {
+        given:
+        UriBuilder builder = UriBuilder.of("http://localhost:12345/foo?foo=bar#baz")
+
+        when:
+        String uri = builder.build().toString()
+
+        then:
+        uri == 'http://localhost:12345/foo?foo=bar#baz'
+    }
+
+    void "path params with adjacent, reserved/unsafe chars"() {
+        given:
+        UriBuilder builder = UriBuilder.of("http://localhost:12345/the date '{year}-{month}-{day}'/events")
+
+        when:
+        String uri = builder.expand(Map<String,String>.of("year", "2022", "month", "12", "day", "31")).toString()
+
+        then:
+        uri == 'http://localhost:12345/the%20date%20%272022-12-31%27/events'
+    }
+
+    void "fragments with adjacent, reserved/unsafe chars"() {
+        given:
+        UriBuilder builder = UriBuilder.of("http://localhost:12345/#the date '{year}-{month}-{day}'/events")
+
+        when:
+        String uri = builder.expand(Map<String,String>.of("year", "2022", "month", "12", "day", "31")).toString()
+
+        then:
+        uri == 'http://localhost:12345/#the%20date%20%272022-12-31%27/events'
+    }
+
 }
