@@ -182,23 +182,34 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
     }
 
     override fun postProcess(annotationMetadata: MutableAnnotationMetadata, element: KSAnnotated) {
-        if (element is KSValueParameter && element.type.resolve().isMarkedNullable) {
-            annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, emptyMap())
+        if (element is KSValueParameter) {
+            handleNullability(element.type.resolve(), annotationMetadata)
         } else if (element is KSFunctionDeclaration) {
-            val markedNullable = element.returnType?.resolve()?.isMarkedNullable
-            if (markedNullable != null && markedNullable) {
-                annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, emptyMap())
+            val ksType = element.returnType?.resolve()
+            if (ksType != null) {
+                handleNullability(ksType, annotationMetadata)
             }
         } else if (element is KSPropertyDeclaration) {
-            val markedNullable = element.type.resolve().isMarkedNullable
-            if (markedNullable) {
-                annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, emptyMap())
-            }
+            handleNullability(element.type.resolve(), annotationMetadata)
         } else if (element is KSPropertySetter) {
             if (!annotationMetadata.hasAnnotation(JvmField::class.java) && (annotationMetadata.hasStereotype(AnnotationUtil.QUALIFIER) || annotationMetadata.hasAnnotation(Property::class.java))) {
                 // implicitly inject
                 annotationMetadata.addDeclaredAnnotation(AnnotationUtil.INJECT, emptyMap())
             }
+        }
+    }
+
+    private fun handleNullability(
+        ksType: KSType,
+        annotationMetadata: MutableAnnotationMetadata
+    ) {
+        if (ksType.isMarkedNullable) {
+            // explicitly allowed to be null so add nullable
+            annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, emptyMap())
+        } else {
+            // with Kotlin the default is not null, so we must store in the metadata
+            // that the element is not nullable
+            annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NON_NULL, emptyMap())
         }
     }
 
