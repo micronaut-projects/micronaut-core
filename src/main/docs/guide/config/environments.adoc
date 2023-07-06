@@ -96,3 +96,22 @@ public class Application {
 }
 ----
 <1> Disable the banner
+
+== Fail on invalid configuration
+
+If you specify an invalid configuration value (such as a missing enum, or a badly formatted numeric), Micronaut will silently ignore this failure and the configuration will be set as null (or excluded from a list).
+
+Since Micronaut 3.3.0 it is possible to configure Micronaut to fail on startup if this conversion error is detected by modifying your `Application` class:
+
+[source,java]
+----
+public class Application {
+
+    public static void main(String[] args) {
+        Micronaut.build(args)
+                 .failOnConfigConversionError(true)  // <1>
+                 .start();
+    }
+}
+----
+<1> Throw an exception on startup for any property conversion errors.

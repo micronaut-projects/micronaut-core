@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -142,6 +142,11 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
             @Override
             public Iterator<ConversionError> iterator() {
                 return thisContext.iterator();
+            }
+
+            @Override
+            public boolean hasErrors() {
+                return thisContext.hasErrors();
             }
 
             @Override

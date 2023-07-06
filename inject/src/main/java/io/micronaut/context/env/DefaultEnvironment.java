@@ -125,7 +125,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @param configuration The configuration
      */
     public DefaultEnvironment(@NonNull ApplicationContextConfiguration configuration) {
-        super(configuration.getConversionService());
+        super(configuration.getConversionService(), configuration.isFailOnConfigConversionError());
         this.configuration = configuration;
         this.resourceLoader = configuration.getResourceLoader();
 

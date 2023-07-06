@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2022 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.convert.format.MapFormat;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.naming.NameUtils;
@@ -67,7 +68,6 @@ import java.util.stream.Collectors;
 public class PropertySourcePropertyResolver implements PropertyResolver {
 
     private static final Logger LOG = ClassUtils.getLogger(PropertySourcePropertyResolver.class);
-
     private static final EnvironmentProperties CURRENT_ENV = StaticOptimizations.get(EnvironmentProperties.class)
             .orElseGet(EnvironmentProperties::empty);
     private static final Pattern DOT_PATTERN = Pattern.compile("\\.");
@@ -77,6 +77,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     private static final Pattern RANDOM_PATTERN = Pattern.compile("\\$\\{" + RANDOM_PREFIX + "(" + RANDOM_UPPER_LIMIT + "|" + RANDOM_RANGE + ")?\\}");
     private static final Object NO_VALUE = new Object();
     private static final PropertyCatalog[] CONVENTIONS = {PropertyCatalog.GENERATED, PropertyCatalog.RAW};
+
     protected final ConversionService<?> conversionService;
     protected final PropertyPlaceholderResolver propertyPlaceholderResolver;
     protected final Map<String, PropertySource> propertySources = new ConcurrentHashMap<>(10);
@@ -90,6 +91,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     private final Map<String, Boolean> containsCache = new ConcurrentHashMap<>(20);
     private final Map<String, Object> resolvedValueCache = new ConcurrentHashMap<>(20);
     private final EnvironmentProperties environmentProperties = EnvironmentProperties.fork(CURRENT_ENV);
+    private final boolean failOnError;
 
     /**
      * Creates a new, initially empty, {@link PropertySourcePropertyResolver} for the given {@link ConversionService}.
@@ -97,15 +99,26 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
      * @param conversionService The {@link ConversionService}
      */
     public PropertySourcePropertyResolver(ConversionService<?> conversionService) {
+        this(conversionService, false);
+    }
+
+    /**
+     * Creates a new, initially empty, {@link PropertySourcePropertyResolver} for the given {@link ConversionService}.
+     *
+     * @param conversionService The {@link ConversionService}
+     * @param failOnConfigConversionError Should the app fail to start up if there are configuration conversion errors.
+     */
+    public PropertySourcePropertyResolver(ConversionService<?> conversionService, boolean failOnConfigConversionError) {
         this.conversionService = conversionService;
         this.propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(this, conversionService);
+        this.failOnError = failOnConfigConversionError;
     }
 
     /**
      * Creates a new, initially empty, {@link PropertySourcePropertyResolver}.
      */
     public PropertySourcePropertyResolver() {
-        this(ConversionService.SHARED);
+        this(ConversionService.SHARED, false);
     }
 
     /**
@@ -114,7 +127,17 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
      * @param propertySources The {@link PropertySource} instances
      */
     public PropertySourcePropertyResolver(PropertySource... propertySources) {
-        this(ConversionService.SHARED);
+        this(false, propertySources);
+    }
+
+    /**
+     * Creates a new {@link PropertySourcePropertyResolver} for the given {@link PropertySource} instances.
+     *
+     * @param propertySources The {@link PropertySource} instances
+     * @param failOnConfigConversionError Should the app fail to start up if there are configuration conversion errors.
+     */
+    public PropertySourcePropertyResolver(boolean failOnConfigConversionError, PropertySource... propertySources) {
+        this(ConversionService.SHARED, failOnConfigConversionError);
         if (propertySources != null) {
             for (PropertySource propertySource : propertySources) {
                 addPropertySource(propertySource);
@@ -324,6 +347,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                             converted = conversionService.convert(value, conversionContext);
                         }
 
+                        if (failOnError && conversionContext.hasErrors()) {
+                            throw new ConversionErrorException(conversionContext.getArgument(), conversionContext.getLastError().get());
+                        }
+
                         if (LOG.isTraceEnabled()) {
                             if (converted.isPresent()) {
                                 LOG.trace("Resolved value [{}] for property: {}", converted.get(), name);
@@ -345,12 +372,23 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     } else if (Map.class.isAssignableFrom(requiredType)) {
                         Map<String, Object> subMap = resolveSubMap(name, entries, conversionContext);
                         if (!subMap.isEmpty()) {
-                            return conversionService.convert(subMap, requiredType, conversionContext);
+                            Optional<T> convert = conversionService.convert(subMap, requiredType, conversionContext);
+
+                            if (failOnError && conversionContext.hasErrors()) {
+                                throw new ConversionErrorException(conversionContext.getArgument(), conversionContext.getLastError().get());
+                            }
+
+                            return convert;
                         } else {
                             return (Optional<T>) Optional.of(subMap);
                         }
                     } else if (PropertyResolver.class.isAssignableFrom(requiredType)) {
                         Map<String, Object> subMap = resolveSubMap(name, entries, conversionContext);
+
+                        if (failOnError && conversionContext.hasErrors()) {
+                            throw new ConversionErrorException(conversionContext.getArgument(), conversionContext.getLastError().get());
+                        }
+
                         return Optional.of((T) new MapPropertyResolver(subMap, conversionService));
                     }
                 }

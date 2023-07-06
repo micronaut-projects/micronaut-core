@@ -187,6 +187,11 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
         return (Micronaut) super.banner(isEnabled);
     }
 
+    @Override
+    public @NonNull Micronaut failOnConfigConversionError(boolean fail) {
+        return (Micronaut) super.failOnConfigConversionError(fail);
+    }
+
     /**
      * Add classes to be included in the initialization of the application.
      *

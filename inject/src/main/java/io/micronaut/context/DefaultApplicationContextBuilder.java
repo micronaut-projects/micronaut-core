@@ -68,6 +68,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private ClassPathResourceLoader classPathResourceLoader;
     private boolean allowEmptyProviders = false;
     private Boolean bootstrapEnvironment = null;
+    private boolean failOnConfigConversionError = false;
 
     /**
      * Default constructor.
@@ -105,6 +106,11 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public boolean isBannerEnabled() {
         return banner;
+    }
+
+    @Override
+    public boolean isFailOnConfigConversionError() {
+        return failOnConfigConversionError;
     }
 
     @Nullable
@@ -359,6 +365,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public @NonNull ApplicationContextBuilder banner(boolean isEnabled) {
         this.banner = isEnabled;
+        return this;
+    }
+
+    @Override
+    public ApplicationContextBuilder failOnConfigConversionError(boolean fail) {
+        this.failOnConfigConversionError = fail;
         return this;
     }
 
