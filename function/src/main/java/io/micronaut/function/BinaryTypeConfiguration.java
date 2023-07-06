@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.binary;
+package io.micronaut.function;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.annotation.NonNull;
@@ -34,7 +34,7 @@ import java.util.Set;
 @ConfigurationProperties(BinaryTypeConfiguration.PREFIX)
 public class BinaryTypeConfiguration {
 
-    static final String PREFIX = "micronaut.http.binary-types";
+    static final String PREFIX = "micronaut.function.binary-types";
 
     private static final Set<String> DEFAULT_BINARY_TYPES = Set.of(
         MediaType.APPLICATION_OCTET_STREAM,

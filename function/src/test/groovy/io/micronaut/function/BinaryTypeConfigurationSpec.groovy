@@ -1,4 +1,4 @@
-package io.micronaut.http.binary
+package io.micronaut.function
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.MediaType
@@ -24,7 +24,7 @@ class BinaryTypeConfigurationSpec extends Specification {
     def "defaults can be turned off"() {
         when:
         def binaryTypeConfiguration = setCtx(
-                'micronaut.http.binary-types.use-defaults': 'false'
+                'micronaut.function.binary-types.use-defaults': 'false'
         )
 
         then:
@@ -38,7 +38,7 @@ class BinaryTypeConfigurationSpec extends Specification {
     def "extra types can be added"() {
         when:
         def binaryTypeConfiguration = setCtx(
-                'micronaut.http.binary-types.additional-types': [MediaType.APPLICATION_XML, MediaType.TEXT_HTML]
+                'micronaut.function.binary-types.additional-types': [MediaType.APPLICATION_XML, MediaType.TEXT_HTML]
         )
 
         then:
@@ -53,8 +53,8 @@ class BinaryTypeConfigurationSpec extends Specification {
     def "extra types can be added AND defaults can be turned off"() {
         when:
         def binaryTypeConfiguration = setCtx(
-                'micronaut.http.binary-types.use-defaults': 'false',
-                'micronaut.http.binary-types.additional-types': [MediaType.APPLICATION_XML, MediaType.TEXT_HTML]
+                'micronaut.function.binary-types.use-defaults': 'false',
+                'micronaut.function.binary-types.additional-types': [MediaType.APPLICATION_XML, MediaType.TEXT_HTML]
         )
 
         then:
