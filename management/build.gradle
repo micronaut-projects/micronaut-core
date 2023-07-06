@@ -4,6 +4,7 @@ dependencies {
 
     api project(":router")
     api project(":runtime")
+    compileOnly project(":http-server")
     compileOnly(libs.managed.micronaut.sql.jdbc) {
         exclude module:'micronaut-inject'
         exclude module:'micronaut-bom'
