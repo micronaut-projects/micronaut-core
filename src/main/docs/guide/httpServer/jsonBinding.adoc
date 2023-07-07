@@ -132,13 +132,15 @@ jackson:
     useBigDecimalForFloats: true
 ----
 
-=== Using JsonMapper
+=== JsonMapper, JsonNode and JsonObjectSerializer
 
 It is possible to enable Jackson json processing in an implementation agnostic way. Add the following dependency:
 
 dependency::micronaut-jackson-databind[]
 
-A api:json.JsonMapper[] can be injected into your code, and using `JsonMapper.createDefault()` it can read and write values, including  api:json.tree.JsonNode[] objects representing a json node for processing scalar or container values.
+A api:json.JsonMapper[] can be injected into your code, or construct one explicitly with the default settings using `JsonMapper.createDefault()`. It reads and writes values, including  api:json.tree.JsonNode[] objects representing a json node for processing scalar or container values.
+
+api:json.JsonObjectSerializer[] is available for serializing Objects and deserializing them from IO streams and byte arrays.
 
 
 
