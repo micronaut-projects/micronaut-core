@@ -38,6 +38,12 @@ $ ./gradlew run --args="-endpoints.health.enabled=true -config.property=test"
 $ ./mvnw mn:run -Dmn.appArgs="-endpoints.health.enabled=true -config.property=test"
 ----
 
+[source,bash]
+.java.exe
+----
+$ java -jar application.jar --config.property=test
+----
+
 For the configuration to be a part of the context, the args from the main method must be passed to the context builder. For example:
 
 [source,java]
