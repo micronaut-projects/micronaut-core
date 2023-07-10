@@ -49,7 +49,7 @@ import java.lang.annotation.Target;
  *   }
  * </code></pre>
  *
- * `@EachBean` requires that the parent bean has a `@Named` qualifier, since the qualifier is inherited by each bean created by `@EachBean`.
+ * {@link EachBean} requires that the parent bean has a {@link jakarta.inject.Named} qualifier, since the qualifier is inherited by each bean created by {@link EachBean}.
  *
  * @author Graeme Rocher
  * @see EachProperty
