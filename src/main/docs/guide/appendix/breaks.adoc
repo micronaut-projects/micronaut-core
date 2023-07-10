@@ -211,3 +211,6 @@ Since Micronaut 3.0 the `OncePerRequestHttpServerFilter` class was deprecated an
 
 Micronaut Framework 4 changes `@CrossOrigin`  behavior to match configuration-based CORS behavior. A method annotated with `@CrossOrigin` allows any origin if you don't specify any value for the `allowedOrigins` and `allowedOriginsRegex` members.
 
+==== `@EachBean` requires a `@Named qualifier
+
+`@EachBean` throws a "multiple possible bean candidates found" exception if any parent bean lacks a name qualifier.

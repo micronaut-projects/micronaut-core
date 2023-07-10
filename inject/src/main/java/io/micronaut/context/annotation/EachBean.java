@@ -49,6 +49,8 @@ import java.lang.annotation.Target;
  *   }
  * </code></pre>
  *
+ * `@EachBean` requires that the parent bean has a `@Named` qualifier, since the qualifier is inherited by each bean created by `@EachBean`.
+ *
  * @author Graeme Rocher
  * @see EachProperty
  * @see ConfigurationProperties
