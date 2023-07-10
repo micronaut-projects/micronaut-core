@@ -62,7 +62,7 @@ snippet::io.micronaut.docs.server.json.PersonController[tags="class,regular,endc
 
 The Micronaut framework only executes your method once the data has been read in a non-blocking manner.
 
-TIP: The output produced by Jackson can be customized in a variety of ways, from defining Jackson modules to using https://github.com/FasterXML/jackson-annotations/wiki/Jackson-Annotations[Jackson annotations]
+TIP: You can customize the output in various ways, such as using https://github.com/FasterXML/jackson-annotations/wiki/Jackson-Annotations[Jackson annotations].
 
 == Jackson Configuration
 
