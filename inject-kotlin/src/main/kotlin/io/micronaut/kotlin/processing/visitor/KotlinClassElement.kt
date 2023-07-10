@@ -372,17 +372,20 @@ internal open class KotlinClassElement(
             }
 
         val allProperties: MutableList<PropertyElement> = mutableListOf()
+        allProperties.addAll(enclosedElementsQuery.getEnclosedElements(this, eq))
         // unfortunate hack since these are not excluded?
         if (hasDeclaredStereotype(ConfigurationReader::class.java)) {
             val configurationBuilderQuery = ElementQuery.of(PropertyElement::class.java)
                 .annotated { it.hasDeclaredAnnotation(ConfigurationBuilder::class.java) }
                 .onlyInstance()
-            val configBuilderProps =
-                enclosedElementsQuery.getEnclosedElements(this, configurationBuilderQuery)
-            allProperties.addAll(configBuilderProps)
+                .onlyAccessible(this)
+            enclosedElementsQuery.getEnclosedElements(this, configurationBuilderQuery)
+                .forEach { e ->
+                    if (!allProperties.contains(e)) {
+                        allProperties.add(e)
+                    }
+                }
         }
-
-        allProperties.addAll(enclosedElementsQuery.getEnclosedElements(this, eq))
         val propertyNames = allProperties.map { it.name }.toSet()
 
         val resolvedProperties: MutableList<PropertyElement> = mutableListOf()
