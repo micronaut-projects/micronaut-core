@@ -10,14 +10,14 @@ Since Micronaut Framework 4.0, users must choose how they want to serialize (Jac
 
 With either approach, the Micronaut framework reads incoming JSON in a non-blocking manner.
 
-=== Serialize using Micronaut Serialization
+== Serialize using Micronaut Serialization
 
 https://micronaut-projects.github.io/micronaut-serialization/snapshot/guide/index.html#quickStart[Micronaut Serialization] offers reflection-free serialization using build-time <<introspection, Bean Introspections>>. It supports alternative formats such as https://micronaut-projects.github.io/micronaut-serialization/snapshot/guide/index.html#jsonpQuick[JSON-P or JSON-B]. You need to add the following dependencies:
 
 dependency:micronaut-serde-processor[groupId=io.micronaut.serde,scope=annotationProcessor]
 dependency:micronaut-serde-jackson[groupId=io.micronaut.serde]
 
-=== Serialization using Jackson Databind
+== Serialization using Jackson Databind
 
 To serialize using https://github.com/FasterXML/jackson[Jackson] Databind include the following dependency:
 
