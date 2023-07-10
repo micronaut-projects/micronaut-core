@@ -91,7 +91,7 @@ httpServer:
     title: Reactive HTTP Request Processing
     bodyAnnotation: Using the @Body Annotation
     reactiveResponses: Reactive Responses
-  jsonBinding: JSON Binding with Jackson
+  jsonBinding: JSON Binding
   datavalidation:
     title: Data Validation
     validationGroups: Validation Groups
