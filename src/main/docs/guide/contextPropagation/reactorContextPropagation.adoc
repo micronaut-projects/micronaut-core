@@ -1,0 +1,21 @@
+The `PropagatedContext` will be automatically added to the Reactors context. It's possible to use the utility class api:core.async.propagation.ReactorPropagation[] to access it.
+
+NOTE: api:core.async.propagation.ReactorPropagation[] is an experimental class and might change in the future.
+
+It is possible to use https://micrometer.io/docs/contextPropagation[Micrometer Context Propagation] that Reactor supports for propagation and the restoring of the thread-local context.
+
+To enable it, include the dependency:
+dependency:io.micrometer:context-propagation[gradleScope="implementation"]
+
+After that all the thread-local propagated elements will be able to restore it's thread local value.
+
+NOTE: The thread-local values are read-only. To modify the value, the `PropagatedContext` instance needs to be changed and put into the Reactor's context.
+
+If you have Micrometer Context Propagation on the classpath but don't want to use it, apply following configuration:
+
+.Disable Micrometer Context Propagation in Reactor
+[source,yaml]
+----
+reactor:
+    enableAutomaticContextPropagation: false
+----

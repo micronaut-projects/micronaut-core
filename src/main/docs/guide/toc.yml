@@ -251,6 +251,9 @@ configurations:
     cassandraSupport: Configuring Cassandra
     liquibaseSupport: Configuring Liquibase
     flywaySupport: Configuring Flyway
+contextPropagation:
+  title: Context propagation
+  reactorContextPropagation: Reactor context propagation
 logging:
   title: Logging
   loggingMessages: Logging Messages

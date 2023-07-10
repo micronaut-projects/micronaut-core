@@ -1,0 +1,13 @@
+The context propagation is represented by api:core.propagation.PropagatedContext[] object, it's designed to be immutable and it consists of multiple elements of api:core.propagation.PropagatedContextElement[].
+
+Each element represent a particular state that needs to be propagated. There is a special element that can be used to update and restore the thread-local value api:core.propagation.ThreadPropagatedContextElement[]:
+
+snippet::io.micronaut.docs.propagation.MdcPropagationContext[tags="class", indent=0, title="Example of MDC propagated element implementing `ThreadPropagatedContextElement`"]
+
+In this example the propagated context element implements the setting of the MDC context and restoring it after.
+
+NOTE: The `ThreadPropagatedContextElement` is inspired by `kotlinx.coroutines.ThreadContextElement`
+
+snippet::io.micronaut.docs.propagation.MdcService[tags="createUser", indent=0, title="MDC propagation example"]
+
+NOTE: In the previous versions of Micronaut Framework we would capture the context to propagate, this is not the case since Micronaut 4. We always require for the context to be modified manually and repropagated.
