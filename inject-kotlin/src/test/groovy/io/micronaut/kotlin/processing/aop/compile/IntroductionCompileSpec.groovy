@@ -215,6 +215,7 @@ import jakarta.inject.Singleton
 @TestAnn
 interface MyBean {
     fun test(): Int
+    val test : Int
 }
 
 @Retention
@@ -241,5 +242,50 @@ class StubIntroduction: Interceptor<Any, Any> {
         instance instanceof Intercepted
         interceptor.invoked == 1
         result == 10
+
+        when:
+        result = instance.test
+
+        then:"the interceptor was invoked"
+        instance instanceof Intercepted
+        interceptor.invoked == 2
+        result == 10
+    }
+
+    void 'test intercept list property'() {
+        given:
+        ApplicationContext context = buildContext('''
+package introductiontest
+
+import io.micronaut.aop.*
+import jakarta.inject.Singleton
+
+@TestAnn
+interface MyBean {
+    val test : List<String>
+}
+
+@Retention
+@Target(AnnotationTarget.FUNCTION, AnnotationTarget.CLASS)
+@Introduction
+annotation class TestAnn
+
+@InterceptorBean(TestAnn::class)
+class StubIntroduction: Interceptor<Any, Any> {
+    override fun intercept(context: InvocationContext<Any, Any>): Any {
+        return emptyList()
+    }
+}
+''')
+        def instance = getBean(context, 'introductiontest.MyBean')
+        def interceptor = getBean(context, 'introductiontest.StubIntroduction')
+
+        when:
+        def result = instance.test
+
+        then:"the interceptor was invoked"
+        instance instanceof Intercepted
+        interceptor.invoked == 1
+        result == []
     }
 }
