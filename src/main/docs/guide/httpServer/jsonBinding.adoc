@@ -6,13 +6,13 @@ The most common data interchange format nowadays is JSON.
 
 By default, the api:http.annotation.Controller[] annotation specifies that the controllers in Micronaut framework consume and produce JSON by default.
 
-Since Micronaut Framework 4.0, users must choose how they want to serialize (Jackson Databind or Micronaut Serialization). Both approaches allow the usage of https://micronaut-projects.github.io/micronaut-serialization/snapshot/guide/index.html#jacksonAnnotations[Jackson Annotations].
+Since Micronaut Framework 4.0, users must choose how they want to serialize (Jackson Databind or Micronaut Serialization). Both approaches allow the usage of https://micronaut-projects.github.io/micronaut-serialization/latest/guide/index.html#jacksonAnnotations[Jackson Annotations].
 
 With either approach, the Micronaut framework reads incoming JSON in a non-blocking manner.
 
 == Serialize using Micronaut Serialization
 
-https://micronaut-projects.github.io/micronaut-serialization/snapshot/guide/index.html#quickStart[Micronaut Serialization] offers reflection-free serialization using build-time <<introspection, Bean Introspections>>. It supports alternative formats such as https://micronaut-projects.github.io/micronaut-serialization/snapshot/guide/index.html#jsonpQuick[JSON-P or JSON-B]. You need to add the following dependencies:
+https://micronaut-projects.github.io/micronaut-serialization/latest/guide/index.html#quickStart[Micronaut Serialization] offers reflection-free serialization using build-time <<introspection, Bean Introspections>>. It supports alternative formats such as https://micronaut-projects.github.io/micronaut-serialization/latest/guide/index.html#jsonpQuick[JSON-P or JSON-B]. You need to add the following dependencies:
 
 dependency:micronaut-serde-processor[groupId=io.micronaut.serde,scope=annotationProcessor]
 dependency:micronaut-serde-jackson[groupId=io.micronaut.serde]
