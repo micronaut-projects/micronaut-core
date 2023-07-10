@@ -66,7 +66,7 @@ TIP: You can customize the output in various ways, such as using https://github.
 
 == Jackson Configuration
 
-The Jackson `ObjectMapper` can be configured through configuration with the api:io.micronaut.jackson.JacksonConfiguration[] class.
+If you use <<jsonBinding, `micronaut-jackson-databind`>>, the Jackson's `ObjectMapper` can be configured through configuration with the api:io.micronaut.jackson.JacksonConfiguration[] class.
 
 All Jackson configuration keys start with `jackson`.
 
@@ -89,7 +89,7 @@ jackson:
 
 === Features
 
-All features can be configured with their name as the key and a boolean to indicate enabled or disabled.
+If you use <<jsonBinding, `micronaut-jackson-databind`>>, all Jackson's features can be configured with their name as the key and a boolean to indicate enabled or disabled.
 
 |======
 |serialization | Map | link:{jackson-databind}com/fasterxml/jackson/databind/SerializationFeature.html[SerializationFeature]
@@ -115,18 +115,18 @@ jackson:
 
 === Further customising `JsonFactory`
 
-There may be situations where you wish to customise the `JsonFactory` used by the `ObjectMapper` beyond the configuration of features (for example to allow custom character escaping).
+If you use <<jsonBinding, `micronaut-jackson-databind`>>, there may be situations where you wish to customise the `JsonFactory` used by the `ObjectMapper` beyond the configuration of features (for example to allow custom character escaping).
 This can be achieved by providing your own `JsonFactory` bean, or by providing a `BeanCreatedEventListener<JsonFactory>` which configures the default bean on startup.
 
 === Support for `@JsonView`
 
-You can use the `@JsonView` annotation on controller methods if you set `jackson.json-view.enabled` to `true` in your configuration file (e.g `application.yml`).
+If you use <<jsonBinding, `micronaut-jackson-databind`>>, you can use the `@JsonView` annotation on controller methods if you set `jackson.json-view.enabled` to `true` in your configuration file (e.g `application.yml`).
 
 Jackson's `@JsonView` annotation lets you control which properties are exposed on a per-response basis. See https://www.baeldung.com/jackson-json-view-annotation[Jackson JSON Views] for more information.
 
 === Beans
 
-In addition to configuration, beans can be registered to customize Jackson. All beans that extend any of the following classes are registered with the object mapper:
+If you use <<jsonBinding, `micronaut-jackson-databind`>>, in addition to configuration, beans can be registered to customize Jackson. All beans that extend any of the following classes are registered with the object mapper:
 
 * link:{jackson-databind}com/fasterxml/jackson/databind/Module.html[Module]
 * link:{jackson-databind}com/fasterxml/jackson/databind/JsonDeserializer.html[JsonDeserializer]
