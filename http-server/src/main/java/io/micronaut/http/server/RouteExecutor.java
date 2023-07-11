@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.async.propagation.ReactivePropagation;
+import io.micronaut.core.async.propagation.ReactorPropagation;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
@@ -403,34 +404,32 @@ public final class RouteExecutor {
             if (routeInfo.isSuspended()) {
                 executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
                         coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(request, contextView, propagatedContext));
-                        return Mono.from(
-                            ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request)).toPublisher()
-                        );
-                    }))
-                    .putInContext(ServerRequestContext.KEY, request);
+                        return callReactiveRoute(propagatedContext, routeMatch, request);
+                    }));
             } else if (routeInfo.isReactive()) {
-                executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request))
-                    .putInContext(ServerRequestContext.KEY, request);
+                executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, () -> ReactiveExecutionFlow.fromPublisher(
+                    callReactiveRoute(propagatedContext, routeMatch, request)
+                ));
             } else {
                 executeMethodResponseFlow = ExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request));
             }
+        } else if (routeInfo.isSuspended()) {
+            executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
+                coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(request, contextView, propagatedContext));
+                return callReactiveRoute(propagatedContext, routeMatch, request);
+            }));
+        } else if (routeInfo.isReactive()) {
+            executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(callReactiveRoute(propagatedContext, routeMatch, request));
         } else {
-            if (routeInfo.isSuspended()) {
-                executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
-                        coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(request, contextView, propagatedContext));
-                        return Mono.from(
-                            ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request)).toPublisher()
-                        );
-                    }))
-                    .putInContext(ServerRequestContext.KEY, request);
-            } else if (routeInfo.isReactive()) {
-                executeMethodResponseFlow = ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request))
-                    .putInContext(ServerRequestContext.KEY, request);
-            } else {
-                executeMethodResponseFlow = executeRouteAndConvertBody(propagatedContext, routeMatch, request);
-            }
+            executeMethodResponseFlow = executeRouteAndConvertBody(propagatedContext, routeMatch, request);
         }
         return executeMethodResponseFlow;
+    }
+
+    private Mono<MutableHttpResponse<?>> callReactiveRoute(PropagatedContext propagatedContext, RouteMatch<?> routeMatch, HttpRequest<?> request) {
+        return Mono.from(
+            ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request)).toPublisher()
+        ).contextWrite(cv -> ReactorPropagation.addPropagatedContext(cv, propagatedContext).put(ServerRequestContext.KEY, request));
     }
 
     private ExecutionFlow<MutableHttpResponse<?>> executeRouteAndConvertBody(PropagatedContext propagatedContext, RouteMatch<?> routeMatch, HttpRequest<?> httpRequest) {

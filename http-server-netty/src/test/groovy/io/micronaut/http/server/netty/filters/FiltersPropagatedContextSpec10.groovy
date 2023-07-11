@@ -3,6 +3,7 @@ package io.micronaut.http.server.netty.filters
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Order
+import io.micronaut.core.async.propagation.ReactorPropagation
 import io.micronaut.core.propagation.MutablePropagatedContext
 import io.micronaut.core.propagation.PropagatedContext
 import io.micronaut.core.propagation.PropagatedContextElement
@@ -16,6 +17,7 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
 import reactor.core.publisher.Mono
+import reactor.util.context.ContextView
 import spock.lang.Specification
 
 import java.util.concurrent.Callable
@@ -87,26 +89,30 @@ class FiltersPropagatedContextSpec10 extends Specification {
         @Get("/filters-reactive-get")
         Mono<String> getReactive() {
             validateMyContextIsPresent()
-            return Mono.fromCallable(new Callable<String>() {
-                @Override
-                String call() throws Exception {
-                    validateMyContextIsPresent()
-                    "OK"
-                }
-            })
+            return Mono.deferContextual {contextView ->
+                Mono.fromCallable(new Callable<String>() {
+                    @Override
+                    String call() throws Exception {
+                        validateMyContextIsPresent(contextView)
+                        "OK"
+                    }
+                })
+            }
         }
 
         @ExecuteOn(TaskExecutors.IO)
         @Get("/filters-reactive-get-io")
         Mono<String> getReactiveIO() {
             validateMyContextIsPresent()
-            return Mono.fromCallable(new Callable<String>() {
-                @Override
-                String call() throws Exception {
-                    validateMyContextIsPresent()
-                    "OK"
-                }
-            })
+            return Mono.deferContextual {contextView ->
+                Mono.fromCallable(new Callable<String>() {
+                    @Override
+                    String call() throws Exception {
+                        validateMyContextIsPresent(contextView)
+                        "OK"
+                    }
+                })
+            }
         }
 
     }
@@ -144,6 +150,12 @@ class FiltersPropagatedContextSpec10 extends Specification {
     static validateMyContextIsEmpty() {
         if (PropagatedContext.get().find(MyContext).isPresent()) {
             throw new IllegalAccessException("My context element is present!")
+        }
+    }
+
+    static validateMyContextIsPresent(ContextView contextView) {
+        if (ReactorPropagation.findContextElement(contextView, MyContext).isEmpty()) {
+            throw new IllegalAccessException("My context element is missing!")
         }
     }
 
