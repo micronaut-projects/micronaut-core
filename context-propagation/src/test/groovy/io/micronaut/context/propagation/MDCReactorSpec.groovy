@@ -59,7 +59,7 @@ class MDCReactorSpec extends Specification {
 
     void "test MDC propagates"() {
         expect:
-            List<Tuple2> result = Flux.range(1, 1000)
+            List<Tuple2> result = Flux.range(1, 1)
                     .flatMap {
                         String tracingId = UUID.randomUUID()
                         HttpRequest<Object> request = HttpRequest

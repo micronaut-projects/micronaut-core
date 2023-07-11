@@ -404,32 +404,30 @@ public final class RouteExecutor {
             if (routeInfo.isSuspended()) {
                 executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
                         coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(request, contextView, propagatedContext));
-                        return callReactiveRoute(propagatedContext, routeMatch, request);
+                        return Mono.from(
+                            ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request)).toPublisher()
+                        );
                     }));
             } else if (routeInfo.isReactive()) {
-                executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, () -> ReactiveExecutionFlow.fromPublisher(
-                    callReactiveRoute(propagatedContext, routeMatch, request)
-                ));
+                executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request));
             } else {
                 executeMethodResponseFlow = ExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request));
             }
-        } else if (routeInfo.isSuspended()) {
-            executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
-                coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(request, contextView, propagatedContext));
-                return callReactiveRoute(propagatedContext, routeMatch, request);
-            }));
-        } else if (routeInfo.isReactive()) {
-            executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(callReactiveRoute(propagatedContext, routeMatch, request));
         } else {
-            executeMethodResponseFlow = executeRouteAndConvertBody(propagatedContext, routeMatch, request);
+            if (routeInfo.isSuspended()) {
+                executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
+                        coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(request, contextView, propagatedContext));
+                        return Mono.from(
+                            ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request)).toPublisher()
+                        );
+                    }));
+            } else if (routeInfo.isReactive()) {
+                executeMethodResponseFlow = ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request));
+            } else {
+                executeMethodResponseFlow = executeRouteAndConvertBody(propagatedContext, routeMatch, request);
+            }
         }
         return executeMethodResponseFlow;
-    }
-
-    private Mono<MutableHttpResponse<?>> callReactiveRoute(PropagatedContext propagatedContext, RouteMatch<?> routeMatch, HttpRequest<?> request) {
-        return Mono.from(
-            ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request)).toPublisher()
-        ).contextWrite(cv -> ReactorPropagation.addPropagatedContext(cv, propagatedContext).put(ServerRequestContext.KEY, request));
     }
 
     private ExecutionFlow<MutableHttpResponse<?>> executeRouteAndConvertBody(PropagatedContext propagatedContext, RouteMatch<?> routeMatch, HttpRequest<?> httpRequest) {
@@ -583,7 +581,8 @@ public final class RouteExecutor {
                     }
                     return Flux.just(singleResponse);
                 })
-                .switchIfEmpty(Mono.fromSupplier(emptyResponse));
+                .switchIfEmpty(Mono.fromSupplier(emptyResponse))
+                .contextWrite(context -> ReactorPropagation.addPropagatedContext(context, propagatedContext).put(ServerRequestContext.KEY, request));
         }
         // streaming case
         Argument<?> typeArgument = routeInfo.getReturnType().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
@@ -597,7 +596,7 @@ public final class RouteExecutor {
                 return response.flatMap(resp ->
                     processPublisherBody(propagatedContext, request, resp, routeInfo));
             }
-            return response;
+            return response.contextWrite(context -> ReactorPropagation.addPropagatedContext(context, propagatedContext).put(ServerRequestContext.KEY, request));
         }
         MutableHttpResponse<?> response = forStatus(routeInfo, null).body(body);
         return processPublisherBody(propagatedContext, request, response, routeInfo);
@@ -619,12 +618,14 @@ public final class RouteExecutor {
         }
         MediaType mediaType = response.getContentType().orElseGet(() -> resolveDefaultResponseContentType(request, routeInfo));
 
-        Flux<Object> bodyPublisher = applyExecutorToPublisher(Publishers.convertPublisher(conversionService, body, Publisher.class), findExecutor(routeInfo));
+        Flux<Object> bodyPublisher = applyExecutorToPublisher((Publisher<Object>) Publishers.convertPublisher(conversionService, body, Publisher.class), findExecutor(routeInfo))
+            .contextWrite(cv -> ReactorPropagation.addPropagatedContext(cv, propagatedContext).put(ServerRequestContext.KEY, request));
 
-        return Mono.just(response
+        return Mono.<MutableHttpResponse<?>>just(response
             .header(HttpHeaders.TRANSFER_ENCODING, "chunked")
             .header(HttpHeaders.CONTENT_TYPE, mediaType)
-            .body(ReactivePropagation.propagate(propagatedContext, bodyPublisher)));
+            .body(ReactivePropagation.propagate(propagatedContext, bodyPublisher)))
+            .contextWrite(context -> ReactorPropagation.addPropagatedContext(context, propagatedContext).put(ServerRequestContext.KEY, request));
     }
 
     private void applyConfiguredHeaders(MutableHttpHeaders headers) {
