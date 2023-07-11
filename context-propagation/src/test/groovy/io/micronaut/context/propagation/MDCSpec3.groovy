@@ -61,9 +61,10 @@ class MDCSpec3 extends Specification {
 
         @Get(value = '/mdc-test', produces = MediaType.TEXT_PLAIN)
         HttpResponse<Publisher<String>> getMdc() {
-            getTraceIdOrFail()
+            def trace = getTraceIdOrFail()
             return HttpResponse.ok(Publishers.map(Mono.fromCallable({ ->
-                return getTraceIdOrFail()
+                // here trace cannot be delegated without micrometer context propagation
+                return trace
             }), { String n -> n }))
         }
 
