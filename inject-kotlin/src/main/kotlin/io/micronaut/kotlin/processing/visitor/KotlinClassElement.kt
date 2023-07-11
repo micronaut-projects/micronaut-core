@@ -714,7 +714,7 @@ internal open class KotlinClassElement(
                 }
 
                 MethodElement::class.java -> {
-                    val declaredFunctions = classNode.getDeclaredFunctions()
+                    classNode.getDeclaredFunctions()
                         .filter { func: KSFunctionDeclaration ->
                             !func.isConstructor() &&
                                     func.origin != Origin.SYNTHETIC &&
@@ -726,19 +726,6 @@ internal open class KotlinClassElement(
                                     ).contains(func.simpleName.asString())
                         }
                         .toList()
-                    val declaredProperties = classNode.getDeclaredProperties()
-                    val propertiesAndMethods = mutableListOf<KSNode>()
-                    propertiesAndMethods.addAll(declaredFunctions)
-                    declaredProperties.forEach { p ->
-                        if (p.setter != null) {
-                            propertiesAndMethods.add(p.setter!!)
-                        }
-                        if (p.getter != null){
-                            propertiesAndMethods.add(p.getter!!)
-                        }
-                    }
-
-                    return propertiesAndMethods
                 }
 
                 FieldElement::class.java -> {
@@ -786,22 +773,6 @@ internal open class KotlinClassElement(
             val elementFactory: KotlinElementFactory = visitorContext.elementFactory
             val owningClass = this@KotlinClassElement
             return when (nativeType) {
-                is KSPropertySetter -> {
-                    return KotlinPropertySetterMethodElement(
-                        owningClass,
-                        KotlinPropertyElement(owningClass, nativeType.receiver, elementAnnotationMetadataFactory, visitorContext),
-                        nativeType,
-                        elementAnnotationMetadataFactory, visitorContext
-                    )
-                }
-                is KSPropertyGetter -> {
-                    return KotlinPropertyGetterMethodElement(
-                        owningClass,
-                        nativeType,
-                        KotlinPropertyElement(owningClass, nativeType.receiver, elementAnnotationMetadataFactory, visitorContext),
-                        elementAnnotationMetadataFactory, visitorContext
-                    )
-                }
                 is KSFunctionDeclaration -> {
                     if (nativeType.isConstructor()) {
                         return elementFactory.newConstructorElement(
