@@ -50,6 +50,8 @@ import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.MethodReference;
 import io.micronaut.scheduling.executor.ExecutorSelector;
+import io.micronaut.scheduling.instrument.InstrumentedExecutorService;
+import io.micronaut.scheduling.instrument.InstrumentedScheduledExecutorService;
 import io.micronaut.web.router.DefaultRouteInfo;
 import io.micronaut.web.router.MethodBasedRouteInfo;
 import io.micronaut.web.router.MethodBasedRouteMatch;
@@ -73,8 +75,10 @@ import java.time.LocalDateTime;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -366,15 +370,54 @@ public final class RouteExecutor {
         return executor;
     }
 
-    private <T> Flux<T> applyExecutorToPublisher(Publisher<T> publisher, @Nullable ExecutorService executor) {
-        if (executor != null) {
-            final Scheduler scheduler = Schedulers.fromExecutorService(executor);
-            return Flux.from(publisher)
-                .subscribeOn(scheduler)
-                .publishOn(scheduler);
-        } else {
-            return Flux.from(publisher);
+    private <T> Flux<T> applyExecutorToPublisher(Publisher<T> publisher, @Nullable ExecutorService executor, PropagatedContext propagatedContext) {
+        if (executor == null) {
+            return Flux.from(publisher).subscribeOn(Schedulers.fromExecutor(command -> propagatedContext.wrap(command).run()));
         }
+        if (executor instanceof InstrumentedExecutorService instrumentedExecutorService) {
+            executor = instrumentedExecutorService.getTarget();
+        }
+        if (executor instanceof ScheduledExecutorService scheduledExecutorService) {
+            executor = new InstrumentedScheduledExecutorService() {
+                @Override
+                public ScheduledExecutorService getTarget() {
+                    return scheduledExecutorService;
+                }
+
+                @Override
+                public <X> Callable<X> instrument(Callable<X> task) {
+                    return propagatedContext.wrap(task);
+                }
+
+                @Override
+                public Runnable instrument(Runnable command) {
+                    return propagatedContext.wrap(command);
+                }
+            };
+        } else {
+            ExecutorService finalExecutor = executor;
+            executor = new InstrumentedExecutorService() {
+
+                @Override
+                public ExecutorService getTarget() {
+                    return finalExecutor;
+                }
+
+                @Override
+                public <X> Callable<X> instrument(Callable<X> task) {
+                    return propagatedContext.wrap(task);
+                }
+
+                @Override
+                public Runnable instrument(Runnable command) {
+                    return propagatedContext.wrap(command);
+                }
+            };
+        }
+        final Scheduler scheduler = Schedulers.fromExecutorService(executor);
+        return Flux.from(publisher)
+            .subscribeOn(scheduler)
+            .publishOn(scheduler);
     }
 
     private boolean isSingle(RouteInfo<?> finalRoute, Class<?> bodyClass) {
@@ -618,8 +661,11 @@ public final class RouteExecutor {
         }
         MediaType mediaType = response.getContentType().orElseGet(() -> resolveDefaultResponseContentType(request, routeInfo));
 
-        Flux<Object> bodyPublisher = applyExecutorToPublisher((Publisher<Object>) Publishers.convertPublisher(conversionService, body, Publisher.class), findExecutor(routeInfo))
-            .contextWrite(cv -> ReactorPropagation.addPropagatedContext(cv, propagatedContext).put(ServerRequestContext.KEY, request));
+        Flux<Object> bodyPublisher = applyExecutorToPublisher(
+            (Publisher<Object>) Publishers.convertPublisher(conversionService, body, Publisher.class),
+            findExecutor(routeInfo),
+            propagatedContext
+        ).contextWrite(cv -> ReactorPropagation.addPropagatedContext(cv, propagatedContext).put(ServerRequestContext.KEY, request));
 
         return Mono.<MutableHttpResponse<?>>just(response
             .header(HttpHeaders.TRANSFER_ENCODING, "chunked")

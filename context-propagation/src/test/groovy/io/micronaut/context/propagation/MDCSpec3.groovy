@@ -63,8 +63,7 @@ class MDCSpec3 extends Specification {
         HttpResponse<Publisher<String>> getMdc() {
             def trace = getTraceIdOrFail()
             return HttpResponse.ok(Publishers.map(Mono.fromCallable({ ->
-                // here trace cannot be delegated without micrometer context propagation
-                return trace
+                return getTraceIdOrFail()
             }), { String n -> n }))
         }
 
