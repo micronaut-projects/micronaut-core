@@ -271,8 +271,10 @@ interface MyBean {
 annotation class TestAnn
 
 @InterceptorBean(TestAnn::class)
-class StubIntroduction: Interceptor<Any, Any> {
-    override fun intercept(context: InvocationContext<Any, Any>): Any {
+class StubIntroduction: Interceptor<Any, List<Object>> {
+    var invoked : Boolean = false
+    override fun intercept(context: InvocationContext<Any, List<Object>>): List<Object> {
+        invoked = true
         return emptyList()
     }
 }
@@ -285,7 +287,7 @@ class StubIntroduction: Interceptor<Any, Any> {
 
         then:"the interceptor was invoked"
         instance instanceof Intercepted
-        interceptor.invoked == 1
+        interceptor.invoked
         result == []
     }
 }
