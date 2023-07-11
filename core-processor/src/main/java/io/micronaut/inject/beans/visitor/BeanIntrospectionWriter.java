@@ -1045,20 +1045,18 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                         Object constructorArgument = constructorArguments[i];
                         if (constructorArgument == this) {
                             constructorWriter.loadArg(2);
-                            pushCastToType(constructorWriter, parameter);
-                            if (!parameter.isPrimitive()) {
-                                pushBoxPrimitiveIfNecessary(parameter, constructorWriter);
-                            }
-                        } else if (constructorArgument instanceof MethodElement) {
-                            MethodElement readMethod = (MethodElement) constructorArgument;
+                        } else if (constructorArgument instanceof MethodElement readMethod) {
                             constructorWriter.loadLocal(prevBeanTypeLocal, beanType);
                             invokeMethod(constructorWriter, readMethod);
-                        } else if (constructorArgument instanceof FieldElement) {
-                            FieldElement fieldElement = (FieldElement) constructorArgument;
+                        } else if (constructorArgument instanceof FieldElement fieldElement) {
                             constructorWriter.loadLocal(prevBeanTypeLocal, beanType);
                             invokeGetField(constructorWriter, fieldElement);
                         } else {
                             throw new IllegalStateException();
+                        }
+                        pushCastToType(constructorWriter, parameter);
+                        if (!parameter.isPrimitive()) {
+                            pushBoxPrimitiveIfNecessary(parameter, constructorWriter);
                         }
                     }
                 });
