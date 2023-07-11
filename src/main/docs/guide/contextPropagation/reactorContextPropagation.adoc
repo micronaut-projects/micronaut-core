@@ -1,4 +1,6 @@
-The `PropagatedContext` will be automatically added to the Reactors context. It's possible to use the utility class api:core.async.propagation.ReactorPropagation[] to access it.
+Since Micronaut Framework version 4 Reactor integration no longer captures the state automatically, previous implementation required for all of the reactive operators to be instrumented to capture the current state for it to be propagated. That was adding an unwanted overhead and a complicated instrumentation of the Reactor operations. New implementations requires for the propagated context to be captured manually.
+
+The `PropagatedContext` will be automatically added to the Reactors context for the interceptors and the HTTP filters. It's possible to use the utility class api:core.async.propagation.ReactorPropagation[] to access it.
 
 NOTE: api:core.async.propagation.ReactorPropagation[] is an experimental class and might change in the future.
 
