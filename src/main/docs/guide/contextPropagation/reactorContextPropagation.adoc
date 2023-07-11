@@ -1,6 +1,6 @@
-Since Micronaut Framework version 4 Reactor integration no longer captures the state automatically, previous implementation required for all of the reactive operators to be instrumented to capture the current state for it to be propagated. That was adding an unwanted overhead and a complicated instrumentation of the Reactor operations. New implementations requires for the propagated context to be captured manually.
+Since Micronaut Framework version 4 Reactor integration no longer captures the state automatically, previous implementation required for all of the reactive operators to be instrumented to capture the current state for it to be propagated. That was adding an unwanted overhead and required us to maintain complicated Reactor operators instrumentation. New implementations requires for the propagated context to be extended manually. New version of the Reactor allows to achieve the same thread-local propagation by including the Micrometer Context Propagation dependency.
 
-The `PropagatedContext` will be automatically added to the Reactors context for the interceptors and the HTTP filters. It's possible to use the utility class api:core.async.propagation.ReactorPropagation[] to access it.
+The Micronaut's `PropagatedContext` will be automatically added to the Reactors context for the interceptors and the HTTP filters. It's possible to use the utility class api:core.async.propagation.ReactorPropagation[] to access it.
 
 NOTE: api:core.async.propagation.ReactorPropagation[] is an experimental class and might change in the future.
 
@@ -13,7 +13,7 @@ After that all the thread-local propagated elements will be able to restore it's
 
 NOTE: The thread-local values are read-only. To modify the value, the `PropagatedContext` instance needs to be changed and put into the Reactor's context.
 
-If you have Micrometer Context Propagation on the classpath but don't want to use it, apply following configuration:
+If you have Micrometer Context Propagation on the classpath, but don't want to use it, apply following configuration:
 
 .Disable Micrometer Context Propagation in Reactor
 [source,yaml]

@@ -1,31 +1,27 @@
 package io.micronaut.docs.propagation;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.propagation.slf4j.MdcPropagationContext;
-import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.core.propagation.MutablePropagatedContext;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.filter.HttpServerFilter;
-import io.micronaut.http.filter.ServerFilterChain;
-import org.reactivestreams.Publisher;
+import io.micronaut.http.annotation.RequestFilter;
+import io.micronaut.http.annotation.ServerFilter;
 import org.slf4j.MDC;
-import reactor.core.publisher.Mono;
+
+import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
 
 @Requires(property = "mdc.example.enabled")
 // tag::class[]
-public class MdcFilter implements HttpServerFilter {
+@ServerFilter(MATCH_ALL_PATTERN)
+public class MdcFilter {
 
-    @Override
-    public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request,
-                                                      ServerFilterChain chain) {
+    @RequestFilter
+    public void myRequestFilter(HttpRequest<?> request, MutablePropagatedContext mutablePropagatedContext) {
         try {
             String trackingId = request.getHeaders().get("X-TrackingId");
             MDC.put("trackingId", trackingId);
-            try (PropagatedContext.Scope ignore = PropagatedContext.get().plus(new MdcPropagationContext()).propagate()) {
-                return Mono.from(chain.proceed(request)).contextWrite(ctx -> ctx.put("xyz", "abc"));
-            }
+            mutablePropagatedContext.add(new MdcPropagationContext());
         } finally {
-            MDC.clear();
+            MDC.remove("trackingId");
         }
     }
 

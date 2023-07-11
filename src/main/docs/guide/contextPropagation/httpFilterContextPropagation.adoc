@@ -1,0 +1,11 @@
+Modifying the propagated context is a common scenario, usually you want to extend the context to include the request related values.
+
+To use a non-reactive HTTP filter API you need to add a method parameter api:core.propagation.MutablePropagatedContext[] and modify the propagated context elements by adding or removing the existing once:
+
+snippet::io.micronaut.docs.propagation.MdcFilter[tags="class", indent=0, title="Example of adding a new MDC propagated context element"]
+
+The next filter in the chain will have the new propagated context available. Any of the thread-local context elements will be set for the next filter or the controller method invocation.
+
+To use the legacy reactive HTTP filters simply modify and propagate the context bound to the next chain invocation:
+
+snippet::io.micronaut.docs.propagation.MdcLegacyFilter[tags="class", indent=0, title="Example of adding a new MDC propagated context element for the reactive filter"]

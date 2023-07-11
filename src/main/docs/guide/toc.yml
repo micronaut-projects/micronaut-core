@@ -254,6 +254,7 @@ configurations:
 contextPropagation:
   title: Context propagation
   reactorContextPropagation: Reactor context propagation
+  httpFilterContextPropagation: HTTP filters context propagation
 logging:
   title: Logging
   loggingMessages: Logging Messages
