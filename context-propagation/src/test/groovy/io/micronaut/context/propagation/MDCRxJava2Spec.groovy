@@ -114,6 +114,7 @@ class MDCRxJava2Spec extends Specification {
             checkTracing(tracingId)
 
             return Mono<String>.fromCallable {
+                checkTracing(tracingId)
                 mdcClient.test3(tracingId, new SomeBody())
             }.delayElement(Duration.ofMillis(50))
         }
