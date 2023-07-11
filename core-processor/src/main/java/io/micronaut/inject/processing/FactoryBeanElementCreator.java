@@ -244,6 +244,21 @@ final class FactoryBeanElementCreator extends DeclaredBeanElementCreator {
                 .filter(m -> m.isPublic() && !m.isFinal() && !m.isStatic()).toList();
             methodElements
                 .forEach(methodElement -> visitAroundMethod(aopProxyWriter, methodElement.getDeclaringType(), methodElement));
+            List<PropertyElement> syntheticBeanProperties = producedType.getSyntheticBeanProperties();
+            for (PropertyElement syntheticBeanProperty : syntheticBeanProperties) {
+                syntheticBeanProperty.getReadMethod().ifPresent(m -> {
+                        if (!m.isFinal()) {
+                            visitAroundMethod(aopProxyWriter, m.getDeclaringType(), m);
+                        }
+                    }
+                );
+                syntheticBeanProperty.getWriteMethod().ifPresent(m -> {
+                        if (!m.isFinal()) {
+                            visitAroundMethod(aopProxyWriter, m.getDeclaringType(), m);
+                        }
+                    }
+                );
+            }
 
         } else if (producedAnnotationMetadata.hasStereotype(Executable.class)) {
             if (producedType.isArray()) {

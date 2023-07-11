@@ -45,7 +45,7 @@ internal abstract class AbstractKotlinPropertyAccessorMethodElement<T : KotlinNa
 
     override fun isSynthetic() = true
 
-    override fun isFinal() = true
+    override fun isFinal() = !accessor.receiver.isOpen()
 
     override fun isAbstract(): Boolean = accessor.receiver.isAbstract()
 

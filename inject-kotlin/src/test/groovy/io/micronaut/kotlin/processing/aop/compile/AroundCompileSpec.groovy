@@ -1,8 +1,10 @@
 package io.micronaut.kotlin.processing.aop.compile
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import io.micronaut.aop.Intercepted
 import io.micronaut.aop.InterceptorBinding
 import io.micronaut.aop.InterceptorKind
+import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.kotlin.processing.aop.simple.Mutating
 import io.micronaut.kotlin.processing.aop.simple.TestBinding
 import io.micronaut.context.ApplicationContext
@@ -17,6 +19,39 @@ import spock.lang.Specification
 import static io.micronaut.annotation.processing.test.KotlinCompiler.*
 
 class AroundCompileSpec extends Specification {
+
+    void 'test AOP advice applied on factory with properties'() {
+        when:
+        def context = buildContext('''
+package test
+
+import io.micronaut.kotlin.processing.aop.simple.Mutating
+import io.micronaut.kotlin.processing.aop.compile.MyClient
+import io.micronaut.kotlin.processing.aop.compile.MyClientImpl
+import io.micronaut.context.annotation.*
+import com.fasterxml.jackson.databind.ObjectMapper
+
+@Factory
+class MyBeanFactory {
+
+    @Mutating("someVal")
+    @jakarta.inject.Singleton
+    fun client(): MyClient {
+        return MyClientImpl()
+    }
+
+}
+
+''')
+
+        def bean = context.getBean(MyClient)
+        then:
+        bean instanceof Intercepted
+        bean.users == ["Fred", "Bob"]
+
+        cleanup:
+        context.close()
+    }
 
     void 'test stereotype method level interceptor matching'() {
         given:
