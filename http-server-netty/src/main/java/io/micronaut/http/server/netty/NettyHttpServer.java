@@ -611,7 +611,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     private void stopInternal(boolean stopServerOnly) {
-        List<Future<?>> futures = new ArrayList<>();
+        List<Future<?>> futures = new ArrayList<>(2);
         try {
             if (shutdownParent) {
                 EventLoopGroupConfiguration parent = serverConfiguration.getParent();
@@ -656,7 +656,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     LOG.debug("Waiting for graceful shutdown to complete");
                 }
                 for (Future<?> future : futures) {
-                    future.await();
+                    future.awaitUninterruptibly();
                 }
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Done...");
