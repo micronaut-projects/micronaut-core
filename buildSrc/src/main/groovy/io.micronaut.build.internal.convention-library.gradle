@@ -14,13 +14,6 @@ configurations {
     }
 }
 
-micronautBuild {
-    binaryCompatibility {
-        enabled.set(true)
-        baselineVersion = "4.0.0-RC3"
-    }
-}
-
 // Workaround for javadoc not finding java source
 // files for classes written in an alternate language (Kotlin, Groovy)
 configurations {
