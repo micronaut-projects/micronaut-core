@@ -20,13 +20,13 @@ Please read the https://micronaut.io/2022/12/27/micronaut-framework-3-8-0-releas
 
 Several improvements:
 
-- If you want complete control of where your application loads configuration from, for example, due to security restrictions, you can disable the default https://docs.micronaut.io/latest/guide/#propertySource[`PropertySourceLoader`] implementations by calling `ApplicationContextBuilder::enableDefaultPropertySources(false)` when starting your application.
+- If you want complete control of where your application loads configuration from, for example, due to security restrictions, you can disable the default <<propertySource, `PropertySourceLoader`>> implementations by calling `ApplicationContextBuilder::enableDefaultPropertySources(false)` when starting your application.
 
 - Better `java.time` conversion for YAML configuration
 
 - Client SSL inner configuration is https://docs.micronaut.io/latest/guide/#bootstrap[Bootstrap] context compatible.
 
-- https://docs.micronaut.io/latest/api/io/micronaut/http/uri/UriBuilder.html[`UriBuilder`] methods `queryParam` and `replaceQueryParam` ignore null values.
+- api:http.uri.UriBuilder[] methods `queryParam` and `replaceQueryParam` ignore null values.
 
 - It is possible to stop the Netty server without stopping the Application context.
 
@@ -74,7 +74,7 @@ public class AppHttpClientFilter implements HttpClientFilter {
 
 === Netty runtime
 
-This version upgrades https://netty.io[Netty] from 4.1.77 to 4.1.79. Moreover, it contains improvements to the API to https://docs.micronaut.io/latest/guide/#nettyClientPipeline[configure the Netty Client Pipeline] and to https://docs.micronaut.io/latest/guide/#nettyServerPipeline[configure the Netty Server Pipeline].
+This version upgrades https://netty.io[Netty] from 4.1.77 to 4.1.79. Moreover, it contains improvements to the API to <<nettyClientPipeline, configure the Netty Client Pipeline>> and to <<nettyServerPipeline, configure the Netty Server Pipeline>>.
 
 === Improvements to HttpClientException
 
