@@ -579,15 +579,19 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         if (defaultConstructor != null) {
             writeInstantiateMethod(classWriter, defaultConstructor, "instantiate");
             // in case invoked directly or via instantiateUnsafe
-            writeInstantiateMethod(classWriter, defaultConstructor, "instantiateInternal", Object[].class);
-            writeBooleanMethod(classWriter, METHOD_IS_BUILDABLE, true);
-        } else if (constructor != null) {
+            if (constructor == null) {
+                writeInstantiateMethod(classWriter, defaultConstructor, "instantiateInternal", Object[].class);
+                writeBooleanMethod(classWriter, METHOD_IS_BUILDABLE, true);
+            }
+        }
+
+        if (constructor != null) {
             if (ArrayUtils.isEmpty(constructor.getParameters())) {
                 writeInstantiateMethod(classWriter, constructor, "instantiate");
             }
             writeInstantiateMethod(classWriter, constructor, "instantiateInternal", Object[].class);
             writeBooleanMethod(classWriter, METHOD_IS_BUILDABLE, true);
-        } else {
+        } else if (defaultConstructor == null) {
             writeBooleanMethod(classWriter, METHOD_IS_BUILDABLE, hasBuilder);
         }
 

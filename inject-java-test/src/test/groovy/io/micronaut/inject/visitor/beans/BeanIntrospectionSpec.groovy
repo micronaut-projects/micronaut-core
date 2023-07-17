@@ -55,7 +55,7 @@ class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
     void "test introspection for builder method"() {
         given:
-        def introspection = buildBeanIntrospection('mixed.TestBuildMe2', '''
+        def introspection = buildBeanIntrospection('test.TestBuildMe', '''
 package test;
 
 import io.micronaut.core.annotation.Introspected;
