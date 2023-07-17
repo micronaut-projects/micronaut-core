@@ -36,5 +36,4 @@ public interface UnsafeBeanInstantiationIntrospection<T> extends BeanIntrospecti
      */
     @NonNull T instantiateUnsafe(@NonNull Object... arguments);
 
-
 }

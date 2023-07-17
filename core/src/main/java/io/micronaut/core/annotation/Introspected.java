@@ -186,6 +186,49 @@ public @interface Introspected {
     String targetPackage() default "";
 
     /**
+     * Allows specifying a builder for the introspection.
+     *
+     * @return The builder definition for the introspection.
+     * @since 4.1.0
+     */
+    @Experimental
+    IntrospectionBuilder builder() default @IntrospectionBuilder();
+
+    /**
+     * Configuration for an introspection builder.
+     */
+    @Documented
+    @Retention(RUNTIME)
+    @interface IntrospectionBuilder {
+        /**
+         * The class that is the builder for this type.
+         *
+         * <p>Should be accessible. Mutually exclusive with {@link #builderMethod()}</p>
+         * @return The builder class
+         */
+        Class<?> builderClass() default void.class;
+
+        /**
+         * The name of the method that is the builder for this type.
+         * <p>Should be accessible. Mutually exclusive with {@link #builderClass()} ()}</p>
+         * @return The builder method.
+         */
+        String builderMethod() default "";
+
+        /**
+         * The name of the method that builds the instance.
+         *
+         * @return The method name.
+         */
+        String creatorMethod() default "build";
+
+        /**
+         * @return The accessor style for the write methods of the builder.
+         */
+        AccessorsStyle accessorStyle() default @AccessorsStyle(writePrefixes = "");
+    }
+
+    /**
      * Allow pre-computed indexes for property lookups based on an annotation and a member.
      *
      * @see io.micronaut.core.beans.BeanIntrospection#getIndexedProperty(Class, String)

@@ -53,6 +53,67 @@ import java.time.Instant
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
+    void "test introspection for builder method"() {
+        given:
+        def introspection = buildBeanIntrospection('mixed.TestBuildMe2', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(
+    builder = @Introspected.IntrospectionBuilder(builderMethod = "builder")
+)
+class TestBuildMe {
+    private final String name;
+    private final int age;
+
+    private TestBuildMe(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public int getAge() {
+        return age;
+    }
+
+    public static Builder builder() {
+        return new Builder();
+    }
+
+    public static final class Builder {
+        private Builder() {
+        }
+
+        private String name;
+        private int age;
+
+        public Builder name(String name) {
+            this.name = name;
+            return this;
+        }
+
+        public Builder age(int age) {
+            this.age = age;
+            return this;
+        }
+
+        public TestBuildMe build() {
+            return new TestBuildMe(
+                name,
+                age
+            );
+        }
+    }
+}
+''')
+        expect:
+        introspection != null
+    }
+
     void "test expressions in introspection properties with type use"() {
         given:
         def introspection = buildBeanIntrospection('mixed.Test', '''

@@ -16,7 +16,9 @@
 package io.micronaut.inject.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -26,12 +28,15 @@ import io.micronaut.core.beans.BeanMethod;
 import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.beans.UnsafeBeanInstantiationIntrospection;
 import io.micronaut.core.beans.UnsafeBeanProperty;
+import io.micronaut.core.beans.exceptions.IntrospectionException;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringIntMap;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
@@ -40,6 +45,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.AbstractCollection;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
@@ -70,6 +76,9 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     private final StringIntMap beanPropertyIndex;
 
     private BeanConstructor<B> beanConstructor;
+
+    private Builder<B> builder;
+    private IntrospectionBuilderData builderData;
 
     protected AbstractInitializableBeanIntrospection(Class<B> beanType,
                                                   AnnotationMetadata annotationMetadata,
@@ -107,6 +116,15 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         }
     }
 
+    @Override
+    public Builder<B> builder() {
+        if (isBuildable()) {
+            return new IntrospectionBuilder<>(this);
+        } else {
+            throw new IntrospectionException("No accessible constructor or builder exists for type: " + getBeanType().getName());
+        }
+    }
+
     /**
      * Reflection free bean instantiation implementation for the given arguments.
      *
@@ -116,7 +134,9 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     @NonNull
     @Internal
     @UsedByGeneratedCode
-    protected abstract B instantiateInternal(@Nullable Object[] arguments);
+    protected B instantiateInternal(@Nullable Object[] arguments) {
+        throw new InstantiationException("Type [" + getBeanType() + "] defines no accessible constructor");
+    }
 
     /**
      * Obtain a property by its index.
@@ -374,6 +394,257 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     @Override
     public String toString() {
         return "BeanIntrospection{type=" + beanType + '}';
+    }
+
+    @SuppressWarnings("unchecked")
+    @NonNull
+    private IntrospectionBuilderData getBuilderData() {
+        if (this.builderData == null) {
+
+            AnnotationValue<Introspected.IntrospectionBuilder> builderAnn = getAnnotationMetadata().findAnnotation(Introspected.class)
+                .flatMap(a -> a.getAnnotation("builder", Introspected.IntrospectionBuilder.class)).orElse(null);
+            if (builderAnn != null) {
+                Class<?> builderClass = getAnnotationMetadata().classValue(Introspected.class, "builderClass").orElse(null);
+                if (builderClass != null) {
+                    BeanIntrospection<Object> builderIntrospection = (BeanIntrospection<Object>) BeanIntrospection.getIntrospection(builderClass);
+                    Collection<BeanMethod<Object, Object>> beanMethods = builderIntrospection.getBeanMethods();
+
+                    // find the creator method
+                    BeanMethod<Object, Object> constructorMethod = beanMethods.stream()
+                        .filter(m -> m.getReturnType().getType().equals(getBeanType()) && ArrayUtils.isEmpty(m.getArguments()))
+                        .findFirst().orElse(null);
+                    if (constructorMethod == null) {
+                        throw new IntrospectionException("No build method found in builder: " + builderClass.getName());
+                    } else {
+                        BeanMethod<Object, Object>[] builderMethods = beanMethods.stream()
+                            .filter(m -> m.getReturnType().getType().equals(builderIntrospection.getBeanType()))
+                            .toArray(BeanMethod[]::new);
+
+                        @NonNull Argument<?>[] arguments = Arrays.stream(builderMethods)
+                            .map(m -> {
+                                @NonNull Argument<?>[] methodArgs = m.getArguments();
+                                if (ArrayUtils.isNotEmpty(methodArgs)) {
+                                    return methodArgs[0];
+                                } else {
+                                    return Argument.of(Boolean.class, m.getName());
+                                }
+                            }).toArray(Argument[]::new);
+                        this.builderData = new IntrospectionBuilderData(
+                            builderIntrospection,
+                            constructorMethod,
+                            builderMethods,
+                            arguments
+                        );
+                    }
+                } else {
+                    throw new IntrospectionException("Introspection defines invalid builder member for type: " + getBeanType());
+                }
+            } else {
+                int constructorLength = constructorArguments.length;
+                @NonNull UnsafeBeanProperty<B, Object>[] writeableProperties = resolveWriteableProperties(beanPropertiesList);
+                Argument<?>[] propertyArguments = toArguments(writeableProperties);
+                Argument<?>[] arguments;
+                if (constructorLength == 0) {
+                    arguments = propertyArguments;
+                } else {
+                    arguments = ArrayUtils.concat(constructorArguments, propertyArguments);
+                }
+                this.builderData = new IntrospectionBuilderData(
+                    arguments,
+                    constructorLength,
+                    (UnsafeBeanProperty<Object, Object>[]) writeableProperties
+                );
+            }
+        }
+        return builderData;
+    }
+
+    @NonNull
+    private static Argument<?>[] toArguments(BeanProperty<?, ?>[] writeableProperties) {
+        return Arrays.stream(writeableProperties)
+            .map(BeanProperty::asArgument)
+            .toArray(Argument[]::new);
+    }
+
+    @SuppressWarnings("unchecked")
+    @NonNull
+    private <P> UnsafeBeanProperty<P, Object>[] resolveWriteableProperties(Collection<BeanProperty<P, Object>> beanProperties) {
+        return beanProperties.stream()
+            .filter(bp -> !bp.isReadOnly())
+            .map(bp -> ((UnsafeBeanProperty<P, Object>) bp))
+            .toArray(UnsafeBeanProperty[]::new);
+    }
+
+    @SuppressWarnings("java:S6218")
+    private record IntrospectionBuilderData(
+        Argument<?>[] arguments,
+        int constructorLength,
+        @Nullable
+        UnsafeBeanProperty<Object, Object>[] writeableProperties,
+        @Nullable
+        BeanIntrospection<Object> builder,
+        @Nullable
+        BeanMethod<Object, Object> creator,
+        @Nullable
+        BeanMethod<Object, Object>[] buildMethods,
+        StringIntMap argumentIndex) {
+        public IntrospectionBuilderData(
+            Argument<?>[] arguments,
+            int constructorLength,
+            UnsafeBeanProperty<Object, Object>[] writeableProperties) {
+            this(arguments, constructorLength, writeableProperties, null, null, null, new StringIntMap(arguments.length));
+            for (int i = 0; i < arguments.length; i++) {
+                argumentIndex.put(arguments[i].getName(), i);
+            }
+        }
+
+        public IntrospectionBuilderData(
+            BeanIntrospection<Object> builder,
+            BeanMethod<Object, Object> creator,
+            BeanMethod<Object, Object>[] buildMethods,
+            Argument<?>[] arguments) {
+            this(arguments, 0, null, builder, creator, buildMethods, new StringIntMap(arguments.length));
+            for (int i = 0; i < arguments.length; i++) {
+                argumentIndex.put(arguments[i].getName(), i);
+            }
+        }
+    }
+
+    private static final class IntrospectionBuilder<B> implements Builder<B> {
+        private static final Object[] NULL_ARG = { null };
+        private final Object[] params;
+        private final IntrospectionBuilderData builderData;
+        private final AbstractInitializableBeanIntrospection<B> introspection;
+
+
+        IntrospectionBuilder(AbstractInitializableBeanIntrospection<B> outer) {
+            IntrospectionBuilderData data = outer.getBuilderData();
+            this.introspection = outer;
+            this.builderData = data;
+            this.params = new Object[data.arguments.length];
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <A> @NonNull Argument<A>[] getArguments() {
+            return (Argument<A>[]) builderData.arguments;
+        }
+
+        @Override
+        public int indexOf(String name) {
+            return builderData.argumentIndex.get(name, -1);
+        }
+
+        @Override
+        public @NonNull <A> Builder<B> with(String name, A value) {
+            int i = indexOf(name);
+            if (i != -1) {
+                @SuppressWarnings("unchecked")
+                Argument<A> argument = (Argument<A>) builderData.arguments[i];
+                if (!argument.getWrapperType().isInstance(value)) {
+                    throw new IllegalArgumentException("Invalid value [" + value + "] specified for argument [" + argument + "]");
+                }
+                return with(i, argument, value);
+            }
+            return this;
+        }
+
+        @Override
+        public @NonNull <A> Builder<B> with(int index, Argument<A> argument, A value) {
+            if (value == null && argument.isNonNull()) {
+                    throw new IllegalArgumentException("Non-null argument [" + argument + "] specified as a null");
+
+            }
+            params[index] = value;
+            return this;
+        }
+
+        @Override
+        public @NonNull <A> Builder<B> convert(int index, Argument<A> argument, Object value, ConversionService conversionService) {
+            if (value == null) {
+                if (argument.isNonNull()) {
+                    throw new IllegalArgumentException("Non-null argument [" + argument + "] specified as a null");
+                }
+            } else if (!argument.isInstance(value)) {
+                value = conversionService.convertRequired(value, argument);
+            }
+            params[index] = value;
+            return this;
+        }
+
+        @Override
+        public Builder<B> with(B existing) {
+            if (existing != null) {
+                Collection<BeanProperty<B, Object>> properties = introspection.getBeanProperties();
+                for (BeanProperty<B, Object> property : properties) {
+                    if (!property.isWriteOnly() && property.hasSetterOrConstructorArgument()) {
+                        int i = indexOf(property.getName());
+                        if (i > -1) {
+                            with(i, property.asArgument(), property.get(existing));
+                        }
+                    }
+                }
+            }
+            return this;
+        }
+
+        @Override
+        public B build() {
+            BeanIntrospection<Object> builderIntrospection = builderData.builder;
+            if (builderIntrospection != null) {
+                Object b = builderIntrospection.instantiate();
+                BeanMethod<Object, Object> creator = builderData.creator;
+                for (int i = 0; i < params.length; i++) {
+                    Object param = params[i];
+                    BeanMethod<Object, Object> m = builderData.buildMethods[i];
+                    if (param instanceof Boolean bool) {
+                        if (m.getArguments().length == 0) {
+                            if (Boolean.TRUE.equals(bool)) {
+                                Object r = m.invoke(b);
+                                if (r != null) {
+                                    b = r;
+                                }
+                            }
+                        } else {
+                            Object r = m.invoke(b, bool);
+                            if (r != null) {
+                                b = r;
+                            }
+                        }
+                    } else {
+
+                        Object r = null;
+                        if (param != null) {
+                            r = m.invoke(b, param);
+                        } else {
+                            if (builderData.arguments[i].isDeclaredNullable()) {
+                                r = m.invoke(b, NULL_ARG);
+                            }
+                        }
+                        if (r != null) {
+                            b = r;
+                        }
+                    }
+                }
+                return (B) creator.invoke(b);
+            } else {
+                int constructorLength = builderData.constructorLength;
+                if (constructorLength == params.length) {
+                    return introspection.instantiateInternal(params);
+                } else {
+                    Object[] constructorParams = Arrays.copyOfRange(params, 0, constructorLength);
+                    B bean = introspection.instantiateInternal(constructorParams);
+                    UnsafeBeanProperty<Object, Object>[] writeableProperties = builderData.writeableProperties;
+                    if (writeableProperties != null) {
+                        for (int i = constructorLength; i < builderData.arguments.length; i++) {
+                            UnsafeBeanProperty<Object, Object> property = writeableProperties[i - constructorLength];
+                            property.setUnsafe(bean, params[i]);
+                        }
+                    }
+                    return bean;
+                }
+            }
+        }
     }
 
     /**

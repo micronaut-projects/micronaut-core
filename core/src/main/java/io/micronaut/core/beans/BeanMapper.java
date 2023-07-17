@@ -101,14 +101,6 @@ public interface BeanMapper<I, O> {
          */
         enum ConflictStrategy {
             /**
-             * Ignore the conflict and bind what is possible.
-             */
-            IGNORE,
-            /**
-             * Log a warning, but ignore.
-             */
-            WARN,
-            /**
              * Try and convert otherwise error.
              */
             CONVERT,
