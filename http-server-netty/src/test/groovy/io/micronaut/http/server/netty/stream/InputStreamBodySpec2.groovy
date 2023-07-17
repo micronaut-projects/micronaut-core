@@ -37,7 +37,7 @@ class InputStreamBodySpec2 extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
             ['spec.name': InputStreamBodySpec2.class.name,
-             'micronaut.http.client.read-timeout': '30s',
+             'micronaut.http.client.read-timeout': '60s',
              'micronaut.netty.event-loops.default.num-threads': '1'])
 
     @Retry

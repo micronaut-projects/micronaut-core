@@ -21,9 +21,15 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.*;
+import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
+import io.micronaut.http.FullHttpRequest;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpParameters;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.PushCapableHttpRequest;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.bind.binders.*;
 import io.micronaut.http.cookie.Cookie;
@@ -33,7 +39,11 @@ import jakarta.inject.Singleton;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.annotation.Annotation;
-import java.util.*;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import static io.micronaut.core.util.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
 
@@ -47,6 +57,8 @@ import static io.micronaut.core.util.KotlinUtils.KOTLIN_COROUTINES_SUPPORTED;
 public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
 
     private static final long CACHE_MAX_SIZE = 30;
+
+    private static final String REQUEST_BINDING_UNSATISFIED = "micronaut.http.bind.request.unsatisfied";
 
     private final Map<Class<? extends Annotation>, RequestArgumentBinder> byAnnotation = new LinkedHashMap<>();
     private final Map<TypeAndAnnotation, RequestArgumentBinder> byTypeAndAnnotation = new LinkedHashMap<>();
@@ -88,7 +100,12 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                 if (source.getBody().isPresent()) {
                     return () -> Optional.of(new FullHttpRequest(source, typeVariable.get()));
                 } else {
-                    return ArgumentBinder.BindingResult.UNSATISFIED;
+                    if (source.getAttribute(REQUEST_BINDING_UNSATISFIED).isPresent() && typeVariable.get().isNullable()) {
+                        return () -> Optional.of(source);
+                    } else {
+                        source.setAttribute(REQUEST_BINDING_UNSATISFIED, true);
+                        return ArgumentBinder.BindingResult.UNSATISFIED;
+                    }
                 }
             } else {
                 return () -> Optional.of(source);

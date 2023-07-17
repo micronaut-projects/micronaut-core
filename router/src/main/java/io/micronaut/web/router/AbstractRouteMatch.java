@@ -264,7 +264,6 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                     UnresolvedArgument<?> unresolved = (UnresolvedArgument<?>) value;
                     ArgumentBinder.BindingResult<?> bindingResult = unresolved.get();
 
-
                     if (bindingResult.isPresentAndSatisfied()) {
                         Object resolved = bindingResult.get();
                         if (resolved instanceof ConversionError) {
@@ -276,8 +275,9 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                     } else {
                         if (argument.isNullable()) {
                             argumentList.add(null);
+                        } else if (argument.isOptional()) {
+                            argumentList.add(Optional.empty());
                         } else {
-
                             List<ConversionError> conversionErrors = bindingResult.getConversionErrors();
                             if (!conversionErrors.isEmpty()) {
                                 // should support multiple errors

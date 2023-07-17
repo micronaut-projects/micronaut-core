@@ -115,12 +115,6 @@ public class NettyConverters implements TypeConverterRegistrar {
         );
 
         conversionService.addConverter(
-                ByteBuf.class,
-                Object.class,
-                byteBufToObjectConverter()
-        );
-
-        conversionService.addConverter(
                 FileUpload.class,
                 CompletedFileUpload.class,
                 fileUploadToCompletedFileUploadConverter()
@@ -345,13 +339,6 @@ public class NettyConverters implements TypeConverterRegistrar {
                 return Optional.empty();
             }
         };
-    }
-
-    /**
-     * @return A converter that returns bytebufs to objects
-     */
-    protected TypeConverter<ByteBuf, Object> byteBufToObjectConverter() {
-        return (object, targetType, context) -> conversionService.convert(object.toString(context.getCharset()), targetType, context);
     }
 
     /**
