@@ -288,7 +288,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 try {
                     loadedVisitor.getVisitor().finish(javaVisitorContext);
                 } catch (Throwable e) {
-                    e.printStackTrace();
                     error("Error finalizing type visitor [%s]: %s", loadedVisitor.getVisitor(), e.getMessage());
                 }
             }
