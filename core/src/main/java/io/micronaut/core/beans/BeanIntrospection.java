@@ -16,6 +16,7 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.convert.ConversionService;
@@ -284,14 +285,14 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      * @param <T> The bean type.
      * @since 4.1.0
      */
+    @Experimental
     interface Builder<T> {
         /**
          * All the arguments possible for creating the instance.
          *
-         * @param <A> The generic type
          * @return The arguments
          */
-        <A> @NonNull Argument<A>[] getArguments();
+        @NonNull Argument<?>[] getArguments();
 
         /**
          * @param name The argument name
@@ -304,10 +305,9 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
          *
          * @param name     The name of the argument
          * @param value    The value
-         * @param <A>      The generic type of the value
          * @return This builder
          */
-        <A> @NonNull Builder<T> with(@NonNull String name, @Nullable A value);
+        @NonNull Builder<T> with(@NonNull String name, @Nullable Object value);
 
         /**
          * Create the instance copying properties from the given instance to start.

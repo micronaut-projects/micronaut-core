@@ -546,8 +546,8 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
         @SuppressWarnings("unchecked")
         @Override
-        public <A> @NonNull Argument<A>[] getArguments() {
-            return (Argument<A>[]) builderData.arguments;
+        public @NonNull Argument<?>[] getArguments() {
+            return builderData.arguments;
         }
 
         @Override
@@ -556,11 +556,11 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         }
 
         @Override
-        public @NonNull <A> Builder<B> with(String name, A value) {
+        public @NonNull Builder<B> with(String name, Object value) {
             int i = indexOf(name);
             if (i != -1) {
                 @SuppressWarnings("unchecked")
-                Argument<A> argument = (Argument<A>) builderData.arguments[i];
+                Argument<Object> argument = (Argument<Object>) builderData.arguments[i];
                 return with(i, argument, value);
             }
             return this;
