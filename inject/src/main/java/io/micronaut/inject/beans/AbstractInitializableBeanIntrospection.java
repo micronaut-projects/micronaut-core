@@ -40,6 +40,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringIntMap;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
+import org.jetbrains.annotations.NotNull;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -424,7 +425,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
                             .map(m -> {
                                 @NonNull Argument<?>[] methodArgs = m.getArguments();
                                 if (ArrayUtils.isNotEmpty(methodArgs)) {
-                                    return methodArgs[0];
+                                    return toWrapperIfNecessary(methodArgs[0]);
                                 } else {
                                     return Argument.of(Boolean.class, m.getName());
                                 }
@@ -447,7 +448,13 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
                 if (constructorLength == 0) {
                     arguments = propertyArguments;
                 } else {
-                    arguments = ArrayUtils.concat(constructorArguments, propertyArguments);
+                    Argument<?>[] newConstructorArguments = new Argument[constructorLength];
+                    for (int i = 0; i < constructorLength; i++) {
+                        Argument<?> constructorArgument = constructorArguments[i];
+                        Argument<?> argument = toWrapperIfNecessary(constructorArgument);
+                        newConstructorArguments[i] = argument;
+                    }
+                    arguments = ArrayUtils.concat(newConstructorArguments, propertyArguments);
                 }
                 this.builderData = new IntrospectionBuilderData(
                     arguments,
@@ -462,8 +469,21 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     @NonNull
     private static Argument<?>[] toArguments(BeanProperty<?, ?>[] writeableProperties) {
         return Arrays.stream(writeableProperties)
-            .map(BeanProperty::asArgument)
+            .map(bp -> {
+                Argument<?> argument = bp.asArgument();
+                return toWrapperIfNecessary(argument);
+            })
             .toArray(Argument[]::new);
+    }
+
+    @NonNull
+    private static Argument<?> toWrapperIfNecessary(Argument<?> argument) {
+        if (argument.isPrimitive()) {
+            // alway use wrapper type
+            Class<?> wrapperType = argument.getWrapperType();
+            return Argument.of(wrapperType, argument.getName(), argument.getAnnotationMetadata());
+        }
+        return argument;
     }
 
     @SuppressWarnings("unchecked")
@@ -541,9 +561,6 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
             if (i != -1) {
                 @SuppressWarnings("unchecked")
                 Argument<A> argument = (Argument<A>) builderData.arguments[i];
-                if (!argument.getWrapperType().isInstance(value)) {
-                    throw new IllegalArgumentException("Invalid value [" + value + "] specified for argument [" + argument + "]");
-                }
                 return with(i, argument, value);
             }
             return this;
@@ -554,6 +571,9 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
             if (value == null && argument.isNonNull()) {
                     throw new IllegalArgumentException("Non-null argument [" + argument + "] specified as a null");
 
+            }
+            if (!argument.isInstance(value)) {
+                throw new IllegalArgumentException("Invalid value [" + value + "] specified for argument [" + argument + "]");
             }
             params[index] = value;
             return this;
@@ -580,7 +600,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
                     if (!property.isWriteOnly() && property.hasSetterOrConstructorArgument()) {
                         int i = indexOf(property.getName());
                         if (i > -1) {
-                            with(i, property.asArgument(), property.get(existing));
+                            with(i, (Argument<Object>) builderData.arguments[i], property.get(existing));
                         }
                     }
                 }
