@@ -69,7 +69,7 @@ final class DefaultIntrospectionBeanMapHandler implements IntrospectionBeanMapHa
         }
         Collection<BeanProperty<I, Object>> beanProperties = left.getBeanProperties();
         BeanIntrospection.Builder<O> builder = output != null ? right.builder().with(output) : right.builder();
-        @NonNull Argument<Object>[] builderArguments = builder.getArguments();
+        @SuppressWarnings("unchecked") @NonNull Argument<Object>[] builderArguments = (Argument<Object>[]) builder.getArguments();
         BeanMapper.MapStrategy.ConflictStrategy conflictStrategy = mapStrategy.conflictStrategy();
         for (BeanProperty<I, Object> beanProperty : beanProperties) {
             if (!beanProperty.isWriteOnly()) {
@@ -109,7 +109,7 @@ final class DefaultIntrospectionBeanMapHandler implements IntrospectionBeanMapHa
         }
         BeanMapper.MapStrategy.ConflictStrategy conflictStrategy = mapStrategy.conflictStrategy();
         BeanIntrospection.Builder<O> builder = outputIntrospection.builder();
-        @NonNull Argument<Object>[] arguments = builder.getArguments();
+        @SuppressWarnings("unchecked") @NonNull Argument<Object>[] arguments = (Argument<Object>[]) builder.getArguments();
 
         for (BeanProperty<I, Object> beanProperty : inputIntrospection.getBeanProperties()) {
             if (!beanProperty.isWriteOnly()) {
@@ -144,7 +144,7 @@ final class DefaultIntrospectionBeanMapHandler implements IntrospectionBeanMapHa
         }
         BeanMapper.MapStrategy.ConflictStrategy conflictStrategy = mapStrategy.conflictStrategy();
         BeanIntrospection.Builder<O> builder = outputIntrospection.builder();
-        @NonNull Argument<Object>[] arguments = builder.getArguments();
+        @NonNull Argument<Object>[] arguments = (Argument<Object>[]) builder.getArguments();
 
         handleMapInput(input, conflictStrategy, builder, arguments);
         return builder.build();
@@ -158,7 +158,7 @@ final class DefaultIntrospectionBeanMapHandler implements IntrospectionBeanMapHa
         BeanMapper.MapStrategy.ConflictStrategy conflictStrategy = mapStrategy.conflictStrategy();
         if (CollectionUtils.isNotEmpty(input)) {
             BeanIntrospection.Builder<O> builder = right.builder().with(output);
-            @NonNull Argument<Object>[] arguments = builder.getArguments();
+            @NonNull Argument<Object>[] arguments = (Argument<Object>[]) builder.getArguments();
             handleMapInput(
                 input,
                 conflictStrategy,
