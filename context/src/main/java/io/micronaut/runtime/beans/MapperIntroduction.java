@@ -25,7 +25,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.BeanIntrospection;
-import io.micronaut.core.beans.BeanMapper;
 import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.expressions.EvaluatedExpression;
 import io.micronaut.core.expressions.ExpressionEvaluationContext;
@@ -70,50 +69,44 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
                 // should never be empty, validated at compile time
                 Argument<Object> fromType = (Argument<Object>) context.getArguments()[0];
                 BeanIntrospection<Object> toIntrospection = BeanIntrospection.getIntrospection(toType.getType());
-                BeanIntrospection<Object> fromIntrospection = BeanIntrospection.getIntrospection(fromType.getType());
+                Class<Object> fromClass = fromType.getType();
+                boolean isMap = Map.class.isAssignableFrom(fromClass);
+                BeanIntrospection<Object> fromIntrospection = isMap ? null : BeanIntrospection.getIntrospection(fromClass);
                 AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
-                BeanMapper.MapStrategy.ConflictStrategy conflictStrategy = annotationMetadata.enumValue(Mapper.class, "conflictStrategy", BeanMapper.MapStrategy.ConflictStrategy.class)
-                    .orElse(BeanMapper.MapStrategy.ConflictStrategy.CONVERT);
-                BeanMapper.MapStrategy.Builder builder = BeanMapper.MapStrategy.builder().withConflictStrategy(conflictStrategy);
+                Mapper.MapStrategy.ConflictStrategy conflictStrategy = annotationMetadata.enumValue(Mapper.class, "conflictStrategy", Mapper.MapStrategy.ConflictStrategy.class)
+                    .orElse(Mapper.MapStrategy.ConflictStrategy.CONVERT);
+                Mapper.MapStrategy.Builder builder = Mapper.MapStrategy.builder().withConflictStrategy(conflictStrategy);
 
                 if (annotationMetadata.isPresent(Mapper.class, AnnotationMetadata.VALUE_MEMBER)) {
                     List<AnnotationValue<Mapper.Mapping>> annotations = context.getAnnotationValuesByType(Mapper.Mapping.class);
 
-                    Map<String, Function<Object, BiFunction<BeanMapper.MapStrategy, Object, Object>>> customMappers = new HashMap<>();
-                    for (AnnotationValue<Mapper.Mapping> mapping : annotations) {
-                        String to = mapping.stringValue(Mapper.Mapping.MEMBER_TO).orElse(null);
-                        if (StringUtils.isNotEmpty(to)) {
-                            Map<CharSequence, Object> values = mapping.getValues();
-                            Object from = values.get(Mapper.Mapping.MEMBER_FROM);
-                            if (from instanceof EvaluatedExpression evaluatedExpression) {
-                                customMappers.put(to, (expressionEvaluationContext ->
-                                    (mapStrategy, object) -> evaluatedExpression.evaluate((ExpressionEvaluationContext) expressionEvaluationContext)
-                                ));
-                            } else if (from != null) {
-                                BeanProperty<Object, Object> fromProperty = fromIntrospection.getRequiredProperty(from.toString(), Object.class);
-                                customMappers.put(to, (expressionEvaluationContext -> (mapStrategy, object) -> fromProperty.get(object)));
-                            }
-
-                        }
-                    }
+                    Map<String, Function<Object, BiFunction<Mapper.MapStrategy, Object, Object>>> customMappers = buildCustomMappers(fromIntrospection, annotations, isMap);
 
                     // requires runtime evaluation
                     if (annotationMetadata instanceof EvaluatedAnnotationMetadata) {
-                        invocation = callContext -> {
-                            BeanMapper.MapStrategy.Builder callbuilder = BeanMapper.MapStrategy.builder().withConflictStrategy(conflictStrategy);
-                            AnnotationMetadata callAnnotationMetadata = callContext.getAnnotationMetadata();
-                            ConfigurableExpressionEvaluationContext evaluationContext = ((EvaluatedAnnotationMetadata) callAnnotationMetadata).getEvaluationContext();
-                            customMappers.forEach((name, mapperSupplier) -> callbuilder.withCustomMapper(name, mapperSupplier.apply(evaluationContext)));
-                            return beanMapHandler.map(
-                                callContext.getParameterValues()[0],
-                                callbuilder.build(),
-                                fromIntrospection,
-                                toIntrospection
-                            );
-                        };
+                        if (isMap) {
+                            invocation = callContext -> {
+                                Mapper.MapStrategy mapStrategy = buildEvaluatedMapStrategy(conflictStrategy, customMappers, callContext, true);
+                                return beanMapHandler.map(
+                                    (Map<String, Object>) callContext.getParameterValues()[0],
+                                    mapStrategy,
+                                    toIntrospection
+                                );
+                            };
+                        } else {
+                            invocation = callContext -> {
+                                Mapper.MapStrategy mapStrategy = buildEvaluatedMapStrategy(conflictStrategy, customMappers, callContext, false);
+                                return beanMapHandler.map(
+                                    callContext.getParameterValues()[0],
+                                    mapStrategy,
+                                    fromIntrospection,
+                                    toIntrospection
+                                );
+                            };
+                        }
                     } else if (!customMappers.isEmpty()) {
                         invocation = callContext -> {
-                            BeanMapper.MapStrategy.Builder callbuilder = BeanMapper.MapStrategy.builder().withConflictStrategy(conflictStrategy);
+                            Mapper.MapStrategy.Builder callbuilder = Mapper.MapStrategy.builder().withConflictStrategy(conflictStrategy);
                             customMappers.forEach((name, mapperSupplier) -> callbuilder.withCustomMapper(name, mapperSupplier.apply(null)));
                             Object input = callContext.getParameterValues()[0];
                             return beanMapHandler.map(
@@ -124,10 +117,10 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
                             );
                         };
                     } else {
-                        invocation = mapDefault(toIntrospection, fromIntrospection, builder);
+                        invocation = mapDefault(toIntrospection, fromIntrospection, builder, isMap);
                     }
                 } else {
-                    invocation = mapDefault(toIntrospection, fromIntrospection, builder);
+                    invocation = mapDefault(toIntrospection, fromIntrospection, builder, isMap);
                 }
 
                 cachedInvocations.put(key, invocation);
@@ -141,15 +134,58 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
         }
     }
 
-    private MapInvocation mapDefault(BeanIntrospection<Object> toIntrospection, BeanIntrospection<Object> fromIntrospection, BeanMapper.MapStrategy.Builder builder) {
+    private static Mapper.MapStrategy buildEvaluatedMapStrategy(Mapper.MapStrategy.ConflictStrategy conflictStrategy, Map<String, Function<Object, BiFunction<Mapper.MapStrategy, Object, Object>>> customMappers, MethodInvocationContext<Object, Object> callContext, boolean isMap) {
+        Mapper.MapStrategy.Builder callbuilder = Mapper.MapStrategy.builder().withConflictStrategy(conflictStrategy);
+        AnnotationMetadata callAnnotationMetadata = callContext.getAnnotationMetadata();
+        ConfigurableExpressionEvaluationContext evaluationContext = ((EvaluatedAnnotationMetadata) callAnnotationMetadata).getEvaluationContext();
+        customMappers.forEach((name, mapperSupplier) -> callbuilder.withCustomMapper(name, mapperSupplier.apply(evaluationContext)));
+        Mapper.MapStrategy mapStrategy = callbuilder.build();
+        return mapStrategy;
+    }
+
+    private static Map<String, Function<Object, BiFunction<Mapper.MapStrategy, Object, Object>>> buildCustomMappers(BeanIntrospection<Object> fromIntrospection, List<AnnotationValue<Mapper.Mapping>> annotations, boolean isMap) {
+        Map<String, Function<Object, BiFunction<Mapper.MapStrategy, Object, Object>>> customMappers = new HashMap<>();
+        for (AnnotationValue<Mapper.Mapping> mapping : annotations) {
+            String to = mapping.stringValue(Mapper.Mapping.MEMBER_TO).orElse(null);
+            if (StringUtils.isNotEmpty(to)) {
+                Map<CharSequence, Object> values = mapping.getValues();
+                Object from = values.get(Mapper.Mapping.MEMBER_FROM);
+                if (from instanceof EvaluatedExpression evaluatedExpression) {
+                    customMappers.put(to, (expressionEvaluationContext ->
+                        (mapStrategy, object) -> evaluatedExpression.evaluate((ExpressionEvaluationContext) expressionEvaluationContext)
+                    ));
+                } else if (from != null) {
+                    String propertyName = from.toString();
+                    if (fromIntrospection != null) {
+                        BeanProperty<Object, Object> fromProperty = fromIntrospection.getRequiredProperty(propertyName, Object.class);
+                        customMappers.put(to, (expressionEvaluationContext -> (mapStrategy, object) -> fromProperty.get(object)));
+                    } else if (isMap) {
+                        customMappers.put(to, (expressionEvaluationContext -> (mapStrategy, object) -> ((Map<String, Object>) object).get(propertyName)));
+                    }
+                }
+
+            }
+        }
+        return customMappers;
+    }
+
+    private MapInvocation mapDefault(BeanIntrospection<Object> toIntrospection, BeanIntrospection<Object> fromIntrospection, Mapper.MapStrategy.Builder builder, boolean isMap) {
         MapInvocation invocation;
-        BeanMapper.MapStrategy mapStrategy = builder.build();
-        invocation = callContext -> beanMapHandler.map(
-            callContext.getParameterValues()[0],
-            mapStrategy,
-            fromIntrospection,
-            toIntrospection
-        );
+        Mapper.MapStrategy mapStrategy = builder.build();
+        if (isMap) {
+            invocation = callContext -> beanMapHandler.map(
+                (Map<String, Object>) callContext.getParameterValues()[0],
+                mapStrategy,
+                toIntrospection
+            );
+        } else {
+            invocation = callContext -> beanMapHandler.map(
+                callContext.getParameterValues()[0],
+                mapStrategy,
+                fromIntrospection,
+                toIntrospection
+            );
+        }
         return invocation;
     }
 

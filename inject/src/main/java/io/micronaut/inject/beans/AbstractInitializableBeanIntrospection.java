@@ -29,6 +29,7 @@ import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.beans.UnsafeBeanInstantiationIntrospection;
 import io.micronaut.core.beans.UnsafeBeanProperty;
 import io.micronaut.core.beans.exceptions.IntrospectionException;
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -580,13 +581,14 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         }
 
         @Override
-        public @NonNull <A> Builder<B> convert(int index, Argument<A> argument, Object value, ConversionService conversionService) {
+        public @NonNull <A> Builder<B> convert(int index, ArgumentConversionContext<A> conversionContext, Object value, ConversionService conversionService) {
+            Argument<A> argument = conversionContext.getArgument();
             if (value == null) {
                 if (argument.isNonNull()) {
                     throw new IllegalArgumentException("Non-null argument [" + argument + "] specified as a null");
                 }
             } else if (!argument.isInstance(value)) {
-                value = conversionService.convertRequired(value, argument);
+                value = conversionService.convertRequired(value, conversionContext);
             }
             params[index] = value;
             return this;

@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.exceptions.IntrospectionException;
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
@@ -338,7 +339,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
          * @param <A>               The generic type
          * @return This builder
          */
-        <A> @NonNull Builder<T> convert(int index, @NonNull Argument<A> argument, @Nullable Object value, @NonNull ConversionService conversionService);
+        <A> @NonNull Builder<T> convert(int index, @NonNull ArgumentConversionContext<A> argument, @Nullable Object value, @NonNull ConversionService conversionService);
 
         /**
          * Build the instance from the current state.

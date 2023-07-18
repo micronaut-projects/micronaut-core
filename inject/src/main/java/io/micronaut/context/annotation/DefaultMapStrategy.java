@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.beans;
+package io.micronaut.context.annotation;
 
 import io.micronaut.core.annotation.NonNull;
 
@@ -27,10 +27,10 @@ import java.util.function.BiFunction;
  * @param conflictStrategy The conflict strategy
  * @param customMappers custom property mappers
  */
-record DefaultMapStrategy(@NonNull BeanMapper.MapStrategy.ConflictStrategy conflictStrategy,
-                          @NonNull Map<String, BiFunction<BeanMapper.MapStrategy, Object, Object>> customMappers) implements BeanMapper.MapStrategy {
+record DefaultMapStrategy(@NonNull Mapper.MapStrategy.ConflictStrategy conflictStrategy,
+                          @NonNull Map<String, BiFunction<Mapper.MapStrategy, Object, Object>> customMappers) implements Mapper.MapStrategy {
     DefaultMapStrategy() {
-        this(ConflictStrategy.CONVERT, Collections.emptyMap());
+        this(Mapper.MapStrategy.ConflictStrategy.CONVERT, Collections.emptyMap());
     }
 
     DefaultMapStrategy {

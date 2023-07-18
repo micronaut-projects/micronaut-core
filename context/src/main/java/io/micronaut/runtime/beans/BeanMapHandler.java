@@ -15,9 +15,9 @@
  */
 package io.micronaut.runtime.beans;
 
+import io.micronaut.context.annotation.Mapper;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.beans.BeanMapper;
 
 import java.util.Map;
 
@@ -39,7 +39,7 @@ public sealed interface BeanMapHandler permits IntrospectionBeanMapHandler {
      * @param <I> The input generic type
      * @param <O> The output generic type
      */
-    <I, O> @NonNull O map(@NonNull I input, @NonNull Class<O> outputType, @NonNull BeanMapper.MapStrategy mapStrategy);
+    <I, O> @NonNull O map(@NonNull I input, @NonNull Class<O> outputType, @NonNull Mapper.MapStrategy mapStrategy);
 
     /**
      * Map all the properties from the input to the output.
@@ -50,7 +50,7 @@ public sealed interface BeanMapHandler permits IntrospectionBeanMapHandler {
      * @return The output
      * @param <O> The output generic type
      */
-    <O> @NonNull O map(@NonNull Map<String, Object> input, @NonNull Class<O> outputType, @NonNull BeanMapper.MapStrategy mapStrategy);
+    <O> @NonNull O map(@NonNull Map<String, Object> input, @NonNull Class<O> outputType, @NonNull Mapper.MapStrategy mapStrategy);
 
     /**
      * Map all the properties from the input to the output.
@@ -62,7 +62,7 @@ public sealed interface BeanMapHandler permits IntrospectionBeanMapHandler {
      * @param <I> The input generic type
      * @param <O> The output generic type
      */
-    <I, O> @NonNull O map(@NonNull I input, @NonNull O output, @NonNull BeanMapper.MapStrategy mapStrategy);
+    <I, O> @NonNull O map(@NonNull I input, @NonNull O output, @NonNull Mapper.MapStrategy mapStrategy);
 
     /**
      * Map all the properties from the input to the output.
@@ -73,10 +73,10 @@ public sealed interface BeanMapHandler permits IntrospectionBeanMapHandler {
      * @return The output
      * @param <O> The output generic type
      */
-    <O> @NonNull O map(@NonNull Map<String, Object> input, @NonNull O output, @NonNull BeanMapper.MapStrategy mapStrategy);
+    <O> @NonNull O map(@NonNull Map<String, Object> input, @NonNull O output, @NonNull Mapper.MapStrategy mapStrategy);
 
     /**
-     * Map all the properties from the input to the output. Uses a map strategy of {@link BeanMapper.MapStrategy#DEFAULT}.
+     * Map all the properties from the input to the output. Uses a map strategy of {@link Mapper.MapStrategy#DEFAULT}.
      *
      * @param input The input
      * @param output The output
@@ -85,11 +85,11 @@ public sealed interface BeanMapHandler permits IntrospectionBeanMapHandler {
      * @param <O> The output generic type
      */
     default <I, O> @NonNull O map(@NonNull I input, O output) {
-        return map(input, output, BeanMapper.MapStrategy.DEFAULT);
+        return map(input, output, Mapper.MapStrategy.DEFAULT);
     }
 
     /**
-     * Map all the properties from the input to the output. Uses a map strategy of {@link BeanMapper.MapStrategy#DEFAULT}.
+     * Map all the properties from the input to the output. Uses a map strategy of {@link Mapper.MapStrategy#DEFAULT}.
      * @param input The input
      * @param outputType The output type
      * @return The output
@@ -97,7 +97,7 @@ public sealed interface BeanMapHandler permits IntrospectionBeanMapHandler {
      * @param <O> The output generic type
      */
     default <I, O> O map(I input, Class<O> outputType) {
-        return map(input, outputType, BeanMapper.MapStrategy.DEFAULT);
+        return map(input, outputType, Mapper.MapStrategy.DEFAULT);
     }
 
 }

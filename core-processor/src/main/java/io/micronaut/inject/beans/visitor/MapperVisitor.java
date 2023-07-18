@@ -28,6 +28,7 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public final class MapperVisitor implements TypeElementVisitor<Object, Mapper> {
@@ -57,7 +58,16 @@ public final class MapperVisitor implements TypeElementVisitor<Object, Mapper> {
 
                         List<AnnotationValue<Mapper.Mapping>> values = element.getAnnotationMetadata().getAnnotationValuesByType(Mapper.Mapping.class);
                         if (CollectionUtils.isNotEmpty(values)) {
-                            ParameterElement fromType = parameters[0];
+                            ParameterElement fromParameter = parameters[0];
+                            ClassElement fromType = fromParameter.getGenericType();
+                            boolean isMap = fromType.isAssignable(Map.class);
+                            if (isMap) {
+                                List<? extends ClassElement> boundGenerics = fromType.getBoundGenericTypes();
+                                if (boundGenerics.isEmpty() || !boundGenerics.iterator().next().isAssignable(String.class)) {
+                                    context.fail("@Mapping from parameter that is a Map must have String keys", element);
+                                    return;
+                                }
+                            }
 
                             for (AnnotationValue<Mapper.Mapping> value : values) {
                                 value.stringValue("to").ifPresent(to -> {
@@ -68,10 +78,9 @@ public final class MapperVisitor implements TypeElementVisitor<Object, Mapper> {
                                 });
                                 value.stringValue("from").ifPresent(from -> {
                                     if (!from.contains("#{")) {
-                                        ClassElement genericType = fromType.getGenericType();
-                                        List<PropertyElement> beanProperties = genericType.getBeanProperties(PropertyElementQuery.of(genericType).includes(Set.of(from)));
+                                        List<PropertyElement> beanProperties = fromType.getBeanProperties(PropertyElementQuery.of(fromType).includes(Set.of(from)));
                                         if (beanProperties.isEmpty()) {
-                                            context.fail("@Mapping(from=\"" + from + "\") specifies a property that doesn't exist in type " + genericType.getName(), element);
+                                            context.fail("@Mapping(from=\"" + from + "\") specifies a property that doesn't exist in type " + fromType.getName(), element);
                                         }
                                     }
                                 });

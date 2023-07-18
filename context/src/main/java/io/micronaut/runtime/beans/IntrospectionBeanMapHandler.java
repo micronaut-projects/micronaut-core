@@ -15,10 +15,10 @@
  */
 package io.micronaut.runtime.beans;
 
+import io.micronaut.context.annotation.Mapper;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.beans.BeanIntrospection;
-import io.micronaut.core.beans.BeanMapper;
 
 import java.util.Map;
 
@@ -44,7 +44,7 @@ public sealed interface IntrospectionBeanMapHandler extends BeanMapHandler permi
     <I, O> O map(
         @NonNull I input,
         @NonNull O output,
-        @NonNull BeanMapper.MapStrategy mapStrategy,
+        @NonNull Mapper.MapStrategy mapStrategy,
         @NonNull BeanIntrospection<I> left,
         @NonNull BeanIntrospection<O> right
     );
@@ -59,7 +59,7 @@ public sealed interface IntrospectionBeanMapHandler extends BeanMapHandler permi
      * @param <O>                 The output generic
      * @return The output.
      */
-    <I, O> @NonNull O map(@NonNull I input, @NonNull BeanMapper.MapStrategy mapStrategy, @NonNull BeanIntrospection<O> outputIntrospection);
+    <I, O> @NonNull O map(@NonNull I input, @NonNull Mapper.MapStrategy mapStrategy, @NonNull BeanIntrospection<O> outputIntrospection);
 
     /**
      * Map the input to the output with the given introspection.
@@ -72,7 +72,7 @@ public sealed interface IntrospectionBeanMapHandler extends BeanMapHandler permi
      * @param <O>                 The output generic
      * @return The output.
      */
-    <I, O> @NonNull O map(@NonNull I input, @NonNull BeanMapper.MapStrategy mapStrategy, @NonNull BeanIntrospection<I> inputIntrospection, @NonNull BeanIntrospection<O> outputIntrospection);
+    <I, O> @NonNull O map(@NonNull I input, @NonNull Mapper.MapStrategy mapStrategy, @NonNull BeanIntrospection<I> inputIntrospection, @NonNull BeanIntrospection<O> outputIntrospection);
 
     /**
      * Map the input to the output with the given introspection.
@@ -83,7 +83,7 @@ public sealed interface IntrospectionBeanMapHandler extends BeanMapHandler permi
      * @param <O>                 The output generic type
      * @return The output
      */
-    <O> @NonNull O map(@NonNull Map<String, Object> input, @NonNull BeanMapper.MapStrategy mapStrategy, @NonNull BeanIntrospection<O> outputIntrospection);
+    <O> @NonNull O map(@NonNull Map<String, Object> input, @NonNull Mapper.MapStrategy mapStrategy, @NonNull BeanIntrospection<O> outputIntrospection);
 
     /**
      * Map input to output where input is a map.
@@ -95,5 +95,5 @@ public sealed interface IntrospectionBeanMapHandler extends BeanMapHandler permi
      * @param right       The introspection
      * @return The output
      */
-    <O> @NonNull O map(@NonNull Map<String, Object> input, @NonNull O output, @NonNull BeanMapper.MapStrategy mapStrategy, @NonNull BeanIntrospection<O> right);
+    <O> @NonNull O map(@NonNull Map<String, Object> input, @NonNull O output, @NonNull Mapper.MapStrategy mapStrategy, @NonNull BeanIntrospection<O> right);
 }
