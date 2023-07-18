@@ -60,6 +60,9 @@ public @interface Mapper {
     @interface Mapping {
         String MEMBER_TO = "to";
         String MEMBER_FROM = "from";
+        String MEMBER_CONDITION = "condition";
+
+        String MEMBER_FORMAT = "format";
 
         /**
          * @return name of the property to map to.
@@ -97,6 +100,10 @@ public @interface Mapper {
          */
         @NonNull ConflictStrategy conflictStrategy();
 
+        /**
+         * Custom mapper definitions.
+         * @return The custom mappers.
+         */
         Map<String, BiFunction<MapStrategy, Object, Object>> customMappers();
 
         /**

@@ -27,6 +27,7 @@ import io.micronaut.inject.ast.PropertyElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -69,11 +70,17 @@ public final class MapperVisitor implements TypeElementVisitor<Object, Mapper> {
                                 }
                             }
 
+                            Set<String> toDefs = new HashSet<>();
                             for (AnnotationValue<Mapper.Mapping> value : values) {
                                 value.stringValue("to").ifPresent(to -> {
-                                    List<PropertyElement> beanProperties = toType.getBeanProperties(PropertyElementQuery.of(toType).includes(Set.of(to)));
-                                    if (beanProperties.isEmpty()) {
-                                        context.fail("@Mapping(to=\"" + to + "\") specifies a property that doesn't exist in type " + toType.getName(), element);
+                                    if (toDefs.contains(to)) {
+                                        context.fail("Multiple @Mapping definitions map to the same property: " + to, element);
+                                    } else {
+                                        toDefs.add(to);
+                                        List<PropertyElement> beanProperties = toType.getBeanProperties(PropertyElementQuery.of(toType).includes(Set.of(to)));
+                                        if (beanProperties.isEmpty()) {
+                                            context.fail("@Mapping(to=\"" + to + "\") specifies a property that doesn't exist in type " + toType.getName(), element);
+                                        }
                                     }
                                 });
                                 value.stringValue("from").ifPresent(from -> {

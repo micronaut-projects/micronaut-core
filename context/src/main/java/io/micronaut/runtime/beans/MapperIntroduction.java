@@ -24,8 +24,12 @@ import io.micronaut.context.expressions.ConfigurableExpressionEvaluationContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.expressions.EvaluatedExpression;
 import io.micronaut.core.expressions.ExpressionEvaluationContext;
 import io.micronaut.core.type.Argument;
@@ -47,11 +51,11 @@ import java.util.function.Function;
 @Internal
 @BootstrapContextCompatible
 final class MapperIntroduction implements MethodInterceptor<Object, Object> {
-    private final IntrospectionBeanMapHandler beanMapHandler;
+    private final ConversionService conversionService;
     private final Map<ExecutableMethod<?, ?>, MapInvocation> cachedInvocations = new ConcurrentHashMap<>();
 
-    MapperIntroduction(IntrospectionBeanMapHandler beanMapHandler) {
-        this.beanMapHandler = beanMapHandler;
+    MapperIntroduction(ConversionService conversionService) {
+        this.conversionService = conversionService;
     }
 
     @Override
@@ -86,8 +90,8 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
                     if (annotationMetadata instanceof EvaluatedAnnotationMetadata) {
                         if (isMap) {
                             invocation = callContext -> {
-                                Mapper.MapStrategy mapStrategy = buildEvaluatedMapStrategy(conflictStrategy, customMappers, callContext, true);
-                                return beanMapHandler.map(
+                                Mapper.MapStrategy mapStrategy = buildMapStrategy(conflictStrategy, customMappers, callContext);
+                                return map(
                                     (Map<String, Object>) callContext.getParameterValues()[0],
                                     mapStrategy,
                                     toIntrospection
@@ -95,8 +99,8 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
                             };
                         } else {
                             invocation = callContext -> {
-                                Mapper.MapStrategy mapStrategy = buildEvaluatedMapStrategy(conflictStrategy, customMappers, callContext, false);
-                                return beanMapHandler.map(
+                                Mapper.MapStrategy mapStrategy = buildMapStrategy(conflictStrategy, customMappers, callContext);
+                                return map(
                                     callContext.getParameterValues()[0],
                                     mapStrategy,
                                     fromIntrospection,
@@ -106,12 +110,11 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
                         }
                     } else if (!customMappers.isEmpty()) {
                         invocation = callContext -> {
-                            Mapper.MapStrategy.Builder callbuilder = Mapper.MapStrategy.builder().withConflictStrategy(conflictStrategy);
-                            customMappers.forEach((name, mapperSupplier) -> callbuilder.withCustomMapper(name, mapperSupplier.apply(null)));
+                            Mapper.MapStrategy mapStrategy = buildMapStrategy(conflictStrategy, customMappers, callContext);
                             Object input = callContext.getParameterValues()[0];
-                            return beanMapHandler.map(
+                            return map(
                                 input,
-                                callbuilder.build(),
+                                mapStrategy,
                                 fromIntrospection,
                                 toIntrospection
                             );
@@ -134,16 +137,23 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
         }
     }
 
-    private static Mapper.MapStrategy buildEvaluatedMapStrategy(Mapper.MapStrategy.ConflictStrategy conflictStrategy, Map<String, Function<Object, BiFunction<Mapper.MapStrategy, Object, Object>>> customMappers, MethodInvocationContext<Object, Object> callContext, boolean isMap) {
+    private static Mapper.MapStrategy buildMapStrategy(Mapper.MapStrategy.ConflictStrategy conflictStrategy, Map<String, Function<Object, BiFunction<Mapper.MapStrategy, Object, Object>>> customMappers, MethodInvocationContext<Object, Object> callContext) {
         Mapper.MapStrategy.Builder callbuilder = Mapper.MapStrategy.builder().withConflictStrategy(conflictStrategy);
         AnnotationMetadata callAnnotationMetadata = callContext.getAnnotationMetadata();
-        ConfigurableExpressionEvaluationContext evaluationContext = ((EvaluatedAnnotationMetadata) callAnnotationMetadata).getEvaluationContext();
-        customMappers.forEach((name, mapperSupplier) -> callbuilder.withCustomMapper(name, mapperSupplier.apply(evaluationContext)));
-        Mapper.MapStrategy mapStrategy = callbuilder.build();
-        return mapStrategy;
+        if (callAnnotationMetadata instanceof EvaluatedAnnotationMetadata evaluatedAnnotationMetadata) {
+            ConfigurableExpressionEvaluationContext evaluationContext = evaluatedAnnotationMetadata.getEvaluationContext();
+            customMappers.forEach((name, mapperSupplier) -> callbuilder.withCustomMapper(name, mapperSupplier.apply(evaluationContext)));
+        } else {
+            customMappers.forEach((name, mapperSupplier) -> callbuilder.withCustomMapper(name, mapperSupplier.apply(null)));
+        }
+
+        return callbuilder.build();
     }
 
-    private static Map<String, Function<Object, BiFunction<Mapper.MapStrategy, Object, Object>>> buildCustomMappers(BeanIntrospection<Object> fromIntrospection, List<AnnotationValue<Mapper.Mapping>> annotations, boolean isMap) {
+    private static Map<String, Function<Object, BiFunction<Mapper.MapStrategy, Object, Object>>> buildCustomMappers(
+        BeanIntrospection<Object> fromIntrospection,
+        List<AnnotationValue<Mapper.Mapping>> annotations,
+        boolean isMap) {
         Map<String, Function<Object, BiFunction<Mapper.MapStrategy, Object, Object>>> customMappers = new HashMap<>();
         for (AnnotationValue<Mapper.Mapping> mapping : annotations) {
             String to = mapping.stringValue(Mapper.Mapping.MEMBER_TO).orElse(null);
@@ -173,13 +183,13 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
         MapInvocation invocation;
         Mapper.MapStrategy mapStrategy = builder.build();
         if (isMap) {
-            invocation = callContext -> beanMapHandler.map(
+            invocation = callContext -> map(
                 (Map<String, Object>) callContext.getParameterValues()[0],
                 mapStrategy,
                 toIntrospection
             );
         } else {
-            invocation = callContext -> beanMapHandler.map(
+            invocation = callContext -> map(
                 callContext.getParameterValues()[0],
                 mapStrategy,
                 fromIntrospection,
@@ -192,5 +202,81 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
     @FunctionalInterface
     private interface MapInvocation {
         Object map(MethodInvocationContext<Object, Object> invocationContext);
+    }
+
+    private  <I, O> O map(I input, Mapper.MapStrategy mapStrategy, BeanIntrospection<I> inputIntrospection, BeanIntrospection<O> outputIntrospection) {
+        boolean isDefault = mapStrategy == Mapper.MapStrategy.DEFAULT;
+        Mapper.MapStrategy.ConflictStrategy conflictStrategy = mapStrategy.conflictStrategy();
+        BeanIntrospection.Builder<O> builder = outputIntrospection.builder();
+        @SuppressWarnings("unchecked") @NonNull Argument<Object>[] arguments = (Argument<Object>[]) builder.getArguments();
+
+        if (!isDefault) {
+            processCustomMappers(input, mapStrategy, conflictStrategy, builder, arguments);
+        }
+        for (BeanProperty<I, Object> beanProperty : inputIntrospection.getBeanProperties()) {
+            if (!beanProperty.isWriteOnly()) {
+                String propertyName = beanProperty.getName();
+                if (!isDefault && mapStrategy.customMappers().containsKey(propertyName)) {
+                    continue;
+                }
+                int i = builder.indexOf(propertyName);
+                if (i > -1) {
+                    Argument<Object> argument = arguments[i];
+                    Object value = beanProperty.get(input);
+                    if (argument.isInstance(value)) {
+                        builder.with(i, argument, value);
+                    } else if (conflictStrategy == Mapper.MapStrategy.ConflictStrategy.CONVERT) {
+                        builder.convert(i, ConversionContext.of(argument), value, conversionService);
+                    } else {
+                        builder.with(i, argument, value);
+                    }
+                }
+            }
+        }
+        return builder.build();
+    }
+
+    private <I, O> void processCustomMappers(I input, Mapper.MapStrategy mapStrategy, Mapper.MapStrategy.ConflictStrategy conflictStrategy, BeanIntrospection.Builder<O> builder, @NonNull Argument<Object>[] arguments) {
+        mapStrategy.customMappers().forEach((name, func) -> {
+            int i = builder.indexOf(name);
+            if (i > -1) {
+                Argument<Object> argument = arguments[i];
+                Object result = func.apply(mapStrategy, input);
+                if (argument.isInstance(result)) {
+                    builder.with(i, argument, result);
+                } else if (conflictStrategy == Mapper.MapStrategy.ConflictStrategy.CONVERT) {
+                    builder.convert(i, ConversionContext.of(argument), result, conversionService);
+                }
+            }
+        });
+    }
+
+    private <O> O map(Map<String, Object> input, Mapper.MapStrategy mapStrategy, BeanIntrospection<O> outputIntrospection) {
+        BeanIntrospection.Builder<O> builder = outputIntrospection.builder();
+        @NonNull Argument<Object>[] arguments = (Argument<Object>[]) builder.getArguments();
+        handleMapInput(input, mapStrategy, builder, arguments);
+        return builder.build();
+    }
+
+    private <O> void handleMapInput(Map<String, Object> input, Mapper.MapStrategy mapStrategy, BeanIntrospection.Builder<O> builder, @NonNull Argument<Object>[] arguments) {
+        Mapper.MapStrategy.ConflictStrategy conflictStrategy = mapStrategy.conflictStrategy();
+        boolean isDefault = mapStrategy == Mapper.MapStrategy.DEFAULT;
+        if (!isDefault) {
+            processCustomMappers(input, mapStrategy, conflictStrategy, builder, arguments);
+        }
+        input.forEach((key, value) -> {
+            int i = builder.indexOf(key);
+            if (!isDefault && mapStrategy.customMappers().containsKey(key)) {
+                return;
+            }
+            if (i > -1) {
+                Argument<Object> argument = arguments[i];
+                if (conflictStrategy == Mapper.MapStrategy.ConflictStrategy.CONVERT) {
+                    builder.convert(i, ConversionContext.of(argument), value, conversionService);
+                } else {
+                    builder.with(i, argument, value);
+                }
+            }
+        });
     }
 }
