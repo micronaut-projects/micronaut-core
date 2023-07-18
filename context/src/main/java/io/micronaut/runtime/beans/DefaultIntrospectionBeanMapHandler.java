@@ -15,6 +15,7 @@
  */
 package io.micronaut.runtime.beans;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.beans.BeanIntrospection;
@@ -38,6 +39,7 @@ import java.util.Objects;
  */
 @Singleton
 @Internal
+@BootstrapContextCompatible
 final class DefaultIntrospectionBeanMapHandler implements IntrospectionBeanMapHandler {
     private final BeanIntrospector beanIntrospector;
     private final ConversionService conversionService;
@@ -104,21 +106,38 @@ final class DefaultIntrospectionBeanMapHandler implements IntrospectionBeanMapHa
 
     @Override
     public <I, O> O map(I input, BeanMapper.MapStrategy mapStrategy, BeanIntrospection<I> inputIntrospection, BeanIntrospection<O> outputIntrospection) {
-        if (mapStrategy == null) {
-            mapStrategy = BeanMapper.MapStrategy.DEFAULT;
-        }
+        boolean isDefault = mapStrategy == BeanMapper.MapStrategy.DEFAULT;
         BeanMapper.MapStrategy.ConflictStrategy conflictStrategy = mapStrategy.conflictStrategy();
         BeanIntrospection.Builder<O> builder = outputIntrospection.builder();
         @SuppressWarnings("unchecked") @NonNull Argument<Object>[] arguments = (Argument<Object>[]) builder.getArguments();
 
+        if (!isDefault) {
+            mapStrategy.customMappers().forEach((name, func) -> {
+                int i = builder.indexOf(name);
+                if (i > -1) {
+                    Argument<Object> argument = arguments[i];
+                    Object result = func.apply(mapStrategy, input);
+                    if (argument.isInstance(result)) {
+                        builder.with(i, argument, result);
+                    } else if (conflictStrategy == BeanMapper.MapStrategy.ConflictStrategy.CONVERT) {
+                        builder.convert(i, argument, result, conversionService);
+                    }
+                }
+            });
+        }
         for (BeanProperty<I, Object> beanProperty : inputIntrospection.getBeanProperties()) {
             if (!beanProperty.isWriteOnly()) {
                 String propertyName = beanProperty.getName();
+                if (!isDefault && mapStrategy.customMappers().containsKey(propertyName)) {
+                    continue;
+                }
                 int i = builder.indexOf(propertyName);
                 if (i > -1) {
                     Argument<Object> argument = arguments[i];
                     Object value = beanProperty.get(input);
-                    if (conflictStrategy == BeanMapper.MapStrategy.ConflictStrategy.CONVERT) {
+                    if (argument.isInstance(value)) {
+                        builder.with(i, argument, value);
+                    } else if (conflictStrategy == BeanMapper.MapStrategy.ConflictStrategy.CONVERT) {
                         builder.convert(i, argument, value, conversionService);
                     } else {
                         builder.with(i, argument, value);

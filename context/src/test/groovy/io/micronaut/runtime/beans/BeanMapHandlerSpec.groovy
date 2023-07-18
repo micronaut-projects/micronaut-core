@@ -1,6 +1,6 @@
-package io.micronaut.beans
+package io.micronaut.runtime.beans
 
-import io.micronaut.beans.SimpleRobotEntity.TestBeans
+import io.micronaut.runtime.beans.SimpleRobotEntity.TestBeans
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.beans.BeanMapper
 import jakarta.inject.Inject

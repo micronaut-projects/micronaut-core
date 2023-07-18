@@ -23,6 +23,7 @@ import io.micronaut.context.expressions.DefaultExpressionEvaluationContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.BeanDefinition;
 
@@ -46,6 +47,13 @@ public final class EvaluatedAnnotationMetadata extends MappingAnnotationMetadata
                                         ConfigurableExpressionEvaluationContext evaluationContext) {
         this.delegateAnnotationMetadata = targetMetadata;
         this.evaluationContext = evaluationContext;
+    }
+
+    /**
+     * @return The evaluation context.
+     */
+    public @NonNull ConfigurableExpressionEvaluationContext getEvaluationContext() {
+        return evaluationContext;
     }
 
     /**

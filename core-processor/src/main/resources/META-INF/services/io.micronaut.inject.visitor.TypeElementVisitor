@@ -1,4 +1,5 @@
 io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
+io.micronaut.inject.beans.visitor.MapperVisitor
 io.micronaut.context.visitor.BeanImportVisitor
 io.micronaut.context.visitor.ContextConfigurerVisitor
 io.micronaut.context.visitor.ExecutableVisitor

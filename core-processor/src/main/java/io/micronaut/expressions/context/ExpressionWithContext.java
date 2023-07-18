@@ -19,6 +19,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 
+import java.util.Objects;
+
 /**
  * Metadata for evaluated expression used at compilation time
  * to generate expression class.
@@ -51,5 +53,22 @@ public record ExpressionWithContext(@NonNull EvaluatedExpressionReference expres
     @NonNull
     public String expressionClassName() {
         return expressionReference.expressionClassName();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ExpressionWithContext that = (ExpressionWithContext) o;
+        return Objects.equals(expressionReference, that.expressionReference);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(expressionReference);
     }
 }

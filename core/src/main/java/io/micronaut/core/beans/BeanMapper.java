@@ -18,6 +18,11 @@ package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.util.CollectionUtils;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.BiFunction;
 
 /**
  * A bean mapper is an injectable type to map one type to another.
@@ -72,7 +77,7 @@ public interface BeanMapper<I, O> {
     /**
      * Strategy to use to perform mapping.
      */
-    interface MapStrategy {
+    sealed interface MapStrategy permits DefaultMapStrategy {
         /**
          * The default. Uses {@link ConflictStrategy#CONVERT}.
          */
@@ -83,16 +88,7 @@ public interface BeanMapper<I, O> {
          */
         @NonNull ConflictStrategy conflictStrategy();
 
-        /**
-         * Default strategy.
-         *
-         * @param conflictStrategy The conflict strategy
-         */
-        record DefaultMapStrategy(@NonNull ConflictStrategy conflictStrategy) implements MapStrategy {
-            public DefaultMapStrategy() {
-                this(ConflictStrategy.CONVERT);
-            }
-        }
+        Map<String, BiFunction<MapStrategy, Object, Object>> customMappers();
 
         /**
          * The conflict strategy specifies the behaviour if a conflict is found.
@@ -108,6 +104,51 @@ public interface BeanMapper<I, O> {
              * Throw an {@link IllegalArgumentException}.
              */
             ERROR
+        }
+
+        /**
+         * @return A map strategy builder.
+         */
+        static @NonNull Builder builder() {
+            return new Builder();
+        }
+
+        /**
+         * Builder for constructing {@link MapStrategy}.
+         */
+        @Experimental
+        final class Builder {
+            private Map<String, BiFunction<MapStrategy,  Object, Object>> customMappers = new HashMap<>();
+            private ConflictStrategy conflictStrategy = ConflictStrategy.CONVERT;
+
+            /**
+             * @param conflictStrategy The conflict strategy
+             * @return This builder
+             */
+            public @NonNull Builder withConflictStrategy(ConflictStrategy conflictStrategy) {
+                this.conflictStrategy = conflictStrategy;
+                return this;
+            }
+
+            /**
+             * @param name The name of the target property
+             * @param mapper The mapper
+             * @return This builder
+             */
+            public @NonNull Builder withCustomMapper(@NonNull String name, @NonNull BiFunction<MapStrategy, Object, Object> mapper) {
+                customMappers.put(name, mapper);
+                return this;
+            }
+
+            /**
+             * @return Build the map strategy.
+             */
+            public @NonNull MapStrategy build() {
+                if (CollectionUtils.isEmpty(customMappers) && conflictStrategy == ConflictStrategy.CONVERT) {
+                    return MapStrategy.DEFAULT;
+                }
+                return new DefaultMapStrategy(conflictStrategy, customMappers);
+            }
         }
     }
 
