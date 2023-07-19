@@ -191,24 +191,30 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
 
                 Object from = values.get(Mapper.Mapping.MEMBER_FROM);
                 Object condition = values.get(Mapper.Mapping.MEMBER_CONDITION);
+                EvaluatedExpression evaluatedCondition = condition instanceof EvaluatedExpression ee ? ee : null;
                 ArgumentConversionContext<?> finalConversionContext = conversionContext;
                 if (from instanceof EvaluatedExpression evaluatedExpression) {
-                    customMappers.put(to, (expressionEvaluationContext ->
-                        (object, builder) -> {
-                            ExpressionEvaluationContext evaluationContext = (ExpressionEvaluationContext) expressionEvaluationContext;
-                            if (condition instanceof EvaluatedExpression conditionExpression) {
-                                if (ObjectUtils.coerceToBoolean(conditionExpression.evaluate(evaluationContext))) {
+                    if (evaluatedCondition != null) {
+                        customMappers.put(to, (expressionEvaluationContext ->
+                            (object, builder) -> {
+                                ExpressionEvaluationContext evaluationContext = (ExpressionEvaluationContext) expressionEvaluationContext;
+                                if (ObjectUtils.coerceToBoolean(evaluatedCondition.evaluate(evaluationContext))) {
                                     Object v = evaluatedExpression.evaluate(evaluationContext);
                                     handleValue(i, argument, defaultValue, finalConversionContext, builder, v);
                                 } else if (defaultValue != null) {
                                     builder.with(i, argument, defaultValue);
                                 }
-                            } else {
+                            }
+                        ));
+                    } else {
+                        customMappers.put(to, (expressionEvaluationContext ->
+                            (object, builder) -> {
+                                ExpressionEvaluationContext evaluationContext = (ExpressionEvaluationContext) expressionEvaluationContext;
                                 Object v = evaluatedExpression.evaluate(evaluationContext);
                                 handleValue(i, argument, defaultValue, finalConversionContext, builder, v);
                             }
-                        }
-                    ));
+                        ));
+                    }
                 } else if (from != null) {
                     String propertyName = from.toString();
                     if (fromIntrospection != null) {
