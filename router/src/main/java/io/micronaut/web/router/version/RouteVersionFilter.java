@@ -20,9 +20,13 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.version.annotation.Version;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.UriRouteMatch;
+import io.micronaut.web.router.version.resolution.HeaderVersionResolverConfiguration;
 import io.micronaut.web.router.version.resolution.RequestVersionResolver;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +35,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Predicate;
+
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD;
 
 /**
  * Implementation of {@link io.micronaut.web.router.filter.RouteMatchFilter} responsible for filtering route matches on {@link Version}.
@@ -47,16 +53,43 @@ public class RouteVersionFilter implements VersionRouteMatchFilter {
     private final List<RequestVersionResolver> resolvingStrategies;
     private final DefaultVersionProvider defaultVersionProvider;
 
+    @Nullable
+    private final RoutesVersioningConfiguration routesVersioningConfiguration;
+
+    @Nullable
+    private final HeaderVersionResolverConfiguration headerVersionResolverConfiguration;
+
+
     /**
      * Creates a {@link RouteVersionFilter} with a collection of {@link RequestVersionResolver}.
      *
      * @param resolvingStrategies A list of {@link RequestVersionResolver} beans to extract version from HTTP request
      * @param defaultVersionProvider The Default Version Provider
+     * @deprecated Use {@link RouteVersionFilter(List, DefaultVersionProvider, RoutesVersioningConfiguration, HeaderVersionResolverConfiguration)} instead.
      */
+    @Deprecated
     public RouteVersionFilter(List<RequestVersionResolver> resolvingStrategies,
                               @Nullable DefaultVersionProvider defaultVersionProvider) {
+        this(resolvingStrategies, defaultVersionProvider, null, null);
+    }
+
+    /**
+     * Creates a {@link RouteVersionFilter} with a collection of {@link RequestVersionResolver}.
+     *
+     * @param resolvingStrategies A list of {@link RequestVersionResolver} beans to extract version from HTTP request
+     * @param defaultVersionProvider The Default Version Provider
+     * @param routesVersioningConfiguration Configuration for routes versioning
+     * @param headerVersionResolverConfiguration Configuration for Header Version resolution
+     */
+    @Inject
+    public RouteVersionFilter(List<RequestVersionResolver> resolvingStrategies,
+                                         @Nullable DefaultVersionProvider defaultVersionProvider,
+                                         @Nullable RoutesVersioningConfiguration routesVersioningConfiguration,
+                                         @Nullable HeaderVersionResolverConfiguration headerVersionResolverConfiguration) {
         this.resolvingStrategies = resolvingStrategies;
         this.defaultVersionProvider = defaultVersionProvider;
+        this.routesVersioningConfiguration = routesVersioningConfiguration;
+        this.headerVersionResolverConfiguration = headerVersionResolverConfiguration;
     }
 
     /**
@@ -82,9 +115,13 @@ public class RouteVersionFilter implements VersionRouteMatchFilter {
 
         return match -> {
             Optional<String> routeVersion = getVersion(match);
-            return routeVersion.isPresent() ?
-                    matchIfRouteIsVersioned(request, version.orElse(defaultVersion.orElse(null)), routeVersion.get()) :
-                    matchIfRouteIsNotVersioned(request, version.orElse(null));
+            if (routeVersion.isPresent()) {
+                if (shouldFilterReturnTrueForPreFlightRequest(request)) {
+                    return true;
+                }
+                return matchIfRouteIsVersioned(request, version.orElse(defaultVersion.orElse(null)), routeVersion.get());
+            }
+            return matchIfRouteIsNotVersioned(request, version.orElse(null));
         };
     }
 
@@ -154,6 +191,23 @@ public class RouteVersionFilter implements VersionRouteMatchFilter {
      */
     protected <T, R> Optional<String> getVersion(UriRouteMatch<T, R> routeMatch) {
         return routeMatch.getExecutableMethod().stringValue(Version.class);
+    }
+
+
+    private boolean shouldFilterReturnTrueForPreFlightRequest(HttpRequest<?> request) {
+        if (!isPreflightRequest(request)) {
+            return false;
+        }
+        if (routesVersioningConfiguration != null && routesVersioningConfiguration.isEnabled() && headerVersionResolverConfiguration != null) {
+            return headerVersionResolverConfiguration.getNames().stream().anyMatch(expectedHeaderName -> request.getHeaders().getAll(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS).contains(expectedHeaderName));
+        }
+        return true;
+    }
+
+    private static boolean isPreflightRequest(HttpRequest<?> request) {
+        HttpHeaders headers = request.getHeaders();
+        Optional<String> origin = headers.getOrigin();
+        return origin.isPresent() && headers.contains(ACCESS_CONTROL_REQUEST_METHOD) && HttpMethod.OPTIONS == request.getMethod();
     }
 
 }
