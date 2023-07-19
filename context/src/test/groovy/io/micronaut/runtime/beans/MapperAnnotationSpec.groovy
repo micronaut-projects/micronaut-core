@@ -88,6 +88,14 @@ class MapperAnnotationSpec extends Specification {
         result.id == 'FOO'
         result.companyId == 'rab'
         result.parts == 20
+
+        when:"a doesn't match condition"
+        result = testBean.toEntityTransform(new CreateRobot("foo", "bar", 55))
+
+        then:
+        result.id == 'FOO'
+        result.companyId == 'rab'
+        result.parts == 10
     }
 }
 
@@ -105,7 +113,7 @@ abstract class Test {
     abstract SimpleRobotEntity toEntity(CreateRobot createRobot)
 
     @Mapper.Mapping(to = "id", from = "#{createRobot.id.toUpperCase()}")
-    @Mapper.Mapping(to = "parts", from = "#{createRobot.parts * 2}")
+    @Mapper.Mapping(to = "parts", from = "#{createRobot.parts * 2}", condition = "#{createRobot.parts < 50}", defaultValue = "10")
     @Mapper.Mapping(to = "companyId", from = "#{this.calcCompanyId(createRobot)}")
     abstract SimpleRobotEntity toEntityTransform(CreateRobot createRobot)
 

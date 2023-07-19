@@ -16,17 +16,12 @@
 package io.micronaut.context.annotation;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.util.CollectionUtils;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.function.BiFunction;
 
 /**
  * An annotation that can be used on abstract methods that define a return type and exactly a single argument.
@@ -49,7 +44,7 @@ public @interface Mapper {
     /**
      * @return The conflict strategy.
      */
-    MapStrategy.ConflictStrategy conflictStrategy() default MapStrategy.ConflictStrategy.CONVERT;
+    ConflictStrategy conflictStrategy() default ConflictStrategy.CONVERT;
 
     /**
      * The mappings.
@@ -61,8 +56,8 @@ public @interface Mapper {
         String MEMBER_TO = "to";
         String MEMBER_FROM = "from";
         String MEMBER_CONDITION = "condition";
-
         String MEMBER_FORMAT = "format";
+        String MEMBER_DEFAULT_VALUE = "defaultValue";
 
         /**
          * @return name of the property to map to.
@@ -87,84 +82,18 @@ public @interface Mapper {
     }
 
     /**
-     * Strategy to use to perform mapping.
+     * The conflict strategy specifies the behaviour if a conflict is found.
+     *
+     * <p>A conflict could be if for the example the source input defines a property that doesn't exist in the output or the types don't match</p>
      */
-    sealed interface MapStrategy permits DefaultMapStrategy {
+    enum ConflictStrategy {
         /**
-         * The default. Uses {@link ConflictStrategy#CONVERT}.
+         * Try and convert otherwise error.
          */
-        MapStrategy DEFAULT = new DefaultMapStrategy();
-
+        CONVERT,
         /**
-         * @return The conflict strategy.
+         * Throw an {@link IllegalArgumentException}.
          */
-        @NonNull ConflictStrategy conflictStrategy();
-
-        /**
-         * Custom mapper definitions.
-         * @return The custom mappers.
-         */
-        Map<String, BiFunction<MapStrategy, Object, Object>> customMappers();
-
-        /**
-         * The conflict strategy specifies the behaviour if a conflict is found.
-         *
-         * <p>A conflict could be if for the example the source input defines a property that doesn't exist in the output or the types don't match</p>
-         */
-        enum ConflictStrategy {
-            /**
-             * Try and convert otherwise error.
-             */
-            CONVERT,
-            /**
-             * Throw an {@link IllegalArgumentException}.
-             */
-            ERROR
-        }
-
-        /**
-         * @return A map strategy builder.
-         */
-        static @NonNull Builder builder() {
-            return new Builder();
-        }
-
-        /**
-         * Builder for constructing {@link MapStrategy}.
-         */
-        @Experimental
-        final class Builder {
-            private Map<String, BiFunction<MapStrategy,  Object, Object>> customMappers = new HashMap<>();
-            private ConflictStrategy conflictStrategy = ConflictStrategy.CONVERT;
-
-            /**
-             * @param conflictStrategy The conflict strategy
-             * @return This builder
-             */
-            public @NonNull Builder withConflictStrategy(ConflictStrategy conflictStrategy) {
-                this.conflictStrategy = conflictStrategy;
-                return this;
-            }
-
-            /**
-             * @param name The name of the target property
-             * @param mapper The mapper
-             * @return This builder
-             */
-            public @NonNull Builder withCustomMapper(@NonNull String name, @NonNull BiFunction<MapStrategy, Object, Object> mapper) {
-                customMappers.put(name, mapper);
-                return this;
-            }
-
-            /**
-             * @return Build the map strategy.
-             */
-            public @NonNull MapStrategy build() {
-                if (CollectionUtils.isEmpty(customMappers) && conflictStrategy == ConflictStrategy.CONVERT) {
-                    return MapStrategy.DEFAULT;
-                }
-                return new DefaultMapStrategy(conflictStrategy, customMappers);
-            }
-        }
+        ERROR
     }
 }
