@@ -21,7 +21,6 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.convert.format.MapFormat;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.StringConvention;
@@ -399,10 +398,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                         } else {
                             converted = conversionService.convert(value, conversionContext);
                         }
-
-                        conversionContext.getLastError().ifPresent(error -> {
-                            throw new ConversionErrorException(conversionContext.getArgument(), error);
-                        });
 
                         if (log.isTraceEnabled()) {
                             if (converted.isPresent()) {

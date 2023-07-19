@@ -27,6 +27,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
+import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
@@ -176,6 +177,9 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
             }
             ArgumentBinder binder = this.beanPropertyBinder.get();
             ArgumentBinder.BindingResult result = binder.bind(conversionContext, correctKeys(map));
+            conversionContext.getLastError().ifPresent(error -> {
+                throw new ConversionErrorException(conversionContext.getArgument(), error);
+            });
             return result.getValue();
         };
     }
