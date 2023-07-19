@@ -299,7 +299,7 @@ public class CrossOriginTest {
                     .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
                     .build()));
             },
-            ()-> {
+            () -> {
                 // V2 version/common
                 config.put("micronaut.router.versioning.default-version", 2);
                 asserts(SPECNAME, config,
@@ -309,7 +309,7 @@ public class CrossOriginTest {
                         .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
                         .build()));
             },
-            ()-> {
+            () -> {
                 // V2 version/new
                 config.put("micronaut.router.versioning.default-version", 2);
                 asserts(SPECNAME, config,
