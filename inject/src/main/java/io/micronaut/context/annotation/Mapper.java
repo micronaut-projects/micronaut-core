@@ -79,6 +79,11 @@ public @interface Mapper {
          * @return The default value to use.
          */
         String defaultValue() default "";
+
+        /**
+         * @return The format (for numbers an dates).
+         */
+        String format() default "";
     }
 
     /**

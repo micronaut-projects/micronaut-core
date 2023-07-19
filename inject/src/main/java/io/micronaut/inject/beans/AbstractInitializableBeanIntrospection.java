@@ -607,28 +607,24 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
         @Override
         public @NonNull <A> Builder<B> with(int index, Argument<A> argument, A value) {
-            if (value == null && argument.isNonNull()) {
-                    throw new IllegalArgumentException("Non-null argument [" + argument + "] specified as a null");
-
+            if (value != null) {
+                if (!argument.isInstance(value)) {
+                    throw new IllegalArgumentException("Invalid value [" + value + "] specified for argument [" + argument + "]");
+                }
+                params[index] = value;
             }
-            if (!argument.isInstance(value)) {
-                throw new IllegalArgumentException("Invalid value [" + value + "] specified for argument [" + argument + "]");
-            }
-            params[index] = value;
             return this;
         }
 
         @Override
         public @NonNull <A> Builder<B> convert(int index, ArgumentConversionContext<A> conversionContext, Object value, ConversionService conversionService) {
             Argument<A> argument = conversionContext.getArgument();
-            if (value == null) {
-                if (argument.isNonNull()) {
-                    throw new IllegalArgumentException("Non-null argument [" + argument + "] specified as a null");
+            if (value != null) {
+                if (!argument.isInstance(value)) {
+                    value = conversionService.convertRequired(value, conversionContext);
                 }
-            } else if (!argument.isInstance(value)) {
-                value = conversionService.convertRequired(value, conversionContext);
+                params[index] = value;
             }
-            params[index] = value;
             return this;
         }
 
@@ -652,7 +648,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         public B build() {
             for (int i = 0; i < builderData.required.length; i++) {
                 if (builderData.required[i] && params[i] == null) {
-                    throw new IllegalArgumentException("Required argument [" + builderData.arguments[i] + "] cannot be null");
+                    throw new IllegalArgumentException("Non-null argument [" + builderData.arguments[i] + "] specified as a null");
                 }
             }
             BeanIntrospection<Object> builderIntrospection = builderData.builder;
