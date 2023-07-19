@@ -14,6 +14,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.BlockingHttpClient
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import spock.lang.Specification
@@ -76,7 +77,25 @@ class CorsVersionSpec extends Specification {
     }
 
     void "preflight for version routed without version header"() {
-        //TODO
+        given:
+        BlockingHttpClient client = httpClient.toBlocking()
+
+        when:
+        MutableHttpRequest<?> request = HttpRequest.OPTIONS("/common")
+        preflightHeaders(null).each { k, v -> request.header(k, v)}
+        client.exchange(request)
+
+        then:
+        noExceptionThrown()
+
+        when:
+        request = HttpRequest.OPTIONS("/new")
+        preflightHeaders(null).each { k, v -> request.header(k, v)}
+        client.exchange(request)
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.status == HttpStatus.NOT_FOUND
     }
 
     static Map<String, String> preflightHeaders(String accessControlRequestHeaders) {

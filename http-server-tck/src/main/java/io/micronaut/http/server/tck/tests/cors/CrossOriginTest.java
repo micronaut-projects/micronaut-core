@@ -286,14 +286,11 @@ public class CrossOriginTest {
     }
 
     @Test
-    void testApiVersionedEndpoints() {
-        Map<String, Object> config = CollectionUtils.mapOf(
-            "micronaut.router.versioning.enabled", StringUtils.TRUE,
-            "micronaut.router.versioning.header.enabled", StringUtils.TRUE,
-            "micronaut.router.versioning.header.names", Collections.singletonList("x-api-version")
-        );
+    void versionedPreflightBehavesAsExpectedWithDefaultVersion() {
+        Map<String, Object> config = versionedRoutesConfig();
         assertAll(
             () -> {
+                // V1 version/common
                 config.put("micronaut.router.versioning.default-version", 1);
                 asserts(SPECNAME, config,
                 preflight(UriBuilder.of("/version").path("common"), "https://foo.com", HttpMethod.GET),
@@ -303,6 +300,7 @@ public class CrossOriginTest {
                     .build()));
             },
             ()-> {
+                // V2 version/common
                 config.put("micronaut.router.versioning.default-version", 2);
                 asserts(SPECNAME, config,
                     preflight(UriBuilder.of("/version").path("common"), "https://foo.com", HttpMethod.GET),
@@ -311,17 +309,8 @@ public class CrossOriginTest {
                         .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
                         .build()));
             },
-            // this one fails with a 404 error, see https://github.com/micronaut-projects/micronaut-core/issues/9375
             ()-> {
-                config.put("micronaut.router.versioning.default-version", 1);
-                asserts(SPECNAME, config,
-                    preflight(UriBuilder.of("/version").path("new"), "https://foo.com", HttpMethod.GET),
-                    (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
-                        .status(HttpStatus.OK)
-                        .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
-                        .build()));
-            },
-            ()-> {
+                // V2 version/new
                 config.put("micronaut.router.versioning.default-version", 2);
                 asserts(SPECNAME, config,
                     preflight(UriBuilder.of("/version").path("new"), "https://foo.com", HttpMethod.GET),
@@ -333,6 +322,50 @@ public class CrossOriginTest {
         );
     }
 
+    @Test
+    void versionedPreflightWithHeaderNoDefaultVersion() throws IOException {
+        Map<String, Object> config = versionedRoutesConfig();
+        asserts(SPECNAME, config,
+            preflight(UriBuilder.of("/version").path("new"), "https://foo.com", HttpMethod.GET)
+                .header("Access-Control-Request-Headers", "x-api-version"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
+                .build()));
+    }
+
+    @Test
+    void versionedPreflightWhenDefaultVersionNotMatchHasHeader() throws IOException {
+        Map<String, Object> config = versionedRoutesConfig();
+        config.put("micronaut.router.versioning.default-version", 1);
+        asserts(SPECNAME, config,
+            preflight(UriBuilder.of("/version").path("new"), "https://foo.com", HttpMethod.GET)
+                .header("Access-Control-Request-Headers", "x-api-version"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
+                .build()));
+    }
+
+    @Test
+    void versionedPreflightFailsWhenDefaultVersionNotMatchAndNoHeader() throws IOException {
+        Map<String, Object> config = versionedRoutesConfig();
+        config.put("micronaut.router.versioning.default-version", 1);
+        asserts(SPECNAME, config,
+            preflight(UriBuilder.of("/version").path("new"), "https://foo.com", HttpMethod.GET),
+            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.NOT_FOUND)
+                .assertResponse(CorsUtils::assertCorsHeadersNotPresent)
+                .build()));
+    }
+
+    private static Map<String, Object> versionedRoutesConfig() {
+        return CollectionUtils.mapOf(
+            "micronaut.router.versioning.enabled", StringUtils.TRUE,
+            "micronaut.router.versioning.header.enabled", StringUtils.TRUE,
+            "micronaut.router.versioning.header.names", Collections.singletonList("x-api-version")
+        );
+    }
 
     private static MutableHttpRequest<?> preflight(UriBuilder uriBuilder, String originValue, HttpMethod method) {
         return preflight(uriBuilder.build(), originValue, method);
