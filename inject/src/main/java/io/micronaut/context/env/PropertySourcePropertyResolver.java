@@ -400,6 +400,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                         }
 
                         if (log.isTraceEnabled()) {
+                            conversionContext.getLastError().ifPresent(x -> log.trace("There is error in conversion context:", x.getCause()));
                             if (converted.isPresent()) {
                                 log.trace("Resolved value [{}] for property: {}", converted.get(), name);
                             } else {
