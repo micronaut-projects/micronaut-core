@@ -411,7 +411,11 @@ public class DefaultMutableConversionService implements MutableConversionService
             CharSequence.class,
             (object, targetType, context) -> {
                 NumberFormat format = resolveNumberFormat(context);
-                return Optional.of(format.format(object));
+                if (format != null) {
+                    return Optional.of(format.format(object));
+                } else {
+                    return Optional.of(object.toString());
+                }
             }
         );
 
