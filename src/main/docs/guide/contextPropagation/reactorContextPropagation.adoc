@@ -1,4 +1,8 @@
-Since Micronaut Framework version 4 Reactor integration no longer captures the state automatically, previous implementation required for all of the reactive operators to be instrumented to capture the current state for it to be propagated. That was adding an unwanted overhead and required us to maintain complicated Reactor operators instrumentation. New implementations requires for the propagated context to be extended manually. New version of the Reactor allows to achieve the same thread-local propagation by including the Micrometer Context Propagation dependency.
+Since Micronaut Framework version 4, https://projectreactor.io[Project Reactor] integration no longer captures the state automatically. Micronaut Framework users need to extend the propagation context manually.
+
+Before version 4, Micronaut Framework required the instrumentation of every reactive operator to capture the current state to propagate it. It added an unwanted overhead and forced us to maintain complicated Reactor operators' instrumentation.
+
+Since 3.5.0, Reactor-Core embeds support for the `io.micrometer:context-propagation` SPI. This allows to achieve the same thread-local propagation by including the  https://micrometer.io/docs/contextPropagation[Micrometer Context Propagation] dependency.
 
 The Micronaut's `PropagatedContext` will be automatically added to the Reactors context for the interceptors and the HTTP filters. It's possible to use the utility class api:core.async.propagation.ReactorPropagation[] to access it.
 
