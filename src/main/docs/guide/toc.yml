@@ -1,7 +1,7 @@
 introduction:
   title: Introduction
   whatsNew: What's New?
-  upgrading: Upgrading to Micronaut 3.x
+  upgrading: Upgrading your Micronaut Application
 quickStart:
   title: Quick Start
   buildCLI: Install the CLI
