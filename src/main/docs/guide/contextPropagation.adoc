@@ -1,4 +1,4 @@
-The context propagation is represented by api:core.propagation.PropagatedContext[] object, it's designed to be immutable and it consists of multiple elements of api:core.propagation.PropagatedContextElement[].
+The api:core.propagation.PropagatedContext[] object represents the context propagation. We designed the context propagation API for immutability. It consists of multiple elements of type api:core.propagation.PropagatedContextElement[].
 
 Each element represents a particular state that needs to be propagated. There is a special element that can be used to update and restore the thread-local value api:core.propagation.ThreadPropagatedContextElement[]:
 
