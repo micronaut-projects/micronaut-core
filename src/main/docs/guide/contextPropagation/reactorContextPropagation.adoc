@@ -23,5 +23,5 @@ If you have Micrometer Context Propagation on the classpath but don't want to us
 [configuration]
 ----
 reactor:
-    enableAutomaticContextPropagation: false
+    enable-automatic-context-propagation: false
 ----
