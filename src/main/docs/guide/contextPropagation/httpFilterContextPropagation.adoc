@@ -6,6 +6,6 @@ snippet::io.micronaut.docs.propagation.MdcFilter[tags="class", indent=0, title="
 
 The next filter in the chain will have the new propagated context available. Any of the thread-local context elements will be set for the next filter or the controller method invocation.
 
-To use the legacy reactive HTTP filters simply modify and propagate the context bound to the next chain invocation:
+To use the legacy reactive HTTP filters, simply modify and propagate the context bound to the following chain invocation:
 
 snippet::io.micronaut.docs.propagation.MdcLegacyFilter[tags="class", indent=0, title="Example of adding a new MDC propagated context element for the reactive filter"]
