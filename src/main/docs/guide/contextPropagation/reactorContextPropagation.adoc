@@ -11,7 +11,8 @@ NOTE: api:core.async.propagation.ReactorPropagation[] is an experimental class a
 It is possible to use https://micrometer.io/docs/contextPropagation[Micrometer Context Propagation], which Reactor supports for propagation and restoring the thread-local context.
 
 To enable it, include the dependency:
-dependency:io.micrometer:context-propagation[gradleScope="implementation"]
+
+dependency:context-propagation[groupId="io.micrometer",scope="compile"]
 
 After that all the thread-local propagated elements will be able to restore it's thread local value.
 
