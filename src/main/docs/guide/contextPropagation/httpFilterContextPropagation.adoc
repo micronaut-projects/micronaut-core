@@ -1,4 +1,4 @@
-Modifying the propagated context is a common scenario, usually you want to extend the context to include the request related values.
+Modifying the propagated context is a common scenario. Usually, you want to extend the context to include the request-related values.
 
 To use a non-reactive HTTP filter API you need to add a method parameter api:core.propagation.MutablePropagatedContext[] and modify the propagated context elements by adding or removing the existing once:
 
