@@ -90,7 +90,7 @@ See <<filtermethods, Filter Methods>>
 
 ==== Context Propagation API
 
-Micronaut Framework 4 introduces a new <<contextPropagation, Context Propagation API>>.
+Micronaut Framework 4 introduces a new <<contextPropagation, Context Propagation API>>, which aims to simplify reactor instrumentation, avoid thread-local usage, and integrate idiomatically with Kotlin Coroutines.
 
 === Breaking Changes
 
