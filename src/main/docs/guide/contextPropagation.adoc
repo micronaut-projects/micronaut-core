@@ -14,4 +14,4 @@ NOTE: The api:core.propagation.ThreadPropagatedContextElement[] is inspired by K
 
 snippet::io.micronaut.docs.propagation.MdcService[tags="createUser", indent=0, title="MDC propagation example"]
 
-NOTE: In the previous versions of Micronaut Framework we would capture the context to propagate, this is not the case since Micronaut Framework 4. We always require for the context to be modified manually and repropagated.
+IMPORTANT: In the previous versions of Micronaut Framework, we would capture the context to propagate, this is not the case since Micronaut Framework 4. We always require for the context to be modified manually and repropagated.
