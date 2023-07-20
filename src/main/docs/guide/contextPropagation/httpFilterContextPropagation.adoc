@@ -12,4 +12,8 @@ The next filter in the chain will have the new propagated context available. Any
 
 To use the legacy reactive HTTP filters, simply modify and propagate the context bound to the following chain invocation:
 
-snippet::io.micronaut.docs.propagation.MdcLegacyFilter[tags="class", indent=0, title="Example of adding a new MDC propagated context element for the reactive filter"]
+.Example of adding a new MDC propagated context element for the reactive filter:
+[source,java]
+----
+include::{testsuitejava}/propagation/MdcLegacyFilter.java[tags="class", indent=0]
+----
