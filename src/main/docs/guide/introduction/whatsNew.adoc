@@ -88,6 +88,9 @@ See <<filtermethods, Filter Methods>>
 
 <<javanetClient, Additional implementation of the HTTP Client based on Java HTTP Client>>
 
+==== Context Propagation API
+
+Micronaut Framework 4 introduces a new <<contextPropagation, Context Propagation API>>.
 
 === Breaking Changes
 
