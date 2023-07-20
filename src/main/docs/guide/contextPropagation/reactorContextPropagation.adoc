@@ -8,7 +8,7 @@ The framework automatically adds the `PropagatedContext` to Project Reactor's co
 
 NOTE: api:core.async.propagation.ReactorPropagation[] is an experimental class and might change in the future.
 
-It is possible to use https://micrometer.io/docs/contextPropagation[Micrometer Context Propagation] that Reactor supports for propagation and the restoring of the thread-local context.
+It is possible to use https://micrometer.io/docs/contextPropagation[Micrometer Context Propagation], which Reactor supports for propagation and restoring the thread-local context.
 
 To enable it, include the dependency:
 dependency:io.micrometer:context-propagation[gradleScope="implementation"]
