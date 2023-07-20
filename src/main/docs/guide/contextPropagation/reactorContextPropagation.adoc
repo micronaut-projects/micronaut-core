@@ -20,7 +20,7 @@ NOTE: The thread-local values are read-only. To modify them, the `PropagatedCont
 If you have Micrometer Context Propagation on the classpath but don't want to use it, apply the following configuration:
 
 .Disable Micrometer Context Propagation in Reactor
-[source,yaml]
+[configuration]
 ----
 reactor:
     enableAutomaticContextPropagation: false
