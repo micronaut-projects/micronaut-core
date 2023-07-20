@@ -1,6 +1,6 @@
 Modifying the propagated context is a common scenario. Usually, you want to extend the context to include the request-related values.
 
-To use a non-reactive HTTP filter API you need to add a method parameter api:core.propagation.MutablePropagatedContext[] and modify the propagated context elements by adding or removing the existing once:
+To use a non-reactive HTTP filter API, you need to add a method parameter api:core.propagation.MutablePropagatedContext[] and modify the propagated context elements by adding or removing the existing ones:
 
 snippet::io.micronaut.docs.propagation.MdcFilter[tags="class", indent=0, title="Example of adding a new MDC propagated context element"]
 
