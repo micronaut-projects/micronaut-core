@@ -194,6 +194,10 @@ httpClient:
   clientHttp2: HTTP/2 Support
   clientHttp3: HTTP/3 Support
   clientSample: HTTP Client Sample
+contextPropagation:
+  title: Context propagation
+  reactorContextPropagation: Reactor context propagation
+  httpFilterContextPropagation: HTTP filters context propagation
 cloud:
   title: Cloud Native Features
   cloudConfiguration:
@@ -251,10 +255,6 @@ configurations:
     cassandraSupport: Configuring Cassandra
     liquibaseSupport: Configuring Liquibase
     flywaySupport: Configuring Flyway
-contextPropagation:
-  title: Context propagation
-  reactorContextPropagation: Reactor context propagation
-  httpFilterContextPropagation: HTTP filters context propagation
 logging:
   title: Logging
   loggingMessages: Logging Messages

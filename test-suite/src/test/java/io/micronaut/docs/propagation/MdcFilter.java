@@ -9,7 +9,7 @@ import org.slf4j.MDC;
 
 import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
 
-@Requires(property = "mdc.example.enabled")
+@Requires(property = "mdc.example.filter.enabled")
 // tag::class[]
 @ServerFilter(MATCH_ALL_PATTERN)
 public class MdcFilter {
