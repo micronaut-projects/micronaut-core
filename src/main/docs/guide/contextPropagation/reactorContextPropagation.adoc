@@ -17,7 +17,7 @@ After that all the thread-local propagated elements will be able to restore it's
 
 NOTE: The thread-local values are read-only. To modify the value, the `PropagatedContext` instance needs to be changed and put into the Reactor's context.
 
-If you have Micrometer Context Propagation on the classpath, but don't want to use it, apply following configuration:
+If you have Micrometer Context Propagation on the classpath but don't want to use it, apply the following configuration:
 
 .Disable Micrometer Context Propagation in Reactor
 [source,yaml]
