@@ -214,3 +214,7 @@ Micronaut Framework 4 changes `@CrossOrigin`  behavior to match configuration-ba
 ==== `@EachBean` requires a `@Named qualifier
 
 `@EachBean` throws a "multiple possible bean candidates found" exception if any parent bean lacks a name qualifier.
+
+==== Manual Context Propagation
+
+In Micronaut Framework 4, users need to extend the <<contextPropagation, propagation context>> manually.
