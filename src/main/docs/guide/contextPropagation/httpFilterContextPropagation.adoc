@@ -2,7 +2,11 @@ Modifying the propagated context is a common scenario. Usually, you want to exte
 
 To use a non-reactive HTTP filter API, you need to add a method parameter api:core.propagation.MutablePropagatedContext[] and modify the propagated context elements by adding or removing the existing ones:
 
-snippet::io.micronaut.docs.propagation.MdcFilter[tags="class", indent=0, title="Example of adding a new MDC propagated context element"]
+.Example of adding a new MDC propagated context element
+[source,java]
+----
+include::{testsuitejava}/propagation/MdcFilter.java[tags="class", indent=0]
+----
 
 The next filter in the chain will have the new propagated context available. Any of the thread-local context elements will be set for the next filter or the controller method invocation.
 
