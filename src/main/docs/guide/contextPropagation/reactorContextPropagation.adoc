@@ -14,7 +14,7 @@ To enable it, include the dependency:
 
 dependency:context-propagation[groupId="io.micrometer",scope="compile"]
 
-After that all the thread-local propagated elements will be able to restore it's thread local value.
+After that, all the thread-local propagated elements can restore their thread-local value.
 
 NOTE: The thread-local values are read-only. To modify them, the `PropagatedContext` instance needs to be changed and put into the Reactor's context.
 
