@@ -25,8 +25,6 @@ import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
 import io.netty.handler.codec.http.FullHttpResponse;
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
@@ -112,15 +110,6 @@ public interface NettyHttpResponseBuilder {
 
             response.getHeaders()
                 .forEach((s, strings) -> fullHttpResponse.headers().add(s, strings));
-        }
-
-        // does the response have a body
-        if (response instanceof FullHttpResponse || response instanceof StreamedHttpResponse) {
-            io.netty.handler.codec.http.HttpHeaders nettyHeaders = fullHttpResponse.headers();
-            // default to Transfer-Encoding: chunked if Content-Length not set or not already set
-            if (!nettyHeaders.contains(HttpHeaderNames.CONTENT_LENGTH) && !nettyHeaders.contains(HttpHeaderNames.TRANSFER_ENCODING)) {
-                nettyHeaders.set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
-            }
         }
         return fullHttpResponse;
     }

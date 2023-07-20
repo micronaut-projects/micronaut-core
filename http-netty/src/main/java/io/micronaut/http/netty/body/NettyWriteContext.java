@@ -46,7 +46,18 @@ public interface NettyWriteContext {
      *
      * @param response The response to write
      */
-    void writeFull(@NonNull FullHttpResponse response);
+    default void writeFull(@NonNull FullHttpResponse response) {
+        writeFull(response, false);
+    }
+
+    /**
+     * Write a full response.
+     *
+     * @param response The response to write
+     * @param headResponse If {@code true}, this is a response to a {@code HEAD} request, so the
+     * {@code Content-Length} header should not be overwritten.
+     */
+    void writeFull(@NonNull FullHttpResponse response, boolean headResponse);
 
     /**
      * Write a streamed response.

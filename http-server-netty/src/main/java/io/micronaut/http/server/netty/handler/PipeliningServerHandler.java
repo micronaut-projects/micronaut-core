@@ -634,19 +634,28 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
         }
 
-        /**
-         * Write a full response.
-         *
-         * @param response The response to write
-         */
         @Override
-        public void writeFull(FullHttpResponse response) {
+        public void writeFull(FullHttpResponse response, boolean headResponse) {
+            response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
+            if (canHaveBody(response.status())) {
+                if (!headResponse) {
+                    response.headers().set(HttpHeaderNames.CONTENT_LENGTH, response.content().readableBytes());
+                }
+            } else {
+                response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
+            }
             preprocess(response);
             write(new FullOutboundHandler(this, response));
         }
 
         @Override
         public void writeStreamed(HttpResponse response, Publisher<HttpContent> content) {
+            response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
+            if (canHaveBody(response.status())) {
+                response.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
+            } else {
+                response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
+            }
             preprocess(response);
             content.subscribe(new StreamingOutboundHandler(this, response));
         }
