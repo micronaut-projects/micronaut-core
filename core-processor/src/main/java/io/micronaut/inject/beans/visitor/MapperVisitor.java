@@ -24,6 +24,7 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.PropertyElementQuery;
+import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -54,7 +55,7 @@ public final class MapperVisitor implements TypeElementVisitor<Object, Mapper> {
                 @NonNull ParameterElement[] parameters = element.getParameters();
                 if (parameters.length == 1) {
                     if (toType.isVoid()) {
-                        context.fail("A void return type is not permitted for a mapper", element);
+                        throw new ProcessingException(element, "A void return type is not permitted for a mapper");
                     } else {
 
                         List<AnnotationValue<Mapper.Mapping>> values = element.getAnnotationMetadata().getAnnotationValuesByType(Mapper.Mapping.class);
@@ -65,8 +66,7 @@ public final class MapperVisitor implements TypeElementVisitor<Object, Mapper> {
                             if (isMap) {
                                 List<? extends ClassElement> boundGenerics = fromType.getBoundGenericTypes();
                                 if (boundGenerics.isEmpty() || !boundGenerics.iterator().next().isAssignable(String.class)) {
-                                    context.fail("@Mapping from parameter that is a Map must have String keys", element);
-                                    return;
+                                    throw new ProcessingException(element, "@Mapping from parameter that is a Map must have String keys");
                                 }
                             }
 
@@ -74,12 +74,12 @@ public final class MapperVisitor implements TypeElementVisitor<Object, Mapper> {
                             for (AnnotationValue<Mapper.Mapping> value : values) {
                                 value.stringValue("to").ifPresent(to -> {
                                     if (toDefs.contains(to)) {
-                                        context.fail("Multiple @Mapping definitions map to the same property: " + to, element);
+                                        throw new ProcessingException(element, "Multiple @Mapping definitions map to the same property: " + to);
                                     } else {
                                         toDefs.add(to);
                                         List<PropertyElement> beanProperties = toType.getBeanProperties(PropertyElementQuery.of(toType).includes(Set.of(to)));
                                         if (beanProperties.isEmpty()) {
-                                            context.fail("@Mapping(to=\"" + to + "\") specifies a property that doesn't exist in type " + toType.getName(), element);
+                                            throw new ProcessingException(element, "@Mapping(to=\"" + to + "\") specifies a property that doesn't exist in type " + toType.getName());
                                         }
                                     }
                                 });
@@ -87,7 +87,7 @@ public final class MapperVisitor implements TypeElementVisitor<Object, Mapper> {
                                     if (!from.contains("#{")) {
                                         List<PropertyElement> beanProperties = fromType.getBeanProperties(PropertyElementQuery.of(fromType).includes(Set.of(from)));
                                         if (beanProperties.isEmpty()) {
-                                            context.fail("@Mapping(from=\"" + from + "\") specifies a property that doesn't exist in type " + fromType.getName(), element);
+                                            throw new ProcessingException(element, "@Mapping(from=\"" + from + "\") specifies a property that doesn't exist in type " + fromType.getName());
                                         }
                                     }
                                 });
@@ -98,10 +98,10 @@ public final class MapperVisitor implements TypeElementVisitor<Object, Mapper> {
                         }
                     }
                 } else {
-                    context.fail("Only a single parameter is permitted on a mapping method", element);
+                    throw new ProcessingException(element, "Only a single parameter is permitted on a mapping method");
                 }
             } else {
-                context.fail("@Mapper can only be declared on abstract methods", element);
+                throw new ProcessingException(element, "@Mapper can only be declared on abstract methods");
             }
         }
     }
