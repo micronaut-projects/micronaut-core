@@ -287,7 +287,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 .ALL_METHODS
                 .onlyAccessible(classToBuild)
                 .onlyInstance()
-                .filter(m -> m.getGenericReturnType().getName().equals(classToBuild.getName()) && !m.hasParameters());
+                .filter(m -> m.getGenericReturnType().getName().equals(classToBuild.getName()));
             if (creatorMethod != null) {
                 buildMethodQuery = buildMethodQuery.named(creatorMethod);
             }

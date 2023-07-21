@@ -75,4 +75,23 @@ class BeanIntrospectionBuilderSpec extends Specification {
         result.name == "Fred"
         result.age == 20
     }
+
+    void 'test build type with builder method with arguments'() {
+
+        given:
+        def introspection = BeanIntrospection.getIntrospection(TestBuildMe3)
+        def builder = introspection.builder()
+        def result = builder.with("name", "Fred").with("age", 20).build("Apple")
+
+
+        expect:
+        result.name == "Fred"
+        result.age == 20
+        result.company == "Apple"
+        introspection.constructorArguments.length == 3
+        introspection.instantiate("Fred", 20, "Apple") == result
+        introspection.hasBuilder()
+        introspection.isBuildable()
+
+    }
 }

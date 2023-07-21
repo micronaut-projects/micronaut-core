@@ -91,7 +91,8 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
         this.constructorAnnotationMetadata = constructorAnnotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : EvaluatedAnnotationMetadata.wrapIfNecessary(constructorAnnotationMetadata);
         if (hasBuilder()) {
-            this.constructorArguments = getBuilderData().arguments;
+            IntrospectionBuilderData bd = getBuilderData();
+            this.constructorArguments = ArrayUtils.concat(bd.arguments, bd.creator.getArguments());
         } else {
             this.constructorArguments = constructorArguments == null ? Argument.ZERO_ARGUMENTS : constructorArguments;
         }
@@ -143,18 +144,20 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     protected B instantiateInternal(@Nullable Object[] arguments) {
         if (hasBuilder() && arguments != null) {
             Builder<B> b = builder();
-            @NonNull Argument<?>[] args = b.getArguments();
-            if (args.length == arguments.length) {
-                for (int i = 0; i < args.length; i++) {
-                    Argument<Object> arg = (Argument<Object>) args[i];
-                    Object val = arguments[i];
-                    b.with(i, arg, val);
-                }
+            @NonNull Argument<?>[] args = b.getBuilderArguments();
+            for (int i = 0; i < args.length; i++) {
+                Argument<Object> arg = (Argument<Object>) args[i];
+                Object val = arguments[i];
+                b.with(i, arg, val);
+            }
+            @NonNull Argument<?>[] buildMethodArguments = b.getBuildMethodArguments();
+            if (buildMethodArguments.length == 0) {
+                return b.build();
             } else {
-                throw new IllegalArgumentException("Expected " + args.length + " arguments to instantiate type [" + getBeanType() + "] but got " + arguments.length);
+                @Nullable Object[] buildParams = Arrays.copyOfRange(arguments, args.length, arguments.length);
+                return b.build(buildParams);
             }
 
-            return b.build();
         } else {
             throw new InstantiationException("Type [" + getBeanType() + "] defines no accessible constructor");
         }
@@ -433,7 +436,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
                     // find the creator method
                     BeanMethod<Object, Object> constructorMethod = beanMethods.stream()
-                        .filter(m -> m.getReturnType().getType().equals(getBeanType()) && ArrayUtils.isEmpty(m.getArguments()))
+                        .filter(m -> m.getReturnType().getType().equals(getBeanType()))
                         .findFirst().orElse(null);
                     if (constructorMethod == null) {
                         throw new IntrospectionException("No build method found in builder: " + builderClass.getName());
@@ -605,8 +608,13 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
         @SuppressWarnings("unchecked")
         @Override
-        public @NonNull Argument<?>[] getArguments() {
+        public @NonNull Argument<?>[] getBuilderArguments() {
             return builderData.arguments;
+        }
+
+        @Override
+        public @NonNull Argument<?>[] getBuildMethodArguments() {
+            return builderData.creator.getArguments();
         }
 
         @Override
@@ -666,6 +674,11 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
         @Override
         public B build() {
+            return build(ArrayUtils.EMPTY_OBJECT_ARRAY);
+        }
+
+        @Override
+        public B build(Object... builderParams) {
             for (int i = 0; i < builderData.required.length; i++) {
                 if (builderData.required[i] && params[i] == null) {
                     throw new IllegalArgumentException("Non-null argument [" + builderData.arguments[i] + "] specified as a null");
@@ -707,7 +720,11 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
                         }
                     }
                 }
-                return (B) creator.invoke(b);
+                if (creator.getArguments().length != builderParams.length) {
+                    throw new InstantiationException("Build method " + creator + " expects [" + creator.getArguments().length + "] arguments, but " + builderParams.length + " were provided");
+                } else {
+                    return (B) creator.invoke(b, builderParams);
+                }
             } else {
                 int constructorLength = builderData.constructorLength;
                 if (constructorLength == params.length) {

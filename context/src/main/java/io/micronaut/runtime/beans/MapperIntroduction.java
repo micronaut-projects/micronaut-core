@@ -168,7 +168,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
                 if (i == -1) {
                     continue;
                 }
-                @SuppressWarnings("unchecked") Argument<Object> argument = (Argument<Object>) builderMeta.getArguments()[i];
+                @SuppressWarnings("unchecked") Argument<Object> argument = (Argument<Object>) builderMeta.getBuilderArguments()[i];
                 ArgumentConversionContext<?> conversionContext = null;
                 if (format != null) {
                     conversionContext = ConversionContext.of(argument);
@@ -273,7 +273,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
         boolean isDefault = mapStrategy == MapStrategy.DEFAULT;
         Mapper.ConflictStrategy conflictStrategy = mapStrategy.conflictStrategy();
         BeanIntrospection.Builder<O> builder = outputIntrospection.builder();
-        @SuppressWarnings("unchecked") @NonNull Argument<Object>[] arguments = (Argument<Object>[]) builder.getArguments();
+        @SuppressWarnings("unchecked") @NonNull Argument<Object>[] arguments = (Argument<Object>[]) builder.getBuilderArguments();
 
         if (!isDefault) {
             processCustomMappers(input, mapStrategy, builder, arguments);
@@ -314,7 +314,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
 
     private <O> O map(Map<String, Object> input, MapStrategy mapStrategy, BeanIntrospection<O> outputIntrospection) {
         BeanIntrospection.Builder<O> builder = outputIntrospection.builder();
-        @NonNull Argument<Object>[] arguments = (Argument<Object>[]) builder.getArguments();
+        @NonNull Argument<Object>[] arguments = (Argument<Object>[]) builder.getBuilderArguments();
         handleMapInput(input, mapStrategy, builder, arguments);
         return builder.build();
     }

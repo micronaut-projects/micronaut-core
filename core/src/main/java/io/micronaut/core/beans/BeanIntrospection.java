@@ -293,7 +293,14 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
          *
          * @return The arguments
          */
-        @NonNull Argument<?>[] getArguments();
+        @NonNull Argument<?>[] getBuilderArguments();
+
+        /**
+         * Any arguments required by the build method. If the build method has arguments these should be provided by {@link #build()}.
+         *
+         * @return The arguments
+         */
+        @NonNull Argument<?>[] getBuildMethodArguments();
 
         /**
          * @param name The argument name
@@ -348,5 +355,14 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
          * @throws IllegalArgumentException If one of the supplied inputs is invalid
          */
         @NonNull T build();
+
+        /**
+         * Build the instance from the current state and given parameters to the build method.
+         *
+         * @param params The params
+         * @return The built instance.
+         * @throws IllegalArgumentException If one of the supplied inputs is invalid
+         */
+        @NonNull T build(Object... params);
     }
 }
