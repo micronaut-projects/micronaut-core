@@ -608,12 +608,12 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         }
     }
 
-    private void writeBooleanMethod(ClassWriter classWriter, String methodName, boolean isBuildable) {
-        GeneratorAdapter isBuildableMethod = startPublicMethodZeroArgs(classWriter, boolean.class, methodName);
-        isBuildableMethod.push(isBuildable);
-        isBuildableMethod.returnValue();
-        isBuildableMethod.visitMaxs(2, 1);
-        isBuildableMethod.endMethod();
+    private void writeBooleanMethod(ClassWriter classWriter, String methodName, boolean state) {
+        GeneratorAdapter booleanMethod = startPublicMethodZeroArgs(classWriter, boolean.class, methodName);
+        booleanMethod.push(state);
+        booleanMethod.returnValue();
+        booleanMethod.visitMaxs(2, 1);
+        booleanMethod.endMethod();
     }
 
     private void buildFindIndexedProperty(ClassWriter classWriter) {
