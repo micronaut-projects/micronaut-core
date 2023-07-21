@@ -68,6 +68,8 @@ class BeanIntrospectionBuilderSpec extends Specification {
 
 
         expect:
+        introspection.instantiate("Fred", 20) == result
+        introspection.constructorArguments.length == 2
         introspection.hasBuilder()
         introspection.isBuildable()
         result.name == "Fred"

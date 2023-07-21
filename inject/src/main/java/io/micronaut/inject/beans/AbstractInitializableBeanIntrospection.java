@@ -79,7 +79,6 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
     private BeanConstructor<B> beanConstructor;
 
-    private Builder<B> builder;
     private IntrospectionBuilderData builderData;
 
     protected AbstractInitializableBeanIntrospection(Class<B> beanType,
@@ -91,7 +90,12 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         this.beanType = beanType;
         this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
         this.constructorAnnotationMetadata = constructorAnnotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : EvaluatedAnnotationMetadata.wrapIfNecessary(constructorAnnotationMetadata);
-        this.constructorArguments = constructorArguments == null ? Argument.ZERO_ARGUMENTS : constructorArguments;
+        if (hasBuilder()) {
+            this.constructorArguments = getBuilderData().arguments;
+        } else {
+            this.constructorArguments = constructorArguments == null ? Argument.ZERO_ARGUMENTS : constructorArguments;
+        }
+
         if (propertiesRefs != null) {
             List<BeanProperty<B, Object>> beanProperties = new ArrayList<>(propertiesRefs.length);
             for (BeanPropertyRef beanPropertyRef : propertiesRefs) {
@@ -137,7 +141,23 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     @Internal
     @UsedByGeneratedCode
     protected B instantiateInternal(@Nullable Object[] arguments) {
-        throw new InstantiationException("Type [" + getBeanType() + "] defines no accessible constructor");
+        if (hasBuilder() && arguments != null) {
+            Builder<B> b = builder();
+            @NonNull Argument<?>[] args = b.getArguments();
+            if (args.length == arguments.length) {
+                for (int i = 0; i < args.length; i++) {
+                    Argument<Object> arg = (Argument<Object>) args[i];
+                    Object val = arguments[i];
+                    b.with(i, arg, val);
+                }
+            } else {
+                throw new IllegalArgumentException("Expected " + args.length + " arguments to instantiate type [" + getBeanType() + "] but got " + arguments.length);
+            }
+
+            return b.build();
+        } else {
+            throw new InstantiationException("Type [" + getBeanType() + "] defines no accessible constructor");
+        }
     }
 
     /**
