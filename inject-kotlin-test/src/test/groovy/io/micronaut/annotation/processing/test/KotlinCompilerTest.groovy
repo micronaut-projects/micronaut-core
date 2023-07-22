@@ -53,7 +53,7 @@ class Foo {
 
 @Singleton
 class Bar {
-    
+
 }
 ''')
         def bean = getBean(context, "example.Foo")
@@ -75,6 +75,52 @@ class Test {
 
         expect:
         definition != null
+    }
+
+    // issue https://github.com/micronaut-projects/micronaut-core/issues/8500
+    void "build kotlin bean definition inheriting java innner static class with executable method"() {
+        given:
+        def definition = buildBeanDefinition('test.Test', """
+package test;
+import io.micronaut.annotation.processing.test.TestJavaBeans
+import jakarta.inject.Singleton
+
+@Singleton
+class Test: TestJavaBeans.$className() {
+}
+""")
+
+        expect:
+        definition != null
+
+        where:
+        className                |_
+        'ScheduledPublicBean'    |_
+        'ScheduledProtectedBean' |_
+        'ScheduledDefaultBean'   |_
+    }
+
+    // issue https://github.com/micronaut-projects/micronaut-core/issues/8500
+    void "build kotlin bean definition inheriting java single class with executable method"() {
+        given:
+        def definition = buildBeanDefinition('test.Test', """
+package test;
+import io.micronaut.annotation.processing.test.$className
+import jakarta.inject.Singleton
+
+@Singleton
+class Test: $className() {
+}
+""")
+
+        expect:
+        definition != null
+
+        where:
+        className                      ||_
+        'PublicScheduledPublicBean'    ||_
+        'PublicScheduledProtectedBean' ||_
+        'PublicScheduledDefaultBean'   ||_
     }
 
     void "introspection with 'is' properties"() {
