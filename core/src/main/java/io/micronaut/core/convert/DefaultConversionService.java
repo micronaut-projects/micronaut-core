@@ -334,7 +334,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 return Optional.empty();
             }
 
-            StringJoiner joiner = new StringJoiner("");
+            StringJoiner joiner = new StringJoiner(",");
             for (String string : object) {
                 joiner.add(string);
             }
