@@ -20,6 +20,8 @@ import io.micronaut.aop.InterceptedMethod;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
+import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.inject.BeanDefinition;
@@ -35,6 +37,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 
+import java.util.Arrays;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -201,6 +205,10 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
      * @return Returns the fallback value or throws the original exception
      */
     protected Object resolveFallback(MethodInvocationContext<Object, Object> context, RuntimeException exception) {
+
+        Class<?> declaringType = context.classValue(Recoverable.class, "api").orElseGet(context::getDeclaringType);
+        BeanDefinition<?> beanDefinition = beanContext.findBeanDefinition(declaringType, Qualifiers.byStereotype(Fallback.class)).orElse(null);
+
         if (exception instanceof NoAvailableServiceException) {
             NoAvailableServiceException nase = (NoAvailableServiceException) exception;
             if (LOG.isErrorEnabled()) {
@@ -214,7 +222,9 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
         }
 
         Optional<? extends MethodExecutionHandle<?, Object>> fallback = findFallbackMethod(context);
-        if (fallback.isPresent()) {
+        if (fallback.isPresent() &&  Optional
+                .ofNullable(beanDefinition)
+                .map(x->isExceptionRecoverable(exception, x)).orElse(true)) {
             MethodExecutionHandle<?, Object> fallbackMethod = fallback.get();
             try {
                 if (LOG.isDebugEnabled()) {
@@ -227,5 +237,35 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
         } else {
             throw exception;
         }
+    }
+
+    private Boolean isExceptionRecoverable(RuntimeException exception,
+                                           BeanDefinition<?> beanDefinition) {
+
+       return Optional.of(beanDefinition.getAnnotationMetadata())
+                .flatMap(x->x.findDeclaredAnnotation(Fallback.class))
+                .map(AnnotationValue::getValues)
+                .map(annotationValues -> shouldResolveFallback(annotationValues, exception))
+                .orElse(false);
+    }
+
+    private boolean shouldResolveFallback(Map<CharSequence, Object> annotationValues,
+                                          RuntimeException exception) {
+
+        Boolean result = null;
+
+        AnnotationClassValue<?>[] excludes = ((AnnotationClassValue<?>[])annotationValues.get("excludes"));
+        AnnotationClassValue<?>[] includes = ((AnnotationClassValue<?>[])annotationValues.get("includes"));
+        if (excludes != null) {
+            result = Arrays.stream(excludes)
+                    .noneMatch(ac -> ac.getClass().getTypeName().equals(exception.getClass().getTypeName()));
+        }
+
+        if (includes != null) {
+            result = Optional.ofNullable(result).orElse(true) && Arrays.stream(includes)
+                    .anyMatch(ac -> ac.getClass().getTypeName().equals(exception.getClass().getTypeName()));
+        }
+
+        return Optional.ofNullable(result).orElse(true);
     }
 }
