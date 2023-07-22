@@ -116,8 +116,9 @@ public class UriTemplate implements Comparable<UriTemplate> {
                 String userInfo = matcher.group(5);
                 String host = matcher.group(6);
                 String port = matcher.group(8);
-                String path = matcher.group(9);
-                String query = matcher.group(11);
+                PathAndQueryParams pathAndQueryParams = new PathAndQueryParams(matcher.group(9), matcher.group(11));
+                String path = pathAndQueryParams.getPath();
+                String query = pathAndQueryParams.getQueryParams();
                 String fragment = matcher.group(13);
                 if (userInfo != null) {
                     createParser(userInfo, parserArguments).parse(segments);
