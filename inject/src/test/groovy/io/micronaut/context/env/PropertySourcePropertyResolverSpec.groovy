@@ -477,6 +477,19 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.getProperty("start", String).get() == "`startswithtick"
     }
 
+    void 'test escaping a literal ${value}'() {
+        given:
+        def values = [
+                'foo.bar': '${:$}{some-value}'
+        ]
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect:
+        resolver.getProperty("foo.bar", String).get() == '${some-value}'
+    }
+
     void "test properties starting with z"() {
         given:
         def values = [

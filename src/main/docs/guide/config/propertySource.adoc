@@ -115,6 +115,15 @@ myapp:
 
 The above example looks for a `server.address` property and defaults to `http://localhost:8080`. This default value is escaped with backticks since it has a `:` character.
 
+.Literal placeholder syntax
+[source,yaml]
+----
+myapp:
+  value: ${:$}{value}
+----
+
+If you require a literal `${value}` string in your configuration without any resolution of `value`, you need to use `${:$}` to generate the initial dollar symbol, and avoid resolution of `value` as above.
+
 === Property Value Binding
 
 Note that these property references should be in kebab case (lowercase and hyphen-separated) when placing references in code or in placeholder values. For example, use `micronaut.server.default-charset` and not `micronaut.server.defaultCharset`.
