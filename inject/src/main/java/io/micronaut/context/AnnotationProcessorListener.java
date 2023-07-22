@@ -64,9 +64,9 @@ class AnnotationProcessorListener implements BeanCreatedEventListener<Annotation
                 Collection<BeanDefinition<?>> beanDefinitions = beanContext.getBeanDefinitions(Qualifiers.byStereotype((Class) firstArgument.getType()));
 
                 boolean isParallel = firstArgument.isAnnotationPresent(Parallel.class);
-
                 if (isParallel) {
                     for (BeanDefinition<?> beanDefinition : beanDefinitions) {
+                        processorDefinition.addRequiredComponent(beanDefinition.getBeanType());
                         Collection<? extends ExecutableMethod<?, ?>> executableMethods = beanDefinition.getExecutableMethods();
                         for (ExecutableMethod<?, ?> executableMethod : executableMethods) {
                             ForkJoinPool.commonPool().execute(() -> {
@@ -89,6 +89,7 @@ class AnnotationProcessorListener implements BeanCreatedEventListener<Annotation
                     }
                 } else {
                     for (BeanDefinition<?> beanDefinition : beanDefinitions) {
+                        processorDefinition.addRequiredComponent(beanDefinition.getBeanType());
                         Collection<? extends ExecutableMethod<?, ?>> executableMethods = beanDefinition.getExecutableMethods();
                         for (ExecutableMethod<?, ?> executableMethod : executableMethods) {
                             try {

@@ -476,7 +476,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (beanType == null) {
             return Collections.emptyList();
         }
-        return getBeanRegistrations(null, Argument.of(beanType), null);
+        return getBeanRegistrations(null, Argument.of(beanType), qualifier);
     }
 
     @Override
@@ -1982,8 +1982,9 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
             // Find ExecutableMethodProcessor for each annotation and process the BeanDefinitionMethodReference
             byAnnotation.forEach((annotationType, methods) ->
-                    streamOfType(ExecutableMethodProcessor.class, Qualifiers.byTypeArguments(annotationType))
-                            .forEach(processor -> {
+                    getBeanRegistrations(ExecutableMethodProcessor.class, Qualifiers.byTypeArguments(annotationType))
+                            .forEach(registration -> {
+                                ExecutableMethodProcessor processor = registration.getBean();
                                 if (processor instanceof LifeCycle<?>) {
                                     ((LifeCycle<?>) processor).start();
                                 }
@@ -1994,6 +1995,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                     // Only process the method if the the annotation is not declared at the class level
                                     // If declared at the class level it will already have been processed by AnnotationProcessorListener
                                     if (!beanDefinition.hasStereotype(annotationType)) {
+                                        registration.getBeanDefinition().addRequiredComponent(beanDefinition.getBeanType());
+
                                         //noinspection unchecked
                                         if (method.hasDeclaredStereotype(Parallel.class)) {
                                             ForkJoinPool.commonPool().execute(() -> {

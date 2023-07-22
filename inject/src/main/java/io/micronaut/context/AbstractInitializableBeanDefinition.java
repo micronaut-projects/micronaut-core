@@ -138,7 +138,12 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
     @Nullable
     private List<MethodInjectionPoint<T, ?>> preDestroyMethods;
     @Nullable
-    private Collection<Class<?>> requiredComponents;
+    private Set<Class<?>> requiredComponents;
+    /**
+     * Stores required components determined at runtime prior to {@link #requiredComponents} being initialized.
+     */
+    @Nullable
+    private Set<Class<?>> runtimeRequiredComponents;
     @Nullable
     private Argument<?>[] requiredParametrizedArguments;
 
@@ -388,47 +393,62 @@ public class AbstractInitializableBeanDefinition<T> extends AbstractBeanContextC
 
     @Override
     public final Collection<Class<?>> getRequiredComponents() {
-        if (requiredComponents != null) {
-            return requiredComponents;
-        }
-        Set<Class<?>> requiredComponents = new HashSet<>();
-        Consumer<Argument> argumentConsumer = argument -> {
-            if (argument.isContainerType() || argument.isProvider()) {
-                argument.getFirstTypeVariable()
-                        .map(Argument::getType)
-                        .ifPresent(requiredComponents::add);
-            } else {
-                requiredComponents.add(argument.getType());
-            }
-        };
-        if (constructor != null) {
-            if (constructor instanceof MethodReference) {
-                MethodReference methodConstructor = (MethodReference) constructor;
-                if (methodConstructor.arguments != null && methodConstructor.arguments.length > 0) {
-                    for (Argument<?> argument : methodConstructor.arguments) {
-                        argumentConsumer.accept(argument);
+        if (requiredComponents == null) {
+            Set<Class<?>> requiredComponents = new HashSet<>();
+            Consumer<Argument> argumentConsumer = argument -> {
+                if (argument.isContainerType() || argument.isProvider()) {
+                    argument.getFirstTypeVariable()
+                            .map(Argument::getType)
+                            .ifPresent(requiredComponents::add);
+                } else {
+                    requiredComponents.add(argument.getType());
+                }
+            };
+            if (constructor != null) {
+                if (constructor instanceof MethodReference) {
+                    MethodReference methodConstructor = (MethodReference) constructor;
+                    if (methodConstructor.arguments != null && methodConstructor.arguments.length > 0) {
+                        for (Argument<?> argument : methodConstructor.arguments) {
+                            argumentConsumer.accept(argument);
+                        }
                     }
                 }
             }
-        }
-        if (methodInjection != null) {
-            for (MethodReference methodReference : methodInjection) {
-                if (methodReference.arguments != null && methodReference.arguments.length > 0) {
-                    for (Argument<?> argument : methodReference.arguments) {
-                        argumentConsumer.accept(argument);
+            if (methodInjection != null) {
+                for (MethodReference methodReference : methodInjection) {
+                    if (methodReference.arguments != null && methodReference.arguments.length > 0) {
+                        for (Argument<?> argument : methodReference.arguments) {
+                            argumentConsumer.accept(argument);
+                        }
                     }
                 }
             }
-        }
-        if (fieldInjection != null) {
-            for (FieldReference fieldReference : fieldInjection) {
-                if (annotationMetadata != null && annotationMetadata.hasDeclaredAnnotation(AnnotationUtil.INJECT)) {
-                    argumentConsumer.accept(fieldReference.argument);
+            if (fieldInjection != null) {
+                for (FieldReference fieldReference : fieldInjection) {
+                    if (annotationMetadata != null && annotationMetadata.hasDeclaredAnnotation(AnnotationUtil.INJECT)) {
+                        argumentConsumer.accept(fieldReference.argument);
+                    }
                 }
             }
+            if (runtimeRequiredComponents != null) {
+                requiredComponents.addAll(runtimeRequiredComponents);
+            }
+            this.requiredComponents = requiredComponents;
         }
-        this.requiredComponents = Collections.unmodifiableSet(requiredComponents);
-        return this.requiredComponents;
+
+        return Collections.unmodifiableSet(this.requiredComponents);
+    }
+
+    @Override
+    public void addRequiredComponent(Class<?> clazz) {
+        if (requiredComponents == null) {
+            if (runtimeRequiredComponents == null) {
+                runtimeRequiredComponents = new HashSet<>(1);
+            }
+            runtimeRequiredComponents.add(clazz);
+        } else {
+            requiredComponents.add(clazz);
+        }
     }
 
     @Override

@@ -215,6 +215,13 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
     }
 
     /**
+     * Add (at runtime) a required component for this bean definition.
+     * @param clazz The required component
+     */
+    default void addRequiredComponent(Class<?> clazz) {
+    }
+
+    /**
      * All methods that require injection. This is a subset of all the methods in the class.
      *
      * @return The required properties
