@@ -89,19 +89,19 @@ public final class JacksonDatabindMapper implements JsonMapper {
         this(createDefaultMapper());
     }
 
-    private static ObjectMapper createDefaultMapper() {
-        ObjectMapperFactory objectMapperFactory = new ObjectMapperFactory();
-        objectMapperFactory.setDeserializers(new JsonNodeDeserializer());
-        objectMapperFactory.setSerializers(new JsonNodeSerializer());
-        return objectMapperFactory.objectMapper(null, null);
-    }
-
     private JacksonDatabindMapper(JacksonDatabindMapper from, Argument<?> type) {
         this.objectMapper = from.objectMapper;
         this.config = from.config;
         this.treeCodec = from.treeCodec;
         this.specializedReader = from.createReader(type);
         this.specializedWriter = from.createWriter(type);
+    }
+
+    private static ObjectMapper createDefaultMapper() {
+        ObjectMapperFactory objectMapperFactory = new ObjectMapperFactory();
+        objectMapperFactory.setDeserializers(new JsonNodeDeserializer());
+        objectMapperFactory.setSerializers(new JsonNodeSerializer());
+        return objectMapperFactory.objectMapper(null, null);
     }
 
     @Internal

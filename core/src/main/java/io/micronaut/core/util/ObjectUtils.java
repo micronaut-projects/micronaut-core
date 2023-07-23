@@ -49,7 +49,7 @@ public final class ObjectUtils {
     }
 
     /**
-     * Hashing method. Alternative to {@link Objects#hash(Object...)} without allocating an array.
+     * Hashing method. Alternative to {@link java.util.Objects#hash(Object...)} without allocating an array.
      * @param o1 The object 1
      * @param o2 The object 2
      * @param o3 The object 3

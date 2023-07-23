@@ -129,6 +129,9 @@ public class DefaultFileSystemResourceLoader implements FileSystemResourceLoader
         }
         if (path.startsWith("file:")) {
             path = path.substring(5);
+            if (path.startsWith("//")) {
+                path = path.substring(2);
+            }
         }
         return path;
     }

@@ -207,7 +207,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
      * @param e The exception
      */
     protected void handleDestructionException(BeanDestructionException e) {
-        LOG.error("Error occurred destroying bean of scope @" + annotationType.getSimpleName() + ": " + e.getMessage(), e);
+        LOG.error("Error occurred destroying bean of scope @{}: {}", annotationType.getSimpleName(), e.getMessage(), e);
     }
 
     @SuppressWarnings("unchecked")

@@ -27,7 +27,7 @@ import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.health.indicator.HealthResult;
 
 /**
- * A filter that matches the {@link io.micronaut.management.endpoint.health.HealthEndpoint}
+ * A filter that matches the {@link HealthEndpoint}
  * and returns an appropriate HTTP status code.
  *
  * @author graemerocher
@@ -64,6 +64,11 @@ public class HealthResultFilter {
         this.healthEndpoint = healthEndpoint;
     }
 
+    /**
+     * Set response status by health result.
+     *
+     * @param response http response
+     */
     @ResponseFilter
     public void doFilter(MutableHttpResponse<?> response) {
         Object body = response.body();

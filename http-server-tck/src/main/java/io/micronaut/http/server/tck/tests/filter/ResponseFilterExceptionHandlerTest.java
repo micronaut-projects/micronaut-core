@@ -67,7 +67,7 @@ public class ResponseFilterExceptionHandlerTest {
 
     }
 
-    @ServerFilter(value = MATCH_ALL_PATTERN)
+    @ServerFilter(MATCH_ALL_PATTERN)
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class ErrorThrowingFilter {
         @ResponseFilter

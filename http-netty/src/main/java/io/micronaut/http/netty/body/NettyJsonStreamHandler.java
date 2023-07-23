@@ -39,6 +39,13 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
 
+/**
+ * Netty json stream implementation for MessageBodyHandler.
+ *
+ * @param <T> The type
+ *
+ * @since 4.0.0
+ */
 @Internal
 @Singleton
 @Produces(MediaType.APPLICATION_JSON_STREAM)

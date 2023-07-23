@@ -15,7 +15,7 @@
  */
 package io.micronaut.testsuitehelper;
 
-import static javax.lang.model.SourceVersion.RELEASE_8;
+import static javax.lang.model.SourceVersion.RELEASE_17;
 
 import java.io.File;
 import java.io.IOException;
@@ -34,10 +34,10 @@ import javax.tools.StandardLocation;
  * Annotation processor for test generation.
  */
 @SupportedAnnotationTypes("*")
-@SupportedSourceVersion(RELEASE_8)
+@SupportedSourceVersion(RELEASE_17)
 public class TestGeneratingAnnotationProcessor extends AbstractProcessor {
 
-    private boolean executed = false;
+    private boolean executed;
 
     @Override
     public boolean process(final Set<? extends TypeElement> annotations, final RoundEnvironment roundEnv) {
@@ -81,7 +81,7 @@ public class TestGeneratingAnnotationProcessor extends AbstractProcessor {
     }
 
     private String determineOutputPath() throws IOException {
-        // go write a file so as to figure out where we're running
+        // go write a file to figure out where we're running
         final FileObject resource = processingEnv
             .getFiler()
             .createResource(StandardLocation.CLASS_OUTPUT, "", "tmp" + System.currentTimeMillis(), (Element[]) null);
