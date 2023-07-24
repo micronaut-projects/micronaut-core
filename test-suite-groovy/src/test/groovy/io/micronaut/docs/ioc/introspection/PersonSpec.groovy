@@ -1,9 +1,9 @@
-package io.micronaut.docs.ioc.introspection;
+package io.micronaut.docs.ioc.introspection
 
-import io.micronaut.core.beans.BeanIntrospection;
-import io.micronaut.test.extensions.spock.annotation.MicronautTest;
+import io.micronaut.core.beans.BeanIntrospection
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import org.junit.jupiter.api.Test
-import spock.lang.Specification;
+import spock.lang.Specification
 
 @MicronautTest
 class PersonSpec extends Specification {
@@ -11,7 +11,7 @@ class PersonSpec extends Specification {
     @Test
     void "test person introspection"() {
         // tag::usage[]
-        BeanIntrospection<Person> introspection = BeanIntrospection.getIntrospection(Person.class);
+        BeanIntrospection<Person> introspection = BeanIntrospection.getIntrospection(Person)
         Person person = introspection.instantiate('John', 42)
 
         person.name() == 'John'
