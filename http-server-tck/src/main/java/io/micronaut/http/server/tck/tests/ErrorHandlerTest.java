@@ -17,6 +17,7 @@ package io.micronaut.http.server.tck.tests;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
@@ -31,7 +32,6 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Status;
-import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.http.hateoas.Link;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
@@ -41,10 +41,10 @@ import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.json.JsonMapper;
 import jakarta.inject.Singleton;
-import org.junit.jupiter.api.Test;
-
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
+import org.junit.jupiter.api.Test;
+
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
@@ -139,8 +139,8 @@ public class ErrorHandlerTest {
     void jsonMessageFormatErrorsReturn400() throws IOException {
         asserts(SPEC_NAME,
             CollectionUtils.mapOf(
-            PROPERTY_MICRONAUT_SERVER_CORS_CONFIGURATIONS_WEB_ALLOWED_ORIGINS, Collections.singletonList("http://localhost:8080"),
-            PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
+                PROPERTY_MICRONAUT_SERVER_CORS_CONFIGURATIONS_WEB_ALLOWED_ORIGINS, Collections.singletonList("http://localhost:8080"),
+                PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
             HttpRequest.POST("/json/jsonBody", "{\"numberField\": \"textInsteadOfNumber\"}"),
             (server, request) -> AssertionUtils.assertThrows(server, request,
                 HttpResponseAssertion.builder()
@@ -151,11 +151,26 @@ public class ErrorHandlerTest {
     }
 
     @Test
+    void jsonSyntaxErrorBodyAccessible() throws IOException {
+        asserts(SPEC_NAME,
+            CollectionUtils.mapOf(
+                PROPERTY_MICRONAUT_SERVER_CORS_CONFIGURATIONS_WEB_ALLOWED_ORIGINS, Collections.singletonList("http://localhost:8080"),
+                PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE),
+            HttpRequest.POST("/json/jsonBody", "{\"numberField\": \"textInsteadOf"),
+            (server, request) -> AssertionUtils.assertThrows(server, request,
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body("Syntax error: {\"numberField\": \"textInsteadOf")
+                    .build()
+            ));
+    }
+
+    @Test
     void corsHeadersArePresentAfterFailedDeserialisationWhenErrorHandlerIsUsed() throws IOException {
         asserts(SPEC_NAME,
             CollectionUtils.mapOf(
-            PROPERTY_MICRONAUT_SERVER_CORS_CONFIGURATIONS_WEB_ALLOWED_ORIGINS, Collections.singletonList("http://localhost:8080"),
-            PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE
+                PROPERTY_MICRONAUT_SERVER_CORS_CONFIGURATIONS_WEB_ALLOWED_ORIGINS, Collections.singletonList("http://localhost:8080"),
+                PROPERTY_MICRONAUT_SERVER_CORS_ENABLED, StringUtils.TRUE
         ), HttpRequest.POST("/json/errors/global", "{\"numberField\": \"string is not a number\"}")
                 .header(HttpHeaders.ORIGIN, LOCALHOST),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
@@ -287,6 +302,13 @@ public class ErrorHandlerTest {
         String jsonBody(@Valid @Body RequestObject data) {
             return "blah";
         }
+
+        @Error
+        @Produces(MediaType.APPLICATION_JSON) // it's a lie!
+        @Status(HttpStatus.BAD_REQUEST)
+        String syntaxErrorHandler(@Body @Nullable String body) {
+            return "Syntax error: " + body;
+        }
     }
 
     @Controller("/global-errors")
@@ -307,17 +329,6 @@ public class ErrorHandlerTest {
             return "global status";
         }
 
-    }
-
-    @Singleton
-    @Requires(property = "spec.name", value = SPEC_NAME)
-    static class CodecExceptionExceptionHandler
-        implements ExceptionHandler<CodecException, HttpResponse> {
-
-        @Override
-        public HttpResponse handle(HttpRequest request, CodecException exception) {
-            return HttpResponse.badRequest("Invalid JSON: " + exception.getMessage()).contentType(MediaType.APPLICATION_JSON);
-        }
     }
 
     @Singleton

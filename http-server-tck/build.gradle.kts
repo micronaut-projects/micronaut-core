@@ -25,3 +25,8 @@ dependencies {
     api(libs.junit.jupiter.params)
     api(libs.managed.reactor)
 }
+micronautBuild {
+    binaryCompatibility {
+        enabled.set(false)
+    }
+}

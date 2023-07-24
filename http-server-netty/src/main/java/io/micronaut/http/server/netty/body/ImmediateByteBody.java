@@ -123,7 +123,8 @@ public final class ImmediateByteBody extends ManagedBody<ByteBuf> implements Byt
     public <T> ImmediateSingleObjectBody processSingle(HttpServerConfiguration configuration, MessageBodyReader<T> reader, Argument<T> type, MediaType mediaType, Headers httpHeaders) {
         ByteBuf buf = prepareClaim();
         checkLength(configuration, buf.readableBytes());
-        ByteBuffer<ByteBuf> wrapped = NettyByteBufferFactory.DEFAULT.wrap(buf);
+        // use a slice here so that, in case of failure, our buffer positions remain unaffected
+        ByteBuffer<ByteBuf> wrapped = NettyByteBufferFactory.DEFAULT.wrap(buf.slice());
         T read = reader.read(type, mediaType, httpHeaders, wrapped);
         return next(new ImmediateSingleObjectBody(read));
     }
