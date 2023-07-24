@@ -2,7 +2,30 @@ Since 4.1.x the ann:context.annotation.Mapper[] annotation can be used on any ab
 
 Inspired by similar functionality in libraries like https://mapstruct.org[Map Struct], a `Mapper` uses the <<introspections, Bean Introspection>> and <<evaluatedExpressions, Expressions>> features built into Micronaut that are already reflection free.
 
-For example given the following type:
+NOTE: For Mapping, base and target types need to be <<introspection, introspected>>.
+
+=== @Mapper Example
+
+Given the following types:
+
+snippet::io.micronaut.docs.ioc.mappers.ContactForm[tags="class"]
+
+snippet::io.micronaut.docs.ioc.mappers.ContactEntity[tags="class"]
+
+You can write an interface to define a mapping between both types by simply annotating a method with ann:context.annotation.Mapper[].
+
+snippet::io.micronaut.docs.ioc.mappers.ContactMappers[tags="imports, class"]
+
+The Micronaut compiler generates an implementation the previous an interface at compilation-time.
+
+You can then inject a bean of type `ContactMappers` and easily map from one type to another.
+
+snippet::io.micronaut.docs.ioc.mappers.SimpleMapperSpec[tags="mappers", indent=0]
+
+
+=== @Mapping Example
+
+For example, given the following type:
 
 snippet::io.micronaut.docs.ioc.mappers.Product[tags="class"]
 
