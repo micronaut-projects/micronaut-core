@@ -4,19 +4,13 @@ import io.micronaut.core.annotation.Introspected
 
 // tag::class[]
 @Introspected(builder = Introspected.IntrospectionBuilder(builderClass = Person.Builder::class))
-data class Person(val name: String, val age: Int) {
-    class Builder {
-        private var name: String? = null
-        private var age = 0
-        fun name(name: String): Builder {
-            this.name = name
-            return this
-        }
-
-        fun age(age: Int): Builder {
-            this.age = age
-            return this
-        }
+data class Person private constructor(val name: String, val age: Int) {
+    data class Builder(
+        var name: String? = null,
+        var age: Int = 0
+    ) {
+        fun name(name: String) = apply { this.name = name }
+        fun age(age: Int) = apply { this.age = age }
 
         fun build(): Person {
             requireNotNull(name) { "Name must be specified" }
@@ -25,3 +19,4 @@ data class Person(val name: String, val age: Int) {
         }
     }
 }
+//end::class[]
