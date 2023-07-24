@@ -1,0 +1,49 @@
+It is possible to use <<configurationPropertiesAccessorsStyle, the `@AccessorsStyle` annotation>> with `@Introspected`:
+
+[source, java]
+----
+import io.micronaut.core.annotation.AccessorsStyle;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+@AccessorsStyle(readPrefixes = "", writePrefixes = "") // <1>
+public class Person {
+
+    private String name;
+    private int age;
+
+    public Person(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    public String name() { // <2>
+        return name;
+    }
+
+    public void name(String name) { // <2>
+        this.name = name;
+    }
+
+    public int age() { // <2>
+        return age;
+    }
+
+    public void age(int age) { // <2>
+        this.age = age;
+    }
+}
+----
+<1> Annotate the class with `@AccessorsStyle` to define empty read and write prefixes for getters and setters.
+<2> Define the getters and setters without a prefix.
+
+Now it is possible to retrieve the compile time generated introspection using the api:core.beans.BeanIntrospection[] API:
+
+[source, java]
+----
+BeanIntrospection<Person> introspection = BeanIntrospection.getIntrospection(Person.class);
+Person person = introspection.instantiate("John", 42);
+
+Assertions.assertEquals("John", person.name());
+Assertions.assertEquals(42, person.age());
+----

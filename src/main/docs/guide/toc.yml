@@ -35,7 +35,19 @@ ioc:
   lifecycle: Life-Cycle Methods
   contextEvents: Context Events
   events: Bean Events
-  introspection: Bean Introspection
+  introspection:
+    title: Bean Introspection
+    atIntrospected: Use the @Introspected Annotation
+    introspectedAccessorsStyle: Use @Introspected with @AccessorsStyle
+    accessKind: Bean Fields
+    atCreator: Constructor Methods
+    staticAtCreator: Static Creator Methods
+    introspectionEnums: Introspect Enums
+    introspectedAnnotationOnAConfigurationClass: Use the @Introspected Annotation on a Configuration Class
+    introspectExistingAnnotations: Write an AnnotationMapper to Introspect Existing Annotations
+    beanWrapperApi: The BeanWrapper API
+    jacksonAndBeanIntrospection: Jackson and Bean Introspection
+  beanMappers: Bean Mappers
   beanValidation: Bean Validation
   annotationMetadata: Bean Annotation Metadata
   beanImport: Importing Beans from Libraries
