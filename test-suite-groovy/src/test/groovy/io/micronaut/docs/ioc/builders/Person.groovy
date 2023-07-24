@@ -1,14 +1,27 @@
 package io.micronaut.docs.ioc.builders
 
-import groovy.transform.Canonical
+import groovy.transform.CompileStatic
+import groovy.transform.EqualsAndHashCode
+
+//tag::class[]
 import io.micronaut.core.annotation.Introspected
-
-
-@Canonical
-@Introspected(builder = @Introspected.IntrospectionBuilder(builderClass = Builder))
+@CompileStatic
+@Introspected(builder = @Introspected.IntrospectionBuilder(
+        builderClass = Person.Builder.class
+))
+@EqualsAndHashCode
 class Person {
-    String name
-    int age
+    final String name
+    final int age
+
+    private Person(String name, int age) {
+        this.name = name
+        this.age = age
+    }
+
+    static Builder builder() {
+        new Builder()
+    }
 
     static final class Builder {
         private String name
@@ -16,16 +29,21 @@ class Person {
 
         Builder name(String name) {
             this.name = name
-            return this
+            this
         }
 
         Builder age(int age) {
             this.age = age
-            return this
+            this
         }
 
         Person build() {
-            return new Person(name, age)
+            Objects.requireNonNull(name)
+            if (age < 1) {
+                throw new IllegalArgumentException("Age must be a positive number")
+            }
+            new Person(name, age)
         }
     }
 }
+//end::class[]
