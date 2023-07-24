@@ -63,6 +63,18 @@ public final class StringIntMap {
         }
     }
 
+    public boolean containsKey(String key) {
+        if (keys == null) {
+            return false;
+        }
+        for (String k : keys) {
+            if (k != null && k.equals(key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     public int get(String key, int def) {
         int i = probe(key);
         return i < 0 ? def : values[i];
