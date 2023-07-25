@@ -235,7 +235,8 @@ public class NameUtils {
             int len = methodName.length();
             int prefixLength = writePrefix.length();
             if (len > prefixLength && methodName.startsWith(writePrefix)) {
-                isValid = Character.isUpperCase(methodName.charAt(prefixLength));
+                char nextChar = methodName.charAt(prefixLength);
+                isValid = isValidCharacterAfterReaderWriterPrefix(nextChar);
             }
 
             if (isValid) {
@@ -370,7 +371,7 @@ public class NameUtils {
             int len = methodName.length();
             if (len > prefixLength) {
                 char firstVarNameChar = methodName.charAt(prefixLength);
-                isValid = firstVarNameChar == '_' || firstVarNameChar == '$' || Character.isUpperCase(firstVarNameChar);
+                isValid = isValidCharacterAfterReaderWriterPrefix(firstVarNameChar);
             }
 
             if (isValid) {
@@ -379,6 +380,10 @@ public class NameUtils {
         }
 
         return isValid;
+    }
+
+    private static boolean isValidCharacterAfterReaderWriterPrefix(char c) {
+        return c == '_' || c == '$' || Character.isUpperCase(c);
     }
 
     /**

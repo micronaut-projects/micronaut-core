@@ -35,7 +35,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *
  * <p>Adding {@link Parallel} to methods is most useful when used in conjunction with a {@link io.micronaut.context.processor.ExecutableMethodProcessor}. Be aware however, that the processor in this case should be thread safe as could be executed in parallel for different methods.</p>
  *
- * <p>NOTE: The use of {@link Parallel} generally only makes sense when combined with non {@link Prototype} scopes such as {@link javax.inject.Singleton} and {@link Context}</p>
+ * <p>NOTE: The use of {@link Parallel} generally only makes sense when combined with non {@link Prototype} scopes such as {@link jakarta.inject.Singleton} and {@link Context}</p>
  *
  * @author graemerocher
  * @since 1.0

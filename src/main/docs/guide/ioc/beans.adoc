@@ -1,4 +1,4 @@
-A bean is an object whose lifecycle is managed by the Micronaut IoC container. That lifecycle may include creation, execution, and destruction. Micronaut implements the https://javax-inject.github.io/javax-inject/[JSR-330 (javax.inject) - Dependency Injection for Java] specification, hence to use Micronaut you simply use the link:{jeeapi}/javax/inject/package-summary.html[annotations provided by javax.inject].
+A bean is an object whose lifecycle is managed by the Micronaut IoC container. That lifecycle may include creation, execution, and destruction. Micronaut implements the https://javax-inject.github.io/javax-inject/[JSR-330 (jakarta.inject) - Dependency Injection for Java] specification, hence to use Micronaut you simply use the link:{jakartaapi}/jakarta/inject/package-summary.html[annotations provided by jakarta.inject].
 
 The following is a simple example:
 
@@ -12,9 +12,9 @@ To perform dependency injection, run the link:{api}/io/micronaut/context/BeanCon
 
 snippet::io.micronaut.docs.inject.intro.VehicleSpec[tags="start",indent="0"]
 
-Micronaut automatically discovers dependency injection metadata on the classpath and wires the beans together according to injection points you define.
+The Micronaut framework automatically discovers dependency injection metadata on the classpath and wires the beans together according to injection points you define.
 
-Micronaut supports the following types of dependency injection:
+The Micronaut framework supports the following types of dependency injection:
 
 * Constructor injection (must be one public constructor or a single constructor annotated with `@Inject`)
 * Field injection

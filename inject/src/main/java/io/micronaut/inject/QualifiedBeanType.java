@@ -21,13 +21,11 @@ import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.naming.NameResolver;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.lang.annotation.Annotation;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * An interface for a {@link BeanType} that allows qualifiers.
@@ -49,7 +47,7 @@ public interface QualifiedBeanType<T> extends BeanType<T>, AnnotationMetadataDel
             // All qualifiers are removed from the factory class anyway, so we can skip the hierarchy
             annotationMetadata = annotationMetadata.getDeclaredMetadata();
         }
-        List<AnnotationValue<Annotation>> annotations = annotationMetadata.getAnnotationValuesByStereotype(AnnotationUtil.QUALIFIER);
+        List<AnnotationValue<Annotation>> annotations = AnnotationUtil.findQualifierAnnotations(annotationMetadata);
         if (!annotations.isEmpty()) {
             if (annotations.size() == 1) {
                 final AnnotationValue<Annotation> annotationValue = annotations.iterator().next();

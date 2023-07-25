@@ -29,6 +29,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -112,12 +113,12 @@ public class AnnotationUtil {
     /**
      * Simple Annotation name used for nullable.
      */
-    public static final String NULLABLE = "javax.annotation.Nullable";
+    public static final String NULLABLE = "jakarta.annotation.Nullable";
 
     /**
      * Simple Annotation name used for non-null.
      */
-    public static final String NON_NULL = "javax.annotation.Nonnull";
+    public static final String NON_NULL = "jakarta.annotation.Nonnull";
 
     /**
      * The around annotation type.
@@ -152,37 +153,37 @@ public class AnnotationUtil {
     /**
      * The meta annotation used for inject declarations.
      */
-    public static final String INJECT = "javax.inject.Inject";
+    public static final String INJECT = "jakarta.inject.Inject";
 
     /**
      * The meta annotation used for scope declarations.
      */
-    public static final String SCOPE = "javax.inject.Scope";
+    public static final String SCOPE = "jakarta.inject.Scope";
 
     /**
      * The meta annotation used for singleton scope.
      */
-    public static final String SINGLETON = "javax.inject.Singleton";
+    public static final String SINGLETON = "jakarta.inject.Singleton";
 
     /**
      * The meta annotation used for qualifier declarations.
      */
-    public static final String QUALIFIER = "javax.inject.Qualifier";
+    public static final String QUALIFIER = "jakarta.inject.Qualifier";
 
     /**
      * The meta annotation used for named qualifiers.
      */
-    public static final String NAMED = "javax.inject.Named";
+    public static final String NAMED = "jakarta.inject.Named";
 
     /**
      * The meta annotation used for pre-destroy declarations.
      */
-    public static final String PRE_DESTROY = "javax.annotation.PreDestroy";
+    public static final String PRE_DESTROY = "jakarta.annotation.PreDestroy";
 
     /**
      * The meta annotation used for post-construct declarations.
      */
-    public static final String POST_CONSTRUCT = "javax.annotation.PostConstruct";
+    public static final String POST_CONSTRUCT = "jakarta.annotation.PostConstruct";
 
     /**
      * The annotation attribute containing all the attributes marked as non binding.
@@ -196,6 +197,56 @@ public class AnnotationUtil {
 
     private static final Map<Integer, List<String>> INTERN_LIST_POOL = new ConcurrentHashMap<>();
     private static final Map<String, Map<String, Object>> INTERN_MAP_POOL = new ConcurrentHashMap<>();
+
+    /**
+     * Finds qualifier annotations.
+     * @param annotationMetadata The annotation metadata
+     * @return The qualifier annotations
+     * @since 4.0.0
+     */
+    public static List<AnnotationValue<Annotation>> findQualifierAnnotations(AnnotationMetadata annotationMetadata) {
+        return annotationMetadata.getAnnotationValuesByStereotype(AnnotationUtil.QUALIFIER);
+    }
+
+    /**
+     * Finds qualifier annotations names.
+     * @param annotationMetadata The annotation metadata
+     * @return The qualifier annotations names
+     * @since 4.0.0
+     */
+    public static List<String> findQualifierAnnotationsNames(AnnotationMetadata annotationMetadata) {
+        return annotationMetadata.getAnnotationNamesByStereotype(AnnotationUtil.QUALIFIER);
+    }
+
+    /**
+     * Has qualifier annotations.
+     * @param annotationMetadata The annotation metadata
+     * @return True if qualifier annotation
+     * @since 4.0.0
+     */
+    public static boolean hasDeclaredQualifierAnnotation(AnnotationMetadata annotationMetadata) {
+        return annotationMetadata.hasDeclaredAnnotation(AnnotationUtil.QUALIFIER);
+    }
+
+    /**
+     * Resolve non-binding members.
+     * @param annotationMetadata The annotation metadata
+     * @return The non-binding members
+     * @since 4.0.0
+     */
+    public static String[] resolveNonBindingMembers(AnnotationMetadata annotationMetadata) {
+        return annotationMetadata.stringValues(AnnotationUtil.QUALIFIER, AnnotationUtil.NON_BINDING_ATTRIBUTE);
+    }
+
+    /**
+     * Finds a qualifier annotation.
+     * @param annotationMetadata The annotation metadata
+     * @return A qualifier annotation
+     * @since 4.0.0
+     */
+    public static Optional<String> findQualifierAnnotation(AnnotationMetadata annotationMetadata) {
+        return annotationMetadata.getAnnotationNameByStereotype(AnnotationUtil.QUALIFIER);
+    }
 
     /**
      * Converts the given objects into a set of potentially cached and interned strings contained within an internal pool of lists. See {@link String#intern()}.

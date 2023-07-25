@@ -66,7 +66,6 @@ public class NettyCompletedFileUpload implements CompletedFileUpload {
         this.fileUpload = fileUpload;
         this.controlRelease = controlRelease;
         if (controlRelease) {
-            fileUpload.retain();
             tracker = RESOURCE_LEAK_DETECTOR.get().track(this);
         } else {
             tracker = null;

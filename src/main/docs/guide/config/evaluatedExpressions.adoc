@@ -1,0 +1,441 @@
+Since 4.0, Micronaut framework supports embedding evaluated expressions in annotation values using `#{...}` syntax which
+allows to achieve even more flexibility while configuring your application.
+
+.Evaluated Expression example
+[source,groovy]
+----
+@Value("#{ T(Math).random() }")
+double injectedValue;
+----
+
+Expressions can be defined whenever an annotation member accepts a string or an array of strings.
+
+NOTE: Expressions are currently not supported for "type use" annotations (annotations that declare `ElementType.TYPE_USE`).
+
+.Evaluated Expression in array
+[source,java]
+----
+@Singleton
+@Requires(env = {"dev", "#{ 'test' }"})
+public class EvaluatedExpressionInArray {}
+----
+
+You can also embed one or more expressions in a string template in a similar manner to embedding properties with the `${...}` syntax.
+
+.Evaluated Expression template
+[source,groovy]
+----
+@Value("http://#{'hostname'}/#{'path'}")
+String url;
+----
+
+Evaluated Expressions are validated and compiled at build time which guarantees type safety at runtime.
+
+Once an application is running expressions are evaluated on demand as part of annotation metadata resolution. The
+usage of expressions does not impact performance as evaluation process is completely reflection free.
+
+Note that, for security reasons expressions cannot be dynamically compiled at runtime from potentially untrusted
+input. All expressions are compiled and checked statically during the compilation process of the application with
+errors reported as compilation failures.
+
+In general, expressions can be treated as statement written using a programming language with reduced
+set of available features. Even though the complexity of expression is only limited by the list of supported syntax
+constructs, it is in general not recommended to place complex logic inside an expression as there are usually better
+ways to achieve the same result.
+
+== Using Expressions in Micronaut framework
+
+Expressions can be used anywhere throughout the Micronaut framework and associated modules, but as an example, you can use them to implement simple scheduled job control, for example:
+
+snippet::io.micronaut.docs.expressions.ExampleJob[tags="imports,clazz",title="Job Control with Expressions"]
+
+<1> Here the `condition` member of the ann:scheduling.annotation.Scheduled[] annotation is used to only execute the job if a pre-condition is met.
+<2> The `condition` invokes a method of the type that checks if the job is paused. Other methods can be used to pause and resume execution of the job as desired.
+
+TIP: You can also use expressions to perform conditional routing using the ann:http.annotation.RouteCondition[] annotation.
+
+== Evaluated Expression Language Reference
+
+The Evaluated Expressions syntax supports the following functionality:
+
+* Literal Values
+* Math Operators
+* Comparison Operators
+* Logical Operators
+* Ternary Operator
+* Type References
+* Method Invocation
+* Property Access
+* Retrieving Beans from Bean Context
+* Retrieving Environment Properties
+
+=== Literal Values
+
+The following types of literal values are supported:
+
+* `null`
+* boolean values (`true`, `false`)
+* strings, which need to be surrounded with single quotation mark (`'`)
+* numeric values (`int`, `long`, `float`, `double`)
+
+Integer and Long values can also be specified in hexadecimal or octal notation. Float and Double values can also be
+specified in exponential notation. All numeric values can be negative as well.
+
+.Literal values examples
+[source]
+----
+#{ null }
+#{ true }
+#{ 'string value' }
+#{ 10 }
+#{ 0xFFL }
+#{ 10L }
+#{ .123f }
+#{ 1E+1d }
+#{ 123D }
+----
+
+=== Math Operators
+
+The supported mathematical operators are `+`, `-`, `*`, `/`, `%`, `^`. Math operators can only be applied to numeric
+values (except `+` which can be used for string concatenation as well). Mathematical operations are performed in order
+enforced by standard operator precedence. You can also change evaluation order by using brackets `()`.
+
+`/` and `%` operators can be aliased by `div` and `mod` keywords respectively.
+
+.Math operators examples
+[source]
+----
+#{ 1 + 2 }             // 3
+#{ 'a' + 'b' + 'c' }   // 'abc'
+#{ 7 - 3 }             // 4
+#{ 7 * 3 }             // 21
+#{ 7 * ( 3 + 1) }      // 28
+
+#{ 15 / 3 }            // 5
+#{ 15 div 3 }          // 5
+
+#{ 15 % 3 }            // 0
+#{ 15 mod 3 }          // 0
+
+// Unlike in Java, ^ operator means exponentiation
+#{ 3 ^ 2 }             // 9
+----
+
+=== Comparison Operators
+
+The following comparison operators are supported: `==`, `!=`, `>`, `<`, `>=`, `\<=`, `matches`
+Comparison operations are performed in order enforced by standard operator precedence.
+You can also change evaluation order by using brackets `()`.
+
+Equality check is supported for both primitive types and objects. It is performed using `Object.equals()` method.
+
+`>`, `<`, `>=`, `\<=` operations can be applied to numeric types or types that implement `java.lang.Comparable`
+interface.
+
+`matches` keyword can be used to determine whether a string matches provided regular expression which has to
+be specified as string literal. The regular expression itself will be checked for validity at compilation time.
+
+.Comparison operators examples
+[source]
+----
+#{ 1 + 2 == 3 }         // true
+#{ 'abc' != 'abc' }     // false
+#{ 7 > 3 }              // true
+#{ 7 < 3 }              // false
+#{ 7 >= 7 }             // true
+#{ 7 <= 8 }             // false
+
+#{ 'AbC' matches '[A-Za-z*'  }      // Compilation failure
+#{ 'AbC' matches '[A-Za-z]*'  }     // true
+#{ 'AbC' matches '[a-z]*'  }        // false
+----
+
+=== Logical Operators
+
+The following logical operators are supported:
+
+* `&&` (can be aliased with `and`)
+* `||` (can be aliased with `or`),
+* `!` (can be aliaded with `not`)
+* `empty` / `not empty` (works with strings, collections, arrays, and maps)
+
+Logical operations are performed in order enforced by standard operator precedence.
+You can also change evaluation order by using brackets `()`.
+
+.Logical operators examples
+[source]
+----
+#{ true && false }         // false
+#{ true and true }         // true
+
+#{ true || false }         // true
+#{ false or false }        // false
+
+#{ !false }                // true
+#{ !!true }                // true
+
+#{ empty '' }              // true
+#{ not empty '' }          // false
+----
+
+=== Ternary Operator
+
+A standard ternary operator is supported to allow specifying if-then-else conditional logic in expression
+
+[source]
+----
+condition ? thenBranch : elseBranch
+----
+
+where `condition` evaluation should provide boolean value, and the complexity of `then` and `else` branches is not
+limited.
+
+.Ternary operator examples
+[source]
+----
+#{ 15 > 10 ? 'a' : 'b' }    // 'a'
+#{ 15 >= 16 ? 'a' : 'b' }   // 'b'
+----
+
+=== Dot and Safe Navigation Operator
+
+The dot operator can be used to access methods and properties of a value within an expression. For example:
+
+.Dot operator usage
+[source]
+----
+#{ collection.size() > 0 }
+#{ foo.bar.name == "Fred" }
+----
+
+You can also use the safe dereference operator `?.` to navigate paths in a null safe way:
+
+.Safe dereference operator
+[source]
+----
+#{ foo?.bar?.name == "Fred" }
+----
+
+TIP: When used, the safe dereference operator will also automatically unwrap Java's `Optional` type.
+
+=== Type References
+
+A predefined syntax construct `T(...)` can be used to reference a class. The value inside brackets should be fully
+qualified class name (including the package name). The only exception is `java.lang.*` classes which can be referenced
+directly by only specifying the simple class name. Primitive types can not be referenced.
+
+Type References are evaluated in different ways depending on the context.
+
+==== Simple type reference
+
+A simple type reference is resolved as a `Class<?>` object.
+
+.Type reference example
+[source]
+----
+#{ T(java.lang.String) }    // String.class
+----
+
+Same rule applies if type reference is specified as a method argument.
+
+==== Type check with `instanceof`
+
+A Type Reference can be used as the right-hand side part of the `instanceof` operator
+
+.Type check example
+[source]
+----
+#{ 'abc' instanceof T(String) }  // true
+----
+
+which is equivalent to the following Java code and will be evaluated as a boolean value:
+
+[source]
+----
+"abc" instanceof String
+----
+
+==== Static method invocation
+
+Type Reference can be used to invoke a static method of a class
+
+.Static method invocation
+[source]
+----
+#{ T(Math).random() }
+----
+
+=== Expression Evaluation Context
+
+By default, the only methods you can invoke inside Evaluated Expressions are static methods using type references.
+
+The available methods can be extended by extended the evaluation context. There are two ways to extend the evaluation context. The first involves registering new context class via a custom api:TypeElementVisitor[].
+
+NOTE: The api:TypeElementVisitor[] has to be on the annotation processor classpath, therefore needs to be defined in a separate module that can be included on this classpath.
+
+Once a class is registered within evaluation context the methods and properties of the class are available for referencing in evaluated expressions.
+
+Consider the following example:
+
+snippet::io.micronaut.docs.expressions.CustomEvaluationContext[title="User-defined evaluated expression context"]
+
+NOTE: The class should be resolvable as a bean can use `jakarta.inject` annotations to inject other types if necessary. In addition, for performance reasons all evaluation context classes are effectively singleton regardless of the defined scope.
+
+Registering this class can be achieved with a custom implementation of api:expressions.context.ExpressionEvaluationContextRegistrar[] that is registered via service loader as a api:inject.visitor.TypeElementVisitor[] (create a new `META-INF/services/io.micronaut.inject.visitor.TypeElementVisitor` file referencing the new class) and placed on the annotation processor classpath:
+
+snippet::io.micronaut.docs.expressions.ContextRegistrar[title="Defining a ExpressionEvaluationContextRegistrar"]
+
+Method `generateRandom(int, int)` can now be used within Evaluated Expression in the following way:
+
+snippet::io.micronaut.docs.expressions.ContextConsumer[title="Usage of user-defined evaluated expression context"]
+
+At runtime, the bean will be retrieved from
+application context and respective method will be invoked.
+
+If a matching method is not found within evaluation context at compilation time, the compilation will fail. A
+compilation error will also occur if multiple suitable methods are found in the evaluation context, keep that in mind
+if you provide multiple api:expressions.context.ExpressionEvaluationContextRegistrar[] that a conflict can occur as these types are effectively global.
+
+The methods will be considered ambiguous (leading to compilation failure) when their names are the same and list of
+provided arguments matches multiple methods parameters.
+
+Using a api:expressions.context.ExpressionEvaluationContextRegistrar[] makes its methods and properties available for evaluated
+expressions within any annotation in a global manner.
+
+However, you can also specify evaluation context scoped to concrete annotation or
+annotation member using ann:context.annotation.AnnotationExpressionContext[].
+
+snippet::io.micronaut.docs.expressions.AnnotationContextExample[title="Usage of annotation level evaluated expression context"]
+
+<1> Here two new methods are introduced to the context called `firstValue()` and `secondValue()` only for the scope of the `@CustomAnnotation`
+<2> The `firstValue()` method is defined in a bean called `AnnotationContext`
+<3> The `secondValue()` method is defined in a bean called `AnnotationMemberContext`
+<4> On the `@CustomAnnotation` annotation the methods of the `AnnotationContext` type are exposed to all members of the annotation (type level context).
+<5> On the `value()` member of the `@CustomAnnotation` annotation the methods of the `AnnotationContextExample` are made available but scoped only to the `value()` member.
+
+Again context classes need to be explicitly defined as beans to make them available for retrieval from
+application context at runtime.
+
+=== Method Invocation
+
+You can invoke both static methods using type references, methods from evaluation context and methods on objects,
+which means method chaining is supported.
+
+.Chaining methods in expression
+[source,java]
+----
+import io.micronaut.context.annotation.Value;
+import jakarta.inject.Singleton;
+
+@Singleton
+class CustomEvaluationContext {
+
+    public String stringValue() {
+        return "stringValue";
+    }
+
+}
+
+@Singleton
+class ContextConsumer {
+
+    @Value("#{ #stringValue().length() }")
+    public int stringLength;
+
+}
+----
+
+Varargs methods invocation is supported as well. Note that if last parameter of a method is an array, you can still
+invoke it providing list of arguments separated by comma without explicitly wrapping it into array. So in this case
+it will be treated in same way as if last method argument was explicitly specified as varargs parameter.
+
+.Invoking varargs methods in expressions
+[source,java]
+----
+import io.micronaut.context.annotation.Value;
+import jakarta.inject.Singleton;
+
+@Singleton
+class CustomEvaluationContext {
+
+    public int countIntegers(int... values) {
+        return values.length;
+    }
+
+    public int countStrings(String[] values) {
+        return values.length;
+    }
+
+}
+
+@Singleton
+class ContextConsumer {
+
+    @Value("#{ #countIntegers(1, 2, 3) }")
+    public int totalIntegers;
+
+    @Value("#{ #countStrings('a', 'b', 'c') }")
+    public int totalStrings;
+
+}
+----
+
+=== Property Access
+
+JavaBean properties can be accessed simply be referencing their names from evaluation context prefixed with `#`. Bean
+properties can also be chained with dot in the same way as methods.
+
+.Accessing bean properties in expressions
+[source,java]
+----
+
+import io.micronaut.context.annotation.Value;
+import jakarta.inject.Singleton;
+
+@Singleton
+class CustomEvaluationContext {
+
+    public String getName() {
+        return "Bob";
+    }
+
+    public int getAge() {
+        return 25;
+    }
+
+}
+
+@Singleton
+class ContextConsumer {
+
+    @Value("#{ 'Name is ' + #name + ', age is ' + #age }")
+    public String value;
+
+}
+----
+
+=== Retrieving Beans from Bean Context
+
+A predefined syntax construct `ctx[...]` can be used to retrieve beans from bean
+context. The argument inside square brackets has to be a fully qualified class name (note that `T(...)` wrapper is
+optional and can be omitted for simplicity).
+
+.Retrieving beans from bean context
+[source]
+----
+#{ ctx[T(io.micronaut.example.ContextBean)] }
+#{ ctx[io.micronaut.example.ContextBean] }
+----
+
+=== Retrieving Environment Properties
+
+A syntax construct `env[...]` can be used to retrieve environment properties by name.
+The expression inside square brackets has to resolve to string value, otherwise compilation will fail. If property
+value will be absent at runtime, the expression will return `null`
+
+.Retrieving Environment Properties
+[source]
+----
+#{ env['test.property'] }
+----

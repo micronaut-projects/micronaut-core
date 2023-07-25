@@ -15,13 +15,14 @@
  */
 package io.micronaut.http.server.cors;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ImmutableArgumentConversionContext;
 import io.micronaut.core.io.socket.SocketUtils;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
@@ -29,14 +30,13 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.annotation.Filter;
-import io.micronaut.http.filter.HttpServerFilter;
-import io.micronaut.http.filter.ServerFilterChain;
+import io.micronaut.http.annotation.RequestFilter;
+import io.micronaut.http.annotation.ResponseFilter;
+import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.util.HttpHostResolver;
 import org.jetbrains.annotations.NotNull;
-import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -49,7 +49,16 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static io.micronaut.http.HttpAttributes.AVAILABLE_HTTP_METHODS;
-import static io.micronaut.http.HttpHeaders.*;
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS;
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS;
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS;
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN;
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS;
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_MAX_AGE;
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS;
+import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD;
+import static io.micronaut.http.HttpHeaders.ORIGIN;
+import static io.micronaut.http.HttpHeaders.VARY;
 import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
 
 /**
@@ -59,8 +68,8 @@ import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Filter(MATCH_ALL_PATTERN)
-public class CorsFilter implements HttpServerFilter {
+@ServerFilter(MATCH_ALL_PATTERN)
+public class CorsFilter implements Ordered {
     private static final Logger LOG = LoggerFactory.getLogger(CorsFilter.class);
     private static final ArgumentConversionContext<HttpMethod> CONVERSION_CONTEXT_HTTP_METHOD = ImmutableArgumentConversionContext.of(HttpMethod.class);
 
@@ -79,17 +88,19 @@ public class CorsFilter implements HttpServerFilter {
         this.httpHostResolver = httpHostResolver;
     }
 
-    @Override
-    public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-        String origin = request.getHeaders().getOrigin().orElse(null);
+    @RequestFilter
+    @Nullable
+    @Internal
+    public final HttpResponse<?> filterRequest(HttpRequest<?> request) {
+        String origin = request.getOrigin().orElse(null);
         if (origin == null) {
             LOG.trace("Http Header " + HttpHeaders.ORIGIN + " not present. Proceeding with the request.");
-            return chain.proceed(request);
+            return null; // proceed
         }
         CorsOriginConfiguration corsOriginConfiguration = getConfiguration(request).orElse(null);
         if (corsOriginConfiguration != null) {
             if (CorsUtil.isPreflightRequest(request)) {
-                return handlePreflightRequest(request, chain, corsOriginConfiguration);
+                return handlePreflightRequest(request, corsOriginConfiguration);
             }
             if (!validateMethodToMatch(request, corsOriginConfiguration).isPresent()) {
                 return forbidden();
@@ -98,13 +109,25 @@ public class CorsFilter implements HttpServerFilter {
                 LOG.trace("The resolved configuration allows any origin. To prevent drive-by-localhost attacks the request is forbidden");
                 return forbidden();
             }
-            return Publishers.then(chain.proceed(request), resp -> decorateResponseWithHeaders(request, resp, corsOriginConfiguration));
+            return null; // proceed
         } else if (shouldDenyToPreventDriveByLocalhostAttack(origin, request)) {
             LOG.trace("the request specifies an origin different than localhost. To prevent drive-by-localhost attacks the request is forbidden");
             return forbidden();
         }
         LOG.trace("CORS configuration not found for {} origin", origin);
-        return chain.proceed(request);
+        return null; // proceed
+    }
+
+    @ResponseFilter
+    @Internal
+    public final void filterResponse(HttpRequest<?> request, MutableHttpResponse<?> response) {
+        CorsOriginConfiguration corsOriginConfiguration = getConfiguration(request).orElse(null);
+        if (corsOriginConfiguration != null) {
+            if (CorsUtil.isPreflightRequest(request)) {
+                decorateResponseWithHeadersForPreflightRequest(request, response, corsOriginConfiguration);
+            }
+            decorateResponseWithHeaders(request, response, corsOriginConfiguration);
+        }
     }
 
     /**
@@ -121,7 +144,7 @@ public class CorsFilter implements HttpServerFilter {
         if (httpHostResolver == null) {
             return false;
         }
-        String origin = request.getHeaders().getOrigin().orElse(null);
+        String origin = request.getOrigin().orElse(null);
         if (origin == null) {
             return false;
         }
@@ -284,7 +307,7 @@ public class CorsFilter implements HttpServerFilter {
 
     @NonNull
     private Optional<CorsOriginConfiguration> getConfiguration(@NonNull HttpRequest<?> request) {
-        String requestOrigin = request.getHeaders().getOrigin().orElse(null);
+        String requestOrigin = request.getOrigin().orElse(null);
         if (requestOrigin == null) {
             return Optional.empty();
         }
@@ -347,8 +370,8 @@ public class CorsFilter implements HttpServerFilter {
     }
 
     @NotNull
-    private static Publisher<MutableHttpResponse<?>> forbidden() {
-        return Publishers.just(HttpResponse.status(HttpStatus.FORBIDDEN));
+    private static MutableHttpResponse<Object> forbidden() {
+        return HttpResponse.status(HttpStatus.FORBIDDEN);
     }
 
     @NonNull
@@ -367,32 +390,27 @@ public class CorsFilter implements HttpServerFilter {
     private void decorateResponseWithHeaders(@NonNull HttpRequest<?> request,
                                              @NonNull MutableHttpResponse<?> response,
                                              @NonNull CorsOriginConfiguration config) {
-        HttpHeaders headers = request.getHeaders();
-        setOrigin(headers.getOrigin().orElse(null), response);
+        setOrigin(request.getOrigin().orElse(null), response);
         setVary(response);
         setExposeHeaders(config.getExposedHeaders(), response);
         setAllowCredentials(config, response);
     }
 
     @NonNull
-    private Publisher<MutableHttpResponse<?>> handlePreflightRequest(@NonNull HttpRequest<?> request,
-                                                                     @NonNull ServerFilterChain chain,
+    private MutableHttpResponse<?> handlePreflightRequest(@NonNull HttpRequest<?> request,
                                                                      @NonNull CorsOriginConfiguration corsOriginConfiguration) {
         Optional<HttpStatus> statusOptional = validatePreflightRequest(request, corsOriginConfiguration);
         if (statusOptional.isPresent()) {
             HttpStatus status = statusOptional.get();
             if (status.getCode() >= 400) {
-                return Publishers.just(HttpResponse.status(status));
+                return HttpResponse.status(status);
             }
             MutableHttpResponse<?> resp = HttpResponse.status(status);
             decorateResponseWithHeadersForPreflightRequest(request, resp, corsOriginConfiguration);
             decorateResponseWithHeaders(request, resp, corsOriginConfiguration);
-            return Publishers.just(resp);
+            return resp;
         }
-        return Publishers.then(chain.proceed(request), resp -> {
-            decorateResponseWithHeadersForPreflightRequest(request, resp, corsOriginConfiguration);
-            decorateResponseWithHeaders(request, resp, corsOriginConfiguration);
-        });
+        return null;
     }
 
     @NonNull

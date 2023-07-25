@@ -93,6 +93,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         final boolean metadata = introspected.booleanValue("annotationMetadata").orElse(true);
         final Set<String> includedAnnotations = CollectionUtils.setOf(introspected.stringValues("includedAnnotations"));
         final Set<AnnotationValue<Annotation>> indexedAnnotations = CollectionUtils.setOf(introspected.get("indexed", AnnotationValue[].class, new AnnotationValue[0]));
+        final String targetPackage = introspected.stringValue("targetPackage").orElse(element.getPackageName());
 
         if (!classes.isEmpty()) {
             AtomicInteger index = new AtomicInteger(0);
@@ -100,16 +101,14 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 if (isIntrospected(context, ce)) {
                     return;
                 }
-                final AnnotationMetadata typeMetadata = ce.getAnnotationMetadata();
-                final AnnotationMetadata resolvedMetadata = typeMetadata == AnnotationMetadata.EMPTY_METADATA
-                    ? element.getAnnotationMetadata()
-                    : new AnnotationMetadataHierarchy(element.getAnnotationMetadata(), typeMetadata);
                 final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
+                    targetPackage,
                     element.getName(),
                     index.getAndIncrement(),
                     element,
                     ce,
-                    metadata ? resolvedMetadata : null
+                    metadata ? ce.getAnnotationMetadata() : null,
+                    context
                 );
 
                 processElement(
@@ -132,11 +131,13 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                             continue;
                         }
                         final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
+                            targetPackage,
                             element.getName(),
                             j++,
                             element,
                             classElement,
-                            metadata ? element.getAnnotationMetadata() : null
+                            metadata ? element.getAnnotationMetadata() : null,
+                            context
                         );
 
                         processElement(metadata,
@@ -149,8 +150,10 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             }
         } else {
             final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
+                targetPackage,
                 element,
-                metadata ? element.getAnnotationMetadata() : null
+                metadata ? element.getAnnotationMetadata() : null,
+                context
             );
             processElement(metadata, indexedAnnotations, element, writer);
         }

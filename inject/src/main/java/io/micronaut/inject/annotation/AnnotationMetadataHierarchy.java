@@ -115,6 +115,16 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     }
 
     @Override
+    public boolean hasEvaluatedExpressions() {
+        for (AnnotationMetadata annotationMetadata: hierarchy) {
+            if (annotationMetadata.hasEvaluatedExpressions()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
     public Optional<Class<? extends Annotation>> getAnnotationType(@NonNull String name) {
         for (AnnotationMetadata metadata : hierarchy) {
             Optional<Class<? extends Annotation>> annotationType = metadata.getAnnotationType(name);

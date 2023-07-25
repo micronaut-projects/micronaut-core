@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.uri;
 
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.ObjectUtils;
 
 import java.util.ArrayList;
@@ -37,7 +39,7 @@ import java.util.stream.Collectors;
  */
 public class UriMatchTemplate extends UriTemplate implements UriMatcher {
 
-    protected static final String VARIABLE_MATCH_PATTERN = "([^\\/\\?#&;\\+]";
+    protected static final String VARIABLE_MATCH_PATTERN = "([^\\/\\?#(?!\\{)&;\\+]";
     protected StringBuilder pattern;
     protected List<UriMatchVariable> variables;
     private final Pattern matchPattern;
@@ -45,8 +47,8 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
     private final boolean exactMatch;
 
     // Matches cache
-    private Optional<UriMatchInfo> rootMatchInfo;
-    private Optional<UriMatchInfo> exactMatchInfo;
+    private UriMatchInfo rootMatchInfo;
+    private UriMatchInfo exactMatchInfo;
 
     /**
      * Construct a new URI template for the given template.
@@ -135,10 +137,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
                 final Optional<UriMatchVariable> umv = variables.stream()
                         .filter(v -> v.getName().equals(var.get())).findFirst();
                 if (umv.isPresent()) {
-                    final UriMatchVariable uriMatchVariable = umv.get();
-                    if (uriMatchVariable.isQuery()) {
-                        return false;
-                    }
+                    return !umv.get().isQuery();
                 }
             }
             return true;
@@ -149,11 +148,21 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
      * Match the given URI string.
      *
      * @param uri The uRI
-     * @return True if it matches
+     * @return an optional match
      */
     @Override
-    @SuppressWarnings("java:S2789") // performance optimization
     public Optional<UriMatchInfo> match(String uri) {
+        return Optional.ofNullable(tryMatch(uri));
+    }
+
+    /**
+     * Match the given URI string.
+     *
+     * @param uri The uRI
+     * @return a match or null
+     */
+    @Nullable
+    public UriMatchInfo tryMatch(@NonNull String uri) {
         if (uri == null) {
             throw new IllegalArgumentException("Argument 'uri' cannot be null");
         }
@@ -164,7 +173,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
 
         if (isRoot && (length == 0 || (length == 1 && uri.charAt(0) == '/'))) {
             if (rootMatchInfo == null) {
-                rootMatchInfo = Optional.of(new DefaultUriMatchInfo(uri, Collections.emptyMap(), variables));
+                rootMatchInfo = new DefaultUriMatchInfo(uri, Collections.emptyMap(), variables);
             }
             return rootMatchInfo;
         }
@@ -179,16 +188,16 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         if (exactMatch) {
             if (uri.equals(templateString)) {
                 if (exactMatchInfo == null) {
-                    exactMatchInfo = Optional.of(new DefaultUriMatchInfo(uri, Collections.emptyMap(), variables));
+                    exactMatchInfo = new DefaultUriMatchInfo(uri, Collections.emptyMap(), variables);
                 }
                 return exactMatchInfo;
             }
-            return Optional.empty();
+            return null;
         }
         Matcher matcher = matchPattern.matcher(uri);
         if (matcher.matches()) {
             if (variables.isEmpty()) {
-                return Optional.of(new DefaultUriMatchInfo(uri, Collections.emptyMap(), variables));
+                return new DefaultUriMatchInfo(uri, Collections.emptyMap(), variables);
             } else {
                 int count = matcher.groupCount();
                 Map<String, Object> variableMap = new LinkedHashMap<>(count);
@@ -201,10 +210,10 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
                     String value = matcher.group(index);
                     variableMap.put(variable.getName(), value);
                 }
-                return Optional.of(new DefaultUriMatchInfo(uri, variableMap, variables));
+                return new DefaultUriMatchInfo(uri, variableMap, variables);
             }
         }
-        return Optional.empty();
+        return null;
     }
 
     @Override

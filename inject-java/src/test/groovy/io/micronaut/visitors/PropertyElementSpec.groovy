@@ -18,14 +18,25 @@ package io.micronaut.visitors
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.http.annotation.Get
 import io.micronaut.inject.ast.ClassElement
-import spock.lang.IgnoreIf
-import spock.util.environment.Jvm
-
-import javax.annotation.Nullable
+import jakarta.annotation.Nullable
 import jakarta.validation.constraints.NotBlank
 
 class PropertyElementSpec extends AbstractTypeElementSpec {
-    @IgnoreIf({ !jvm.isJava14Compatible() })
+
+    void 'test field annotation and records'() {
+        given:
+            ClassElement classElement = buildClassElement('''
+package test;
+
+record Book(@io.micronaut.visitors.MyFieldAnn(name = "test123") String title, int pages) {}
+''')
+            def beanProperties = classElement.getBeanProperties()
+            def titleProp = beanProperties.find { it.name == 'title' }
+        expect:
+            titleProp.hasAnnotation(MyFieldAnn)
+            titleProp.stringValue(MyFieldAnn, "name").get() == "test123"
+    }
+
     void 'test bean properties work for records'() {
         given:
         ClassElement classElement = buildClassElement('''
@@ -44,9 +55,6 @@ record Book( @jakarta.validation.constraints.NotBlank String title, int pages) {
         beanProperties.every { it.readOnly }
     }
 
-    // Java 9+ doesn't allow resolving elements was the compiler
-    // is finished being used so this test cannot be made to work beyond Java 8 the way it is currently written
-    @IgnoreIf({ Jvm.current.isJava9Compatible() })
     void "test simple bean properties"() {
         buildBeanDefinition('test.TestController', '''
 package test;
@@ -58,9 +66,9 @@ import io.micronaut.http.annotation.Get;
 public class TestController {
 
     private int age;
-    @javax.annotation.Nullable
+    @jakarta.annotation.Nullable
     private String name;
-    @javax.annotation.Nullable
+    @jakarta.annotation.Nullable
     private String description;
 
     /**

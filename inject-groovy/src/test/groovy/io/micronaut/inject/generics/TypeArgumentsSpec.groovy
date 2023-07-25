@@ -10,7 +10,7 @@ class TypeArgumentsSpec extends AbstractBeanDefinitionSpec {
         BeanDefinition definition = buildBeanDefinition('test.ChainA','''\
 package test;
 
-import javax.inject.Singleton;
+import jakarta.inject.Singleton;
 
 @Singleton
 class ChainA extends ChainB<Boolean> {

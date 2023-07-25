@@ -34,17 +34,12 @@ public enum HttpAttributes implements CharSequence {
     ERROR(Constants.PREFIX + ".error"),
 
     /**
-     * Attribute used to store the object that represents the Route.
-     */
-    ROUTE(Constants.PREFIX + ".route"),
-
-    /**
      * Attribute used to store the object that represents the Route match.
      */
     ROUTE_MATCH(Constants.PREFIX + ".route.match"),
 
     /**
-     * Attribute used to store the object that represents the Route metadata.
+     * Attribute used to store the object that represents the Route.
      */
     ROUTE_INFO(Constants.PREFIX + ".route.info"),
 
@@ -80,13 +75,21 @@ public enum HttpAttributes implements CharSequence {
 
     /**
      * Attribute used to store a client Certificate (mutual authentication).
+     *
+     * @deprecated Use {@link HttpRequest#getCertificate()} instead
      */
+    @Deprecated
     X509_CERTIFICATE("javax.servlet.request.X509Certificate"),
 
     /**
      * Attribute used to store Available HTTP methods on the OPTIONS request.
      */
-    AVAILABLE_HTTP_METHODS(Constants.PREFIX + ".route.availableHttpMethods");
+    AVAILABLE_HTTP_METHODS(Constants.PREFIX + ".route.availableHttpMethods"),
+
+    /**
+     * The message body writer.
+     */
+    MESSAGE_BODY_WRITER(Constants.PREFIX + ".messageBodyWriter");
 
     private final String name;
 

@@ -756,7 +756,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
             BeanDefinitionVisitor beanDefinitionWriter) throws IOException {
         beanDefinitionWriter.visitBeanDefinitionEnd();
         BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
-                new BeanDefinitionReferenceWriter(beanDefinitionWriter);
+                new BeanDefinitionReferenceWriter(beanDefinitionWriter, visitorContext);
         beanDefinitionReferenceWriter
                 .setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing());
         beanDefinitionReferenceWriter.accept(classWriterOutputVisitor);

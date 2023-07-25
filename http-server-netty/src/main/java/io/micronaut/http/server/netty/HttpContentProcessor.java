@@ -15,8 +15,10 @@
  */
 package io.micronaut.http.server.netty;
 
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.Toggleable;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 
 import java.util.Collection;
@@ -32,7 +34,9 @@ import java.util.Collection;
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Use the {@link io.micronaut.http.body.MessageBodyReader} API instead
  */
+@Deprecated
 public interface HttpContentProcessor extends Toggleable {
     /**
      * Process more data.
@@ -67,5 +71,17 @@ public interface HttpContentProcessor extends Toggleable {
      */
     default HttpContentProcessor resultType(Argument<?> type) {
         return this;
+    }
+
+    /**
+     * Process a single {@link ByteBuf} into a single item, if possible.
+     *
+     * @param data The input data
+     * @return The output value, or {@code null} if this is unsupported.
+     * @throws Throwable Any failure
+     */
+    @Nullable
+    default Object processSingle(ByteBuf data) throws Throwable {
+        return null;
     }
 }

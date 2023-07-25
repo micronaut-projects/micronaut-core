@@ -119,8 +119,20 @@ public interface ClassWriterOutputVisitor {
      *
      * @param path The path
      * @return The file if it was possible to create it
+     * @deprecated Use {@link #visitGeneratedFile(String, Element...)} instead
      */
+    @Deprecated
     Optional<GeneratedFile> visitGeneratedFile(String path);
+
+    /**
+     * Visit a file that will be generated within the generated sources directory.
+     *
+     * @param path The path
+     * @param originatingElements  the originating elements
+     * @return The file if it was possible to create it
+     * @since 4.0.0
+     */
+    Optional<GeneratedFile> visitGeneratedFile(String path, Element... originatingElements);
 
     /**
      * Finish writing and flush any service entries to disk.

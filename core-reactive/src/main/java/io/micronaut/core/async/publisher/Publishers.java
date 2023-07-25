@@ -99,6 +99,7 @@ public class Publishers {
         return List.of(
             "io.micronaut.core.async.publisher.CompletableFuturePublisher",
             "io.micronaut.core.async.publisher.Publishers$JustPublisher",
+            "io.micronaut.core.async.publisher.Publishers$JustThrowPublisher",
             "io.reactivex.Single",
             "reactor.core.publisher.Mono",
             "io.reactivex.Maybe",
@@ -426,7 +427,7 @@ public class Publishers {
         if (Publisher.class.isAssignableFrom(type)) {
             return true;
         } else {
-            if (type.isPrimitive() || packageOf(type).startsWith("java.")) {
+            if (type.isPrimitive() || type.getName().startsWith("java.")) {
                 return false;
             }
             for (Class<?> reactiveType : REACTIVE_TYPES) {
@@ -576,7 +577,7 @@ public class Publishers {
     }
 
     /**
-     * A publisher for a value.
+     * A publisher for a value. Needs to be public for micronaut-aot.
      *
      * @param <T> The type
      */
@@ -615,11 +616,12 @@ public class Publishers {
 
 
     /**
-     * A publisher that throws an error.
+     * A publisher that throws an error. Needs to be public for micronaut-aot.
      *
      * @param <T> The type
      */
-    private static class JustThrowPublisher<T> implements MicronautPublisher<T> {
+    @Internal
+    public static class JustThrowPublisher<T> implements MicronautPublisher<T> {
 
         private final Throwable error;
 

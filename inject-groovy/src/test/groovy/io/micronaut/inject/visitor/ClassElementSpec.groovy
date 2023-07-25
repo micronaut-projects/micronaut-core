@@ -33,6 +33,7 @@ import io.micronaut.inject.ast.PrimitiveElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.ast.TypedElement
 import io.micronaut.inject.ast.WildcardElement
+import jakarta.validation.Valid
 import spock.lang.Issue
 import spock.lang.PendingFeature
 import spock.lang.Unroll
@@ -474,7 +475,7 @@ interface AnotherInterface {
 package clselem1;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController implements java.util.function.Supplier<String> {
@@ -500,7 +501,7 @@ public class TestController implements java.util.function.Supplier<String> {
 package clselem2;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController {
@@ -528,7 +529,7 @@ package clselem3;
 
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController {
@@ -556,7 +557,7 @@ public class TestController {
 package clselem4;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController {
@@ -582,7 +583,7 @@ public class TestController {
 package clselem5;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController<T extends Foo> {
@@ -610,7 +611,7 @@ class Foo {}
 package clselem6;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController<T extends Foo> {
@@ -640,7 +641,7 @@ class Foo {}
 package clselem7;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController {
@@ -668,7 +669,7 @@ class Foo {}
 package clselem8;
 
 import io.micronaut.http.annotation.*;
-import javax.inject.Inject;
+import jakarta.inject.Inject;
 
 @Controller("/test")
 public class TestController<T extends Foo> {
@@ -932,9 +933,13 @@ class SuccessfulTest extends AbstractExample {
             def allFields = classElement.getEnclosedElements(ElementQuery.ALL_FIELDS)
         then:
             props.size() == 3
-            props[0].name == "ctx"
-            props[1].name.contains "dummy"
-            props[2].name.contains "sharedCtx"
+            props[0].name == '$spock_sharedField_sharedCtx'
+            props[1].name == "ctx"
+            props[2].name.contains "dummy"
+            allFields.size() == 3
+            allFields[0].name == '$spock_sharedField_sharedCtx'
+            allFields[1].name == "ctx"
+            allFields[2].name.contains "dummy"
     }
 
     void "test fields selection"() {
@@ -2280,6 +2285,46 @@ class MyRepo implements Repo<MyBean, Long> {
         then:
             interfaces.size() == 1
             interfaces[0].simpleName == "Repo"
+    }
+
+    void "test interface type annotations"() {
+        ClassElement ce = buildClassElement('test.MyRepo', '''
+package test;
+import jakarta.validation.Valid;
+import java.util.List;
+
+interface MyRepo extends Repo<@Valid MyBean, Long> {
+}
+
+interface Repo<E, ID> extends GenericRepository<E, ID> {
+
+    void save(E entity);
+
+}
+
+interface GenericRepository<E, ID> {
+}
+
+
+class MyBean {
+    private String name;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+''')
+
+        when:
+            def method = ce.findMethod("save").get()
+            def type = method.parameters[0].getGenericType()
+        then:
+            type.hasAnnotation(Valid)
     }
 
     void validateBookArgument(ClassElement classElement) {

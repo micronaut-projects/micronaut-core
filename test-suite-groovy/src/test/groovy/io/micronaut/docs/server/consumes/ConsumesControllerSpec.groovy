@@ -22,6 +22,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.http.codec.CodecException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -76,7 +77,7 @@ class ConsumesControllerSpec extends Specification {
                         .contentType(MediaType.TEXT_PLAIN))
 
         then:
-        noExceptionThrown()
+        thrown CodecException
     }
 
     @Introspected

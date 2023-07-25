@@ -25,6 +25,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.annotation.InstantiatedMember;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -38,6 +39,7 @@ import io.micronaut.inject.visitor.VisitorContext;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -52,6 +54,9 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
+
+import static io.micronaut.core.expressions.EvaluatedExpressionReference.EXPR_SUFFIX;
+import static io.micronaut.expressions.EvaluatedExpressionConstants.EXPRESSION_PATTERN;
 
 /**
  * An abstract implementation that builds {@link AnnotationMetadata}.
@@ -433,11 +438,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      *
      * @param originatingElement The originating element
      * @param member             The member
+     * @param annotationName     The annotation name
      * @param memberName         The member name
      * @param annotationValue    The value
      * @return The object
      */
-    protected abstract Object readAnnotationValue(T originatingElement, T member, String memberName, Object annotationValue);
+    protected abstract Object readAnnotationValue(T originatingElement, T member, String annotationName, String memberName, Object annotationValue);
 
     /**
      * Read the raw default annotation values from the given annotation.
@@ -543,6 +549,50 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return An optional mirror
      */
     protected abstract Optional<T> getAnnotationMirror(String annotationName);
+
+    /**
+     * Detect evaluated expression in annotation value.
+     *
+     * @param value - Annotation value
+     * @return if value contains evaluated expression
+     */
+    protected boolean isEvaluatedExpression(@Nullable Object value) {
+        return (value instanceof String str && str.matches(EXPRESSION_PATTERN))
+                   || (value instanceof String[] strArray &&
+                           Arrays.stream(strArray).anyMatch(this::isEvaluatedExpression));
+    }
+
+    /**
+     * Wraps original annotation value to make it processable at later stages.
+     *
+     * @param originatingElement originating annotated element
+     * @param annotationName annotation name
+     * @param memberName annotation member name
+     * @param initialAnnotationValue original annotation value
+     * @return expression reference
+     */
+    @NonNull
+    protected Object buildEvaluatedExpressionReference(@NonNull T originatingElement,
+                                                       @NonNull String annotationName,
+                                                       @NonNull String memberName,
+                                                       @NonNull Object initialAnnotationValue) {
+        String originatingClassName = getOriginatingClassName(originatingElement);
+        if (originatingClassName != null) {
+            String packageName = NameUtils.getPackageName(originatingClassName);
+            String simpleClassName = NameUtils.getSimpleName(originatingClassName);
+            String exprClassName = "%s.$%s%s".formatted(packageName, simpleClassName, EXPR_SUFFIX);
+
+            Integer expressionIndex = EvaluatedExpressionReference.nextIndex(exprClassName);
+
+            return new EvaluatedExpressionReference(initialAnnotationValue, annotationName, memberName, exprClassName + expressionIndex);
+        } else {
+            return initialAnnotationValue;
+        }
+
+    }
+
+    @Nullable
+    protected abstract String getOriginatingClassName(@NonNull T orginatingElement);
 
     /**
      * Get the annotation member.
@@ -783,7 +833,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     }
                     if (isInstantiatedMember) {
                         final String memberName = getAnnotationMemberName(member);
-                        final Object rawValue = readAnnotationValue(originatingElement, member, memberName, annotationValue);
+                        final Object rawValue = readAnnotationValue(originatingElement, member, annotationName, memberName, annotationValue);
                         if (rawValue instanceof AnnotationClassValue<?> annotationClassValue) {
                             annotationValues.put(memberName, new AnnotationClassValue<>(annotationClassValue.getName(), true));
                         }
@@ -1050,7 +1100,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     }
                     // special case: don't add stereotype for @Nonnull when it's marked as UNKNOWN/MAYBE/NEVER.
                     // https://github.com/micronaut-projects/micronaut-core/issues/6795
-                    if (stereotypeName.equals("javax.annotation.Nonnull")) {
+                    if (stereotypeName.equals("jakarta.annotation.Nonnull")) {
                         String when = Objects.toString(stereotypeAnnotationValue.getValues().get("when"));
                         return !(when.equals("UNKNOWN") || when.equals("MAYBE") || when.equals("NEVER"));
                     }
@@ -1389,6 +1439,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 av
         );
     }
+
 
     /**
      * Used to clear mutated metadata at the end of a compilation cycle.

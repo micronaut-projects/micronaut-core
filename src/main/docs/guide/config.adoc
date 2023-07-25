@@ -25,6 +25,6 @@ Configuration can by default be provided in Java properties files or https://www
 |===
 
 
-In addition, Micronaut allows overriding any property via system properties or environment variables.
+In addition, Micronaut framework allows overriding any property via system properties or environment variables.
 
 Each source of configuration is modeled with the link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource] interface and the mechanism is extensible, allowing the implementation of additional link:{api}/io/micronaut/context/env/PropertySourceLoader.html[PropertySourceLoader] implementations.

@@ -175,40 +175,6 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
         return annotations;
     }
 
-    /**
-     * Adds any annotation values found in the values map to the results.
-     *
-     * @param results The results
-     * @param values The values
-     */
-    protected final void addAnnotationValuesFromData(List results, Map<CharSequence, Object> values) {
-        if (values != null) {
-            Object v = values.get(AnnotationMetadata.VALUE_MEMBER);
-            if (v instanceof io.micronaut.core.annotation.AnnotationValue[]) {
-                io.micronaut.core.annotation.AnnotationValue[] avs = (io.micronaut.core.annotation.AnnotationValue[]) v;
-                for (io.micronaut.core.annotation.AnnotationValue av : avs) {
-                    addValuesToResults(results, av);
-                }
-            } else if (v instanceof Collection) {
-                Collection c = (Collection) v;
-                for (Object o : c) {
-                    if (o instanceof io.micronaut.core.annotation.AnnotationValue) {
-                        addValuesToResults(results, ((io.micronaut.core.annotation.AnnotationValue) o));
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     * Adds a values instance to the results.
-     *
-     * @param results The results
-     * @param values The values
-     */
-    protected void addValuesToResults(List<io.micronaut.core.annotation.AnnotationValue> results, io.micronaut.core.annotation.AnnotationValue values) {
-        results.add(values);
-    }
 
     private Annotation[] initializeAnnotations(Set<String> names) {
         if (CollectionUtils.isNotEmpty(names)) {

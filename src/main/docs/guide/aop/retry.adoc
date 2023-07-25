@@ -1,6 +1,6 @@
 In distributed systems and microservice environments, failure is something you have to plan for, and it is common to want to attempt to retry an operation if it fails. If first you don't succeed try again!
 
-With this in mind, Micronaut includes a api:retry.annotation.Retryable[] annotation.
+With this in mind, the Micronaut framework includes a api:retry.annotation.Retryable[] annotation.
 
 == Retry Dependency
 

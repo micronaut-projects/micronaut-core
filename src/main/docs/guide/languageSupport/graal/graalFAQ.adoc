@@ -1,6 +1,6 @@
-==== How does Micronaut manage to run on GraalVM?
+==== How does Micronaut framework manage to run on GraalVM?
 
-Micronaut features a Dependency Injection and Aspect-Oriented Programming runtime that uses no reflection. This makes it easier for Micronaut applications to run on GraalVM since there are https://github.com/oracle/graal/blob/master/docs/reference-manual/native-image/Compatibility.md[compatibility] concerns particularly around https://github.com/oracle/graal/blob/master/docs/reference-manual/native-image/Reflection.md[reflection] in Native Images.
+The Micronaut framework features a Dependency Injection and Aspect-Oriented Programming runtime that uses no reflection. This makes it easier for Micronaut applications to run on GraalVM since there are https://github.com/oracle/graal/blob/master/docs/reference-manual/native-image/Compatibility.md[compatibility] concerns particularly around https://github.com/oracle/graal/blob/master/docs/reference-manual/native-image/Reflection.md[reflection] in Native Images.
 
 ==== How can I make a Micronaut application that uses picocli run on GraalVM?
 
@@ -8,7 +8,7 @@ Picocli provides a `picocli-codegen` module with a tool for generating a GraalVM
 
 ==== What about other Third-Party Libraries?
 
-Micronaut cannot guarantee that third-party libraries work on GraalVM SubstrateVM, that is down to each individual library to implement support.
+The Micronaut framework cannot guarantee that third-party libraries work on GraalVM SubstrateVM, that is down to each individual library to implement support.
 
 ==== I Get a "Class XXX is instantiated reflectively..." Exception. What do I do?
 

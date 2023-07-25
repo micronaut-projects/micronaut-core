@@ -1,3 +1,3 @@
-Client communication between Microservices is a critical component of any Microservice architecture. With that in mind, Micronaut includes an HTTP client that has both a low-level API and a higher-level AOP-driven API.
+Client communication between Microservices is a critical component of any Microservice architecture. With that in mind, Micronaut framework includes an HTTP client that has both a low-level API and a higher-level AOP-driven API.
 
 TIP: Regardless whether you choose to use Micronaut's HTTP server, you may wish to use the Micronaut HTTP client in your application since it is a feature-rich client implementation.

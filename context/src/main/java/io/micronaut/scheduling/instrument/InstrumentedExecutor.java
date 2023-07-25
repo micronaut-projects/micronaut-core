@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Experimental;
 
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 
 /**
  * An {@link Executor} that has been instrumented to allow for propagation of thread state
@@ -29,6 +30,32 @@ import java.util.concurrent.Executor;
  */
 @Experimental
 public interface InstrumentedExecutor extends Executor, RunnableInstrumenter {
+
+    /**
+     * Unwrap instrumented executor if needed.
+     * @param executor The executor
+     * @return The unwrapped value or the original one
+     * @since 4.0.0
+     */
+    static Executor unwrap(Executor executor) {
+        if (executor instanceof InstrumentedExecutor instrumentedExecutor) {
+            return instrumentedExecutor.getTarget();
+        }
+        return executor;
+    }
+
+    /**
+     * Unwrap instrumented executor if needed.
+     * @param executor The executor
+     * @return The unwrapped value or the original one
+     * @since 4.0.0
+     */
+    static ExecutorService unwrap(ExecutorService executor) {
+        if (executor instanceof InstrumentedExecutor instrumentedExecutor) {
+            return (ExecutorService) instrumentedExecutor.getTarget();
+        }
+        return executor;
+    }
 
     /**
      * Implementors can override to specify the target {@link Executor}.

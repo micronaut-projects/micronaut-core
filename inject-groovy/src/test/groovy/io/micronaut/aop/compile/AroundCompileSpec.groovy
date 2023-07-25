@@ -20,6 +20,60 @@ import java.lang.annotation.Annotation
 
 class AroundCompileSpec extends AbstractBeanDefinitionSpec {
 
+    void 'test apply interceptor using interface'() {
+        given:
+            ApplicationContext context = buildContext('''
+package test;
+
+import java.lang.annotation.*;
+import io.micronaut.aop.*;
+import jakarta.inject.*;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+interface IMyBean {
+    @TestAnn
+    void test();
+}
+
+@Singleton
+class MyBean implements IMyBean {
+
+    @Override
+    void test() {
+
+    }
+
+}
+
+@Inherited
+@Retention(RUNTIME)
+@Target([ElementType.METHOD, ElementType.TYPE])
+@InterceptorBinding
+@interface TestAnn {
+}
+
+@InterceptorBean(TestAnn.class)
+class TestInterceptor implements Interceptor {
+    boolean invoked = false;
+    @Override
+    public Object intercept(InvocationContext context) {
+        invoked = true;
+        return context.proceed();
+    }
+}
+
+''')
+            def instance = getBean(context, 'test.MyBean')
+            def interceptor = getBean(context, 'test.TestInterceptor')
+
+        when:
+            instance.test()
+
+        then:"the interceptor was invoked"
+            instance instanceof Intercepted
+            interceptor.invoked
+    }
+
     void 'test apply interceptor binder with annotation mapper'() {
         given:
         ApplicationContext context = buildContext('''
@@ -64,7 +118,6 @@ class TestInterceptor implements Interceptor {
         then:"the interceptor was invoked"
         instance instanceof Intercepted
         interceptor.invoked
-
     }
 
     void 'test method level interceptor matching'() {

@@ -1,4 +1,4 @@
-Static resource resolution is enabled by default. Micronaut supports resolving resources from the classpath or the file system.
+Static resource resolution is enabled by default. The Micronaut framework supports resolving resources from the classpath or the file system.
 
 See the information below for available configuration options:
 

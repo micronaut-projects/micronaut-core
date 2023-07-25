@@ -35,9 +35,9 @@ class CorsUtil {
      * @param request The {@link HttpRequest} object
      * @return Return whether this request is a pre-flight request
      */
-    static boolean isPreflightRequest(HttpRequest request) {
+    static boolean isPreflightRequest(HttpRequest<?> request) {
         HttpHeaders headers = request.getHeaders();
-        Optional<String> origin = headers.getOrigin();
+        Optional<String> origin = request.getOrigin();
         return origin.isPresent() && headers.contains(ACCESS_CONTROL_REQUEST_METHOD) && HttpMethod.OPTIONS == request.getMethod();
     }
 }

@@ -2,12 +2,19 @@ plugins {
     id "io.micronaut.build.internal.convention-library"
 }
 
+micronautBuild {
+    core {
+        usesMicronautTestSpock()
+    }
+}
+
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":graal")
     compileOnly libs.graal
     compileOnly libs.managed.netty.transport.native.epoll
     compileOnly libs.managed.netty.transport.native.kqueue
+    compileOnly libs.managed.netty.transport.native.iouring
     compileOnly project(":websocket")
 
     api project(":http")
@@ -21,6 +28,12 @@ dependencies {
 
     testImplementation project(":runtime")
     testImplementation project(":websocket")
+    testImplementation project(":jackson-databind")
+
+    testAnnotationProcessor project(":inject-java")
+    testImplementation project(":inject")
+    testImplementation project(":inject-java-test")
+    testCompileOnly project(":inject-groovy")
 }
 
 spotless {

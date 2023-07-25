@@ -19,6 +19,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.expressions.EvaluatedExpression;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -160,8 +161,6 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     }
 
     /**
-     * Internal copy constructor.
-     *
      * @param target            The target
      * @param defaultValues     The default values
      * @param convertibleValues The convertible values
@@ -169,17 +168,17 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      */
     @Internal
     @UsedByGeneratedCode
-    protected AnnotationValue(AnnotationValue<A> target,
-                              Map<CharSequence, Object> defaultValues,
-                              ConvertibleValues<Object> convertibleValues,
-                              Function<Object, Object> valueMapper) {
+    public AnnotationValue(AnnotationValue<A> target,
+                           Map<CharSequence, Object> defaultValues,
+                           ConvertibleValues<Object> convertibleValues,
+                           Function<Object, Object> valueMapper) {
         this.annotationName = target.annotationName;
         this.defaultValues = defaultValues;
         this.values = target.values;
         this.convertibleValues = convertibleValues;
         this.valueMapper = valueMapper;
         this.retentionPolicy = RetentionPolicy.RUNTIME;
-        this.stereotypes = null;
+        this.stereotypes = target.stereotypes;
     }
 
     /**
@@ -752,7 +751,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
     @Override
     public OptionalLong longValue(@NonNull String member) {
-        return longValue(member, null);
+        return longValue(member, valueMapper);
     }
 
     /**
@@ -789,7 +788,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
     @Override
     public Optional<Short> shortValue(@NonNull String member) {
-        return shortValue(member, null);
+        return shortValue(member, valueMapper);
     }
 
     /**
@@ -972,7 +971,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
     @Override
     public Optional<Boolean> booleanValue(@NonNull String member) {
-        return booleanValue(member, null);
+        return booleanValue(member, valueMapper);
     }
 
     /**
@@ -1301,6 +1300,17 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         return Optional.empty();
     }
 
+    /**
+     * If this AnnotationValue contains Evaluated Expressions.
+     *
+     * @return true if it is
+     * @since 4.0.0
+     */
+    public boolean hasEvaluatedExpressions() {
+        return values.values().stream()
+            .anyMatch(value -> value instanceof EvaluatedExpression);
+    }
+
     @Override
     public String toString() {
         if (values.isEmpty()) {
@@ -1605,7 +1615,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
                 }
             }
         }
-        if (valueMapper != null && rawValue instanceof String) {
+        if (valueMapper != null && (rawValue instanceof String || rawValue instanceof EvaluatedExpression)) {
             return valueMapper.apply(rawValue);
         }
         return rawValue;

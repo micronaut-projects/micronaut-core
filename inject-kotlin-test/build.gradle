@@ -14,13 +14,13 @@ dependencies {
     }
     api(libs.managed.ksp.api)
     api(libs.managed.ksp)
-    implementation(libs.kotlin.compiler.embeddable)
-    implementation "com.squareup.okio:okio:3.2.0"
+    implementation(libs.managed.kotlin.compiler.embeddable)
+    implementation "com.squareup.okio:okio:3.3.0"
     implementation "io.github.classgraph:classgraph:4.8.149"
     testImplementation libs.javax.persistence
     testImplementation project(":runtime")
     api libs.blaze.persistence.core
-    implementation libs.kotlin.stdlib
+    implementation libs.managed.kotlin.stdlib
 }
 
 tasks.named("sourcesJar") {

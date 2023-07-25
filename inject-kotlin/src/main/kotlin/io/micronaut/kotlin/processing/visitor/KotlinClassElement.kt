@@ -133,13 +133,13 @@ internal open class KotlinClassElement(
             .toList()
     }
 
+    @OptIn(KspExperimental::class)
     private val internalCanonicalName: String by lazy {
-        declaration.qualifiedName!!.asString()
+        val javaName = visitorContext.resolver.mapKotlinNameToJava(declaration.qualifiedName!!)
+        javaName?.asString() ?: declaration.qualifiedName!!.asString()
     }
 
-    private val internalName: String by lazy {
-        declaration.getBinaryName(visitorContext.resolver, visitorContext)
-    }
+    private val internalName = declaration.getBinaryName(visitorContext.resolver, visitorContext)
 
     private val resolvedInterfaces: Collection<ClassElement> by lazy {
         declaration.superTypes.map { it.resolve() }
@@ -372,17 +372,20 @@ internal open class KotlinClassElement(
             }
 
         val allProperties: MutableList<PropertyElement> = mutableListOf()
+        allProperties.addAll(enclosedElementsQuery.getEnclosedElements(this, eq))
         // unfortunate hack since these are not excluded?
         if (hasDeclaredStereotype(ConfigurationReader::class.java)) {
             val configurationBuilderQuery = ElementQuery.of(PropertyElement::class.java)
                 .annotated { it.hasDeclaredAnnotation(ConfigurationBuilder::class.java) }
                 .onlyInstance()
-            val configBuilderProps =
-                enclosedElementsQuery.getEnclosedElements(this, configurationBuilderQuery)
-            allProperties.addAll(configBuilderProps)
+                .onlyAccessible(this)
+            enclosedElementsQuery.getEnclosedElements(this, configurationBuilderQuery)
+                .forEach { e ->
+                    if (!allProperties.contains(e)) {
+                        allProperties.add(e)
+                    }
+                }
         }
-
-        allProperties.addAll(enclosedElementsQuery.getEnclosedElements(this, eq))
         val propertyNames = allProperties.map { it.name }.toSet()
 
         val resolvedProperties: MutableList<PropertyElement> = mutableListOf()
@@ -463,7 +466,6 @@ internal open class KotlinClassElement(
 
     override fun isTypeVariable() = typeVariable
 
-    @OptIn(KspExperimental::class)
     override fun isAssignable(type: String): Boolean {
         val otherDeclaration = visitorContext.resolver.getClassDeclarationByName(type)
         if (otherDeclaration != null) {
@@ -481,42 +483,33 @@ internal open class KotlinClassElement(
             if (thisFullName == otherFullName) {
                 return true
             }
-            val otherKotlinType = otherDeclaration.asStarProjectedType()
-            if (otherKotlinType == kotlinType) {
+            val otherKotlinType = otherDeclaration.asStarProjectedType().makeNullable()
+            val kotlinTypeNullable = kotlinType.makeNullable()
+            if (otherKotlinType == kotlinTypeNullable) {
                 return true
             }
-            if (otherKotlinType.isAssignableFrom(kotlinType)) {
+            if (otherKotlinType.isAssignableFrom(kotlinTypeNullable)) {
                 return true
             }
         }
+        return isAssignable2(type)
+    }
+
+    // Second attempt to check if the class is assignable, the method is public for testing
+    @OptIn(KspExperimental::class)
+    fun isAssignable2(type: String): Boolean {
         val kotlinName = visitorContext.resolver.mapJavaNameToKotlin(
             visitorContext.resolver.getKSNameFromString(type)
-        )
-        if (kotlinName != null) {
-            val kotlinClassByName = visitorContext.resolver.getKotlinClassByName(kotlinName)
-            if (kotlinClassByName != null && kotlinType.starProjection().isAssignableFrom(kotlinClassByName.asStarProjectedType())) {
-                return true
-            }
-        }
-        return false
+        ) ?: return false
+        val kotlinClassByName = visitorContext.resolver.getKotlinClassByName(kotlinName) ?: return false
+        return kotlinClassByName.asStarProjectedType().makeNullable().isAssignableFrom(kotlinType.starProjection().makeNullable())
     }
 
     override fun isAssignable(type: ClassElement): Boolean {
         if (type is KotlinClassElement) {
-            return type.kotlinType.isAssignableFrom(kotlinType)
+            return type.kotlinType.starProjection().makeNullable().isAssignableFrom(kotlinType.starProjection().makeNullable())
         }
         return super.isAssignable(type)
-    }
-
-    override fun isPrimitive(): Boolean {
-        return isVoid
-    }
-
-    override fun isVoid(): Boolean {
-        if (internalName == "kotlin.Unit") {
-            return true
-        }
-        return false
     }
 
     override fun copyThis() = KotlinClassElement(
@@ -625,6 +618,17 @@ internal open class KotlinClassElement(
 
     private inner class KotlinEnclosedElementsQuery :
         EnclosedElementsQuery<KSClassDeclaration, KSNode>() {
+
+        @OptIn(KspExperimental::class)
+        override fun getElementName(element: KSNode): String {
+            if (element is KSFunctionDeclaration) {
+                return visitorContext.resolver.getJvmName(element)!!
+            }
+            if (element is KSDeclaration) {
+                return element.getBinaryName(visitorContext.resolver, visitorContext)
+            }
+            return ""
+        }
 
         override fun getNativeClassType(classElement: ClassElement): KSClassDeclaration {
             return (classElement as KotlinClassElement).nativeType.declaration

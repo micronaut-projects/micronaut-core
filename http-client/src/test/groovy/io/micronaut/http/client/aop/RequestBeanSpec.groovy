@@ -11,7 +11,7 @@ import io.micronaut.http.annotation.*
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.http.filter.OncePerRequestHttpServerFilter
+import io.micronaut.http.filter.HttpServerFilter
 import io.micronaut.http.filter.ServerFilterChain
 import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Singleton
@@ -20,7 +20,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-import javax.annotation.Nullable
+import jakarta.annotation.Nullable
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Pattern
 
@@ -68,7 +68,7 @@ class RequestBeanSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.response.getBody(Map).get()._embedded.errors[0].message.contains("Field must have value first or second.")
+        ex.response.getBody(Map).get()._embedded.errors[0].message == "bean.validatedValue: Field must have value 'first' or 'second'."
     }
 
     void "test validated value returns ok when valid"() {
@@ -112,7 +112,7 @@ class RequestBeanSpec extends Specification {
 
         then:
         def ex = thrown(HttpClientResponseException)
-        ex.response.getBody(Map).get()._embedded.errors[0].message.contains("Field must have value first or second.")
+        ex.response.getBody(Map).get()._embedded.errors[0].message == "bean.validatedValue: Field must have value 'first' or 'second'."
     }
 
     void "test Immutable Bean gets injected Typed Value"() {
@@ -424,9 +424,9 @@ class RequestBeanSpec extends Specification {
     }
 
     @Filter("/request/bean/**")
-    static class TestFilter extends OncePerRequestHttpServerFilter {
+    static class TestFilter implements HttpServerFilter {
         @Override
-        protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
+        Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
             request.getAttributes().put("filter.value", "Filter Test Value")
             return chain.proceed(request)
         }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,8 +36,6 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanConfiguration;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -59,6 +57,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -85,7 +84,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final String EC2_LINUX_BIOS_VENDOR_FILE = "/sys/devices/virtual/dmi/id/bios_vendor";
     private static final String EC2_WINDOWS_HYPERVISOR_CMD = "wmic path win32_computersystemproduct get uuid";
     private static final String FILE_SEPARATOR = ",";
-    private static final Logger LOG = LoggerFactory.getLogger(DefaultEnvironment.class);
     private static final String AWS_LAMBDA_FUNCTION_NAME_ENV = "AWS_LAMBDA_FUNCTION_NAME";
     private static final String K8S_ENV = "KUBERNETES_SERVICE_HOST";
     private static final String PCF_ENV = "VCAP_SERVICES";
@@ -126,7 +124,17 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @param configuration The configuration
      */
     public DefaultEnvironment(@NonNull ApplicationContextConfiguration configuration) {
-        super(configuration.getConversionService().orElseGet(MutableConversionService::create));
+        this(configuration, true);
+    }
+
+    /**
+     * Construct a new environment for the given configuration.
+     *
+     * @param configuration The configuration
+     * @param logEnabled flag to enable or disable logger
+     */
+    public DefaultEnvironment(@NonNull ApplicationContextConfiguration configuration, boolean logEnabled) {
+        super(configuration.getConversionService().orElseGet(MutableConversionService::create), logEnabled);
         this.mutableConversionService = (MutableConversionService) conversionService;
         this.configuration = configuration;
         this.resourceLoader = configuration.getResourceLoader();
@@ -157,8 +165,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         this.classLoader = configuration.getClassLoader();
         this.annotationScanner = createAnnotationScanner(classLoader);
         this.names = environments;
-        if (LOG.isInfoEnabled() && !environments.isEmpty()) {
-            LOG.info("Established active environments: {}", environments);
+        if (!environments.isEmpty()) {
+            log.info("Established active environments: {}", environments);
         }
         List<String> configLocations = configuration.getOverrideConfigLocations() == null ?
                 new ArrayList<>(DEFAULT_CONFIG_LOCATIONS) : configuration.getOverrideConfigLocations();
@@ -264,9 +272,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @Override
     public Environment start() {
         if (running.compareAndSet(false, true)) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Starting environment {} for active names {}", this, getActiveNames());
-            }
+            log.debug("Starting environment {} for active names {}", this, getActiveNames());
             if (reading.compareAndSet(false, true)) {
 
                 readPropertySources(getPropertySourceRootName());
@@ -352,9 +358,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     protected boolean shouldDeduceEnvironments() {
         if (deduceEnvironments != null) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Environment deduction was set explicitly via builder to: " + deduceEnvironments);
-            }
+            log.debug("Environment deduction was set explicitly via builder to: {}", deduceEnvironments);
 
             return deduceEnvironments;
         } else if (configuration.isEnableDefaultPropertySources()) {
@@ -363,26 +367,39 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
             if (StringUtils.isNotEmpty(deduceEnv)) {
                 boolean deduce = Boolean.parseBoolean(deduceEnv);
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Environment deduction was set via environment variable to: " + deduce);
-                }
+                log.debug("Environment deduction was set via environment variable to: {}", deduce);
                 return deduce;
             } else if (StringUtils.isNotEmpty(deduceProperty)) {
                 boolean deduce = Boolean.parseBoolean(deduceProperty);
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Environment deduction was set via system property to: " + deduce);
-                }
+                log.debug("Environment deduction was set via system property to: {}", deduce);
                 return deduce;
             } else {
                 boolean deduceDefault = DEDUCE_ENVIRONMENT_DEFAULT;
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Environment deduction is using the default of: " + deduceDefault);
-                }
+                log.debug("Environment deduction is using the default of: {}", deduceDefault);
                 return deduceDefault;
             }
         } else {
             return false;
         }
+    }
+
+    /**
+     * @return Whether cloud environment should be deduced based on environment variable, system property or configuration
+     */
+    protected boolean shouldDeduceCloudEnvironment() {
+        String deduceEnv = CachedEnvironment.getenv(Environment.DEDUCE_CLOUD_ENVIRONMENT_ENV);
+        if (StringUtils.isNotEmpty(deduceEnv)) {
+            boolean deduce = Boolean.parseBoolean(deduceEnv);
+            log.debug("Cloud environment deduction was set via environment variable to: {}", deduce);
+            return deduce;
+        }
+        String deduceProperty = CachedEnvironment.getProperty(Environment.DEDUCE_CLOUD_ENVIRONMENT_PROPERTY);
+        if (StringUtils.isNotEmpty(deduceProperty)) {
+            boolean deduce = Boolean.parseBoolean(deduceProperty);
+            log.debug("Cloud environment deduction was set via system property to: {}", deduce);
+            return deduce;
+        }
+        return configuration.isDeduceCloudEnvironment();
     }
 
     /**
@@ -428,9 +445,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         propertySources.addAll(this.propertySources.values());
         OrderUtil.sort(propertySources);
         for (PropertySource propertySource : propertySources) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Processing property source: {}", propertySource.getName());
-            }
+            log.debug("Processing property source: {}", propertySource.getName());
             processPropertySource(propertySource, propertySource.getConvention());
         }
     }
@@ -489,9 +504,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                         String fileName = NameUtils.filename(filePath);
                         Optional<PropertySourceLoader> propertySourceLoader = Optional.ofNullable(loaderByFormatMap.get(extension));
                         if (propertySourceLoader.isPresent()) {
-                            if (LOG.isDebugEnabled()) {
-                                LOG.debug("Reading property sources from loader: {}", propertySourceLoader);
-                            }
+                            log.debug("Reading property sources from loader: {}", propertySourceLoader);
                             Optional<Map<String, Object>> properties = readPropertiesFromLoader(fileName, filePath, propertySourceLoader.get());
                             if (properties.isPresent()) {
                                 propertySources.add(PropertySource.of(filePath, properties.get(), order));
@@ -541,9 +554,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             loadPropertySourceFromLoader(name, new PropertiesPropertySourceLoader(), propertySources, resourceLoader);
         } else {
             for (PropertySourceLoader propertySourceLoader : propertySourceLoaders) {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Reading property sources from loader: {}", propertySourceLoader);
-                }
+                log.debug("Reading property sources from loader: {}", propertySourceLoader);
                 loadPropertySourceFromLoader(name, propertySourceLoader, propertySources, resourceLoader);
             }
         }
@@ -648,7 +659,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         EnvironmentsAndPackage environmentsAndPackage = this.environmentsAndPackage;
         boolean isNotFunction = !specifiedNames.contains(Environment.FUNCTION);
         final boolean deduceEnvironment = shouldDeduceEnvironments();
-        final boolean deduceCloudEnvironmentUsingProbes = isNotFunction && configuration.isDeduceCloudEnvironment();
+        final boolean deduceCloudEnvironmentUsingProbes = isNotFunction && shouldDeduceCloudEnvironment();
         if (environmentsAndPackage == null) {
             synchronized (EnvironmentsAndPackage.class) { // double check
                 environmentsAndPackage = this.environmentsAndPackage;
@@ -825,6 +836,23 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 }
             }
         }
+        if (!changes.isEmpty()) {
+            Map<String, Object> placeholdersAltered = new LinkedHashMap<>();
+            for (Map<String, Object> map : newCatalog) {
+                if (map != null) {
+                    map.forEach((key, v) -> {
+                        if (v instanceof String val) {
+                            for (String changed : changes.keySet()) {
+                                if (val.contains(changed)) {
+                                    placeholdersAltered.put(key, v);
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+            changes.putAll(placeholdersAltered);
+        }
         return changes;
     }
 
@@ -842,11 +870,15 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                     changes.put(key, null);
                 } else if (hasOld && !hasNew) {
                     changes.put(key, oldValue);
-                } else if (hasNew && hasOld && !newValue.equals(oldValue)) {
+                } else if (hasNew && hasOld && hasChanged(newValue, oldValue)) {
                     changes.put(key, oldValue);
                 }
             }
         }
+    }
+
+    private static boolean hasChanged(Object newValue, Object oldValue) {
+        return !Objects.deepEquals(newValue, oldValue);
     }
 
     private Map<String, Object>[] copyCatalog() {
@@ -940,7 +972,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 stdout.append(line);
             }
         } catch (IOException e) {
-
+            // ignore
         }
 
         return stdout;

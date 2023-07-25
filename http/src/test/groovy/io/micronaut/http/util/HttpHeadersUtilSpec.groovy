@@ -67,6 +67,17 @@ class HttpHeadersUtilSpec extends Specification {
         appender.stop()
     }
 
+    def "splitAcceptHeader"(String header, String result) {
+        expect:
+        HttpHeadersUtil.splitAcceptHeader(header) == result
+
+        where:
+        header                                         | result
+        "fr-CH, fr;q=0.9, en;q=0.8, de;q=0.7, *;q=0.5" | "fr-CH"
+        "fr-CH;q=0.9, en;q=0.8, de;q=0.7, *;q=0.5"     | "fr-CH"
+        "*"                                            | null
+    }
+
     static class MemoryAppender extends AppenderBase<ILoggingEvent> {
         final BlockingQueue<String> events = new LinkedBlockingQueue<>()
 

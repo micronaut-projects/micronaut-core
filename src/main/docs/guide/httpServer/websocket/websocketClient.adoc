@@ -30,7 +30,7 @@ You can also define abstract methods that start with either `send` or `broadcast
 public abstract void send(String message);
 ----
 
-Note by returning `void` this tells Micronaut that the method is a blocking send. You can instead define methods that return either futures or a rs:Publisher[]:
+Note by returning `void` this tells the Micronaut framework that the method is a blocking send. You can instead define methods that return either futures or a rs:Publisher[]:
 
 .WebSocket Send Methods
 [source,java]

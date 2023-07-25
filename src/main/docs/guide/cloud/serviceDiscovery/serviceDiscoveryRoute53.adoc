@@ -106,7 +106,7 @@ Type can be 'HTTP','HTTPS', or 'TCP'. You can only use a standard health check o
 
 For a custom health check, you only need to specify `--health-check-custom-config FailureThreshold=integer` which works on private namespaces as well.
 
-This is also good because Micronaut sends out pulsation commands to let AWS know the instance is still healthy.
+This is also good because the Micronaut framework sends out pulsation commands to let AWS know the instance is still healthy.
 
 For more help run 'aws discoveryservice create-service help'.
 

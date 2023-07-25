@@ -8,7 +8,7 @@ Then add the `classes` task as task to execute for the application or for tests 
 
 image::kotlin-run-2.png[Intellij Settings,1024,768]
 
-Now when you run tests or start the application, Micronaut will generate classes at compile time.
+Now when you run tests or start the application, the Micronaut framework will generate classes at compile time.
 
 Alternatively, you can https://www.jetbrains.com/help/idea/gradle.html#delegate_build_gradle[delegate IntelliJ build/run actions to Gradle] completely:
 

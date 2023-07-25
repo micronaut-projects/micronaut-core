@@ -24,7 +24,7 @@ Now when you invoke the `bintrayService.fetchRepositories()` method, the `Author
 
 === Injecting Another Client into a ClientFilter
 
-To create an link:{micronautreactorapi}/io/micronaut/reactor/http/client/ReactorHttpClient.html[ReactorHttpClient], Micronaut needs to resolve all `ClientFilter` beans, which creates a circular dependency when injecting another link:{micronautreactorapi}/io/micronaut/reactor/http/client/ReactorHttpClient.html[ReactorHttpClient] or a `@Client` bean into an instance of a `ClientFilter`.
+To create an link:{micronautreactorapi}/io/micronaut/reactor/http/client/ReactorHttpClient.html[ReactorHttpClient], the Micronaut framework needs to resolve all `ClientFilter` beans, which creates a circular dependency when injecting another link:{micronautreactorapi}/io/micronaut/reactor/http/client/ReactorHttpClient.html[ReactorHttpClient] or a `@Client` bean into an instance of a `ClientFilter`.
 
 To resolve this issue, use the api:context.BeanProvider[] interface to inject another link:{micronautreactorapi}/io/micronaut/reactor/http/client/ReactorHttpClient.html[ReactorHttpClient] or a `@Client` bean into an instance of `ClientFilter`.
 

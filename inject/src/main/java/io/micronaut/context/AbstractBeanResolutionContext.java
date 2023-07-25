@@ -728,6 +728,11 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         public BeanDefinition<B> getDeclaringBean() {
             return getDeclaringType();
         }
+
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return getArgument().getAnnotationMetadata();
+        }
     }
 
     /**

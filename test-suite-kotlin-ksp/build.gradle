@@ -1,7 +1,7 @@
 plugins {
     id "io.micronaut.build.internal.convention-test-library"
     id "org.jetbrains.kotlin.jvm"
-    id("com.google.devtools.ksp") version "1.8.0-1.0.8"
+    id("com.google.devtools.ksp") version "1.8.22-1.0.11"
 }
 
 micronautBuild {
@@ -13,32 +13,25 @@ micronautBuild {
 }
 
 repositories {
-    mavenLocal()
     mavenCentral()
-    maven {
-        url "https://s01.oss.sonatype.org/content/repositories/snapshots/"
-        mavenContent {
-            snapshotsOnly()
-        }
-    }
 }
 
 dependencies {
-    api libs.kotlin.stdlib
-    api libs.kotlin.reflect
-    api libs.kotlinx.coroutines.core
-    api libs.kotlinx.coroutines.jdk8
-    api libs.kotlinx.coroutines.rx2
+    api libs.managed.kotlin.stdlib
+    api libs.managed.kotlin.reflect
+    api libs.managed.kotlinx.coroutines.core
+    api libs.managed.kotlinx.coroutines.jdk8
+    api libs.managed.kotlinx.coroutines.rx2
     api project(':http-server-netty')
     api project(':http-client')
     api project(':runtime')
 
     testImplementation project(":context")
-    testImplementation libs.kotlin.test
-    testImplementation libs.kotlinx.coroutines.core
-    testImplementation libs.kotlinx.coroutines.rx2
-    testImplementation libs.kotlinx.coroutines.slf4j
-    testImplementation libs.kotlinx.coroutines.reactor
+    testImplementation libs.managed.kotlin.test
+    testImplementation libs.managed.kotlinx.coroutines.core
+    testImplementation libs.managed.kotlinx.coroutines.rx2
+    testImplementation libs.managed.kotlinx.coroutines.slf4j
+    testImplementation libs.managed.kotlinx.coroutines.reactor
 
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation libs.junit.jupiter.api
@@ -68,10 +61,6 @@ dependencies {
         exclude group: 'io.micronaut'
     }
     testImplementation libs.javax.inject
-    testImplementation(platform(libs.test.boms.micronaut.tracing))
-    testImplementation(libs.micronaut.tracing.zipkin) {
-        exclude group: 'io.micronaut'
-    }
 
     testRuntimeOnly libs.junit.jupiter.engine
     testRuntimeOnly(platform(libs.test.boms.micronaut.aws))
@@ -86,7 +75,7 @@ dependencies {
 configurations.testRuntimeClasspath {
     resolutionStrategy.eachDependency {
         if (it.requested.group == 'org.jetbrains.kotlin') {
-            it.useVersion(libs.versions.kotlin.asProvider().get())
+            it.useVersion(libs.versions.managed.kotlin.asProvider().get())
         }
     }
 }

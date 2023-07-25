@@ -18,6 +18,7 @@ package io.micronaut.inject.annotation;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
@@ -50,6 +51,8 @@ import java.util.stream.Collectors;
 public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
 
     private boolean hasPropertyExpressions = false;
+    private boolean hasEvaluatedExpressions = false;
+
     @Nullable
     Map<String, Map<CharSequence, Object>> annotationDefaultValues;
     @Nullable
@@ -66,11 +69,21 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     }
 
     private MutableAnnotationMetadata(@Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
+                                      @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes,
+                                      @Nullable Map<String, Map<CharSequence, Object>> allStereotypes,
+                                      @Nullable Map<String, Map<CharSequence, Object>> allAnnotations,
+                                      @Nullable Map<String, List<String>> annotationsByStereotype,
+                                      boolean hasPropertyExpressions) {
+        this(declaredAnnotations, declaredStereotypes, allStereotypes, allAnnotations, annotationsByStereotype, hasPropertyExpressions, false);
+    }
+
+    private MutableAnnotationMetadata(@Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
                                      @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes,
                                      @Nullable Map<String, Map<CharSequence, Object>> allStereotypes,
                                      @Nullable Map<String, Map<CharSequence, Object>> allAnnotations,
                                      @Nullable Map<String, List<String>> annotationsByStereotype,
-                                     boolean hasPropertyExpressions) {
+                                     boolean hasPropertyExpressions,
+                                     boolean hasEvaluatedExpressions) {
         super(declaredAnnotations,
               declaredStereotypes,
               allStereotypes,
@@ -78,6 +91,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
               annotationsByStereotype,
               hasPropertyExpressions);
         this.hasPropertyExpressions = hasPropertyExpressions;
+        this.hasEvaluatedExpressions = hasEvaluatedExpressions;
     }
 
     public static MutableAnnotationMetadata of(AnnotationMetadata annotationMetadata) {
@@ -104,6 +118,11 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     }
 
     @Override
+    public boolean hasEvaluatedExpressions() {
+        return hasEvaluatedExpressions;
+    }
+
+    @Override
     public MutableAnnotationMetadata clone() {
         final MutableAnnotationMetadata cloned = new MutableAnnotationMetadata(
                 declaredAnnotations != null ? cloneMapOfMapValue(declaredAnnotations) : null,
@@ -111,7 +130,8 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                 allStereotypes != null ? cloneMapOfMapValue(allStereotypes) : null,
                 allAnnotations != null ? cloneMapOfMapValue(allAnnotations) : null,
                 annotationsByStereotype != null ? cloneMapOfListValue(annotationsByStereotype) : null,
-                hasPropertyExpressions
+                hasPropertyExpressions,
+                hasEvaluatedExpressions
         );
         if (annotationDefaultValues != null) {
             cloned.annotationDefaultValues = new LinkedHashMap<>(annotationDefaultValues);
@@ -129,6 +149,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
             cloned.sourceAnnotationDefaultValues = cloneMapOfMapValue(sourceAnnotationDefaultValues);
         }
         cloned.hasPropertyExpressions = hasPropertyExpressions;
+        cloned.hasEvaluatedExpressions = hasEvaluatedExpressions;
         return cloned;
     }
 
@@ -149,6 +170,10 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
 
     private boolean computeHasPropertyExpressions(Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
         return hasPropertyExpressions || values != null && retentionPolicy == RetentionPolicy.RUNTIME && hasPropertyExpressions(values);
+    }
+
+    private boolean computeHasEvaluatedExpressions(Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {
+        return hasEvaluatedExpressions || values != null && retentionPolicy == RetentionPolicy.RUNTIME  &&  hasEvaluatedExpressions(values);
     }
 
     private boolean hasPropertyExpressions(Map<CharSequence, Object> values) {
@@ -544,6 +569,8 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                                boolean isDeclared,
                                RetentionPolicy retentionPolicy) {
         hasPropertyExpressions = computeHasPropertyExpressions(values, retentionPolicy);
+        hasEvaluatedExpressions = computeHasEvaluatedExpressions(values, retentionPolicy);
+
         if (isDeclared && declaredAnnotations != null) {
             putValues(annotation, values, declaredAnnotations);
         }
@@ -646,6 +673,8 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
                                        Map<String, Map<CharSequence, Object>> allAnnotations,
                                        RetentionPolicy retentionPolicy) {
         hasPropertyExpressions = computeHasPropertyExpressions(annotationValue.getValues(), retentionPolicy);
+        hasEvaluatedExpressions = computeHasEvaluatedExpressions(annotationValue.getValues(), retentionPolicy);
+
         if (annotationRepeatableContainer == null) {
             annotationRepeatableContainer = new HashMap<>(2);
         }
@@ -718,6 +747,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     @Internal
     public void addAnnotationMetadata(DefaultAnnotationMetadata annotationMetadata) {
         hasPropertyExpressions |= annotationMetadata.hasPropertyExpressions();
+        hasEvaluatedExpressions |= annotationMetadata.hasEvaluatedExpressions();
         if (annotationMetadata.declaredAnnotations != null && !annotationMetadata.declaredAnnotations.isEmpty()) {
             if (declaredAnnotations == null) {
                 declaredAnnotations = new LinkedHashMap<>();
@@ -779,6 +809,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     public void addAnnotationMetadata(MutableAnnotationMetadata annotationMetadata) {
         addAnnotationMetadata((DefaultAnnotationMetadata) annotationMetadata);
         hasPropertyExpressions |= annotationMetadata.hasPropertyExpressions;
+        hasEvaluatedExpressions |= annotationMetadata.hasEvaluatedExpressions;
         if (annotationMetadata.sourceRetentionAnnotations != null) {
             if (sourceRetentionAnnotations == null) {
                 sourceRetentionAnnotations = new HashSet<>(annotationMetadata.sourceRetentionAnnotations);
@@ -1046,5 +1077,25 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
             }
         }
         return AnnotationMetadataSupport.getRepeatableAnnotation(annotation);
+    }
+
+    private boolean hasEvaluatedExpressions(Map<CharSequence, Object> annotationValues) {
+        if (CollectionUtils.isEmpty(annotationValues)) {
+            return false;
+        }
+
+        return annotationValues.values().stream().anyMatch(value -> {
+            if (value instanceof EvaluatedExpressionReference) {
+                return true;
+            } else if (value instanceof AnnotationValue av) {
+                return hasEvaluatedExpressions(av.getValues());
+            } else if (value instanceof AnnotationValue[] avArray) {
+                return Arrays.stream(avArray)
+                           .map(AnnotationValue::getValues)
+                           .anyMatch(this::hasEvaluatedExpressions);
+            } else {
+                return false;
+            }
+        });
     }
 }

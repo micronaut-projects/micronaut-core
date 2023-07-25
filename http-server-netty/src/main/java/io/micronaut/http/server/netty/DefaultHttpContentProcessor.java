@@ -17,13 +17,10 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
-import io.micronaut.http.netty.stream.StreamedHttpMessage;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.multipart.HttpData;
-import io.netty.util.ReferenceCountUtil;
 
 import java.util.Collection;
 import java.util.concurrent.atomic.AtomicLong;
@@ -42,7 +39,6 @@ public class DefaultHttpContentProcessor implements HttpContentProcessor {
     protected final HttpServerConfiguration configuration;
     protected final long advertisedLength;
     protected final long requestMaxSize;
-    protected final StreamedHttpMessage streamedHttpMessage;
     protected final AtomicLong receivedLength = new AtomicLong();
 
     /**
@@ -51,11 +47,6 @@ public class DefaultHttpContentProcessor implements HttpContentProcessor {
      */
     public DefaultHttpContentProcessor(NettyHttpRequest<?> nettyHttpRequest, HttpServerConfiguration configuration) {
         this.nettyHttpRequest = nettyHttpRequest;
-        HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
-        if (!(nativeRequest instanceof StreamedHttpMessage)) {
-            throw new IllegalStateException("Streamed HTTP message expected");
-        }
-        this.streamedHttpMessage = (StreamedHttpMessage) nativeRequest;
         this.configuration = configuration;
         this.requestMaxSize = configuration.getMaxRequestSize();
         this.ctx = nettyHttpRequest.getChannelHandlerContext();
@@ -84,7 +75,7 @@ public class DefaultHttpContentProcessor implements HttpContentProcessor {
     }
 
     private void fireExceedsLength(long receivedLength, long expected, ByteBufHolder message) {
-        ReferenceCountUtil.safeRelease(message);
+        message.release();
         throw new ContentLengthExceededException(expected, receivedLength);
     }
 }

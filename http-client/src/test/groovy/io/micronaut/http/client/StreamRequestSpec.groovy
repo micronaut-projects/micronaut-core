@@ -42,6 +42,7 @@ import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
 import java.time.Duration
+
 /**
  * @author graemerocher
  * @since 1.0
@@ -88,8 +89,8 @@ class StreamRequestSpec extends Specification {
         )).contentType(MediaType.TEXT_PLAIN_TYPE), List)).blockFirst()
 
         then:
-        result.body().size() == 5
-        result.body() == ["Number 0", "Number 1", "Number 2", "Number 3", "Number 4"]
+        // no guarantee that the strings aren't merged, so we have to allow for it
+        result.body().join("") == "Number 0Number 1Number 2Number 3Number 4"
 
     }
 
@@ -121,8 +122,8 @@ class StreamRequestSpec extends Specification {
         )).contentType(MediaType.TEXT_PLAIN_TYPE), List)).blockFirst()
 
         then:
-        result.body().size() == 5
-        result.body() == ["Number 0", "Number 1", "Number 2", "Number 3", "Number 4"]
+        // no guarantee that the strings aren't merged, so we have to allow for it
+        result.body().join("") == "Number 0Number 1Number 2Number 3Number 4"
     }
 
     void "test stream post request with POJOs"() {
@@ -273,7 +274,7 @@ class StreamRequestSpec extends Specification {
 
         @Post("/pojo-flowable-error")
         Publisher<Book> pojoReactiveSequenceError(@Header MediaType contentType, @Body Publisher<Book> books) {
-            return Flux.from(books).flatMap({ Book book ->
+            return Flux.from(books).concatMap ({ Book book ->
                 if(book.title.endsWith("3")) {
                     return Flux.error(new RuntimeException("Can't have books with 3"))
                 }

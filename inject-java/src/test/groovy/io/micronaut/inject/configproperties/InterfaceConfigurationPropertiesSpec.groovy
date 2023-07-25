@@ -72,7 +72,7 @@ import java.util.Optional;
 @ConfigurationProperties("foo.bar")
 @Executable
 interface MyConfig {
-    @javax.annotation.Nullable
+    @jakarta.annotation.Nullable
     String getHost();
 
     @jakarta.validation.constraints.Min(10L)

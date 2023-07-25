@@ -16,6 +16,8 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ast.ClassElement;
@@ -27,9 +29,6 @@ import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 import io.micronaut.inject.visitor.VisitorContext;
 import org.objectweb.asm.Type;
-
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 
 import java.io.File;
 import java.io.IOException;

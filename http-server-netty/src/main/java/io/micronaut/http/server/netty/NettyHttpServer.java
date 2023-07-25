@@ -39,10 +39,10 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.exceptions.ServerStartupException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
-import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
 import io.micronaut.http.server.util.DefaultHttpHostResolver;
 import io.micronaut.http.server.util.HttpHostResolver;
 import io.micronaut.http.ssl.ServerSslConfiguration;
+import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
@@ -117,7 +117,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private final ServerSslConfiguration sslConfiguration;
     private final Environment environment;
     private final RoutingInBoundHandler routingHandler;
-    private final HttpContentProcessorResolver httpContentProcessorResolver;
     private final boolean isDefault;
     private final ApplicationContext applicationContext;
     private final AtomicBoolean running = new AtomicBoolean(false);
@@ -136,14 +135,12 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     /**
      * @param serverConfiguration                     The Netty HTTP server configuration
      * @param nettyEmbeddedServices                   The embedded server context
-     * @param handlerRegistry                         The handler registry
      * @param isDefault                               Is this the default server
      */
     @SuppressWarnings("ParameterNumber")
     public NettyHttpServer(
             NettyHttpServerConfiguration serverConfiguration,
             NettyEmbeddedServices nettyEmbeddedServices,
-            NettyCustomizableResponseTypeHandlerRegistry handlerRegistry,
             boolean isDefault) {
         this.isDefault = isDefault;
         this.serverConfiguration = serverConfiguration;
@@ -160,23 +157,22 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             this.sslConfiguration = null;
         }
         ApplicationEventPublisher<HttpRequestTerminatedEvent> httpRequestTerminatedEventPublisher = nettyEmbeddedServices
-                .getEventPublisher(HttpRequestTerminatedEvent.class);
+            .getEventPublisher(HttpRequestTerminatedEvent.class);
         final Supplier<ExecutorService> ioExecutor = SupplierUtil.memoized(() ->
-                nettyEmbeddedServices.getExecutorSelector()
-                        .select(TaskExecutors.BLOCKING).orElse(null)
+            nettyEmbeddedServices.getExecutorSelector()
+                .select(TaskExecutors.BLOCKING).orElse(null)
         );
-        this.httpContentProcessorResolver = new DefaultHttpContentProcessorResolver(
-                nettyEmbeddedServices.getApplicationContext(),
-                () -> serverConfiguration
+        HttpContentProcessorResolver httpContentProcessorResolver = new DefaultHttpContentProcessorResolver(
+            nettyEmbeddedServices.getApplicationContext(),
+            () -> serverConfiguration
         );
         this.routingHandler = new RoutingInBoundHandler(
-                serverConfiguration,
-                handlerRegistry,
-                nettyEmbeddedServices,
-                ioExecutor,
-                httpContentProcessorResolver,
-                httpRequestTerminatedEventPublisher,
-                applicationContext.getConversionService()
+            serverConfiguration,
+            nettyEmbeddedServices,
+            ioExecutor,
+            httpContentProcessorResolver,
+            httpRequestTerminatedEventPublisher,
+            applicationContext.getConversionService()
         );
         this.hostResolver = new DefaultHttpHostResolver(serverConfiguration, () -> NettyHttpServer.this);
 
@@ -330,20 +326,20 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     @Override
     @NonNull
     public synchronized NettyEmbeddedServer stop() {
-        return stop(true);
+        return stop(false);
     }
 
     @Override
     @NonNull
     public NettyEmbeddedServer stopServerOnly() {
-        return stop(false);
+        return stop(true);
     }
 
     @NonNull
-    private NettyEmbeddedServer stop(boolean stopApplicationContext) {
+    private NettyEmbeddedServer stop(boolean stopServerOnly) {
         if (isRunning() && workerGroup != null) {
             if (running.compareAndSet(true, false)) {
-                stopInternal(stopApplicationContext);
+                stopInternal(stopServerOnly);
             }
         }
         return this;
@@ -429,6 +425,19 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     public URI getURI() {
         try {
             return new URI(getScheme() + "://" + getHost() + ':' + getPort());
+        } catch (URISyntaxException e) {
+            throw new ConfigurationException("Invalid server URL: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public URI getContextURI() {
+        try {
+            String contextPath = serverConfiguration.getContextPath();
+            if (contextPath == null) {
+                return getURI();
+            }
+            return new URI(getScheme() + "://" + getHost() + ':' + getPort() + contextPath);
         } catch (URISyntaxException e) {
             throw new ConfigurationException("Invalid server URL: " + e.getMessage(), e);
         }
@@ -564,7 +573,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     LOG.error("Error starting Micronaut server: " + e.getMessage(), e);
                 }
             }
-            stopInternal(true);
+            stopInternal(false);
             throw new ServerStartupException("Unable to start Micronaut server on " + displayAddress(cfg), e);
         }
     }
@@ -595,39 +604,64 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     private void logShutdownErrorIfNecessary(Future<?> future) {
-        if (!future.isSuccess()) {
-            if (LOG.isWarnEnabled()) {
-                Throwable e = future.cause();
-                LOG.warn("Error stopping Micronaut server: " + e.getMessage(), e);
-            }
+        if (!future.isSuccess() && LOG.isWarnEnabled()) {
+            Throwable e = future.cause();
+            LOG.warn("Error stopping Micronaut server: " + e.getMessage(), e);
         }
     }
 
-    private void stopInternal(boolean stopApplicationContext) {
+    private void stopInternal(boolean stopServerOnly) {
+        List<Future<?>> futures = new ArrayList<>(2);
         try {
             if (shutdownParent) {
                 EventLoopGroupConfiguration parent = serverConfiguration.getParent();
                 if (parent != null) {
                     long quietPeriod = parent.getShutdownQuietPeriod().toMillis();
                     long timeout = parent.getShutdownTimeout().toMillis();
-                    parentGroup.shutdownGracefully(quietPeriod, timeout, TimeUnit.MILLISECONDS)
-                            .addListener(this::logShutdownErrorIfNecessary);
+                    futures.add(
+                        parentGroup.shutdownGracefully(quietPeriod, timeout, TimeUnit.MILLISECONDS)
+                            .addListener(this::logShutdownErrorIfNecessary)
+                    );
                 } else {
-                    parentGroup.shutdownGracefully()
-                            .addListener(this::logShutdownErrorIfNecessary);
+                    futures.add(
+                        parentGroup.shutdownGracefully()
+                            .addListener(this::logShutdownErrorIfNecessary)
+                    );
                 }
             }
             if (shutdownWorker) {
-                workerGroup.shutdownGracefully()
-                        .addListener(this::logShutdownErrorIfNecessary);
+                futures.add(
+                    workerGroup.shutdownGracefully()
+                        .addListener(this::logShutdownErrorIfNecessary)
+                );
             }
             webSocketSessions.close();
             applicationContext.getEventPublisher(ServerShutdownEvent.class).publishEvent(new ServerShutdownEvent(this));
-            if (isDefault && applicationContext.isRunning() && stopApplicationContext) {
+            if (isDefault && applicationContext.isRunning() && !stopServerOnly) {
                 applicationContext.stop();
             }
             serverConfiguration.getMultipart().getLocation().ifPresent(dir -> DiskFileUpload.baseDirectory = null);
+            for (Listener listener : activeListeners) {
+                if (listener.httpPipelineBuilder != null) {
+                    listener.httpPipelineBuilder.close();
+                    listener.httpPipelineBuilder = null;
+                }
+            }
             this.activeListeners = null;
+
+            // If we are only stopping the server, we need to wait for the futures to complete otherwise
+            // when CRaC is trying to take a snapshot it will capture objects in flow of shutting down.
+            if (stopServerOnly) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Waiting for graceful shutdown to complete");
+                }
+                for (Future<?> future : futures) {
+                    future.awaitUninterruptibly();
+                }
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Done...");
+                }
+            }
         } catch (Throwable e) {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Error stopping Micronaut server: " + e.getMessage(), e);
@@ -697,7 +731,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     @Override
     public Set<String> getObservedConfigurationPrefixes() {
-        return Collections.singleton(HttpServerConfiguration.PREFIX);
+        return Set.of(HttpServerConfiguration.PREFIX, SslConfiguration.PREFIX);
     }
 
     @Override
@@ -746,7 +780,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      */
     @Internal
     public void buildEmbeddedChannel(EmbeddedChannel prototype, boolean ssl) {
-        createPipelineBuilder(rootCustomizer, false).new ConnectionPipeline(prototype, ssl, ssl).initChannel();
+        try (HttpPipelineBuilder builder = createPipelineBuilder(rootCustomizer, false)) {
+            builder.new ConnectionPipeline(prototype, ssl).initChannel();
+        }
     }
 
     static Predicate<String> inclusionPredicate(NettyHttpServerConfiguration.AccessLogger config) {
@@ -772,7 +808,11 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         }
 
         void refresh() {
+            HttpPipelineBuilder oldBuilder = httpPipelineBuilder;
             httpPipelineBuilder = createPipelineBuilder(listenerCustomizer, config.getFamily() == NettyHttpServerConfiguration.NettyListenerConfiguration.Family.QUIC);
+            if (oldBuilder != null) {
+                oldBuilder.close();
+            }
             if (config.isSsl() && !httpPipelineBuilder.supportsSsl()) {
                 throw new IllegalStateException("Listener configured for SSL, but no SSL context available");
             }
@@ -786,7 +826,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         @Override
         protected void initChannel(@NonNull Channel ch) throws Exception {
-            httpPipelineBuilder.new ConnectionPipeline(ch, config.isSsl(), config.isSsl()).initChannel();
+            httpPipelineBuilder.new ConnectionPipeline(ch, config.isSsl()).initChannel();
         }
     }
 
@@ -799,7 +839,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         protected void initChannel(Channel ch) throws Exception {
             // udp does not have connection channels
             setServerChannel(ch);
-            httpPipelineBuilder.new ConnectionPipeline(ch, false, true).initHttp3Channel();
+            httpPipelineBuilder.new ConnectionPipeline(ch, true).initHttp3Channel();
         }
     }
 

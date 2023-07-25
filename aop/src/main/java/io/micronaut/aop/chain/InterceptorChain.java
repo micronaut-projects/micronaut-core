@@ -27,6 +27,7 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
 
 import java.lang.annotation.Annotation;
 import java.util.*;
@@ -47,6 +48,7 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
 
     protected final B target;
     protected final ExecutableMethod<B, R> executionHandle;
+    private final AnnotationMetadata annotationMetadata;
 
     /**
      * Constructor.
@@ -66,11 +68,17 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
         }
         this.target = target;
         this.executionHandle = method;
+        AnnotationMetadata metadata = executionHandle.getAnnotationMetadata();
+        if (originalParameters.length > 0 && metadata instanceof EvaluatedAnnotationMetadata eam) {
+            this.annotationMetadata = eam.withArguments(target, originalParameters);
+        } else {
+            this.annotationMetadata = metadata;
+        }
     }
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
-        return executionHandle.getAnnotationMetadata();
+        return annotationMetadata;
     }
 
     @Override

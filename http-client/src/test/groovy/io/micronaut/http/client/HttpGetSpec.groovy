@@ -44,7 +44,7 @@ import spock.lang.Issue
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
-import javax.annotation.Nullable
+import jakarta.annotation.Nullable
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -311,7 +311,7 @@ class HttpGetSpec extends Specification {
         String body = res.getBody(String).orElse(null)
 
         then:
-        body == null
+        body == "success"
     }
 
     void "test that Optional.empty() should return 404"() {

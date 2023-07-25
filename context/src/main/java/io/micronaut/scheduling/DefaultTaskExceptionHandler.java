@@ -34,14 +34,14 @@ import io.micronaut.core.annotation.Nullable;
 @Primary
 public class DefaultTaskExceptionHandler implements TaskExceptionHandler<Object, Throwable> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DefaultTaskExceptionHandler.class);
+    static final Logger LOG = LoggerFactory.getLogger(DefaultTaskExceptionHandler.class);
 
     @Override
     public void handle(@Nullable Object bean, @NonNull Throwable throwable) {
         if (LOG.isErrorEnabled()) {
             StringBuilder message = new StringBuilder("Error invoking scheduled task ");
             if (bean != null) {
-                message.append("for bean [").append(bean.toString()).append("] ");
+                message.append("for bean [").append(bean).append("] ");
             }
             message.append(throwable.getMessage());
             LOG.error(message.toString(), throwable);

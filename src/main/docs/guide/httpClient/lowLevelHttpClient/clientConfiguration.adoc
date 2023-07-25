@@ -42,7 +42,7 @@ Then, inject the named client configuration:
 @Client("foo") @Inject ReactorHttpClient httpClient;
 ----
 
-You can also define a bean that extends from api:http.client.HttpClientConfiguration[] and ensure that the `javax.inject.Named` annotation names it appropriately:
+You can also define a bean that extends from api:http.client.HttpClientConfiguration[] and ensure that the `jakarta.inject.Named` annotation names it appropriately:
 
 .Defining an HTTP client configuration bean
 [source,java]
@@ -112,7 +112,7 @@ By setting the `pool.enabled` property to `false`, you can disable connection re
 
 === Configuring Event Loop Groups
 
-By default, Micronaut shares a common Netty `EventLoopGroup` for worker threads and all HTTP client threads.
+By default, the Micronaut framework shares a common Netty `EventLoopGroup` for worker threads and all HTTP client threads.
 
 This `EventLoopGroup` can be configured via the `micronaut.netty.event-loops.default` property:
 

@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty.jackson
 
 import com.fasterxml.jackson.annotation.JsonView
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
@@ -71,7 +72,9 @@ class JsonViewController {
 
     @JsonView(Views.Admin)
     @Post("/asBody")
-    HttpResponse<TestModel> asBody(@JsonView(Views.Public) TestModel model) {
+    HttpResponse<TestModel> asBody(@JsonView(Views.Public) @Body TestModel model) {
+        assert model.birthdate == null
+        assert model.password == null
         return HttpResponse.ok(model)
     }
 }

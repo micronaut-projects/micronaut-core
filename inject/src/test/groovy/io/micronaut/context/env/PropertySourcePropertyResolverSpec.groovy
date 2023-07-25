@@ -155,7 +155,8 @@ class PropertySourcePropertyResolverSpec extends Specification {
         def values = [
                 'foo.bar': '10',
                 'foo.baz': 20,
-                'bar'    : 30
+                'bar'    : 30,
+                'arr'    : new byte[] {1, 2, 3, 0x80},
         ]
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
                 PropertySource.of("test", [(property): value] + values)
@@ -188,6 +189,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
         'my.property' | '${FOO_BAR_1}'                                       | 'my.property' | String  | 'foo bar 1'
         'my.property' | 'bolt://${NEO4J_HOST:localhost}:${NEO4J_PORT:32781}' | 'my.property' | String  | 'bolt://localhost:32781'
         'my.property' | '${bar}'                                             | 'my.property' | Integer | 30
+        'my.property' | '${arr}'                                             | 'my.property' | byte[]  | new byte[] {1, 2, 3, 0x80}
     }
 
 

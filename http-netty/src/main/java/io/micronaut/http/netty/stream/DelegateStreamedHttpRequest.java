@@ -30,7 +30,7 @@ import org.reactivestreams.Subscriber;
  * @since 1.0
  */
 @Internal
-final class DelegateStreamedHttpRequest extends DelegateHttpRequest implements StreamedHttpRequest {
+public class DelegateStreamedHttpRequest extends DelegateHttpRequest implements StreamedHttpRequest {
 
     private final Publisher<? extends HttpContent> stream;
     private boolean consumed;
@@ -39,7 +39,7 @@ final class DelegateStreamedHttpRequest extends DelegateHttpRequest implements S
      * @param request The Http request
      * @param stream  The publisher
      */
-    DelegateStreamedHttpRequest(HttpRequest request, Publisher<? extends HttpContent> stream) {
+    public DelegateStreamedHttpRequest(HttpRequest request, Publisher<? extends HttpContent> stream) {
         super(request);
         this.stream = stream;
     }

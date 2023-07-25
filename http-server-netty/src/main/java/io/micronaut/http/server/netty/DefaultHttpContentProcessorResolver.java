@@ -17,15 +17,14 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.BeanProvider;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.CopyOnWriteMap;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Body;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.inject.ExecutionHandle;
 import io.micronaut.web.router.RouteMatch;
@@ -35,7 +34,8 @@ import jakarta.inject.Singleton;
 import java.io.InputStream;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Supplier;
+import java.util.concurrent.ConcurrentMap;
+import java.util.function.Function;
 
 
 /**
@@ -51,12 +51,13 @@ import java.util.function.Supplier;
  */
 @Singleton
 @Internal
-class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolver {
+public class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolver {
 
     private static final Set<Class<?>> RAW_BODY_TYPES = CollectionUtils.setOf(String.class, byte[].class, ByteBuffer.class, InputStream.class);
 
-    private final BeanLocator beanLocator;
     private final BeanProvider<NettyHttpServerConfiguration> serverConfiguration;
+    private final ConcurrentMap<MediaType, Optional<HttpContentSubscriberFactory>> subscriberFactoryCache = new CopyOnWriteMap<>(128);
+    private final Function<MediaType, Optional<HttpContentSubscriberFactory>> findSubscriberFactory;
     private NettyHttpServerConfiguration nettyServerConfiguration;
 
     /**
@@ -65,31 +66,18 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
      */
     DefaultHttpContentProcessorResolver(BeanLocator beanLocator,
                                         BeanProvider<NettyHttpServerConfiguration> serverConfiguration) {
-        this.beanLocator = beanLocator;
         this.serverConfiguration = serverConfiguration;
+        this.findSubscriberFactory = mt -> beanLocator.findBean(HttpContentSubscriberFactory.class, new ConsumesMediaTypeQualifier<>(mt));
     }
 
     @Override
     @NonNull
+    @Deprecated
     public HttpContentProcessor resolve(@NonNull NettyHttpRequest<?> request, @NonNull RouteMatch<?> route) {
-        Argument<?> bodyType = route.getBodyArgument()
-                /*
-                The getBodyArgument() method returns arguments for functions where it is
-                not possible to dictate whether the argument is supposed to bind the entire
-                body or just a part of the body. We check to ensure the argument has the body
-                annotation to exclude that use case
-                */
-                .filter(argument -> {
-                    AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
-                    if (annotationMetadata.hasAnnotation(Body.class)) {
-                        return !annotationMetadata.stringValue(Body.class).isPresent();
-                    } else {
-                        return false;
-                    }
-                })
+        Argument<?> bodyType = route.getRouteInfo().getFullRequestBodyType()
                 .orElseGet(() -> {
-                    if (route instanceof ExecutionHandle) {
-                        for (Argument<?> argument: ((ExecutionHandle) route).getArguments()) {
+                    if (route instanceof ExecutionHandle executionHandle) {
+                        for (Argument<?> argument: executionHandle.getArguments()) {
                             if (argument.getType() == HttpRequest.class) {
                                 return argument;
                             }
@@ -106,8 +94,11 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
         if (bodyType.getType() == HttpRequest.class) {
             bodyType = bodyType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
         }
-        boolean isRaw = RAW_BODY_TYPES.contains(bodyType.getType());
-        return resolve(request, isRaw);
+        return resolve(request, isRaw(bodyType));
+    }
+
+    public static boolean isRaw(Argument<?> bodyType) {
+        return RAW_BODY_TYPES.contains(bodyType.getType());
     }
 
     @Override
@@ -117,20 +108,16 @@ class DefaultHttpContentProcessorResolver implements HttpContentProcessorResolve
     }
 
     private HttpContentProcessor resolve(NettyHttpRequest<?> request, boolean rawBodyType) {
-        Supplier<DefaultHttpContentProcessor> defaultHttpContentProcessor = () -> new DefaultHttpContentProcessor(request, getServerConfiguration());
-
-        if (rawBodyType) {
-            return defaultHttpContentProcessor.get();
-        } else {
+        if (!rawBodyType) {
             Optional<MediaType> contentType = request.getContentType();
-            return contentType
-                    .flatMap(type ->
-                            beanLocator.findBean(HttpContentSubscriberFactory.class,
-                                    new ConsumesMediaTypeQualifier<>(type))
-                    ).map(factory ->
-                            factory.build(request)
-                    ).orElseGet(defaultHttpContentProcessor);
+            if (contentType.isPresent()) {
+                Optional<HttpContentSubscriberFactory> factory = subscriberFactoryCache.computeIfAbsent(contentType.get(), findSubscriberFactory);
+                if (factory.isPresent()) {
+                    return factory.get().build(request);
+                }
+            }
         }
+        return new DefaultHttpContentProcessor(request, getServerConfiguration());
     }
 
     private NettyHttpServerConfiguration getServerConfiguration() {

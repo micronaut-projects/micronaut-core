@@ -1,6 +1,6 @@
 The majority of JVM frameworks in use today were designed before the rise of cloud deployments and microservice architectures. Applications built with these frameworks were intended to be deployed to traditional Java containers. As a result, cloud support in these frameworks typically comes as an add-on rather than as core design features.
 
-Micronaut was designed from the ground up for building microservices for the cloud. As a result, many key features that typically require external libraries or services are available within your application itself. To override one of the industry's current favorite buzzwords, Micronaut applications are "natively cloud-native".
+Micronaut framework was designed from the ground up for building microservices for the cloud. As a result, many key features that typically require external libraries or services are available within your application itself. To override one of the industry's current favorite buzzwords, Micronaut applications are "natively cloud-native".
 
 The following are some cloud-specific features that are integrated directly into the Micronaut runtime:
 
@@ -10,6 +10,6 @@ The following are some cloud-specific features that are integrated directly into
 * Distributed Tracing
 * Serverless Functions
 
-Many features in Micronaut are heavily inspired by features from Spring and Grails. This is by design and helps developers who are already familiar with systems such as Spring Cloud.
+Many features in the Micronaut framework are heavily inspired by features from Spring and Grails. This is by design and helps developers who are already familiar with systems such as Spring Cloud.
 
 The following sections cover these features and how to use them.

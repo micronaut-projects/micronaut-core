@@ -25,7 +25,12 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.*
+import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Header
+import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
@@ -35,6 +40,7 @@ import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import reactor.core.publisher.Flux
 import spock.lang.Specification
+
 import java.nio.charset.StandardCharsets
 
 /**
@@ -425,8 +431,7 @@ class HttpPostSpec extends Specification {
         }
 
         @Post(uri = '/query/url-encoded', consumes = MediaType.APPLICATION_FORM_URLENCODED)
-        Book simpleUrlEncoded(@Body Book book, String title) {
-            assert title == book.title
+        Book simpleUrlEncoded(@Body Book book) {
             return book
         }
 
@@ -481,7 +486,7 @@ class HttpPostSpec extends Specification {
         @Post(uri = "/multipartCharset",
                 consumes = MediaType.MULTIPART_FORM_DATA,
                 produces = MediaType.TEXT_PLAIN)
-        String multipartCharset(@Body CompletedFileUpload file) {
+        String multipartCharset(CompletedFileUpload file) {
             return file.fileUpload.getCharset()
         }
 

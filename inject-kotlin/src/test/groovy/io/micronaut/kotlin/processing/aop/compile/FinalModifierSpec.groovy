@@ -20,9 +20,11 @@ import io.micronaut.aop.Intercepted
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import spock.lang.Issue
+import spock.lang.PendingFeature
 import spock.lang.Specification
 
-import static io.micronaut.annotation.processing.test.KotlinCompiler.*
+import static io.micronaut.annotation.processing.test.KotlinCompiler.buildBeanDefinition
+import static io.micronaut.annotation.processing.test.KotlinCompiler.buildContext
 
 class FinalModifierSpec extends Specification {
 
@@ -175,6 +177,7 @@ class MyBean
         e.message.contains 'Cannot apply AOP advice to final class. Class must be made non-final to support proxying: test.MyBean'
     }
 
+    @PendingFeature(reason = "active workaround for https://github.com/micronaut-projects/micronaut-core/issues/9426")
     void "test final modifier on class with AOP advice doesn't compile"() {
         when:
         buildBeanDefinition('test.$MyBean' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''
@@ -197,6 +200,7 @@ class MyBean(@Value("\\${foo.bar}") private val myValue: String) {
         e.message.contains 'Cannot apply AOP advice to final class. Class must be made non-final to support proxying: test.MyBean'
     }
 
+    @PendingFeature(reason = "active workaround for https://github.com/micronaut-projects/micronaut-core/issues/9426")
     void "test final modifier on method with AOP advice doesn't compile"() {
         when:
         buildBeanDefinition('test.$MyBean' + BeanDefinitionWriter.CLASS_SUFFIX + BeanDefinitionWriter.PROXY_SUFFIX, '''

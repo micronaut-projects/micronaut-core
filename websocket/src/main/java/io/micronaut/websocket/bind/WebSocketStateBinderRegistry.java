@@ -18,15 +18,14 @@ package io.micronaut.websocket.bind;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.ArgumentBinderRegistry;
-import io.micronaut.core.bind.annotation.AnnotatedArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.QueryValueArgumentBinder;
+import io.micronaut.http.bind.binders.UnmatchedRequestArgumentBinder;
 import io.micronaut.websocket.WebSocketSession;
 
 import java.util.HashMap;
@@ -61,33 +60,29 @@ public class WebSocketStateBinderRegistry implements ArgumentBinderRegistry<WebS
     }
 
     @Override
-    public <T, ST> void addRequestArgumentBinder(ArgumentBinder<T, ST> binder) {
-        requestBinderRegistry.addRequestArgumentBinder(binder);
-    }
-
-    @Override
-    public <T> Optional<ArgumentBinder<T, WebSocketState>> findArgumentBinder(Argument<T> argument, WebSocketState source) {
-        Optional<ArgumentBinder<T, HttpRequest<?>>> argumentBinder = requestBinderRegistry.findArgumentBinder(argument, source.getOriginatingRequest());
+    public <T> Optional<ArgumentBinder<T, WebSocketState>> findArgumentBinder(Argument<T> argument) {
+        Optional<ArgumentBinder<T, HttpRequest<?>>> argumentBinder = requestBinderRegistry.findArgumentBinder(argument);
         if (argumentBinder.isPresent()) {
             ArgumentBinder<T, HttpRequest<?>> adapted = argumentBinder.get();
 
-            boolean isParameterBinder = adapted instanceof AnnotatedArgumentBinder && ((AnnotatedArgumentBinder) adapted).getAnnotationType() == QueryValue.class;
-            if (!isParameterBinder) {
-                return Optional.of((context, source1) -> adapted.bind(context, source.getOriginatingRequest()));
+            boolean isUnmatchedRequestArgumentBinder = adapted instanceof UnmatchedRequestArgumentBinder;
+            if (!isUnmatchedRequestArgumentBinder) {
+                return Optional.of((context, source1) -> adapted.bind(context, source1.getOriginatingRequest()));
             }
         }
 
-        ArgumentBinder binder = byType.get(argument.getType());
+        ArgumentBinder<T, WebSocketState> binder = (ArgumentBinder<T, WebSocketState>) byType.get(argument.getType());
         if (binder != null) {
-            //noinspection unchecked
             return Optional.of(binder);
-        } else {
+        }
+        return Optional.of((context, source) -> {
             ConvertibleValues<Object> uriVariables = source.getSession().getUriVariables();
             if (uriVariables.contains(argument.getName())) {
-                return Optional.of((context, s) -> () -> uriVariables.get(argument.getName(), argument));
-            } else {
-                return Optional.of((context, s) -> (ArgumentBinder.BindingResult<T>) queryValueArgumentBinder.bind((ArgumentConversionContext<Object>) context, s.getOriginatingRequest()));
+                Optional<T> val = uriVariables.get(argument.getName(), argument);
+                return val.isEmpty() ? ArgumentBinder.BindingResult.UNSATISFIED : () -> val;
             }
-        }
+            return (ArgumentBinder.BindingResult<T>) queryValueArgumentBinder.bind((ArgumentConversionContext<Object>) context, source.getOriginatingRequest());
+        });
+
     }
 }

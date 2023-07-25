@@ -18,26 +18,30 @@ package io.micronaut.http.bind;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
-import io.micronaut.http.FullHttpRequest;
 import io.micronaut.http.HttpHeaders;
-import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpParameters;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.PushCapableHttpRequest;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.bind.binders.AnnotatedRequestArgumentBinder;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
 import io.micronaut.http.bind.binders.CookieAnnotationBinder;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
+import io.micronaut.http.bind.binders.DefaultUnmatchedRequestArgumentBinder;
 import io.micronaut.http.bind.binders.HeaderAnnotationBinder;
-import io.micronaut.http.bind.binders.ParameterAnnotationBinder;
 import io.micronaut.http.bind.binders.PartAnnotationBinder;
 import io.micronaut.http.bind.binders.PathVariableAnnotationBinder;
+import io.micronaut.http.bind.binders.PendingRequestBindingResult;
+import io.micronaut.http.bind.binders.QueryValueArgumentBinder;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.bind.binders.RequestAttributeAnnotationBinder;
 import io.micronaut.http.bind.binders.RequestBeanAnnotationBinder;
@@ -48,6 +52,7 @@ import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
 import java.lang.annotation.Annotation;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -73,6 +78,8 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
     private final ConversionService conversionService;
     private final Map<TypeAndAnnotation, Optional<RequestArgumentBinder>> argumentBinderCache =
         new ConcurrentLinkedHashMap.Builder<TypeAndAnnotation, Optional<RequestArgumentBinder>>().maximumWeightedCapacity(CACHE_MAX_SIZE).build();
+    private final List<RequestArgumentBinder<Object>> unmatchedBinders = new ArrayList<>();
+    private final DefaultUnmatchedRequestArgumentBinder defaultUnmatchedRequestArgumentBinder;
 
     /**
      * @param conversionService The conversion service
@@ -82,50 +89,38 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         this(conversionService, Arrays.asList(binders));
     }
 
+    public DefaultRequestBinderRegistry(ConversionService conversionService, List<RequestArgumentBinder> binders) {
+        this(conversionService, binders, new DefaultBodyAnnotationBinder(conversionService));
+    }
+
     /**
-     * @param conversionService The conversion service
-     * @param binders           The request argument binders
+     * @param conversionService    The conversion service
+     * @param binders              The request argument binders
+     * @param bodyAnnotationBinder The body annotation binder
      */
     @Inject
-    public DefaultRequestBinderRegistry(ConversionService conversionService, List<RequestArgumentBinder> binders) {
+    public DefaultRequestBinderRegistry(
+        ConversionService conversionService,
+        List<RequestArgumentBinder> binders,
+        DefaultBodyAnnotationBinder bodyAnnotationBinder
+    ) {
         this.conversionService = conversionService;
-
         if (CollectionUtils.isNotEmpty(binders)) {
             for (RequestArgumentBinder binder : binders) {
-                addRequestArgumentBinder(binder);
+                addArgumentBinder(binder);
             }
         }
 
+        byAnnotation.put(Body.class, bodyAnnotationBinder);
         registerDefaultAnnotationBinders(byAnnotation);
 
         byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (RequestArgumentBinder<HttpHeaders>) (argument, source) -> () -> Optional.of(source.getHeaders()));
-        byType.put(Argument.of(HttpRequest.class).typeHashCode(), (RequestArgumentBinder<HttpRequest<?>>) (argument, source) -> {
-            if (HttpMethod.permitsRequestBody(source.getMethod())) {
-                Optional<Argument<?>> typeVariable = argument.getFirstTypeVariable()
-                    .filter(arg -> arg.getType() != Object.class)
-                    .filter(arg -> arg.getType() != Void.class);
-                if (typeVariable.isPresent()) {
-                    return () -> Optional.of(new FullHttpRequest(source, typeVariable.get()));
-                }
-            }
-            return () -> Optional.of(source);
-        });
-        byType.put(Argument.of(PushCapableHttpRequest.class).typeHashCode(), (RequestArgumentBinder<PushCapableHttpRequest>) (argument, source) -> {
-            if (source instanceof PushCapableHttpRequest) {
-                Optional<Argument<?>> typeVariable = argument.getFirstTypeVariable()
-                        .filter(arg -> arg.getType() != Object.class)
-                        .filter(arg -> arg.getType() != Void.class);
-                if (typeVariable.isPresent() && HttpMethod.permitsRequestBody(source.getMethod())) {
-                    if (source.getBody().isPresent()) {
-                        return () -> Optional.of(new PushCapableFullHttpRequest((PushCapableHttpRequest) source, typeVariable.get()));
-                    } else {
-                        return ArgumentBinder.BindingResult.EMPTY;
-                    }
-                } else {
-                    return () -> Optional.of((PushCapableHttpRequest) source);
-                }
+        byType.put(Argument.of(HttpRequest.class).typeHashCode(), (RequestArgumentBinder<HttpRequest<?>>) (argument, source) -> convertBodyIfNecessary(bodyAnnotationBinder, argument, source, false));
+        byType.put(Argument.of(PushCapableHttpRequest.class).typeHashCode(), (RequestArgumentBinder<PushCapableHttpRequest<?>>) (argument, source) -> {
+            if (source instanceof PushCapableHttpRequest<?>) {
+                return convertBodyIfNecessary(bodyAnnotationBinder, argument, source, true);
             } else {
-                return ArgumentBinder.BindingResult.UNSATISFIED;
+                return ArgumentBinder.BindingResult.unsatisfied();
             }
         });
         byType.put(Argument.of(HttpParameters.class).typeHashCode(), (RequestArgumentBinder<HttpParameters>) (argument, source) -> () -> Optional.of(source.getParameters()));
@@ -140,16 +135,23 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
             Cookie finalCookie = cookie;
             return () -> finalCookie != null ? Optional.of(finalCookie) : Optional.empty();
         });
+
+        defaultUnmatchedRequestArgumentBinder = new DefaultUnmatchedRequestArgumentBinder<>(
+            List.of(
+                new QueryValueArgumentBinder<>(conversionService),
+                new RequestAttributeAnnotationBinder<>(conversionService)
+            ),
+            unmatchedBinders,
+            List.of(bodyAnnotationBinder)
+        );
     }
 
     @SuppressWarnings("rawtypes")
     @Override
-    public <T, ST> void addRequestArgumentBinder(ArgumentBinder<T, ST> binder) {
-        if (binder instanceof AnnotatedRequestArgumentBinder) {
-            AnnotatedRequestArgumentBinder<?, ?> annotatedRequestArgumentBinder = (AnnotatedRequestArgumentBinder) binder;
+    public <T> void addArgumentBinder(ArgumentBinder<T, HttpRequest<?>> binder) {
+        if (binder instanceof AnnotatedRequestArgumentBinder<?, ?> annotatedRequestArgumentBinder) {
             Class<? extends Annotation> annotationType = annotatedRequestArgumentBinder.getAnnotationType();
-            if (binder instanceof TypedRequestArgumentBinder) {
-                TypedRequestArgumentBinder<?> typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
+            if (binder instanceof TypedRequestArgumentBinder<?> typedRequestArgumentBinder) {
                 Argument argumentType = typedRequestArgumentBinder.argumentType();
                 byTypeAndAnnotation.put(new TypeAndAnnotation(argumentType, annotationType), (RequestArgumentBinder) binder);
                 List<Class<?>> superTypes = typedRequestArgumentBinder.superTypes();
@@ -162,14 +164,18 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                 byAnnotation.put(annotationType, annotatedRequestArgumentBinder);
             }
 
-        } else if (binder instanceof TypedRequestArgumentBinder) {
-            TypedRequestArgumentBinder typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
+        } else if (binder instanceof TypedRequestArgumentBinder<?> typedRequestArgumentBinder) {
             byType.put(typedRequestArgumentBinder.argumentType().typeHashCode(), typedRequestArgumentBinder);
         }
     }
 
     @Override
-    public <T> Optional<ArgumentBinder<T, HttpRequest<?>>> findArgumentBinder(Argument<T> argument, HttpRequest<?> source) {
+    public void addUnmatchedRequestArgumentBinder(RequestArgumentBinder<Object> binder) {
+        unmatchedBinders.add(binder);
+    }
+
+    @Override
+    public <T> Optional<ArgumentBinder<T, HttpRequest<?>>> findArgumentBinder(Argument<T> argument) {
         Optional<Class<? extends Annotation>> opt = argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Bindable.class);
         if (opt.isPresent()) {
             Class<? extends Annotation> annotationType = opt.get();
@@ -191,7 +197,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
                 }
             }
         }
-        return Optional.of(new ParameterAnnotationBinder<>(conversionService));
+        return Optional.of(defaultUnmatchedRequestArgumentBinder);
     }
 
     /**
@@ -234,17 +240,14 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
      * @param byAnnotation The request argument binder
      */
     protected void registerDefaultAnnotationBinders(Map<Class<? extends Annotation>, RequestArgumentBinder> byAnnotation) {
-        DefaultBodyAnnotationBinder bodyBinder = new DefaultBodyAnnotationBinder(conversionService);
-        byAnnotation.put(Body.class, bodyBinder);
-
         CookieAnnotationBinder<Object> cookieAnnotationBinder = new CookieAnnotationBinder<>(conversionService);
         byAnnotation.put(cookieAnnotationBinder.getAnnotationType(), cookieAnnotationBinder);
 
         HeaderAnnotationBinder<Object> headerAnnotationBinder = new HeaderAnnotationBinder<>(conversionService);
         byAnnotation.put(headerAnnotationBinder.getAnnotationType(), headerAnnotationBinder);
 
-        ParameterAnnotationBinder<Object> parameterAnnotationBinder = new ParameterAnnotationBinder<>(conversionService);
-        byAnnotation.put(parameterAnnotationBinder.getAnnotationType(), parameterAnnotationBinder);
+        QueryValueArgumentBinder<Object> queryValueAnnotationBinder = new QueryValueArgumentBinder<>(conversionService);
+        byAnnotation.put(queryValueAnnotationBinder.getAnnotationType(), queryValueAnnotationBinder);
 
         RequestAttributeAnnotationBinder<Object> requestAttributeAnnotationBinder = new RequestAttributeAnnotationBinder<>(conversionService);
         byAnnotation.put(requestAttributeAnnotationBinder.getAnnotationType(), requestAttributeAnnotationBinder);
@@ -252,16 +255,67 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         PathVariableAnnotationBinder<Object> pathVariableAnnotationBinder = new PathVariableAnnotationBinder<>(conversionService);
         byAnnotation.put(pathVariableAnnotationBinder.getAnnotationType(), pathVariableAnnotationBinder);
 
-        RequestBeanAnnotationBinder<Object> requestBeanAnnotationBinder = new RequestBeanAnnotationBinder<>(this, conversionService);
+        RequestBeanAnnotationBinder<Object> requestBeanAnnotationBinder = new RequestBeanAnnotationBinder<>(this);
         byAnnotation.put(requestBeanAnnotationBinder.getAnnotationType(), requestBeanAnnotationBinder);
 
-        PartAnnotationBinder<Object> partAnnotationBinder = new PartAnnotationBinder<>(conversionService);
+        PartAnnotationBinder<Object> partAnnotationBinder = new PartAnnotationBinder<>();
         byAnnotation.put(partAnnotationBinder.getAnnotationType(), partAnnotationBinder);
 
         if (KOTLIN_COROUTINES_SUPPORTED) {
             ContinuationArgumentBinder continuationArgumentBinder = new ContinuationArgumentBinder();
             byType.put(continuationArgumentBinder.argumentType().typeHashCode(), continuationArgumentBinder);
         }
+    }
+
+    private static ArgumentBinder.BindingResult<? extends HttpRequest<?>> convertBodyIfNecessary(
+        DefaultBodyAnnotationBinder<Object> bodyAnnotationBinder,
+        ArgumentConversionContext<? extends HttpRequest<?>> context,
+        HttpRequest<?> source,
+        boolean pushCapable
+    ) {
+        if (source.getMethod().permitsRequestBody()) {
+            Optional<Argument<?>> typeVariable = context.getFirstTypeVariable()
+                .filter(arg -> arg.getType() != Object.class)
+                .filter(arg -> arg.getType() != Void.class);
+            if (typeVariable.isPresent()) {
+                @SuppressWarnings("unchecked")
+                ArgumentConversionContext<Object> unwrappedConversionContext = ConversionContext.of((Argument<Object>) typeVariable.get());
+                ArgumentBinder.BindingResult<Object> bodyBound = bodyAnnotationBinder.bindFullBody(unwrappedConversionContext, source);
+                // can't use flatMap here because we return a present optional even when the body conversion failed
+                return new PendingRequestBindingResult<>() {
+                    @Override
+                    public boolean isPending() {
+                        return bodyBound instanceof PendingRequestBindingResult<Object> p && p.isPending();
+                    }
+
+                    @Override
+                    public List<ConversionError> getConversionErrors() {
+                        return bodyBound.getConversionErrors();
+                    }
+
+                    @Override
+                    public Optional<HttpRequest<?>> getValue() {
+                        Optional<Object> body = bodyBound.getValue();
+                        if (pushCapable) {
+                            return Optional.of(new PushCapableRequestWrapper<Object>((HttpRequest<Object>) source, (PushCapableHttpRequest<?>) source) {
+                                @Override
+                                public Optional<Object> getBody() {
+                                    return body;
+                                }
+                            });
+                        } else {
+                            return Optional.of(new HttpRequestWrapper<Object>((HttpRequest<Object>) source) {
+                                @Override
+                                public Optional<Object> getBody() {
+                                    return body;
+                                }
+                            });
+                        }
+                    }
+                };
+            }
+        }
+        return () -> Optional.of(source);
     }
 
     /**
@@ -305,28 +359,22 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         }
     }
 
-    private static final class PushCapableFullHttpRequest<B> extends FullHttpRequest<B> implements PushCapableHttpRequest<B> {
-        /**
-         * @param delegate The Http Request
-         * @param bodyType The Body Type
-         */
-        public PushCapableFullHttpRequest(PushCapableHttpRequest<B> delegate, Argument<B> bodyType) {
-            super(delegate, bodyType);
-        }
+    private static class PushCapableRequestWrapper<B> extends HttpRequestWrapper<B> implements PushCapableHttpRequest<B> {
+        private final PushCapableHttpRequest<?> push;
 
-        @Override
-        public PushCapableHttpRequest<B> getDelegate() {
-            return (PushCapableHttpRequest<B>) super.getDelegate();
+        public PushCapableRequestWrapper(HttpRequest<B> primary, PushCapableHttpRequest<?> push) {
+            super(primary);
+            this.push = push;
         }
 
         @Override
         public boolean isServerPushSupported() {
-            return getDelegate().isServerPushSupported();
+            return push.isServerPushSupported();
         }
 
         @Override
         public PushCapableHttpRequest<B> serverPush(@NonNull HttpRequest<?> request) {
-            getDelegate().serverPush(request);
+            push.serverPush(request);
             return this;
         }
     }

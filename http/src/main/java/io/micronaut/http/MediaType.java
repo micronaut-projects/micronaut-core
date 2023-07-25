@@ -23,7 +23,6 @@ import io.micronaut.core.convert.ImmutableArgumentConversionContext;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.http.annotation.Produces;
@@ -42,7 +41,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -163,6 +161,36 @@ public class MediaType implements CharSequence {
      * XML: application/xml.
      */
     public static final MediaType APPLICATION_XML_TYPE = new MediaType(APPLICATION_XML);
+
+    /**
+     * JSON GitHub: application/vnd.github+json.
+     */
+    public static final String APPLICATION_JSON_GITHUB = "application/vnd.github+json";
+
+    /**
+     * JSON GitHub: application/vnd.github+json.
+     */
+    public static final MediaType APPLICATION_JSON_GITHUB_TYPE = new MediaType(MediaType.APPLICATION_JSON_GITHUB);
+
+    /**
+     * JSON Feed: application/feed+json.
+     */
+    public static final String APPLICATION_JSON_FEED = "application/feed+json";
+
+    /**
+     * JSON Feed: application/feed+json.
+     */
+    public static final MediaType APPLICATION_JSON_FEED_TYPE = new MediaType(MediaType.APPLICATION_JSON_FEED);
+
+    /**
+     * JSON Feed: application/problem+json.
+     */
+    public static final String APPLICATION_JSON_PROBLEM = "application/problem+json";
+
+    /**
+     * JSON Feed: application/problem+json.
+     */
+    public static final MediaType APPLICATION_JSON_PROBLEM_TYPE = new MediaType(MediaType.APPLICATION_JSON_PROBLEM);
 
     /**
      * JSON: application/json.
@@ -399,8 +427,11 @@ public class MediaType implements CharSequence {
     protected final String extension;
     protected final Map<CharSequence, String> parameters;
     private final String strRepr;
+    private final String lowerName;
 
     private BigDecimal qualityNumberField = BigDecimal.ONE;
+
+    private boolean valid;
 
     static {
         textTypePatterns.add(Pattern.compile("^text/.*$"));
@@ -490,6 +521,7 @@ public class MediaType implements CharSequence {
             withoutArgs = name;
         }
         this.name = withoutArgs;
+        this.lowerName = withoutArgs.toLowerCase(Locale.ROOT);
         int i = withoutArgs.indexOf('/');
         if (i > -1) {
             this.type = withoutArgs.substring(0, i);
@@ -535,6 +567,12 @@ public class MediaType implements CharSequence {
                 return APPLICATION_XML_TYPE;
             case APPLICATION_JSON:
                 return APPLICATION_JSON_TYPE;
+            case APPLICATION_JSON_FEED:
+                return APPLICATION_JSON_FEED_TYPE;
+            case APPLICATION_JSON_GITHUB:
+                return APPLICATION_JSON_GITHUB_TYPE;
+            case APPLICATION_JSON_PROBLEM:
+                return APPLICATION_JSON_PROBLEM_TYPE;
             case APPLICATION_YAML:
                 return APPLICATION_YAML_TYPE;
             case TEXT_XML:
@@ -699,6 +737,21 @@ public class MediaType implements CharSequence {
         }
     }
 
+    /**
+     * Validate this media type for sending as an HTTP header. This is an optimization to only run
+     * the validation once if possible. If the validation function does not throw, future calls to
+     * this method will not call the validation function again.
+     *
+     * @param r Validation function
+     */
+    @Internal
+    public void validate(Runnable r) {
+        if (!valid) {
+            r.run();
+            valid = true;
+        }
+    }
+
     @Override
     public String toString() {
         return strRepr;
@@ -735,12 +788,12 @@ public class MediaType implements CharSequence {
 
         MediaType mediaType = (MediaType) o;
 
-        return name.equalsIgnoreCase(mediaType.name);
+        return lowerName.equals(mediaType.lowerName);
     }
 
     @Override
     public int hashCode() {
-        return name.hashCode();
+        return lowerName.hashCode();
     }
 
     /**
@@ -760,35 +813,49 @@ public class MediaType implements CharSequence {
      * @since 1.3.3
      */
     public static List<MediaType> orderedOf(List<? extends CharSequence> values) {
-        if (CollectionUtils.isNotEmpty(values)) {
-            List<MediaType> mediaTypes = new LinkedList<>();
-            for (CharSequence value : values) {
-                for (String token : StringUtils.splitOmitEmptyStrings(value, ',')) {
-                    try {
-                        mediaTypes.add(MediaType.of(token));
-                    } catch (IllegalArgumentException e) {
-                        // ignore
-                    }
+        if (values == null) {
+            return Collections.emptyList();
+        }
+        int headerCount = values.size();
+        if (headerCount == 0) {
+            return Collections.emptyList();
+        }
+        if (headerCount == 1) {
+            // fast path for single header with single media type
+            String singleHeader = values.get(0).toString();
+            if (singleHeader.indexOf(',') == -1) {
+                try {
+                    return List.of(MediaType.of(singleHeader));
+                } catch (IllegalArgumentException ignored) {
                 }
             }
-            mediaTypes = new ArrayList<>(mediaTypes);
-            mediaTypes.sort((o1, o2) -> {
-                //The */* type is always last
-                if (o1.type.equals("*")) {
-                    return 1;
-                } else if (o2.type.equals("*")) {
-                    return -1;
-                }
-                if (o2.subtype.equals("*") && !o1.subtype.equals("*")) {
-                    return -1;
-                } else if (o1.subtype.equals("*") && !o2.subtype.equals("*")) {
-                    return 1;
-                }
-                return o2.getQualityAsNumber().compareTo(o1.getQualityAsNumber());
-            });
-            return Collections.unmodifiableList(mediaTypes);
         }
-        return Collections.emptyList();
+
+        List<MediaType> mediaTypes = new ArrayList<>();
+        for (CharSequence value : values) {
+            for (String token : StringUtils.splitOmitEmptyStrings(value, ',')) {
+                try {
+                    mediaTypes.add(MediaType.of(token));
+                } catch (IllegalArgumentException e) {
+                    // ignore
+                }
+            }
+        }
+        mediaTypes.sort((o1, o2) -> {
+            //The */* type is always last
+            if (o1.type.equals("*")) {
+                return 1;
+            } else if (o2.type.equals("*")) {
+                return -1;
+            }
+            if (o2.subtype.equals("*") && !o1.subtype.equals("*")) {
+                return -1;
+            } else if (o1.subtype.equals("*") && !o2.subtype.equals("*")) {
+                return 1;
+            }
+            return o2.getQualityAsNumber().compareTo(o1.getQualityAsNumber());
+        });
+        return Collections.unmodifiableList(mediaTypes);
     }
 
     /**

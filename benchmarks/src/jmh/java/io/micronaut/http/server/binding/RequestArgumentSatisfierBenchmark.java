@@ -19,7 +19,6 @@ import io.micronaut.aop.around.AroundCompileBenchmark;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
 import org.openjdk.jmh.annotations.Benchmark;
@@ -49,10 +48,9 @@ public class RequestArgumentSatisfierBenchmark {
     public void benchmarkFulfillArgumentRequirements() {
         final MutableHttpRequest<Object> request = HttpRequest.GET("/arguments/foo/bar/10");
         final UriRouteMatch<Object, Object> routeMatch = router.find(request.getMethod(), request.getUri().toString(), request).findFirst().orElse(null);
-        final RouteMatch<?> transformed = requestArgumentSatisfier.fulfillArgumentRequirements(
+        requestArgumentSatisfier.fulfillArgumentRequirementsBeforeFilters(
                 routeMatch,
-                request,
-                true
+                request
         );
     }
 

@@ -26,10 +26,13 @@ import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.MutableHttpMessage;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.netty.stream.DefaultStreamedHttpResponse;
@@ -62,7 +65,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @Internal
 @TypeHint(value = NettyMutableHttpResponse.class)
-public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpResponseBuilder {
+public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpResponseBuilder {
     private static final ServerCookieEncoder DEFAULT_SERVER_COOKIE_ENCODER = ServerCookieEncoder.LAX;
 
     private final HttpVersion httpVersion;
@@ -78,6 +81,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
     private ServerCookieEncoder serverCookieEncoder = DEFAULT_SERVER_COOKIE_ENCODER;
 
     private final BodyConvertor bodyConvertor = newBodyConvertor();
+    private MessageBodyWriter<B> messageBodyWriter;
 
     /**
      * @param nettyResponse     The {@link FullHttpResponse}
@@ -114,7 +118,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
      * @param conversionService The conversion service
      */
     public NettyMutableHttpResponse(HttpVersion httpVersion, HttpResponseStatus httpResponseStatus, Object body, ConversionService conversionService) {
-        this(httpVersion, httpResponseStatus, new DefaultHttpHeaders(), body, conversionService);
+        this(httpVersion, httpResponseStatus, null, body, conversionService);
     }
 
     /**
@@ -143,12 +147,38 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
                                      ConversionService conversionService) {
         this.httpVersion = httpVersion;
         this.httpResponseStatus = httpResponseStatus;
-        this.nettyHeaders = nettyHeaders;
         this.trailingNettyHeaders = trailingNettyHeaders;
         this.decoderResult = decoderResult;
         this.conversionService = conversionService;
+
+        boolean hasHeaders = nettyHeaders != null;
+        if (!hasHeaders) {
+            nettyHeaders = new DefaultHttpHeaders(false);
+        }
+        this.nettyHeaders = nettyHeaders;
         this.headers = new NettyHttpHeaders(nettyHeaders, conversionService);
-        setBody(body);
+        if (body == null) {
+            this.body = null;
+            this.optionalBody = Optional.empty();
+        } else {
+            this.body = body;
+            this.optionalBody = Optional.of(body);
+            Optional<MediaType> mediaType = MediaType.fromType(body.getClass());
+            if (mediaType.isPresent() && (!hasHeaders || !nettyHeaders.contains(HttpHeaderNames.CONTENT_TYPE))) {
+                contentType(mediaType.get());
+            }
+        }
+    }
+
+    @Override
+    public Optional<MessageBodyWriter<B>> getBodyWriter() {
+        return Optional.ofNullable(messageBodyWriter);
+    }
+
+    @Override
+    public MutableHttpMessage<B> bodyWriter(MessageBodyWriter<B> messageBodyWriter) {
+        this.messageBodyWriter = messageBodyWriter;
+        return this;
     }
 
     /**
@@ -201,6 +231,19 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
             }
         }
         return attributes;
+    }
+
+    @Override
+    public io.micronaut.http.HttpResponse<B> setAttribute(CharSequence name, Object value) {
+        // This is the copy from the super method to avoid the type pollution
+        if (StringUtils.isNotEmpty(name)) {
+            if (value == null) {
+                getAttributes().remove(name.toString());
+            } else {
+                getAttributes().put(name.toString(), value);
+            }
+        }
+        return this;
     }
 
     @Override
@@ -270,6 +313,18 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, Nett
             bodyConvertor.cleanup();
         }
         return (MutableHttpResponse<T>) this;
+    }
+
+    @Override
+    public MutableHttpResponse<B> contentType(MediaType mediaType) {
+        if (mediaType == null) {
+            headers.remove(HttpHeaderNames.CONTENT_TYPE);
+        } else {
+            // optimization for content type validation
+            mediaType.validate(() -> NettyHttpHeaders.validateHeader(HttpHeaderNames.CONTENT_TYPE, mediaType));
+            headers.setUnsafe(HttpHeaderNames.CONTENT_TYPE, mediaType);
+        }
+        return this;
     }
 
     /**

@@ -19,7 +19,7 @@ import groovy.transform.PackageScope
 import org.atinject.jakartatck.auto.accessories.RoundThing
 import org.atinject.jakartatck.auto.accessories.SpareTire
 
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 class Tire extends RoundThing {
 

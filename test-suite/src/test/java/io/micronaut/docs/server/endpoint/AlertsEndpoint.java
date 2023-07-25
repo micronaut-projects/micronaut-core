@@ -16,8 +16,8 @@
 package io.micronaut.docs.server.endpoint;
 
 import io.micronaut.context.annotation.Requires;
-//tag::imports[]
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Body;
 import io.micronaut.management.endpoint.annotation.Delete;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
@@ -48,7 +48,7 @@ public class AlertsEndpoint {
 
     @Write(consumes = MediaType.TEXT_PLAIN)
     @Sensitive(property = "add.sensitive", defaultValue = true) // <3>
-    void addAlert(String alert) {
+    void addAlert(@Body String alert) {
         alerts.add(alert);
     }
 }

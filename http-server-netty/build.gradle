@@ -14,6 +14,7 @@ micronautBuild {
 tasks.named("test") {
     systemProperty("io.netty.leakDetection.level", "paranoid")
     systemProperty("io.netty.customResourceLeakDetector", "io.micronaut.http.server.netty.fuzzing.BufferLeakDetection")
+    systemProperty("io.netty.leakDetection.targetRecords", "100")
     maxHeapSize("1G")
 }
 
@@ -28,7 +29,7 @@ dependencies {
     implementation libs.managed.reactor
     compileOnly project(":jackson-databind")
     compileOnly project(":websocket")
-    compileOnly libs.kotlin.stdlib
+    compileOnly libs.managed.kotlin.stdlib
     compileOnly libs.managed.netty.transport.native.unix.common
     compileOnly libs.managed.netty.incubator.codec.http3
 
@@ -89,7 +90,12 @@ dependencies {
             classifier = Os.isArch("aarch64") ? "osx-aarch_64" : "osx-x86_64"
         }
     }
-    testImplementation libs.managed.logback.classic
+    testImplementation(libs.managed.netty.tcnative.boringssl.static) {
+        artifact {
+            classifier = Os.isArch("aarch64") ? "osx-aarch_64" : "osx-x86_64"
+        }
+    }
+    testImplementation libs.logback.classic
 
     // Adding these for now since micronaut-test isnt resolving correctly ... probably need to upgrade gradle there too
     testImplementation libs.junit.jupiter.api

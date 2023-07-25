@@ -18,6 +18,7 @@ dependencies {
     compileOnly (libs.micronaut.validation) {
         exclude group: 'io.micronaut'
     }
+    compileOnly project(":http-client-core")
 
     implementation libs.managed.reactor
 
@@ -34,7 +35,7 @@ dependencies {
     testRuntimeOnly libs.h2
     testRuntimeOnly libs.mysql.driver
 
-    compileOnly libs.managed.logback.classic
+    compileOnly libs.logback.classic
     compileOnly libs.log4j
 
 }

@@ -17,6 +17,7 @@ package io.micronaut.http.server;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
 import io.micronaut.http.bind.binders.HttpCoroutineContextFactory;
@@ -42,7 +43,7 @@ public final class CoroutineHelper {
         this.coroutineContextFactories = coroutineContextFactories;
     }
 
-    public void setupCoroutineContext(HttpRequest<?> httpRequest, ContextView contextView) {
-        ContinuationArgumentBinder.setupCoroutineContext(httpRequest, contextView, coroutineContextFactories);
+    public void setupCoroutineContext(HttpRequest<?> httpRequest, ContextView contextView, PropagatedContext propagatedContext) {
+        ContinuationArgumentBinder.setupCoroutineContext(httpRequest, contextView, propagatedContext, coroutineContextFactories);
     }
 }

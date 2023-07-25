@@ -159,10 +159,10 @@ class HealthEndpointSpec extends Specification {
         result.details.jdbc.status == "UP"
         result.details.jdbc.details."jdbc:h2:mem:oneDb".status == "UP"
         result.details.jdbc.details."jdbc:h2:mem:oneDb".details.database == "H2"
-        result.details.jdbc.details."jdbc:h2:mem:oneDb".details.version == "2.1.210 (2022-01-17)"
+        result.details.jdbc.details."jdbc:h2:mem:oneDb".details.version == "2.1.214 (2022-06-13)"
         result.details.jdbc.details."jdbc:h2:mem:twoDb".status == "UP"
         result.details.jdbc.details."jdbc:h2:mem:twoDb".details.database == "H2"
-        result.details.jdbc.details."jdbc:h2:mem:twoDb".details.version == "2.1.210 (2022-01-17)"
+        result.details.jdbc.details."jdbc:h2:mem:twoDb".details.version == "2.1.214 (2022-06-13)"
         result.details.service.status == "UP"
 
         cleanup:

@@ -78,6 +78,11 @@ public abstract class AbstractEnvironmentAnnotationMetadata implements Annotatio
     }
 
     @Override
+    public boolean hasEvaluatedExpressions() {
+        return environmentAnnotationMetadata.hasEvaluatedExpressions();
+    }
+
+    @Override
     public <T> Optional<T> getValue(@NonNull String annotation, @NonNull String member, @NonNull Argument<T> requiredType) {
         Environment environment = getEnvironment();
         if (environment != null) {

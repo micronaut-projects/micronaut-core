@@ -21,6 +21,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.netty.body.JsonCounter;
 import io.micronaut.http.server.netty.AbstractHttpContentProcessor;
 import io.micronaut.http.server.netty.HttpContentProcessor;
 import io.micronaut.http.server.netty.NettyHttpRequest;
@@ -31,6 +32,7 @@ import io.micronaut.json.tree.JsonNode;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.CompositeByteBuf;
+import io.netty.handler.codec.http.DefaultHttpContent;
 
 import java.io.IOException;
 import java.util.Collection;
@@ -44,11 +46,13 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-public class JsonContentProcessor extends AbstractHttpContentProcessor {
+public final class JsonContentProcessor extends AbstractHttpContentProcessor {
 
     private final JsonMapper jsonMapper;
     private final JsonCounter counter = new JsonCounter();
-    private CompositeByteBuf buffer;
+    private boolean tokenize;
+    private ByteBuf singleBuffer;
+    private CompositeByteBuf compositeBuffer;
 
     /**
      * @param nettyHttpRequest The Netty Http request
@@ -61,9 +65,8 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
             JsonMapper jsonMapper) {
         super(nettyHttpRequest, configuration);
         this.jsonMapper = jsonMapper;
-
-        if (hasContentType(MediaType.APPLICATION_JSON_TYPE)) {
-
+        this.tokenize = !hasContentType(MediaType.APPLICATION_JSON_TYPE);
+        if (!tokenize) {
             // if the content type is application/json, we can only have one root-level value
             counter.noTokenization();
         }
@@ -81,10 +84,36 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
                 if (genericArgument.isPresent() && !Iterable.class.isAssignableFrom(genericArgument.get().getType()) && !isJsonStream) {
                     // if the generic argument is not a iterable type them stream the array into the publisher
                     counter.unwrapTopLevelArray();
+                    tokenize = true;
                 }
             }
         }
         return this;
+    }
+
+    @Override
+    public Object processSingle(ByteBuf data) throws Throwable {
+        // if data is empty, we return no json nodes, so can't use this method
+        if (tokenize || !data.isReadable()) {
+            return null;
+        }
+
+        if (data.readableBytes() > requestMaxSize) {
+            fireExceedsLength(data.readableBytes(), requestMaxSize, new DefaultHttpContent(data));
+        }
+        int start = data.readerIndex();
+        counter.feed(data);
+        data.readerIndex(start);
+        ByteBuffer<ByteBuf> wrapped = NettyByteBufferFactory.DEFAULT.wrap(data);
+        if (((NettyHttpServerConfiguration) configuration).isEagerParsing()) {
+            try {
+                return jsonMapper.readValue(wrapped, Argument.of(JsonNode.class));
+            } finally {
+                data.release();
+            }
+        } else {
+            return new LazyJsonNode(wrapped);
+        }
     }
 
     private boolean hasContentType(MediaType expected) {
@@ -98,13 +127,21 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
         try {
             countLoop(out, content);
         } catch (Exception e) {
-            if (this.buffer != null) {
-                this.buffer.release();
-                this.buffer = null;
-            }
+            releaseBuffers();
             throw e;
         } finally {
             content.release();
+        }
+    }
+
+    private void releaseBuffers() {
+        if (this.singleBuffer != null) {
+            this.singleBuffer.release();
+            this.singleBuffer = null;
+        }
+        if (this.compositeBuffer != null) {
+            this.compositeBuffer.release();
+            this.compositeBuffer = null;
         }
     }
 
@@ -116,49 +153,54 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor {
             JsonCounter.BufferRegion bufferRegion = counter.pollFlushedRegion();
             if (bufferRegion != null) {
                 long start = Math.max(initialPosition, bufferRegion.start());
-                flush(out, content.retainedSlice(
+                buffer(content.retainedSlice(
                     Math.toIntExact(start - bias),
                     Math.toIntExact(bufferRegion.end() - start)
                 ));
+                flush(out);
             }
         }
         if (counter.isBuffering()) {
             int currentBufferStart = Math.toIntExact(Math.max(initialPosition, counter.bufferStart()) - bias);
-            bufferForNextRun(content.retainedSlice(currentBufferStart, content.writerIndex() - currentBufferStart));
+            content.readerIndex(currentBufferStart);
+            buffer(content.retain());
         }
     }
 
-    private void bufferForNextRun(ByteBuf buffer) {
-        if (this.buffer == null) {
-            // number of components should not be too small to avoid unnecessary consolidation
-            this.buffer = buffer.alloc().compositeBuffer(((NettyHttpServerConfiguration) configuration).getJsonBufferMaxComponents());
+    private void buffer(ByteBuf buffer) {
+        if (this.singleBuffer == null && this.compositeBuffer == null) {
+            this.singleBuffer = buffer;
+        } else {
+            if (this.compositeBuffer == null) {
+                // number of components should not be too small to avoid unnecessary consolidation
+                this.compositeBuffer = buffer.alloc().compositeBuffer(((NettyHttpServerConfiguration) configuration).getJsonBufferMaxComponents());
+                this.compositeBuffer.addComponent(true, this.singleBuffer);
+                this.singleBuffer = null;
+            }
+            this.compositeBuffer.addComponent(true, buffer);
         }
-        this.buffer.addComponent(true, buffer);
     }
 
-    private void flush(Collection<Object> out, ByteBuf completedNode) throws IOException {
-        if (this.buffer != null) {
-            completedNode = completedNode == null ? this.buffer : this.buffer.addComponent(true, completedNode);
-            this.buffer = null;
-        }
+    private void flush(Collection<Object> out) throws IOException {
+        ByteBuf completedNode = compositeBuffer == null ? singleBuffer : compositeBuffer;
         ByteBuffer<ByteBuf> wrapped = NettyByteBufferFactory.DEFAULT.wrap(completedNode);
         if (((NettyHttpServerConfiguration) configuration).isEagerParsing()) {
             try {
                 out.add(jsonMapper.readValue(wrapped, Argument.of(JsonNode.class)));
             } finally {
-                if (completedNode != null) {
-                    completedNode.release();
-                }
+                releaseBuffers();
             }
         } else {
             out.add(new LazyJsonNode(wrapped));
+            compositeBuffer = null;
+            singleBuffer = null;
         }
     }
 
     @Override
     public void complete(Collection<Object> out) throws Throwable {
-        if (this.buffer != null) {
-            flush(out, null);
+        if (this.singleBuffer != null || this.compositeBuffer != null) {
+            flush(out);
         }
     }
 }

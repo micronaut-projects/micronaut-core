@@ -4,11 +4,11 @@ Micronaut framework comes with its own set of annotations to declare nullability
 
 **Why does the Micronaut framework add its own set of nullability annotations instead of using one of the existing nullability annotations libraries?**
 
-Throughout the history of the framework, we used other nullability annotation libraries. However, licensing issues made us change nullability annotations several times. To avoid having to change nullability annotations in the future,  we added our own set of nullability annotations in Micronaut Framework 2.4
+Throughout the history of the framework, we used other nullability annotation libraries. However, licensing issues made us change nullability annotations several times. To avoid having to change nullability annotations in the future,  we added our own set of nullability annotations in Micronaut framework 2.4
 
 **Are Micronaut Nullability annotations recognized by Kotlin?**
 
-Yes, Micronaut nullability annotations are mapped at compilation time to `javax.annotation.Nullable` and `javax.annotation.Nonnull`.
+Yes, Micronaut framework's nullability annotations are mapped at compilation time to `jakarta.annotation.Nullable` and `jakarta.annotation.Nonnull`.
 
 **Why should you use nullability annotations in your code?**
 

@@ -82,6 +82,7 @@ import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.core.type.UnsafeExecutable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -94,7 +95,6 @@ import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionMethodReference;
 import io.micronaut.inject.BeanDefinitionReference;
-import io.micronaut.inject.BeanFactory;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.DisposableBeanDefinition;
@@ -104,10 +104,10 @@ import io.micronaut.inject.InjectableBeanDefinition;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.MethodExecutionHandle;
-import io.micronaut.inject.ParametrizedBeanFactory;
 import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
 import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.inject.QualifiedBeanType;
+import io.micronaut.inject.UnsafeExecutionHandle;
 import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.provider.AbstractProviderDefinition;
 import io.micronaut.inject.proxy.InterceptedBeanProxy;
@@ -593,68 +593,11 @@ public class DefaultBeanContext implements InitializableBeanContext {
     }
 
     @Override
-    public MethodExecutionHandle<?, Object> createExecutionHandle(BeanDefinition<? extends Object> beanDefinition, ExecutableMethod<Object, ?> method) {
-        return new MethodExecutionHandle<>() {
-
-            private Object target;
-
-            @NonNull
-            @Override
-            public AnnotationMetadata getAnnotationMetadata() {
-                return method.getAnnotationMetadata();
-            }
-
-            @Override
-            public Object getTarget() {
-                Object target = this.target;
-                if (target == null) {
-                    synchronized (this) { // double check
-                        target = this.target;
-                        if (target == null) {
-                            target = getBean(beanDefinition);
-                            this.target = target;
-                        }
-                    }
-                }
-                return target;
-            }
-
-            @Override
-            public Class getDeclaringType() {
-                return beanDefinition.getBeanType();
-            }
-
-            @Override
-            public String getMethodName() {
-                return method.getMethodName();
-            }
-
-            @Override
-            public Argument[] getArguments() {
-                return method.getArguments();
-            }
-
-            @Override
-            public Method getTargetMethod() {
-                return method.getTargetMethod();
-            }
-
-            @Override
-            public ReturnType getReturnType() {
-                return method.getReturnType();
-            }
-
-            @Override
-            public Object invoke(Object... arguments) {
-                return method.invoke(getTarget(), arguments);
-            }
-
-            @NonNull
-            @Override
-            public ExecutableMethod<?, Object> getExecutableMethod() {
-                return (ExecutableMethod<?, Object>) method;
-            }
-        };
+    public MethodExecutionHandle<?, Object> createExecutionHandle(BeanDefinition<?> beanDefinition, ExecutableMethod<Object, ?> method) {
+        if (method instanceof UnsafeExecutable<?,?>) {
+            return new BeanContextUnsafeExecutionHandle(method, beanDefinition, (UnsafeExecutable<Object, Object>) method);
+        }
+        return new BeanContextExecutionHandle(method, beanDefinition);
     }
 
     @SuppressWarnings("unchecked")
@@ -1134,10 +1077,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
     @NonNull
     private <T> Map<String, Object> resolveArgumentValues(BeanResolutionContext resolutionContext, BeanDefinition<T> definition, Object[] args) {
         Argument[] requiredArguments;
-        // TODO: remove this after Micronaut 4 Milestone 1
-        if (definition instanceof ParametrizedBeanFactory parametrizedBeanFactory) {
-            requiredArguments = parametrizedBeanFactory.getRequiredArguments();
-        } else if (definition instanceof ParametrizedInstantiatableBeanDefinition<T> parametrizedInstantiatableBeanDefinition) {
+        if (definition instanceof ParametrizedInstantiatableBeanDefinition<T> parametrizedInstantiatableBeanDefinition) {
             requiredArguments = parametrizedInstantiatableBeanDefinition.getRequiredArguments();
         } else {
             return null;
@@ -2333,10 +2273,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                @Nullable Qualifier<T> qualifier,
                                @Nullable Map<String, Object> argumentValues) {
         T bean;
-        // TODO: remove this after Micronaut 4 Milestone 1
-        if (beanDefinition instanceof BeanFactory) {
-            bean = resolveByBeanFactory(resolutionContext, beanDefinition, qualifier, argumentValues);
-        } else if (beanDefinition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
+        if (beanDefinition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
             bean = resolveByBeanFactory(resolutionContext, instantiatableBeanDefinition, qualifier, argumentValues);
         } else {
             throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
@@ -2362,14 +2299,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         try {
             resolutionContext.setCurrentQualifier(declaredQualifier != null && !AnyQualifier.INSTANCE.equals(declaredQualifier) ? declaredQualifier : qualifier);
             T bean;
-            // TODO: remove this after Micronaut 4 Milestone 1
-            if (beanDefinition instanceof ParametrizedBeanFactory parametrizedBeanFactory) {
-                Map<String, Object> convertedValues = getRequiredArgumentValues(resolutionContext, parametrizedBeanFactory.getRequiredArguments(),
-                        argumentValues, beanDefinition);
-                bean = (T) parametrizedBeanFactory.build(resolutionContext, this, beanDefinition, convertedValues);
-            } else if (beanDefinition instanceof BeanFactory beanFactory) {
-                bean = (T) beanFactory.build(resolutionContext, this, beanDefinition);
-            } else if (beanDefinition instanceof ParametrizedInstantiatableBeanDefinition<T> parametrizedInstantiatableBeanDefinition) {
+            if (beanDefinition instanceof ParametrizedInstantiatableBeanDefinition<T> parametrizedInstantiatableBeanDefinition) {
                 Argument<Object>[] requiredArguments = parametrizedInstantiatableBeanDefinition.getRequiredArguments();
                 Map<String, Object> convertedValues = getRequiredArgumentValues(resolutionContext, requiredArguments, argumentValues, beanDefinition);
                 bean = parametrizedInstantiatableBeanDefinition.instantiate(resolutionContext, this, convertedValues);
@@ -2406,8 +2336,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
         bean = triggerBeanCreatedEventListener(resolutionContext, beanDefinition, bean, finalQualifier);
 
-        if (beanDefinition instanceof ValidatedBeanDefinition) {
-            bean = ((ValidatedBeanDefinition<T>) beanDefinition).validate(resolutionContext, bean);
+        if (beanDefinition instanceof ValidatedBeanDefinition<T> validatedBeanDefinition) {
+            bean = validatedBeanDefinition.validate(resolutionContext, bean);
         }
         if (LOG_LIFECYCLE.isDebugEnabled()) {
             LOG_LIFECYCLE.debug("Created bean [{}] from definition [{}] with qualifier [{}]", bean, beanDefinition, finalQualifier);
@@ -3083,7 +3013,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                                                                   @Nullable Qualifier<T> qualifier,
                                                                   @NonNull Argument<T> beanType,
                                                                   @NonNull BeanDefinition<T> definition) {
-        BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
+        BeanKey<T> beanKey = new BeanKey<>(definition.asArgument(), qualifier);
         T bean = registeredScope.getOrCreate(
                 new BeanCreationContext<T>() {
                     @NonNull
@@ -3101,7 +3031,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                     @NonNull
                     @Override
                     public CreatedBean<T> create() throws BeanCreationException {
-                        return createRegistration(resolutionContext == null ? null : resolutionContext.copy(), beanType, qualifier, definition, true);
+                        return createRegistration(resolutionContext == null ? null : resolutionContext.copy(), beanKey.beanType, qualifier, definition, true);
                     }
                 }
         );
@@ -3785,7 +3715,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
         @NonNull
         @Override
-        public ExecutableMethod<?, R> getExecutableMethod() {
+        public ExecutableMethod<T, R> getExecutableMethod() {
             return method;
         }
 
@@ -3819,8 +3749,10 @@ public class DefaultBeanContext implements InitializableBeanContext {
      * @param <T> The targe type
      * @param <R> The return type
      */
-    private static final class ObjectExecutionHandle<T, R> extends AbstractExecutionHandle<T, R> {
+    private static final class ObjectExecutionHandle<T, R> extends AbstractExecutionHandle<T, R> implements UnsafeExecutionHandle<T, R> {
 
+        @Nullable
+        private final UnsafeExecutable<T, R> unsafeExecutable;
         private final T target;
 
         /**
@@ -3830,6 +3762,11 @@ public class DefaultBeanContext implements InitializableBeanContext {
         ObjectExecutionHandle(T target, ExecutableMethod<T, R> method) {
             super(method);
             this.target = target;
+            if (method instanceof UnsafeExecutable unsafeExecutable) {
+                this.unsafeExecutable = unsafeExecutable;
+            } else {
+                this.unsafeExecutable = null;
+            }
         }
 
         @Override
@@ -3840,6 +3777,14 @@ public class DefaultBeanContext implements InitializableBeanContext {
         @Override
         public R invoke(Object... arguments) {
             return method.invoke(target, arguments);
+        }
+
+        @Override
+        public R invokeUnsafe(Object... arguments) {
+            if (unsafeExecutable == null) {
+                return invoke(arguments);
+            }
+            return unsafeExecutable.invokeUnsafe(target, arguments);
         }
 
         @Override
@@ -4226,6 +4171,100 @@ public class DefaultBeanContext implements InitializableBeanContext {
             if (ref != null && ref.equals(reference)) {
                 this.reference = null;
             }
+        }
+    }
+
+    private final class BeanContextUnsafeExecutionHandle extends BeanContextExecutionHandle implements UnsafeExecutionHandle<Object, Object> {
+
+        private final UnsafeExecutable<Object, Object> unsafeExecutionHandle;
+
+        public BeanContextUnsafeExecutionHandle(ExecutableMethod<Object, ?> method, BeanDefinition<?> beanDefinition, UnsafeExecutable<Object, Object> unsafeExecutionHandle) {
+            super(method, beanDefinition);
+            this.unsafeExecutionHandle = unsafeExecutionHandle;
+        }
+
+        @Override
+        public Object invokeUnsafe(Object... arguments) {
+            return unsafeExecutionHandle.invokeUnsafe(getTarget(), arguments);
+        }
+
+        @Override
+        public String toString() {
+            return unsafeExecutionHandle.toString();
+        }
+    }
+
+    private sealed class BeanContextExecutionHandle implements MethodExecutionHandle<Object, Object> {
+
+        private final ExecutableMethod<Object, ?> method;
+        private final BeanDefinition<?> beanDefinition;
+        private Object target;
+
+        public BeanContextExecutionHandle(ExecutableMethod<Object, ?> method, BeanDefinition<? extends Object> beanDefinition) {
+            this.method = method;
+            this.beanDefinition = beanDefinition;
+        }
+
+        @NonNull
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return method.getAnnotationMetadata();
+        }
+
+        @Override
+        public Object getTarget() {
+            Object target = this.target;
+            if (target == null) {
+                synchronized (this) { // double check
+                    target = this.target;
+                    if (target == null) {
+                        target = getBean(beanDefinition);
+                        this.target = target;
+                    }
+                }
+            }
+            return target;
+        }
+
+        @Override
+        public Class getDeclaringType() {
+            return beanDefinition.getBeanType();
+        }
+
+        @Override
+        public String getMethodName() {
+            return method.getMethodName();
+        }
+
+        @Override
+        public Argument[] getArguments() {
+            return method.getArguments();
+        }
+
+        @Override
+        public Method getTargetMethod() {
+            return method.getTargetMethod();
+        }
+
+        @Override
+        public ReturnType getReturnType() {
+            return method.getReturnType();
+        }
+
+        @Override
+        public Object invoke(Object... arguments) {
+            return method.invoke(getTarget(), arguments);
+        }
+
+        @NonNull
+        @Override
+        public ExecutableMethod<Object, Object> getExecutableMethod() {
+            return (ExecutableMethod<Object, Object>) method;
+        }
+
+        @Override
+        public String toString() {
+            return method.toString();
         }
     }
 }

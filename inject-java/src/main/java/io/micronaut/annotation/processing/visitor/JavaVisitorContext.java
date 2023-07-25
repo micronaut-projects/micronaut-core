@@ -30,6 +30,8 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory;
+import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.annotation.AbstractAnnotationElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
@@ -92,6 +94,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     private final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = new ArrayList<>();
     private final JavaElementFactory elementFactory;
     private final TypeElementVisitor.VisitorKind visitorKind;
+    private final DefaultExpressionCompilationContextFactory expressionCompilationContextFactory;
     private @Nullable
     JavaFileManager standardFileManager;
     private final JavaAnnotationMetadataBuilder annotationMetadataBuilder;
@@ -135,6 +138,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
         this.visitorKind = visitorKind;
         this.annotationMetadataBuilder = new JavaAnnotationMetadataBuilder(elements, messager, annotationUtils, modelUtils);
         this.elementAnnotationMetadataFactory = new JavaElementAnnotationMetadataFactory(false, this.annotationMetadataBuilder);
+        this.expressionCompilationContextFactory = new DefaultExpressionCompilationContextFactory(this);
     }
 
     /**
@@ -214,6 +218,11 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     @Override
     public JavaElementAnnotationMetadataFactory getElementAnnotationMetadataFactory() {
         return elementAnnotationMetadataFactory;
+    }
+
+    @Override
+    public ExpressionCompilationContextFactory getExpressionCompilationContextFactory() {
+        return expressionCompilationContextFactory;
     }
 
     @Override
@@ -300,6 +309,11 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     @Override
     public Optional<GeneratedFile> visitGeneratedFile(String path) {
         return outputVisitor.visitGeneratedFile(path);
+    }
+
+    @Override
+    public Optional<GeneratedFile> visitGeneratedFile(String path, io.micronaut.inject.ast.Element... originatingElements) {
+        return outputVisitor.visitGeneratedFile(path, originatingElements);
     }
 
     @Override

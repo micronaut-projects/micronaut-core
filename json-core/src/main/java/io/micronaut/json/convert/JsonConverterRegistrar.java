@@ -52,7 +52,8 @@ import java.util.Optional;
 @Experimental
 @Prototype
 public final class JsonConverterRegistrar implements TypeConverterRegistrar {
-    private final BeanProvider<JsonMapper> objectCodec;
+    private final BeanProvider<JsonMapper> objectCodecProvider;
+    private JsonMapper objectCodec;
     private final ConversionService conversionService;
     private final BeanProvider<BeanPropertyBinder> beanPropertyBinder;
 
@@ -62,9 +63,18 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
             ConversionService conversionService,
             BeanProvider<BeanPropertyBinder> beanPropertyBinder
     ) {
-        this.objectCodec = objectCodec;
+        this.objectCodecProvider = objectCodec;
         this.conversionService = conversionService;
         this.beanPropertyBinder = beanPropertyBinder;
+    }
+
+    private JsonMapper objectCodec() {
+        // JsonMapper is immutable, so we don't need safe publication here
+        JsonMapper objectCodec = this.objectCodec;
+        if (objectCodec == null) {
+            this.objectCodec = objectCodec = objectCodecProvider.get();
+        }
+        return objectCodec;
     }
 
     @Override
@@ -143,7 +153,7 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
                 return Optional.empty();
             }
             try {
-                return Optional.of(new JsonNodeConvertibleValues<>(node.toJsonNode(objectCodec.get()), conversionService));
+                return Optional.of(new JsonNodeConvertibleValues<>(node.toJsonNode(objectCodec()), conversionService));
             } catch (IOException e) {
                 context.reject(e);
                 return Optional.empty();
@@ -203,7 +213,7 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
     private TypeConverter<Object, JsonNode> objectToJsonNodeConverter() {
         return (object, targetType, context) -> {
             try {
-                return Optional.of(objectCodec.get().writeValueToTree(object));
+                return Optional.of(objectCodec().writeValueToTree(object));
             } catch (IllegalArgumentException | IOException e) {
                 context.reject(e);
                 return Optional.empty();
@@ -233,9 +243,9 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
         return (node, targetType, context) -> {
             try {
                 if (CharSequence.class.isAssignableFrom(targetType) && node.isObject()) {
-                    return Optional.of(new String(objectCodec.get().writeValueAsBytes(node), StandardCharsets.UTF_8));
+                    return Optional.of(new String(objectCodec().writeValueAsBytes(node), StandardCharsets.UTF_8));
                 } else {
-                    return Optional.ofNullable(this.objectCodec.get().readValueFromTree(node, argument(targetType, context)));
+                    return Optional.ofNullable(objectCodec().readValueFromTree(node, argument(targetType, context)));
                 }
             } catch (IOException e) {
                 context.reject(e);
@@ -250,7 +260,7 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
     private TypeConverter<LazyJsonNode, Object> unparsedJsonNodeToObjectConverter() {
         return (node, targetType, context) -> {
             try {
-                JsonMapper mapper = objectCodec.get();
+                JsonMapper mapper = objectCodec();
                 if (CharSequence.class.isAssignableFrom(targetType) && node.isObject()) {
                     // parse once to JsonNode to ensure validity & sanitize the input
                     byte[] sanitized = mapper.writeValueAsBytes(node.toJsonNode(mapper));

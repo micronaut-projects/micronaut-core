@@ -51,7 +51,6 @@ class OptionsRequestAttributesSpec extends Specification {
 
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-            Assert.that(request.getAttributes().contains(HttpAttributes.ROUTE.toString()))
             Assert.that(request.getAttributes().contains(HttpAttributes.ROUTE_MATCH.toString()))
             Assert.that(request.getAttributes().contains(HttpAttributes.ROUTE_INFO.toString()))
             Assert.that(request.getAttributes().contains(HttpAttributes.URI_TEMPLATE.toString()))

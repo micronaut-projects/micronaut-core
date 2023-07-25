@@ -112,7 +112,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
     }
 
     private List<LoadedVisitor> loadedVisitors;
-    private Collection<TypeElementVisitor> typeElementVisitors;
+    private Collection<? extends TypeElementVisitor<?, ?>> typeElementVisitors;
 
     /**
      * The visited annotation names.
@@ -127,7 +127,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
 
-        this.typeElementVisitors = findTypeElementVisitors();
+        Collection<? extends TypeElementVisitor<?, ?>> typeElementVisitors = findTypeElementVisitors();
 
         // set supported options as system properties to keep compatibility
         // in particular for micronaut-openapi
@@ -167,7 +167,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
      * @return True if visitors are present.
      */
     protected boolean hasVisitors() {
-        for (TypeElementVisitor<?, ?> typeElementVisitor : typeElementVisitors) {
+        for (TypeElementVisitor<?, ?> typeElementVisitor : findTypeElementVisitors()) {
             if (typeElementVisitor.getVisitorKind() == getVisitorKind()) {
                 return true;
             }
@@ -207,6 +207,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
     @Override
     public Set<String> getSupportedOptions() {
         Stream<String> baseOption = super.getSupportedOptions().stream();
+        Collection<? extends TypeElementVisitor<?, ?>> typeElementVisitors = findTypeElementVisitors();
         Stream<String> visitorsOptions = typeElementVisitors
             .stream()
             .map(TypeElementVisitor::getSupportedOptions)
@@ -315,12 +316,15 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
      *
      * @return A collection of type element visitors.
      */
-    protected @NonNull
-    Collection<TypeElementVisitor> findTypeElementVisitors() {
-        for (String visitorWarning : VISITOR_WARNINGS) {
-            warning(visitorWarning);
+    @NonNull
+    protected synchronized Collection<? extends TypeElementVisitor<?, ?>> findTypeElementVisitors() {
+        if (typeElementVisitors == null) {
+            for (String visitorWarning : VISITOR_WARNINGS) {
+                warning(visitorWarning);
+            }
+            typeElementVisitors = findCoreTypeElementVisitors(null);
         }
-        return findCoreTypeElementVisitors(null);
+        return typeElementVisitors;
     }
 
     /**
@@ -335,8 +339,8 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         }
     }
 
-    private static @NonNull
-    Collection<TypeElementVisitor> findCoreTypeElementVisitors(
+    @NonNull
+    private static Collection<? extends TypeElementVisitor<?, ?>> findCoreTypeElementVisitors(
         @Nullable Set<String> warnings) {
         return SERVICE_LOADER.collectAll(visitor -> {
                 if (!visitor.isEnabled()) {
@@ -363,6 +367,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 return true;
             }).stream()
             .filter(Objects::nonNull)
+            .<TypeElementVisitor<?, ?>>map(e -> e)
             // remove duplicate classes
             .collect(Collectors.toMap(Object::getClass, v -> v, (a, b) -> a)).values();
     }
@@ -511,9 +516,6 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 executableElement,
                 javaVisitorContext.getElementAnnotationMetadataFactory()
             );
-            if (methodElement.getDeclaringType().isAssignable(Enum.class)) {
-                return null;
-            }
             for (LoadedVisitor visitor : visitors) {
                 if (visitor.matchesElement(methodElement)) {
                     visitor.getVisitor().visitMethod(methodElement, javaVisitorContext);

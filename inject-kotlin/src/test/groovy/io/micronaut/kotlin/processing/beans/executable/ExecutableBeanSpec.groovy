@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.type.Argument
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.validation.RequiresValidation
+import jakarta.annotation.Nonnull
 import spock.lang.Issue
 import spock.lang.PendingFeature
 import spock.lang.Specification
@@ -254,29 +255,29 @@ import java.util.List
 import io.micronaut.kotlin.processing.beans.executable.*
 
 @jakarta.inject.Singleton
-class MyBean {
+open class MyBean {
     @Executable
-    fun saveAll(books: @Valid MutableList<MyBook>) {
+    open fun saveAll(books: @Valid MutableList<MyBook>) {
     }
 
     @Executable
-    fun <T : MyBook> saveAll2(book: @Valid MutableList<out T>) {
+    open fun <T : MyBook> saveAll2(book: @Valid MutableList<out T>) {
     }
 
     @Executable
-    fun <T : MyBook> saveAll3(book: @Valid MutableList<T>) {
+    open fun <T : MyBook> saveAll3(book: @Valid MutableList<T>) {
     }
 
     @Executable
-    fun save2(book: @Valid MyBook) {
+    open fun save2(book: @Valid MyBook) {
     }
 
     @Executable
-    fun <T : MyBook> save3(book: @Valid T) {
+    open fun <T : MyBook> save3(book: @Valid T) {
     }
 
     @Executable
-    fun get(): MyBook? {
+    open fun get(): MyBook? {
         return null
     }
 }
@@ -366,29 +367,29 @@ import java.util.List
 import io.micronaut.kotlin.processing.beans.executable.*
 
 @jakarta.inject.Singleton
-internal class MyBean {
+internal open class MyBean {
     @Executable
-    fun saveAll(books: @Valid MutableList<@TypeUseRuntimeAnn MyBook>) {
+    open fun saveAll(books: @Valid MutableList<@TypeUseRuntimeAnn MyBook>) {
     }
 
     @Executable
-    fun <@TypeUseRuntimeAnn T : MyBook> saveAll2(book: @Valid MutableList<out T>) {
+    open fun <@TypeUseRuntimeAnn T : MyBook> saveAll2(book: @Valid MutableList<out T>) {
     }
 
     @Executable
-    fun <@TypeUseRuntimeAnn T : MyBook> saveAll3(book: @Valid MutableList<T>) {
+    open fun <@TypeUseRuntimeAnn T : MyBook> saveAll3(book: @Valid MutableList<T>) {
     }
 
     @Executable
-    fun save2(book: @Valid @TypeUseRuntimeAnn MyBook) {
+    open fun save2(book: @Valid @TypeUseRuntimeAnn MyBook) {
     }
 
     @Executable
-    fun <@TypeUseRuntimeAnn T : MyBook> save3(book: @Valid T) {
+    open fun <@TypeUseRuntimeAnn T : MyBook> save3(book: @Valid T) {
     }
 
     @Executable
-    fun get(): @TypeUseRuntimeAnn MyBook? {
+    open fun get(): @TypeUseRuntimeAnn MyBook? {
         return null
     }
 }
@@ -534,9 +535,17 @@ class MyBean {
 
 ''')
         when:
+            def saveAllList = bd.findMethod("saveAll", List).get()
+            def saveAllListArgument = saveAllList.getArguments()[0]
+        then:
+            // The list itself should be marked as Nonnull
+            saveAllListArgument.getAnnotationMetadata().getAnnotationNames() == [Nonnull.class.name] as Set<String>
+
+        when:
             def saveAll = bd.findMethod("saveAll", List).get()
             def listTypeArgument = saveAll.getArguments()[0].getTypeParameters()[0]
         then:
+            // this is not Nonnull as we are checking the list content type, not the list itself
             validateMyBookArgument(listTypeArgument)
 
         when:
@@ -567,19 +576,19 @@ class MyBean {
             def save2 = bd.findMethod("save2", MyBook).get()
             def parameter2 = save2.getArguments()[0]
         then:
-            validateMyBookArgument(parameter2)
+            validateMyBookArgument(parameter2, true)
 
         when:
             def save3 = bd.findMethod("save3", MyBook).get()
             def parameter3 = save3.getArguments()[0]
         then:
-            validateMyBookArgument(parameter3)
+            validateMyBookArgument(parameter3, true)
 
         when:
             def save4 = bd.findMethod("save4", MyBook).get()
             def parameter4 = save4.getArguments()[0]
         then:
-            validateMyBookArgument(parameter4)
+            validateMyBookArgument(parameter4, true)
 
 //        when:
 //            def save5 = bd.findMethod("save5", MyBook).get()
@@ -659,13 +668,18 @@ class MyBean {
             validateMyBookArgument(parameter5)
     }
 
-    void validateMyBookArgument(Argument argument) {
-        // The argument should only have type annotations
+    void validateMyBookArgument(Argument argument, boolean shouldBeNonnull = false) {
+        // The argument should only have type annotations and potentially Nonnull
         def am = argument.getAnnotationMetadata()
         assert am.hasAnnotation(TypeUseRuntimeAnn.class)
         assert !am.hasAnnotation(MyEntity.class)
         assert !am.hasAnnotation(Introspected.class)
-        assert am.getAnnotationNames().size() == 1
+        if (shouldBeNonnull) {
+            assert am.hasAnnotation(Nonnull.class)
+            assert am.getAnnotationNames() == [Nonnull.class.name, TypeUseRuntimeAnn.class.name] as Set<String>
+        } else {
+            assert am.getAnnotationNames() == [TypeUseRuntimeAnn.class.name] as Set<String>
+        }
     }
 }
 

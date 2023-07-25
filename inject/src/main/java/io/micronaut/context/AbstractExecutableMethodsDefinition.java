@@ -16,19 +16,30 @@
 package io.micronaut.context;
 
 import io.micronaut.context.env.Environment;
-import io.micronaut.core.annotation.*;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.core.type.UnsafeExecutable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ExecutableMethodsDefinition;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
 
 import java.lang.reflect.Method;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
@@ -40,11 +51,12 @@ import java.util.stream.Stream;
  * @since 3.0
  */
 @Internal
-public abstract class AbstractExecutableMethodsDefinition<T> implements ExecutableMethodsDefinition<T>, EnvironmentConfigurable {
+public abstract class AbstractExecutableMethodsDefinition<T> implements ExecutableMethodsDefinition<T>, EnvironmentConfigurable, BeanContextConfigurable {
 
     private final MethodReference[] methodsReferences;
     private final DispatchedExecutableMethod<T, ?>[] executableMethods;
     private Environment environment;
+    private BeanContext beanContext;
     private List<DispatchedExecutableMethod<T, ?>> executableMethodsList;
 
     protected AbstractExecutableMethodsDefinition(MethodReference[] methodsReferences) {
@@ -58,6 +70,16 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         for (DispatchedExecutableMethod<T, ?> executableMethod : executableMethods) {
             if (executableMethod != null) {
                 executableMethod.configure(environment);
+            }
+        }
+    }
+
+    @Override
+    public void configure(BeanContext beanContext) {
+        this.beanContext = beanContext;
+        for (DispatchedExecutableMethod<T, ?> executableMethod : executableMethods) {
+            if (executableMethod != null) {
+                executableMethod.configure(beanContext);
             }
         }
     }
@@ -101,6 +123,9 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             executableMethod = new DispatchedExecutableMethod<>(this, index, methodsReference, methodsReference.annotationMetadata);
             if (environment != null) {
                 executableMethod.configure(environment);
+            }
+            if (beanContext != null) {
+                executableMethod.configure(beanContext);
             }
             executableMethods[index] = executableMethod;
         }
@@ -302,7 +327,8 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
      * @param <T> The type
      * @param <R> The result type
      */
-    private static final class DispatchedExecutableMethod<T, R> implements ExecutableMethod<T, R>, EnvironmentConfigurable {
+    private static final class DispatchedExecutableMethod<T, R> implements ExecutableMethod<T, R>,
+        EnvironmentConfigurable, BeanContextConfigurable, UnsafeExecutable<T, R> {
 
         private final AbstractExecutableMethodsDefinition dispatcher;
         private final int index;
@@ -328,8 +354,21 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         }
 
         @Override
+        public void configure(BeanContext beanContext) {
+            annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
+            if (annotationMetadata instanceof EvaluatedAnnotationMetadata eam) {
+                eam.configure(beanContext);
+            }
+        }
+
+        @Override
         public boolean hasPropertyExpressions() {
             return annotationMetadata.hasPropertyExpressions();
+        }
+
+        @Override
+        public boolean hasEvaluatedExpressions() {
+            return annotationMetadata.hasEvaluatedExpressions();
         }
 
         @Override
@@ -400,6 +439,11 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         @Override
         public R invoke(T instance, Object... arguments) {
             ArgumentUtils.validateArguments(this, methodReference.arguments, arguments);
+            return (R) dispatcher.dispatch(index, instance, arguments);
+        }
+
+        @Override
+        public R invokeUnsafe(T instance, Object... arguments) {
             return (R) dispatcher.dispatch(index, instance, arguments);
         }
 
@@ -492,5 +536,4 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
             return environment;
         }
     }
-
 }

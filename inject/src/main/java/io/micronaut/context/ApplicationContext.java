@@ -250,7 +250,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      */
     static @NonNull ApplicationContextBuilder builder(@NonNull String... environments) {
         ArgumentUtils.requireNonNull("environments", environments);
-        return new DefaultApplicationContextBuilder()
+        return builder()
                 .environments(environments);
     }
 
@@ -264,7 +264,7 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
     static @NonNull ApplicationContextBuilder builder(@NonNull Map<String, Object> properties, @NonNull String... environments) {
         ArgumentUtils.requireNonNull("environments", environments);
         ArgumentUtils.requireNonNull("properties", properties);
-        return new DefaultApplicationContextBuilder()
+        return builder()
                 .properties(properties)
                 .environments(environments);
     }
@@ -276,6 +276,14 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
      */
     static @NonNull ApplicationContextBuilder builder() {
         return new DefaultApplicationContextBuilder();
+    }
+
+    /**
+     * @param classLoader The class loader to use
+     * @return The application context builder
+     */
+    static @NonNull ApplicationContextBuilder builder(ClassLoader classLoader) {
+        return new DefaultApplicationContextBuilder(classLoader);
     }
 
     /**
@@ -302,8 +310,8 @@ public interface ApplicationContext extends BeanContext, PropertyResolver, Prope
         ArgumentUtils.requireNonNull("environments", environments);
         ArgumentUtils.requireNonNull("classLoader", classLoader);
 
-        return builder(environments)
-                .classLoader(classLoader);
+        return builder(classLoader)
+            .environments(environments);
     }
 
     /**

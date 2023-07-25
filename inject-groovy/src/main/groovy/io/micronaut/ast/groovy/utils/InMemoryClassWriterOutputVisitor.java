@@ -80,6 +80,11 @@ public class InMemoryClassWriterOutputVisitor implements ClassWriterOutputVisito
     }
 
     @Override
+    public Optional<GeneratedFile> visitGeneratedFile(String path, Element... originatingElements) {
+        return Optional.empty();
+    }
+
+    @Override
     public void finish() {
         classStreams.forEach((name, stream) ->
             classLoader.addClass(name, stream.toByteArray())

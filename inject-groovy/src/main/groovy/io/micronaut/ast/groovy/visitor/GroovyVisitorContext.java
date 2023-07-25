@@ -29,6 +29,8 @@ import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory;
+import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
@@ -41,6 +43,7 @@ import io.micronaut.inject.writer.GeneratedFile;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.control.ClassNodeResolver;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.Janitor;
 import org.codehaus.groovy.control.SourceUnit;
@@ -75,6 +78,7 @@ public class GroovyVisitorContext implements VisitorContext {
     private final GroovyElementFactory groovyElementFactory;
     private final List<AbstractBeanDefinitionBuilder> beanDefinitionBuilders = new ArrayList<>();
     private final GroovyElementAnnotationMetadataFactory elementAnnotationMetadataFactory;
+    private final ExpressionCompilationContextFactory expressionCompilationContextFactory;
 
     /**
      * @param sourceUnit      The source unit
@@ -96,6 +100,7 @@ public class GroovyVisitorContext implements VisitorContext {
         this.attributes = VISITOR_ATTRIBUTES;
         this.groovyElementFactory = new GroovyElementFactory(this);
         this.elementAnnotationMetadataFactory = new GroovyElementAnnotationMetadataFactory(false, new GroovyAnnotationMetadataBuilder(sourceUnit, compilationUnit));
+        this.expressionCompilationContextFactory = new DefaultExpressionCompilationContextFactory(this);
     }
 
     @NonNull
@@ -123,10 +128,18 @@ public class GroovyVisitorContext implements VisitorContext {
                 groovyElementFactory.newClassElement(cn, annotationMetadataFactory)
             );
         }
-        ClassNode classNode = Optional.ofNullable(compilationUnit.getClassNode(name))
-            .orElseGet(() -> classNodeFromClassLoader(name));
 
-        return Optional.ofNullable(classNode).map(cn -> groovyElementFactory.newClassElement(cn, annotationMetadataFactory));
+        ClassNodeResolver.LookupResult lookupResult = compilationUnit.getClassNodeResolver().resolveName(name, compilationUnit);
+        Optional<ClassNode> classNode;
+        if (lookupResult != null) {
+            classNode = Optional.ofNullable(lookupResult.getClassNode());
+        } else {
+            classNode = Optional.ofNullable(compilationUnit.getClassNode(name));
+        }
+
+        ClassNode finalClassNode = classNode.orElseGet(() -> classNodeFromClassLoader(name));
+
+        return Optional.ofNullable(finalClassNode).map(cn -> groovyElementFactory.newClassElement(cn, annotationMetadataFactory));
     }
 
     private ClassNode classNodeFromClassLoader(String name) {
@@ -177,6 +190,11 @@ public class GroovyVisitorContext implements VisitorContext {
     @Override
     public GroovyElementAnnotationMetadataFactory getElementAnnotationMetadataFactory() {
         return elementAnnotationMetadataFactory;
+    }
+
+    @Override
+    public ExpressionCompilationContextFactory getExpressionCompilationContextFactory() {
+        return this.expressionCompilationContextFactory;
     }
 
     @Override
@@ -250,6 +268,11 @@ public class GroovyVisitorContext implements VisitorContext {
     @Override
     public Optional<GeneratedFile> visitGeneratedFile(String path) {
         return outputVisitor.visitGeneratedFile(path);
+    }
+
+    @Override
+    public Optional<GeneratedFile> visitGeneratedFile(String path, Element... originatingElements) {
+        return outputVisitor.visitGeneratedFile(path, originatingElements);
     }
 
     @Override

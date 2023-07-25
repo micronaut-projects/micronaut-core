@@ -17,7 +17,6 @@ package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.uri.UriMatchInfo;
@@ -26,10 +25,8 @@ import io.micronaut.http.uri.UriMatchVariable;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.nio.charset.Charset;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 
 /**
  * Default implementation of the {@link RouteMatch} interface for matches to URIs.
@@ -42,70 +39,24 @@ import java.util.function.Function;
 @Internal
 class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements UriRouteMatch<T, R> {
 
-    private final HttpMethod httpMethod;
     private final UriMatchInfo matchInfo;
-    private final DefaultRouteBuilder.DefaultUriRoute uriRoute;
+    private final UriRouteInfo<T, R> uriRouteInfo;
     private final Charset defaultCharset;
 
     /**
      * @param matchInfo The URI match info
-     * @param uriRoute The URI route
+     * @param routeInfo The URI route
      * @param defaultCharset The default charset
      * @param conversionService The conversion service
      */
     DefaultUriRouteMatch(UriMatchInfo matchInfo,
-                         DefaultRouteBuilder.DefaultUriRoute uriRoute,
+                         UriRouteInfo<T, R> routeInfo,
                          Charset defaultCharset, ConversionService conversionService
     ) {
-        super(uriRoute, conversionService);
-        this.uriRoute = uriRoute;
+        super(routeInfo, conversionService);
         this.matchInfo = matchInfo;
-        this.httpMethod = uriRoute.httpMethod;
+        this.uriRouteInfo = routeInfo;
         this.defaultCharset = defaultCharset;
-    }
-
-    @Override
-    public UriRouteMatch<T, R> decorate(Function<RouteMatch<R>, R> executor) {
-        Map<String, Object> variables = getVariableValues();
-        List<Argument<?>> arguments = getRequiredArguments();
-        RouteMatch<R> thisRoute = this;
-        return new DefaultUriRouteMatch<>(matchInfo, uriRoute, defaultCharset, conversionService) {
-            @Override
-            public List<Argument<?>> getRequiredArguments() {
-                return arguments;
-            }
-
-            @Override
-            public R execute(Map<String, Object> argumentValues) {
-                return executor.apply(thisRoute);
-            }
-
-            @Override
-            public Map<String, Object> getVariableValues() {
-                return variables;
-            }
-        };
-    }
-
-    @Override
-    protected RouteMatch<R> newFulfilled(Map<String, Object> newVariables, List<Argument<?>> requiredArguments) {
-        return new DefaultUriRouteMatch<T, R>(matchInfo, uriRoute, defaultCharset, conversionService) {
-
-            @Override
-            public List<Argument<?>> getRequiredArguments() {
-                return requiredArguments;
-            }
-
-            @Override
-            public Map<String, Object> getVariableValues() {
-                return newVariables;
-            }
-        };
-    }
-
-    @Override
-    public UriRouteMatch<T, R> fulfill(Map<String, Object> argumentValues) {
-        return (UriRouteMatch<T, R>) super.fulfill(argumentValues);
     }
 
     @Override
@@ -118,7 +69,7 @@ class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements Uri
         Map<String, Object> variables = matchInfo.getVariableValues();
         if (CollectionUtils.isNotEmpty(variables)) {
             final String charset = defaultCharset.toString();
-            Map<String, Object> decoded = new LinkedHashMap<>(variables.size());
+            Map<String, Object> decoded = CollectionUtils.newLinkedHashMap(variables.size());
             variables.forEach((k, v) -> {
                 if (v instanceof CharSequence) {
                     try {
@@ -145,17 +96,17 @@ class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements Uri
     }
 
     @Override
-    public UriRoute getRoute() {
-        return (UriRoute) abstractRoute;
+    public UriRouteInfo<T, R> getRouteInfo() {
+        return uriRouteInfo;
     }
 
     @Override
     public HttpMethod getHttpMethod() {
-        return httpMethod;
+        return uriRouteInfo.getHttpMethod();
     }
 
     @Override
     public String toString() {
-        return httpMethod + " - " + matchInfo.getUri();
+        return uriRouteInfo.getHttpMethod() + " - " + matchInfo.getUri();
     }
 }

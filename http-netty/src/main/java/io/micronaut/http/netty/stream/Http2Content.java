@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.netty.stream;
 
+import io.micronaut.core.annotation.Internal;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http2.Http2Stream;
 
@@ -23,7 +24,10 @@ import io.netty.handler.codec.http2.Http2Stream;
  *
  * @author graemerocher
  * @since 2.1.3
+ * @deprecated Unused
  */
+@Internal
+@Deprecated
 public interface Http2Content extends HttpContent {
     /**
      * @return The stream the content is associated with.

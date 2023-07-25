@@ -15,25 +15,24 @@
  */
 package io.micronaut.runtime;
 
-import io.micronaut.context.banner.Banner;
-import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.annotation.Nullable;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.DefaultApplicationContextBuilder;
+import io.micronaut.context.banner.Banner;
 import io.micronaut.context.banner.MicronautBanner;
 import io.micronaut.context.banner.ResourceBanner;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
+import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.naming.Described;
-import io.micronaut.core.version.VersionUtils;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.PrintStream;
-import java.net.URL;
+import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -47,7 +46,6 @@ import java.util.function.Function;
  * @since 1.0
  */
 public class Micronaut extends DefaultApplicationContextBuilder implements ApplicationContextBuilder  {
-    private static final String MICRONAUT_PREFIX = "  Micronaut";
     private static final String BANNER_NAME = "micronaut-banner.txt";
     private static final Logger LOG = LoggerFactory.getLogger(Micronaut.class);
     private static final String SHUTDOWN_MONITOR_THREAD = "micronaut-shutdown-monitor-thread";
@@ -92,8 +90,8 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                         if (embeddedApplication instanceof EmbeddedServer embeddedServer) {
                             if (LOG.isInfoEnabled()) {
                                 long took = elapsedMillis(start);
-                                URL url = embeddedServer.getURL();
-                                LOG.info("Startup completed in {}ms. Server Running: {}", took, url);
+                                URI uri = embeddedServer.getContextURI();
+                                LOG.info("Startup completed in {}ms. Server Running: {}", took, uri);
                             }
                             keepAlive = embeddedServer.isKeepAlive();
                         } else {
@@ -350,13 +348,6 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
         }
         PrintStream out = System.out;
         resolveBanner(out).print();
-        printMicronautVersion(out);
-    }
-
-    private void printMicronautVersion(@NonNull PrintStream out) {
-        String version = VersionUtils.getMicronautVersion();
-        version = (version != null) ? " (v" + version + ")" : "";
-        out.println(MICRONAUT_PREFIX + version + "\n");
     }
 
     @NonNull

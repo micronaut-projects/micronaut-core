@@ -17,18 +17,20 @@ package io.micronaut.http.reactive.execution;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
-import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
 import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import reactor.core.CoreSubscriber;
 import reactor.core.Fuseable;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
+import reactor.util.context.Context;
+import reactor.util.context.ContextView;
 
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -45,7 +47,7 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
     private Mono<Object> value;
 
     <K> ReactorExecutionFlowImpl(Publisher<K> value) {
-        this(Mono.from(value));
+        this(value instanceof Flux<K> flux ? flux.next() : Mono.from(value));
     }
 
     <K> ReactorExecutionFlowImpl(Mono<K> value) {
@@ -84,10 +86,18 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
 
     @Override
     public void onComplete(BiConsumer<? super Object, Throwable> fn) {
-        value.subscribe(new Subscriber<>() {
+        value.subscribe(new CoreSubscriber<>() {
 
             Subscription subscription;
-            final AtomicReference<Object> value = new AtomicReference<>();
+            Object value;
+
+            @Override
+            public Context currentContext() {
+                if (fn instanceof ReactiveConsumer reactiveConsumer) {
+                    return Context.of(reactiveConsumer.contextView);
+                }
+                return CoreSubscriber.super.currentContext();
+            }
 
             @Override
             public void onSubscribe(Subscription s) {
@@ -97,8 +107,8 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
 
             @Override
             public void onNext(Object v) {
+                value = v;
                 subscription.request(1); // ???
-                value.set(v);
             }
 
             @Override
@@ -108,7 +118,7 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
 
             @Override
             public void onComplete() {
-                fn.accept(value.get(), null);
+                fn.accept(value, null);
             }
         });
     }
@@ -129,8 +139,6 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
     static <R> Mono<Object> toMono(ExecutionFlow<R> next) {
         if (next instanceof ReactorExecutionFlowImpl reactiveFlowImpl) {
             return reactiveFlowImpl.value;
-        } else if (next instanceof CompletableFutureExecutionFlow<?> completableFutureFlow) {
-            return Mono.fromCompletionStage(completableFutureFlow.toCompletableFuture());
         } else if (next instanceof ImperativeExecutionFlow<?> imperativeFlow) {
             Mono<Object> m;
             if (imperativeFlow.getError() != null) {
@@ -150,8 +158,24 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
                 });
             }
             return m;
+        } else {
+            return Mono.deferContextual(contextView -> {
+                Sinks.One<Object> sink = Sinks.one();
+                ReactiveConsumer reactiveConsumer = new ReactiveConsumer(contextView) {
+
+                    @Override
+                    public void accept(Object o, Throwable throwable) {
+                        if (throwable != null) {
+                            sink.tryEmitError(throwable);
+                        } else {
+                            sink.tryEmitValue(o);
+                        }
+                    }
+                };
+                next.onComplete(reactiveConsumer);
+                return sink.asMono();
+            });
         }
-        throw new IllegalStateException();
     }
 
     static <R> Mono<Object> toMono(Supplier<ExecutionFlow<R>> next) {
@@ -166,5 +190,14 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
     @Override
     public CompletableFuture<Object> toCompletableFuture() {
         return value.toFuture();
+    }
+
+    private abstract static class ReactiveConsumer implements BiConsumer<Object, Throwable> {
+
+        private final ContextView contextView;
+
+        private ReactiveConsumer(ContextView contextView) {
+            this.contextView = contextView;
+        }
     }
 }

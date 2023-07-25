@@ -8,9 +8,10 @@ dependencies {
     annotationProcessor project(":graal")
     api project(":context")
     api project(":core-reactive")
+    implementation project(":context-propagation")
     implementation libs.managed.reactor
-    compileOnly libs.kotlinx.coroutines.core
-    compileOnly libs.kotlinx.coroutines.reactor
+    compileOnly libs.managed.kotlinx.coroutines.core
+    compileOnly libs.managed.kotlinx.coroutines.reactor
 
     compileOnly libs.managed.jackson.annotations
 
@@ -19,7 +20,7 @@ dependencies {
     testImplementation project(":jackson-databind")
     testImplementation project(":inject")
     testImplementation project(":runtime")
-    testImplementation(libs.managed.logback.classic)
+    testImplementation(libs.logback.classic)
 }
 
 tasks.named("compileKotlin") {

@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.EntryPoint;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -48,13 +49,19 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *     returned by the continuation will be the response produced by the downstream, and can be
  *     modified and returned. Note that if you call a non-reactive continuation, the call will
  *     block, which may block the netty event loop. For that reason, always mark such a filter with
- *     {@link io.micronaut.scheduling.annotation.ExecuteOn}.</li>
+ *     {@link io.micronaut.scheduling.annotation.ExecuteOn}</li>
+ *     <li>A {@code @}{@link Header}, {@code @}{@link QueryValue} or {@code @}{@link CookieValue}
+ *     parameter</li>
+ *     <li>A {@code @}{@link Body} parameter of type {@code byte[]}, {@link String} or
+ *     {@link ByteBuffer}. Only supported for some HTTP server implementations.</li>
+ *     <li>A {@link io.micronaut.core.propagation.MutablePropagatedContext} to modify the propagated context</li>
  * </ul>
  *
  * The return value may be:
  *
  * <ul>
- *     <li>{@code void} to immediately continue execution</li>
+ *     <li>{@code void} or {@code null} to immediately continue execution, without changing the
+ *     request or response</li>
  *     <li>An updated {@link HttpRequest}</li>
  *     <li>A {@link HttpResponse} to skip execution of the request</li>
  *     <li>A {@link Publisher} (or other reactive type) that produces any of these return types, to

@@ -1,8 +1,8 @@
-The methods provided by Java's link:{jdkapi}/java/lang/reflect/AnnotatedElement.html[AnnotatedElement] API in general don't provide the ability to introspect annotations without loading the annotations themselves. Nor do they provide any ability to introspect annotation stereotypes (often called meta-annotations; an annotation stereotype is where an annotation is annotated with another annotation, essentially inheriting its behaviour).
+The methods provided by Java's link:{jdkapi}/java.base/java/lang/reflect/AnnotatedElement.html[AnnotatedElement] API in general don't provide the ability to introspect annotations without loading the annotations themselves. Nor do they provide any ability to introspect annotation stereotypes (often called meta-annotations; an annotation stereotype is where an annotation is annotated with another annotation, essentially inheriting its behaviour).
 
 To solve this problem many frameworks produce runtime metadata or perform expensive reflection to analyze the annotations of a class.
 
-Micronaut instead produces this annotation metadata at compile time, avoiding expensive reflection and saving memory.
+The Micronaut framework instead produces this annotation metadata at compile time, avoiding expensive reflection and saving memory.
 
 The link:{api}/io/micronaut/context/BeanContext.html[BeanContext] API can be used to obtain a reference to a link:{api}/io/micronaut/inject/BeanDefinition.html[BeanDefinition] which implements the link:{api}/io/micronaut/core/annotation/AnnotationMetadata.html[AnnotationMetadata] interface.
 
@@ -37,12 +37,12 @@ This approach is not recommended however, as it requires reflection and increase
 
 === Annotation Inheritance
 
-Micronaut will respect the rules defined in Java's jdk:java.lang.reflect.AnnotatedElement[] API with regards to annotation inheritance:
+The Micronaut framework will respect the rules defined in Java's jdk:java.lang.reflect.AnnotatedElement[] API with regards to annotation inheritance:
 
 * Annotations meta-annotated with jdk:java.lang.annotation.Inherited[] will be available via the `getAnnotation*` methods of the api:core.annotation.AnnotationMetadata[] API whilst those directly declared are available via the `getDeclaredAnnotation*` methods.
 * Annotations not meta-annotated with jdk:java.lang.annotation.Inherited[] will not be included in the metadata
 
-Micronaut differs from the jdk:java.lang.reflect.AnnotatedElement[] API in that it extends these rules to methods and method parameters such that:
+The Micronaut framework differs from the jdk:java.lang.reflect.AnnotatedElement[] API in that it extends these rules to methods and method parameters such that:
 
 * Any annotations annotated with jdk:java.lang.annotation.Inherited[] and present on a method of interface or super class `A` that is overridden by child interface or class `B` will be inherited into the api:core.annotation.AnnotationMetadata[] retrievable via the api:inject.ExecutableMethod[] API from a api:inject.BeanDefinition[] or an <<aop, AOP interceptor>>.
 * Any annotations annotated with jdk:java.lang.annotation.Inherited[] and present on a method parameter of interface or super class `A` that is overridden by child interface or class `B` will be inherited into the api:core.annotation.AnnotationMetadata[] retrievable via the api:core.type.Argument[] interface from the `getArguments` method of the api:inject.ExecutableMethod[] API.

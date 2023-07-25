@@ -283,7 +283,7 @@ package test
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.annotation.EachProperty
 
-import javax.inject.Inject
+import jakarta.inject.Inject
 import java.util.List
 
 @ConfigurationProperties("parent")

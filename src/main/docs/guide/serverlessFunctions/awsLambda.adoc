@@ -2,7 +2,7 @@ Support for AWS Lambda is implemented in the https://micronaut-projects.github.i
 
 ==== Simple Functions with AWS Lambda
 
-You can implement AWS Request Handlers with Micronaut that directly implement the AWS Lambda SDK API. See the documentation on https://micronaut-projects.github.io/micronaut-aws/latest/guide/#requestHandlers[Micronaut Request Handlers] for more information.
+You can implement AWS Request Handlers with the Micronaut framework that directly implement the AWS Lambda SDK API. See the documentation on https://micronaut-projects.github.io/micronaut-aws/latest/guide/#requestHandlers[Micronaut Request Handlers] for more information.
 
 [TIP]
 .Using the CLI

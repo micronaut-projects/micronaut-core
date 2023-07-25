@@ -17,6 +17,7 @@ package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.getClassDeclarationByName
+import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSClassDeclaration
@@ -25,6 +26,8 @@ import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.convert.value.MutableConvertibleValues
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
 import io.micronaut.core.util.StringUtils
+import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory
+import io.micronaut.expressions.context.ExpressionCompilationContextFactory
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
@@ -51,6 +54,7 @@ internal open class KotlinVisitorContext(
     private val outputVisitor = KotlinOutputVisitor(environment)
     val annotationMetadataBuilder: KotlinAnnotationMetadataBuilder
     private val elementAnnotationMetadataFactory: KotlinElementAnnotationMetadataFactory
+    private val expressionCompilationContextFactory : ExpressionCompilationContextFactory
 
     init {
         visitorAttributes = MutableConvertibleValuesMap()
@@ -58,6 +62,7 @@ internal open class KotlinVisitorContext(
         elementFactory = KotlinElementFactory(this)
         elementAnnotationMetadataFactory =
             KotlinElementAnnotationMetadataFactory(false, annotationMetadataBuilder)
+        expressionCompilationContextFactory = DefaultExpressionCompilationContextFactory(this)
     }
 
     override fun <T : Any?> get(
@@ -110,6 +115,7 @@ internal open class KotlinVisitorContext(
                 declaration.annotations.any { ann ->
                     stereotypes.contains(
                         KotlinAnnotationMetadataBuilder.getAnnotationTypeName(
+                            resolver,
                             ann,
                             this
                         )
@@ -150,8 +156,12 @@ internal open class KotlinVisitorContext(
         return outputVisitor.visitMetaInfFile(path, *originatingElements)
     }
 
-    override fun visitGeneratedFile(path: String?): Optional<GeneratedFile> {
+    override fun visitGeneratedFile(path: String): Optional<GeneratedFile> {
         return outputVisitor.visitGeneratedFile(path)
+    }
+
+    override fun visitGeneratedFile(path: String, vararg originatingElements: Element): Optional<GeneratedFile> {
+        return outputVisitor.visitGeneratedFile(path, *originatingElements)
     }
 
     override fun finish() {
@@ -173,6 +183,10 @@ internal open class KotlinVisitorContext(
     override fun getElementFactory(): KotlinElementFactory = elementFactory
     override fun getElementAnnotationMetadataFactory(): ElementAnnotationMetadataFactory {
         return elementAnnotationMetadataFactory
+    }
+
+    override fun getExpressionCompilationContextFactory(): ExpressionCompilationContextFactory {
+        return expressionCompilationContextFactory
     }
 
     override fun getAnnotationMetadataBuilder(): AbstractAnnotationMetadataBuilder<*, *> {
@@ -231,11 +245,15 @@ internal open class KotlinVisitorContext(
     }
 
     class KspGeneratedFile(
-        private val outputStream: OutputStream,
-        private val path: String
+        private val environment: SymbolProcessorEnvironment,
+        private val elements : MutableList<String>,
+        private val dependencies : Dependencies
     ) : GeneratedFile {
 
+        private val fileName = elements.removeAt(elements.size - 1)
+        private val path = elements.joinToString(".")
         private val file = File(path)
+
 
         override fun toURI(): URI {
             return file.toURI()
@@ -249,7 +267,11 @@ internal open class KotlinVisitorContext(
             return Files.newInputStream(file.toPath())
         }
 
-        override fun openOutputStream(): OutputStream = outputStream
+        override fun openOutputStream(): OutputStream = environment.codeGenerator.createNewFile(
+            dependencies,
+            elements.joinToString("."),
+            fileName.substringBeforeLast('.'),
+            fileName.substringAfterLast('.'))
 
         override fun openReader(): Reader {
             return file.reader()
@@ -260,7 +282,7 @@ internal open class KotlinVisitorContext(
         }
 
         override fun openWriter(): Writer {
-            return OutputStreamWriter(outputStream)
+            return OutputStreamWriter(openOutputStream())
         }
 
     }

@@ -25,12 +25,6 @@ micronautBuild {
 
 repositories {
     mavenCentral()
-    maven {
-        url "https://s01.oss.sonatype.org/content/repositories/snapshots/"
-        mavenContent {
-            snapshotsOnly()
-        }
-    }
 }
 
 dependencies {
@@ -38,5 +32,5 @@ dependencies {
     testImplementation project(':http-server-netty')
     testImplementation project(":jackson-databind")
 
-    testRuntimeOnly libs.managed.logback.classic
+    testRuntimeOnly libs.logback.classic
 }

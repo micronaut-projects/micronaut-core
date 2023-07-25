@@ -6,6 +6,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Error
 import io.micronaut.http.annotation.Get
@@ -221,7 +222,7 @@ class ContentNegotiationSpec extends Specification {
 
         @Post(value = "/process",
                 processes = [MediaType.APPLICATION_JSON, MediaType.APPLICATION_XML])
-        Person process(Person person) {
+        Person process(@Body Person person) {
             return person
         }
 

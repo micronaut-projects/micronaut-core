@@ -2,14 +2,14 @@ The Micronaut CLI is the recommended way to create new Micronaut projects. The C
 
 TIP: We have a website that can be used to generate projects instead of the CLI. Check out https://micronaut.io/launch/[Micronaut Launch] to get started!
 
-When <<buildCLI, Micronaut is installed on your computer>>, you can call the CLI with the `mn` command.
+When <<buildCLI, Micronaut framework is installed on your computer>>, you can call the CLI with the `mn` command.
 
 [source,bash]
 ----
 $ mn create-app my-app
 ----
 
-A Micronaut CLI project can be identified by the `micronaut-cli.yml` file, which is included at the project root if it was generated via the CLI. This file will include the project's profile, default package, and other variables. The project's default package is evaluated based on the project name.
+A Micronaut framework CLI project can be identified by the `micronaut-cli.yml` file, which is included at the project root if it was generated via the CLI. This file will include the project's profile, default package, and other variables. The project's default package is evaluated based on the project name.
 
 [source,bash]
 ----

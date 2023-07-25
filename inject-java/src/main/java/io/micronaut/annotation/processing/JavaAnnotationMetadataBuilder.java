@@ -299,6 +299,26 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
+    protected String getOriginatingClassName(Element orginatingElement) {
+        TypeElement typeElement = getOriginatingTypeElement(orginatingElement);
+        if (typeElement != null) {
+            return JavaModelUtils.getClassName(typeElement);
+        }
+        return null;
+    }
+
+    private TypeElement getOriginatingTypeElement(Element element) {
+        if (element == null) {
+            return null;
+        }
+        if (element instanceof TypeElement typeElement) {
+            return typeElement;
+        }
+
+        return getOriginatingTypeElement(element.getEnclosingElement());
+    }
+
+    @Override
     protected <K extends Annotation> Optional<io.micronaut.core.annotation.AnnotationValue<K>> getAnnotationValues(Element originatingElement, Element member, Class<K> annotationType) {
         List<? extends AnnotationMirror> annotationMirrors = member.getAnnotationMirrors();
         String annotationName = annotationType.getName();
@@ -328,8 +348,11 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         if (memberName != null && annotationValue instanceof javax.lang.model.element.AnnotationValue && !annotationValues.containsKey(memberName)) {
             final MetadataAnnotationValueVisitor resolver = new MetadataAnnotationValueVisitor(originatingElement, (ExecutableElement) member);
             ((javax.lang.model.element.AnnotationValue) annotationValue).accept(resolver, this);
-            final Object resolvedValue = resolver.resolvedValue;
+            Object resolvedValue = resolver.resolvedValue;
             if (resolvedValue != null) {
+                if (isEvaluatedExpression(resolvedValue)) {
+                    resolvedValue = buildEvaluatedExpressionReference(originatingElement, annotationName, memberName, resolvedValue);
+                }
                 validateAnnotationValue(originatingElement, annotationName, member, memberName, resolvedValue);
                 annotationValues.put(memberName, resolvedValue);
             }
@@ -364,13 +387,16 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
-    protected Object readAnnotationValue(Element originatingElement, Element member, String memberName, Object annotationValue) {
+    protected Object readAnnotationValue(Element originatingElement, Element member, String annotationName, String memberName, Object annotationValue) {
         if (memberName != null && annotationValue instanceof javax.lang.model.element.AnnotationValue) {
             final MetadataAnnotationValueVisitor visitor = new MetadataAnnotationValueVisitor(originatingElement, (ExecutableElement) member);
             ((javax.lang.model.element.AnnotationValue) annotationValue).accept(visitor, this);
             return visitor.resolvedValue;
         } else if (memberName != null && annotationValue != null && ClassUtils.isJavaLangType(annotationValue.getClass())) {
             // only allow basic types
+            if (isEvaluatedExpression(annotationValue)) {
+                annotationValue = buildEvaluatedExpressionReference(originatingElement, annotationName, memberName, annotationValue);
+            }
             return annotationValue;
         }
         return null;

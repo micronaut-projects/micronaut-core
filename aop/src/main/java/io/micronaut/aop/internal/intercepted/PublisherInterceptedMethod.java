@@ -38,7 +38,7 @@ import java.util.concurrent.ExecutorService;
  */
 @Internal
 @Experimental
-class PublisherInterceptedMethod implements InterceptedMethod {
+sealed class PublisherInterceptedMethod implements InterceptedMethod permits ReactorInterceptedMethod {
     private static final boolean AVAILABLE = ClassUtils.isPresent("io.micronaut.core.async.publisher.Publishers", PublisherInterceptedMethod.class.getClassLoader());
     private final MethodInvocationContext<?, ?> context;
     private final ConversionService conversionService;
@@ -109,7 +109,7 @@ class PublisherInterceptedMethod implements InterceptedMethod {
         return AVAILABLE && Publishers.isConvertibleToPublisher(reactiveType);
     }
 
-    private Object convertPublisherResult(ReturnType<?> returnType, Object result) {
+    protected Object convertPublisherResult(ReturnType<?> returnType, Object result) {
         if (returnType.getType().isInstance(result)) {
             return result;
         }
@@ -117,7 +117,7 @@ class PublisherInterceptedMethod implements InterceptedMethod {
                 .orElseThrow(() -> new IllegalStateException("Cannot convert publisher result: " + result + " to '" + returnType.getType().getName() + "'"));
     }
 
-    private Publisher<?> convertToPublisher(Object result) {
+    protected Publisher<?> convertToPublisher(Object result) {
         if (result == null) {
             return Publishers.empty();
         }

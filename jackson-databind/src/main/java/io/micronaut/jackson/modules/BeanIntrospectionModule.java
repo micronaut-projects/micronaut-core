@@ -79,11 +79,14 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.core.beans.UnsafeBeanProperty;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.jackson.JacksonConfiguration;
+import io.micronaut.jackson.JacksonDeserializationPreInstantiateCallback;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -122,9 +125,26 @@ public class BeanIntrospectionModule extends SimpleModule {
     boolean ignoreReflectiveProperties = false;
 
     /**
+     * The pre-instantiate callback.
+     */
+    @Nullable
+    private final JacksonDeserializationPreInstantiateCallback preInstantiateCallback;
+
+    /**
      * Default constructor.
      */
     public BeanIntrospectionModule() {
+        this(null);
+    }
+
+    /**
+     * The constructor.
+     *
+     * @param preInstantiateCallback The optional instance {@link JacksonDeserializationPreInstantiateCallback}
+     */
+    @Inject
+    public BeanIntrospectionModule(@Nullable JacksonDeserializationPreInstantiateCallback preInstantiateCallback) {
+        this.preInstantiateCallback = preInstantiateCallback;
         setDeserializerModifier(new BeanIntrospectionDeserializerModifier());
         setSerializerModifier(new BeanIntrospectionSerializerModifier());
     }
@@ -134,8 +154,7 @@ public class BeanIntrospectionModule extends SimpleModule {
         super.setupModule(context);
 
         ObjectCodec owner = context.getOwner();
-        if (owner instanceof ObjectMapper) {
-            ObjectMapper mapper = (ObjectMapper) owner;
+        if (owner instanceof ObjectMapper mapper) {
             mapper.setConfig(mapper.getSerializationConfig().with(new BeanIntrospectionAccessorNamingStrategyProvider(mapper.getSerializationConfig().getAccessorNaming())));
             mapper.setConfig(mapper.getDeserializationConfig().with(new BeanIntrospectionAccessorNamingStrategyProvider(mapper.getDeserializationConfig().getAccessorNaming())));
         }
@@ -156,24 +175,23 @@ public class BeanIntrospectionModule extends SimpleModule {
     }
 
     private PropertyMetadata newPropertyMetadata(Argument<?> argument, AnnotationMetadata annotationMetadata) {
-        final Boolean required = argument.isNonNull() ||
-                annotationMetadata.booleanValue(JsonProperty.class, "required").orElse(false);
+        final Boolean required = annotationMetadata.booleanValue(JsonProperty.class, "required").orElse(false);
 
         int index = annotationMetadata.intValue(JsonProperty.class, "index").orElse(-1);
         return PropertyMetadata.construct(
-                required,
-                annotationMetadata.stringValue(JsonPropertyDescription.class).orElse(null),
-                index > -1 ? index : null,
-                annotationMetadata.stringValue(JsonProperty.class, "defaultValue").orElse(null)
+            required,
+            annotationMetadata.stringValue(JsonPropertyDescription.class).orElse(null),
+            index > -1 ? index : null,
+            annotationMetadata.stringValue(JsonProperty.class, "defaultValue").orElse(null)
         );
     }
 
     private AnnotatedMember createVirtualMember(TypeResolutionContext typeResolutionContext, Class<?> beanClass, String name, JavaType javaType, AnnotationMetadata annotationMetadata) {
         return new VirtualAnnotatedMember(
-                typeResolutionContext,
-                beanClass,
-                name,
-                javaType
+            typeResolutionContext,
+            beanClass,
+            name,
+            javaType
         ) {
             @Override
             public boolean hasOneOf(Class<? extends Annotation>[] annoClasses) {
@@ -198,8 +216,8 @@ public class BeanIntrospectionModule extends SimpleModule {
         }
         JsonInclude.Include incl = inclusion.getValueInclusion();
         if ((incl == JsonInclude.Include.ALWAYS)
-                || (incl == JsonInclude.Include.NON_NULL)
-                || (incl == JsonInclude.Include.USE_DEFAULTS)) {
+            || (incl == JsonInclude.Include.NON_NULL)
+            || (incl == JsonInclude.Include.USE_DEFAULTS)) {
             return null;
         }
         return BeanPropertyWriter.MARKER_FOR_EMPTY;
@@ -230,15 +248,15 @@ public class BeanIntrospectionModule extends SimpleModule {
     @NonNull
     private JsonFormat.Value parseJsonFormat(@NonNull AnnotationValue<JsonFormat> formatAnnotation) {
         return new JsonFormat.Value(
-                formatAnnotation.stringValue("pattern").orElse(""),
-                formatAnnotation.enumValue("shape", JsonFormat.Shape.class).orElse(JsonFormat.Shape.ANY),
-                formatAnnotation.stringValue("locale").orElse(JsonFormat.DEFAULT_LOCALE),
-                formatAnnotation.stringValue("timezone").orElse(JsonFormat.DEFAULT_TIMEZONE),
-                JsonFormat.Features.construct(
-                        formatAnnotation.enumValues("with", JsonFormat.Feature.class),
-                        formatAnnotation.enumValues("without", JsonFormat.Feature.class)
-                ),
-                formatAnnotation.enumValue("lenient", OptBoolean.class).orElse(OptBoolean.DEFAULT).asBoolean()
+            formatAnnotation.stringValue("pattern").orElse(""),
+            formatAnnotation.enumValue("shape", JsonFormat.Shape.class).orElse(JsonFormat.Shape.ANY),
+            formatAnnotation.stringValue("locale").orElse(JsonFormat.DEFAULT_LOCALE),
+            formatAnnotation.stringValue("timezone").orElse(JsonFormat.DEFAULT_TIMEZONE),
+            JsonFormat.Features.construct(
+                formatAnnotation.enumValues("with", JsonFormat.Feature.class),
+                formatAnnotation.enumValues("without", JsonFormat.Feature.class)
+            ),
+            formatAnnotation.enumValue("lenient", OptBoolean.class).orElse(OptBoolean.DEFAULT).asBoolean()
         );
     }
 
@@ -281,8 +299,7 @@ public class BeanIntrospectionModule extends SimpleModule {
         @Override
         public BeanSerializerBuilder updateBuilder(SerializationConfig config, BeanDescription beanDesc, BeanSerializerBuilder builder) {
             final Class<?> beanClass = beanDesc.getBeanClass();
-            final BeanIntrospection<Object> introspection =
-                    findIntrospection(beanClass);
+            final BeanIntrospection<Object> introspection = findIntrospection(beanClass);
 
             if (introspection == null) {
                 return super.updateBuilder(config, beanDesc, builder);
@@ -313,26 +330,27 @@ public class BeanIntrospectionModule extends SimpleModule {
                     }
                     TypeResolutionContext typeResolutionContext = new TypeResolutionContext.Empty(config.getTypeFactory());
                     final List<BeanPropertyWriter> newProperties = new ArrayList<>(beanProperties.size());
-                    for (BeanProperty<Object, Object> beanProperty : beanProperties) {
-                        if (beanProperty.hasAnnotation(JsonIgnore.class)) {
+                    for (BeanProperty<Object, Object> bp : beanProperties) {
+                        if (bp.hasAnnotation(JsonIgnore.class)) {
                             continue;
                         }
+                        UnsafeBeanProperty<Object, Object> beanProperty = (UnsafeBeanProperty<Object, Object>) bp;
                         final String propertyName = getName(config, namingStrategy, beanProperty);
                         BeanPropertyWriter writer = new BeanIntrospectionPropertyWriter(
-                                createVirtualMember(
-                                        typeResolutionContext,
-                                        beanProperty.getDeclaringType(),
-                                        propertyName,
-                                        newType(beanProperty.asArgument(), config.getTypeFactory()),
-                                        beanProperty
-                                ),
-                                config,
+                            createVirtualMember(
+                                typeResolutionContext,
+                                beanProperty.getDeclaringType(),
                                 propertyName,
-                                beanProperty,
-                                config.getTypeFactory(),
-                                findSerializerFromAnnotation(beanProperty, JsonSerialize.class)
-                                // would be nice to add the TypeSerializer here too, but we don't have access to the
-                                // SerializerFactory for findPropertyTypeSerializer
+                                newType(beanProperty.asArgument(), config.getTypeFactory()),
+                                beanProperty
+                            ),
+                            config,
+                            propertyName,
+                            beanProperty,
+                            config.getTypeFactory(),
+                            findSerializerFromAnnotation(beanProperty, JsonSerialize.class)
+                            // would be nice to add the TypeSerializer here too, but we don't have access to the
+                            // SerializerFactory for findPropertyTypeSerializer
                         );
 
                         newProperties.add(writer);
@@ -358,17 +376,17 @@ public class BeanIntrospectionModule extends SimpleModule {
                         // ignore properties that are @JsonIgnore, so that we don't replace other properties of the
                         // same name
                         if (property.isPresent() &&
-                                !property.get().isAnnotationPresent(JsonIgnore.class) &&
-                                // we can't support XmlBeanPropertyWriter easily https://github.com/micronaut-projects/micronaut-core/issues/5907
-                                !existing.getClass().getName().equals("com.fasterxml.jackson.dataformat.xml.ser.XmlBeanPropertyWriter")) { // NOSONAR
-                            final BeanProperty<Object, Object> beanProperty = property.get();
+                            !property.get().isAnnotationPresent(JsonIgnore.class) &&
+                            // we can't support XmlBeanPropertyWriter easily https://github.com/micronaut-projects/micronaut-core/issues/5907
+                            !existing.getClass().getName().equals("com.fasterxml.jackson.dataformat.xml.ser.XmlBeanPropertyWriter")) { // NOSONAR
+                            final UnsafeBeanProperty<Object, Object> beanProperty = (UnsafeBeanProperty<Object, Object>) property.get();
                             newProperties.set(i, new BeanIntrospectionPropertyWriter(
-                                        existing,
-                                        beanProperty,
-                                        existing.getSerializer(),
-                                        config.getTypeFactory(),
-                                        existing.getViews()
-                                    )
+                                    existing,
+                                    beanProperty,
+                                    existing.getSerializer(),
+                                    config.getTypeFactory(),
+                                    existing.getViews()
+                                )
                             );
                         } else {
                             newProperties.set(i, existing);
@@ -389,9 +407,9 @@ public class BeanIntrospectionModule extends SimpleModule {
 
         @Override
         public BeanDeserializerBuilder updateBuilder(
-                DeserializationConfig config,
-                BeanDescription beanDesc,
-                BeanDeserializerBuilder builder) {
+            DeserializationConfig config,
+            BeanDescription beanDesc,
+            BeanDeserializerBuilder builder) {
 
             if (builder.getValueInstantiator().getDelegateType(config) != null) {
                 return builder;
@@ -410,12 +428,12 @@ public class BeanIntrospectionModule extends SimpleModule {
                     for (BeanProperty<Object, Object> beanProperty : introspection.getBeanProperties()) {
                         if (!beanProperty.isReadOnly()) {
                             builder.addOrReplaceProperty(new VirtualSetter(
-                                            beanDesc.getClassInfo(),
-                                            config.getTypeFactory(),
-                                            beanProperty,
-                                            getName(config, propertyNamingStrategy, beanProperty),
-                                            findSerializerFromAnnotation(beanProperty, JsonDeserialize.class)),
-                                    true);
+                                    beanDesc.getClassInfo(),
+                                    config.getTypeFactory(),
+                                    (UnsafeBeanProperty<Object, Object>) beanProperty,
+                                    getName(config, propertyNamingStrategy, beanProperty),
+                                    findSerializerFromAnnotation(beanProperty, JsonDeserialize.class)),
+                                true);
                         }
                     }
                 } else {
@@ -431,15 +449,14 @@ public class BeanIntrospectionModule extends SimpleModule {
                     }
                     while (properties.hasNext()) {
                         final SettableBeanProperty settableBeanProperty = properties.next();
-                        if (settableBeanProperty instanceof MethodProperty) {
-                            MethodProperty methodProperty = (MethodProperty) settableBeanProperty;
-                            final BeanProperty<Object, Object> beanProperty =
-                                    remainingProperties.remove(settableBeanProperty.getName());
+                        if (settableBeanProperty instanceof MethodProperty methodProperty) {
+                            final UnsafeBeanProperty<Object, Object> beanProperty =
+                                (UnsafeBeanProperty<Object, Object>) remainingProperties.remove(settableBeanProperty.getName());
 
                             if (beanProperty != null && !beanProperty.isReadOnly()) {
                                 SettableBeanProperty newProperty = new BeanIntrospectionSetter(
-                                        methodProperty,
-                                        beanProperty
+                                    methodProperty,
+                                    beanProperty
                                 );
                                 builder.addOrReplaceProperty(newProperty, true);
                             }
@@ -452,12 +469,12 @@ public class BeanIntrospectionModule extends SimpleModule {
                             SettableBeanProperty existing = builder.findProperty(PropertyName.construct(entry.getKey()));
                             if (existing == null) {
                                 builder.addOrReplaceProperty(new VirtualSetter(
-                                                beanDesc.getClassInfo(),
-                                                config.getTypeFactory(),
-                                                entry.getValue(),
-                                                entry.getKey(),
-                                                findSerializerFromAnnotation(entry.getValue(), JsonDeserialize.class)),
-                                        true);
+                                        beanDesc.getClassInfo(),
+                                        config.getTypeFactory(),
+                                        (UnsafeBeanProperty<Object, Object>) entry.getValue(),
+                                        entry.getKey(),
+                                        findSerializerFromAnnotation(entry.getValue(), JsonDeserialize.class)),
+                                    true);
                             }
                         }
                     }
@@ -496,18 +513,18 @@ public class BeanIntrospectionModule extends SimpleModule {
                                 }
 
                                 props[i] = new CreatorProperty(
-                                        propertyName,
-                                        javaType,
-                                        null,
-                                        typeDeserializer,
-                                        null,
-                                        null,
-                                        i,
-                                        null,
-                                        propertyMetadata
+                                    propertyName,
+                                    javaType,
+                                    null,
+                                    typeDeserializer,
+                                    null,
+                                    null,
+                                    i,
+                                    null,
+                                    propertyMetadata
 
                                 ) {
-                                    private final BeanProperty<Object, Object> property = introspection.getProperty(argument.getName()).orElse(null);
+                                    private final UnsafeBeanProperty<Object, Object> property = (UnsafeBeanProperty<Object, Object>) introspection.getProperty(argument.getName()).orElse(null);
 
                                     @Override
                                     public <A extends Annotation> A getAnnotation(Class<A> acls) {
@@ -522,14 +539,14 @@ public class BeanIntrospectionModule extends SimpleModule {
                                     @Override
                                     public void deserializeAndSet(JsonParser p, DeserializationContext ctxt, Object instance) throws IOException {
                                         if (property != null) {
-                                            property.set(instance, deserialize(p, ctxt));
+                                            property.setUnsafe(instance, deserialize(p, ctxt));
                                         }
                                     }
 
                                     @Override
                                     public Object deserializeSetAndReturn(JsonParser p, DeserializationContext ctxt, Object instance) throws IOException {
                                         if (property != null) {
-                                            property.set(instance, deserialize(p, ctxt));
+                                            property.setUnsafe(instance, deserialize(p, ctxt));
                                         }
                                         return null;
                                     }
@@ -537,14 +554,14 @@ public class BeanIntrospectionModule extends SimpleModule {
                                     @Override
                                     public void set(Object instance, Object value) {
                                         if (property != null) {
-                                            property.set(instance, value);
+                                            property.setUnsafe(instance, value);
                                         }
                                     }
 
                                     @Override
-                                    public Object setAndReturn(Object instance, Object value) throws IOException {
+                                    public Object setAndReturn(Object instance, Object value) {
                                         if (property != null) {
-                                            property.set(instance, value);
+                                            property.setUnsafe(instance, value);
                                         }
                                         return null;
                                     }
@@ -613,8 +630,8 @@ public class BeanIntrospectionModule extends SimpleModule {
                     @Override
                     public boolean canCreateFromInt() {
                         return constructorArguments.length == 1 && (
-                                constructorArguments[0].equalsType(Argument.INT) ||
-                                        constructorArguments[0].equalsType(Argument.LONG));
+                            constructorArguments[0].equalsType(Argument.INT) ||
+                                constructorArguments[0].equalsType(Argument.LONG));
                     }
 
                     @Override
@@ -633,32 +650,46 @@ public class BeanIntrospectionModule extends SimpleModule {
                     }
 
                     @Override
-                    public Object createUsingDefault(DeserializationContext ctxt) throws IOException {
+                    public Object createUsingDefault(DeserializationContext ctxt) {
                         return introspection.instantiate();
                     }
 
                     @Override
-                    public Object createUsingDelegate(DeserializationContext ctxt, Object delegate) throws IOException {
+                    public Object createUsingDelegate(DeserializationContext ctxt, Object delegate) {
+                        if (preInstantiateCallback != null) {
+                            preInstantiateCallback.preInstantiate(introspection, delegate);
+                        }
                         return introspection.instantiate(false, new Object[] { delegate });
                     }
 
                     @Override
-                    public Object createFromObjectWith(DeserializationContext ctxt, Object[] args) throws IOException {
+                    public Object createFromObjectWith(DeserializationContext ctxt, Object[] args) {
+                        if (preInstantiateCallback != null) {
+                            preInstantiateCallback.preInstantiate(introspection, args);
+                        }
                         return introspection.instantiate(false, args);
                     }
 
                     @Override
-                    public Object createUsingArrayDelegate(DeserializationContext ctxt, Object delegate) throws IOException {
-                        return introspection.instantiate(false, new Object[] { delegate });
-                    }
+                    public Object createUsingArrayDelegate(DeserializationContext ctxt, Object delegate) {
+                        if (preInstantiateCallback != null) {
+                            preInstantiateCallback.preInstantiate(introspection, delegate);
+                        }
+                        return introspection.instantiate(false, new Object[] { delegate });                    }
 
                     @Override
-                    public Object createFromString(DeserializationContext ctxt, String value) throws IOException {
+                    public Object createFromString(DeserializationContext ctxt, String value) {
+                        if (preInstantiateCallback != null) {
+                            preInstantiateCallback.preInstantiate(introspection, value);
+                        }
                         return introspection.instantiate(false, new Object[]{ value });
                     }
 
                     @Override
-                    public Object createFromInt(DeserializationContext ctxt, int value) throws IOException {
+                    public Object createFromInt(DeserializationContext ctxt, int value) {
+                        if (preInstantiateCallback != null) {
+                            preInstantiateCallback.preInstantiate(introspection, value);
+                        }
                         InstantiationException originalException;
                         try {
                             return introspection.instantiate(false, new Object[]{value});
@@ -673,17 +704,26 @@ public class BeanIntrospectionModule extends SimpleModule {
                     }
 
                     @Override
-                    public Object createFromLong(DeserializationContext ctxt, long value) throws IOException {
+                    public Object createFromLong(DeserializationContext ctxt, long value) {
+                        if (preInstantiateCallback != null) {
+                            preInstantiateCallback.preInstantiate(introspection, value);
+                        }
                         return introspection.instantiate(false, new Object[]{ value });
                     }
 
                     @Override
-                    public Object createFromDouble(DeserializationContext ctxt, double value) throws IOException {
+                    public Object createFromDouble(DeserializationContext ctxt, double value) {
+                        if (preInstantiateCallback != null) {
+                            preInstantiateCallback.preInstantiate(introspection, value);
+                        }
                         return introspection.instantiate(false, new Object[]{ value });
                     }
 
                     @Override
-                    public Object createFromBoolean(DeserializationContext ctxt, boolean value) throws IOException {
+                    public Object createFromBoolean(DeserializationContext ctxt, boolean value) {
+                        if (preInstantiateCallback != null) {
+                            preInstantiateCallback.preInstantiate(introspection, value);
+                        }
                         return introspection.instantiate(false, new Object[]{ value });
                     }
 
@@ -698,14 +738,18 @@ public class BeanIntrospectionModule extends SimpleModule {
      */
     private class VirtualSetter extends SettableBeanProperty {
 
-        final BeanProperty beanProperty;
+        final UnsafeBeanProperty<Object, Object> beanProperty;
         final TypeResolutionContext typeResolutionContext;
 
-        VirtualSetter(TypeResolutionContext typeResolutionContext, TypeFactory typeFactory, BeanProperty<?, ?> beanProperty, String propertyName, JsonDeserializer<Object> valueDeser) {
+        VirtualSetter(TypeResolutionContext typeResolutionContext,
+                      TypeFactory typeFactory,
+                      UnsafeBeanProperty<Object, Object> beanProperty,
+                      String propertyName,
+                      JsonDeserializer<Object> valueDeser) {
             super(
-                    new PropertyName(propertyName),
-                    newType(beanProperty.asArgument(), typeFactory),
-                    newPropertyMetadata(beanProperty.asArgument(), beanProperty.getAnnotationMetadata()), valueDeser);
+                new PropertyName(propertyName),
+                newType(beanProperty.asArgument(), typeFactory),
+                newPropertyMetadata(beanProperty.asArgument(), beanProperty.getAnnotationMetadata()), valueDeser);
             this.beanProperty = beanProperty;
             this.typeResolutionContext = typeResolutionContext;
         }
@@ -746,11 +790,11 @@ public class BeanIntrospectionModule extends SimpleModule {
         @Override
         public AnnotatedMember getMember() {
             return createVirtualMember(
-                    typeResolutionContext,
-                    beanProperty.getDeclaringType(),
-                    _propName.getSimpleName(),
-                    _type,
-                    beanProperty
+                typeResolutionContext,
+                beanProperty.getDeclaringType(),
+                _propName.getSimpleName(),
+                _type,
+                beanProperty
             );
         }
 
@@ -761,23 +805,23 @@ public class BeanIntrospectionModule extends SimpleModule {
 
         @Override
         public void deserializeAndSet(JsonParser p, DeserializationContext ctxt, Object instance) throws IOException {
-            beanProperty.set(instance, deserialize(p, ctxt));
+            beanProperty.setUnsafe(instance, deserialize(p, ctxt));
         }
 
         @Override
         public Object deserializeSetAndReturn(JsonParser p, DeserializationContext ctxt, Object instance) throws IOException {
-            beanProperty.set(instance, deserialize(p, ctxt));
+            beanProperty.setUnsafe(instance, deserialize(p, ctxt));
             return null;
         }
 
         @Override
-        public void set(Object instance, Object value) throws IOException {
-            beanProperty.set(instance, value);
+        public void set(Object instance, Object value) {
+            beanProperty.setUnsafe(instance, value);
         }
 
         @Override
-        public Object setAndReturn(Object instance, Object value) throws IOException {
-            beanProperty.set(instance, value);
+        public Object setAndReturn(Object instance, Object value) {
+            beanProperty.setUnsafe(instance, value);
             return null;
         }
 
@@ -802,60 +846,60 @@ public class BeanIntrospectionModule extends SimpleModule {
      */
     private class BeanIntrospectionPropertyWriter extends BeanPropertyWriter {
         protected final Class<?>[] _views;
-        final BeanProperty<Object, Object> beanProperty;
+        final UnsafeBeanProperty<Object, Object> beanProperty;
         final SerializableString fastName;
         private final JavaType type;
         private final boolean unwrapping;
 
         BeanIntrospectionPropertyWriter(BeanPropertyWriter src,
-                                        BeanProperty<Object, Object> introspection,
+                                        UnsafeBeanProperty<Object, Object> beanProperty,
                                         JsonSerializer<Object> ser,
                                         TypeFactory typeFactory,
                                         Class<?>[] views) {
-            this(src.getSerializedName(), src, introspection, ser, typeFactory, views);
+            this(src.getSerializedName(), src, beanProperty, ser, typeFactory, views);
         }
 
         BeanIntrospectionPropertyWriter(SerializableString name,
                                         BeanPropertyWriter src,
-                                        BeanProperty<Object, Object> introspection,
+                                        UnsafeBeanProperty<Object, Object> beanProperty,
                                         JsonSerializer<Object> ser,
                                         TypeFactory typeFactory,
                                         Class<?>[] views) {
             super(src);
             // either use the passed on serializer or the original one
             _serializer = (ser != null) ? ser : src.getSerializer();
-            beanProperty = introspection;
+            this.beanProperty = beanProperty;
             fastName = name;
             _views = views;
-            this.type = JacksonConfiguration.constructType(beanProperty.asArgument(), typeFactory);
+            this.type = JacksonConfiguration.constructType(this.beanProperty.asArgument(), typeFactory);
             _dynamicSerializers = (ser == null) ? PropertySerializerMap
-                    .emptyForProperties() : null;
-            this.unwrapping = introspection.hasAnnotation(JsonUnwrapped.class);
+                .emptyForProperties() : null;
+            this.unwrapping = beanProperty.hasAnnotation(JsonUnwrapped.class);
         }
 
         BeanIntrospectionPropertyWriter(
-                AnnotatedMember virtualMember,
-                SerializationConfig config,
-                String name,
-                BeanProperty<Object, Object> introspection,
-                TypeFactory typeFactory,
-                JsonSerializer<?> ser) {
+            AnnotatedMember virtualMember,
+            SerializationConfig config,
+            String name,
+            UnsafeBeanProperty<Object, Object> beanProperty,
+            TypeFactory typeFactory,
+            JsonSerializer<?> ser) {
             super(
-                    SimpleBeanPropertyDefinition.construct(config, virtualMember),
-                    virtualMember,
-                    AnnotationCollector.emptyAnnotations(),
-                    null, ser, null, null,
-                    suppressNulls(config.getDefaultPropertyInclusion()),
-                    suppressableValue(config.getDefaultPropertyInclusion()),
-                    null
+                SimpleBeanPropertyDefinition.construct(config, virtualMember),
+                virtualMember,
+                AnnotationCollector.emptyAnnotations(),
+                null, ser, null, null,
+                suppressNulls(config.getDefaultPropertyInclusion()),
+                suppressableValue(config.getDefaultPropertyInclusion()),
+                null
             );
-            beanProperty = introspection;
+            this.beanProperty = beanProperty;
             fastName = new SerializedString(name);
             _views = null;
-            this.type = JacksonConfiguration.constructType(beanProperty.asArgument(), typeFactory);
+            this.type = JacksonConfiguration.constructType(this.beanProperty.asArgument(), typeFactory);
             _dynamicSerializers = PropertySerializerMap
-                    .emptyForProperties();
-            this.unwrapping = introspection.hasAnnotation(JsonUnwrapped.class);
+                .emptyForProperties();
+            this.unwrapping = beanProperty.hasAnnotation(JsonUnwrapped.class);
         }
 
         @Override
@@ -1023,9 +1067,9 @@ public class BeanIntrospectionModule extends SimpleModule {
      */
     private static class BeanIntrospectionSetter extends SettableBeanProperty.Delegating {
 
-        final BeanProperty beanProperty;
+        final UnsafeBeanProperty<Object, Object> beanProperty;
 
-        BeanIntrospectionSetter(SettableBeanProperty methodProperty, BeanProperty beanProperty) {
+        BeanIntrospectionSetter(SettableBeanProperty methodProperty, UnsafeBeanProperty<Object, Object> beanProperty) {
             super(methodProperty);
             this.beanProperty = beanProperty;
         }
@@ -1037,23 +1081,23 @@ public class BeanIntrospectionModule extends SimpleModule {
 
         @Override
         public void deserializeAndSet(JsonParser p, DeserializationContext ctxt, Object instance) throws IOException {
-            beanProperty.set(instance, deserialize(p, ctxt));
+            beanProperty.setUnsafe(instance, deserialize(p, ctxt));
         }
 
         @Override
         public Object deserializeSetAndReturn(JsonParser p, DeserializationContext ctxt, Object instance) throws IOException {
-            beanProperty.set(instance, deserialize(p, ctxt));
+            beanProperty.setUnsafe(instance, deserialize(p, ctxt));
             return null;
         }
 
         @Override
         public void set(Object instance, Object value) {
-            beanProperty.set(instance, value);
+            beanProperty.setUnsafe(instance, value);
         }
 
         @Override
         public Object setAndReturn(Object instance, Object value) {
-            beanProperty.set(instance, value);
+            beanProperty.setUnsafe(instance, value);
             return null;
         }
     }

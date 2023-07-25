@@ -1,4 +1,4 @@
-Micronaut supports sending files to the client in a couple of easy ways.
+The Micronaut framework supports sending files to the client in a couple of easy ways.
 
 == Sending File Objects
 
@@ -19,7 +19,7 @@ public SystemFile download() {
 
 == Sending an InputStream
 
-For cases where a reference to a `File` object is not possible (for example resources in JAR files), Micronaut supports transferring input streams. To return a stream of data from the controller method, construct a api:http.server.types.files.StreamedFile[].
+For cases where a reference to a `File` object is not possible (for example resources in JAR files), the Micronaut framework supports transferring input streams. To return a stream of data from the controller method, construct a api:http.server.types.files.StreamedFile[].
 
 TIP: The constructor for `StreamedFile` also accepts a `java.net.URL` for your convenience.
 
@@ -34,7 +34,7 @@ public StreamedFile download() {
 }
 ----
 
-The server supports returning `304` (Not Modified) responses if the files being transferred have not changed, and the request contains the appropriate header. In addition, if the client accepts encoded responses, Micronaut encodes the file if appropriate. Encoding happens if the file is text-based and larger than 1KB by default. The threshold at which data is encoded is configurable. See the server configuration reference for details.
+The server supports returning `304` (Not Modified) responses if the files being transferred have not changed, and the request contains the appropriate header. In addition, if the client accepts encoded responses, the Micronaut framework encodes the file if appropriate. Encoding happens if the file is text-based and larger than 1KB by default. The threshold at which data is encoded is configurable. See the server configuration reference for details.
 
 TIP: To use a custom data source to send data through an input stream, construct a link:{javase}java/io/PipedInputStream.html[PipedInputStream] and link:{javase}java/io/PipedOutputStream.html[PipedOutputStream] to write data from the output stream to the input. Make sure to do the work on a separate thread so the file can be returned immediately.
 
@@ -42,6 +42,6 @@ TIP: To use a custom data source to send data through an input stream, construct
 
 By default, file responses include caching headers. The following options determine how the `Cache-Control` header is built.
 
-include::{includedir}configurationProperties/io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration.adoc[]
+include::{includedir}configurationProperties/io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration$FileTypeHandlerConfiguration.adoc[]
 
-include::{includedir}configurationProperties/io.micronaut.http.server.netty.types.files.FileTypeHandlerConfiguration$CacheControlConfiguration.adoc[]
+include::{includedir}configurationProperties/io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration$FileTypeHandlerConfiguration$CacheControlConfiguration.adoc[]

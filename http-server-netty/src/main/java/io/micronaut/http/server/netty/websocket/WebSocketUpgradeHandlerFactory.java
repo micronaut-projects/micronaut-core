@@ -17,11 +17,11 @@ package io.micronaut.http.server.netty.websocket;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.server.netty.NettyEmbeddedServer;
 import io.micronaut.http.server.netty.NettyEmbeddedServices;
-import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
-import io.netty.channel.SimpleChannelInboundHandler;
 import jakarta.inject.Singleton;
 
 /**
@@ -34,13 +34,22 @@ import jakarta.inject.Singleton;
 @Singleton
 @Internal
 public final class WebSocketUpgradeHandlerFactory {
+    private final ConversionService conversionService;
+    private final NettyHttpServerConfiguration serverConfiguration;
+
+    public WebSocketUpgradeHandlerFactory(ConversionService conversionService, NettyHttpServerConfiguration serverConfiguration) {
+        this.conversionService = conversionService;
+        this.serverConfiguration = serverConfiguration;
+    }
+
     /**
      * Creates the websocket upgrade inbound handler.
-     * @param embeddedServer The server
+     *
+     * @param embeddedServer        The server
      * @param nettyEmbeddedServices The services
      * @return The handler
      */
-    public SimpleChannelInboundHandler<NettyHttpRequest<?>> create(NettyEmbeddedServer embeddedServer, NettyEmbeddedServices nettyEmbeddedServices) {
-        return new NettyServerWebSocketUpgradeHandler(nettyEmbeddedServices, embeddedServer);
+    public NettyServerWebSocketUpgradeHandler create(NettyEmbeddedServer embeddedServer, NettyEmbeddedServices nettyEmbeddedServices) {
+        return new NettyServerWebSocketUpgradeHandler(nettyEmbeddedServices, embeddedServer, conversionService, serverConfiguration);
     }
 }

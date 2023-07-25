@@ -15,7 +15,7 @@
  */
 package org.atinject.jakartatck.auto
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 @Singleton
 class FuelTank {

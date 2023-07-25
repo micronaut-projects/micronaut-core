@@ -16,7 +16,7 @@ micronaut:
       childOptions:
         autoRead: true
 ----
-- By default Micronaut binds to all network interfaces. Use `localhost` to bind only to loopback network interface
+- By default, Micronaut framework binds to all network interfaces. Use `localhost` to bind only to loopback network interface
 - `maxHeaderSize` sets the maximum size for headers
 - `worker.threads` specifies the number of Netty worker threads
 - `autoRead` enables request body auto read
@@ -57,4 +57,12 @@ micronaut:
         prefer-native-transport: true
 ----
 
-NOTE: Netty enables simplistic sampling resource leak detection which reports there is a leak or not, at the cost of small overhead. You can disable it or enable more advanced detection by setting property `netty.resource-leak-detector-level` to one of: `SIMPLE` (default), `DISABLED`, `PARANOID` or `ADVANCED`.
+On Linux, Netty also offers an io_uring-based transport in incubator status. On x86_64:
+
+dependency:netty-incubator-transport-native-io_uring[groupId="io.netty.incubator",scope="runtimeOnly",classifier="linux-x86_64"]
+
+On ARM64:
+
+dependency:netty-incubator-transport-native-io_uring[groupId="io.netty.incubator",scope="runtimeOnly",classifier="linux-aarch_64"]
+
+NOTE: Netty enables simplistic sampling resource leak detection which reports there is a leak or not, at the cost of small overhead. You can enable it by setting property `netty.resource-leak-detector-level` to one of: `DISABLED` (default), `SIMPLE`, `PARANOID` or `ADVANCED`.

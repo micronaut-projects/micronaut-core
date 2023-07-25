@@ -83,7 +83,7 @@ The "worst" status is returned as the overall status. A non-operational status i
 
 == Provided Indicators
 
-All Micronaut provided health indicators are exposed on /health and /health/readiness endpoints.
+All the Micronaut framework provided health indicators are exposed on /health and /health/readiness endpoints.
 
 === Disk Space
 

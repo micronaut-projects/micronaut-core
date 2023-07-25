@@ -19,10 +19,9 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.Intercepted
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
-import io.micronaut.inject.BeanDefinition
-import spock.lang.Specification
+import jakarta.validation.Valid
+import jakarta.validation.constraints.Min
 import spock.lang.Unroll
-
 /**
  * @author Graeme Rocher
  * @since 1.0
@@ -74,5 +73,26 @@ interface Test extends ParentInterface<List<String>> {
 
         expect:
         !definition.getTypeArguments(ParentInterface).isEmpty()
+    }
+
+    void "test type argument annotation propagation"() {
+        def definition = buildBeanDefinition("test.Test\$Intercepted", """
+package test;
+
+import java.util.List;
+import io.micronaut.aop.introduction.DataCrudRepo;
+import io.micronaut.aop.introduction.Stub;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+
+@Stub
+interface Test extends DataCrudRepo<@Valid  String, @Min(5) Integer> {
+}
+""")
+
+        expect:
+        definition.getRequiredMethod("save", String).getArguments()[0].getAnnotationMetadata().hasAnnotation(Valid)
+        definition.getRequiredMethod("findById", Integer).getArguments()[0].getAnnotationMetadata().hasAnnotation(Min)
+        definition.getRequiredMethod("findById", Integer).getReturnType().getAnnotationMetadata().hasAnnotation(Valid)
     }
 }

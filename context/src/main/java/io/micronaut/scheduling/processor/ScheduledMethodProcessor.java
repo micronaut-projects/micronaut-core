@@ -17,14 +17,19 @@ package io.micronaut.scheduling.processor;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.Qualifier;
+import io.micronaut.context.bind.DefaultExecutableBeanContextBinder;
+import io.micronaut.context.bind.ExecutableBeanContextBinder;
+import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.bind.BoundExecutable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.annotation.EvaluatedAnnotationValue;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.scheduling.ScheduledExecutorTaskScheduler;
 import io.micronaut.scheduling.TaskExceptionHandler;
@@ -39,7 +44,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
 import java.time.Duration;
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
@@ -64,6 +68,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     private static final String MEMBER_ZONE_ID = "zoneId";
     private static final String MEMBER_FIXED_DELAY = "fixedDelay";
     private static final String MEMBER_SCHEDULER = "scheduler";
+    private static final String MEMBER_CONDITION = "condition";
 
     private final BeanContext beanContext;
     private final ConversionService conversionService;
@@ -112,33 +117,30 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
             }
 
             TaskScheduler taskScheduler = optionalTaskScheduler.orElseThrow(() -> new SchedulerConfigurationException(method, "No scheduler of type TaskScheduler configured for name: " + scheduler));
-
             Runnable task = () -> {
-                io.micronaut.context.Qualifier<Object> qualifer = beanDefinition
-                    .getAnnotationTypeByStereotype(AnnotationUtil.QUALIFIER)
-                    .map(type -> Qualifiers.byAnnotation(beanDefinition, type))
-                    .orElse(null);
-
-                Class<Object> beanType = (Class<Object>) beanDefinition.getBeanType();
-                Object bean = null;
                 try {
-                    bean = beanContext.getBean(beanType, qualifer);
-                    if (method.getArguments().length == 0) {
-                        ((ExecutableMethod) method).invoke(bean);
+                    ExecutableBeanContextBinder binder = new DefaultExecutableBeanContextBinder();
+                    BoundExecutable<?, ?> boundExecutable = binder.bind(method, beanContext);
+                    Object bean = beanContext.getBean((Argument<Object>) beanDefinition.asArgument(), (Qualifier<Object>) beanDefinition.getDeclaredQualifier());
+                    AnnotationValue<Scheduled> finalAnnotationValue = scheduledAnnotation;
+                    if (finalAnnotationValue instanceof EvaluatedAnnotationValue<Scheduled> evaluated) {
+                        finalAnnotationValue = evaluated.withArguments(bean, boundExecutable.getBoundArguments());
                     }
-                } catch (Throwable e) {
-                    io.micronaut.context.Qualifier<TaskExceptionHandler> qualifier = Qualifiers.byTypeArguments(beanType, e.getClass());
-                    Collection<BeanDefinition<TaskExceptionHandler>> definitions = beanContext.getBeanDefinitions(TaskExceptionHandler.class, qualifier);
-                    Optional<BeanDefinition<TaskExceptionHandler>> mostSpecific = definitions.stream().filter(def -> {
-                        List<Argument<?>> typeArguments = def.getTypeArguments(TaskExceptionHandler.class);
-                        if (typeArguments.size() == 2) {
-                            return typeArguments.get(0).getType() == beanType && typeArguments.get(1).getType() == e.getClass();
+                    boolean shouldRun = finalAnnotationValue.booleanValue(MEMBER_CONDITION).orElse(true);
+                    if (shouldRun) {
+                        try {
+                            ((BoundExecutable<Object, Object>) boundExecutable).invoke(bean);
+                        } catch (Throwable e) {
+                            handleException((Class<Object>) beanDefinition.getBeanType(), bean, e);
                         }
-                        return false;
-                    }).findFirst();
-
-                    TaskExceptionHandler finalHandler = mostSpecific.map(bd -> beanContext.getBean(bd.getBeanType(), qualifier)).orElse(this.taskExceptionHandler);
-                    finalHandler.handle(bean, e);
+                    }
+                } catch (NoSuchBeanException noSuchBeanException) {
+                   // ignore: a timing issue can occur when the context is being shutdown. If a scheduled job runs and the context
+                   // is shutdown and available beans cleared then the bean is no longer available. The best thing to do here is just ignore the failure.
+                   LOG.debug("Scheduled job skipped for context shutdown: {}.{}", beanDefinition.getBeanType().getSimpleName(), method.getDescription(true));
+                } catch (Exception e) {
+                    TaskExceptionHandler finalHandler = findHandler(beanDefinition.getBeanType(), e);
+                    finalHandler.handleCreationFailure(beanDefinition, e);
                 }
             };
 
@@ -186,6 +188,17 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                 throw new SchedulerConfigurationException(method, "Failed to schedule task. Invalid definition");
             }
         }
+    }
+
+    private void handleException(Class<Object> beanType, Object bean, Throwable e) {
+        TaskExceptionHandler<Object, Throwable> finalHandler = findHandler(beanType, e);
+        finalHandler.handle(bean, e);
+    }
+
+    @SuppressWarnings("unchecked")
+    private TaskExceptionHandler<Object, Throwable> findHandler(Class<?> beanType, Throwable e) {
+        return beanContext.findBean(Argument.of(TaskExceptionHandler.class, beanType, e.getClass()))
+                          .orElse(this.taskExceptionHandler);
     }
 
     @Override

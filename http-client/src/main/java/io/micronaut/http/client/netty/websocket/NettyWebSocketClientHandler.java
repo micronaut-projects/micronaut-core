@@ -99,7 +99,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
         this.genericWebSocketBean = webSocketBean;
         String clientPath = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class).orElse("");
         UriMatchTemplate matchTemplate = UriMatchTemplate.of(clientPath);
-        this.matchInfo = matchTemplate.match(request.getPath()).orElse(null);
+        this.matchInfo = matchTemplate.tryMatch(request.getPath());
     }
 
     @Override

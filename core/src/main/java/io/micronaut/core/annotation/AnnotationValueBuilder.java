@@ -15,6 +15,8 @@
  */
 package io.micronaut.core.annotation;
 
+import io.micronaut.core.expressions.EvaluatedExpression;
+import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.reflect.ReflectionUtils;
 
 import java.lang.annotation.Annotation;
@@ -788,7 +790,9 @@ public class AnnotationValueBuilder<T extends Annotation> {
                                     clazz == String.class ||
                                     clazz == Enum.class ||
                                     clazz == AnnotationClassValue.class ||
-                                    clazz == AnnotationValue.class
+                                    clazz == AnnotationValue.class ||
+                                    clazz == EvaluatedExpressionReference.class ||
+                                    clazz == EvaluatedExpression.class
                             );
                     if (!isValid) {
                         throw new IllegalArgumentException("The member named [" + entry.getKey().toString() + "] with type [" + value.getClass().getName() + "] is not a valid member type");

@@ -9,6 +9,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.http.codec.CodecException
 import io.micronaut.runtime.server.EmbeddedServer
 
 class ConsumesControllerSpec: StringSpec() {
@@ -47,7 +48,7 @@ class ConsumesControllerSpec: StringSpec() {
                         .contentType(MediaType.APPLICATION_JSON))
             }
 
-            shouldNotThrowAny {
+            shouldThrow<CodecException> {
                 client.toBlocking().exchange<Book, Any>(HttpRequest.POST("/consumes/member", book)
                         .contentType(MediaType.TEXT_PLAIN))
             }

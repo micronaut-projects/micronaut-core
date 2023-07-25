@@ -4,9 +4,30 @@
 
 The most common data interchange format nowadays is JSON.
 
-In fact, the defaults in the api:http.annotation.Controller[] annotation specify that the controllers in Micronaut consume and produce JSON by default.
+By default, the api:http.annotation.Controller[] annotation specifies that the controllers in Micronaut framework consume and produce JSON by default.
 
-To do so in a non-blocking manner, Micronaut builds on the https://github.com/FasterXML/jackson[Jackson] Asynchronous JSON parsing API and Netty, such that the reading of incoming JSON is done in a non-blocking manner.
+Since Micronaut Framework 4.0, users must choose how they want to serialize (Jackson Databind or Micronaut Serialization). Both approaches allow the usage of https://micronaut-projects.github.io/micronaut-serialization/latest/guide/index.html#jacksonAnnotations[Jackson Annotations].
+
+With either approach, the Micronaut framework reads incoming JSON in a non-blocking manner.
+
+== Serialize using Micronaut Serialization
+
+https://micronaut-projects.github.io/micronaut-serialization/latest/guide/index.html#quickStart[Micronaut Serialization] offers reflection-free serialization using build-time <<introspection, Bean Introspections>>. It supports alternative formats such as https://micronaut-projects.github.io/micronaut-serialization/latest/guide/index.html#jsonpQuick[JSON-P or JSON-B]. You need to add the following dependencies:
+
+dependency:micronaut-serde-processor[groupId=io.micronaut.serde,scope=annotationProcessor]
+dependency:micronaut-serde-jackson[groupId=io.micronaut.serde]
+
+== Serialization using Jackson Databind
+
+To serialize using https://github.com/FasterXML/jackson[Jackson] Databind include the following dependency:
+
+dependency:micronaut-jackson-databind[]
+
+== JsonMapper
+
+You may be used to work with https://fasterxml.github.io/jackson-databind/javadoc/2.7/com/fasterxml/jackson/databind/ObjectMapper.html[Jackson's `ObjectMapper`]. However, we don't recommend using Jackson's `ObjectMapper` directly; instead you should use api:json.JsonMapper[], an API almost identical to Jackson's `ObjectMapper`. Moreover, both <<jsonBinding, Micronaut Serialization and Micronaut Jackson Databind>> implement api:json.JsonMapper[].
+
+You can inject a bean of type `JsonMapper` or manually instantiate one via `JsonMapper.createDefault()`.
 
 == Binding using Reactive Frameworks
 
@@ -39,13 +60,13 @@ Note however you can just as easily write:
 
 snippet::io.micronaut.docs.server.json.PersonController[tags="class,regular,endclass", indent=0, title="Binding JSON POJOs"]
 
-Micronaut only executes your method once the data has been read in a non-blocking manner.
+The Micronaut framework only executes your method once the data has been read in a non-blocking manner.
 
-TIP: The output produced by Jackson can be customized in a variety of ways, from defining Jackson modules to using https://github.com/FasterXML/jackson-annotations/wiki/Jackson-Annotations[Jackson annotations]
+TIP: You can customize the output in various ways, such as using https://github.com/FasterXML/jackson-annotations/wiki/Jackson-Annotations[Jackson annotations].
 
 == Jackson Configuration
 
-The Jackson `ObjectMapper` can be configured through configuration with the api:io.micronaut.jackson.JacksonConfiguration[] class.
+If you use <<jsonBinding, `micronaut-jackson-databind`>>, the Jackson's `ObjectMapper` can be configured through configuration with the api:io.micronaut.jackson.JacksonConfiguration[] class.
 
 All Jackson configuration keys start with `jackson`.
 
@@ -68,7 +89,7 @@ jackson:
 
 === Features
 
-All features can be configured with their name as the key and a boolean to indicate enabled or disabled.
+If you use <<jsonBinding, `micronaut-jackson-databind`>>, all Jackson's features can be configured with their name as the key and a boolean to indicate enabled or disabled.
 
 |======
 |serialization | Map | link:{jackson-databind}com/fasterxml/jackson/databind/SerializationFeature.html[SerializationFeature]
@@ -94,18 +115,18 @@ jackson:
 
 === Further customising `JsonFactory`
 
-There may be situations where you wish to customise the `JsonFactory` used by the `ObjectMapper` beyond the configuration of features (for example to allow custom character escaping).
+If you use <<jsonBinding, `micronaut-jackson-databind`>>, there may be situations where you wish to customise the `JsonFactory` used by the `ObjectMapper` beyond the configuration of features (for example to allow custom character escaping).
 This can be achieved by providing your own `JsonFactory` bean, or by providing a `BeanCreatedEventListener<JsonFactory>` which configures the default bean on startup.
 
 === Support for `@JsonView`
 
-You can use the `@JsonView` annotation on controller methods if you set `jackson.json-view.enabled` to `true` in your configuration file (e.g `application.yml`).
+If you use <<jsonBinding, `micronaut-jackson-databind`>>, you can use the `@JsonView` annotation on controller methods if you set `jackson.json-view.enabled` to `true` in your configuration file (e.g `application.yml`).
 
 Jackson's `@JsonView` annotation lets you control which properties are exposed on a per-response basis. See https://www.baeldung.com/jackson-json-view-annotation[Jackson JSON Views] for more information.
 
 === Beans
 
-In addition to configuration, beans can be registered to customize Jackson. All beans that extend any of the following classes are registered with the object mapper:
+If you use <<jsonBinding, `micronaut-jackson-databind`>>, in addition to configuration, beans can be registered to customize Jackson. All beans that extend any of the following classes are registered with the object mapper:
 
 * link:{jackson-databind}com/fasterxml/jackson/databind/Module.html[Module]
 * link:{jackson-databind}com/fasterxml/jackson/databind/JsonDeserializer.html[JsonDeserializer]
@@ -131,3 +152,4 @@ jackson:
     useBigIntegerForInts: true
     useBigDecimalForFloats: true
 ----
+

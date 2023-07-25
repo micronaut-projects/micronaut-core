@@ -16,9 +16,8 @@ dependencies {
     testImplementation libs.javax.inject
     testImplementation libs.spotbugs
     testImplementation libs.hibernate
-    testImplementation libs.hibernate.validator
-    testRuntimeOnly libs.javax.el.impl
-    testRuntimeOnly libs.javax.el
+    testRuntimeOnly libs.jakarta.el.impl
+    testRuntimeOnly libs.jakarta.el
     testImplementation project(":http-server-netty")
     testImplementation project(":http-client")
     testImplementation project(":jackson-databind")

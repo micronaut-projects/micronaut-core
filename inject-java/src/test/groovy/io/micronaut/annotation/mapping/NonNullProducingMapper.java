@@ -10,7 +10,7 @@ import java.util.List;
 public class NonNullProducingMapper implements TypedAnnotationMapper<NonNullStereotyped> {
     @Override
     public List<AnnotationValue<?>> map(AnnotationValue<NonNullStereotyped> annotation, VisitorContext visitorContext) {
-        return Collections.singletonList(AnnotationValue.builder("javax.annotation.Nullable").build());
+        return Collections.singletonList(AnnotationValue.builder("jakarta.annotation.Nullable").build());
     }
 
     @Override

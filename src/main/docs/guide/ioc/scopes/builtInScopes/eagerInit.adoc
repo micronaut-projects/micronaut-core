@@ -18,7 +18,7 @@ public class Application {
 
 <1> Setting eager init to `true` initializes all singletons
 
-When you use Micronaut in environments such as <<serverlessFunctions, Serverless Functions>>, you will not have an Application class and instead you extend a Micronaut-provided class. In those cases, Micronaut provides methods which you can override to enhance the api:context.ApplicationContextBuilder[]
+When you use Micronaut framework in environments such as <<serverlessFunctions, Serverless Functions>>, you will not have an Application class and instead you extend a Micronaut-provided class. In those cases, Micronaut provides methods which you can override to enhance the api:context.ApplicationContextBuilder[]
 
 .Override of newApplicationContextBuilder()
 [source,java]

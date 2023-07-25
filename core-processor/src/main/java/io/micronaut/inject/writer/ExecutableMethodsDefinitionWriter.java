@@ -29,6 +29,7 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.processing.JavaModelUtils;
+import io.micronaut.inject.visitor.VisitorContext;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Label;
 import org.objectweb.asm.Opcodes;
@@ -96,17 +97,19 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
     private final DispatchWriter methodDispatchWriter;
 
     private final Set<String> methodNames = new HashSet<>();
-
     private final AnnotationMetadata annotationMetadataWithDefaults;
-
+    private final EvaluatedExpressionProcessor evaluatedExpressionProcessor;
     private ClassWriter classWriter;
 
-    public ExecutableMethodsDefinitionWriter(AnnotationMetadata annotationMetadataWithDefaults,
+    public ExecutableMethodsDefinitionWriter(VisitorContext visitorContext,
+                                             EvaluatedExpressionProcessor evaluatedExpressionProcessor,
+                                             AnnotationMetadata annotationMetadataWithDefaults,
                                              String beanDefinitionClassName,
                                              String beanDefinitionReferenceClassName,
                                              OriginatingElements originatingElements) {
         super(originatingElements);
         this.annotationMetadataWithDefaults = annotationMetadataWithDefaults;
+        this.evaluatedExpressionProcessor = evaluatedExpressionProcessor;
         this.className = beanDefinitionClassName + CLASS_SUFFIX;
         this.internalName = getInternalName(className);
         this.thisType = Type.getObjectType(internalName);
@@ -196,6 +199,7 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
                                      MethodElement methodElement,
                                      String interceptedProxyClassName,
                                      String interceptedProxyBridgeMethodName) {
+        evaluatedExpressionProcessor.processEvaluatedExpressions(methodElement);
 
         String methodKey = methodElement.getName() +
                 "(" +
@@ -228,7 +232,7 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
      */
     public final void visitDefinitionEnd() {
         classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
-        classWriter.visit(V1_8, ACC_SYNTHETIC | ACC_FINAL,
+        classWriter.visit(V17, ACC_SYNTHETIC | ACC_FINAL,
                 internalName,
                 null,
                 SUPER_TYPE.getInternalName(),

@@ -20,7 +20,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.management.endpoint.routes.RouteData;
 import io.micronaut.management.endpoint.routes.RouteDataCollector;
 import io.micronaut.management.endpoint.routes.RoutesEndpoint;
-import io.micronaut.web.router.UriRoute;
+import io.micronaut.web.router.UriRouteInfo;
 import jakarta.inject.Singleton;
 
 import java.util.LinkedHashMap;
@@ -48,7 +48,7 @@ public class DefaultRouteDataCollector implements RouteDataCollector<Map<String,
     }
 
     @Override
-    public Map<String, Object> getData(Stream<UriRoute> routes) {
+    public Map<String, Object> getData(Stream<UriRouteInfo<?, ?>> routes) {
         return routes
             .collect(Collectors.toMap(
                 this::getRouteKey,
@@ -62,7 +62,7 @@ public class DefaultRouteDataCollector implements RouteDataCollector<Map<String,
      * @param route The URI route
      * @return The route key
      */
-    protected String getRouteKey(UriRoute route) {
+    protected String getRouteKey(UriRouteInfo<?, ?> route) {
         String produces = route
             .getProduces()
             .stream()

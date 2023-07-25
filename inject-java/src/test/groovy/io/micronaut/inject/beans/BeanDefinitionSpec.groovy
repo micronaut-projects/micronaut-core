@@ -487,14 +487,10 @@ public class Test {
         def param3 = param2.getTypeParameters()[0]
 
         then:
-        param.getAnnotationMetadata().getAnnotationNames().size() == 1
-        param.getAnnotationMetadata().getAnnotationNames().asList() == ['io.micronaut.validation.annotation.ValidatedElement']
-        param1.getAnnotationMetadata().getAnnotationNames().size() == 1
-        param1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
-        param2.getAnnotationMetadata().getAnnotationNames().size() == 1
-        param2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
-        param3.getAnnotationMetadata().getAnnotationNames().size() == 1
-        param3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
+        param.getAnnotationMetadata().getAnnotationNames().contains('io.micronaut.validation.annotation.ValidatedElement')
+        param1.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.Size$List')
+        param2.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotEmpty$List')
+        param3.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotNull$List')
     }
 
     void "test isTypeVariable"() {

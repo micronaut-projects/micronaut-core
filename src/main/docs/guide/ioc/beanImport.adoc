@@ -24,7 +24,7 @@ public class Application {
 ----
 
 <1> The ann:context.annotation.Import[] is defined
-<2> The `packages` to import are defined. Note that Micronaut will not recurse through sub-packages so sub-packages need to be listed explicitly
-<3> By default Micronaut will only import classes that feature a scope or a qualifier. By using `*` you can make every type a bean.
+<2> The `packages` to import are defined. Note that the Micronaut framework will not recurse through sub-packages so sub-packages need to be listed explicitly
+<3> By default, Micronaut framework will only import classes that feature a scope or a qualifier. By using `*` you can make every type a bean.
 
 NOTE: In general `@Import` should be used in applications rather than libraries since if two libraries import the same beans the result will likely be a api:context.exceptions.NonUniqueBeanException[]

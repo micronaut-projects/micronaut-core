@@ -15,8 +15,6 @@
  */
 package io.micronaut.core.util;
 
-import io.micronaut.core.annotation.NextMajorVersion;
-
 import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.BinaryOperator;
@@ -188,14 +186,4 @@ public class StreamUtils {
         }, Collections::unmodifiableCollection);
     }
 
-    /**
-     * @param <T> The type
-     * @return An immutable collection
-     * @deprecated use Stream#toList
-     */
-    @Deprecated(forRemoval = true)
-    @NextMajorVersion("Remove after Micronaut 4 milestone 1")
-    public static <T> Collector<T, Collection<T>, Collection<T>> toImmutableCollection() {
-        return toImmutableCollection(ArrayList::new);
-    }
 }

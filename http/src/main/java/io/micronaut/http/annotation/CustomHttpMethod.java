@@ -15,21 +15,21 @@
  */
 package io.micronaut.http.annotation;
 
+import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.core.async.annotation.SingleResult;
+
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
-import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.core.async.annotation.SingleResult;
-
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * This annotation is designed for non-standard http methods, that you
  * can provide by specifying the required {@link #method()} property.
- * 
+ *
  * @author spirit-1984
  * @since 1.3.0
  */

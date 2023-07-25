@@ -27,6 +27,9 @@ import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
+import java.util.Arrays;
+import java.util.List;
+
 /**
  * A {@link io.micronaut.http.codec.MediaTypeCodec} for JSON and Jackson.
  *
@@ -41,6 +44,14 @@ public class JsonMediaTypeCodec extends MapperMediaTypeCodec {
 
     public static final String CONFIGURATION_QUALIFIER = "json";
 
+    public static final List<MediaType> JSON_ADDITIONAL_TYPES = Arrays.asList(
+        MediaType.TEXT_JSON_TYPE,
+        MediaType.APPLICATION_HAL_JSON_TYPE,
+        MediaType.APPLICATION_JSON_GITHUB_TYPE,
+        MediaType.APPLICATION_JSON_FEED_TYPE,
+        MediaType.APPLICATION_JSON_PROBLEM_TYPE
+    );
+
     /**
      * @param jsonMapper                To read/write JSON
      * @param applicationConfiguration The common application configurations
@@ -49,7 +60,7 @@ public class JsonMediaTypeCodec extends MapperMediaTypeCodec {
     public JsonMediaTypeCodec(JsonMapper jsonMapper,
                               ApplicationConfiguration applicationConfiguration,
                               @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
-        super(jsonMapper, applicationConfiguration, codecConfiguration, MediaType.APPLICATION_JSON_TYPE);
+        this(() -> jsonMapper, applicationConfiguration, codecConfiguration);
     }
 
     /**
@@ -61,7 +72,7 @@ public class JsonMediaTypeCodec extends MapperMediaTypeCodec {
     public JsonMediaTypeCodec(BeanProvider<JsonMapper> jsonCodec,
                               ApplicationConfiguration applicationConfiguration,
                               @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
-        super(jsonCodec, applicationConfiguration, codecConfiguration, MediaType.APPLICATION_JSON_TYPE);
+        super(jsonCodec, applicationConfiguration, codecConfiguration, MediaType.APPLICATION_JSON_TYPE, JSON_ADDITIONAL_TYPES);
     }
 
     @Override

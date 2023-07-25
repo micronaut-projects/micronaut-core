@@ -50,6 +50,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -210,7 +212,8 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 );
                 GraalReflectionMetadataWriter writer = new GraalReflectionMetadataWriter(
                         element,
-                        annotationMetadata
+                        annotationMetadata,
+                        context
                 );
                 try {
                     writer.accept(context);
@@ -365,7 +368,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
     private static final class ReflectionConfigData {
         private final AnnotationClassValue<?> type;
-        private final List<TypeHint.AccessType> accessTypes = new ArrayList<>(5);
+        private final SortedSet<TypeHint.AccessType> accessTypes = new TreeSet<>();
         private final List<AnnotationValue<ReflectionConfig.ReflectiveMethodConfig>> methods = new ArrayList<>(30);
         private final List<AnnotationValue<ReflectionConfig.ReflectiveFieldConfig>> fields = new ArrayList<>(30);
 

@@ -33,6 +33,8 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.MapPropertyResolver;
 import io.micronaut.core.value.PropertyResolver;
 import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.helpers.NOPLogger;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -62,8 +64,6 @@ import java.util.regex.Pattern;
  */
 public class PropertySourcePropertyResolver implements PropertyResolver, AutoCloseable {
 
-    private static final Logger LOG = ClassUtils.getLogger(PropertySourcePropertyResolver.class);
-
     private static final EnvironmentProperties CURRENT_ENV = StaticOptimizations.get(EnvironmentProperties.class)
             .orElseGet(EnvironmentProperties::empty);
     private static final Pattern DOT_PATTERN = Pattern.compile("\\.");
@@ -80,9 +80,32 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     protected final Map<String, Object>[] catalog = new Map[58];
     protected final Map<String, Object>[] rawCatalog = new Map[58];
     protected final Map<String, Object>[] nonGenerated = new Map[58];
+
+    protected Logger log;
+
     private final Map<String, Boolean> containsCache = new ConcurrentHashMap<>(20);
-    private final Map<String, Object> resolvedValueCache = new ConcurrentHashMap<>(20);
+    /**
+     * Cache for values <i>before</i> conversion. This avoids recomputing placeholders, which keeps
+     * random values (e.g. {@code ${random.port}} stable).
+     */
+    private final Map<String, Object> placeholderResolutionCache = new ConcurrentHashMap<>(20);
+    /**
+     * Cache for values <i>after</i> conversion.
+     */
+    private final Map<ConversionCacheKey, Object> resolvedValueCache = new ConcurrentHashMap<>(20);
     private final EnvironmentProperties environmentProperties = EnvironmentProperties.fork(CURRENT_ENV);
+
+    /**
+     * Creates a new, initially empty, {@link PropertySourcePropertyResolver} for the given {@link ConversionService}.
+     *
+     * @param conversionService The {@link ConversionService}
+     * @param logEnabled        flag to enable or disable logger
+     */
+    public PropertySourcePropertyResolver(ConversionService conversionService, boolean logEnabled) {
+        this.log = logEnabled ? LoggerFactory.getLogger(getClass()) : NOPLogger.NOP_LOGGER;
+        this.conversionService = conversionService;
+        this.propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(this, conversionService);
+    }
 
     /**
      * Creates a new, initially empty, {@link PropertySourcePropertyResolver} for the given {@link ConversionService}.
@@ -90,8 +113,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * @param conversionService The {@link ConversionService}
      */
     public PropertySourcePropertyResolver(ConversionService conversionService) {
-        this.conversionService = conversionService;
-        this.propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(this, conversionService);
+        this(conversionService, true);
     }
 
     /**
@@ -305,16 +327,23 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             Objects.requireNonNull(conversionContext, "Conversion context should not be null");
             Class<T> requiredType = conversionContext.getArgument().getType();
             boolean cacheableType = ClassUtils.isJavaLangType(requiredType);
-            Object cached = cacheableType ? resolvedValueCache.get(cacheKey(name, requiredType)) : null;
+            Object cached = cacheableType ? resolvedValueCache.get(new ConversionCacheKey(name, requiredType)) : null;
             if (cached != null) {
                 return cached == NO_VALUE ? Optional.empty() : Optional.of((T) cached);
             } else {
-                Map<String, Object> entries = resolveEntriesForKey(name, false, PropertyCatalog.GENERATED);
-                if (entries == null) {
-                    entries = resolveEntriesForKey(name, false, PropertyCatalog.RAW);
+                Object value = placeholderResolutionCache.get(name);
+                // entries map to get the value from, only populated if there's a cache miss with placeholderResolutionCache
+                Map<String, Object> entries = null;
+                if (value == null) {
+                    entries = resolveEntriesForKey(name, false, PropertyCatalog.GENERATED);
+                    if (entries == null) {
+                        entries = resolveEntriesForKey(name, false, PropertyCatalog.RAW);
+                    }
                 }
-                if (entries != null) {
-                    Object value = entries.get(name);
+                if (entries != null || value != null) {
+                    if (value == null) {
+                        value = entries.get(name);
+                    }
                     if (value == null) {
                         value = entries.get(normalizeName(name));
                         if (value == null && name.indexOf('[') == -1) {
@@ -359,27 +388,31 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
                     if (value != null) {
                         Optional<T> converted;
-                        value = resolvePlaceHoldersIfNecessary(value);
+                        if (entries != null) {
+                            // iff entries is null, the value is from placeholderResolutionCache and doesn't need this step
+                            value = resolvePlaceHoldersIfNecessary(value);
+                            placeholderResolutionCache.put(name, value);
+                        }
                         if (requiredType.isInstance(value) && !CollectionUtils.isIterableOrMap(requiredType)) {
                             converted = (Optional<T>) Optional.of(value);
                         } else {
                             converted = conversionService.convert(value, conversionContext);
                         }
 
-                        if (LOG.isTraceEnabled()) {
+                        if (log.isTraceEnabled()) {
                             if (converted.isPresent()) {
-                                LOG.trace("Resolved value [{}] for property: {}", converted.get(), name);
+                                log.trace("Resolved value [{}] for property: {}", converted.get(), name);
                             } else {
-                                LOG.trace("Resolved value [{}] cannot be converted to type [{}] for property: {}", value, conversionContext.getArgument(), name);
+                                log.trace("Resolved value [{}] cannot be converted to type [{}] for property: {}", value, conversionContext.getArgument(), name);
                             }
                         }
 
                         if (cacheableType) {
-                            resolvedValueCache.put(cacheKey(name, requiredType), converted.orElse((T) NO_VALUE));
+                            resolvedValueCache.put(new ConversionCacheKey(name, requiredType), converted.orElse((T) NO_VALUE));
                         }
                         return converted;
                     } else if (cacheableType) {
-                        resolvedValueCache.put(cacheKey(name, requiredType), NO_VALUE);
+                        resolvedValueCache.put(new ConversionCacheKey(name, requiredType), NO_VALUE);
                         return Optional.empty();
                     } else if (Properties.class.isAssignableFrom(requiredType)) {
                         Properties properties = resolveSubProperties(name, entries, conversionContext);
@@ -399,9 +432,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             }
 
         }
-        if (LOG.isTraceEnabled()) {
-            LOG.trace("No value found for property: {}", name);
-        }
+        log.trace("No value found for property: {}", name);
 
         Class<T> requiredType = conversionContext.getArgument().getType();
         if (Properties.class.isAssignableFrom(requiredType)) {
@@ -412,15 +443,10 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         return Optional.empty();
     }
 
-    @NonNull
-    private <T> String cacheKey(@NonNull String name, Class<T> requiredType) {
-        return name + '|' + requiredType.getSimpleName();
-    }
-
     /**
      * Returns a combined Map of all properties in the catalog.
      *
-     * @param keyConvention The map key convention
+     * @param keyConvention  The map key convention
      * @param transformation The map format
      * @return Map of all properties
      */
@@ -569,9 +595,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         synchronized (catalog) {
             for (String property : properties) {
 
-                if (LOG.isTraceEnabled()) {
-                    LOG.trace("Processing property key {}", property);
-                }
+                log.trace("Processing property key {}", property);
 
                 Object value = properties.get(property);
 
@@ -739,6 +763,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     protected void resetCaches() {
         containsCache.clear();
         resolvedValueCache.clear();
+        placeholderResolutionCache.clear();
     }
 
     private void processSubmapKey(Map<String, Object> map, String key, Object value, @Nullable StringConvention keyConvention) {
@@ -771,7 +796,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     private Object resolvePlaceHoldersIfNecessary(Object value) {
         if (value instanceof CharSequence) {
-            return propertyPlaceholderResolver.resolveRequiredPlaceholders(value.toString());
+            return propertyPlaceholderResolver.resolveRequiredPlaceholdersObject(value.toString());
         } else if (value instanceof List) {
             List<?> list = (List) value;
             List<?> newList = new ArrayList<>(list);
@@ -820,6 +845,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         }
     }
 
+
     /**
      * The property catalog to use.
      */
@@ -840,5 +866,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
          * {@code foo.bar-baz}, and {@code foo-bar.baz}.
          */
         GENERATED
+    }
+
+    private record ConversionCacheKey(@NonNull String name, Class<?> requiredType) {
     }
 }

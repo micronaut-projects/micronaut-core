@@ -1,7 +1,7 @@
 plugins {
     id "io.micronaut.build.internal.convention-library"
     id "org.jetbrains.kotlin.jvm"
-    id "com.google.devtools.ksp" version "1.8.0-Beta-1.0.8"
+    id "com.google.devtools.ksp" version "1.8.22-1.0.11"
 
 }
 
@@ -27,7 +27,7 @@ dependencies {
 
     testImplementation project(":jackson-databind")
     testImplementation project(":inject-kotlin-test")
-    testImplementation libs.kotlin.stdlib
+    testImplementation libs.managed.kotlin.stdlib
     testImplementation project(':http-client')
     testImplementation libs.managed.jackson.annotations
     testImplementation libs.managed.reactor
@@ -42,9 +42,9 @@ dependencies {
     testImplementation libs.javax.persistence
     testImplementation project(":runtime")
     testImplementation(libs.neo4j.bolt)
-    testImplementation libs.kotlinx.coroutines.core
-    testImplementation libs.kotlinx.coroutines.jdk8
-    testImplementation libs.kotlinx.coroutines.rx2
+    testImplementation libs.managed.kotlinx.coroutines.core
+    testImplementation libs.managed.kotlinx.coroutines.jdk8
+    testImplementation libs.managed.kotlinx.coroutines.rx2
     testImplementation (libs.micronaut.test.junit5) {
         exclude group: 'io.micronaut'
     }

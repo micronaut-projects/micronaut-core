@@ -9,7 +9,7 @@ snippet::io.micronaut.docs.aop.around.NotNull[tags="imports,annotation", indent=
 
 <1> The retention policy of the annotation should be `RUNTIME`
 <2> Generally you want to be able to apply advice at the class or method level so the target types are `TYPE` and `METHOD`
-<3> The ann:aop.Around[] annotation is added to tell Micronaut that the annotation is Around advice
+<3> The ann:aop.Around[] annotation is added to tell the Micronaut framework that the annotation is Around advice
 
 The next step to defining Around advice is to implement a api:aop.MethodInterceptor[]. For example the following interceptor disallows parameters with `null` values:
 
@@ -41,7 +41,7 @@ This behaviour is more efficient as only one instance of the bean is required, h
 
 * `proxyTarget` (defaults to `false`) - If set to `true`, instead of a subclass that calls `super`, the proxy delegates to the original bean instance
 * `hotswap` (defaults to `false`) - Same as `proxyTarget=true`, but in addition the proxy implements link:{api}/io/micronaut/aop/HotSwappableInterceptedProxy.html[HotSwappableInterceptedProxy] which wraps each method call in a `ReentrantReadWriteLock` and allows swapping the target instance at runtime.
-* `lazy` (defaults to `false`) - By default Micronaut eagerly initializes the proxy target when the proxy is created. If set to `true` the proxy target is instead resolved lazily for each method call.
+* `lazy` (defaults to `false`) - By default the Micronaut framework eagerly initializes the proxy target when the proxy is created. If set to `true` the proxy target is instead resolved lazily for each method call.
 
 == AOP Advice on @Factory Beans
 

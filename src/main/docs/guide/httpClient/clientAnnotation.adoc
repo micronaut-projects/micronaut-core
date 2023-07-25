@@ -18,7 +18,7 @@ Additionally, to use the `jakarta.validation` features, add the `validation` mod
 
 dependency:micronaut-validation[]
 
-On the server-side of Micronaut you can implement the `PetOperations` interface:
+On the server-side of the Micronaut framework you can implement the `PetOperations` interface:
 
 snippet::io.micronaut.docs.annotation.PetController[tags="imports, class", indent=0, title="PetController.java"]
 

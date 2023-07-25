@@ -8,7 +8,7 @@ Alternatively one can register a link:{api}/io/micronaut/context/env/PropertySou
 
 === Included PropertySource Loaders
 
-Micronaut by default contains `PropertySourceLoader` implementations that load properties from the given locations and priority:
+Micronaut framework by default contains `PropertySourceLoader` implementations that load properties from the given locations and priority:
 
 . Command line arguments
 . Properties from `SPRING_APPLICATION_JSON` (for Spring compatibility)
@@ -73,7 +73,7 @@ datasources:
     driverClassName: ${JDBC_DRIVER:com.mysql.cj.jdbc.Driver}
 ----
 
-To securely externalize configuration consider using a secrets manager system supported by Micronaut such as:
+To securely externalize configuration consider using a secrets manager system supported by the Micronaut framework such as:
 
 * https://micronaut-projects.github.io/micronaut-aws/latest/guide/#secretsmanager[AWS Secrets Manager].
 * https://micronaut-projects.github.io/micronaut-gcp/latest/guide/#secretManager[Google Cloud Secrets Manager].
@@ -83,7 +83,7 @@ To securely externalize configuration consider using a secrets manager system su
 
 === Property Value Placeholders
 
-As mentioned in the previous section, Micronaut includes a property placeholder syntax to reference configuration properties both within configuration values and with any Micronaut annotation. See ann:io.micronaut.context.annotation.Value[] and the section on <<valueAnnotation,Configuration Injection>>.
+As mentioned in the previous section, the Micronaut framework includes a property placeholder syntax to reference configuration properties both within configuration values and with any Micronaut annotation. See ann:io.micronaut.context.annotation.Value[] and the section on <<valueAnnotation,Configuration Injection>>.
 
 TIP: Programmatic usage is also possible via the api:io.micronaut.context.env.PropertyPlaceholderResolver[] interface.
 
@@ -120,7 +120,7 @@ The above example looks for a `server.address` property and defaults to `http://
 
 Note that these property references should be in kebab case (lowercase and hyphen-separated) when placing references in code or in placeholder values. For example, use `micronaut.server.default-charset` and not `micronaut.server.defaultCharset`.
 
-Micronaut still allows specifying the latter in configuration, but normalizes the properties into kebab case form to optimize memory consumption and reduce complexity when resolving properties. The following table summarizes how properties are normalized from different sources:
+The Micronaut framework still allows specifying the latter in configuration, but normalizes the properties into kebab case form to optimize memory consumption and reduce complexity when resolving properties. The following table summarizes how properties are normalized from different sources:
 
 .Property Value Normalization
 |===

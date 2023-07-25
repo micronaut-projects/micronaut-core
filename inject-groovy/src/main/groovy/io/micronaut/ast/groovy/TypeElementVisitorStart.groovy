@@ -44,7 +44,8 @@ import org.codehaus.groovy.transform.GroovyASTTransformation
  * @since 1.0
  */
 @CompileStatic
-@GroovyASTTransformation(phase = CompilePhase.INITIALIZATION)
+// IMPORTANT NOTE: This transform runs in phase CONVERSION so it runs before TypeElementVisitorTransform
+@GroovyASTTransformation(phase = CompilePhase.CONVERSION)
 class TypeElementVisitorStart implements ASTTransformation, CompilationUnitAware {
 
     public static final String ELEMENT_VISITORS_PROPERTY = "micronaut.element.visitors"

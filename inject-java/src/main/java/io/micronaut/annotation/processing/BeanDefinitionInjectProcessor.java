@@ -27,7 +27,6 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.inject.processing.BeanDefinitionCreator;
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
@@ -77,9 +76,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         AnnotationUtil.PRE_DESTROY,
         "jakarta.annotation.PreDestroy",
         "jakarta.annotation.PostConstruct",
-        "javax.inject.Inject",
-        "javax.inject.Qualifier",
-        "javax.inject.Singleton",
+        "jakarta.inject.Inject",
+        "jakarta.inject.Qualifier",
+        "jakarta.inject.Singleton",
         "jakarta.inject.Inject",
         "jakarta.inject.Qualifier",
         "jakarta.inject.Singleton",
@@ -258,8 +257,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     }
                 }
             } finally {
-                AbstractAnnotationMetadataBuilder.clearMutated();
-                JavaAnnotationMetadataBuilder.clearCaches();
+                BeanDefinitionWriter.finish();
             }
         }
 
@@ -267,7 +265,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     }
 
     /**
-     * Writes {@link io.micronaut.inject.BeanDefinitionReference} into /META-INF/services/io.micronaut.inject.BeanDefinitionReference.
+     * Writes {@link io.micronaut.inject.BeanDefinitionReference} into /META-INF/services/io
+     * .micronaut.inject.BeanDefinitionReference.
      */
     private void writeBeanDefinitionsToMetaInf() {
         try {
@@ -284,7 +283,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             if (beanDefinitionWriter.isEnabled()) {
                 beanDefinitionWriter.accept(classWriterOutputVisitor);
                 BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
-                    new BeanDefinitionReferenceWriter(beanDefinitionWriter);
+                    new BeanDefinitionReferenceWriter(beanDefinitionWriter, this.javaVisitorContext);
                 beanDefinitionReferenceWriter.setRequiresMethodProcessing(beanDefinitionWriter.requiresMethodProcessing());
 
                 String className = beanDefinitionReferenceWriter.getBeanDefinitionQualifiedClassName();

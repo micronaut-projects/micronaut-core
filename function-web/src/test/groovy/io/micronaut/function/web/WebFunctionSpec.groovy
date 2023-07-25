@@ -24,8 +24,10 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Body
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.PendingFeature
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -146,6 +148,7 @@ class WebFunctionSpec extends Specification {
         embeddedServer.stop()
     }
 
+    @PendingFeature(reason = "the controller accepts application/json only now, there is no more dynamic reading based on request content type")
     void "test string consumer with text plain"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
@@ -277,7 +280,7 @@ class WebFunctionSpec extends Specification {
 
         static Book LAST_VALUE
         @Override
-        void accept(Book book) {
+        void accept(@Body Book book) {
             LAST_VALUE = book
         }
     }

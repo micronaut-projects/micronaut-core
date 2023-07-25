@@ -53,7 +53,7 @@ For example, to add support for MongoDB, add the following dependency:
 compile "io.micronaut.mongodb:micronaut-mongo-reactive"
 ----
 
-For Groovy users, Micronaut provides special support for https://gorm.grails.org[GORM].
+For Groovy users, the Micronaut framework provides special support for https://gorm.grails.org[GORM].
 
 WARNING: With GORM for Hibernate you cannot have both the `hibernate-jpa` and `hibernate-gorm` dependencies.
 

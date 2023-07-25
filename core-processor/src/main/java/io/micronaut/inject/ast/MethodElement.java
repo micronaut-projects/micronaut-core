@@ -228,6 +228,15 @@ public interface MethodElement extends MemberElement {
     }
 
     /**
+     * If method has varargs parameter.
+     * @return True if it does
+     * @since 4.0.0
+     */
+    default boolean isVarArgs() {
+        return false;
+    }
+
+    /**
      * The generic return type of the method.
      *
      * @return The return type of the method

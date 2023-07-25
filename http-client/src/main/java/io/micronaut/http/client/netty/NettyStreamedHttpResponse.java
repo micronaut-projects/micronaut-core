@@ -46,7 +46,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpResponseBuilder {
+final class NettyStreamedHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpResponseBuilder {
 
     private final StreamedHttpResponse nettyResponse;
     private final NettyHttpHeaders headers;

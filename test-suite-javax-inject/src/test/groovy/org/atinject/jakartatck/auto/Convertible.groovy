@@ -25,9 +25,9 @@ import org.atinject.jakartatck.auto.accessories.SpareTire
 import spock.lang.PendingFeature
 import spock.lang.Specification
 
-import javax.inject.Inject
-import javax.inject.Named
-import javax.inject.Provider
+import jakarta.inject.Inject
+import jakarta.inject.Named
+import jakarta.inject.Provider
 
 class Convertible implements Car {
 

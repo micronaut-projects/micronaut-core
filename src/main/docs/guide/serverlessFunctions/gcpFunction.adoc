@@ -2,7 +2,7 @@ Support for Google Cloud Function is implemented in the https://micronaut-projec
 
 ==== Simple Functions with Cloud Function
 
-You can implement Cloud Functions with Micronaut that directly implement the https://github.com/GoogleCloudPlatform/functions-framework-java[Cloud Function Framework API]. See the documentation on https://micronaut-projects.github.io/micronaut-gcp/latest/guide/#simpleFunctions[Simple Functions] for more information.
+You can implement Cloud Functions with the Micronaut framework that directly implement the https://github.com/GoogleCloudPlatform/functions-framework-java[Cloud Function Framework API]. See the documentation on https://micronaut-projects.github.io/micronaut-gcp/latest/guide/#simpleFunctions[Simple Functions] for more information.
 
 [TIP]
 .Using the CLI

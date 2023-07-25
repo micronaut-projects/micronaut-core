@@ -50,13 +50,9 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
         private fun getTypeForAnnotation(annotationMirror: KSAnnotation, visitorContext: KotlinVisitorContext): KSClassDeclaration {
             return annotationMirror.annotationType.resolve().declaration.getClassDeclaration(visitorContext)
         }
-        fun getAnnotationTypeName(annotationMirror: KSAnnotation, visitorContext: KotlinVisitorContext): String {
+        fun getAnnotationTypeName(resolver: Resolver, annotationMirror: KSAnnotation, visitorContext: KotlinVisitorContext): String {
             val type = getTypeForAnnotation(annotationMirror, visitorContext)
-            return if (type.qualifiedName != null) {
-                type.qualifiedName!!.asString()
-            } else {
-                annotationMirror.shortName.asString()
-            }
+            return type.getBinaryName(resolver, visitorContext)
         }
     }
 
@@ -86,7 +82,7 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
     }
 
     override fun getAnnotationTypeName(annotationMirror: KSAnnotation): String {
-        return Companion.getAnnotationTypeName(annotationMirror, visitorContext)
+        return Companion.getAnnotationTypeName(resolver, annotationMirror, visitorContext)
     }
 
     override fun getElementName(element: KSAnnotated): String {
@@ -186,23 +182,34 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
     }
 
     override fun postProcess(annotationMetadata: MutableAnnotationMetadata, element: KSAnnotated) {
-        if (element is KSValueParameter && element.type.resolve().isMarkedNullable) {
-            annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, emptyMap())
+        if (element is KSValueParameter) {
+            handleNullability(element.type.resolve(), annotationMetadata)
         } else if (element is KSFunctionDeclaration) {
-            val markedNullable = element.returnType?.resolve()?.isMarkedNullable
-            if (markedNullable != null && markedNullable) {
-                annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, emptyMap())
+            val ksType = element.returnType?.resolve()
+            if (ksType != null) {
+                handleNullability(ksType, annotationMetadata)
             }
         } else if (element is KSPropertyDeclaration) {
-            val markedNullable = element.type.resolve().isMarkedNullable
-            if (markedNullable) {
-                annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, emptyMap())
-            }
+            handleNullability(element.type.resolve(), annotationMetadata)
         } else if (element is KSPropertySetter) {
             if (!annotationMetadata.hasAnnotation(JvmField::class.java) && (annotationMetadata.hasStereotype(AnnotationUtil.QUALIFIER) || annotationMetadata.hasAnnotation(Property::class.java))) {
                 // implicitly inject
                 annotationMetadata.addDeclaredAnnotation(AnnotationUtil.INJECT, emptyMap())
             }
+        }
+    }
+
+    private fun handleNullability(
+        ksType: KSType,
+        annotationMetadata: MutableAnnotationMetadata
+    ) {
+        if (ksType.isMarkedNullable) {
+            // explicitly allowed to be null so add nullable
+            annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, emptyMap())
+        } else {
+            // with Kotlin the default is not null, so we must store in the metadata
+            // that the element is not nullable
+            annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NON_NULL, emptyMap())
         }
     }
 
@@ -224,7 +231,7 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
                     } else {
                         val parameters = parent.parameters
                         val parameterIndex =
-                            parameters.indexOf(parameters.find { it.name == element.name })
+                            parameters.indexOf(parameters.find { it.name!!.asString() == element.name!!.asString() })
                         methodsHierarchy(parent)
                             .map { if (it == parent) element else it.parameters[parameterIndex] }
                             .toMutableList()
@@ -281,7 +288,7 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
         annotationValues: MutableMap<CharSequence, Any>
     ) {
         if (!annotationValues.containsKey(memberName)) {
-            val value = readAnnotationValue(originatingElement, member, memberName, annotationValue)
+            val value = readAnnotationValue(originatingElement, member, annotationName, memberName, annotationValue)
             if (value != null) {
                 validateAnnotationValue(originatingElement, annotationName, member, memberName, value)
                 annotationValues[memberName] = value
@@ -314,6 +321,7 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
     override fun readAnnotationValue(
         originatingElement: KSAnnotated,
         member: KSAnnotated,
+        annotationName: String,
         memberName: String,
         annotationValue: Any
     ): Any? {
@@ -324,7 +332,18 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
             is Array<*> -> {
                 toArray(annotationValue.toList(), originatingElement)
             }
-            else -> readAnnotationValue(originatingElement, annotationValue)
+            else -> {
+                if (isEvaluatedExpression(annotationValue)) {
+                    return buildEvaluatedExpressionReference(
+                        originatingElement,
+                        annotationName,
+                        memberName,
+                        annotationValue
+                    )
+                } else {
+                    return readAnnotationValue(originatingElement, annotationValue)
+                }
+            }
         }
     }
 
@@ -363,6 +382,20 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
             }
         } else {
             mutableMapOf<KSDeclaration, Any>()
+        }
+    }
+
+    override fun getOriginatingClassName(orginatingElement: KSAnnotated): String? {
+        val binaryName = if (orginatingElement is KSClassDeclaration) {
+            orginatingElement.getBinaryName(resolver, visitorContext)
+        } else {
+            val classDeclaration = orginatingElement.getClassDeclaration(visitorContext)
+            classDeclaration.getBinaryName(resolver, visitorContext)
+        }
+        return if (binaryName != Object::javaClass.name) {
+            binaryName
+        } else {
+            null
         }
     }
 
@@ -441,12 +474,21 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
                 val values: Map<out KSDeclaration, *> = readAnnotationRawValues(annotationMirror)
                 val converted: MutableMap<CharSequence, Any> = mutableMapOf()
                 for ((key, value1) in values) {
-                    val value = value1!!
+                    var value = value1!!
+                    val memberName = key.simpleName.asString()
+                    if (isEvaluatedExpression(value)) {
+                        value = buildEvaluatedExpressionReference(
+                            originatingElement,
+                            annotationName,
+                            memberName,
+                            value
+                        )
+                    }
                     readAnnotationRawValues(
                         originatingElement,
                         annotationName,
                         key,
-                        key.simpleName.asString(),
+                        memberName,
                         value,
                         converted
                     )
@@ -574,6 +616,7 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
         if (value is KSAnnotation) {
             return readNestedAnnotationValue(originatingElement, value)
         }
+
          return value
     }
 

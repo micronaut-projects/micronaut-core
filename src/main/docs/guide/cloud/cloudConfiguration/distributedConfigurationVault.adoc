@@ -1,4 +1,4 @@
-Micronaut integrates with https://www.vaultproject.io/[HashiCorp Vault] as a distributed configuration source.
+The Micronaut framework integrates with https://www.vaultproject.io/[HashiCorp Vault] as a distributed configuration source.
 
 To enable distributed configuration make sure <<bootstrap>> is enabled and create a `src/main/resources/bootstrap.[yml/toml/properties]` file with the following configuration:
 
@@ -19,7 +19,7 @@ vault:
 
 See the https://micronaut-projects.github.io/micronaut-discovery-client/latest/guide/configurationreference.html#io.micronaut.discovery.vault.config.VaultClientConfiguration[configuration reference] for all configuration options.
 
-Micronaut uses the configured `micronaut.application.name` to lookup property sources for the application from Vault.
+The Micronaut framework uses the configured `micronaut.application.name` to lookup property sources for the application from Vault.
 
 .Configuration Resolution Precedence
 |===

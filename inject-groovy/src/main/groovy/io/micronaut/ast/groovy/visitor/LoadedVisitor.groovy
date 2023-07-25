@@ -15,7 +15,6 @@
  */
 package io.micronaut.ast.groovy.visitor
 
-import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Internal
@@ -95,7 +94,6 @@ class LoadedVisitor implements Ordered {
         return true
     }
 
-    @CompileDynamic
     @Override
     int hashCode() {
         return visitor.getClass().hashCode()

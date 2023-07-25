@@ -1,7 +1,7 @@
 introduction:
   title: Introduction
   whatsNew: What's New?
-  upgrading: Upgrading to Micronaut 3.x
+  upgrading: Upgrading your Micronaut Application
 quickStart:
   title: Quick Start
   buildCLI: Install the CLI
@@ -35,7 +35,18 @@ ioc:
   lifecycle: Life-Cycle Methods
   contextEvents: Context Events
   events: Bean Events
-  introspection: Bean Introspection
+  introspection:
+    title: Bean Introspection
+    atIntrospected: Use the @Introspected Annotation
+    introspectedAccessorsStyle: Use @Introspected with @AccessorsStyle
+    accessKind: Bean Fields
+    atCreator: Constructor Methods
+    staticAtCreator: Static Creator Methods
+    introspectionEnums: Introspect Enums
+    introspectedAnnotationOnAConfigurationClass: Use the @Introspected Annotation on a Configuration Class
+    introspectExistingAnnotations: Write an AnnotationMapper to Introspect Existing Annotations
+    beanWrapperApi: The BeanWrapper API
+    jacksonAndBeanIntrospection: Jackson and Bean Introspection
   beanValidation: Bean Validation
   annotationMetadata: Bean Annotation Metadata
   beanImport: Importing Beans from Libraries
@@ -47,6 +58,7 @@ config:
   environments: The Environment
   propertySource: Externalized Configuration with PropertySources
   valueAnnotation: Configuration Injection
+  evaluatedExpressions: Expression Language
   configurationProperties: Configuration Properties
   customTypeConverter: Custom Type Converters
   eachProperty: Using @EachProperty to Drive Configuration
@@ -90,7 +102,7 @@ httpServer:
     title: Reactive HTTP Request Processing
     bodyAnnotation: Using the @Body Annotation
     reactiveResponses: Reactive Responses
-  jsonBinding: JSON Binding with Jackson
+  jsonBinding: JSON Binding
   datavalidation:
     title: Data Validation
     validationGroups: Validation Groups
@@ -118,6 +130,7 @@ httpServer:
       filtermethodsexample: Server Filter with Filter Methods
       errorStates: Error States
       continuations: Continuations
+      order: Filter Order
     httpServerFilter:
       title: HttpServerFilter
       httpServerFilterExample: HttpServerFilter Example
@@ -192,6 +205,10 @@ httpClient:
   clientHttp2: HTTP/2 Support
   clientHttp3: HTTP/3 Support
   clientSample: HTTP Client Sample
+contextPropagation:
+  title: Context propagation
+  reactorContextPropagation: Reactor context propagation
+  httpFilterContextPropagation: HTTP filters context propagation
 cloud:
   title: Cloud Native Features
   cloudConfiguration:

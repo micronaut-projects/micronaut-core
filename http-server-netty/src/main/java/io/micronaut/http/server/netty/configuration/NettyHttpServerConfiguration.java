@@ -167,6 +167,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
     private final List<ChannelPipelineListener> pipelineCustomizers;
 
+    private HttpServerType serverType = HttpServerType.STREAMED;
+
     private Map<ChannelOption, Object> childOptions = Collections.emptyMap();
     private Map<ChannelOption, Object> options = Collections.emptyMap();
     private Worker worker;
@@ -176,6 +178,8 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private int maxHeaderSize = DEFAULT_MAXHEADERSIZE;
     private int maxChunkSize = DEFAULT_MAXCHUNKSIZE;
     private int maxH2cUpgradeRequestSize = DEFAULT_MAXCHUNKSIZE; // same default as maxChunkSize, we don't want to buffer super long bodies
+
+    private boolean closeOnExpectationFailed = false;
     private boolean chunkedSupported = DEFAULT_CHUNKSUPPORTED;
     private boolean validateHeaders = DEFAULT_VALIDATEHEADERS;
     private int initialBufferSize = DEFAULT_INITIALBUFFERSIZE;
@@ -217,6 +221,50 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
             List<ChannelPipelineListener> pipelineCustomizers) {
         super(applicationConfiguration);
         this.pipelineCustomizers = pipelineCustomizers;
+    }
+
+    /**
+     * @return Sets the server type.
+     * @see HttpServerType
+     */
+    @NonNull
+    public HttpServerType getServerType() {
+        return serverType;
+    }
+
+    /**
+     * If a 100-continue response is detected but the content length is too large then true means close the connection. otherwise the connection will remain open and data will be consumed and discarded until the next request is received.
+     *
+     * <p>only relevant when {@link HttpServerType#FULL_CONTENT} is set</p>
+     * @return True if the connection should be closed
+     * @see #setServerType(HttpServerType)
+     * @see io.netty.handler.codec.http.HttpObjectAggregator
+     */
+    public boolean isCloseOnExpectationFailed() {
+        return closeOnExpectationFailed;
+    }
+
+    /**
+     * If a 100-continue response is detected but the content length is too large then true means close the connection. otherwise the connection will remain open and data will be consumed and discarded until the next request is received.
+     *
+     * <p>only relevant when {@link HttpServerType#FULL_CONTENT} is set</p>
+     * @param closeOnExpectationFailed  True if the connection should be closed
+     * @see #setServerType(HttpServerType)
+     * @see io.netty.handler.codec.http.HttpObjectAggregator
+     */
+    public void setCloseOnExpectationFailed(boolean closeOnExpectationFailed) {
+        this.closeOnExpectationFailed = closeOnExpectationFailed;
+    }
+
+    /**
+     * Set the server type.
+     *
+     * @param serverType The server type
+     */
+    public void setServerType(@Nullable HttpServerType serverType) {
+        if (serverType != null) {
+            this.serverType = serverType;
+        }
     }
 
     /**
@@ -1027,7 +1075,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      *
      * @author James Kleeh
      * @author graemerocher
-     * @since @since 3.1.0
+     * @since 3.1.0
      */
     @ConfigurationProperties("responses.file")
     public static class FileTypeHandlerConfiguration {
@@ -1415,5 +1463,19 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
             @Experimental
             QUIC,
         }
+    }
+
+    /**
+     * Sets the manner in which the HTTP server is configured to receive requests.
+     */
+    public enum HttpServerType {
+        /**
+         * Requests are streamed on demand with {@link io.netty.handler.flow.FlowControlHandler} used to control back pressure.
+         */
+        STREAMED,
+        /**
+         * Execute controllers only once the full content of the request has been received.
+         */
+        FULL_CONTENT
     }
 }

@@ -11,12 +11,6 @@ micronautBuild {
 
 repositories {
     mavenCentral()
-    maven {
-        url "https://s01.oss.sonatype.org/content/repositories/snapshots/"
-        mavenContent {
-            snapshotsOnly()
-        }
-    }
 }
 
 dependencies {
@@ -24,6 +18,7 @@ dependencies {
     testImplementation project(":http-client")
     testImplementation project(":http-client-jdk")
     testImplementation project(":inject-groovy")
+    testImplementation project(":inject-groovy-test")
     testImplementation project(":http-server-netty")
     testImplementation project(":jackson-databind")
     testImplementation project(":runtime")
@@ -51,6 +46,7 @@ dependencies {
     testRuntimeOnly libs.bcpkix
 
     testImplementation libs.managed.reactor
+    testImplementation(libs.awaitility)
 }
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

@@ -1,1 +1,1 @@
-Micronaut has integrations with Spring in several forms. See the https://micronaut-projects.github.io/micronaut-spring/latest/guide[Micronaut Spring Documentation] for more information.
+Micronaut framework has integrations with Spring in several forms. See the https://micronaut-projects.github.io/micronaut-spring/latest/guide[Micronaut Spring Documentation] for more information.

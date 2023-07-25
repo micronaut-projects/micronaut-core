@@ -33,9 +33,9 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.CopyOnWriteMap;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -88,13 +88,12 @@ import java.util.function.Function;
  */
 public class DefaultMutableConversionService implements MutableConversionService {
 
-    private static final int CACHE_MAX = 150;
+    private static final int CACHE_MAX = 256;
+    private static final int CACHE_EVICTION_BATCH = 64;
     private static final TypeConverter UNCONVERTIBLE = (object, targetType, context) -> Optional.empty();
 
     private final Map<ConvertiblePair, TypeConverter> typeConverters = new ConcurrentHashMap<>();
-    private final Map<ConvertiblePair, TypeConverter> converterCache = new ConcurrentLinkedHashMap.Builder<ConvertiblePair, TypeConverter>()
-            .maximumWeightedCapacity(CACHE_MAX)
-            .build();
+    private final Map<ConvertiblePair, TypeConverter> converterCache = new ConcurrentHashMap<>();
 
     /**
      * Constructor.
@@ -120,7 +119,7 @@ public class DefaultMutableConversionService implements MutableConversionService
 
         Class<?> sourceType = object.getClass();
         final AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
-        if (annotationMetadata.hasStereotype(Format.class)) {
+        if (annotationMetadata.hasStereotypeNonRepeating(Format.class)) {
             Optional<String> formattingAnn = annotationMetadata.getAnnotationNameByStereotype(Format.class);
             String formattingAnnotation = formattingAnn.orElse(null);
             ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, formattingAnnotation);
@@ -130,7 +129,7 @@ public class DefaultMutableConversionService implements MutableConversionService
                 if (typeConverter == null) {
                     return Optional.empty();
                 } else {
-                    converterCache.put(pair, typeConverter);
+                    addToConverterCache(pair, typeConverter);
                     if (typeConverter == UNCONVERTIBLE) {
                         return Optional.empty();
                     } else {
@@ -146,10 +145,10 @@ public class DefaultMutableConversionService implements MutableConversionService
             if (typeConverter == null) {
                 typeConverter = findTypeConverter(sourceType, targetType, null);
                 if (typeConverter == null) {
-                    converterCache.put(pair, UNCONVERTIBLE);
+                    addToConverterCache(pair, UNCONVERTIBLE);
                     return Optional.empty();
                 } else {
-                    converterCache.put(pair, typeConverter);
+                    addToConverterCache(pair, typeConverter);
                     if (typeConverter == UNCONVERTIBLE) {
                         return Optional.empty();
                     } else {
@@ -171,7 +170,7 @@ public class DefaultMutableConversionService implements MutableConversionService
         if (typeConverter == null) {
             typeConverter = findTypeConverter(sourceType, targetType, null);
             if (typeConverter != null) {
-                converterCache.put(pair, typeConverter);
+                addToConverterCache(pair, typeConverter);
                 return typeConverter != UNCONVERTIBLE;
             }
             return false;
@@ -183,7 +182,7 @@ public class DefaultMutableConversionService implements MutableConversionService
     public <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
         ConvertiblePair pair = newPair(sourceType, targetType, typeConverter);
         typeConverters.put(pair, typeConverter);
-        converterCache.put(pair, typeConverter);
+        addToConverterCache(pair, typeConverter);
     }
 
     @Override
@@ -191,7 +190,14 @@ public class DefaultMutableConversionService implements MutableConversionService
         ConvertiblePair pair = new ConvertiblePair(sourceType, targetType);
         TypeConverter<S, T> typeConverter = TypeConverter.of(sourceType, targetType, function);
         typeConverters.put(pair, typeConverter);
+        addToConverterCache(pair, typeConverter);
+    }
+
+    private void addToConverterCache(ConvertiblePair pair, TypeConverter<?, ?> typeConverter) {
         converterCache.put(pair, typeConverter);
+        if (converterCache.size() > CACHE_MAX) {
+            CopyOnWriteMap.evict(converterCache, CACHE_EVICTION_BATCH);
+        }
     }
 
     /**
@@ -976,7 +982,7 @@ public class DefaultMutableConversionService implements MutableConversionService
                 ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType, formattingAnnotation);
                 typeConverter = typeConverters.get(pair);
                 if (typeConverter != null) {
-                    converterCache.put(pair, typeConverter);
+                    addToConverterCache(pair, typeConverter);
                     return typeConverter;
                 }
             }
@@ -988,7 +994,7 @@ public class DefaultMutableConversionService implements MutableConversionService
                     ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType);
                     typeConverter = typeConverters.get(pair);
                     if (typeConverter != null) {
-                        converterCache.put(pair, typeConverter);
+                        addToConverterCache(pair, typeConverter);
                         return typeConverter;
                     }
                 }

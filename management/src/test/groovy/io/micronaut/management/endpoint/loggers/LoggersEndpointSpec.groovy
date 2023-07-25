@@ -185,7 +185,7 @@ class LoggersEndpointSpec extends Specification {
 
         and:
         e.response.status == HttpStatus.BAD_REQUEST
-        e.response.getBody(Map).get()._embedded.errors[0].message.contains 'Cannot deserialize value of type `io.micronaut.logging.LogLevel` from String "FOO"'
+        e.response.getBody(Map).get()._embedded.errors[0].message.contains 'Failed to convert argument [configuredLevel] for value [null] due to: Cannot deserialize value of type `io.micronaut.logging.LogLevel` from String "FOO": not one of the values accepted for Enum class: [ALL, DEBUG, NOT_SPECIFIED, TRACE, WARN, ERROR, INFO, OFF]'
     }
 
     void 'test that an attempt to set ROOT logger to NOT_SPECIFIED level will fail'() {

@@ -17,14 +17,22 @@ package io.micronaut.http;
 
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.type.Headers;
-import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.util.HttpHeadersUtil;
+import jakarta.annotation.Nullable;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.OptionalLong;
 
 /**
  * Constants for common HTTP headers. See https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html.
@@ -688,29 +696,53 @@ public interface HttpHeaders extends Headers {
      * @return A list of zero or many {@link MediaType} instances
      */
     default List<MediaType> accept() {
-        final List<String> values = getAll(HttpHeaders.ACCEPT);
-        if (!values.isEmpty()) {
-            List<MediaType> mediaTypes = new ArrayList<>(10);
-            for (String value : values) {
-                for (String token : StringUtils.splitOmitEmptyStrings(value, ',')) {
+        return MediaType.orderedOf(getAll(HttpHeaders.ACCEPT));
+    }
+
+    /**
+     * The {@code Accept-Charset} header, or {@code null} if unset.
+     *
+     * @return The {@code Accept-Charset} header
+     * @since 4.0.0
+     */
+    @Nullable
+    default Charset acceptCharset() {
+        return findFirst(HttpHeaders.ACCEPT_CHARSET)
+            .map(text -> {
+                text = HttpHeadersUtil.splitAcceptHeader(text);
+                if (text != null) {
                     try {
-                        mediaTypes.add(MediaType.of(token));
-                    } catch (IllegalArgumentException e) {
-                        // ignore
+                        return Charset.forName(text);
+                    } catch (Exception ignored) {
                     }
                 }
-            }
-            return mediaTypes;
-        } else {
-            return Collections.emptyList();
-        }
+                // default to UTF-8
+                return StandardCharsets.UTF_8;
+            })
+            .orElse(null);
+    }
+
+    /**
+     * The {@code Accept-Language} header, or {@code null} if unset.
+     *
+     * @return The {@code Accept-Language} header
+     * @since 4.0.0
+     */
+    @Nullable
+    default Locale acceptLanguage() {
+        return findFirst(HttpHeaders.ACCEPT_LANGUAGE)
+            .map(text -> {
+                String part = HttpHeadersUtil.splitAcceptHeader(text);
+                return part == null ? Locale.getDefault() : Locale.forLanguageTag(part);
+            })
+            .orElse(null);
     }
 
     /**
      * @return Whether the {@link HttpHeaders#CONNECTION} header is set to Keep-Alive
      */
     default boolean isKeepAlive() {
-        return getFirst(CONNECTION, ConversionContext.STRING)
+        return findFirst(CONNECTION)
                  .map(val -> val.equalsIgnoreCase(HttpHeaderValues.CONNECTION_KEEP_ALIVE)).orElse(false);
     }
 

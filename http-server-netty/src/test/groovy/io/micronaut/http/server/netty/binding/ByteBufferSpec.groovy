@@ -2,8 +2,10 @@ package io.micronaut.http.server.netty.binding
 
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.async.annotation.SingleResult
 import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.core.io.buffer.ByteBufferFactory
+import io.micronaut.core.io.buffer.ReferenceCounted
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
@@ -22,7 +24,6 @@ import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Specification
-import io.micronaut.core.async.annotation.SingleResult
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CompletableFuture
@@ -98,12 +99,20 @@ class ByteBufferSpec extends Specification {
 
         @Post(uri = "/buffer-test", processes = MediaType.TEXT_PLAIN)
         Publisher<String> buffer(@Body Publisher<ByteBuffer> body) {
-            return Flux.from(body).map({ buffer -> buffer.toString(StandardCharsets.UTF_8) })
+            return Flux.from(body).map({ buffer ->
+                String s = buffer.toString(StandardCharsets.UTF_8)
+                if (buffer instanceof ReferenceCounted) buffer.release()
+                return s
+            })
         }
 
         @Post(uri = "/buffer-completable", processes = MediaType.TEXT_PLAIN)
         CompletableFuture<String> buffer(@Body CompletableFuture<ByteBuffer> body) {
-            return body.thenApply({ buffer -> buffer.toString(StandardCharsets.UTF_8) })
+            return body.thenApply({ buffer ->
+                String s = buffer.toString(StandardCharsets.UTF_8)
+                if (buffer instanceof ReferenceCounted) buffer.release()
+                return s
+            })
         }
 
         @Get(uri = "/bytes", produces = MediaType.IMAGE_JPEG)

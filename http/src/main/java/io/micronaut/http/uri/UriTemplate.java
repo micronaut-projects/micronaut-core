@@ -75,6 +75,8 @@ public class UriTemplate implements Comparable<UriTemplate> {
     protected final String templateString;
     final List<PathSegment> segments = new ArrayList<>();
 
+    private String asString;
+
     /**
      * Construct a new URI template for the given template.
      *
@@ -247,7 +249,10 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
     @Override
     public String toString() {
-        return toString(pathSegment -> true);
+        if (asString == null) {
+            asString = toString(pathSegment -> true);
+        }
+        return asString;
     }
 
     @Override

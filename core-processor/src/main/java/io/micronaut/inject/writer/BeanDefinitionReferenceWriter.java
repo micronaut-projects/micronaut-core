@@ -33,6 +33,7 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.visitor.VisitorContext;
 import jakarta.inject.Singleton;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Type;
@@ -91,13 +92,16 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
      * Default constructor.
      *
      * @param visitor      The visitor
+     * @param visitorContext          The visitor context
      */
-    public BeanDefinitionReferenceWriter(BeanDefinitionVisitor visitor) {
+    public BeanDefinitionReferenceWriter(BeanDefinitionVisitor visitor,
+                                         VisitorContext visitorContext) {
         super(
                 visitor.getBeanDefinitionName() + REF_SUFFIX,
                 visitor,
                 visitor.getAnnotationMetadata(),
-                true);
+                true,
+                visitorContext);
         this.providedType = visitor.getProvidedType();
         this.beanTypeName = visitor.getBeanTypeName();
         this.typeParameters = visitor.getTypeArgumentMap();

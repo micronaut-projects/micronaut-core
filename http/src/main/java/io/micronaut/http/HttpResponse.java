@@ -428,4 +428,25 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     default Optional<Cookie> getCookie(String name) {
         throw new UnsupportedOperationException("Operation not supported on a " + this.getClass() + " response.");
     }
+
+    /**
+     * Returns a mutable response based on this response.
+     * @return the mutable response
+     * @since 4.0.0
+     */
+    default MutableHttpResponse<?> toMutableResponse() {
+        if (this instanceof MutableHttpResponse<?> mutableHttpResponse) {
+            return mutableHttpResponse;
+        }
+        MutableHttpResponse<?> mutableHttpResponse = HttpResponse.status(code(), reason());
+        mutableHttpResponse.body(body());
+        getHeaders().forEach((name, value) -> {
+            for (String val : value) {
+                mutableHttpResponse.header(name, val);
+            }
+        });
+        mutableHttpResponse.getAttributes().putAll(getAttributes());
+        return mutableHttpResponse;
+    }
+
 }

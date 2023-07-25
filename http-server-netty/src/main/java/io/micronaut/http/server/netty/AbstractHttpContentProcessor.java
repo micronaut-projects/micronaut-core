@@ -78,7 +78,7 @@ public abstract class AbstractHttpContentProcessor implements HttpContentProcess
      * @param message The message to release
      */
     protected void fireExceedsLength(long receivedLength, long expected, ByteBufHolder message) {
-        ReferenceCountUtil.safeRelease(message);
+        message.release();
         throw new ContentLengthExceededException(expected, receivedLength);
     }
 }

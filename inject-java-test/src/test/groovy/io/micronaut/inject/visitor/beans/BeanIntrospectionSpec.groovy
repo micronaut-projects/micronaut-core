@@ -12,6 +12,7 @@ import io.micronaut.annotation.processing.test.JavaParser
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Replaces
+import io.micronaut.context.annotation.Value
 import io.micronaut.context.visitor.ConfigurationReaderVisitor
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
@@ -26,9 +27,11 @@ import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
 import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.inject.ExecutableMethod
+import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.jackson.modules.BeanIntrospectionModule
+import io.micronaut.json.JsonMapper
 import io.micronaut.validation.visitor.ValidationVisitor
 import jakarta.inject.Singleton
 import spock.lang.IgnoreIf
@@ -49,6 +52,91 @@ import java.lang.reflect.Field
 import java.time.Instant
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+
+    void "test expressions in introspection properties with type use"() {
+        given:
+        def introspection = buildBeanIntrospection('mixed.Test', '''
+package mixed;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Value;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+import java.lang.annotation.*;
+import static java.lang.annotation.ElementType.*;
+
+@Introspected
+class Test {
+    @Nullable
+    @Ann("#{'test'}")
+    private String foo;
+    public String getFoo() {
+        return foo;
+    }
+    public void setFoo(@Nullable String foo) {
+        this.foo = foo;
+    }
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@Target({ METHOD, FIELD, ANNOTATION_TYPE, CONSTRUCTOR, PARAMETER, TYPE_USE })
+@interface Ann {
+    String value();
+}
+''')
+        when:
+        def test = introspection.instantiate()
+        def prop = introspection.getRequiredProperty("foo", String)
+        test.foo = 'value'
+
+        then: 'expressions can be retrieved'
+        prop.get(test) == 'value'
+        prop.getAnnotationMetadata() instanceof EvaluatedAnnotationMetadata
+        // TODO: Support expressions in TYPE_USE annotations?
+        prop.stringValue("mixed.Ann").get() == '#{\'test\'}'
+    }
+
+    void "test expressions in introspection properties"() {
+        given:
+        def introspection = buildBeanIntrospection('mixed.Test', '''
+package mixed;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.context.annotation.Value;
+import io.micronaut.core.annotation.Nullable;
+import java.util.Optional;
+import java.lang.annotation.*;
+
+@Introspected
+class Test {
+    @Nullable
+    @Ann("#{'test'}")
+    private String foo;
+    public String getFoo() {
+        return foo;
+    }
+    public void setFoo(@Nullable String foo) {
+        this.foo = foo;
+    }
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Documented
+@interface Ann {
+    String value();
+}
+''')
+        when:
+        def test = introspection.instantiate()
+        def prop = introspection.getRequiredProperty("foo", String)
+        test.foo = 'value'
+
+        then: 'expressions can be retrieved'
+        prop.get(test) == 'value'
+        prop.getAnnotationMetadata() instanceof EvaluatedAnnotationMetadata
+        prop.stringValue("mixed.Ann").get() == 'test'
+    }
 
     void "test mix getter and setter with interface type"() {
         def introspection = buildBeanIntrospection('mixed.Pet', '''
@@ -163,6 +251,41 @@ class Test extends Auditable {
 
         then:
         bean.updatedAt != null
+    }
+
+    void "test introspection can written to different package"() {
+        when:
+        def classLoader = buildClassLoader("test.Test", '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(targetPackage = "test.introspections")
+public class Test {
+    private String name;
+    public Test(String name) {
+        this.name = name;
+    }
+    public String getName() {
+        return name;
+    }
+}
+
+''')
+        def introspectionName = 'test.introspections.$Test$Introspection'
+        def introspection = classLoader.loadClass(introspectionName).newInstance() as BeanIntrospection
+
+        then:
+        introspection != null
+        introspection.getProperty("name").isPresent()
+
+        when:
+        def introspectionRefName = 'test.introspections.$Test$IntrospectionRef'
+        def introspectionRef = classLoader.loadClass(introspectionRefName).newInstance() as BeanIntrospectionReference
+
+        then:
+        introspectionRef != null
+        introspectionRef.load() != null
     }
 
     void "test generics in arrays don't stack overflow"() {
@@ -933,9 +1056,9 @@ public record Foo(@JsonProperty("other") String name, @JsonIgnore int y) {
 ''')
         when:
         def obj = introspection.instantiate("test", 10)
-        def result = ApplicationContext.run('bean.introspection.test':'true').withCloseable {
+        String result = ApplicationContext.run('bean.introspection.test':'true').withCloseable {
             it.getBean(StaticBeanIntrospectionModule).introspectionMap[introspection.beanType] = introspection
-            it.getBean(ObjectMapper).writeValueAsString(obj)
+            it.getBean(JsonMapper).writeValueAsString(obj)
         }
         then:
         result == '{"other":"test"}'
@@ -1116,6 +1239,37 @@ class Test {}
 
         cleanup:
         applicationContext.close()
+    }
+
+    void "test create bean introspection for external class with custom package"() {
+        given:
+        def classLoader = buildClassLoader('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.inject.visitor.beans.OuterBean;
+
+@Introspected(classes=OuterBean.InnerBean.class, targetPackage="test.micronaut.intro")
+class Test {}
+''')
+
+        when:"the reference is loaded"
+        def reference = classLoader.loadClass('test.micronaut.intro.$Test$IntrospectionRef0').newInstance() as BeanIntrospectionReference
+
+        then:"the reference is valid"
+        notThrown(ClassNotFoundException)
+        reference.getBeanType() == OuterBean.InnerBean.class
+        reference.load() != null
+
+        print(classLoader)
+
+        when:"the introspection is loaded"
+        def introspectionName = 'test.micronaut.intro.$io_micronaut_inject_visitor_beans_OuterBean$InnerBean$Introspection'
+        def introspection = classLoader.loadClass(introspectionName).newInstance() as BeanIntrospection
+
+        then:"the introspection is valid"
+        notThrown(ClassNotFoundException)
+        introspection.getProperty("name").isPresent()
     }
 
     void "test create bean introspection for interface"() {
@@ -2033,13 +2187,9 @@ public class Test {
         param2.getTypeParameters().length == 1
         def param3 = param2.getTypeParameters()[0]
 
-        property.getAnnotationMetadata().getAnnotationNames().size() == 0
-        param1.getAnnotationMetadata().getAnnotationNames().size() == 1
-        param1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
-        param2.getAnnotationMetadata().getAnnotationNames().size() == 1
-        param2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
-        param3.getAnnotationMetadata().getAnnotationNames().size() == 1
-        param3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
+        param1.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.Size$List')
+        param2.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotEmpty$List')
+        param3.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotNull$List')
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2083')

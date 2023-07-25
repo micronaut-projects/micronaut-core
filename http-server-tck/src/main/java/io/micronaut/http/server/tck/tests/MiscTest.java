@@ -30,9 +30,10 @@ import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
+import jakarta.validation.constraints.NotBlank;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
-import jakarta.validation.constraints.NotBlank;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.Map;
@@ -89,6 +90,7 @@ public class MiscTest {
     }
 
     @Test
+    @Disabled("not supported anymore")
     void postFormUrlEncodedBodyBindingToPojoWorksIfYouDontSpecifyBodyAnnotation() throws IOException {
         asserts(SPEC_NAME,
             HttpRequest.POST("/form/without-body-annotation", "message=World")
@@ -126,6 +128,7 @@ public class MiscTest {
     }
 
     @Test
+    @Disabled("not supported anymore")
     void applicationJsonWithoutBodyAnnotation() throws IOException {
         asserts(SPEC_NAME,
             HttpRequest.POST("/form/json-without-body-annotation", "{\"message\":\"World\"}")

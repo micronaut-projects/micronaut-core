@@ -19,7 +19,7 @@ import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
 import io.micronaut.web.router.Router;
-import io.micronaut.web.router.UriRoute;
+import io.micronaut.web.router.UriRouteInfo;
 
 import java.util.Comparator;
 import java.util.stream.Stream;
@@ -52,10 +52,8 @@ public class RoutesEndpoint {
     @Read
     @SingleResult
     public Object getRoutes() {
-        Stream<UriRoute> uriRoutes = router.uriRoutes()
-                .sorted(Comparator
-                        .comparing((UriRoute r) -> r.getUriMatchTemplate().toPathString())
-                        .thenComparing(UriRoute::getHttpMethodName));
+        Stream<UriRouteInfo<?, ?>> uriRoutes = router.uriRoutes()
+                .sorted(Comparator.comparing((UriRouteInfo<?, ?> r) -> r.getUriMatchTemplate().toPathString()).thenComparing(UriRouteInfo::getHttpMethodName));
         return routeDataCollector.getData(uriRoutes);
     }
 }

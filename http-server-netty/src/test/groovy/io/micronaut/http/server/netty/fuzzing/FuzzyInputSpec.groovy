@@ -5,7 +5,6 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
-import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry
 import io.micronaut.http.server.netty.NettyHttpServer
@@ -22,7 +21,6 @@ import io.netty.util.ReferenceCountUtil
 import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
 import spock.lang.Specification
-
 /**
  * HTTP inputs generated from fuzzing.
  */
@@ -85,7 +83,7 @@ class FuzzyInputSpec extends Specification {
         when:
         def embeddedChannel = embeddedServer.buildEmbeddedChannel(false)
 
-        embeddedChannel.writeOneInbound(Unpooled.wrappedBuffer(input));
+        embeddedChannel.writeInbound(Unpooled.wrappedBuffer(input));
         embeddedChannel.runPendingTasks();
 
         embeddedChannel.releaseOutbound()
@@ -99,10 +97,6 @@ class FuzzyInputSpec extends Specification {
         embeddedChannel.checkException()
 
         BufferLeakDetection.stopTrackingAndReportLeaks()
-
-        cleanup:
-        // normally this is set on the event loop and so doesn't persist across tests, but with EmbeddedChannel we don't make a new thread
-        ServerRequestContext.set(null)
 
         where:
         input << [

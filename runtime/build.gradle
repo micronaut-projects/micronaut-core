@@ -8,6 +8,7 @@ dependencies {
     api project(':aop')
     api project(':discovery-core')
     api project(':context')
+    api project(':context-propagation')
     api project(":core-reactive")
     api project(":http")
     api project(':inject')
@@ -18,11 +19,11 @@ dependencies {
     compileOnly libs.graal
     compileOnly libs.jcache
 
-    compileOnly libs.javax.el
+    compileOnly libs.jakarta.el
     compileOnly libs.caffeine
-    compileOnly libs.kotlinx.coroutines.core
-    compileOnly libs.kotlinx.coroutines.reactive
-    testImplementation libs.managed.logback.classic
+    compileOnly libs.managed.kotlinx.coroutines.core
+    compileOnly libs.managed.kotlinx.coroutines.reactive
+    testImplementation libs.logback.classic
     testImplementation libs.managed.snakeyaml
     testAnnotationProcessor project(":inject-java")
     testImplementation libs.jsr107

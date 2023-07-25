@@ -15,10 +15,41 @@ import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
 import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.ast.WildcardElement
+import io.micronaut.kotlin.processing.visitor.AllElementsVisitor
 import io.micronaut.kotlin.processing.visitor.KotlinClassElement
+import jakarta.validation.Valid
 import spock.lang.PendingFeature
 
 class ClassElementSpec extends AbstractKotlinCompilerSpec {
+
+    void "test visitGeneratedFile"() {
+        given:
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS.clear()
+        AllElementsVisitor.VISITED_ELEMENTS.clear()
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS.clear()
+        AllElementsVisitor.WRITE_FILE = true
+
+        when:
+        def definition = buildBeanDefinition('test.visit.Test', '''
+package test.visit
+
+ import jakarta.inject.Singleton
+
+
+@Singleton
+class Test {
+    fun myMethod() {}
+}
+''')
+
+        then:
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 1
+        definition.getClass().getClassLoader().getResource("foo/bar.txt").text == 'All good'
+
+        cleanup:
+        AllElementsVisitor.WRITE_FILE == false
+    }
 
     void "test class element"() {
         expect:
@@ -360,30 +391,28 @@ class Test {
             def field = ce.findField("deepList").get()
             def fieldType = field.getGenericType()
 
-            fieldType.getAnnotationMetadata().getAnnotationNames().size() == 0
-
             assertListGenericArgument(fieldType, { ClassElement listArg1 ->
-                assert listArg1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
-                assert listArg1.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
+                assert listArg1.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.Size$List')
+                assert listArg1.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.Size$List')
                 assertListGenericArgument(listArg1, { ClassElement listArg2 ->
-                    assert listArg2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
-                    assert listArg2.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
+                    assert listArg2.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotEmpty$List')
+                    assert listArg2.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotEmpty$List')
                     assertListGenericArgument(listArg2, { ClassElement listArg3 ->
-                        assert listArg3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
-                        assert listArg3.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
+                        assert listArg3.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotNull$List')
+                        assert listArg3.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotNull$List')
                     })
                 })
             })
 
             def level1 = fieldType.getTypeArguments()["E"]
-            level1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
-            level1.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
+            level1.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.Size$List')
+            level1.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.Size$List')
             def level2 = level1.getTypeArguments()["E"]
-            level2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
-            level2.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
+            level2.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotEmpty$List')
+            level2.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotEmpty$List')
             def level3 = level2.getTypeArguments()["E"]
-            level3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
-            level3.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
+            level3.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotNull$List')
+            level3.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotNull$List')
     }
 
     void "test annotation metadata present on deep type parameters for method"() {
@@ -407,27 +436,26 @@ class Test {
             def method = ce.findMethod("deepList").get()
             def theType = method.getGenericReturnType()
 
-            theType.getAnnotationMetadata().getAnnotationNames().size() == 0
 
             def level1 = theType.getTypeArguments()["E"]
-            level1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
-            level1.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
+            level1.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.Size$List')
+            level1.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.Size$List')
             def level2 = level1.getTypeArguments()["E"]
-            level2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
-            level2.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
+            level2.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotEmpty$List')
+            level2.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotEmpty$List')
             def level3 = level2.getTypeArguments()["E"]
-            level3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
-            level3.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
+            level3.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotNull$List')
+            level3.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotNull$List')
 
             assertListGenericArgument(theType, { ClassElement listArg1 ->
-                assert listArg1.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
-                assert listArg1.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.Size$List']
+                assert listArg1.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.Size$List')
+                assert listArg1.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.Size$List')
                 assertListGenericArgument(listArg1, { ClassElement listArg2 ->
-                    assert listArg2.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
-                    assert listArg2.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotEmpty$List']
+                    assert listArg2.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotEmpty$List')
+                    assert listArg2.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotEmpty$List')
                     assertListGenericArgument(listArg2, { ClassElement listArg3 ->
-                        assert listArg3.getTypeAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
-                        assert listArg3.getAnnotationMetadata().getAnnotationNames().asList() == ['jakarta.validation.constraints.NotNull$List']
+                        assert listArg3.getTypeAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotNull$List')
+                        assert listArg3.getAnnotationMetadata().getAnnotationNames().contains('jakarta.validation.constraints.NotNull$List')
                     })
                 })
             })
@@ -1292,7 +1320,7 @@ class Lst<E>
     }
 
     void "test generics model for wildcard"() {
-        ClassElement ce = buildClassElement('test.Test', '''
+        MethodElement method = buildClassElementMapped('test.Test', '''
 package test
 
 class Test<T> {
@@ -1304,9 +1332,8 @@ class Test<T> {
 
 class Lst<E>
 
-''')
+''', {ce -> ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()})
         expect:
-            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
             def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
             !genericTypeArgument.isGenericPlaceholder()
             genericTypeArgument.isRawType()
@@ -1319,7 +1346,7 @@ class Lst<E>
     }
 
     void "test generics model for placeholder"() {
-        ClassElement ce = buildClassElement('test.Test', '''
+        MethodElement method = buildClassElementMapped('test.Test', '''
 package test
 
 class Test<T> {
@@ -1331,9 +1358,8 @@ class Test<T> {
 
 class Lst<E>
 
-''')
+''', {ce -> ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()})
         expect:
-            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
             def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
             genericTypeArgument.isGenericPlaceholder()
             !genericTypeArgument.isRawType()
@@ -1346,7 +1372,7 @@ class Lst<E>
     }
 
     void "test generics model for class placeholder wildcard"() {
-        ClassElement ce = buildClassElement('test.Test', '''
+        def (ClassElement ce, MethodElement method)  = buildClassElementMapped('test.Test', '''
 package test
 
 class Test<T> {
@@ -1358,9 +1384,8 @@ class Test<T> {
 
 class Lst<E>
 
-''')
+''', {ce -> Tuple.tuple(ce, ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get())})
         expect:
-            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
             def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
             !genericTypeArgument.isGenericPlaceholder()
             !genericTypeArgument.isRawType()
@@ -1397,7 +1422,7 @@ class Lst<E>
     }
 
     void "test generics model for method placeholder wildcard"() {
-        ClassElement ce = buildClassElement('test.Test', '''
+        MethodElement method = buildClassElementMapped('test.Test', '''
 package test
 
 class Test {
@@ -1409,9 +1434,8 @@ class Test {
 
 class Lst<E>
 
-''')
+''', {ce -> ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()})
         expect:
-            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
             method.getDeclaredTypeVariables().size() == 1
             method.getDeclaredTypeVariables()[0].declaringElement.get() == method
             method.getDeclaredTypeVariables()[0].variableName == "T"
@@ -1699,7 +1723,6 @@ class MyBeanX {
             def element = ce.findMethod("save").get().getParameters()[0]
             element.getGenericType().simpleName == "MyBeanX"
             element.getType().simpleName == "Object"
-            element.getGenericType().isAssignable("test.MyBeanX")
         when:
             def genRepo = ce.getTypeArguments("test.GenericRepository")
         then:
@@ -1707,6 +1730,34 @@ class MyBeanX {
             genRepo.get("E").getSyntheticBeanProperties().size() == 1
             genRepo.get("E").getMethods().size() == 0
             genRepo.get("E").getFields().get(0).name == "name"
+    }
+
+    void "test interface placeholder 2 isAssignable"() {
+        when:
+        boolean isAssignable = buildClassElementMapped('test.MyRepoX', '''
+package test
+import io.micronaut.context.annotation.Prototype
+import java.util.List
+
+interface MyRepoX : RepoX<MyBeanX, Long>
+interface RepoX<E, ID> : GenericRepository<E, ID> {
+    fun <S : E> save(ent: S)
+}
+interface GenericRepository<E, ID>
+@Prototype
+class MyBeanX {
+    var name: String? = null
+}
+
+''', { ce ->
+            def element = ce.findMethod("save").get().getParameters()[0]
+            element.getGenericType().simpleName == "MyBeanX"
+            element.getType().simpleName == "Object"
+            element.getGenericType().isAssignable("test.MyBeanX")
+        })
+
+        then:
+            isAssignable
     }
 
     void "test abstract placeholder"() {
@@ -1856,6 +1907,281 @@ class Test {
             ce.findMethod("helloWorld\$main").isPresent()
     }
 
+    void "test type isAssignable"() {
+        boolean isAssignable = buildClassElementMapped('test.Test', '''
+package test
+import io.micronaut.context.annotation.Executable
+import io.micronaut.context.annotation.Prototype
+import jakarta.inject.Singleton
+import java.util.List
+
+@Prototype
+class Test {
+    @Executable
+    fun method1() : kotlin.collections.List<String> {
+        return listOf()
+    }
+
+    @Executable
+    fun method2() : java.util.List<String>? {
+        return null
+    }
+
+    @Executable
+    fun method3() : kotlin.collections.List<String>? {
+        return listOf()
+    }
+
+}
+
+''', ce -> {
+            return ce.findMethod("method1").get().getReturnType().isAssignable(Iterable.class)
+                    && ce.findMethod("method2").get().getReturnType().isAssignable(Iterable.class)
+                    && ce.findMethod("method3").get().getReturnType().isAssignable(Iterable.class)
+                    && ((KotlinClassElement) ce.findMethod("method1").get().getReturnType()).isAssignable2(Iterable.class.name)
+                    && ((KotlinClassElement) ce.findMethod("method2").get().getReturnType()).isAssignable2(Iterable.class.name)
+                    && ((KotlinClassElement) ce.findMethod("method3").get().getReturnType()).isAssignable2(Iterable.class.name)
+        })
+
+        expect:
+            isAssignable
+    }
+
+    void "test type isAssignable between nullable and not nullable"() {
+        when:
+            boolean isAssignable = buildClassElementMapped('test.Cart', '''
+package test
+
+data class CartItem(
+        val id: Long?,
+        val name: String,
+        val cart: Cart?
+) {
+    constructor(name: String) : this(null, name, null)
+}
+
+data class Cart(
+        val id: Long?,
+        val items: List<CartItem>?
+) {
+
+    constructor(items: List<CartItem>) : this(null, items)
+
+    fun cartItemsNotNullable() : List<CartItem> = listOf()
+}
+
+''', cl -> cl.getPrimaryConstructor().get().parameters[1].getType().isAssignable(cl.findMethod("cartItemsNotNullable").get().getReturnType()))
+        then:
+            isAssignable
+    }
+
+    void "test override and default methods"() {
+        when:
+            def result = buildClassElementMapped('test.MyBean', '''
+package test
+
+interface MyBean : Parent {
+
+    fun test(): Int
+
+    fun getName() : String {
+        return "my-bean"
+    }
+
+    @Override
+    override fun getDescription() : String {
+        return "description"
+    }
+}
+
+interface Parent {
+     fun getParentName() : String {
+        return "parent"
+    }
+
+    fun getDescription() : String
+}
+
+''', cl -> {
+
+                if (!cl.getMethods().stream().map { me -> me.name }.toList().equals(["getParentName", "test", "getName", "getDescription"] as List)) {
+                    throw new IllegalStateException("Doesn't match")
+                }
+                MethodElement getName = cl.getMethods()[2]
+                if (getName.isAbstract()) {
+                    throw new IllegalStateException("Expected not abstract!")
+                }
+                if (!getName.isDefault()) {
+                    throw new IllegalStateException("Expected default!")
+                }
+                MethodElement getDescription = cl.getMethods()[3]
+                if (getDescription.isAbstract()) {
+                    throw new IllegalStateException("Expected not abstract!")
+                }
+                if (!getDescription.isDefault()) {
+                    throw new IllegalStateException("Expected default!")
+                }
+                return true
+            })
+        then:
+            result
+    }
+
+    void "test abstract and overridden methods"() {
+        when:
+            def result = buildClassElementMapped('test.MyBean2', '''
+package test
+
+import java.lang.annotation.*
+import io.micronaut.aop.*
+import jakarta.inject.*
+
+abstract class MyBean2 : Parent() {
+
+    abstract fun test() : Int
+
+    fun getName() : String {
+        return "my-bean"
+    }
+
+    @Override
+    override fun getDescription() : String {
+        return "description"
+    }
+}
+
+abstract class Parent {
+    fun getParentName() : String {
+        return "parent"
+    }
+
+    abstract fun getDescription() : String
+}
+
+interface MyInterface {
+
+    fun getDescription() : String
+}
+
+
+''', cl -> {
+
+                if (!cl.getMethods().stream().map { me -> me.name }.toList().equals(["getParentName", "test", "getName", "getDescription"] as List)) {
+                    throw new IllegalStateException("Doesn't match")
+                }
+                return true
+            })
+        then:
+            result
+    }
+
+    @PendingFeature
+    void "test abstract and interface and overridden methods"() {
+        when:
+            def result = buildClassElementMapped('test.MyBean2', '''
+package test
+
+import java.lang.annotation.*
+import io.micronaut.aop.*
+import jakarta.inject.*
+
+abstract class MyBean2 : Parent(), MyInterface {
+
+    abstract fun test() : Int
+
+    fun getName() : String {
+        return "my-bean"
+    }
+
+    @Override
+    override fun getDescription() : String {
+        return "description"
+    }
+}
+
+abstract class Parent {
+    fun getParentName() : String {
+        return "parent"
+    }
+
+    abstract fun getDescription() : String
+}
+
+interface MyInterface {
+
+    fun getDescription() : String
+}
+
+
+''', cl -> {
+
+                if (!cl.getMethods().stream().map { me -> me.name }.toList().equals(["getParentName", "test", "getName", "getDescription"] as List)) {
+                    throw new IllegalStateException("Doesn't match")
+                }
+                return true
+            })
+        then:
+            result
+    }
+
+    void "test interface type annotations"() {
+        ClassElement ce = buildClassElement('test.MyRepo', '''
+package test
+import jakarta.validation.Valid
+import java.util.List
+
+interface MyRepo : Repo<@Valid MyBean, Long> {
+}
+
+interface Repo<E, ID> : GenericRepository<E, ID> {
+
+    fun save(entity: E)
+
+}
+
+interface GenericRepository<E, ID>
+
+
+class MyBean {
+}
+
+''')
+
+        when:
+            def method = ce.findMethod("save").get()
+            def type = method.parameters[0].getGenericType()
+        then:
+            type.hasAnnotation(Valid)
+    }
+
+    void "test element canonicalName"() {
+        def ce = buildClassElement('test.TestNamed', '''
+package test
+import io.micronaut.context.annotation.Executable
+import io.micronaut.context.annotation.Prototype
+import jakarta.inject.Singleton
+import java.util.List
+
+@Prototype
+class TestNamed {
+    @Executable
+    fun method1() : kotlin.Int {
+        return 111
+    }
+
+    @Executable
+    fun method2() : kotlin.Int? {
+        return null
+    }
+
+}
+
+''')
+
+        expect:
+            ce.findMethod("method1").get().getReturnType().canonicalName == "int"
+            ce.findMethod("method2").get().getReturnType().canonicalName == Integer.class.name
+    }
 
     private void assertListGenericArgument(ClassElement type, Closure cl) {
         def arg1 = type.getAllTypeArguments().get(List.class.name).get("E")

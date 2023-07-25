@@ -22,10 +22,14 @@ import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.http.HttpHeaderValues;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.util.HttpHeadersUtil;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaderValidationUtil;
+import jakarta.annotation.Nullable;
 
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -36,7 +40,9 @@ import java.util.Base64;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -49,8 +55,8 @@ import java.util.stream.Collectors;
 @Internal
 public class NettyHttpHeaders implements MutableHttpHeaders {
 
-    io.netty.handler.codec.http.HttpHeaders nettyHeaders;
-    ConversionService conversionService;
+    private final io.netty.handler.codec.http.HttpHeaders nettyHeaders;
+    private ConversionService conversionService;
 
     /**
      * @param nettyHeaders      The Netty Http headers
@@ -65,11 +71,13 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
      * Default constructor.
      */
     public NettyHttpHeaders() {
-        this.nettyHeaders = new DefaultHttpHeaders();
+        this.nettyHeaders = new DefaultHttpHeaders(false);
         this.conversionService = ConversionService.SHARED;
     }
 
     /**
+     * Note: Caller must take care to validate headers inserted into this object!
+     *
      * @return The underlying Netty headers.
      */
     public io.netty.handler.codec.http.HttpHeaders getNettyHeaders() {
@@ -79,15 +87,6 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     @Override
     public final boolean contains(String name) {
         return nettyHeaders.contains(name);
-    }
-
-    /**
-     * Sets the underlying netty headers.
-     *
-     * @param headers The Netty http headers
-     */
-    void setNettyHeaders(io.netty.handler.codec.http.HttpHeaders headers) {
-        this.nettyHeaders = headers;
     }
 
     @Override
@@ -133,15 +132,42 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     }
 
     @Override
+    public Optional<String> findFirst(CharSequence name) {
+        // optimization to avoid ConversionService
+        return Optional.ofNullable(get(name));
+    }
+
+    @Override
     public MutableHttpHeaders add(CharSequence header, CharSequence value) {
+        validateHeader(header, value);
         nettyHeaders.add(header, value);
         return this;
     }
 
     @Override
     public MutableHeaders set(CharSequence header, CharSequence value) {
+        validateHeader(header, value);
         nettyHeaders.set(header, value);
         return this;
+    }
+
+    /**
+     * Like {@link #set(CharSequence, CharSequence)} but without header validation.
+     *
+     * @param header The header name
+     * @param value  The header value
+     */
+    public void setUnsafe(CharSequence header, CharSequence value) {
+        nettyHeaders.set(header, value);
+    }
+
+    public static void validateHeader(CharSequence name, CharSequence value) {
+        if (name == null || name.isEmpty() || HttpHeaderValidationUtil.validateToken(name) != -1) {
+            throw new IllegalArgumentException("Invalid header name");
+        }
+        if (HttpHeaderValidationUtil.validateValidHeaderValue(value) != -1) {
+            throw new IllegalArgumentException("Invalid header value");
+        }
     }
 
     @Override
@@ -241,5 +267,71 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     @Override
     public void setConversionService(ConversionService conversionService) {
         this.conversionService = conversionService;
+    }
+
+    @Override
+    public Optional<MediaType> contentType() {
+        // optimization to avoid ConversionService
+        String str = get(HttpHeaderNames.CONTENT_TYPE);
+        if (str != null) {
+            try {
+                return Optional.of(MediaType.of(str));
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
+    public OptionalLong contentLength() {
+        // optimization to avoid ConversionService
+        Optional<String> str = findFirst(HttpHeaderNames.CONTENT_LENGTH);
+        if (str.isPresent()) {
+            try {
+                return OptionalLong.of(Long.parseLong(str.get()));
+            } catch (NumberFormatException ignored) {
+            }
+        }
+        return OptionalLong.empty();
+    }
+
+    @Override
+    public List<MediaType> accept() {
+        // use HttpHeaderNames instead of HttpHeaders
+        return MediaType.orderedOf(getAll(HttpHeaderNames.ACCEPT));
+    }
+
+    @Nullable
+    @Override
+    public Charset acceptCharset() {
+        String text = get(HttpHeaderNames.ACCEPT_CHARSET);
+        if (text == null) {
+            return null;
+        }
+        text = HttpHeadersUtil.splitAcceptHeader(text);
+        if (text != null) {
+            try {
+                return Charset.forName(text);
+            } catch (Exception ignored) {
+            }
+        }
+        // default to UTF-8
+        return StandardCharsets.UTF_8;
+    }
+
+    @Nullable
+    @Override
+    public Locale acceptLanguage() {
+        String text = get(HttpHeaderNames.ACCEPT_LANGUAGE);
+        if (text == null) {
+            return null;
+        }
+        String part = HttpHeadersUtil.splitAcceptHeader(text);
+        return part == null ? Locale.getDefault() : Locale.forLanguageTag(part);
+    }
+
+    @Override
+    public Optional<String> getOrigin() {
+        return findFirst(HttpHeaderNames.ORIGIN);
     }
 }

@@ -25,8 +25,8 @@ import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
-import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.handler.codec.http.multipart.HttpDataFactory;
+import io.netty.handler.codec.http.multipart.HttpPostMultipartRequestDecoder;
 import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
 import io.netty.handler.codec.http.multipart.HttpPostStandardRequestDecoder;
 import io.netty.handler.codec.http.multipart.InterfaceHttpData;
@@ -38,7 +38,7 @@ import java.util.Collection;
 
 /**
  * <p>Decodes {@link MediaType#MULTIPART_FORM_DATA} in a non-blocking manner.</p>
- * <p>
+ *
  * <p>Designed to be used by a single thread</p>
  *
  * @author Graeme Rocher
@@ -68,14 +68,15 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor {
      * @param nettyHttpRequest The {@link NettyHttpRequest}
      * @param configuration    The {@link NettyHttpServerConfiguration}
      */
-    FormDataHttpContentProcessor(NettyHttpRequest<?> nettyHttpRequest, NettyHttpServerConfiguration configuration) {
+    public FormDataHttpContentProcessor(NettyHttpRequest<?> nettyHttpRequest, HttpServerConfiguration configuration) {
         super(nettyHttpRequest, configuration);
         Charset characterEncoding = nettyHttpRequest.getCharacterEncoding();
         HttpServerConfiguration.MultipartConfiguration multipart = configuration.getMultipart();
         HttpDataFactory factory = new MicronautHttpData.Factory(multipart, characterEncoding);
-        final HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
+        // prevent the decoders from immediately parsing the content
+        HttpRequest nativeRequest = nettyHttpRequest.toHttpRequestWithoutBody();
         if (HttpPostRequestDecoder.isMultipart(nativeRequest)) {
-            this.decoder = new MicronautHttpPostMultipartRequestDecoder(factory, nativeRequest, characterEncoding);
+            this.decoder = new HttpPostMultipartRequestDecoder(factory, nativeRequest, characterEncoding);
         } else {
             this.decoder = new HttpPostStandardRequestDecoder(factory, nativeRequest, characterEncoding);
         }
@@ -135,9 +136,9 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor {
                     }
 
                     InterfaceHttpData currentPartialHttpData = postRequestDecoder.currentPartialHttpData();
-                    if (currentPartialHttpData instanceof HttpData) {
-                        // can't give away ownership of this data yet, so retain it
-                        out.add(currentPartialHttpData.retain());
+                    if (currentPartialHttpData != null) {
+                        out.add(currentPartialHttpData);
+                        postRequestDecoder.removeHttpDataFromClean(currentPartialHttpData);
                     }
 
                 } catch (HttpPostRequestDecoder.EndOfDataDecoderException e) {

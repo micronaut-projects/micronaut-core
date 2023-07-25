@@ -12,7 +12,11 @@ micronautBuild {
 
 repositories {
     mavenCentral()
-    maven { url "https://s01.oss.sonatype.org/content/repositories/snapshots/" }
+}
+
+configurations.all {
+    resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
+    resolutionStrategy.cacheDynamicVersionsFor 0, 'seconds'
 }
 
 configurations {
@@ -84,7 +88,7 @@ dependencies {
         transitive = false
     }
 
-    api libs.managed.slf4j.api
+    api libs.slf4j.api
     compileOnly libs.caffeine
     compileOnly libs.bundles.asm
 

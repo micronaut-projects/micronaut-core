@@ -15,12 +15,15 @@
  */
 package io.micronaut.core.bind;
 
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * <p>An interface capable of binding the value of an {@link io.micronaut.core.type.Argument} from a source</p>.
@@ -59,6 +62,7 @@ public interface ArgumentBinder<T, S> {
      * @param <T>
      */
     interface BindingResult<T> {
+
         /**
          * An empty but satisfied result.
          */
@@ -76,6 +80,11 @@ public interface ArgumentBinder<T, S> {
             @Override
             public boolean isSatisfied() {
                 return false;
+            }
+
+            @Override
+            public BindingResult flatMap(Function transform) {
+                return this;
             }
         };
 
@@ -95,7 +104,7 @@ public interface ArgumentBinder<T, S> {
          * @return Was the binding requirement satisfied
          */
         default boolean isSatisfied() {
-            return getConversionErrors() == Collections.EMPTY_LIST;
+            return getConversionErrors().isEmpty();
         }
 
         /**
@@ -113,6 +122,38 @@ public interface ArgumentBinder<T, S> {
         @SuppressWarnings({"java:S3655", "OptionalGetWithoutIsPresent"})
         default T get() {
             return getValue().get();
+        }
+
+        /**
+         * Transform the result, if present.
+         *
+         * @param transform The transformation function
+         * @param <R>       The type of the mapped result
+         * @return The mapped result
+         * @since 4.0.0
+         */
+        @Experimental
+        @NonNull
+        default <R> BindingResult<R> flatMap(@NonNull Function<T, BindingResult<R>> transform) {
+            return new MappedBindingResult<>(this, transform);
+        }
+
+        /**
+         * @param <R> The result type
+         * @return An empty but satisfied result.
+         * @since 4.0.0
+         */
+        static <R> BindingResult<R> empty() {
+            return BindingResult.EMPTY;
+        }
+
+        /**
+         * @param <R> The result type
+         * @return An empty but unsatisfied result.
+         * @since 4.0.0
+         */
+        static <R> BindingResult<R> unsatisfied() {
+            return UNSATISFIED;
         }
     }
 }

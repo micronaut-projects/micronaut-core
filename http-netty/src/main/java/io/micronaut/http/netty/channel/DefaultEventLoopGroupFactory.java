@@ -75,6 +75,16 @@ public class DefaultEventLoopGroupFactory implements EventLoopGroupFactory {
         this.nativeFactory = nativeFactory != null ? nativeFactory : defaultFactory;
         if (nettyGlobalConfiguration != null && nettyGlobalConfiguration.getResourceLeakDetectorLevel() != null) {
             ResourceLeakDetector.setLevel(nettyGlobalConfiguration.getResourceLeakDetectorLevel());
+        } else if (ResourceLeakDetector.getLevel() == ResourceLeakDetector.Level.SIMPLE &&
+            System.getProperty("io.netty.leakDetectionLevel") == null &&
+            System.getProperty("io.netty.leakDetection.level") == null) {
+            // disable leak detection for performance if it's not explicitly enabled in a system
+            // property, via config, or via setLevel
+            ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.DISABLED);
+        }
+
+        if (System.getProperty("io.netty.allocator.maxOrder") == null) {
+            System.setProperty("io.netty.allocator.maxOrder", "3");
         }
     }
 

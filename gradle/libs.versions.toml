@@ -1,20 +1,18 @@
 [versions]
-asm = "9.4"
+asm = "9.5"
 awaitility = "4.2.0"
 bcpkix = "1.70"
 blaze = "1.6.8"
 caffeine = "2.9.3"
-compile-testing = "0.19"
+compile-testing = "0.21.0"
 
 geb = "7.0"
-gorm = "7.3.2"
+gorm = "7.3.4"
 # be sure to update graal version in gradle.properties as well
-graal-svm = "22.3.1"
-h2 = "2.1.210"
+graal-svm = "23.0.0"
+h2 = "2.1.214"
 hibernate = "5.5.9.Final"
-hibernate-validator = "6.1.6.Final"
-htmlSanityCheck = "1.1.6"
-htmlunit = "2.68.0"
+htmlunit = "2.70.0"
 httpcomponents-client = "4.5.14"
 jakarta-inject-api = "2.0.1"
 jakarta-inject-tck = "2.0.1"
@@ -23,36 +21,34 @@ javax-inject = "1"
 javax-persistence = "2.2"
 jetbrains-annotations = "23.0.0"
 jetty = "9.4.48.v20220622"
-jmh = "1.35"
+jmh = "1.36"
 jsr107 = "1.1.1"
 jsr305 = "3.0.2"
-javax-el = "3.0.1-b12"
-javax-el-impl = "2.2.1-b05"
+jakarta-el = "5.0.1"
+jakarta-el-impl = "5.0.0-M1"
 jcache = "1.1.1"
-junit5 = "5.9.1"
-junit-platform="1.9.1"
-kotlin = "1.8.10"
-kotlin-coroutines = "1.6.4"
-ktor = "1.6.8"
-managed-logback = "1.4.5"
-logbook-netty = "2.14.0"
-log4j = "2.19.0"
-micronaut-aws = "3.9.2"
-micronaut-groovy = "4.0.0-SNAPSHOT"
-micronaut-session = "1.0.0-SNAPSHOT"
-micronaut-sql = "4.7.2"
-micronaut-test = "4.0.0-SNAPSHOT"
-micronaut-serde = "2.0.0-SNAPSHOT"
-micronaut-tracing = "5.0.0-SNAPSHOT"
-micronaut-validation = "4.0.0-SNAPSHOT"
-micrometer = "1.10.2"
+junit5 = "5.9.3"
+junit-platform="1.9.3"
+logback = "1.4.8"
+logbook-netty = "2.16.0"
+log4j = "2.20.0"
+micronaut-aws = "4.0.1"
+micronaut-groovy = "4.0.1"
+micronaut-session = "4.0.0-M3"
+micronaut-sql = "5.0.0-M7"
+micronaut-test = "4.0.0-M4"
+micronaut-validation = "4.0.0-M9"
+micronaut-rxjava2 = "2.0.1"
+micronaut-rxjava3 = "3.0.1"
+micronaut-reactor = "3.0.0-M7"
 neo4j-java-driver = "1.4.5"
-selenium = "4.7.2"
+selenium = "4.9.1"
+slf4j = "2.0.7"
 smallrye = "5.5.0"
-spock = "2.2-groovy-4.0"
+spock = "2.3-groovy-4.0"
 spotbugs = "4.7.1"
 systemlambda = "1.2.1"
-testcontainers = "1.17.5"
+testcontainers = "1.18.1"
 vertx = "3.9.13"
 wiremock = "2.33.2"
 
@@ -60,31 +56,37 @@ wiremock = "2.33.2"
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
-managed-groovy = "4.0.9"
+managed-groovy = "4.0.12"
 managed-jakarta-annotation-api = "2.1.1"
-managed-jackson = "2.14.0"
-managed-jackson-databind = "2.14.1"
-managed-maven-native-plugin = "0.9.13"
-managed-methvin-directory-watcher = "0.16.1"
-managed-netty = "4.1.87.Final"
+managed-jackson = "2.15.1"
+managed-jackson-databind = "2.15.2"
+managed-kotlin = "1.8.21"
+managed-kotlin-coroutines = "1.7.1"
+managed-methvin-directory-watcher = "0.18.0"
+managed-netty = "4.1.94.Final"
+managed-netty-iouring = "0.0.21.Final"
 managed-netty-http3 = "0.0.16.Final"
+managed-netty-tcnative = "2.0.61.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
-managed-reactor = "3.4.24"
-managed-slf4j = "2.0.4"
+managed-reactor = "3.5.7"
 managed-snakeyaml = "2.0"
-managed-java-parser-core = "3.24.9"
-managed-ksp = "1.8.0-1.0.9"
+managed-java-parser-core = "3.25.4"
+managed-ksp = "1.8.21-1.0.11"
 micronaut-docs = "2.0.0"
 
 [libraries]
 # Libraries prefixed with bom- are BOM files
 test-boms-micronaut-aws = { module = "io.micronaut.aws:micronaut-aws-bom", version.ref = "micronaut-aws" }
 test-boms-micronaut-sql = { module = "io.micronaut.sql:micronaut-sql-bom", version.ref = "micronaut-sql" }
-test-boms-micronaut-tracing = { module = "io.micronaut.tracing:micronaut-tracing-bom", version.ref = "micronaut-tracing" }
 test-boms-micronaut-validation = { module = "io.micronaut.validation:micronaut-validation-bom", version.ref = "micronaut-validation" }
+test-boms-micronaut-rxjava2 = { module = "io.micronaut.rxjava2:micronaut-rxjava2-bom", version.ref = "micronaut-rxjava2" }
+test-boms-micronaut-rxjava3 = { module = "io.micronaut.rxjava3:micronaut-rxjava3-bom", version.ref = "micronaut-rxjava3" }
+test-boms-micronaut-reactor = { module = "io.micronaut.reactor:micronaut-reactor-bom", version.ref = "micronaut-reactor" }
 
 boms-groovy = { module = "org.apache.groovy:groovy-bom", version.ref = "managed-groovy" }
+boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "managed-kotlin" }
+boms-kotlin-coroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-bom", version.ref = "managed-kotlin-coroutines" }
 boms-netty = { module = "io.netty:netty-bom", version.ref = "managed-netty" }
 boms-jackson = { module = "com.fasterxml.jackson:jackson-bom", version.ref = "managed-jackson" }
 
@@ -108,6 +110,21 @@ managed-jackson-datatype-jsr310 = { module = "com.fasterxml.jackson.datatype:jac
 managed-jackson-module-afterburner = { module = "com.fasterxml.jackson.module:jackson-module-afterburner", version.ref = "managed-jackson" }
 managed-jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin", version.ref = "managed-jackson" }
 managed-jackson-module-parameterNames = { module = "com.fasterxml.jackson.module:jackson-module-parameter-names", version.ref = "managed-jackson" }
+
+managed-kotlin-annotation-processing-embeddable = { module = "org.jetbrains.kotlin:kotlin-annotation-processing-embeddable", version.ref = "managed-kotlin" }
+managed-kotlin-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-compiler-embeddable", version.ref = "managed-kotlin" }
+managed-kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "managed-kotlin" }
+managed-kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "managed-kotlin" }
+managed-kotlin-stdlib-jdk8 = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8", version.ref = "managed-kotlin" }
+managed-kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "managed-kotlin" }
+
+managed-kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "managed-kotlin-coroutines" }
+managed-kotlinx-coroutines-jdk8 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8", version.ref = "managed-kotlin-coroutines" }
+managed-kotlinx-coroutines-reactive = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactive", version.ref = "managed-kotlin-coroutines" }
+managed-kotlinx-coroutines-rx2 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-rx2", version.ref = "managed-kotlin-coroutines" }
+managed-kotlinx-coroutines-slf4j = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-slf4j", version.ref = "managed-kotlin-coroutines" }
+managed-kotlinx-coroutines-reactor = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactor", version.ref = "managed-kotlin-coroutines" }
+
 managed-ksp-api = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "managed-ksp" }
 managed-ksp = { module = "com.google.devtools.ksp:symbol-processing", version.ref = "managed-ksp" }
 managed-java-parser-core = { module = "com.github.javaparser:javaparser-symbol-solver-core", version.ref = "managed-java-parser-core" }
@@ -121,16 +138,14 @@ managed-netty-handler = { module = "io.netty:netty-handler", version.ref = "mana
 managed-netty-handler-proxy = { module = "io.netty:netty-handler-proxy", version.ref = "managed-netty" }
 managed-netty-transport-native-epoll = { module = "io.netty:netty-transport-native-epoll", version.ref = "managed-netty" }
 managed-netty-transport-native-kqueue = { module = "io.netty:netty-transport-native-kqueue", version.ref = "managed-netty" }
+managed-netty-transport-native-iouring = { module = "io.netty.incubator:netty-incubator-transport-native-io_uring", version.ref = "managed-netty-iouring" }
 managed-netty-transport-native-unix-common = { module = "io.netty:netty-transport-native-unix-common", version.ref = "managed-netty" }
+managed-netty-tcnative-boringssl-static = { module = "io.netty:netty-tcnative-boringssl-static", version.ref = "managed-netty-tcnative" }
 
 managed-reactive-streams = { module = "org.reactivestreams:reactive-streams", version.ref = "managed-reactive-streams" }
 
 managed-reactor = { module = "io.projectreactor:reactor-core", version.ref = "managed-reactor" }
 managed-reactor-test = { module = "io.projectreactor:reactor-test", version.ref = "managed-reactor" }
-
-managed-slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "managed-slf4j" }
-managed-slf4j-simple = { module = "org.slf4j:slf4j-simple", version.ref = "managed-slf4j" }
-managed-logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "managed-logback" }
 
 managed-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "managed-snakeyaml" }
 
@@ -160,7 +175,6 @@ groovy-test-junit5 = { module = "org.apache.groovy:groovy-test-junit5", version.
 
 h2 = { module = "com.h2database:h2", version.ref = "h2" }
 hibernate = { module = "org.hibernate:hibernate-core", version.ref = "hibernate" }
-hibernate-validator = { module = "org.hibernate:hibernate-validator", version.ref = "hibernate-validator" }
 
 htmlunit = { module = "net.sourceforge.htmlunit:htmlunit", version.ref = "htmlunit" }
 
@@ -168,8 +182,8 @@ jakarta-inject-api = { module = "jakarta.inject:jakarta.inject-api", version.ref
 jakarta-inject-tck = { module = "jakarta.inject:jakarta.inject-tck", version.ref = "jakarta-inject-tck" }
 
 javax-annotation-api = { module = "javax.annotation:javax.annotation-api", version.ref = "javax-annotation-api" }
-javax-el = { module = "org.glassfish:javax.el", version.ref = "javax-el" }
-javax-el-impl = { module = "org.glassfish:javax.el", version.ref = "javax-el" }
+jakarta-el = { module = "jakarta.el:jakarta.el-api", version.ref = "jakarta-el" }
+jakarta-el-impl = { module = "org.glassfish:jakarta.el", version.ref = "jakarta-el-impl" }
 javax-inject = { module = "javax.inject:javax.inject", version.ref = "javax-inject" }
 javax-persistence = { module = "javax.persistence:javax.persistence-api", version.ref = "javax-persistence" }
 
@@ -192,41 +206,25 @@ junit-vintage = { module = "org.junit.vintage:junit-vintage-engine", version.ref
 
 jetbrains-annotations = { module = "org.jetbrains:annotations", version.ref = "jetbrains-annotations" }
 
-kotlin-annotation-processing-embeddable = { module = "org.jetbrains.kotlin:kotlin-annotation-processing-embeddable", version.ref = "kotlin" }
-kotlin-compiler-embeddable = { module = "org.jetbrains.kotlin:kotlin-compiler-embeddable", version.ref = "kotlin" }
 kotlin-kotest-junit5 = { module = "io.kotest:kotest-runner-junit5-jvm" }
-kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect", version.ref = "kotlin" }
-kotlin-stdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
-kotlin-stdlib-jdk8 = { module = "org.jetbrains.kotlin:kotlin-stdlib-jdk8", version.ref = "kotlin" }
-kotlin-test = { module = "org.jetbrains.kotlin:kotlin-test", version.ref = "kotlin" }
-
-kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlin-coroutines" }
-kotlinx-coroutines-jdk8 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-jdk8", version.ref = "kotlin-coroutines" }
-kotlinx-coroutines-reactive = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactive", version.ref = "kotlin-coroutines" }
-kotlinx-coroutines-rx2 = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-rx2", version.ref = "kotlin-coroutines" }
-kotlinx-coroutines-slf4j = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-slf4j", version.ref = "kotlin-coroutines" }
-kotlinx-coroutines-reactor = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-reactor", version.ref = "kotlin-coroutines" }
 
 log4j = { module = "org.apache.logging.log4j:log4j-core", version.ref = "log4j" }
+
+logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "logback" }
 
 logbook-netty = { module = "org.zalando:logbook-netty", version.ref = "logbook-netty" }
 
 micronaut-docs = { module = "io.micronaut.docs:micronaut-docs-asciidoc-config-props", version.ref = "micronaut-docs" }
 micronaut-runtime-groovy = { module = "io.micronaut.groovy:micronaut-runtime-groovy", version.ref = "micronaut-groovy" }
-micronaut-serde-jackson = { module = "io.micronaut.serde:micronaut-serde-jackson", version.ref = "micronaut-serde" }
 micronaut-session = { module = "io.micronaut.session:micronaut-session", version.ref = "micronaut-session" }
 micronaut-test-bom = { module = "io.micronaut.test:micronaut-test-bom", version.ref = "micronaut-test" }
 micronaut-test-core = { module = "io.micronaut.test:micronaut-test-core", version.ref = "micronaut-test" }
 micronaut-test-junit5 = { module = "io.micronaut.test:micronaut-test-junit5", version.ref = "micronaut-test" }
-micronaut-test-kotest = { module = "io.micronaut.test:micronaut-test-kotest", version.ref = "micronaut-test" }
 micronaut-test-kotest5 = { module = "io.micronaut.test:micronaut-test-kotest5", version.ref = "micronaut-test" }
 micronaut-test-spock = { module = "io.micronaut.test:micronaut-test-spock", version.ref = "micronaut-test" }
 
 micronaut-sql-jdbc = { module = "io.micronaut.sql:micronaut-jdbc", version.ref = "micronaut-sql" }
 micronaut-sql-jdbc-tomcat = { module = "io.micronaut.sql:micronaut-jdbc-tomcat", version.ref = "micronaut-sql" }
-
-micrometer-core = { module = "io.micrometer:micrometer-core", version.ref = "micrometer" }
-
 mysql-driver = { module = "mysql:mysql-connector-java" }
 
 neo4j-bolt = { module = "org.neo4j.driver:neo4j-java-driver", version.ref = "neo4j-java-driver" }
@@ -241,6 +239,8 @@ selenium-driver-chrome = { module = "org.seleniumhq.selenium:selenium-chrome-dri
 selenium-driver-firefox = { module = "org.seleniumhq.selenium:selenium-firefox-driver", version.ref = "selenium" }
 selenium-driver-htmlunit = { module = "org.seleniumhq.selenium:htmlunit-driver", version.ref = "selenium" }
 
+slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+
 smallrye = { module = "io.smallrye:smallrye-fault-tolerance", version.ref = "smallrye" }
 spock = { module = "org.spockframework:spock-core", version.ref = "spock" }
 spotbugs = { module = "com.github.spotbugs:spotbugs-annotations", version.ref = "spotbugs" }
@@ -248,7 +248,7 @@ spotbugs = { module = "com.github.spotbugs:spotbugs-annotations", version.ref = 
 systemlambda = { module = "com.github.stefanbirkner:system-lambda", version.ref = "systemlambda" }
 
 micronaut-tracing-jaeger = { module = "io.micronaut.tracing:micronaut-tracing-jaeger" }
-micronaut-tracing-zipkin = { module = "io.micronaut.tracing:micronaut-tracing-zipkin" }
+micronaut-tracing-brave = { module = "io.micronaut.tracing:micronaut-tracing-brave" }
 
 micronaut-validation = { module = "io.micronaut.validation:micronaut-validation" }
 micronaut-validation-processor = { module = "io.micronaut.validation:micronaut-validation-processor" }

@@ -1,6 +1,6 @@
-Micronaut Framework has offered support for Kotlin via https://kotlinlang.org/docs/reference/kapt.html[Kapt].
+Micronaut framework has offered support for Kotlin via https://kotlinlang.org/docs/reference/kapt.html[Kapt].
 
-With version 4.0, Micronaut Framework supports Kotlin also via https://kotlinlang.org/docs/ksp-overview.html[Kotlin Symbol Processing (KSP) API].
+With version 4.0, Micronaut framework supports Kotlin also via https://kotlinlang.org/docs/ksp-overview.html[Kotlin Symbol Processing (KSP) API].
 
 Please note that KAPT is in maintenance mode. Micronaut framework 4 includes experimental support for KSP which Kotlin users should consider migrating in the future.
 

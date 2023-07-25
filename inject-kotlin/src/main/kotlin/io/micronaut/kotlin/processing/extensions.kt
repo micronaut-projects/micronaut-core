@@ -20,6 +20,7 @@ import com.google.devtools.ksp.getJavaClassByName
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
+import org.objectweb.asm.Type
 
 @OptIn(KspExperimental::class)
 internal fun KSDeclaration.getBinaryName(resolver: Resolver, visitorContext: KotlinVisitorContext): String {
@@ -30,17 +31,28 @@ internal fun KSDeclaration.getBinaryName(resolver: Resolver, visitorContext: Kot
             declaration = parent
         }
     }
-    val binaryName = resolver.mapKotlinNameToJava(declaration.qualifiedName!!)?.asString()
-    return if (binaryName != null) {
-        binaryName
-    } else {
-        val classDeclaration = declaration.getClassDeclaration(visitorContext)
-        val qn = classDeclaration.qualifiedName
-        if (qn != null) {
-            resolver.mapKotlinNameToJava(qn)?.asString() ?: computeName(declaration)
-        } else {
-            computeName(declaration)
+    val binaryName = if (declaration.qualifiedName != null) resolver.mapKotlinNameToJava(declaration.qualifiedName!!)?.asString() else null
+    if (binaryName != null) {
+        return binaryName
+    }
+    val classDeclaration = declaration.getClassDeclaration(visitorContext)
+    val qn = classDeclaration.qualifiedName
+    if (qn != null) {
+        val asString = resolver.mapKotlinNameToJava(qn)?.asString()
+        if (asString != null) {
+            return asString;
         }
+    }
+    if (declaration is KSClassDeclaration && declaration.origin != Origin.SYNTHETIC) {
+        val signature = resolver.mapToJvmSignature(declaration)
+        if (signature != null) {
+            return Type.getType(signature).className
+        }
+    }
+    return if (declaration.origin != Origin.SYNTHETIC) {
+        computeName(declaration)
+    } else {
+        declaration.simpleName.asString()
     }
 }
 
@@ -98,6 +110,28 @@ internal fun KSAnnotated.getClassDeclaration(visitorContext: KotlinVisitorContex
         is KSTypeAlias -> {
             val declaration = this.type.resolve().declaration
             return declaration.getClassDeclaration(visitorContext)
+        }
+        is KSValueParameter -> {
+            val p = this.parent
+            if (p is KSDeclaration) {
+                return p.getClassDeclaration(visitorContext)
+            } else {
+                return visitorContext.resolver.getJavaClassByName(Object::class.java.name)!!
+            }
+        }
+        is KSFunctionDeclaration -> {
+            val parentDeclaration = this.parentDeclaration
+            if (parentDeclaration != null) {
+                return parentDeclaration.getClassDeclaration(visitorContext)
+            }
+            return visitorContext.resolver.getJavaClassByName(Object::class.java.name)!!
+        }
+        is KSPropertyDeclaration -> {
+            val parentDeclaration = this.parentDeclaration
+            if (parentDeclaration != null) {
+                return parentDeclaration.getClassDeclaration(visitorContext)
+            }
+            return visitorContext.resolver.getJavaClassByName(Object::class.java.name)!!
         }
         else -> {
             return visitorContext.resolver.getJavaClassByName(Object::class.java.name)!!

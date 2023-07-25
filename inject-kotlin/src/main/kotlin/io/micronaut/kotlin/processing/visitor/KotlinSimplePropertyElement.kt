@@ -16,6 +16,7 @@
 package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.symbol.KSDeclaration
+import com.google.devtools.ksp.symbol.KSPropertyAccessor
 import io.micronaut.inject.ast.ArrayableClassElement
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.FieldElement
@@ -45,10 +46,18 @@ internal class KotlinSimplePropertyElement(
 
     override val declaration: KSDeclaration by lazy {
         val ksAnnotated = nativeType.element
-        if (ksAnnotated is KSDeclaration) {
-            ksAnnotated
-        } else {
-            throw IllegalStateException("Expected declaration got: $ksAnnotated")
+        when (ksAnnotated) {
+            is KSDeclaration -> {
+                ksAnnotated
+            }
+
+            is KSPropertyAccessor -> {
+                ksAnnotated.receiver
+            }
+
+            else -> {
+                throw IllegalStateException("Expected declaration got: $ksAnnotated")
+            }
         }
     }
 

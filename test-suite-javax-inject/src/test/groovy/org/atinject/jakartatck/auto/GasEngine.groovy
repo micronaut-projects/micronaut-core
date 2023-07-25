@@ -15,7 +15,7 @@
  */
 package org.atinject.jakartatck.auto
 
-import javax.inject.Inject
+import jakarta.inject.Inject
 
 abstract class GasEngine extends Engine {
 

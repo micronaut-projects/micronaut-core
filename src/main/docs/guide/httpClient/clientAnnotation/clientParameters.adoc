@@ -136,7 +136,7 @@ Some parameters are recognized by their type instead of their annotation. The fo
 |Adds a cookie to the request
 |`Cookie cookie`
 
-|link:{jdkapi}/java/util/Locale.html[Locale]
+|link:{jdkapi}/java.base/java/util/Locale.html[Locale]
 |Sets the `Accept-Language` header. Annotate with ann:http.annotation.QueryValue[] or ann:http.annotation.PathVariable[] to populate a URI variable.
 |`Locale locale`
 

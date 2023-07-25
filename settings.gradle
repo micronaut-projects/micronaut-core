@@ -14,7 +14,7 @@ pluginManagement {
 }
 
 plugins {
-    id 'io.micronaut.build.shared.settings' version '6.3.5'
+    id 'io.micronaut.build.shared.settings' version '6.5.3'
 }
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
@@ -28,6 +28,7 @@ include "core"
 include "core-reactive"
 include "core-processor"
 include "context"
+include "context-propagation"
 include "discovery-core"
 include "function"
 include "function-client"
@@ -49,6 +50,7 @@ include "inject-groovy"
 include "inject-groovy-test"
 include "inject-java"
 include "inject-java-test"
+include "inject-java-helper"
 include 'inject-kotlin'
 include 'inject-kotlin-test'
 include "inject-test-utils"
@@ -79,6 +81,7 @@ include "test-suite-kotlin-ksp"
 include "test-suite-groovy"
 include "test-suite-groovy"
 include "test-suite-logback"
+include "test-suite-logback-external-configuration"
 include "test-utils"
 
 // benchmarks

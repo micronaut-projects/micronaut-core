@@ -13,7 +13,8 @@ dependencies {
     api project(':inject')
     api project(':core')
     compileOnly project(':core-reactive')
-    compileOnly libs.kotlinx.coroutines.core
+    compileOnly libs.managed.kotlinx.coroutines.core
+    compileOnly libs.managed.reactor
 }
 
 tasks.named("compileKotlin") {

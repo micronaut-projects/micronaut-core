@@ -1,5 +1,5 @@
-io.micronaut.inject.annotation.internal.PersistenceContextAnnotationMapper
-io.micronaut.inject.annotation.internal.TimedAnnotationMapper
+io.micronaut.inject.annotation.internal.JavaxPersistenceContextAnnotationMapper
+io.micronaut.inject.annotation.internal.JakartaPersistenceContextAnnotationMapper
 io.micronaut.inject.beans.visitor.EntityIntrospectedAnnotationMapper
 io.micronaut.inject.beans.visitor.EntityReflectiveAccessAnnotationMapper
 io.micronaut.inject.beans.visitor.MappedSuperClassIntrospectionMapper

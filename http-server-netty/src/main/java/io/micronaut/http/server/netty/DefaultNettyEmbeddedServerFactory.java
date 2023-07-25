@@ -26,6 +26,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupFactory;
@@ -40,9 +41,7 @@ import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration
 import io.micronaut.http.server.netty.ssl.CertificateProvidedSslBuilder;
 import io.micronaut.http.server.netty.ssl.SelfSignedSslBuilder;
 import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
-import io.micronaut.http.server.netty.types.DefaultCustomizableResponseTypeHandlerRegistry;
-import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
-import io.micronaut.http.server.netty.types.files.FileTypeHandler;
+import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
 import io.micronaut.http.server.netty.websocket.WebSocketUpgradeHandlerFactory;
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.scheduling.executor.ExecutorSelector;
@@ -51,13 +50,11 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.ServerChannel;
-import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.socket.ServerSocketChannel;
 import jakarta.inject.Inject;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -92,6 +89,7 @@ public class DefaultNettyEmbeddedServerFactory
     private final EventLoopGroupRegistry eventLoopGroupRegistry;
     private final Map<Class<?>, ApplicationEventPublisher<?>> cachedEventPublishers = new ConcurrentHashMap<>(5);
     private final WebSocketUpgradeHandlerFactory webSocketUpgradeHandlerFactory;
+    private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     private @Nullable ServerSslBuilder serverSslBuilder;
     private @Nullable ChannelOptionFactory channelOptionFactory;
     private List<ChannelOutboundHandler> outboundHandlers = Collections.emptyList();
@@ -101,6 +99,7 @@ public class DefaultNettyEmbeddedServerFactory
      * @param applicationContext The app ctx
      * @param routeExecutor The route executor
      * @param mediaTypeCodecRegistry The media type codec
+     * @param messageBodyHandlerRegistry The message body handler registery
      * @param staticResourceResolver The static resource resolver
      * @param nettyThreadFactory The netty thread factory
      * @param httpCompressionStrategy The http compression strategy
@@ -111,6 +110,7 @@ public class DefaultNettyEmbeddedServerFactory
     protected DefaultNettyEmbeddedServerFactory(ApplicationContext applicationContext,
                                                 RouteExecutor routeExecutor,
                                                 MediaTypeCodecRegistry mediaTypeCodecRegistry,
+                                                MessageBodyHandlerRegistry messageBodyHandlerRegistry,
                                                 StaticResourceResolver staticResourceResolver,
                                                 @Named(NettyThreadFactory.NAME) ThreadFactory nettyThreadFactory,
                                                 HttpCompressionStrategy httpCompressionStrategy,
@@ -118,6 +118,7 @@ public class DefaultNettyEmbeddedServerFactory
                                                 EventLoopGroupRegistry eventLoopGroupRegistry,
                                                 @Nullable WebSocketUpgradeHandlerFactory webSocketUpgradeHandlerFactory) {
         this.applicationContext = applicationContext;
+        this.messageBodyHandlerRegistry = messageBodyHandlerRegistry;
         this.requestArgumentSatisfier = routeExecutor.getRequestArgumentSatisfier();
         this.routeExecutor = routeExecutor;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
@@ -154,21 +155,21 @@ public class DefaultNettyEmbeddedServerFactory
         return buildInternal(configuration, true, null);
     }
 
+    @Override
+    public MessageBodyHandlerRegistry getMessageBodyHandlerRegistry() {
+        return messageBodyHandlerRegistry;
+    }
+
     @NonNull
     private NettyEmbeddedServer buildInternal(@NonNull NettyHttpServerConfiguration configuration,
                                               boolean isDefaultServer,
                                               @Nullable ServerSslConfiguration sslConfiguration) {
         Objects.requireNonNull(configuration, "Netty HTTP server configuration cannot be null");
-        List<NettyCustomizableResponseTypeHandler<?>> handlers = Arrays.asList(
-                new FileTypeHandler(configuration.getFileTypeHandlerConfiguration()),
-                new StreamTypeHandler()
-        );
 
         if (isDefaultServer) {
             return new NettyHttpServer(
                     configuration,
                     this,
-                    new DefaultCustomizableResponseTypeHandlerRegistry(handlers.toArray(new NettyCustomizableResponseTypeHandler[0])),
                     true
             );
         } else {
@@ -176,7 +177,6 @@ public class DefaultNettyEmbeddedServerFactory
             return new NettyHttpServer(
                     configuration,
                     embeddedServices,
-                    new DefaultCustomizableResponseTypeHandlerRegistry(handlers.toArray(new NettyCustomizableResponseTypeHandler[0])),
                     false
             );
         }
@@ -269,7 +269,7 @@ public class DefaultNettyEmbeddedServerFactory
     }
 
     @Override
-    public Optional<SimpleChannelInboundHandler<NettyHttpRequest<?>>> getWebSocketUpgradeHandler(NettyEmbeddedServer server) {
+    public Optional<NettyServerWebSocketUpgradeHandler> getWebSocketUpgradeHandler(NettyEmbeddedServer server) {
         return Optional.ofNullable(webSocketUpgradeHandlerFactory)
                         .map(factory -> factory.create(server, this));
     }

@@ -16,270 +16,346 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.reflect.ClassUtils;
-import io.micronaut.core.type.Argument;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.execution.DelayedExecutionFlow;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.PartData;
-import io.micronaut.http.multipart.StreamingFileUpload;
+import io.micronaut.http.server.netty.body.HttpBody;
+import io.micronaut.http.server.netty.body.ImmediateMultiObjectBody;
+import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
-import io.micronaut.http.server.netty.multipart.NettyStreamingFileUpload;
 import io.micronaut.web.router.RouteMatch;
-import io.netty.buffer.ByteBufHolder;
-import io.netty.handler.codec.http.multipart.Attribute;
+import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http.multipart.FileUpload;
-import io.netty.handler.codec.http.multipart.HttpData;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Sinks;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
+import java.nio.charset.Charset;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.function.Supplier;
+import java.util.Set;
+import java.util.function.BiFunction;
 
 /**
- * Extension of {@link BaseRouteCompleter} that handles incoming multipart data and binds
- * parameters (e.g. {@link io.micronaut.http.annotation.Part}).
+ * Special {@link HttpBody} that "demultiplexes" form data. Basically, this class receives a stream
+ * of {@link MicronautHttpData} and splits it into individual streams for each form field, and they
+ * can all be subscribed to and bound independently.
  *
  * @since 4.0.0
  * @author Jonas Konrad
  */
 @Internal
-final class FormRouteCompleter extends BaseRouteCompleter {
-    static final Argument<PartData> ARGUMENT_PART_DATA = Argument.of(PartData.class);
+public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
     private static final Logger LOG = LoggerFactory.getLogger(FormRouteCompleter.class);
 
-    private final NettyStreamingFileUpload.Factory fileUploadFactory;
-    private final ConversionService conversionService;
-    private final boolean alwaysAddContent = request.isFormData();
-    private final AtomicLong pressureRequested = new AtomicLong();
-    private final Map<String, Sinks.Many<Object>> subjectsByDataName = new HashMap<>();
-    private final Collection<Sinks.Many<?>> downstreamSubscribers = new ArrayList<>();
+    private final DelayedExecutionFlow<RouteMatch<?>> execute = DelayedExecutionFlow.create();
+    private final EventLoop eventLoop;
+    private boolean executed;
+    private final RouteMatch<?> routeMatch;
+    private Subscription upstreamSubscription;
+    private final Set<MicronautHttpData<?>> allData = new LinkedHashSet<>();
+    private final Map<String, Claimant> claimants = new HashMap<>();
+    private boolean upstreamDemanded = false;
 
-    FormRouteCompleter(NettyStreamingFileUpload.Factory fileUploadFactory, ConversionService conversionService, NettyHttpRequest<?> request, RouteMatch<?> routeMatch) {
-        super(request, routeMatch);
-        this.fileUploadFactory = fileUploadFactory;
-        this.conversionService = conversionService;
+    FormRouteCompleter(RouteMatch<?> routeMatch, EventLoop eventLoop) {
+        this.eventLoop = eventLoop;
+        this.routeMatch = routeMatch;
     }
 
-    private void request(long n) {
-        pressureRequested.getAndUpdate(old -> {
-            if ((old + n) < old) {
-                return Long.MAX_VALUE;
-            } else {
-                return old + n;
+    public DelayedExecutionFlow<RouteMatch<?>> getExecute() {
+        return execute;
+    }
+
+    @Override
+    public void onSubscribe(Subscription s) {
+        upstreamSubscription = s;
+        s.request(1);
+    }
+
+    @Override
+    public void onNext(Object o) {
+        try {
+            addData((MicronautHttpData<?>) o);
+        } catch (Exception e) {
+            upstreamSubscription.cancel();
+            onError(e);
+        }
+    }
+
+    @Override
+    public void onComplete() {
+        for (Claimant claimant : claimants.values()) {
+            claimant.sink.tryEmitComplete();
+        }
+        if (!executed) {
+            executed = true;
+            execute.complete(routeMatch);
+        }
+    }
+
+    @Override
+    public void onError(Throwable failure) {
+        for (Claimant claimant : claimants.values()) {
+            claimant.sink.tryEmitError(failure);
+        }
+        for (Object toDiscard : routeMatch.getVariableValues().values()) {
+            if (toDiscard instanceof ReferenceCounted rc) {
+                rc.release();
             }
-        });
-        needsInput = true;
-        Runnable checkDemand = this.checkDemand;
-        if (checkDemand != null) {
-            checkDemand.run();
+            if (toDiscard instanceof io.netty.util.ReferenceCounted rc) {
+                rc.release();
+            }
+            if (toDiscard instanceof NettyCompletedFileUpload fu) {
+                fu.discard();
+            }
         }
-    }
-
-    private <T> Flux<T> withFlowControl(Flux<T> flux, MicronautHttpData<?> data) {
-        return flux
-            .doOnComplete(data::release)
-            .doOnRequest(this::request);
-    }
-
-    @Override
-    protected void addHolder(ByteBufHolder holder) {
-        if (holder instanceof HttpData data) {
-            needsInput = pressureRequested.decrementAndGet() > 0;
-            addData((MicronautHttpData<?>) data);
-        } else {
-            super.addHolder(holder);
-        }
-    }
-
-    @Override
-    void completeSuccess() {
-        for (Sinks.Many<?> subject : downstreamSubscribers) {
-            // subjects will ignore the onComplete if they're already done
-            subject.tryEmitComplete();
-        }
-        super.completeSuccess();
-    }
-
-    @Override
-    void completeFailure(Throwable failure) {
-        super.completeFailure(failure);
-        for (Sinks.Many<?> subject : downstreamSubscribers) {
-            subject.tryEmitError(failure);
+        executed = true;
+        try {
+            execute.completeExceptionally(failure);
+        } catch (IllegalStateException ignored) {
         }
     }
 
     private void addData(MicronautHttpData<?> data) {
-        if (LOG.isTraceEnabled()) {
-            LOG.trace("Received HTTP Data for request [{}]: {}", request, data);
-        }
+        allData.add(data);
+        upstreamDemanded = false;
 
         String name = data.getName();
-        Optional<Argument<?>> requiredInput = routeMatch.getRequiredInput(name);
-
-        if (requiredInput.isEmpty()) {
-            request.addContent(data);
-            request(1);
+        Claimant claimant = claimants.get(name);
+        data.touch(claimant != null);
+        if (claimant == null) {
+            upstreamSubscription.request(1);
             return;
         }
-
-        Argument<?> argument = requiredInput.get();
-        Supplier<Object> value;
-        boolean isPublisher = Publishers.isConvertibleToPublisher(argument.getType());
-        boolean chunkedProcessing = false;
-
-        if (isPublisher) {
-            if (data.attachment == null) {
-                data.attachment = new HttpDataAttachment();
-                // retain exactly once
-                data.retain();
-            }
-
-            Argument typeVariable;
-
-            if (StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
-                typeVariable = ARGUMENT_PART_DATA;
-            } else {
-                typeVariable = argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-            }
-            Class<?> typeVariableType = typeVariable.getType();
-
-            Sinks.Many<Object> namedSubject = subjectsByDataName.computeIfAbsent(name, key -> makeDownstreamUnicastProcessor());
-
-            chunkedProcessing = PartData.class.equals(typeVariableType) ||
-                Publishers.isConvertibleToPublisher(typeVariableType) ||
-                ClassUtils.isJavaLangType(typeVariableType);
-
-            if (Publishers.isConvertibleToPublisher(typeVariableType)) {
-                boolean streamingFileUpload = StreamingFileUpload.class.isAssignableFrom(typeVariableType);
-                if (streamingFileUpload) {
-                    typeVariable = ARGUMENT_PART_DATA;
-                } else {
-                    typeVariable = typeVariable.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-                }
-                if (data.attachment.subject == null) {
-                    Sinks.Many<PartData> childSubject = makeDownstreamUnicastProcessor();
-                    Flux<PartData> flowable = withFlowControl(childSubject.asFlux(), data);
-                    if (streamingFileUpload && data instanceof FileUpload fu) {
-                        namedSubject.tryEmitNext(fileUploadFactory.create(fu, flowable));
-                    } else {
-                        namedSubject.tryEmitNext(flowable);
+        claimant.send(data);
+        if (!executed && routeMatch.isFulfilled()) {
+            executed = true;
+            execute.complete(routeMatch);
+        }
+        if (executed) {
+            if (!upstreamDemanded) {
+                for (Claimant other : claimants.values()) {
+                    if (other.demand > 0) {
+                        upstreamDemanded = true;
+                        upstreamSubscription.request(1);
+                        break;
                     }
-
-                    data.attachment.subject = childSubject;
                 }
             }
+        } else {
+            // while we still have unfulfilled parameters, request as much data as possible
+            upstreamSubscription.request(1);
+        }
+    }
 
-            Sinks.Many subject;
+    private Claimant createClaimant(String name) {
+        Claimant claimant = new Claimant();
+        if (claimants.putIfAbsent(name, claimant) != null) {
+            throw new IllegalStateException("Field already claimed");
+        }
+        return claimant;
+    }
 
-            if (data.attachment.subject != null) {
-                subject = data.attachment.subject;
-            } else {
-                subject = namedSubject;
+    /**
+     * Claim all fields of the given name. In the returned publisher, each
+     * {@link MicronautHttpData} may appear multiple times if there is new data.
+     *
+     * @param name The field name
+     * @return The publisher of data with this field name
+     */
+    public Flux<? extends MicronautHttpData<?>> claimFieldsRaw(String name) {
+        return createClaimant(name).flux();
+    }
+
+    /**
+     * Claim all fields of the given name. When a new field of the name is seen,
+     * {@code fieldFactory} is called with that field and a publisher that gets the
+     * {@link PartData} every time there is new data for the field.
+     *
+     * @param name The field name
+     * @param fieldFactory The factory to call when a new field is seen
+     * @return A publisher of the objects returned by the factory
+     * @param <R> The return type of the factory
+     */
+    public <R> Flux<R> claimFields(String name, BiFunction<? super MicronautHttpData<?>, ? super Flux<PartData>, R> fieldFactory) {
+        FieldSplitter<R> proc = new FieldSplitter<>(fieldFactory);
+        claimFieldsRaw(name).subscribe(proc);
+        return proc.outer.asFlux();
+    }
+
+    /**
+     * Claim all fields of the given name. The returned publisher will only contain fields that are
+     * {@link MicronautHttpData#isCompleted() completed}.
+     *
+     * @param name The field name
+     * @return The publisher of the complete fields
+     */
+    public Flux<? extends MicronautHttpData<?>> claimFieldsComplete(String name) {
+        Claimant claimant = createClaimant(name);
+        claimant.skipUnfinished = true;
+        return claimant.flux();
+    }
+
+    public boolean isClaimed(String name) {
+        return claimants.containsKey(name);
+    }
+
+    @Override
+    public void release() {
+        for (MicronautHttpData<?> data : allData) {
+            data.release();
+        }
+    }
+
+    @Nullable
+    @Override
+    public HttpBody next() {
+        return null;
+    }
+
+    public Map<String, Object> asMap(Charset defaultCharset) {
+        return ImmediateMultiObjectBody.toMap(defaultCharset, allData);
+    }
+
+    private class Claimant  {
+        private final Sinks.Many<MicronautHttpData<?>> sink = Sinks.many().unicast().onBackpressureBuffer();
+        private long demand;
+        private MicronautHttpData<?> last;
+        private MicronautHttpData<?> unsentIncomplete;
+        private boolean skipUnfinished = false;
+
+        public Flux<MicronautHttpData<?>> flux() {
+            return sink.asFlux()
+                .doOnRequest(this::request)
+                .doOnTerminate(this::releaseNotForwarded)
+                .doOnCancel(this::releaseNotForwarded);
+        }
+
+        private void request(long n) {
+            if (!eventLoop.inEventLoop()) {
+                eventLoop.execute(() -> request(n));
+                return;
             }
 
-            Object part = data;
+            long newDemand = demand + n;
+            if (newDemand < demand) {
+                newDemand = Long.MAX_VALUE;
+            }
+            demand = newDemand;
+            if (newDemand > 0) {
+                if (!upstreamDemanded) {
+                    upstreamDemanded = true;
+                    upstreamSubscription.request(1);
+                }
+            }
+        }
 
-            if (chunkedProcessing) {
-                MicronautHttpData<?>.Chunk chunk = data.pollChunk();
-                part = new NettyPartData(() -> {
-                    if (data instanceof FileUpload fu) {
-                        return Optional.of(MediaType.of(fu.getContentType()));
+        public void send(MicronautHttpData<?> data) {
+            if (last != data) {
+                // take ownership for this claimant. FormRouteCompleter also keeps ownership for asMap
+                data.retain();
+                last = data;
+            }
+
+            if (skipUnfinished && !data.isCompleted()) {
+                unsentIncomplete = data;
+                return;
+            }
+
+            demand--;
+            if (sink.tryEmitNext(data) != Sinks.EmitResult.OK) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Failed to emit data for field {}", data.getName());
+                }
+            }
+        }
+
+        void releaseNotForwarded() {
+            if (unsentIncomplete != null) {
+                unsentIncomplete.release();
+                unsentIncomplete = null;
+            }
+        }
+    }
+
+    private static class FieldSplitter<R> implements Subscriber<MicronautHttpData<?>> {
+        final BiFunction<? super MicronautHttpData<?>, ? super Flux<PartData>, R> fieldFactory;
+
+        Subscription upstream;
+        final Sinks.Many<R> outer = Sinks.many().unicast().onBackpressureBuffer();
+        MicronautHttpData<?> currentData = null;
+
+        Sinks.Many<PartData> innerSink;
+        boolean firstInner = true;
+
+        FieldSplitter(BiFunction<? super MicronautHttpData<?>, ? super Flux<PartData>, R> fieldFactory) {
+            this.fieldFactory = fieldFactory;
+        }
+
+        @Override
+        public void onSubscribe(Subscription s) {
+            upstream = s;
+            s.request(1);
+        }
+
+        @Override
+        public void onNext(MicronautHttpData<?> data) {
+            if (data != currentData) {
+                if (innerSink != null) {
+                    innerSink.tryEmitComplete();
+                }
+
+                currentData = data;
+                innerSink = Sinks.many().unicast().onBackpressureBuffer();
+                firstInner = true;
+                outer.tryEmitNext(fieldFactory.apply(data, innerSink.asFlux().doOnRequest(n -> {
+                    if (firstInner) {
+                        firstInner = false;
+                        if (n != Long.MAX_VALUE) {
+                            n--;
+                        }
+                    }
+                    if (n != 0) {
+                        upstream.request(n);
+                    }
+                })));
+            }
+            MicronautHttpData<?>.Chunk chunk = data.pollChunk();
+            if (chunk == null) {
+                upstream.request(1);
+            } else {
+                NettyPartData part = new NettyPartData(() -> {
+                    if (data instanceof FileUpload fileUpload) {
+                        return Optional.of(MediaType.of(fileUpload.getContentType()));
                     } else {
                         return Optional.empty();
                     }
                 }, chunk::claim);
-            }
-
-            if (data instanceof FileUpload fu &&
-                StreamingFileUpload.class.isAssignableFrom(argument.getType()) &&
-                data.attachment.upload == null) {
-
-                data.attachment.upload = fileUploadFactory.create(fu, withFlowControl(subject.asFlux(), data));
-            }
-
-            Optional<?> converted = conversionService.convert(part, typeVariable);
-
-            converted.ifPresent(subject::tryEmitNext);
-
-            if (data.isCompleted() && chunkedProcessing) {
-                subject.tryEmitComplete();
-            }
-
-            value = () -> {
-                if (data.attachment.upload != null) {
-                    return data.attachment.upload;
-                } else {
-                    if (data.attachment.subject == null) {
-                        return withFlowControl(namedSubject.asFlux(), data);
-                    } else {
-                        return namedSubject.asFlux();
-                    }
-                }
-            };
-
-        } else {
-            if (data instanceof Attribute && !data.isCompleted()) {
-                request.addContent(data);
-                request(1);
-                return;
-            } else {
-                value = () -> {
-                    if (data.refCnt() > 0) {
-                        return data;
-                    } else {
-                        return null;
-                    }
-                };
+                innerSink.tryEmitNext(part);
             }
         }
 
-        if (!execute) {
-            String argumentName = argument.getName();
-            if (!routeMatch.isSatisfied(argumentName)) {
-                Object fulfillParamter = value.get();
-                routeMatch = routeMatch.fulfill(Collections.singletonMap(argumentName, fulfillParamter));
-                // we need to release the data here. However, if the route argument is a
-                // ByteBuffer, we need to retain the data until the route is executed. Adding
-                // the data to the request ensures it is cleaned up after the route completes.
-                if (!alwaysAddContent && fulfillParamter instanceof ByteBufHolder holder) {
-                    request.addContent(holder);
-                }
-            }
-            if (isPublisher && chunkedProcessing) {
-                //accounting for the previous request
-                request(1);
-            }
-            if (routeMatch.isExecutable()) {
-                execute = true;
+        @Override
+        public void onError(Throwable t) {
+            outer.tryEmitError(t);
+            if (innerSink != null) {
+                innerSink.tryEmitError(t);
             }
         }
 
-        if (alwaysAddContent && !request.destroyed) {
-            request.addContent(data);
+        @Override
+        public void onComplete() {
+            outer.tryEmitComplete();
+            if (innerSink != null) {
+                innerSink.tryEmitComplete();
+            }
         }
-
-        if (!execute || !chunkedProcessing) {
-            request(1);
-        }
-    }
-
-    private <T> Sinks.Many<T> makeDownstreamUnicastProcessor() {
-        Sinks.Many<T> processor = Sinks.many().unicast().onBackpressureBuffer();
-        downstreamSubscribers.add(processor);
-        return processor;
-    }
-
-    static class HttpDataAttachment {
-        private Sinks.Many<?> subject;
-        private StreamingFileUpload upload;
     }
 }

@@ -25,6 +25,7 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.Name;
 import javax.lang.model.type.TypeMirror;
 import java.lang.annotation.Annotation;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -54,7 +55,7 @@ final class AnnotationsElement implements Element {
 
     @Override
     public Set<Modifier> getModifiers() {
-        throw notSupportedMethod();
+        return Collections.emptySet();
     }
 
     @Override
@@ -64,12 +65,12 @@ final class AnnotationsElement implements Element {
 
     @Override
     public Element getEnclosingElement() {
-        throw notSupportedMethod();
+        return null;
     }
 
     @Override
     public List<? extends Element> getEnclosedElements() {
-        throw notSupportedMethod();
+        return Collections.emptyList();
     }
 
     @Override
@@ -89,7 +90,7 @@ final class AnnotationsElement implements Element {
 
     @Override
     public <R, P> R accept(ElementVisitor<R, P> v, P p) {
-        throw notSupportedMethod();
+        return v.visit(this);
     }
 
     private static IllegalStateException notSupportedMethod() {

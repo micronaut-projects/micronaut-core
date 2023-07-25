@@ -18,7 +18,7 @@ package io.micronaut.aop.interceptors
 import io.micronaut.aop.Interceptor
 import io.micronaut.aop.InvocationContext
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 /**
  * @author Graeme Rocher

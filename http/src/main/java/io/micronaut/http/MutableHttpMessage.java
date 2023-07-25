@@ -15,6 +15,8 @@
  */
 package io.micronaut.http;
 
+import io.micronaut.http.body.MessageBodyWriter;
+
 import java.util.Base64;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -27,6 +29,17 @@ import java.util.function.Consumer;
  * @since 1.0
  */
 public interface MutableHttpMessage<B> extends HttpMessage<B> {
+
+    /**
+     * Sets the message body writer to use.
+     * @param messageBodyWriter The message body writer.
+     * @return This response
+     * @since 4.0.0
+     */
+    default MutableHttpMessage<B> bodyWriter(MessageBodyWriter<B> messageBodyWriter) {
+        setAttribute(HttpAttributes.MESSAGE_BODY_WRITER, messageBodyWriter);
+        return this;
+    }
 
     /**
      * @return The {@link MutableHttpHeaders} object

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * Contains support classes for creating Bean {@link javax.inject.Qualifier} instances.
+ * Contains support classes for creating Bean {@link jakarta.inject.Qualifier} instances.
  *
  * @see io.micronaut.context.Qualifier
  * @author graemerocher

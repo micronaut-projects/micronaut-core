@@ -16,6 +16,7 @@
 package io.micronaut.scheduling;
 
 import io.micronaut.core.exceptions.BeanExceptionHandler;
+import io.micronaut.inject.BeanDefinition;
 
 /**
  * An exception handler interface for task related exceptions.
@@ -26,4 +27,21 @@ import io.micronaut.core.exceptions.BeanExceptionHandler;
  * @param <E> The generic type of the exception
  */
 public interface TaskExceptionHandler<T, E extends Throwable> extends BeanExceptionHandler<T, E> {
+
+    /**
+     * Handle an error that occurs during creation of the scheduled task.
+     * @param beanType The bean type
+     * @param throwable The throwable
+     * @since 4.0.0
+     */
+    default void handleCreationFailure(BeanDefinition<T> beanType, E throwable) {
+        if (DefaultTaskExceptionHandler.LOG.isErrorEnabled()) {
+            StringBuilder message = new StringBuilder("Error creating scheduled task ");
+            if (beanType != null) {
+                message.append("for bean [").append(beanType.asArgument()).append("] ");
+            }
+            message.append(throwable.getMessage());
+            DefaultTaskExceptionHandler.LOG.error(message.toString(), throwable);
+        }
+    }
 }

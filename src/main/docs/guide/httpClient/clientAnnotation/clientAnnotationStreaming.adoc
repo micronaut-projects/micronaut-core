@@ -64,7 +64,7 @@ The above example sets the `readIdleTimeout` to ten minutes.
 
 === Streaming Server Sent Events
 
-Micronaut features a native client for Server Sent Events (SSE) defined by the interface api:http.client.sse.SseClient[].
+The Micronaut framework features a native client for Server Sent Events (SSE) defined by the interface api:http.client.sse.SseClient[].
 
 You can use this client to stream SSE events from any server that emits them.
 

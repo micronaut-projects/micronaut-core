@@ -163,7 +163,7 @@ class ThreadSelectionSpec extends Specification {
         String alterflowable()
 
         @Post(uri = "/alterflowablePost", produces = MediaType.TEXT_PLAIN)
-        String alterflowablePost(String body)
+        String alterflowablePost(@Body String body)
 
         @Get("/schedulereactive")
         String scheduleReactive()

@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
+import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
@@ -64,10 +65,18 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * Gets the element annotation metadata factory.
      *
      * @return The element annotation metadata factory
-     * @see 4.0.0
+     * @since 4.0.0
      */
     @NonNull
     ElementAnnotationMetadataFactory getElementAnnotationMetadataFactory();
+
+    /**
+     * @return The expression compilation context factory.
+     * @since 4.0.0
+     */
+    @Experimental
+    @NonNull
+    ExpressionCompilationContextFactory getExpressionCompilationContextFactory();
 
     /**
      * Gets the annotation metadata builder.
@@ -160,7 +169,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
             return projectDir;
         }
         // let's find the projectDir
-        Optional<GeneratedFile> dummyFile = visitGeneratedFile("dummy");
+        Optional<GeneratedFile> dummyFile = visitGeneratedFile("dummy" + System.nanoTime());
         if (dummyFile.isPresent()) {
             URI uri = dummyFile.get().toURI();
             // happens in tests 'mem:///CLASS_OUTPUT/dummy'

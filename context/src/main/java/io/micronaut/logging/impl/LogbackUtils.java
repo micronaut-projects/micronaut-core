@@ -25,6 +25,8 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.logging.LoggingSystemException;
 
+import java.io.File;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.List;
 import java.util.function.Supplier;
@@ -52,18 +54,36 @@ public final class LogbackUtils {
     public static void configure(@NonNull ClassLoader classLoader,
                                  @NonNull LoggerContext context,
                                  @NonNull String logbackXmlLocation) {
-        configure(context, logbackXmlLocation, () -> classLoader.getResource(logbackXmlLocation), classLoader);
+        configure(context, logbackXmlLocation, () -> {
+            // Check classpath first
+            URL resource = classLoader.getResource(logbackXmlLocation);
+            if (resource != null) {
+                return resource;
+            }
+            // Check file system
+            File file = new File(logbackXmlLocation);
+            if (file.exists()) {
+                try {
+                    resource = file.toURI().toURL();
+                } catch (MalformedURLException e) {
+
+                    throw new LoggingSystemException("Error creating URL for off-classpath resource", e);
+                }
+            }
+            return resource;
+        }, classLoader);
     }
 
     /**
      * Configures a Logger Context.
-     *
-     * Searches fpr a custom {@link Configurator} via a service loader.
+     * <p>
+     * Searches for a custom {@link Configurator} via a service loader.
      * If not present it configures the context with the resource.
+     * </p>
      *
-     * @param context  Logger Context
+     * @param context            Logger Context
      * @param logbackXmlLocation the location of the xml logback config file
-     * @param resourceSupplier A resource for example logback.xml
+     * @param resourceSupplier   A resource for example logback.xml
      */
     private static void configure(
         @NonNull LoggerContext context,

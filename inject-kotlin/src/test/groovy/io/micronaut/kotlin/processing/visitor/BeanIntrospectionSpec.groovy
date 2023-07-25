@@ -17,7 +17,6 @@ import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.core.type.Argument
 import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.inject.ExecutableMethod
-import io.micronaut.inject.beans.visitor.MappedSuperClassIntrospectionMapper
 import io.micronaut.kotlin.processing.elementapi.SomeEnum
 import io.micronaut.kotlin.processing.elementapi.TestClass
 
@@ -48,6 +47,56 @@ class Test
         noExceptionThrown()
         introspection != null
         introspection.instantiate().class.name == "test.Test"
+    }
+
+    void "test non-null and null introspection"() {
+        when:
+        def introspection = buildBeanIntrospection("test.Test", """
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+data class Test(
+    val name: String,
+    val description: String? = null)
+""")
+
+        then:
+        noExceptionThrown()
+        introspection != null
+        introspection.constructorArguments.size() == 2
+        introspection.constructorArguments[0].isNonNull()
+        introspection.constructorArguments[1].isNullable()
+    }
+
+    void 'test inner annotation'() {
+        when:
+        def introspection = buildBeanIntrospection("test.Test", """
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@MyAnn
+class Test
+
+@Introspected
+@Retention(AnnotationRetention.RUNTIME)
+@Target(AnnotationTarget.CLASS)
+@MyAnn.InnerAnn
+annotation class MyAnn {
+    @Retention(AnnotationRetention.RUNTIME)
+    @Target(AnnotationTarget.CLASS)
+    annotation class InnerAnn
+}
+""")
+
+        then:
+        noExceptionThrown()
+        introspection != null
+        introspection.instantiate().class.name == "test.Test"
+        introspection.hasAnnotation('test.MyAnn')
+        introspection.hasStereotype('test.MyAnn$InnerAnn')
     }
 
     void "test generics in arrays don't stack overflow"() {
@@ -1332,7 +1381,7 @@ class Test
 
         then:"The reference is valid"
         reference != null
-        reference.getBeanType() == MappedSuperClassIntrospectionMapper
+        reference.getBeanType() == io.micronaut.inject.beans.visitor.MappedSuperClassIntrospectionMapper
     }
 
     void "test write bean introspection data"() {
@@ -2166,5 +2215,37 @@ class Holder<A : Animal>(
             def animal = introspection.getProperty("animal").get().asArgument()
             animal instanceof GenericPlaceholder
             animal.isTypeVariable()
+    }
+
+    void "test list property"() {
+        given:
+            BeanIntrospection introspection = buildBeanIntrospection('test.Cart', '''
+package test
+import io.micronaut.core.annotation.Introspected
+
+@io.micronaut.core.annotation.Introspected
+data class CartItem(
+        val id: Long?,
+        val name: String,
+        val cart: Cart?
+) {
+    constructor(name: String) : this(null, name, null)
+}
+
+@io.micronaut.core.annotation.Introspected
+data class Cart(
+        val id: Long?,
+        val items: List<CartItem>?
+) {
+
+    constructor(items: List<CartItem>) : this(null, items)
+
+    fun cartItemsNotNullable() : List<CartItem> = listOf()
+}
+        ''')
+            def bean = introspection.instantiate(1L, new ArrayList())
+            bean = introspection.getProperty("items").get().withValue(bean, new ArrayList())
+        expect:
+            bean
     }
 }

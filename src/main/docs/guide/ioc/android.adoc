@@ -19,7 +19,7 @@ dependencies {
 }
 ----
 
-If you use `lint` as part of your build you may also need to disable the invalid packages check since Android includes a hard-coded check that regards the `javax.inject` package as invalid unless you use Dagger:
+If you use `lint` as part of your build you may also need to disable the invalid packages check since Android includes a hard-coded check that regards the `jakarta.inject` package as invalid unless you use Dagger:
 
 .Configure lint within build.gradle
 [source,groovy]

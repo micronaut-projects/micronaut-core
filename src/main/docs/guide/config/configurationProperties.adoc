@@ -1,7 +1,7 @@
 You can create type-safe configuration by creating classes that are annotated with
  ann:io.micronaut.context.annotation.ConfigurationProperties[].
 
-Micronaut will produce a reflection-free `@ConfigurationProperties` bean and will also at compile time calculate the property paths to evaluate, greatly improving the speed and efficiency of loading `@ConfigurationProperties`.
+The Micronaut framework will produce a reflection-free `@ConfigurationProperties` bean and will also at compile time calculate the property paths to evaluate, greatly improving the speed and efficiency of loading `@ConfigurationProperties`.
 
 For example:
 
@@ -41,7 +41,7 @@ The names supplied to the includes/excludes list must be the "property" name. Fo
 [[configurationPropertiesAccessorsStyle]]
 == Change accessors style
 
-Since 3.3, Micronaut supports defining different accessors prefixes for getters and setter other than the default `get` and `set` defined for Java Beans. Annotate your POJO or `@ConfigurationProperties` class with the link:{api}/io/micronaut/core/annotation/AccessorsStyle.html[@AccessorsStyle] annotation.
+Since 3.3, the Micronaut framework supports defining different accessors prefixes for getters and setter other than the default `get` and `set` defined for Java Beans. Annotate your POJO or `@ConfigurationProperties` class with the link:{api}/io/micronaut/core/annotation/AccessorsStyle.html[@AccessorsStyle] annotation.
 
 This is useful when you write the getters and setters in a fluent way. For example:
 
@@ -81,16 +81,16 @@ public class EngineConfig {
 
 }
 ----
-<1> Micronaut will use an empty prefix for getters and setters.
+<1> The Micronaut framework will use an empty prefix for getters and setters.
 <2> Define the getters and setters with an empty prefix.
 
 Now you can inject `EngineConfig` and use it with `engineConfig.manufacturer()` and `engineConfig.cylinders()` to retrieve the values from configuration.
 
 == Property Type Conversion
 
-Micronaut uses the api:io.micronaut.core.convert.ConversionService[] bean to convert values when resolving properties. You can register additional converters for types not supported by Micronaut by defining beans that implement the api:io.micronaut.core.convert.TypeConverter[] interface.
+The Micronaut framework uses the api:io.micronaut.core.convert.ConversionService[] bean to convert values when resolving properties. You can register additional converters for types not supported by Micronaut by defining beans that implement the api:io.micronaut.core.convert.TypeConverter[] interface.
 
-Micronaut features some built-in conversions that are useful, which are detailed below.
+The Micronaut framework features some built-in conversions that are useful, which are detailed below.
 
 === Duration Conversion
 
@@ -196,7 +196,7 @@ You can use the link:{api}/io/micronaut/context/annotation/ConfigurationBuilder.
 
 Since there is no consistent way to define builders in the Java world, one or more method prefixes can be specified in the annotation to support builder methods like `withXxx` or `setXxx`. If the builder methods have no prefix, assign an empty string to the parameter.
 
-A configuration prefix can also be specified to tell Micronaut where to look for configuration values. By default, builder methods use the configuration prefix specified in a class-level link:{api}/io/micronaut/context/annotation/ConfigurationProperties.html[@ConfigurationProperties] annotation.
+A configuration prefix can also be specified to tell the Micronaut framework where to look for configuration values. By default, builder methods use the configuration prefix specified in a class-level link:{api}/io/micronaut/context/annotation/ConfigurationProperties.html[@ConfigurationProperties] annotation.
 
 For example:
 

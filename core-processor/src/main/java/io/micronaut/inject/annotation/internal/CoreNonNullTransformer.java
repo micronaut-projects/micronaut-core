@@ -26,7 +26,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * A transformer that remaps {@link io.micronaut.core.annotation.NonNull} to {@code javax.annotation.Nonnull}.
+ * A transformer that remaps {@link io.micronaut.core.annotation.NonNull} to {@link io.micronaut.core.annotation.AnnotationUtil#NON_NULL}.
  *
  * @author graemerocher
  * @since 2.4.0

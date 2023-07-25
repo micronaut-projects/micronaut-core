@@ -16,7 +16,7 @@
 package io.micronaut.http.bind.binders;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.bind.annotation.AbstractAnnotatedArgumentBinder;
+import io.micronaut.core.bind.annotation.AbstractArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -28,12 +28,14 @@ import io.micronaut.http.annotation.RequestAttribute;
 /**
  * An {@link io.micronaut.core.bind.annotation.AnnotatedArgumentBinder} implementation that uses the {@link RequestAttribute}
  * annotation to trigger binding from an HTTP request attribute.
+ * NOTE: The binder is annotates as postponed to allow injecting attributes added by filters.
  *
  * @param <T> A type
  * @author Ahmed Lafta
  * @see io.micronaut.http.HttpAttributes
  */
-public class RequestAttributeAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<RequestAttribute, T, HttpRequest<?>> implements AnnotatedRequestArgumentBinder<RequestAttribute, T> {
+public class RequestAttributeAnnotationBinder<T> extends AbstractArgumentBinder<T>
+    implements AnnotatedRequestArgumentBinder<RequestAttribute, T>, PostponedRequestArgumentBinder<T> {
 
     /**
      * @param conversionService conversionService
@@ -52,11 +54,11 @@ public class RequestAttributeAnnotationBinder<T> extends AbstractAnnotatedArgume
         MutableConvertibleValues<Object> parameters = source.getAttributes();
         AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
         String parameterName = annotationMetadata.stringValue(RequestAttribute.class).orElse(argument.getArgument().getName());
-        return doBind(argument, parameters, parameterName, BindingResult.UNSATISFIED);
+        return doBind(argument, parameters, parameterName, BindingResult.unsatisfied());
     }
 
     @Override
-    protected String getFallbackFormat(Argument argument) {
+    protected String getFallbackFormat(Argument<?> argument) {
         return NameUtils.hyphenate(NameUtils.capitalize(argument.getName()), false);
     }
 }

@@ -17,10 +17,8 @@ package io.micronaut.docs.server.suspend
 
 import io.micronaut.http.*
 import io.micronaut.http.annotation.*
-import io.micronaut.http.bind.binders.HttpCoroutineContextFactory
 import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.scheduling.TaskExecutors
-import io.micronaut.tracing.instrument.kotlin.CoroutineTracingDispatcher
 import kotlinx.coroutines.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.atomic.AtomicInteger
@@ -31,8 +29,7 @@ import org.slf4j.MDC
 class SuspendController(
     @Named(TaskExecutors.IO) private val executor: ExecutorService,
     private val suspendService: SuspendService,
-    private val suspendRequestScopedService: SuspendRequestScopedService,
-    private val coroutineTracingDispatcherFactory: HttpCoroutineContextFactory<CoroutineTracingDispatcher>
+    private val suspendRequestScopedService: SuspendRequestScopedService
 ) {
 
     private val coroutineDispatcher: CoroutineDispatcher
@@ -175,13 +172,6 @@ class SuspendController(
     suspend fun keepTracingContextInsideCoroutine() = coroutineScope {
         val before = currentTraceId()
         val after = withContext(Dispatchers.Default) { currentTraceId() }
-        "$before,$after"
-    }
-
-    @Get("/keepTracingContextUsingCoroutineTracingDispatcherExplicitly")
-    fun keepTracingContextUsingCoroutineTracingDispatcherExplicitly() = runBlocking {
-        val before = currentTraceId()
-        val after = withContext(Dispatchers.Default + coroutineTracingDispatcherFactory.create()) { currentTraceId() }
         "$before,$after"
     }
 

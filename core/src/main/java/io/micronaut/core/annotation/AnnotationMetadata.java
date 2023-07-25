@@ -93,6 +93,16 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
+     * Does the metadata contain any evaluated expressions like {@code #{ T(java.lang.Math).random() }}.
+     *
+     * @return True if evaluated expressions are present
+     * @since 4.0.0
+     */
+    default boolean hasEvaluatedExpressions() {
+        return false;
+    }
+
+    /**
      * Resolve all of the annotation names that feature the given stereotype.
      *
      * @param stereotype The annotation names
@@ -1492,6 +1502,18 @@ public interface AnnotationMetadata extends AnnotationSource {
                     .orElseGet(() -> hasStereotype(annotation.getName()));
         }
         return false;
+    }
+
+    /**
+     * Faster version of {@link #hasStereotype(Class)} that does not support repeatable
+     * annotations.
+     *
+     * @param annotation The annotation type
+     * @return Whether this metadata has the given stereotype
+     */
+    @Internal
+    default boolean hasStereotypeNonRepeating(@NonNull Class<? extends Annotation> annotation) {
+        return hasStereotype(annotation.getName());
     }
 
     /**

@@ -1,6 +1,6 @@
 The previous section introduced the notion of Reactive programming using https://projectreactor.io[Project Reactor] and Micronaut.
 
-Micronaut supports returning common reactive types such as reactor:Mono[] (or rx:Single[] rx:Maybe[] rx:Observable[] types from RxJava), an instance of rs:Publisher[] or jdk:java.util.concurrent.CompletableFuture[] from any controller method.
+The Micronaut framework supports returning common reactive types such as reactor:Mono[] (or rx:Single[] rx:Maybe[] rx:Observable[] types from RxJava), an instance of rs:Publisher[] or jdk:java.util.concurrent.CompletableFuture[] from any controller method.
 
 NOTE: To use https://projectreactor.io[Project Reactor]'s `Flux` or `Mono` you need to add the Micronaut Reactor dependency to your project to include the necessary converters.
 
@@ -8,9 +8,9 @@ NOTE: To use https://github.com/ReactiveX/RxJava[RxJava]'s `Flowable`, `Single` 
 
 The argument designated as the body of the request using the api:http.annotation.Body[] annotation can also be a reactive type or a jdk:java.util.concurrent.CompletableFuture[].
 
-When returning a reactive type, Micronaut subscribes to the returned reactive type on the same thread as the request (a Netty Event Loop thread). It is therefore important that if you perform any blocking operations, you offload those operations to an appropriately configured thread pool, for example using the https://projectreactor.io[Project Reactor] or https://github.com/ReactiveX/RxJava[RxJava] `subscribeOn(..)` facility or ann:scheduling.annotation.ExecuteOn[].
+When returning a reactive type, The Micronaut framework subscribes to the returned reactive type on the same thread as the request (a Netty Event Loop thread). It is therefore important that if you perform any blocking operations, you offload those operations to an appropriately configured thread pool, for example using the https://projectreactor.io[Project Reactor] or https://github.com/ReactiveX/RxJava[RxJava] `subscribeOn(..)` facility or ann:scheduling.annotation.ExecuteOn[].
 
-TIP: See the section on <<threadPools, Configuring Thread Pools>> for information on the thread pools that Micronaut sets up and how to configure them.
+TIP: See the section on <<threadPools, Configuring Thread Pools>> for information on the thread pools that the Micronaut framework sets up and how to configure them.
 
 To summarize, the following table illustrates some common response types and their handling:
 
@@ -39,4 +39,4 @@ To summarize, the following table illustrates some common response types and the
 |`Book show()`
 |===
 
-NOTE: When returning a Reactive type, its type affects the returned response. For example, when returning a reactor:Flux[], Micronaut cannot know the size of the response, so `Transfer-Encoding` type of `Chunked` is used. Whilst for types that emit a single result such as `reactor:Mono[]` the `Content-Length` header is populated.
+NOTE: When returning a Reactive type, its type affects the returned response. For example, when returning a reactor:Flux[], the Micronaut framework cannot know the size of the response, so `Transfer-Encoding` type of `Chunked` is used. Whilst for types that emit a single result such as `reactor:Mono[]` the `Content-Length` header is populated.

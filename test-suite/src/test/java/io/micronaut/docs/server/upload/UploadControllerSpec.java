@@ -153,7 +153,8 @@ public class UploadControllerSpec {
         Map<String, Object> embedded = (Map<String, Object>) ex.getResponse().getBody(Map.class).get().get("_embedded");
         Object message = ((Map<String, Object>) ((List) embedded.get("errors")).get(0)).get("message");
 
-        assertEquals("Required argument [CompletedFileUpload file] not specified", message);
+        // a part without a filename is an attribute, which cannot be bound to CompletedFileUpload
+        assertEquals("Cannot convert type [class io.micronaut.http.server.netty.MicronautHttpData$AttributeImpl] to target type: interface io.micronaut.http.multipart.CompletedFileUpload. Considering defining a TypeConverter bean to handle this case.", message);
     }
 
     @Test
@@ -173,7 +174,8 @@ public class UploadControllerSpec {
         Map<String, Object> embedded = (Map<String, Object>) ex.getResponse().getBody(Map.class).get().get("_embedded");
         Object message = ((Map<String, Object>) ((List) embedded.get("errors")).get(0)).get("message");
 
-        assertEquals("Required argument [CompletedFileUpload file] not specified", message);
+        // a part without a filename is an attribute, which cannot be bound to CompletedFileUpload
+        assertEquals("Cannot convert type [class io.micronaut.http.server.netty.MicronautHttpData$AttributeImpl] to target type: interface io.micronaut.http.multipart.CompletedFileUpload. Considering defining a TypeConverter bean to handle this case.", message);
     }
 
     @Test

@@ -1,2 +1,2 @@
-Micronaut features several built-in configurations that enable integration with common databases and other servers.
+Micronaut framework features several built-in configurations that enable integration with common databases and other servers.
 

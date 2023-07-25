@@ -28,7 +28,9 @@ import org.reactivestreams.Processor;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
 import java.util.function.Consumer;
@@ -42,6 +44,18 @@ import java.util.stream.Stream;
  */
 @Experimental
 public interface JsonMapper {
+    /**
+     * Specialize this mapper for the given type. Read and write operations on the returned mapper
+     * may only be called with that type.
+     *
+     * @param type The type to read or write
+     * @return The specialized {@link JsonMapper}.
+     */
+    @NonNull
+    default JsonMapper createSpecific(@NonNull Argument<?> type) {
+        return this;
+    }
+
     /**
      * Transform a {@link JsonNode} to a value of the given type.
      *
@@ -78,6 +92,19 @@ public interface JsonMapper {
     <T> T readValue(@NonNull InputStream inputStream, @NonNull Argument<T> type) throws IOException;
 
     /**
+     * Read a value from the given input stream for the given type.
+     * @param inputStream The input stream
+     * @param type The type
+     * @param <T> The generic type
+     * @return The value or {@code null} if it decodes to null
+     * @throws IOException If an unrecoverable error occurs
+     */
+    default @Nullable <T> T readValue(@NonNull InputStream inputStream, @NonNull Class<T> type) throws IOException {
+        Objects.requireNonNull(type, "Type cannot be null");
+        return readValue(inputStream, Argument.of(type));
+    }
+
+    /**
      * Parse and map json from the given byte array.
      *
      * @param byteArray The input data.
@@ -112,6 +139,33 @@ public interface JsonMapper {
      */
     default <T> T readValue(@NonNull String string, @NonNull Argument<T> type) throws IOException {
         return readValue(string.getBytes(StandardCharsets.UTF_8), type);
+    }
+
+    /**
+     * Read a value from the byte array for the given type.
+     * @param byteArray The byte array
+     * @param type The type
+     * @param <T> The generic type
+     * @return The value or {@code null} if it decodes to null
+     * @throws IOException If an unrecoverable error occurs
+     * @since 4.0.0
+     */
+    default @Nullable <T> T readValue(@NonNull byte[] byteArray, @NonNull Class<T> type) throws IOException {
+        Objects.requireNonNull(type, "Type cannot be null");
+        return readValue(byteArray, Argument.of(type));
+    }
+
+    /**
+     * Read a value from the given string for the given type.
+     * @param string The string
+     * @param type The type
+     * @param <T> The generic type
+     * @return The value or {@code null} if it decodes to null
+     * @throws IOException If an unrecoverable error occurs
+     */
+    default @Nullable <T> T readValue(@NonNull String string, @NonNull Class<T> type) throws IOException {
+        Objects.requireNonNull(type, "Type cannot be null");
+        return readValue(string, Argument.of(type));
     }
 
     /**
@@ -190,6 +244,48 @@ public interface JsonMapper {
     <T> byte[] writeValueAsBytes(@NonNull Argument<T> type, @Nullable T object) throws IOException;
 
     /**
+     * Write the given value as a string.
+     * @param object The object
+     * @return The string
+     * @throws IOException If an unrecoverable error occurs
+     * @since 4.0.0
+     */
+    @SuppressWarnings("unchecked")
+    default  @NonNull String writeValueAsString(@NonNull Object object) throws IOException {
+        Objects.requireNonNull(object, "Object cannot be null");
+        return new String(writeValueAsBytes(object), StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Write the given value as a string.
+     * @param type The type, never {@code null}
+     * @param object The object
+     * @param <T> The generic type
+     * @return The string
+     * @throws IOException If an unrecoverable error occurs
+     * @since 4.0.0
+     */
+    default  @NonNull <T> String writeValueAsString(@NonNull Argument<T> type, @Nullable T object) throws IOException {
+        return writeValueAsString(type, object, StandardCharsets.UTF_8);
+    }
+
+    /**
+     * Write the given value as a string.
+     * @param type The type, never {@code null}
+     * @param object The object
+     * @param charset The charset, never {@code null}
+     * @param <T> The generic type
+     * @return The string
+     * @throws IOException If an unrecoverable error occurs
+     * @since 4.0.0
+     */
+    default  @NonNull <T> String writeValueAsString(@NonNull Argument<T> type, @Nullable T object, Charset charset) throws IOException {
+        Objects.requireNonNull(charset, "Charset cannot be null");
+        byte[] bytes = writeValueAsBytes(type, object);
+        return new String(bytes, charset);
+    }
+
+    /**
      * Update an object from json data.
      *
      * @param value The object to update.
@@ -259,8 +355,15 @@ public interface JsonMapper {
                     return Stream.empty();
                 }
             })
-            .min(OrderUtil.COMPARATOR)
-            .orElseThrow(() -> new IllegalStateException("No JsonMapper implementation found"))
-            .get();
+            .sorted(OrderUtil.COMPARATOR)
+            .flatMap(jsonMapperSupplier -> {
+                try {
+                    return Stream.of(jsonMapperSupplier.get());
+                } catch (Exception e) {
+                    return Stream.empty();
+                }
+            })
+            .findFirst()
+            .orElseThrow(() -> new IllegalStateException("No JsonMapper implementation found"));
     }
 }

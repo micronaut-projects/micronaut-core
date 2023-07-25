@@ -33,7 +33,7 @@ import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import javax.annotation.Nullable
+import jakarta.annotation.Nullable
 
 class QueryParametersSpec extends Specification {
 

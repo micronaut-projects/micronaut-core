@@ -36,8 +36,6 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -73,7 +71,7 @@ public final class ApplicationEventPublisherFactory<T>
         try {
             metadata.addDeclaredAnnotation(Indexes.class.getName(), Collections.singletonMap(AnnotationMetadata.VALUE_MEMBER, getBeanType()));
         } catch (NoClassDefFoundError e) {
-            // ignore, might happen if javax.inject is not the classpath
+            // ignore, might happen if jakarta.inject is not the classpath
         }
         annotationMetadata = metadata;
     }
@@ -212,15 +210,12 @@ public final class ApplicationEventPublisherFactory<T>
     }
 
     private ApplicationEventPublisher<Object> createEventPublisher(Argument<?> eventType, BeanContext beanContext) {
-        return new ApplicationEventPublisher<Object>() {
+        return new ApplicationEventPublisher<>() {
 
-            private final Supplier<List<ApplicationEventListener>> lazyListeners = SupplierUtil.memoized(() -> {
-                List<ApplicationEventListener> listeners = new ArrayList<>(
-                        beanContext.getBeansOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(eventType.getType()))
-                );
-                listeners.sort(OrderUtil.COMPARATOR);
-                return listeners;
-            });
+            private final Supplier<ApplicationEventListener[]> lazyListeners = SupplierUtil.memoized(() -> beanContext.getBeansOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(eventType.getType()))
+                .stream()
+                .sorted(OrderUtil.COMPARATOR)
+                .toArray(ApplicationEventListener[]::new));
 
             @Override
             public void publishEvent(Object event) {
@@ -236,7 +231,7 @@ public final class ApplicationEventPublisherFactory<T>
             public Future<Void> publishEventAsync(Object event) {
                 Objects.requireNonNull(event, "Event cannot be null");
                 CompletableFuture<Void> future = new CompletableFuture<>();
-                List<ApplicationEventListener> eventListeners = lazyListeners.get();
+                ApplicationEventListener[] eventListeners = lazyListeners.get();
                 executorSupplier.get().execute(() -> {
                     try {
                         notifyEventListeners(event, eventListeners);
@@ -247,30 +242,36 @@ public final class ApplicationEventPublisherFactory<T>
                 });
                 return future;
             }
+
+            @Override
+            public boolean isEmpty() {
+                return lazyListeners.get().length == 0;
+            }
         };
     }
 
-    private void notifyEventListeners(@NonNull Object event, Collection<ApplicationEventListener> eventListeners) {
-        if (!eventListeners.isEmpty()) {
-            if (EventLogger.LOG.isTraceEnabled()) {
-                EventLogger.LOG.trace("Established event listeners {} for event: {}", eventListeners, event);
-            }
-            for (ApplicationEventListener listener : eventListeners) {
-                if (listener.supports(event)) {
-                    try {
-                        if (EventLogger.LOG.isTraceEnabled()) {
-                            EventLogger.LOG.trace("Invoking event listener [{}] for event: {}", listener, event);
+    private void notifyEventListeners(@NonNull Object event, ApplicationEventListener[] eventListeners) {
+        if (eventListeners.length == 0) {
+            return;
+        }
+        if (EventLogger.LOG.isTraceEnabled()) {
+            EventLogger.LOG.trace("Established event listeners {} for event: {}", eventListeners, event);
+        }
+        for (ApplicationEventListener listener : eventListeners) {
+            if (listener.supports(event)) {
+                try {
+                    if (EventLogger.LOG.isTraceEnabled()) {
+                        EventLogger.LOG.trace("Invoking event listener [{}] for event: {}", listener, event);
+                    }
+                    listener.onApplicationEvent(event);
+                } catch (ClassCastException ex) {
+                    String msg = ex.getMessage();
+                    if (msg == null || msg.startsWith(event.getClass().getName())) {
+                        if (EventLogger.LOG.isDebugEnabled()) {
+                            EventLogger.LOG.debug("Incompatible listener for event: " + listener, ex);
                         }
-                        listener.onApplicationEvent(event);
-                    } catch (ClassCastException ex) {
-                        String msg = ex.getMessage();
-                        if (msg == null || msg.startsWith(event.getClass().getName())) {
-                            if (EventLogger.LOG.isDebugEnabled()) {
-                                EventLogger.LOG.debug("Incompatible listener for event: " + listener, ex);
-                            }
-                        } else {
-                            throw ex;
-                        }
+                    } else {
+                        throw ex;
                     }
                 }
             }

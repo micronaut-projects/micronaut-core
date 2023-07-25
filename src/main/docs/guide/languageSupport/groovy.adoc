@@ -57,7 +57,7 @@ The above example demonstrates creating a Groovy bean that looks like the follow
 ----
 package hello.world
 
-import javax.inject.Singleton
+import jakarta.inject.Singleton
 
 @Singleton
 class HelloBean {
@@ -65,9 +65,9 @@ class HelloBean {
 }
 ----
 
-WARNING: Groovy automatically imports `groovy.lang.Singleton` which can be confusing as it conflicts with `javax.inject.Singleton`. Make sure you use `javax.inject.Singleton` when declaring a Micronaut singleton bean to avoid surprising behavior.
+WARNING: Groovy automatically imports `groovy.lang.Singleton` which can be confusing as it conflicts with `jakarta.inject.Singleton`. Make sure you use `jakarta.inject.Singleton` when declaring a Micronaut singleton bean to avoid surprising behavior.
 
-We can also create a client - don't forget Micronaut can act as a client or a server!
+We can also create a client - don't forget Micronaut framework can act as a client or a server!
 
 [source,bash]
 .Create a client
@@ -139,7 +139,7 @@ As you can see from the output from the CLI, a https://spockframework.org[Spock]
 ...
 ----
 
-Notice how you use Micronaut both as client and as a server to test itself.
+Notice how you use the Micronaut framework both as client and as a server to test itself.
 
 == Programmatic Routes with GroovyRouterBuilder
 
@@ -209,6 +209,6 @@ You can also define the service as an interface instead of an abstract class to 
 
 A microservice application is just one way to use Micronaut. You can also use it for serverless functions like on AWS Lambda.
 
-With the `function-groovy` module, Micronaut features enhanced support for functions written in Groovy.
+With the `function-groovy` module, the Micronaut framework features enhanced support for functions written in Groovy.
 
 See the section on <<serverlessFunctions, Serverless Functions>> for more information.

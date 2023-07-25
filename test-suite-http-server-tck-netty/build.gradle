@@ -6,12 +6,6 @@ plugins {
 
 repositories {
     mavenCentral()
-    maven {
-        url "https://s01.oss.sonatype.org/content/repositories/snapshots/"
-        mavenContent {
-            snapshotsOnly()
-        }
-    }
 }
 
 micronautBuild {
@@ -24,7 +18,7 @@ dependencies {
     testImplementation(projects.httpServerNetty)
     testImplementation(projects.httpClient)
     testImplementation(libs.junit.platform.engine)
-    testImplementation(libs.managed.logback.classic)
+    testImplementation(libs.logback.classic)
     testImplementation(platform(libs.test.boms.micronaut.validation))
     testImplementation(libs.micronaut.validation) {
         exclude(group: "io.micronaut")
@@ -41,16 +35,6 @@ configurations {
     }
     nativeImageTestClasspath {
         exclude module: 'groovy-test'
-    }
-}
-
-tasks.named("check") { task ->
-    def graal = ["jvmci.Compiler", "java.vendor.version", "java.vendor"].any {
-        println "$it ${System.getProperty(it)}"
-        System.getProperty(it)?.toLowerCase(Locale.ENGLISH)?.contains("graal")
-    }
-    if (graal) {
-        task.dependsOn("nativeTest")
     }
 }
 

@@ -11,11 +11,12 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MutableHttpResponse
+import io.micronaut.http.bind.DefaultRequestBinderRegistry
+import io.micronaut.http.reactive.execution.ReactiveExecutionFlow
 import io.micronaut.inject.ExecutableMethod
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
-import reactor.util.context.Context
-import spock.lang.Ignore
+import reactor.core.publisher.Mono
 import spock.lang.Specification
 
 import java.lang.reflect.Method
@@ -26,7 +27,7 @@ import java.util.concurrent.ThreadFactory
 
 class FilterRunnerSpec extends Specification {
     private FilterRunner filterRunner(List<GenericHttpFilter> filters) {
-        return new FilterRunner(ConversionService.SHARED, filters);
+        return new FilterRunner(filters)
     }
 
     def 'simple tasks should not suspend'() {
@@ -106,19 +107,69 @@ class FilterRunnerSpec extends Specification {
                             .contextWrite { it.put('value', 'around 2') }
                     }
                 },
-                (GenericHttpFilter.TerminalWithReactorContext) ((req, ctx) -> {
-                    events.add('terminal: ' + ctx.get('value'))
-                    ExecutionFlow.just(HttpResponse.ok("resp1"))
-                })
+                (GenericHttpFilter.Terminal) (req) -> {
+                    return ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(ctx -> {
+                        events.add('terminal: ' + ctx.get('value'))
+                        Mono.just(HttpResponse.ok("resp1"))
+                    }))
+                }
         ]
 
         when:
         def runner = filterRunner(filters)
-        runner.reactorContext(Context.of('value', 'outer'))
-        def result = await(runner.run(HttpRequest.GET("/req1")))
+        def result = await(
+                ReactiveExecutionFlow.fromFlow(
+                        runner.run(HttpRequest.GET("/req1"))
+                ).putInContext('value', 'outer')
+        )
         then:
         result != null
         events == ["context 1: outer", "context 2: around 1", "terminal: around 2"]
+
+        where:
+        legacy << [false, true]
+    }
+
+    def 'around filters invocation order'(boolean legacy) {
+        given:
+        def events = []
+        List<GenericHttpFilter> filters = [
+                around(legacy) { request, chain ->
+                    events.add('before 1')
+                    return Flux.deferContextual { ctx ->
+                        events.add('context 1: ' + ctx.get('value'))
+                        Flux.from(chain.proceed(request))
+                                .doOnNext { events.add('next 1') }
+                                .contextWrite { it.put('value', 'around 1') }
+                    }
+                },
+                around(legacy) { request, chain ->
+                    events.add('before 2')
+                    return Flux.deferContextual { ctx ->
+                        events.add('context 2: ' + ctx.get('value'))
+                        Flux.from(chain.proceed(request))
+                                .doOnNext { events.add('next 2') }
+                                .contextWrite { it.put('value', 'around 2') }
+                    }
+                },
+                (GenericHttpFilter.Terminal) (req) -> {
+                    return ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(ctx -> {
+                        events.add('terminal: ' + ctx.get('value'))
+                        Mono.just(HttpResponse.ok("resp1"))
+                    }))
+                }
+        ]
+
+        when:
+        def runner = filterRunner(filters)
+        def result = await(
+                ReactiveExecutionFlow.fromFlow(
+                        runner.run(HttpRequest.GET("/req1"))
+                ).putInContext('value', 'outer')
+        )
+        then:
+        result != null
+        events == ["before 1", "context 1: outer", "before 2", "context 2: around 1", "terminal: around 2", "next 2", "next 1"]
 
         where:
         legacy << [false, true]
@@ -612,7 +663,6 @@ class FilterRunnerSpec extends Specification {
         events == ["before1 thread-outside", "before2 thread-before", "before3 thread-before", "terminal thread-before", "after3 thread-before", "after2 thread-after", "after1 thread-after"]
     }
 
-    @Ignore
     def 'around filter with blocking continuation'() {
         given:
         def events = []
@@ -644,11 +694,11 @@ class FilterRunnerSpec extends Specification {
     }
 
     private def after(ReturnType returnType, List<Argument> arguments = closure.parameterTypes.collect { Argument.of(it) }, Closure<?> closure) {
-        return FilterRunner.prepareFilterMethod(ConversionService.SHARED, null, new LambdaExecutable(closure, arguments.toArray(new Argument[0]), returnType), true, new FilterOrder.Fixed(0))
+        return FilterRunner.prepareFilterMethod(ConversionService.SHARED, null, new LambdaExecutable(closure, arguments.toArray(new Argument[0]), returnType), true, new FilterOrder.Fixed(0), new DefaultRequestBinderRegistry(ConversionService.SHARED))
     }
 
     private def before(ReturnType returnType, List<Argument> arguments = closure.parameterTypes.collect { Argument.of(it) }, Closure<?> closure) {
-        return FilterRunner.prepareFilterMethod(ConversionService.SHARED, null, new LambdaExecutable(closure, arguments.toArray(new Argument[0]), returnType), false, new FilterOrder.Fixed(0))
+        return FilterRunner.prepareFilterMethod(ConversionService.SHARED, null, new LambdaExecutable(closure, arguments.toArray(new Argument[0]), returnType), false, new FilterOrder.Fixed(0), new DefaultRequestBinderRegistry(ConversionService.SHARED))
     }
 
     private def around(boolean legacy, Closure<Publisher<MutableHttpResponse<?>>> closure) {

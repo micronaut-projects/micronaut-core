@@ -342,7 +342,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     @Override
     protected void startClass(ClassVisitor classWriter, String className, Type superType) {
         String[] interfaces = getImplementedInterfaceInternalNames();
-        classWriter.visit(V1_8, ACC_SYNTHETIC, className, null, !isInterface ? superType.getInternalName() : null, interfaces);
+        classWriter.visit(V17, ACC_SYNTHETIC, className, null, !isInterface ? superType.getInternalName() : null, interfaces);
 
         classWriter.visitAnnotation(TYPE_GENERATED.getDescriptor(), false);
 
@@ -817,9 +817,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             writeWithQualifierMethod(proxyClassWriter);
             if (!lazy || cacheLazyTarget) {
                 // add the $target field for the target bean
-                int modifiers = hotswap ? ACC_PRIVATE : ACC_PRIVATE | ACC_FINAL;
                 proxyClassWriter.visitField(
-                        modifiers,
+                        ACC_PRIVATE,
                         FIELD_TARGET,
                         targetType.getDescriptor(),
                         null,
@@ -937,7 +936,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             String[] adviceInterfaces = {Type.getInternalName(interceptedInterface)};
             interfaces = ArrayUtils.concat(interfaces, adviceInterfaces);
         }
-        proxyClassWriter.visit(V1_8, ACC_SYNTHETIC,
+        proxyClassWriter.visit(V17, ACC_SYNTHETIC,
                 proxyInternalName,
                 null,
                 isInterface ? TYPE_OBJECT.getInternalName() : getTypeReferenceForName(targetClassFullName).getInternalName(),
@@ -1613,12 +1612,12 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
      * Method Reference class with names and a list of argument types. Used as the targets.
      */
     private static final class MethodRef {
+        int methodIndex;
         private final String name;
         private final List<ClassElement> argumentTypes;
         private final List<ClassElement> genericArgumentTypes;
         private final Type returnType;
         private final List<String> rawTypes;
-        int methodIndex;
 
         public MethodRef(String name, List<ParameterElement> parameterElements, Type returnType) {
             this.name = name;

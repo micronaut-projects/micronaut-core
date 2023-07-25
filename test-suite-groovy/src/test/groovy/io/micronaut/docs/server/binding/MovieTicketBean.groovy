@@ -21,7 +21,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.PathVariable
 import io.micronaut.http.annotation.QueryValue
 
-import javax.annotation.Nullable
+import jakarta.annotation.Nullable
 import jakarta.validation.constraints.PositiveOrZero
 // end::imports[]
 

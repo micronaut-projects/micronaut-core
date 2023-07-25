@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -199,6 +199,16 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, M
      * Environment key for whether to deduce environments.
      */
     String DEDUCE_ENVIRONMENT_ENV = "MICRONAUT_ENV_DEDUCTION";
+
+    /**
+     * Property for whether to deduce cloud environments.
+     */
+    String DEDUCE_CLOUD_ENVIRONMENT_PROPERTY = "micronaut.env.cloud-deduction";
+
+    /**
+     * Environment key for whether to deduce cloud environments.
+     */
+    String DEDUCE_CLOUD_ENVIRONMENT_ENV = "MICRONAUT_ENV_CLOUD_DEDUCTION";
 
     /**
      * Should respect the order as provided.

@@ -31,7 +31,7 @@ import java.io.IOException;
  * @since 3.1
  */
 @Singleton
-final class JsonNodeDeserializer extends JsonDeserializer<JsonNode> {
+public final class JsonNodeDeserializer extends JsonDeserializer<JsonNode> {
     @Override
     public JsonNode deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
         return JsonNodeTreeCodec.getInstance().readTree(p);

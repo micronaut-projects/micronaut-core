@@ -148,7 +148,7 @@ public final class NettyStreamingFileUpload implements StreamingFileUpload {
     private Publisher<Boolean> transferTo(ThrowingSupplier<OutputStream, IOException> outputStreamSupplier) {
         return Mono.<Boolean>create(emitter ->
 
-                subject.subscribeOn(Schedulers.fromExecutorService(ioExecutor))
+                subject.publishOn(Schedulers.fromExecutorService(ioExecutor))
                         .subscribe(new Subscriber<PartData>() {
                             Subscription subscription;
                             OutputStream outputStream;
@@ -175,6 +175,7 @@ public final class NettyStreamingFileUpload implements StreamingFileUpload {
 
                             @Override
                             public void onError(Throwable t) {
+                                discard();
                                 emitter.error(t);
                                 try {
                                     if (outputStream != null) {
@@ -189,6 +190,7 @@ public final class NettyStreamingFileUpload implements StreamingFileUpload {
 
                             @Override
                             public void onComplete() {
+                                discard();
                                 try {
                                     outputStream.close();
                                     emitter.success(true);

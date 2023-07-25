@@ -15,7 +15,7 @@
  */
 package io.micronaut.management.endpoint.routes;
 
-import io.micronaut.web.router.UriRoute;
+import io.micronaut.web.router.UriRouteInfo;
 
 /**
  * <p>Returns data for a given route to be used for the {@link RoutesEndpoint}.</p>
@@ -27,8 +27,8 @@ import io.micronaut.web.router.UriRoute;
 public interface RouteData<T> {
 
     /**
-     * @param route The route
+     * @param routeInfo The route info
      * @return Route data
      */
-    T getData(UriRoute route);
+    T getData(UriRouteInfo<?, ?> routeInfo);
 }

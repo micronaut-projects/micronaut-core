@@ -35,6 +35,13 @@ public class PropertiesPropertySourceLoader extends AbstractPropertySourceLoader
      */
     public static final String PROPERTIES_EXTENSION = "properties";
 
+    public PropertiesPropertySourceLoader() {
+    }
+
+    public PropertiesPropertySourceLoader(boolean logEnabled) {
+        super(logEnabled);
+    }
+
     @Override
     public Set<String> getExtensions() {
         return Collections.singleton(PROPERTIES_EXTENSION);

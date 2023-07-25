@@ -22,6 +22,8 @@ import io.micronaut.aop.util.DelegatingContextContinuation;
 import io.micronaut.aop.util.KotlinInterceptedMethodHelper;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.async.propagation.KotlinCoroutinePropagation;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.KotlinUtils;
 import kotlin.coroutines.Continuation;
@@ -63,7 +65,7 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
      * Checks if the method invocation is a Kotlin coroutine.
      *
      * @param context {@link MethodInvocationContext}
-     * @return true if Kotlin coroutine
+     * @return new intercepted method if Kotlin coroutine or null if it's not
      */
     public static KotlinInterceptedMethodImpl of(MethodInvocationContext<?, ?> context) {
         if (!KotlinUtils.KOTLIN_COROUTINES_SUPPORTED || !context.getExecutableMethod().isSuspend()) {
@@ -99,6 +101,14 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
 
     @Override
     public CompletableFuture<Object> interceptResultAsCompletionStage() {
+        if (PropagatedContext.exists()) {
+            updateCoroutineContext(
+                KotlinCoroutinePropagation.Companion.updatePropagatedContext(
+                    getCoroutineContext(),
+                    PropagatedContext.get()
+                )
+            );
+        }
         @SuppressWarnings("unchecked")
         CompletableFutureContinuation completableFutureContinuation = new CompletableFutureContinuation((Continuation<Object>) continuation);
         replaceContinuation.accept(completableFutureContinuation);
@@ -112,6 +122,14 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
 
     @Override
     public CompletableFuture<Object> interceptResultAsCompletionStage(Interceptor<?, ?> from) {
+        if (PropagatedContext.exists()) {
+            updateCoroutineContext(
+                KotlinCoroutinePropagation.Companion.updatePropagatedContext(
+                    getCoroutineContext(),
+                    PropagatedContext.get()
+                )
+            );
+        }
         @SuppressWarnings("unchecked")
         CompletableFutureContinuation completableFutureContinuation = new CompletableFutureContinuation((Continuation<Object>) continuation);
         replaceContinuation.accept(completableFutureContinuation);
@@ -141,7 +159,14 @@ final class KotlinInterceptedMethodImpl implements io.micronaut.aop.kotlin.Kotli
         } else {
             throw new IllegalStateException("Cannot convert " + result + "  to 'java.util.concurrent.CompletionStage'");
         }
-        //noinspection unchecked
+        if (PropagatedContext.exists()) {
+            updateCoroutineContext(
+                KotlinCoroutinePropagation.Companion.updatePropagatedContext(
+                    getCoroutineContext(),
+                    PropagatedContext.get()
+                )
+            );
+        }
         return KotlinInterceptedMethodHelper.handleResult(completionStageResult, isUnitValueType, (Continuation<? super Object>) continuation);
     }
 

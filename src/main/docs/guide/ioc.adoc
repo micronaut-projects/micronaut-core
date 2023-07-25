@@ -1,4 +1,4 @@
-Unlike other frameworks which rely on runtime reflection and proxies, Micronaut uses compile time data to implement dependency injection.
+Unlike other frameworks which rely on runtime reflection and proxies, the Micronaut framework uses compile time data to implement dependency injection.
 
 This is a similar approach taken by tools such as Google https://google.github.io/dagger/[Dagger], which is designed primarily with Android in mind. Micronaut, on the other hand, is designed for building server-side microservices and provides many of the same tools and utilities as other frameworks but without using reflection or caching excessive amounts of reflection metadata.
 
@@ -10,7 +10,7 @@ The goals of the Micronaut IoC container are summarized as:
 * Reduce memory footprint
 * Provide clear, understandable error handling
 
-Note that the IoC part of Micronaut can be used completely independently of Micronaut for whatever application type you wish to build.
+Note that the IoC part of the Micronaut framework can be used completely independently of Micronaut for whatever application type you wish to build.
 
 To do so, configure your build to include the `micronaut-inject-java` dependency as an annotation processor.
 
@@ -35,7 +35,7 @@ micronaut {
 }
 ----
 <1> Define the https://plugins.gradle.org/plugin/io.micronaut.library[Micronaut Library plugin]
-<2> Specify the Micronaut version to use
+<2> Specify the Micronaut framework version to use
 
 The entry point for IoC is then the api:context.ApplicationContext[] interface, which includes a `run` method. The following example demonstrates using it:
 

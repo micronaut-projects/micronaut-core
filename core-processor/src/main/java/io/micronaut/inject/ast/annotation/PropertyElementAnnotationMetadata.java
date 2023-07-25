@@ -21,6 +21,8 @@ import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -28,6 +30,7 @@ import io.micronaut.inject.ast.ParameterElement;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -76,12 +79,29 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
             }
         }
         if (field != null && (!field.isSynthetic() || includeSynthetic)) {
-            elements.add(field);
-            MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = field.getType().getTypeAnnotationMetadata();
-            if (!typeAnnotationMetadata.isEmpty()) {
-                elements.add(typeAnnotationMetadata);
+            ClassElement genericFieldType = field.getGenericType();
+            if (getter != null && getter.getGenericReturnType().isAssignable(Optional.class) && !genericFieldType.isAssignable(Optional.class)) {
+                // The case with an Optional getter and a wrapped container field with annotations
+                // We need to copy all the annotations from the field to the type argument of the optional
+                // In the future we might want to support all kind of containers, not just Optional
+                ClassElement wrappedArgument = getter.getGenericReturnType().getTypeArguments(Optional.class).get("T");
+                if (wrappedArgument != null) {
+                    AnnotationMetadata wrappedArgumentAnnotationMetadata = wrappedArgument.getTargetAnnotationMetadata();
+                    AnnotationMetadata fieldAnnotationMetadata = genericFieldType.getAnnotationMetadata().getTargetAnnotationMetadata();
+                    if (wrappedArgumentAnnotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata
+                        && fieldAnnotationMetadata instanceof MutableAnnotationMetadata fieldMutableAnnotationMetadata) {
+                        mutableAnnotationMetadata.addAnnotationMetadata(fieldMutableAnnotationMetadata);
+                    }
+                }
+            } else {
+                elements.add(field);
+                MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = field.getType().getTypeAnnotationMetadata();
+                if (!typeAnnotationMetadata.isEmpty()) {
+                    elements.add(typeAnnotationMetadata);
+                }
             }
         }
+
         if (getter != null && (!getter.isSynthetic() || includeSynthetic)) {
             elements.add(getter.getMethodAnnotationMetadata());
             MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = getter.getReturnType().getTypeAnnotationMetadata();
