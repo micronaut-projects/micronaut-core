@@ -2,6 +2,30 @@ Since 4.1.x the ann:context.annotation.Mapper[] annotation can be used on any ab
 
 Inspired by similar functionality in libraries like https://mapstruct.org[Map Struct], a `Mapper` uses the <<introspections, Bean Introspection>> and <<evaluatedExpressions, Expressions>> features, built into the Micronaut Framework, which are already reflection free.
 
+NOTE: For Mapping, base and target types need to be <<introspection, introspected>>.
+
+=== @Mapper Example
+
+Given the following types:
+
+snippet::io.micronaut.docs.ioc.mappers.ContactForm[tags="class"]
+
+snippet::io.micronaut.docs.ioc.mappers.ContactEntity[tags="class"]
+
+You can write an interface to define a mapping between both types by simply annotating a method with ann:context.annotation.Mapper[].
+
+snippet::io.micronaut.docs.ioc.mappers.ContactMappers[tags="imports, class"]
+
+The Micronaut compiler generates an implementation the previous an interface at compilation-time.
+
+You can then inject a bean of type `ContactMappers` and easily map from one type to another.
+
+snippet::io.micronaut.docs.ioc.mappers.SimpleMapperSpec[tags="mappers", indent=0]
+
+=== @Mapping Example
+
+Each abstract method can define a single ann:context.annotation.Mapper[@Mapper] annotation or one or many ann:context.annotation.Mapper.Mapping[@Mapping] annotations to define how properties map onto the target type.
+
 For example, given the following type:
 
 snippet::io.micronaut.docs.ioc.mappers.Product[tags="class"]
@@ -10,11 +34,9 @@ It is common to want to alter this type's representation in HTTP responses. For 
 
 snippet::io.micronaut.docs.ioc.mappers.ProductDTO[tags="class"]
 
-Here the `price` property is of a different type and an extra property exists called `distributor`. You could write manual logic to deal the mapping and these differences, or you could define a mapper:
+Here the `price` property is of a different type and an extra property exists called `distributor`. You could write manual logic to deal the mapping and these differences, or you could define a mapping:
 
 snippet::io.micronaut.docs.ioc.mappers.ProductMappers[tags="class"]
-
-The Micronaut compiler implements the interface in the above example for you at compilation type.  Each abstract method can define a single ann:context.annotation.Mapper[@Mapper] annotation or one or many ann:context.annotation.Mapper.Mapping[@Mapping] annotations to define how properties map onto the target type.
 
 The `from` member can be used to define either a property name on the source type or an <<evaluatedExpressions, expression>> that reads values from the method argument and transforms them in whatever way you choose, including invoking other methods of the instance.
 
