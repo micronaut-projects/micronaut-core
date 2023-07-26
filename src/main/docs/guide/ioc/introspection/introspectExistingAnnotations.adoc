@@ -1,7 +1,5 @@
-
 If there is an existing annotation that you wish to introspect by default you can write an api:inject.annotation.AnnotationMapper[].
 
 An example of this is https://github.com/micronaut-projects/micronaut-core/blob/master/inject/src/main/java/io/micronaut/inject/beans/visitor/EntityIntrospectedAnnotationMapper.java[EntityIntrospectedAnnotationMapper] which ensures all beans annotated with `javax.persistence.Entity` are introspectable by default.
 
 NOTE: The `AnnotationMapper` must be on the annotation processor classpath.
-
