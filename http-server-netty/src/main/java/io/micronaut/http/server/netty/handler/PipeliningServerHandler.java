@@ -788,6 +788,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         StreamingOutboundHandler(OutboundAccess outboundAccess, HttpResponse initialMessage) {
             super(outboundAccess);
+            if (initialMessage instanceof FullHttpResponse) {
+                throw new IllegalArgumentException("Cannot have a full response as the initial message of a streaming response");
+            }
             this.outboundAccess = outboundAccess;
             this.initialMessage = Objects.requireNonNull(initialMessage, "initialMessage");
         }
