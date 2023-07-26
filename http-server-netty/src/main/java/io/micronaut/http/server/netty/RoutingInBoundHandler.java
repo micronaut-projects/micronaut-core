@@ -32,7 +32,6 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.DynamicMessageBodyWriter;
 import io.micronaut.http.body.MediaTypeProvider;
@@ -68,8 +67,6 @@ import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
-import io.netty.handler.codec.http.HttpHeaderNames;
-import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import org.reactivestreams.Processor;
@@ -333,7 +330,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 actualResponseType = responseBodyType;
             }
             NettyBodyWriter<Object> closure = wrap(messageBodyWriter);
-            handleMissingConnectionHeader(response, nettyRequest, outboundAccess);
+            closeConnectionIfError(response, nettyRequest, outboundAccess);
             if (closure.isBlocking()) {
                 MediaType finalResponseMediaType = responseMediaType;
                 getIoExecutor().execute(() -> writeNettyMessageBody(nettyRequest, (MutableHttpResponse<Object>) response, actualResponseType, finalResponseMediaType, body, closure, outboundAccess));
@@ -426,7 +423,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
 
     private void writeFinalNettyResponse(MutableHttpResponse<?> message, NettyHttpRequest<?> request, PipeliningServerHandler.OutboundAccess outboundAccess) {
         // default Connection header if not set explicitly
-        handleMissingConnectionHeader(message, request, outboundAccess);
+        closeConnectionIfError(message, request, outboundAccess);
         io.netty.handler.codec.http.HttpResponse nettyResponse = NettyHttpResponseBuilder.toHttpResponse(message);
         // close handled by HttpServerKeepAliveHandler
         if (request.getNativeRequest() instanceof StreamedHttpRequest streamed && !streamed.isConsumed()) {
@@ -434,14 +431,10 @@ public final class RoutingInBoundHandler implements RequestHandler {
             Flux.from(streamed).subscribe(HttpContent::release);
         }
         if (nettyResponse instanceof StreamedHttpResponse streamed) {
-            nettyResponse.headers().set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
             writeStreamedWithErrorHandling(request, outboundAccess, streamed);
         } else {
             FullHttpResponse fullResponse = (FullHttpResponse) nettyResponse;
-            if (PipeliningServerHandler.canHaveBody(fullResponse.status()) && request.getMethod() != HttpMethod.HEAD) {
-                nettyResponse.headers().set(HttpHeaderNames.CONTENT_LENGTH, fullResponse.content().readableBytes());
-            }
-            outboundAccess.writeFull(fullResponse);
+            outboundAccess.writeFull(fullResponse, request.getMethod() == HttpMethod.HEAD);
         }
 
         if (LOG.isDebugEnabled()) {
@@ -457,7 +450,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
         streamed.subscribe(sub);
     }
 
-    private void handleMissingConnectionHeader(MutableHttpResponse<?> message, HttpRequest<?> request, PipeliningServerHandler.OutboundAccess outboundAccess) {
+    private void closeConnectionIfError(MutableHttpResponse<?> message, HttpRequest<?> request, PipeliningServerHandler.OutboundAccess outboundAccess) {
         boolean decodeError = request instanceof NettyHttpRequest<?> nettyRequest &&
             nettyRequest.getNativeRequest().decoderResult().isFailure();
 
@@ -486,13 +479,6 @@ public final class RoutingInBoundHandler implements RequestHandler {
             body instanceof ByteBuf ? body : null,
             conversionService
         );
-    }
-
-    private static void setResponseBody(MutableHttpResponse<?> response, ByteBuf byteBuf) {
-        int len = byteBuf.readableBytes();
-        MutableHttpHeaders headers = response.getHeaders();
-        headers.set(HttpHeaderNames.CONTENT_LENGTH, String.valueOf(len));
-        response.body((Object) byteBuf);
     }
 
     /**
@@ -548,7 +534,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 mediaType,
                 object,
                 outgoingResponse.getHeaders(), bufferFactory);
-            setResponseBody(outgoingResponse, (ByteBuf) byteBuffer.asNativeBuffer());
+            outgoingResponse.body((Object) byteBuffer.asNativeBuffer());
             writeFinalNettyResponse(outgoingResponse, (NettyHttpRequest<?>) request, (PipeliningServerHandler.OutboundAccess) nettyContext);
         }
 

@@ -17,7 +17,7 @@ You can use different styles of pattern for path matching by setting `patternSty
 |customer/joy, customer/jay
 
 |`customer/*/id`
-|customer/adam/id, com/amy/id
+|customer/adam/id, customer/amy/id
 
 |`customer/**`
 |customer/adam, customer/adam/id, customer/adam/name

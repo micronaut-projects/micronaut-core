@@ -26,6 +26,11 @@ final class JsonNumber extends JsonScalar {
     }
 
     @Override
+    public Object getValue() {
+        return value;
+    }
+
+    @Override
     public boolean isNumber() {
         return true;
     }

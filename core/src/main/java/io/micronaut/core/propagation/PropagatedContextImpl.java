@@ -41,6 +41,8 @@ import java.util.stream.Stream;
 @Internal
 final class PropagatedContextImpl implements PropagatedContext {
 
+    static final PropagatedContextImpl EMPTY = new PropagatedContextImpl(new PropagatedContextElement[0], false);
+
     private static final ThreadLocal<PropagatedContextImpl> THREAD_CONTEXT = new ThreadLocal<>() {
         @Override
         public String toString() {
@@ -49,8 +51,6 @@ final class PropagatedContextImpl implements PropagatedContext {
     };
 
     private static final Scope CLEANUP = THREAD_CONTEXT::remove;
-
-    private static final PropagatedContextImpl EMPTY = new PropagatedContextImpl(new PropagatedContextElement[0], false);
 
     private final PropagatedContextElement[] elements;
     private final boolean containsThreadElements;
@@ -187,7 +187,11 @@ final class PropagatedContextImpl implements PropagatedContext {
     public Scope propagate() {
         PropagatedContextImpl prevCtx = THREAD_CONTEXT.get();
         Scope restore = prevCtx == null ? CLEANUP : () -> THREAD_CONTEXT.set(prevCtx);
-        if (prevCtx == this || elements.length == 0) {
+        if (prevCtx == this) {
+            return restore;
+        }
+        if (elements.length == 0) {
+            THREAD_CONTEXT.remove();
             return restore;
         }
         PropagatedContextImpl ctx = this;

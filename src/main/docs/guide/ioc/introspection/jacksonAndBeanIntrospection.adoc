@@ -1,0 +1,7 @@
+Jackson is configured to use the api:core.beans.BeanIntrospection[] API to read and write property values and construct objects, resulting in reflection-free serialization/deserialization. This is beneficial from a performance perspective and requires less configuration to operate correctly with runtimes such as GraalVM native.
+
+This feature is enabled by default; disable it by setting the `jackson.bean-introspection-module` configuration to `false`.
+
+NOTE: Currently only bean properties (private field with public getter/setter) are supported and usage of public fields is not supported.
+
+NOTE: This feature is currently experimental and may be subject to change in the future.

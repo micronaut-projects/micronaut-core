@@ -18,6 +18,7 @@ package io.micronaut.validation.routes;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.propagation.MutablePropagatedContext;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
@@ -55,7 +56,8 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
         MutableHttpResponse.class,
         FilterContinuation.class,
         Optional.class,
-        Throwable.class
+        Throwable.class,
+        MutablePropagatedContext.class
     );
     private static final Set<String> PERMITTED_BINDING_ANNOTATIONS = Set.of(
         Body.class.getName(),

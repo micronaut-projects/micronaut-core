@@ -33,9 +33,7 @@ class JsonMediaTypeCodecSpec extends Specification {
         then:
         codec.mediaTypes.contains(MediaType.APPLICATION_JSON_TYPE)
         codec.mediaTypes.contains(MediaType.of("text/javascript"))
-        codec.mediaTypes.size() == JsonMediaTypeCodec.JSON_ADDITIONAL_TYPES.size() + 2 // +2 for the application/json + text/javascript; text/json is already included
-
-
+        codec.mediaTypes.size() == JsonMediaTypeCodec.JSON_ADDITIONAL_TYPES.size() + 2 // +2 for the application/json + text/javascript; text/json is already included in JsonMediaTypeCodec.JSON_ADDITIONAL_TYPES
 
         cleanup:
         ctx.close()

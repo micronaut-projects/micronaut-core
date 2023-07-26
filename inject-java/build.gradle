@@ -17,6 +17,7 @@ dependencies {
 
     testImplementation project(":context")
     testImplementation project(':aop')
+    testImplementation projects.injectJavaHelper
 
     testAnnotationProcessor project(":inject-java")
     testAnnotationProcessor platform(libs.test.boms.micronaut.validation)

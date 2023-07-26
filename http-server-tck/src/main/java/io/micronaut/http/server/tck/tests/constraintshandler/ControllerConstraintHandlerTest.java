@@ -31,13 +31,13 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import org.junit.jupiter.api.Test;
+
 import java.io.IOException;
 import java.util.Map;
 import java.util.Optional;
@@ -51,6 +51,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
     "checkstyle:DesignForExtension"
 })
 public class ControllerConstraintHandlerTest {
+
     public static final String SPEC_NAME = "ControllerConstraintHandlerTest";
     private static final HttpResponseAssertion TEAPOT_ASSERTION = HttpResponseAssertion.builder()
         .status(HttpStatus.I_AM_A_TEAPOT)
@@ -78,11 +79,9 @@ public class ControllerConstraintHandlerTest {
         asserts(SPEC_NAME,
             HttpRequest.POST("/constraints-via-on-error-method/with-at-nullable", "{\"username\":\"\",\"password\":\"secret\"}"),
             (server, request) -> AssertionUtils.assertThrows(server, request, TEAPOT_ASSERTION));
-
         asserts(SPEC_NAME,
             HttpRequest.POST("/constraints-via-on-error-method/with-at-nullable", "{\"password\":\"secret\"}"),
             (server, request) -> AssertionUtils.assertThrows(server, request, TEAPOT_ASSERTION));
-
     }
 
     @Test
@@ -96,17 +95,14 @@ public class ControllerConstraintHandlerTest {
         asserts(SPEC_NAME,
             HttpRequest.POST("/constraints-via-handler", "{\"username\":\"\",\"password\":\"secret\"}"),
             (server, request) -> AssertionUtils.assertThrows(server, request, constraintAssertion("must not be blank\"")));
-
         asserts(SPEC_NAME,
             HttpRequest.POST("/constraints-via-on-error-method", "{\"username\":\"\",\"password\":\"secret\"}"),
             (server, request) -> AssertionUtils.assertThrows(server, request, TEAPOT_ASSERTION));
-
         asserts(SPEC_NAME,
             HttpRequest.POST("/constraints-via-on-error-method", "{\"password\":\"secret\"}"),
             (server, request) -> AssertionUtils.assertThrows(server, request, TEAPOT_ASSERTION));
     }
 
-    @Disabled
     @Test
     void testPojoWithNonNullAnnotation() throws IOException {
         asserts(SPEC_NAME,
@@ -115,12 +111,9 @@ public class ControllerConstraintHandlerTest {
         asserts(SPEC_NAME,
             HttpRequest.POST("/constraints-via-handler/with-non-null", "{\"username\":\"\",\"password\":\"secret\"}"),
             (server, request) -> AssertionUtils.assertThrows(server, request, constraintAssertion("must not be blank\"")));
-
-
         asserts(SPEC_NAME,
             HttpRequest.POST("/constraints-via-on-error-method/with-non-null", "{\"username\":\"\",\"password\":\"secret\"}"),
             (server, request) -> AssertionUtils.assertThrows(server, request, TEAPOT_ASSERTION));
-
         asserts(SPEC_NAME,
             HttpRequest.POST("/constraints-via-on-error-method/with-non-null", "{\"password\":\"secret\"}"),
             (server, request) -> AssertionUtils.assertThrows(server, request, TEAPOT_ASSERTION));
@@ -131,8 +124,8 @@ public class ControllerConstraintHandlerTest {
             .status(HttpStatus.BAD_REQUEST)
             .assertResponse(response -> {
                 Optional<String> json = response.getBody(Argument.of(String.class));
-                assertTrue(json.isPresent());
-                assertTrue(json.get().contains(expectedMessage));
+                assertTrue(json.isPresent(), "response.getBody(Argument.of(String.class)) should be present");
+                assertTrue(json.get().contains(expectedMessage), "Body '" + json.get() + "' should contain '" + expectedMessage + "'");
             }).build();
     }
 

@@ -4,6 +4,25 @@ import spock.lang.Specification
 
 class PropagatedContextSpec extends Specification {
 
+    def "test empty"() {
+        given:
+            PropagatedElement e1 = new PropagatedElement()
+            PropagatedElement e2 = new PropagatedElement()
+            PropagatedElement e3 = new PropagatedElement()
+        expect:
+            try (PropagatedContext.Scope ignore1 = PropagatedContext.getOrEmpty().plus(e1).propagate()) {
+                try (PropagatedContext.Scope ignore2 = PropagatedContext.getOrEmpty().plus(e2).propagate()) {
+                    try (PropagatedContext.Scope ignore3 = PropagatedContext.getOrEmpty().plus(e3).propagate()) {
+                        try (PropagatedContext.Scope ignore4 = PropagatedContext.empty().propagate()) {
+                            PropagatedContext propagatedContext = PropagatedContext.getOrEmpty()
+                            assert propagatedContext.getAllElements() == []
+                            assert !PropagatedContext.exists()
+                        }
+                    }
+                }
+            }
+    }
+
     def "test minus"() {
         given:
             PropagatedElement e1 = new PropagatedElement()

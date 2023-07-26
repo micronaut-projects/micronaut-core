@@ -61,7 +61,7 @@ class MDCSpec3 extends Specification {
 
         @Get(value = '/mdc-test', produces = MediaType.TEXT_PLAIN)
         HttpResponse<Publisher<String>> getMdc() {
-            getTraceIdOrFail()
+            def trace = getTraceIdOrFail()
             return HttpResponse.ok(Publishers.map(Mono.fromCallable({ ->
                 return getTraceIdOrFail()
             }), { String n -> n }))

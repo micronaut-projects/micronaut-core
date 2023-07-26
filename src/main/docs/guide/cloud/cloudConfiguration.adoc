@@ -2,8 +2,10 @@ Applications built for the Cloud often need to adapt to running in a Cloud envir
 
 Micronaut's <<environments, Environment>> concept can be configured to be Cloud platform-aware and makes a best effort to detect the underlying active Cloud environment.
 
-To enable this feature you can call `deduceCloudEnvironment(true)` on the api:context.ApplicationContextBuilder[] interface when starting Micronaut. For example:
+To enable this feature you can:
 
+1. call `deduceCloudEnvironment(true)` on the api:context.ApplicationContextBuilder[] interface when starting Micronaut. For example:
++
 .Enabling Cloud Environment Detection
 [source,java]
 ----
@@ -13,6 +15,9 @@ public static void main(String...args) {
              .start();
 }
 ----
+
+2. Set the `micronaut.env.cloud-deduction` property to `true` in your configuration.
+3. Provide an environment variable `MICRONAUT_ENV_CLOUD_DEDUCTION` set to `true`.
 
 You can then use the api:context.annotation.Requires[] annotation to <<conditionalBeans,conditionally load bean definitions>>.
 
