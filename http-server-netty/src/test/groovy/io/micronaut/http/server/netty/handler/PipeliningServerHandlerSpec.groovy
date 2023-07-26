@@ -23,6 +23,7 @@ import io.netty.handler.codec.http.HttpResponseStatus
 import io.netty.handler.codec.http.HttpVersion
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Sinks
+import spock.lang.Issue
 import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
@@ -197,6 +198,7 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.readOutbound() == null
     }
 
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/9366')
     def 'nested write'() {
         given:
         def mon = new MonitorHandler()
