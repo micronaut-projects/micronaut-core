@@ -60,17 +60,22 @@ import io.micronaut.core.annotation.Introspected
 data class ContactEntity(var id: Long? = null, val firstName: String, val lastName: String)
 """)
 
-          
+
         then:
         noExceptionThrown()
         introspection != null
         introspection.beanProperties.size() == 3
     }
-      
+
     void "test non-null and null introspection"() {
         when:
         def introspection = buildBeanIntrospection("test.Test", """
-        data class Test(
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+data class Test(
     val name: String,
     val description: String? = null)
 """)
