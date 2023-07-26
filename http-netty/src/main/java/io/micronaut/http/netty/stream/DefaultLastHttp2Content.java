@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.netty.stream;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.LastHttp2Content;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.DefaultLastHttpContent;
@@ -26,8 +27,10 @@ import io.netty.handler.codec.http2.Http2Stream;
  * @author graemerocher
  * @since 2.1.3
  */
+@Internal
+@Deprecated
 final class DefaultLastHttp2Content extends DefaultLastHttpContent implements LastHttp2Content {
-    
+
     private final Http2Stream stream;
 
     public DefaultLastHttp2Content(Http2Stream stream) {

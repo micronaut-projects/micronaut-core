@@ -60,7 +60,7 @@ public final class DynamicMessageBodyWriter implements MessageBodyWriter<Object>
             //noinspection unchecked
             return (MessageBodyWriter<Object>) dynamicWriter;
         }
-        if (mediaType.equals(MediaType.TEXT_PLAIN_TYPE) && ClassUtils.isJavaLangType(object.getClass())) {
+        if (mediaType.equals(MediaType.TEXT_PLAIN_TYPE) && ClassUtils.isJavaBasicType(object.getClass())) {
             // compatibility...
             // this will fall back to RawStringHandler, which can handle Object.
             //noinspection unchecked,OptionalGetWithoutIsPresent,rawtypes

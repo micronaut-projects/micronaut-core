@@ -24,6 +24,7 @@ import io.netty.handler.codec.http2.Http2Stream;
  * An {@link Http2Content} default implementation.
  */
 @Internal
+@Deprecated
 public final class DefaultHttp2Content extends DefaultHttpContent implements Http2Content {
     private final Http2Stream stream;
 

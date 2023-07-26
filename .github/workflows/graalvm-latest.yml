@@ -26,11 +26,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Build Matrix
-        uses: micronaut-projects/github-actions/graalvm/build-matrix@master
+        uses: micronaut-projects/github-actions/graalvm/build-matrix@latest-graalvm-changes
         id: build-matrix
-        with:
-          graalvm: 'latest'
-          java: '17'
   build:
     needs: build_matrix
     if: github.repository != 'micronaut-projects/micronaut-project-template'
@@ -45,21 +42,22 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Pre-Build Steps
-        uses: micronaut-projects/github-actions/graalvm/pre-build@master
+        uses: micronaut-projects/github-actions/graalvm/pre-build@latest-graalvm-changes
         id: pre-build
         with:
-          graalvm: ${{ matrix.graalvm }}
-          java: ${{ matrix.java }}
+          distribution: 'graalvm-community'
+          java: '17'
       - name: Build Steps
         uses: micronaut-projects/github-actions/graalvm/build@master
         id: build
         env:
           GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
           GH_USERNAME: ${{ secrets.GH_USERNAME }}
+          GRAALVM_QUICK_BUILD: true
         with:
           nativeTestTask: ${{ matrix.native_test_task }}
       - name: Post-Build Steps
         uses: micronaut-projects/github-actions/graalvm/post-build@master
         id: post-build
         with:
-          java: ${{ matrix.java }}
+          java: '17'

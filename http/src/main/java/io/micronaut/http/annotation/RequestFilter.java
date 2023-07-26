@@ -54,6 +54,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *     parameter</li>
  *     <li>A {@code @}{@link Body} parameter of type {@code byte[]}, {@link String} or
  *     {@link ByteBuffer}. Only supported for some HTTP server implementations.</li>
+ *     <li>A {@link io.micronaut.core.propagation.MutablePropagatedContext} to modify the propagated context</li>
  * </ul>
  *
  * The return value may be:

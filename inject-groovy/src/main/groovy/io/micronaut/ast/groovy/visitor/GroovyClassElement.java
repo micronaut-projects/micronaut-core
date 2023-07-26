@@ -674,6 +674,20 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         }
 
         @Override
+        protected String getElementName(AnnotatedNode element) {
+            if (element instanceof ClassNode cn) {
+                return cn.getName();
+            }
+            if (element instanceof MethodNode methodNode) {
+                return methodNode.getName();
+            }
+            if (element instanceof FieldNode fieldNode) {
+                return fieldNode.getName();
+            }
+            return "";
+        }
+
+        @Override
         protected Set<AnnotatedNode> getExcludedNativeElements(ElementQuery.Result<?> result) {
             if (result.isExcludePropertyElements()) {
                 Set<AnnotatedNode> excluded = new HashSet<>();

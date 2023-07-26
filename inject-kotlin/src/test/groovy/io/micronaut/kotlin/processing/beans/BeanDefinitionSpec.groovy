@@ -24,6 +24,54 @@ import static io.micronaut.annotation.processing.test.KotlinCompiler.getBeanDefi
 
 class BeanDefinitionSpec extends Specification {
 
+    void "test bean suspend fn"() {
+        when:
+        def context = buildContext('''
+package test
+
+import io.micronaut.context.annotation.Executable
+import jakarta.inject.Singleton
+import kotlinx.coroutines.test.runTest
+import io.micronaut.runtime.EmbeddedApplication
+import io.micronaut.test.extensions.junit5.annotation.MicronautTest
+import jakarta.inject.Inject
+import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Assertions
+
+interface TestCase<Context> where Context : TestContext {
+    fun test(block: suspend Context.() -> Unit)
+}
+
+abstract class BaseTest : TestCase<TestContext> {
+    override fun test(block: suspend TestContext.() -> Unit) = runTest {
+        block.invoke(object : TestContext { /* nothing here */ })
+    }
+}
+
+@Singleton
+@Executable
+class FailingTest : BaseTest() {
+}
+
+interface TestContext
+
+''')
+
+        then:
+        context != null
+
+        when:
+        getBean(context, 'test.FailingTest')
+        def bd = getBeanDefinition(context, 'test.FailingTest')
+        def testMethod = bd.findPossibleMethods("test").findFirst().orElseThrow()
+        def param1 = testMethod.getArguments()[0]
+        then:
+        // essentially this is not correct as KSP will provide some kotlin.coroutines.SuspendFunction1 which is internally remapped to kotlin.jvm.functions.Function2
+        param1.type.name == "kotlin.jvm.functions.Function2"
+        param1.typeParameters[0].type.name == "test.TestContext"
+        param1.typeParameters[1].type.name == "kotlin.Unit"
+    }
+
     void "test bean annotated with @MicronautTest"() {
         when:
         def context = buildContext('''

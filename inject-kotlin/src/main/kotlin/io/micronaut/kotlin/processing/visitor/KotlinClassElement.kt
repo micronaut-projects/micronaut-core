@@ -139,9 +139,7 @@ internal open class KotlinClassElement(
         javaName?.asString() ?: declaration.qualifiedName!!.asString()
     }
 
-    private val internalName: String by lazy {
-        declaration.getBinaryName(visitorContext.resolver, visitorContext)
-    }
+    private val internalName = declaration.getBinaryName(visitorContext.resolver, visitorContext)
 
     private val resolvedInterfaces: Collection<ClassElement> by lazy {
         declaration.superTypes.map { it.resolve() }
@@ -374,17 +372,20 @@ internal open class KotlinClassElement(
             }
 
         val allProperties: MutableList<PropertyElement> = mutableListOf()
+        allProperties.addAll(enclosedElementsQuery.getEnclosedElements(this, eq))
         // unfortunate hack since these are not excluded?
         if (hasDeclaredStereotype(ConfigurationReader::class.java)) {
             val configurationBuilderQuery = ElementQuery.of(PropertyElement::class.java)
                 .annotated { it.hasDeclaredAnnotation(ConfigurationBuilder::class.java) }
                 .onlyInstance()
-            val configBuilderProps =
-                enclosedElementsQuery.getEnclosedElements(this, configurationBuilderQuery)
-            allProperties.addAll(configBuilderProps)
+                .onlyAccessible(this)
+            enclosedElementsQuery.getEnclosedElements(this, configurationBuilderQuery)
+                .forEach { e ->
+                    if (!allProperties.contains(e)) {
+                        allProperties.add(e)
+                    }
+                }
         }
-
-        allProperties.addAll(enclosedElementsQuery.getEnclosedElements(this, eq))
         val propertyNames = allProperties.map { it.name }.toSet()
 
         val resolvedProperties: MutableList<PropertyElement> = mutableListOf()
@@ -511,14 +512,6 @@ internal open class KotlinClassElement(
         return super.isAssignable(type)
     }
 
-    override fun isPrimitive(): Boolean {
-        return isVoid
-    }
-
-    override fun isVoid(): Boolean {
-        return internalName == "kotlin.Unit"
-    }
-
     override fun copyThis() = KotlinClassElement(
         nativeType,
         elementAnnotationMetadataFactory,
@@ -625,6 +618,17 @@ internal open class KotlinClassElement(
 
     private inner class KotlinEnclosedElementsQuery :
         EnclosedElementsQuery<KSClassDeclaration, KSNode>() {
+
+        @OptIn(KspExperimental::class)
+        override fun getElementName(element: KSNode): String {
+            if (element is KSFunctionDeclaration) {
+                return visitorContext.resolver.getJvmName(element)!!
+            }
+            if (element is KSDeclaration) {
+                return element.getBinaryName(visitorContext.resolver, visitorContext)
+            }
+            return ""
+        }
 
         override fun getNativeClassType(classElement: ClassElement): KSClassDeclaration {
             return (classElement as KotlinClassElement).nativeType.declaration

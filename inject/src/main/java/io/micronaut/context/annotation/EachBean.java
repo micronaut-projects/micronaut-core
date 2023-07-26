@@ -49,6 +49,8 @@ import java.lang.annotation.Target;
  *   }
  * </code></pre>
  *
+ * {@link EachBean} requires that the parent bean has a {@link jakarta.inject.Named} qualifier, since the qualifier is inherited by each bean created by {@link EachBean}.
+ *
  * @author Graeme Rocher
  * @see EachProperty
  * @see ConfigurationProperties

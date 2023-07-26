@@ -109,6 +109,58 @@ class CrossOriginUtilSpec extends Specification {
         embeddedServer.applicationContext.getBean(TestMethodController).config = null
     }
 
+    void "test CrossOrigin with no attributes is set to defaults"() {
+        when:
+        HttpRequest req = HttpRequest.GET("/defaults").accept(MediaType.TEXT_PLAIN)
+        client.toBlocking().retrieve(req, String.class)
+        CorsOriginConfiguration config = embeddedServer.applicationContext.getBean(TestDefaultsController).config
+
+        then:
+        config
+        config.allowedOrigins == CorsOriginConfiguration.ANY
+        !config.allowedOriginsRegex
+        config.allowedHeaders == CorsOriginConfiguration.ANY
+        CollectionUtils.isEmpty(config.exposedHeaders)
+        config.allowedMethods == CorsOriginConfiguration.ANY_METHOD
+        config.allowCredentials
+        config.maxAge == 1800L
+
+        cleanup:
+        embeddedServer.applicationContext.getBean(TestMethodController).config = null
+    }
+
+    void "test CrossOrigin with allowedOriginsRegex and allowedOrigins"() {
+        when:
+        HttpRequest req = HttpRequest.GET("/regexandallowedorigins").accept(MediaType.TEXT_PLAIN)
+        client.toBlocking().retrieve(req, String.class)
+        CorsOriginConfiguration config = embeddedServer.applicationContext.getBean(TestMethodController).config
+
+        then:
+        config
+        config.allowedOrigins == ['https://foo.com']
+        config.allowedOriginsRegex
+        config.allowedOriginsRegex.get() == '^http(|s):\\/\\/bar\\.com$'
+
+        cleanup:
+        embeddedServer.applicationContext.getBean(TestMethodController).config = null
+    }
+
+    void "test CrossOrigin with allowedOriginsRegex has no allowed origins if not set"() {
+        when:
+        HttpRequest req = HttpRequest.GET("/regex").accept(MediaType.TEXT_PLAIN)
+        client.toBlocking().retrieve(req, String.class)
+        CorsOriginConfiguration config = embeddedServer.applicationContext.getBean(TestMethodController).config
+
+        then:
+        config
+        config.allowedOrigins == []
+        config.allowedOriginsRegex
+        config.allowedOriginsRegex.get() == '^http(|s):\\/\\/bar\\.com$'
+
+        cleanup:
+        embeddedServer.applicationContext.getBean(TestMethodController).config = null
+    }
+
     @Requires(property = 'spec.name', value = SPECNAME)
     @Controller
     static class TestMethodController {
@@ -129,15 +181,33 @@ class CrossOriginUtilSpec extends Specification {
             return "method"
         }
 
-        @CrossOrigin(
-                "https://foo.com"
-                // allowedOriginsRegex = false - is the default
-        )
+        @CrossOrigin("https://foo.com")
         @Produces(MediaType.TEXT_PLAIN)
         @Get("/anothermethod")
         String example(HttpRequest req) {
             this.config = CrossOriginUtil.getCorsOriginConfigurationForRequest(req).orElse(null)
             return "anothermethod"
+        }
+
+        @CrossOrigin(
+                allowedOriginsRegex = '^http(|s):\\/\\/bar\\.com$'
+        )
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get("/regex")
+        String regex(HttpRequest req) {
+            this.config = CrossOriginUtil.getCorsOriginConfigurationForRequest(req).orElse(null)
+            return "regex"
+        }
+
+        @CrossOrigin(
+            allowedOrigins = 'https://foo.com',
+            allowedOriginsRegex = '^http(|s):\\/\\/bar\\.com$'
+        )
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get("/regexandallowedorigins")
+        String regexAndAllowedOrigins(HttpRequest req) {
+            this.config = CrossOriginUtil.getCorsOriginConfigurationForRequest(req).orElse(null)
+            return "regex"
         }
     }
 
@@ -170,6 +240,20 @@ class CrossOriginUtilSpec extends Specification {
 
         @Produces(MediaType.TEXT_PLAIN)
         @Get("/anotherclass")
+        String example(HttpRequest req) {
+            this.config = CrossOriginUtil.getCorsOriginConfigurationForRequest(req).orElse(null)
+            return "class"
+        }
+    }
+
+    @Requires(property = 'spec.name', value = SPECNAME)
+    @Controller
+    @CrossOrigin
+    static class TestDefaultsController{
+        CorsOriginConfiguration config
+
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get("/defaults")
         String example(HttpRequest req) {
             this.config = CrossOriginUtil.getCorsOriginConfigurationForRequest(req).orElse(null)
             return "class"

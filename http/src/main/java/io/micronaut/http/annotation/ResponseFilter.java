@@ -51,6 +51,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *     an error status code, between each filter.</b></li>
  *     <li>A {@code @}{@link Header}, {@code @}{@link QueryValue} or {@code @}{@link CookieValue}
  *     parameter</li>
+ *     <li>A {@link io.micronaut.core.propagation.MutablePropagatedContext} to modify the propagated context</li>
  * </ul>
  *
  * The return value may be:

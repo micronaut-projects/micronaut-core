@@ -4,6 +4,8 @@ dependency:org.jetbrains.kotlinx:kotlinx-coroutines-reactor[]
 
 For more detailed information on how to use the library you can find at the official link:https://kotlin.github.io/kotlinx.coroutines/kotlinx-coroutines-reactor/kotlinx.coroutines.reactor/-reactor-context/index.html[documentation].
 
+NOTE: Since Micronaut framework 4, we recommend using the latest <<contextPropagation, Context Propagation API>>. The api:core.propagation.ThreadPropagatedContextElement[] is inspired by Kotlin Coroutines propagation API element `kotlinx.coroutines.ThreadContextElement` and acts similarly by restoring thread locals.
+
 Following example shows how to propagate Reactor context from the HTTP filter to the controller's coroutine:
 
 snippet::io.micronaut.docs.reactor.ReactorContextPropagationSpec[tags="simplefilter", indent=0, title="Simple filter which writes into Reactor's context"]

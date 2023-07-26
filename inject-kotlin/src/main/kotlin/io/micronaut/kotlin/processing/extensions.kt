@@ -20,6 +20,7 @@ import com.google.devtools.ksp.getJavaClassByName
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
+import org.objectweb.asm.Type
 
 @OptIn(KspExperimental::class)
 internal fun KSDeclaration.getBinaryName(resolver: Resolver, visitorContext: KotlinVisitorContext): String {
@@ -30,17 +31,28 @@ internal fun KSDeclaration.getBinaryName(resolver: Resolver, visitorContext: Kot
             declaration = parent
         }
     }
-    val binaryName = resolver.mapKotlinNameToJava(declaration.qualifiedName!!)?.asString()
-    return if (binaryName != null) {
-        binaryName
-    } else {
-        val classDeclaration = declaration.getClassDeclaration(visitorContext)
-        val qn = classDeclaration.qualifiedName
-        if (qn != null) {
-            resolver.mapKotlinNameToJava(qn)?.asString() ?: computeName(declaration)
-        } else {
-            computeName(declaration)
+    val binaryName = if (declaration.qualifiedName != null) resolver.mapKotlinNameToJava(declaration.qualifiedName!!)?.asString() else null
+    if (binaryName != null) {
+        return binaryName
+    }
+    val classDeclaration = declaration.getClassDeclaration(visitorContext)
+    val qn = classDeclaration.qualifiedName
+    if (qn != null) {
+        val asString = resolver.mapKotlinNameToJava(qn)?.asString()
+        if (asString != null) {
+            return asString;
         }
+    }
+    if (declaration is KSClassDeclaration && declaration.origin != Origin.SYNTHETIC) {
+        val signature = resolver.mapToJvmSignature(declaration)
+        if (signature != null) {
+            return Type.getType(signature).className
+        }
+    }
+    return if (declaration.origin != Origin.SYNTHETIC) {
+        computeName(declaration)
+    } else {
+        declaration.simpleName.asString()
     }
 }
 

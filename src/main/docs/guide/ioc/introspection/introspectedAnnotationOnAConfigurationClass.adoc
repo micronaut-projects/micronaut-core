@@ -1,0 +1,7 @@
+If the class to introspect is already compiled and not under your control, an alternative option is to define a configuration class with the `classes` member of the ann:core.annotation.Introspected[] annotation set.
+
+snippet::io.micronaut.docs.ioc.beans.PersonConfiguration[tags="class"]
+
+In the above example the `PersonConfiguration` class generates introspections for the `Person` class.
+
+NOTE: You can also use the `packages` member of the ann:core.annotation.Introspected[] which package scans at compile time and generates introspections for all classes within a package. Note however this feature is currently regarded as experimental.

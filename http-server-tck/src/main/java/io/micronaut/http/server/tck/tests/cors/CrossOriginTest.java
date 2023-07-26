@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -44,6 +45,8 @@ import io.micronaut.http.tck.HttpResponseAssertion;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.Collections;
+import java.util.Map;
 import java.util.function.BiConsumer;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
@@ -87,6 +90,20 @@ public class CrossOriginTest {
     }
 
     @Test
+    void crossOriginAnnotationWithAnyOriginAnyHeaderAllowedByDefault() throws IOException {
+        asserts(SPECNAME,
+            preflight(UriBuilder.of("/foo").path("all"), "https://foo.com", HttpMethod.GET)
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, "foo"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .assertResponse(response -> {
+                    assertCorsHeaders(response, "https://foo.com", HttpMethod.GET);
+                    assertTrue(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_HEADERS));
+                })
+                .build()));
+    }
+
+    @Test
     void verifyHttpMethodIsValidatedInACorsRequest() {
         assertAll(
             () -> asserts(SPECNAME,
@@ -125,6 +142,17 @@ public class CrossOriginTest {
         asserts(SPECNAME, preflight(uri, origin, HttpMethod.GET), happyPathAssertion(origin));
     }
 
+    @Test
+    void allowedOriginsAndAllowedOriginsRegexHappyPath() throws IOException {
+        URI uri = UriBuilder.of("/allowedoriginsregex").path("bar").build();
+        String origin = "https://foo.com";
+        asserts(SPECNAME, preflight(uri, origin, HttpMethod.GET), happyPathAssertion(origin));
+        origin = "https://bar.com";
+        asserts(SPECNAME, preflight(uri, origin, HttpMethod.GET), happyPathAssertion(origin));
+        origin = "http://bar.com";
+        asserts(SPECNAME, preflight(uri, origin, HttpMethod.GET), happyPathAssertion(origin));
+    }
+
     private static BiConsumer<ServerUnderTest, HttpRequest<?>> happyPathAssertion(String origin) {
         return (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
             .status(HttpStatus.OK)
@@ -138,7 +166,7 @@ public class CrossOriginTest {
     @Test
     void allowedOriginsRegexFailure() throws IOException {
         asserts(SPECNAME,
-            preflight(UriBuilder.of("/allowedoriginsregex").path("bar"), "https://foo.com", HttpMethod.GET),
+            preflight(UriBuilder.of("/allowedoriginsregex").path("foobar"), "https://foo.com", HttpMethod.GET),
             (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.METHOD_NOT_ALLOWED)
                 .assertResponse(CorsUtils::assertCorsHeadersNotPresent)
@@ -198,7 +226,7 @@ public class CrossOriginTest {
     @Test
     void httHeaderValueAccessControlExposeHeaderValueCanBeSetViaCrossOriginAnnotation() throws IOException {
         asserts(SPECNAME,
-            CollectionUtils.mapOf("micronaut.server.cors.single-header", StringUtils.TRUE),
+            Map.of("micronaut.server.cors.single-header", StringUtils.TRUE),
             preflight(UriBuilder.of("/exposedheaders").path("bar"), "https://foo.com", HttpMethod.GET)
                 .header(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, "foo"),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
@@ -282,6 +310,88 @@ public class CrossOriginTest {
                 .build()));
     }
 
+    @Test
+    void versionedPreflightBehavesAsExpectedWithDefaultVersion() {
+        Map<String, Object> config = versionedRoutesConfig();
+        assertAll(
+            () -> {
+                // V1 version/common
+                config.put("micronaut.router.versioning.default-version", 1);
+                asserts(SPECNAME, config,
+                preflight(UriBuilder.of("/version").path("common"), "https://foo.com", HttpMethod.GET),
+                (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
+                    .build()));
+            },
+            () -> {
+                // V2 version/common
+                config.put("micronaut.router.versioning.default-version", 2);
+                asserts(SPECNAME, config,
+                    preflight(UriBuilder.of("/version").path("common"), "https://foo.com", HttpMethod.GET),
+                    (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                        .status(HttpStatus.OK)
+                        .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
+                        .build()));
+            },
+            () -> {
+                // V2 version/new
+                config.put("micronaut.router.versioning.default-version", 2);
+                asserts(SPECNAME, config,
+                    preflight(UriBuilder.of("/version").path("new"), "https://foo.com", HttpMethod.GET),
+                    (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                        .status(HttpStatus.OK)
+                        .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
+                        .build()));
+            }
+        );
+    }
+
+    @Test
+    void versionedPreflightWithHeaderNoDefaultVersion() throws IOException {
+        Map<String, Object> config = versionedRoutesConfig();
+        asserts(SPECNAME, config,
+            preflight(UriBuilder.of("/version").path("new"), "https://foo.com", HttpMethod.GET)
+                .header("Access-Control-Request-Headers", "x-api-version"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
+                .build()));
+    }
+
+    @Test
+    void versionedPreflightWhenDefaultVersionNotMatchHasHeader() throws IOException {
+        Map<String, Object> config = versionedRoutesConfig();
+        config.put("micronaut.router.versioning.default-version", 1);
+        asserts(SPECNAME, config,
+            preflight(UriBuilder.of("/version").path("new"), "https://foo.com", HttpMethod.GET)
+                .header("Access-Control-Request-Headers", "x-api-version"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .assertResponse(response -> assertCorsHeaders(response, "https://foo.com", HttpMethod.GET, false))
+                .build()));
+    }
+
+    @Test
+    void versionedPreflightFailsWhenDefaultVersionNotMatchAndNoHeader() throws IOException {
+        Map<String, Object> config = versionedRoutesConfig();
+        config.put("micronaut.router.versioning.default-version", 1);
+        asserts(SPECNAME, config,
+            preflight(UriBuilder.of("/version").path("new"), "https://foo.com", HttpMethod.GET),
+            (server, request) -> AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
+                .status(HttpStatus.NOT_FOUND)
+                .assertResponse(CorsUtils::assertCorsHeadersNotPresent)
+                .build()));
+    }
+
+    private static Map<String, Object> versionedRoutesConfig() {
+        return CollectionUtils.mapOf(
+            "micronaut.router.versioning.enabled", StringUtils.TRUE,
+            "micronaut.router.versioning.header.enabled", StringUtils.TRUE,
+            "micronaut.router.versioning.header.names", Collections.singletonList("x-api-version")
+        );
+    }
+
     private static MutableHttpRequest<?> preflight(UriBuilder uriBuilder, String originValue, HttpMethod method) {
         return preflight(uriBuilder.build(), originValue, method);
     }
@@ -302,6 +412,13 @@ public class CrossOriginTest {
         String index() {
             return "bar";
         }
+
+        @CrossOrigin // allows all origins, all headers, by default
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get("/all")
+        String defaults() {
+            return "bar";
+        }
     }
 
     @Requires(property = "spec.name", value = SPECNAME)
@@ -318,13 +435,22 @@ public class CrossOriginTest {
         }
 
         @CrossOrigin(
-            value = "^http(|s):\\/\\/foo\\.com$"
-            // allowedOriginsRegex defaults to false
+            allowedOrigins = "https://foo.com",
+            allowedOriginsRegex = "^http(|s):\\/\\/bar\\.com$"
         )
         @Produces(MediaType.TEXT_PLAIN)
         @Get("/bar")
         String bar() {
             return "bar";
+        }
+
+        // regex is no longer allowed on value/allowedOrigins attribute
+        // must now use: allowedOriginsRegex attribute instead
+        @CrossOrigin(value = "^http(|s):\\/\\/foo\\.com$")
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get("/foobar")
+        String foobar() {
+            return "foobar";
         }
     }
 
@@ -437,6 +563,32 @@ public class CrossOriginTest {
     }
 
     @Requires(property = "spec.name", value = SPECNAME)
+    @CrossOrigin("https://foo.com")
+    @Controller("/version")
+    static class ApiVersionController {
+        @Version("1")
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get(value = "common")
+        public String commonV1() {
+            return "This endpoint exists both in V1 and V2";
+        }
+
+        @Version("2")
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get(value = "common")
+        public String commonV2() {
+            return "This endpoint exists both in V1 and V2";
+        }
+
+        @Version("2")
+        @Produces(MediaType.TEXT_PLAIN)
+        @Get(value = "new")
+        public String newV2() {
+            return "This is a new endpoint in V2 of the API";
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPECNAME)
     @Replaces(HttpHostResolver.class)
     @Singleton
     static class HttpHostResolverReplacement implements HttpHostResolver {
@@ -445,4 +597,5 @@ public class CrossOriginTest {
             return "https://micronautexample.com";
         }
     }
+
 }

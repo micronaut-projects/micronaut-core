@@ -130,5 +130,10 @@ The Micronaut framework tries to populate method arguments in the following orde
 . URI variables like `/{id}`.
 . From query parameters if the request is a `GET` request (e.g. `?foo=bar`).
 . If there is a `@Body` and request allows the body, bind the body to it.
-. If the request can have a body and no `@Body` is defined then try to parse the body (either JSON or form data) and bind the method arguments from the body.
+. If the request can have a body and no `@Body` is defined then try to parse the body (either JSON or form data) and bind the method arguments from the body (see the example).
 . Finally, if the method arguments cannot be populated return `400 BAD REQUEST`.
+
+snippet::io.micronaut.docs.server.binding.PointController[tags="class", indent=0, title="Binding Method Arguments From Body with no `@Body`"]
+
+<1> JSON request body binds to method controller arguments, e.g. '{"x":10,"y":20}' (with "application/json")
+<2> Form data also works, e.g. 'x=10&y=20' (with "application/x-www-form-urlencoded")

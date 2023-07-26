@@ -1,0 +1,7 @@
+For classes with multiple constructors, apply the ann:core.annotation.Creator[] annotation to the constructor to use.
+
+snippet::io.micronaut.docs.ioc.beans.Vehicle[tags="class"]
+
+<1> The ann:core.annotation.Creator[] annotation denotes which constructor to use
+
+NOTE: This class has no default constructor, so calls to instantiate without arguments throw an api:core.reflect.exception.InstantiationException[].
