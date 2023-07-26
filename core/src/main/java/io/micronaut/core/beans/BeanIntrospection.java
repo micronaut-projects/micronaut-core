@@ -72,7 +72,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
     @NonNull Builder<T> builder();
 
     /**
-     * Can the introspection be constructor with {@link #builder()}.
+     * Can the introspection be constructed with {@link #builder()}.
      * @return True if it can
      * @since 4.1.0
      */

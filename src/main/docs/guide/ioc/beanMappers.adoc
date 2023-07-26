@@ -1,6 +1,6 @@
 Since 4.1.x the ann:context.annotation.Mapper[] annotation can be used on any abstract method to automatically create a mapping between one type and another.
 
-Inspired by similar functionality in libraries like https://mapstruct.org[Map Struct], a `Mapper` uses the <<introspections, Bean Introspection>> and <<evaluatedExpressions, Expressions>> features built into Micronaut that are already reflection free.
+Inspired by similar functionality in libraries like https://mapstruct.org[Map Struct], a `Mapper` uses the <<introspections, Bean Introspection>> and <<evaluatedExpressions, Expressions>> features, built into the Micronaut Framework, which are already reflection free.
 
 NOTE: For Mapping, base and target types need to be <<introspection, introspected>>.
 
@@ -22,28 +22,27 @@ You can then inject a bean of type `ContactMappers` and easily map from one type
 
 snippet::io.micronaut.docs.ioc.mappers.SimpleMapperSpec[tags="mappers", indent=0]
 
-
 === @Mapping Example
+
+Each abstract method can define a single ann:context.annotation.Mapper[@Mapper] annotation or one or many ann:context.annotation.Mapper.Mapping[@Mapping] annotations to define how properties map onto the target type.
 
 For example, given the following type:
 
 snippet::io.micronaut.docs.ioc.mappers.Product[tags="class"]
 
-It is common to want to alter the representation of this type in say HTTP responses. For example consider this response type:
+It is common to want to alter this type's representation in HTTP responses. For example, consider this response type:
 
 snippet::io.micronaut.docs.ioc.mappers.ProductDTO[tags="class"]
 
-Here the `price` property is of a different type and an extra property exists called `distributor`. You could write manual logic to deal the mapping and these differences, or you could define a mapper:
+Here the `price` property is of a different type and an extra property exists called `distributor`. You could write manual logic to deal the mapping and these differences, or you could define a mapping:
 
 snippet::io.micronaut.docs.ioc.mappers.ProductMappers[tags="class"]
 
-The above example is an interface that will be implemented for you at compilation type. Each abstract method can define either a single ann:context.annotation.Mapper[] annotation or one or many `@Mapping` annotations to define how properties map onto the target type.
+The `from` member can be used to define either a property name on the source type or an <<evaluatedExpressions, expression>> that reads values from the method argument and transforms them in whatever way you choose, including invoking other methods of the instance.
 
-The `from` member can be used to define either a property name on the source type or a <<evaluatedExpressions, expression>> that reads values from the method argument and transforms them in whatever way you choose including invoking other methods of the instance.
+NOTE: A `@Mapping` definition is only needed if you need to apply a transformation for the mapping to be successful. Other properties will be automatically mapped and converted.
 
-NOTE: A `@Mapping` definition is only needed if you need to apply a transformation for the mapping to be successful, other properties will be automatically mapped and converted.
-
-The `ProductMappers` type can then be injected or retrieved from the context and the `toProductDTO` method used to map from the `Product` type to the `ProductDTO` type:
+You can retrieve from the context or inject a bean of type `ProductMappers`. Then, you can use the `toProductDTO` method  to map from the Product type to the ProductDTO type:
 
 snippet::io.micronaut.docs.ioc.mappers.MappersSpec[tags="mappers", indent="0"]
 

@@ -19,7 +19,7 @@ internal class IntrospectionBuilderSpec {
 
         // end::builder[]
         Assertions.assertEquals(
-            Person("Fred", 25),
+            Person.Builder().name("Fred").age(25).build(),
             person
         )
     }

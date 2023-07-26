@@ -4,9 +4,9 @@ import io.micronaut.core.beans.BeanIntrospection;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class IntrospectionBuilderSpec {
-
     @Test
     void testIntrospectionBuilder() {
         // tag::builder[]
@@ -16,11 +16,9 @@ class IntrospectionBuilderSpec {
             .with("age", 25)
             .with("name", "Fred")
             .build();
-
         // end::builder[]
-
         assertEquals(
-            new Person("Fred", 25),
+            Person.builder().name("Fred").age(25).build(),
             person
         );
     }
