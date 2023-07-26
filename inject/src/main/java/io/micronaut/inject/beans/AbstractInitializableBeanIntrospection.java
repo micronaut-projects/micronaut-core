@@ -586,11 +586,8 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         private void init(Argument<?>[] arguments) {
             for (int i = 0; i < arguments.length; i++) {
                 Argument<?> argument = arguments[i];
-                String name = argument.getName();
-                if (!argumentIndex.containsKey(name)) {
-                    argumentIndex.put(name, i);
-                    defaultValues[i] = argument.getAnnotationMetadata().getValue(Bindable.class, "defaultValue", argument).orElse(null);
-                }
+                argumentIndex.put(argument.getName(), i);
+                defaultValues[i] = argument.getAnnotationMetadata().getValue(Bindable.class, "defaultValue", argument).orElse(null);
             }
         }
     }
