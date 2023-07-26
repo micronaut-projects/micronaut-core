@@ -20,7 +20,7 @@ $ unzip example.zip -d example
 
 ==== HTTP Functions with AWS Lambda
 
-You can deploy regular Micronaut applications that use ann:http.annotation.Controller[], etc. using Micronaut's support for AWS API Gateway. See the documentation on https://micronaut-projects.github.io/micronaut-aws/snapshot/guide/#apiProxy[AWS API Gateway Support] for more information.
+You can deploy regular Micronaut applications that use ann:http.annotation.Controller[], etc. using Micronaut's support for AWS API Gateway. See the documentation on https://micronaut-projects.github.io/micronaut-aws/latest/guide/#applicationtyperuntimedependencies[AWS Application Types, Lambda Runtimes, Dependencies] for more information.
 
 [TIP]
 .Using the CLI
