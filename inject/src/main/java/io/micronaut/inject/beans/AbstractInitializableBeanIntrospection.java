@@ -492,7 +492,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     @NonNull
     private <P> UnsafeBeanProperty<P, Object>[] resolveWriteableProperties(Collection<BeanProperty<P, Object>> beanProperties) {
         return beanProperties.stream()
-            .filter(bp -> !bp.isReadOnly())
+            .filter(bp -> !bp.isReadOnly() && Arrays.stream(constructorArguments).noneMatch(a -> bp.getName().equals(a.getName())))
             .map(bp -> ((UnsafeBeanProperty<P, Object>) bp))
             .toArray(UnsafeBeanProperty[]::new);
     }
