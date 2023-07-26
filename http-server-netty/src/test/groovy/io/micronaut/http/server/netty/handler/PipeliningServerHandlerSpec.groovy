@@ -4,6 +4,7 @@ import io.micronaut.http.netty.stream.StreamedHttpRequest
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelOutboundHandlerAdapter
+import io.netty.channel.ChannelPromise
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.handler.codec.http.DefaultFullHttpRequest
 import io.netty.handler.codec.http.DefaultFullHttpResponse
@@ -192,6 +193,45 @@ class PipeliningServerHandlerSpec extends Specification {
         when:
         ch.writeInbound(new DefaultLastHttpContent(Unpooled.wrappedBuffer("foo".getBytes(StandardCharsets.UTF_8))))
         then:
+        ch.readOutbound() == resp
+        ch.readOutbound() == null
+    }
+
+    def 'nested write'() {
+        given:
+        def mon = new MonitorHandler()
+        def resp = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT)
+        def ch = new EmbeddedChannel(mon, new ChannelOutboundHandlerAdapter() {
+            @Override
+            void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
+                super.write(ctx, msg, promise)
+                ctx.fireChannelWritabilityChanged()
+            }
+        }, new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
+                assert request instanceof FullHttpRequest
+                request.release()
+                outboundAccess.writeFull(resp)
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }))
+
+        expect:
+        mon.read == 1
+        mon.flush == 0
+
+        when:
+        def req = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/", Unpooled.EMPTY_BUFFER)
+        ch.writeInbound(req)
+        then:
+        ch.checkException()
+        mon.read == 2
+        mon.flush == 1
         ch.readOutbound() == resp
         ch.readOutbound() == null
     }
