@@ -2,17 +2,6 @@ Since Micronaut framework 1.1, a compile-time replacement for the JDK's jdk:java
 
 The api:core.beans.BeanIntrospector[] and api:core.beans.BeanIntrospection[] interfaces allow looking up bean introspections to instantiate and read/write bean properties without using reflection or caching reflective metadata, which consume excessive memory for large beans.
 
-=== Making a Bean Available for Introspection
-
-Unlike the JDK's jdk:java.beans.Introspector[], every class is not automatically available for introspection. To make a class available for introspection you must at a minimum enable Micronaut's annotation processor (`micronaut-inject-java` for Java and Kotlin and `micronaut-inject-groovy` for Groovy) in your build and ensure you have a runtime time dependency on `micronaut-core`.
-
-dependency::micronaut-inject-java[scope="annotationProcessor", version="{version}"]
-
-NOTE: For Kotlin, add the `micronaut-inject-java` dependency in `kapt` scope, and for Groovy add `micronaut-inject-groovy` in `compileOnly` scope.
-
-dependency::micronaut-core[scope="runtimeOnly", version="{version}"]
-
-Once your build is configured you have a few ways to generate introspection data.
 
 
 

@@ -37,6 +37,7 @@ ioc:
   events: Bean Events
   introspection:
     title: Bean Introspection
+    makingABeanAvailableForIntrospection: Making a Bean Available for Introspection
     atIntrospected: Use the @Introspected Annotation
     introspectedAccessorsStyle: Use @Introspected with @AccessorsStyle
     accessKind: Bean Fields
