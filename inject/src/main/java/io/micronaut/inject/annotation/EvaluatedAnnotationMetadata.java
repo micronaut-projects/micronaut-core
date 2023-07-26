@@ -51,6 +51,7 @@ public final class EvaluatedAnnotationMetadata extends MappingAnnotationMetadata
 
     /**
      * @return The evaluation context.
+     * @since 4.1.0
      */
     public @NonNull ConfigurableExpressionEvaluationContext getEvaluationContext() {
         return evaluationContext;
