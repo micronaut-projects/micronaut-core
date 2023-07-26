@@ -56,6 +56,8 @@ import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.UnsupportedCharsetException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -401,6 +403,20 @@ public class DefaultMutableConversionService implements MutableConversionService
                     SimpleDateFormat format = resolveFormat(context);
                     return Optional.of(format.format(object));
                 }
+        );
+
+        // Number -> CharSequence
+        addConverter(
+            Number.class,
+            CharSequence.class,
+            (object, targetType, context) -> {
+                NumberFormat format = resolveNumberFormat(context);
+                if (format != null) {
+                    return Optional.of(format.format(object));
+                } else {
+                    return Optional.of(object.toString());
+                }
+            }
         );
 
         // String -> Path
@@ -1009,6 +1025,13 @@ public class DefaultMutableConversionService implements MutableConversionService
         return format
             .map(pattern -> new SimpleDateFormat(pattern, context.getLocale()))
             .orElseGet(() -> new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", context.getLocale()));
+    }
+
+    private NumberFormat resolveNumberFormat(ConversionContext context) {
+        AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
+        Optional<String> format = annotationMetadata.stringValue(Format.class);
+
+        return format.map(DecimalFormat::new).orElse(null);
     }
 
     private <S, T> ConvertiblePair newPair(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {

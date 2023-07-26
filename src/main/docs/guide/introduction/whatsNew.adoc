@@ -1,4 +1,7 @@
-//Micronaut {version} includes the following changes:
+== 4.1.0
+
+Support for <<beanMappers, Bean Mappers>> and <<introspection, introspection Builders>>.
+
 == 4.0.0
 
 === Core Changes

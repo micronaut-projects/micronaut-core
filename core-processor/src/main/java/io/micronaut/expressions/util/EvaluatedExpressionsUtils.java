@@ -67,8 +67,8 @@ public final class EvaluatedExpressionsUtils {
             Iterable<?> nestedValues = null;
             if (value instanceof Iterable iterable) {
                 nestedValues = iterable;
-            } else if (value.getClass().isArray()) {
-                nestedValues = Arrays.asList(value);
+            } else if (value instanceof AnnotationValue<?>[] values) {
+                nestedValues = Arrays.asList(values);
             }
 
             if (nestedValues != null) {

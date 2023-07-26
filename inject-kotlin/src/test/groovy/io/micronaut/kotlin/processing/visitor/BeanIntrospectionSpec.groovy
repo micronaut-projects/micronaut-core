@@ -49,6 +49,24 @@ class Test
         introspection.instantiate().class.name == "test.Test"
     }
 
+    void "test data class introspection"() {
+        when:
+        def introspection = buildBeanIntrospection("test.ContactEntity", """
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+data class ContactEntity(var id: Long? = null, val firstName: String, val lastName: String)
+""")
+
+
+        then:
+        noExceptionThrown()
+        introspection != null
+        introspection.beanProperties.size() == 3
+    }
+
     void "test non-null and null introspection"() {
         when:
         def introspection = buildBeanIntrospection("test.Test", """
@@ -65,6 +83,7 @@ data class Test(
         then:
         noExceptionThrown()
         introspection != null
+
         introspection.constructorArguments.size() == 2
         introspection.constructorArguments[0].isNonNull()
         introspection.constructorArguments[1].isNullable()
@@ -97,6 +116,7 @@ annotation class MyAnn {
         introspection.instantiate().class.name == "test.Test"
         introspection.hasAnnotation('test.MyAnn')
         introspection.hasStereotype('test.MyAnn$InnerAnn')
+
     }
 
     void "test generics in arrays don't stack overflow"() {

@@ -47,6 +47,7 @@ ioc:
     introspectExistingAnnotations: Write an AnnotationMapper to Introspect Existing Annotations
     beanWrapperApi: The BeanWrapper API
     jacksonAndBeanIntrospection: Jackson and Bean Introspection
+  beanMappers: Bean Mappers
   beanValidation: Bean Validation
   annotationMetadata: Bean Annotation Metadata
   beanImport: Importing Beans from Libraries

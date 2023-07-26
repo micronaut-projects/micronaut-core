@@ -116,6 +116,20 @@ snippet::io.micronaut.docs.ioc.beans.Business[tags="class"]
 
 TIP: There can be multiple "creator" methods annotated. If there is one without arguments, it will be the default construction method. The first method with arguments will be used as the primary construction method.
 
+==== Builders
+
+If a type can only be constructed via the builder pattern then you can use the `builder` member of the ann:core.annotation.Introspected[] annotation to generate a dynamic builder. For example given this class:
+
+snippet::io.micronaut.docs.ioc.builders.Person[tags="class"]
+
+You can use the `builder()` method of the api:core.beans.BeanIntrospection[] API to construct the instance:
+
+snippet::io.micronaut.docs.ioc.builders.IntrospectionBuilderSpec[tags="builder", indent=0]
+
+TIP: The `builder()` method also works regardless if the type uses a builder and can be used as a general abstraction for object construction. Note however that there is a slight performance overhead vs direct instantiation via the `instantiate()` method, hence the `hasBuilder()` method can be checked if optimized code paths are needed.
+
+NOTE: Introspection Builder does not work with https://groovy-lang.org/metaprogramming.html#xform-Builder[Groovy `@Builder` AST].
+
 ==== Enums
 
 It is possible to introspect enums as well. Add the annotation to the enum and it can be constructed through the standard `valueOf` method.
