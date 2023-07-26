@@ -104,10 +104,12 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 if (isIntrospected(context, ce)) {
                     return;
                 }
+                int introspectionIndex = index.getAndIncrement();
+                processBuilderDefinition(ce, context, introspected, introspectionIndex);
                 final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                     targetPackage,
                     element.getName(),
-                    index.getAndIncrement(),
+                    introspectionIndex,
                     element,
                     ce,
                     metadata ? ce.getAnnotationMetadata() : null,
@@ -133,15 +135,18 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                         if (classElement.isAbstract() || !classElement.isPublic() || isIntrospected(context, classElement)) {
                             continue;
                         }
+                        int introspectionIndex = j++;
+                        processBuilderDefinition(classElement, context, introspected, introspectionIndex);
                         final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                             targetPackage,
                             element.getName(),
-                            j++,
+                            introspectionIndex,
                             element,
                             classElement,
-                            metadata ? element.getAnnotationMetadata() : null,
+                            metadata ? classElement.getAnnotationMetadata() : null,
                             context
                         );
+
 
                         processElement(metadata,
                             indexedAnnotations,
@@ -152,7 +157,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 }
             }
         } else {
-            processBuilderDefinition(element, context, introspected);
+            processBuilderDefinition(element, context, introspected, 0);
             final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                 targetPackage,
                 element,
@@ -163,7 +168,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         }
     }
 
-    private void processBuilderDefinition(ClassElement element, VisitorContext context, AnnotationValue<Introspected> introspected) {
+    private void processBuilderDefinition(ClassElement element, VisitorContext context, AnnotationValue<Introspected> introspected, int index) {
         AnnotationValue<Introspected.IntrospectionBuilder> builder = introspected.getAnnotation("builder", Introspected.IntrospectionBuilder.class).orElse(null);
         if (builder != null) {
             String builderMethod = builder.stringValue("builderMethod").orElse(null);
@@ -194,7 +199,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                             methodElement,
                             null,
                             returnType,
-                            methodMetadata
+                            methodMetadata,
+                            index
                         );
                     } else {
                         context.fail("Builder return type is not public. The method must be static and accessible.", methodElement);
@@ -217,7 +223,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                         builderClassElement.getPrimaryConstructor().orElse(null),
                         builderClassElement.getDefaultConstructor().orElse(null),
                         builderClassElement,
-                        builderClassElement.getTargetAnnotationMetadata()
+                        builderClassElement.getTargetAnnotationMetadata(),
+                        index
                     );
                 } else {
                     context.fail("Builder class not found on compilation classpath: " + builderClass.getName(), element);
@@ -278,7 +285,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         MethodElement primaryConstructor,
         MethodElement defaultConstructor,
         ClassElement builderType,
-        AnnotationMetadata builderMetadata) {
+        AnnotationMetadata builderMetadata,
+        int index) {
         if (builderMetadata == null) {
             builderMetadata = AnnotationMetadata.EMPTY_METADATA;
         }
@@ -297,7 +305,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
                 final BeanIntrospectionWriter builderWriter = new BeanIntrospectionWriter(
                     classToBuild.getPackageName(),
                     builderType.getName(),
-                    0,
+                    index,
                     classToBuild,
                     builderType,
                     builderMetadata,
