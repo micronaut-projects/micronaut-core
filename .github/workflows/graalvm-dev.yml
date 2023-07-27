@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Build Matrix
-        uses: micronaut-projects/github-actions/graalvm/build-matrix@latest-graalvm-changes
+        uses: micronaut-projects/github-actions/graalvm/build-matrix@master
         id: build-matrix
   build:
     needs: build_matrix
@@ -36,7 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Pre-Build Steps
-        uses: micronaut-projects/github-actions/graalvm/pre-build@latest-graalvm-changes
+        uses: micronaut-projects/github-actions/graalvm/pre-build@master
         id: pre-build
         with:
           java: 'dev'
