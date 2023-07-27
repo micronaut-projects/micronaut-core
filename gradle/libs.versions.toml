@@ -48,7 +48,7 @@ smallrye = "5.5.0"
 spock = "2.3-groovy-4.0"
 spotbugs = "4.7.1"
 systemlambda = "1.2.1"
-testcontainers = "1.18.1"
+testcontainers = "1.18.3"
 vertx = "3.9.13"
 wiremock = "2.33.2"
 
