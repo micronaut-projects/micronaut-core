@@ -31,9 +31,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Matcher;
-
-import static io.micronaut.http.uri.UriTemplate.PATTERN_FULL_PATH;
-import static io.micronaut.http.uri.UriTemplate.PATTERN_FULL_URI;
+import java.util.regex.Pattern;
 
 /**
  * Default implementation of the {@link UriBuilder} interface.
@@ -43,6 +41,23 @@ import static io.micronaut.http.uri.UriTemplate.PATTERN_FULL_URI;
  */
 class DefaultUriBuilder implements UriBuilder {
 
+    private static final String STRING_PATTERN_SCHEME = "([^:/?#]+):";
+    private static final String STRING_PATTERN_USER_INFO = "([^@\\[/?#]*)";
+    private static final String STRING_PATTERN_HOST_IPV4 = "[^\\[{/?#:]*";
+    private static final String STRING_PATTERN_HOST_IPV6 = "\\[[\\p{XDigit}\\:\\.]*[%\\p{Alnum}]*\\]";
+    private static final String STRING_PATTERN_HOST = "(" + STRING_PATTERN_HOST_IPV6 + "|" + STRING_PATTERN_HOST_IPV4 + ")";
+    private static final String STRING_PATTERN_PORT = "(\\d*(?:\\{[^/]+?\\})?)";
+    private static final String STRING_PATTERN_PATH = "([^#?]*)";
+    private static final String STRING_PATTERN_QUERY = "([^#]*)";
+    private static final String STRING_PATTERN_REMAINING = "(.*)";
+
+    // Regex patterns that matches URIs. See RFC 3986, appendix B
+    private static final Pattern PATTERN_SCHEME = Pattern.compile("^" + STRING_PATTERN_SCHEME + "//.*");
+    private static final Pattern PATTERN_FULL_PATH = Pattern.compile("^([^#\\?]*)(\\?([^#]*))?(\\#(.*))?$");
+    private static final Pattern PATTERN_FULL_URI = Pattern.compile(
+        "^(" + STRING_PATTERN_SCHEME + ")?" + "(//(" + STRING_PATTERN_USER_INFO + "@)?" + STRING_PATTERN_HOST + "(:" + STRING_PATTERN_PORT +
+            ")?" + ")?" + STRING_PATTERN_PATH + "(\\?" + STRING_PATTERN_QUERY + ")?" + "(#" + STRING_PATTERN_REMAINING + ")?");
+    
     private String authority;
     private final MutableConvertibleMultiValues<String> queryParams;
     private String scheme;
@@ -84,7 +99,7 @@ class DefaultUriBuilder implements UriBuilder {
      * @param uri The URI
      */
     DefaultUriBuilder(CharSequence uri) {
-        if (UriTemplate.PATTERN_SCHEME.matcher(uri).matches()) {
+        if (PATTERN_SCHEME.matcher(uri).matches()) {
             Matcher matcher = PATTERN_FULL_URI.matcher(uri);
 
             if (matcher.find()) {
