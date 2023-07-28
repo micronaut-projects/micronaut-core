@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.expressions.EvaluatedExpression;
 
 import java.lang.annotation.Annotation;
+import java.util.function.Function;
 
 /**
  * An EvaluatedAnnotationValue is a {@link AnnotationValue} that contains one or more expressions.
@@ -42,6 +43,11 @@ public final class EvaluatedAnnotationValue<A extends Annotation> extends Annota
             value -> {
                 if (value instanceof EvaluatedExpression expression) {
                     return expression.evaluate(evaluationContext);
+                } else if (annotationValue instanceof EnvironmentAnnotationValue<A> eav) {
+                    Function<Object, Object> valueMapper = eav.getValueMapper();
+                    if (valueMapper != null) {
+                        return valueMapper.apply(value);
+                    }
                 }
                 return value;
             }
