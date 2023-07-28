@@ -182,6 +182,13 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     }
 
     /**
+     * @return The value mapper.
+     */
+    protected @Nullable Function<Object, Object> getValueMapper() {
+        return valueMapper;
+    }
+
+    /**
      * Creates a builder with the initial value of this annotation.
      *
      * @return The builder with this annotation value
