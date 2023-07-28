@@ -252,7 +252,7 @@ public class SslConfiguration implements Toggleable {
      * @param protocol The protocol
      */
     public void setProtocol(String protocol) {
-        if (!StringUtils.isNotEmpty(protocol)) {
+        if (StringUtils.isNotEmpty(protocol)) {
             this.protocol = protocol;
         }
     }

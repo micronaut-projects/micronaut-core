@@ -11,6 +11,7 @@ dependencies {
     implementation(projects.validation)
     implementation(projects.runtime)
     implementation(projects.inject)
+    implementation(projects.management)
     api(projects.httpServer)
     api(libs.junit.jupiter.api)
     api(libs.junit.jupiter.params)

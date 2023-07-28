@@ -7,11 +7,9 @@ name: GraalVM CE CI
 on:
   push:
     branches:
-      - master
       - '[1-9]+.[0-9]+.x'
   pull_request:
     branches:
-      - master
       - '[1-9]+.[0-9]+.x'
 jobs:
   build:
@@ -62,18 +60,6 @@ jobs:
           GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
           GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
           PREDICTIVE_TEST_SELECTION: "${{ github.event_name == 'pull_request' && 'true' || 'false' }}"
-      - name: Add build scan URL as PR comment
-        uses: actions/github-script@v5
-        if: github.event_name == 'pull_request' && failure()
-        with:
-          github-token: ${{secrets.GITHUB_TOKEN}}
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '❌ ${{ github.workflow }} ${{ matrix.java }} ${{ matrix.graalvm }} failed: ${{ steps.gradle.outputs.build-scan-url }}'
-            })
       - name: Publish Test Report
         if: always()
         uses: mikepenz/action-junit-report@v3.7.1

@@ -18,6 +18,7 @@ package io.micronaut.management.health.indicator.service;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.event.ServiceReadyEvent;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.management.endpoint.health.HealthEndpoint;
@@ -40,9 +41,11 @@ import reactor.core.publisher.Flux;
  */
 @Singleton
 @Requires(beans = HealthEndpoint.class)
+@Requires(property = ServiceReadyHealthIndicator.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
 @Readiness
 public class ServiceReadyHealthIndicator implements HealthIndicator {
 
+    public static final String ENABLED = HealthEndpoint.PREFIX + ".service-ready-indicator-enabled";
     private static final String NAME = "service";
     private final boolean isService;
 

@@ -119,7 +119,9 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
         // Date header
         MutableHttpHeaders headers = response.getHeaders();
         LocalDateTime now = LocalDateTime.now();
-        headers.date(now);
+        if (!headers.contains(HttpHeaders.DATE)) {
+            headers.date(now);
+        }
 
         // Add cache headers
         LocalDateTime cacheSeconds = now.plus(configuration.getCacheSeconds(), ChronoUnit.SECONDS);
