@@ -37,4 +37,10 @@ import java.lang.annotation.Target;
 @Documented
 @jakarta.annotation.Nullable
 public @interface Nullable {
+    /**
+     * Whether the nullable behaviour is inherited by subclasses or implementors in interfaces.
+     * @return True if it should be inherited (defaults to false)
+     * @since 4.1.0
+     */
+    boolean inherited() default false;
 }
