@@ -130,7 +130,7 @@ class DefaultUriBuilder implements UriBuilder {
                     this.path = new StringBuilder(path);
                 }
                 if (query != null) {
-                    final Map parameters = new QueryStringDecoder(query).parameters();
+                    final Map parameters = new QueryStringDecoder(uri.toString()).parameters();
                     this.queryParams = new MutableConvertibleMultiValuesMap<>(parameters);
                 } else {
                     this.queryParams = new MutableConvertibleMultiValuesMap<>();
