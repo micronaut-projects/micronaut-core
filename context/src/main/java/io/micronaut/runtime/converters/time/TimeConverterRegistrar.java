@@ -19,11 +19,11 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.MutableConversionService;
-import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.util.StringUtils;
 
+import java.time.DateTimeException;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -43,6 +43,7 @@ import java.time.temporal.TemporalAccessor;
 import java.time.temporal.TemporalAmount;
 import java.time.temporal.TemporalQuery;
 import java.util.Date;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -146,28 +147,12 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
             (object, targetType, context) -> durationConverter.apply(object, context).map(TemporalAmount.class::cast)
         );
 
-        // TemporalAccessor -> CharSequence
-        final TypeConverter<TemporalAccessor, CharSequence> temporalConverter = (object, targetType, context) -> {
-            try {
-                DateTimeFormatter formatter = resolveFormatter(context);
-                return Optional.of(formatter.format(object));
-            } catch (DateTimeParseException e) {
-                context.reject(object, e);
-                return Optional.empty();
-            }
-        };
-        conversionService.addConverter(
-                TemporalAccessor.class,
-                CharSequence.class,
-                temporalConverter
-        );
-
-        addTemporalStringConverter(conversionService, Instant.class, DateTimeFormatter.ISO_INSTANT, Instant::from);
-        addTemporalStringConverter(conversionService, LocalDate.class, DateTimeFormatter.ISO_LOCAL_DATE, LocalDate::from);
-        addTemporalStringConverter(conversionService, LocalDateTime.class, DateTimeFormatter.ISO_LOCAL_DATE_TIME, LocalDateTime::from);
-        addTemporalStringConverter(conversionService, OffsetTime.class, DateTimeFormatter.ISO_OFFSET_TIME, OffsetTime::from);
-        addTemporalStringConverter(conversionService, OffsetDateTime.class, DateTimeFormatter.ISO_OFFSET_DATE_TIME, OffsetDateTime::from);
-        addTemporalStringConverter(conversionService, ZonedDateTime.class, DateTimeFormatter.ISO_ZONED_DATE_TIME, ZonedDateTime::from);
+        addTemporalStringConverters(conversionService, Instant.class, DateTimeFormatter.ISO_INSTANT, Instant::from);
+        addTemporalStringConverters(conversionService, LocalDate.class, DateTimeFormatter.ISO_LOCAL_DATE, LocalDate::from);
+        addTemporalStringConverters(conversionService, LocalDateTime.class, DateTimeFormatter.ISO_LOCAL_DATE_TIME, LocalDateTime::from);
+        addTemporalStringConverters(conversionService, OffsetTime.class, DateTimeFormatter.ISO_OFFSET_TIME, OffsetTime::from);
+        addTemporalStringConverters(conversionService, OffsetDateTime.class, DateTimeFormatter.ISO_OFFSET_DATE_TIME, OffsetDateTime::from);
+        addTemporalStringConverters(conversionService, ZonedDateTime.class, DateTimeFormatter.ISO_ZONED_DATE_TIME, ZonedDateTime::from);
 
         // java.time -> Date
         addTemporalToDateConverter(conversionService, Instant.class, Function.identity());
@@ -179,7 +164,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
         addTemporalToDateConverter(conversionService, LocalDateTime.class, ldt -> ldt.toInstant(ZoneOffset.UTC));
     }
 
-    private <T extends TemporalAccessor> void addTemporalStringConverter(MutableConversionService conversionService, Class<T> temporalType, DateTimeFormatter isoFormatter, TemporalQuery<T> query) {
+    private <T extends TemporalAccessor> void addTemporalStringConverters(MutableConversionService conversionService, Class<T> temporalType, DateTimeFormatter isoFormatter, TemporalQuery<T> query) {
         conversionService.addConverter(CharSequence.class, temporalType, (CharSequence object, Class<T> targetType, ConversionContext context) -> {
             if (StringUtils.isEmpty(object)) {
                 return Optional.empty();
@@ -211,16 +196,41 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                 }
             }
         });
+
+        conversionService.addConverter(temporalType, CharSequence.class, (object, targetType, context) -> {
+            if (Objects.isNull(object)) {
+                return Optional.empty();
+            }
+            // try explicit format first
+            Optional<String> format = context.getAnnotationMetadata().stringValue(Format.class);
+            if (format.isPresent()) {
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern(format.get(), context.getLocale());
+                try {
+                    CharSequence converted = formatter.format(object);
+                    return Optional.of(converted);
+                } catch (DateTimeException e) {
+                    context.reject(object, e);
+                    return Optional.empty();
+                }
+            } else {
+                try {
+                    CharSequence converted = isoFormatter.format(object);
+                    return Optional.of(converted);
+                } catch (DateTimeException ignored) {
+                }
+                // fall back to RFC 1123 date time for compatibility
+                try {
+                    CharSequence converted = DateTimeFormatter.RFC_1123_DATE_TIME.format(object);
+                    return Optional.of(converted);
+                } catch (DateTimeException e) {
+                    context.reject(object, e);
+                    return Optional.empty();
+                }
+            }
+        });
     }
 
     private <T extends TemporalAccessor> void addTemporalToDateConverter(MutableConversionService conversionService, Class<T> temporalType, Function<T, Instant> toInstant) {
         conversionService.addConverter(temporalType, Date.class, (T object, Class<Date> targetType, ConversionContext context) -> Optional.of(Date.from(toInstant.apply(object))));
-    }
-
-    private DateTimeFormatter resolveFormatter(ConversionContext context) {
-        Optional<String> format = context.getAnnotationMetadata().stringValue(Format.class);
-        return format
-            .map(pattern -> DateTimeFormatter.ofPattern(pattern, context.getLocale()))
-            .orElse(DateTimeFormatter.RFC_1123_DATE_TIME);
     }
 }
