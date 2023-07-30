@@ -15,7 +15,7 @@ endpoints:
 
 - defaults are false for `enabled` and true for `sensitive`
 
-By default the endpoint will mask all values.
+By default, the endpoint will mask all values.
 To customize this masking you need to supply a Bean that implements api:management.endpoint.env.EnvironmentEndpointFilter[].
 
 This first example will mask all values except for those that are prefixed by `safe`

@@ -268,7 +268,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
     /**
      * Get the <i>last</i> body of this request, of any type. This is a weird method to use, avoid
-     * it. It's sometimes necessary to "piggy-back" off other code that parses the body. For
+     * it. It's sometimes necessary to "piggyback" off other code that parses the body. For
      * example in {@link #getBody()}, we want to return whatever we can, even if the body has
      * already been claimed for a {@code @Body} parameter or form parsing or something. So we take
      * the last step in the parse chain and do our best with it.

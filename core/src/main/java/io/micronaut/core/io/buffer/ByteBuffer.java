@@ -225,7 +225,7 @@ public interface ByteBuffer<T> {
      * to {@code buf.nioBuffer(buf.readerIndex(), buf.readableBytes())}.  This method does not
      * modify {@code readerIndex} or {@code writerIndex} of this buffer.  Please note that the
      * returned NIO buffer will not see the changes of this buffer if this buffer is a dynamic
-     * buffer and it adjusted its capacity.
+     * buffer, and it adjusted its capacity.
      *
      * @return byteBuffer
      * @throws UnsupportedOperationException if this buffer cannot create a {@link java.nio.ByteBuffer}
@@ -239,7 +239,7 @@ public interface ByteBuffer<T> {
      * NIO buffer does not affect the indexes and marks of this buffer.  This method does not
      * modify {@code readerIndex} or {@code writerIndex} of this buffer.  Please note that the
      * returned NIO buffer will not see the changes of this buffer if this buffer is a dynamic
-     * buffer and it adjusted its capacity.
+     * buffer, and it adjusted its capacity.
      * @return byteBuffer
      * @param index  The index
      * @param length The length

@@ -298,7 +298,7 @@ public class NameUtils {
     }
 
     /**
-     * Get the equivalent setter name for the given property and a the first prefix.
+     * Get the equivalent setter name for the given property and the first prefix.
      *
      * @param propertyName The property name
      * @param prefixes     The prefixes
@@ -443,7 +443,7 @@ public class NameUtils {
     }
 
     /**
-     * Get the equivalent getter name for the given property and a the first prefix.
+     * Get the equivalent getter name for the given property and the first prefix.
      *
      * @param propertyName The property name
      * @param prefixes     The prefixes

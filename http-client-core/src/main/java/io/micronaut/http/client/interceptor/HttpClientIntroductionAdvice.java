@@ -116,7 +116,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private final ConversionService conversionService;
 
     /**
-     * Constructor for advice class to setup things like Headers, Cookies, Parameters for Clients.
+     * Constructor for advice class to set up things like Headers, Cookies, Parameters for Clients.
      *
      * @param clientFactory        The client factory
      * @param jsonMediaTypeCodec   The JSON media type codec

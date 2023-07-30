@@ -194,7 +194,7 @@ abstract class AbstractKotlinCompilation<A : CommonCompilerArguments> internal c
         val args = arguments.also { args ->
             args.freeArgs =
                 sources.map(File::getAbsolutePath).distinct() + if (sources.none(File::hasKotlinFileExtension)) {
-                    /* __HACK__: The Kotlin compiler expects at least one Kotlin source file or it will crash,
+                    /* __HACK__: The Kotlin compiler expects at least one Kotlin source file, or it will crash,
                        so we trick the compiler by just including an empty .kt-File. We need the compiler to run
                        even if there are no Kotlin files because some compiler plugins may also process Java files. */
                     listOf(SourceFile.new("emptyKotlinFile.kt", "").writeIfNeeded(sourcesDir).absolutePath)
@@ -263,7 +263,7 @@ abstract class AbstractKotlinCompilation<A : CommonCompilerArguments> internal c
 
     protected val hostClasspaths by lazy { HostEnvironment.classpath }
 
-    /* This internal buffer and stream is used so it can be easily converted to a string
+    /* This internal buffer and stream is used, so it can be easily converted to a string
     that is put into the [Result] object, in addition to printing immediately to the user's
     stream. */
     protected val internalMessageBuffer = Buffer()

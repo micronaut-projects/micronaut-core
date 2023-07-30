@@ -25,7 +25,7 @@ import java.util.stream.Stream;
 /**
  * Qualifies using an annotation.
  *
- * @param <T> Type type
+ * @param <T> Type
  * @author Graeme Rocher
  * @since 1.0
  */

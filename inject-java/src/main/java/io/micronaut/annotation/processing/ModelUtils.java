@@ -94,7 +94,7 @@ public class ModelUtils {
     }
 
     /**
-     * Obtains the {@link TypeElement} for an given element.
+     * Obtains the {@link TypeElement} for a given element.
      *
      * @param element The element
      * @return The {@link TypeElement}

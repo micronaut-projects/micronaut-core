@@ -597,7 +597,7 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * @return The proxy user name to use
+     * @return The proxy username to use
      */
     public Optional<String> getProxyUsername() {
         String type = proxyType.name().toLowerCase();
@@ -605,9 +605,9 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Sets the proxy user name to use.
+     * Sets the proxy username to use.
      *
-     * @param proxyUsername The proxy user name to use
+     * @param proxyUsername The proxy username to use
      */
     public void setProxyUsername(String proxyUsername) {
         this.proxyUsername = proxyUsername;

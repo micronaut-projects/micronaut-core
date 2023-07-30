@@ -23,7 +23,7 @@ import javax.tools.ToolProvider
 
 /**
  * ToolProvider has no synchronization internally, so if we don't synchronize from the outside we
- * could wind up loading the compiler classes multiple times from different class loaders.
+ * could wind uploading the compiler classes multiple times from different class loaders.
  */
 internal object SynchronizedToolProvider {
     private var getPlatformClassLoaderMethod: Method? = null

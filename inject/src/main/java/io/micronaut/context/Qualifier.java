@@ -41,7 +41,7 @@ public interface Qualifier<T> {
      * @param beanType   The bean type
      * @param candidates The candidates
      * @param <BT>       The bean type subclass
-     * @return The qualified candidate or null it it cannot be qualified
+     * @return The qualified candidate or null it cannot be qualified
      */
     <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates);
 

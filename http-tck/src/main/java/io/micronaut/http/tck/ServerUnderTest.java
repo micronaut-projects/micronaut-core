@@ -42,7 +42,7 @@ public interface ServerUnderTest extends ApplicationContextProvider, Closeable, 
     String BLOCKING_CLIENT_PROPERTY = "use.blocking.client";
 
     /*
-     * Perform an HTTP request for the given request against the server under test and returns the the full HTTP response
+     * Perform an HTTP request for the given request against the server under test and returns the full HTTP response
      * @param request  The {@link HttpRequest} to execute
      * @param <I>     The request body type
      * @param <O>     The response body type

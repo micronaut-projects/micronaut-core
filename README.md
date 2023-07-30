@@ -58,7 +58,7 @@ Micronaut Framework is using Semantic Versioning 2.0.0. To understand what that 
 
 ## CI
 
-[Github Actions](https://github.com/micronaut-projects/micronaut-core/actions) are used to build Micronaut Framework. If a build fails in `master`, check the [test reports](https://micronaut-projects.github.io/micronaut-core/index.html).
+[GitHub Actions](https://github.com/micronaut-projects/micronaut-core/actions) are used to build Micronaut Framework. If a build fails in `master`, check the [test reports](https://micronaut-projects.github.io/micronaut-core/index.html).
 
 
 

@@ -59,7 +59,7 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
     Collection<V> values();
 
     /**
-     * @return Whether this values is empty
+     * @return Whether these values are empty
      */
     default boolean isEmpty() {
         return this == ConvertibleValues.EMPTY || names().isEmpty();

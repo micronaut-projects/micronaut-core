@@ -178,7 +178,7 @@ public class DependencyInjectionException extends BeanCreationException {
     }
 
     /**
-     * Builds an error message for attempted argument conversion on a argument.
+     * Builds an error message for attempted argument conversion on an argument.
      *
      * @param resolutionContext         The resolution context
      * @param argumentConversionContext The argument conversion context

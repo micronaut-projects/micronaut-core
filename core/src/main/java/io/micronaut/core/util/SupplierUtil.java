@@ -59,7 +59,7 @@ public class SupplierUtil {
 
     /**
      * Caches the result of supplier in a thread safe manner. The result
-     * is only cached if it is non null or non empty if an optional.
+     * is only cached if it is non-null or non-empty if an optional.
      *
      * @param valueSupplier The supplier providing the result
      * @param <T> The type of result

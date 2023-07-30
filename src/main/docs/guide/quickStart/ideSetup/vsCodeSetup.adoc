@@ -12,7 +12,7 @@ The GraalVM Extension Pack also includes the https://marketplace.visualstudio.co
 
 * An application creation wizard
 * Code completion for YAML configuration
-* Pallet commands to build, deploy, create Native Images etc. 
+* Pallet commands to build, deploy, create Native Images etc.
 
 ==== Option 2) Red Hat/Microsoft Java Extension Pack
 
@@ -31,4 +31,4 @@ NOTE: If you don't run the above command beforehand then annotation processing w
 
 Once the extension pack is installed just type `code .` in any project directory and the project will be automatically set up.
 
-NOTE: For macOs, you need to install the `code` command https://code.visualstudio.com/docs/setup/mac[by following these instructions].
+NOTE: For macOS, you need to install the `code` command https://code.visualstudio.com/docs/setup/mac[by following these instructions].

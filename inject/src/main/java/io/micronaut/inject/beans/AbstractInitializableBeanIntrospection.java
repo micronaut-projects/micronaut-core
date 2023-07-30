@@ -212,7 +212,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
      *
      * @param annotationType  The annotation type
      * @param annotationValue The annotation value
-     * @return A immutable collection of properties.
+     * @return An immutable collection of properties.
      * @see io.micronaut.core.annotation.Introspected#indexed()
      */
     @Nullable

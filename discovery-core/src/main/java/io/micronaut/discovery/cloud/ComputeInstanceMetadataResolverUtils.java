@@ -117,7 +117,7 @@ public class ComputeInstanceMetadataResolverUtils {
     }
 
     /**
-     * Populates the instance instance metadata's {@link AbstractComputeInstanceMetadata#setMetadata(Map)} property.
+     * Populates the instance metadata's {@link AbstractComputeInstanceMetadata#setMetadata(Map)} property.
      *
      * @param instanceMetadata The instance metadata
      * @param metadata         A json object of metadata
@@ -148,7 +148,7 @@ public class ComputeInstanceMetadataResolverUtils {
     }
 
     /**
-     * Populates the instance instance metadata's {@link AbstractComputeInstanceMetadata#setMetadata(Map)} property.
+     * Populates the instance metadata's {@link AbstractComputeInstanceMetadata#setMetadata(Map)} property.
      *
      * @param instanceMetadata The instance metadata
      * @param metadata         A map of metadata

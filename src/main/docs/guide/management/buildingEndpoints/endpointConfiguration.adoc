@@ -11,7 +11,7 @@ class FooEndpoint {
 }
 ----
 
-By default the endpoint is enabled. To disable it, set `endpoints.foo.enabled` to false. If `endpoints.foo.enabled` is not set and `endpoints.all.enabled` is `false`, the endpoint will be disabled.
+By default, the endpoint is enabled. To disable it, set `endpoints.foo.enabled` to false. If `endpoints.foo.enabled` is not set and `endpoints.all.enabled` is `false`, the endpoint will be disabled.
 
 The configuration values for the endpoint override those for `all`. If `endpoints.foo.enabled` is `true` and `endpoints.all.enabled` is `false`, the endpoint will be enabled.
 

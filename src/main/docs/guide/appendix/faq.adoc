@@ -26,7 +26,7 @@ Micronaut supports any JVM language that supports the Annotation Processor API. 
 
 ==== Can Micronaut be used for purposes other than Microservices?
 
-Yes. Micronaut is very modular and you can choose to use just the Dependency Injection and AOP implementation by including the `micronaut-inject-java` (or `micronaut-inject-groovy` for Groovy) dependency in your application.
+Yes. Micronaut is very modular, and you can choose to use just the Dependency Injection and AOP implementation by including the `micronaut-inject-java` (or `micronaut-inject-groovy` for Groovy) dependency in your application.
 
 In fact Micronaut's support for <<serverlessFunctions, Serverless Computing>> uses this exact approach.
 

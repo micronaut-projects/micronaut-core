@@ -2,7 +2,7 @@ The link:{api}/io/micronaut/http/annotation/Controller.html[@Controller] annotat
 
 == URI Paths
 
-The value of the `@Controller` annotation is a https://tools.ietf.org/html/rfc6570[RFC-6570 URI template], so you can embed URI variables within the path using the syntax defined by the URI template specification.
+The value of the `@Controller` annotation is an https://tools.ietf.org/html/rfc6570[RFC-6570 URI template], so you can embed URI variables within the path using the syntax defined by the URI template specification.
 
 NOTE: Many other frameworks, including Spring, implement the URI template specification
 

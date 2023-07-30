@@ -16,7 +16,7 @@ The task above executes every five minutes.
 
 === Scheduling with a Fixed Delay
 
-To schedule a task so it runs five minutes after the termination of the previous task use the `fixedDelay` member. For example:
+To schedule a task, so it runs five minutes after the termination of the previous task use the `fixedDelay` member. For example:
 
 .Fixed Delay Example
 snippet::io.micronaut.docs.aop.scheduled.ScheduledExample[tags="fixedDelay", indent=0, title="Fixed Delay Example"]
@@ -31,7 +31,7 @@ The above example runs the task every Monday morning at 10:15AM in the time zone
 
 === Scheduling with only an Initial Delay
 
-To schedule a task so it runs once after the server starts, use the `initialDelay` member:
+To schedule a task, so it runs once after the server starts, use the `initialDelay` member:
 
 snippet::io.micronaut.docs.aop.scheduled.ScheduledExample[tags="initialDelay", indent=0, title="Initial Delay Example"]
 

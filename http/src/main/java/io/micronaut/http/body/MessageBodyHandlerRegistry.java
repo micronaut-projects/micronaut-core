@@ -51,7 +51,7 @@ public interface MessageBodyHandlerRegistry {
      * Find a reader for the type and annotation metadata at declaration point.
      * @param type The type
      * @param mediaType The media type
-     * @return A message body reader if it is exists.
+     * @return A message body reader if it is existing.
      * @param <T> The generic type
      */
     <T> Optional<MessageBodyReader<T>> findReader(
@@ -63,7 +63,7 @@ public interface MessageBodyHandlerRegistry {
      * Find a writer for the type and annotation metadata at declaration point.
      * @param type The type
      * @param mediaType The media type
-     * @return A message body writer if it is exists.
+     * @return A message body writer if it is existing.
      * @param <T> The generic type
      */
     <T> Optional<MessageBodyWriter<T>> findWriter(

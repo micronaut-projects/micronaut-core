@@ -26,7 +26,7 @@ import io.micronaut.retry.RetryState;
 interface MutableRetryState extends RetryState {
 
     /**
-     * @return Return the milli second value for the next delay
+     * @return Return the millisecond value for the next delay
      */
     long nextDelay();
 }

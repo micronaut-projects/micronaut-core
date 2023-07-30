@@ -40,7 +40,7 @@ Recall that the value of `@Client` can be:
 * A relative URI, in which case the server targeted is the current server (useful for testing)
 * A service identifier. See the section on <<serviceDiscovery, Service Discovery>> for more information on this topic.
 
-In production you typically use a service ID and <<serviceDiscovery, Service Discovery>> to discover services automatically.
+In production, you typically use a service ID and <<serviceDiscovery, Service Discovery>> to discover services automatically.
 
 Another important thing to notice regarding the `save` method in the example above is that it returns a rx:Single[] type.
 

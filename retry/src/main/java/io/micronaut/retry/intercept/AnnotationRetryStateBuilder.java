@@ -50,7 +50,7 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
     private final AnnotationMetadata annotationMetadata;
 
     /**
-     * Build the meta data for the given element with retry.
+     * Build the metadata for the given element with retry.
      *
      * @param annotationMetadata Allows the inspection of annotation metadata and stereotypes (meta-annotations)
      */

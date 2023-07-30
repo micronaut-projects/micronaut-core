@@ -26,7 +26,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Utility methods for dealing with generic types via reflection. Generally reflection is to be avoided in Micronaut. Hence
+ * Utility methods for dealing with generic types via reflection. Generally reflection is to be avoided in Micronaut. Hence,
  * this class is regarded as internal and used for only certain niche cases.
  *
  * @author Graeme Rocher
@@ -53,7 +53,7 @@ public class GenericTypeUtils {
     }
 
     /**
-     * Resolve all of the type arguments for the given interface from the given type. Also
+     * Resolve all type arguments for the given interface from the given type. Also
      * searches superclasses.
      *
      * @param type          The type to resolve from
@@ -77,7 +77,7 @@ public class GenericTypeUtils {
     }
 
     /**
-     * Resolve all of the type arguments for the given super type from the given type.
+     * Resolve all type arguments for the given super type from the given type.
      *
      * @param type      The type to resolve from
      * @param superTypeToResolve The suepr type to resolve from

@@ -185,7 +185,7 @@ public interface AnnotationSource {
     }
 
     /**
-     * Get all of the values for the given annotation that are directly declared on the annotated element.
+     * Get all values for the given annotation that are directly declared on the annotated element.
      *
      * @param annotation The annotation name
      * @param <T> The annotation type
@@ -197,7 +197,7 @@ public interface AnnotationSource {
     }
 
     /**
-     * Get all of the values for the given annotation that are directly declared on the annotated element.
+     * Get all values for the given annotation that are directly declared on the annotated element.
      *
      * @param annotationClass The annotation name
      * @param <T> The annotation type
@@ -233,7 +233,7 @@ public interface AnnotationSource {
     }
 
     /**
-     * Get all of the values for the given annotation that are directly declared on the annotated element.
+     * Get all values for the given annotation that are directly declared on the annotated element.
      *
      * @param annotation The annotation name
      * @param <T> The annotation type

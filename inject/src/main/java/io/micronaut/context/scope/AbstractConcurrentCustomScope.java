@@ -51,7 +51,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
 
     /**
      * A custom scope annotation.
-     * 
+     *
      * @param annotationType The annotation type
      */
     protected AbstractConcurrentCustomScope(Class<A> annotationType) {
@@ -98,7 +98,7 @@ public abstract class AbstractConcurrentCustomScope<A extends Annotation> implem
     /**
      * Destroys the scope.
      *
-     * @param scopeMap Th scope map
+     * @param scopeMap The scope map
      */
     protected void destroyScope(@Nullable Map<BeanIdentifier, CreatedBean<?>> scopeMap) {
         w.lock();

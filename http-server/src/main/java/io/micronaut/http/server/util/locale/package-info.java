@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * Micronaut utilities to resolve a {@link java.util.Locale} for an HTTP request.
+ * Micronaut's utilities to resolve a {@link java.util.Locale} for an HTTP request.
  *
  * @author Sergio del Amo
  * @since 1.0

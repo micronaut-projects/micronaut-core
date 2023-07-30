@@ -585,11 +585,11 @@ public class UriTemplate implements Comparable<UriTemplate> {
      */
     protected static class UriTemplateParser {
         private static final int STATE_TEXT = 0; // raw text
-        private static final int STATE_VAR_START = 1; // the start of a URI variable ie. {
-        private static final int STATE_VAR_CONTENT = 2; // within a URI variable. ie. {var}
-        private static final int STATE_VAR_NEXT = 11; // within the next variable in a URI variable declaration ie. {var, var2}
-        private static final int STATE_VAR_MODIFIER = 12; // within a variable modifier ie. {var:1}
-        private static final int STATE_VAR_NEXT_MODIFIER = 13; // within a variable modifier of a next variable ie. {var, var2:1}
+        private static final int STATE_VAR_START = 1; // the start of a URI variable i.e. {
+        private static final int STATE_VAR_CONTENT = 2; // within a URI variable. i.e. {var}
+        private static final int STATE_VAR_NEXT = 11; // within the next variable in a URI variable declaration i.e. {var, var2}
+        private static final int STATE_VAR_MODIFIER = 12; // within a variable modifier i.e. {var:1}
+        private static final int STATE_VAR_NEXT_MODIFIER = 13; // within a variable modifier of a next variable i.e. {var, var2:1}
         String templateText;
         private int state = STATE_TEXT;
         private char operator = OPERATOR_NONE; // zero means no operator

@@ -83,7 +83,7 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
     }
 
     /**
-     * Returns whether this type is a wrapper type that wraps the actual type such as a Optional or a Response wrapper.
+     * Returns whether this type is a wrapper type that wraps the actual type such as an Optional or a Response wrapper.
      *
      * @return True if it is a wrapper type.
      * @since 2.4.0
@@ -101,7 +101,7 @@ public interface TypeInformation<T> extends TypeVariableResolver, AnnotationMeta
     }
 
     /**
-     * @return Is the return the return type a reactive completable type.
+     * @return Is the return type a reactive completable type.
      * @since 2.0.0
      */
     default boolean isCompletable() {

@@ -726,8 +726,8 @@ class AnnotationClassReader {
      * @param offset a bytecode offset in a method.
      * @param labels the already created labels, indexed by their offset. If a
      *               label already exists for offset this method must not create a
-     *               new one. Otherwise it must store the new label in this array.
-     * @return a non null Label, which must be equal to labels[offset].
+     *               new one. Otherwise, it must store the new label in this array.
+     * @return a non-null Label, which must be equal to labels[offset].
      */
     protected Label readLabel(int offset, Label[] labels) {
         // SPRING PATCH: leniently handle offset mismatch

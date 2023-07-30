@@ -612,7 +612,7 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
-     * Get a {@link ClassElement} instance corresponding to this type, but with the given type arguments. This is best
+     * Get a {@link ClassElement} instance corresponding to this type, but with the given type arguments. This is the best
      * effort – implementations may only support {@link ClassElement}s that come from the same visitor context, and
      * other {@link ClassElement}s only to a limited degree.
      *
@@ -690,7 +690,7 @@ public interface ClassElement extends TypedElement {
 
     /**
      * Builds a map of all the type parameters for a class, its super classes and interfaces.
-     * The resulting map contains the name of the class to the a map of the resolved generic types.
+     * The resulting map contains the name of the class to the map of the resolved generic types.
      *
      * @return The type arguments for this class element
      */
@@ -716,7 +716,7 @@ public interface ClassElement extends TypedElement {
      * Tests whether one type is assignable to another.
      *
      * @param type The type to check
-     * @return {@code true} if and only if the this type is assignable to the second
+     * @return {@code true} if and only if the type is assignable to the second
      */
     default boolean isAssignable(Class<?> type) {
         return isAssignable(type.getName());

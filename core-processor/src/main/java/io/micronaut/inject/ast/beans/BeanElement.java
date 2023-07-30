@@ -33,7 +33,7 @@ import io.micronaut.inject.visitor.VisitorContext;
 public interface BeanElement extends Element {
 
     /**
-     * Returns all of the injection points for the bean. These
+     * Returns all injection points for the bean. These
      * will be a combination of {@link io.micronaut.inject.ast.FieldElement} and {@link io.micronaut.inject.ast.MethodElement} instances.
      *
      * @return The injection points for the bean.

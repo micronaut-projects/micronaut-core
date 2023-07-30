@@ -81,7 +81,7 @@ public interface TypeElementVisitor<C, E> extends Ordered, Toggleable {
     }
 
     /**
-     * Executed when a enum constant is encountered that matches the {@literal <}E{@literal >} generic.
+     * Executed when an enum constant is encountered that matches the {@literal <}E{@literal >} generic.
      *
      * @param element The element
      * @param context The visitor context

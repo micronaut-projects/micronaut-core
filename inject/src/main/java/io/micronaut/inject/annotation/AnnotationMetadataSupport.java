@@ -269,7 +269,7 @@ public final class AnnotationMetadataSupport {
     }
 
     /**
-     * Registers a annotation type.
+     * Registers an annotation type.
      *
      * @param annotationClassValue the annotation class value
      */

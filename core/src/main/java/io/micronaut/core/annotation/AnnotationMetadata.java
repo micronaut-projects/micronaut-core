@@ -103,7 +103,7 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
-     * Resolve all of the annotation names that feature the given stereotype.
+     * Resolve all annotation names that feature the given stereotype.
      *
      * @param stereotype The annotation names
      * @return A set of annotation names
@@ -114,7 +114,7 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
-     * Resolve all of the annotation values that feature the given stereotype.
+     * Resolve all annotation values that feature the given stereotype.
      *
      * @param stereotype The annotation names
      * @param <T> The annotation type
@@ -172,7 +172,7 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
-     * Resolve all of the annotations names for the given stereotype that are declared annotations.
+     * Resolve all annotations names for the given stereotype that are declared annotations.
      *
      * @param stereotype The stereotype
      * @return The declared annotations
@@ -182,7 +182,7 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
-     * Get all of the values for the given annotation and type of the underlying values.
+     * Get all values for the given annotation and type of the underlying values.
      *
      * @param annotation The annotation name
      * @param valueType  valueType
@@ -194,7 +194,7 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
-     * Get all of the values for the given annotation and type of the underlying values.
+     * Get all values for the given annotation and type of the underlying values.
      *
      * @param annotation The annotation name
      * @return An immutable map of values
@@ -632,7 +632,7 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
-     * Get all of the values for the given annotation.
+     * Get all values for the given annotation.
      *
      * @param annotation The annotation name
      * @param valueType  valueType
@@ -647,7 +647,7 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
-     * Resolve all of the annotation names that feature the given stereotype.
+     * Resolve all annotation names that feature the given stereotype.
      *
      * @param stereotype The annotation names
      * @return A set of annotation names
@@ -658,7 +658,7 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
-     * Resolve all of the annotation names that feature the given stereotype.
+     * Resolve all annotation names that feature the given stereotype.
      *
      * @param stereotype The annotation names
      * @return A set of annotation names
@@ -668,7 +668,7 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
-     * Resolve all of the annotation names that feature the given stereotype.
+     * Resolve all annotation names that feature the given stereotype.
      *
      * @param stereotype The annotation names
      * @return A set of annotation names
@@ -689,7 +689,7 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
-     * Resolve all of the annotation names that feature the given stereotype.
+     * Resolve all annotation names that feature the given stereotype.
      *
      * @param stereotype The annotation names
      * @param classLoader The classloader to load annotation type

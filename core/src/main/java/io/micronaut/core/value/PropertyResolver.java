@@ -114,7 +114,7 @@ public interface PropertyResolver extends ValueResolver<String> {
     }
 
     /**
-     * Return all the properties under the given key. By default Micronaut stores keys in keb-case, such that normalized lookups
+     * Return all the properties under the given key. By default, Micronaut stores keys in keb-case, such that normalized lookups
      * are more efficient. You can obtain the raw key values by passing in {@link StringConvention#RAW}.
      *
      * @param name The name

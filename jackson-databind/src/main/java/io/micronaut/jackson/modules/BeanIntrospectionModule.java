@@ -947,7 +947,7 @@ public class BeanIntrospectionModule extends SimpleModule {
                 return;
             }
             Object value = beanProperty.get(bean);
-            // Null (etc) handling; copied from super-class impl
+            // Null (etc.) handling; copied from super-class impl
             if (value == null) {
                 boolean willSuppressNulls = willSuppressNulls();
                 if (!willSuppressNulls && _nullSerializer != null) {
@@ -1004,7 +1004,7 @@ public class BeanIntrospectionModule extends SimpleModule {
             }
 
             Object value = beanProperty.get(bean);
-            // Null (etc) handling; copied from super-class impl
+            // Null (etc.) handling; copied from super-class impl
             if (value == null) {
                 boolean willSuppressNulls = willSuppressNulls();
                 if (!willSuppressNulls && _nullSerializer != null) {

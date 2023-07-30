@@ -110,7 +110,7 @@ public final class AnnotationClassValue<T> implements CharSequence, Named {
     }
 
     /**
-     * Return whether the class value is instantiated. Normally this is the same as using isPresent on {@link #getInstance()}, except at compilation time where instances are not instantiated.
+     * Return whether the class value is instantiated. Normally this is the same as using isPresent on {@link #getInstance()}, except at compilation time when instances are not instantiated.
      *
      * @return Whether this class value is instantiated
      * @since 1.1

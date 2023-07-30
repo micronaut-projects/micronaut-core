@@ -209,7 +209,7 @@ public interface RouteBuilder {
      * @param originatingClass The class where the error originates from
      * @param error            The error type
      * @param type             The type to route to
-     * @param method           The method THe method to route to
+     * @param method           The method to route to
      * @param parameterTypes   The parameter types for the target method
      * @return The route
      */

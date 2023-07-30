@@ -14,7 +14,7 @@ micronaut:
           - http://foo2
 ----
 
-You can then inject a client with `@Client("foo")` and it will use the above configuration to load balance between the two configured servers.
+You can then inject a client with `@Client("foo")`, and it will use the above configuration to load balance between the two configured servers.
 
 IMPORTANT: When using `@Client` with service discovery, the service id must be specified in the annotation in kebab-case. The configuration in the example above however can be in camel case.
 

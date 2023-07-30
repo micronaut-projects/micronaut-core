@@ -1,4 +1,4 @@
-A Micronaut controller action produces `application/json` by default. However you can change the `Content-Type` of the response with the `@Produces` annotation or the `produces` member of the HTTP method annotations.
+A Micronaut controller action produces `application/json` by default. However, you can change the `Content-Type` of the response with the `@Produces` annotation or the `produces` member of the HTTP method annotations.
 
 snippet::io.micronaut.docs.server.response.ProducesController[tags="imports,clazz", indent=0]
 

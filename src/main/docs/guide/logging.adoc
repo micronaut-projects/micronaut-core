@@ -1,1 +1,1 @@
-The Micronaut framework uses https://www.slf4j.org/[Slf4j] to log messages. The default implementation for applications created via Micronaut Launch is https://logback.qos.ch/[Logback]. Any other Slf4j implementation is supported however.
+The Micronaut framework uses https://www.slf4j.org/[Slf4j] to log messages. The default implementation for applications created via Micronaut Launch is https://logback.qos.ch/[Logback]. Any other Slf4j implementation is supported, however.

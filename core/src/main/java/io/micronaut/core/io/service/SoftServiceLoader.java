@@ -142,7 +142,7 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
     }
 
     /**
-     * @param alternative An alternative type to use if the this type is not present
+     * @param alternative An alternative type to use if this type is not present
      * @param classLoader The classloader
      * @return Return the first such instance
      */

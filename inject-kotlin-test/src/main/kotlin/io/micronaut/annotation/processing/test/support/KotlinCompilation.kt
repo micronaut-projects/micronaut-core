@@ -348,7 +348,7 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 				addAll(kotlinSources)
 			}
 			else {
-				/* __HACK__: The K2JVMCompiler expects at least one Kotlin source file or it will crash.
+				/* __HACK__: The K2JVMCompiler expects at least one Kotlin source file, or it will crash.
                    We still need kapt to run even if there are no Kotlin sources because it executes APs
                    on Java sources as well. Alternatively we could call the JavaCompiler instead of kapt
                    to do annotation processing when there are only Java sources, but that's quite a lot
@@ -397,7 +397,7 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 	}
 
 	/**
-	 * 	Base javac arguments that only depend on the the arguments given by the user
+	 * 	Base javac arguments that only depend on the arguments given by the user
 	 *  Depending on which compiler implementation is actually used, more arguments
 	 *  may be added
 	 */
@@ -420,7 +420,7 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 
 		addAll(javacArguments)
 
-		// also add class output path to javac classpath so it can discover
+		// also add class output path to javac classpath, so it can discover
 		// already compiled Kotlin classes
 		addAll("-cp", (commonClasspaths() + classesDir)
 			    .joinToString(File.pathSeparator, transform = File::getAbsolutePath))
@@ -435,7 +435,7 @@ class KotlinCompilation : AbstractKotlinCompilation<K2JVMCompilerArguments>() {
 			return ExitCode.OK
 
         if(jdkHome != null && jdkHome!!.canonicalPath != processJdkHome.canonicalPath) {
-            /* If a JDK home is given, try to run javac from there so it uses the same JDK
+            /* If a JDK home is given, try to run javac from there, so it uses the same JDK
                as K2JVMCompiler. Changing the JDK of the system java compiler via the
                "--system" and "-bootclasspath" options is not so easy.
                If the jdkHome is the same as the current process, we still run an in process compilation because it is

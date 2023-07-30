@@ -2,8 +2,8 @@ At this point, you may be wondering how Micronaut framework performs the above d
 
 The key is a set of AST transformations (for Groovy) and annotation processors (for Java) that generate classes that implement the link:{api}/io/micronaut/inject/BeanDefinition.html[BeanDefinition] interface.
 
-Micronaut framework uses the ASM bytecode library to generate classes, and because Micronaut knows ahead of time the injection points, there is no need to scan all of the methods, fields, constructors, etc. at runtime like other frameworks such as Spring do.
+Micronaut framework uses the ASM bytecode library to generate classes, and because Micronaut knows ahead of time the injection points, there is no need to scan all methods, fields, constructors, etc. at runtime like other frameworks such as Spring do.
 
 Also, since reflection is not used when constructing the bean, the JVM can inline and optimize the code far better, resulting in better runtime performance and reduced memory consumption. This is particularly important for non-singleton scopes where application performance depends on bean creation performance.
 
-In addition, with Micronaut framework your application startup time and memory consumption are not affected by the size of your codebase in the same way as with a framework that uses reflection. Reflection-based IoC frameworks load and cache reflection data for every single field, method, and constructor in your code. Thus as your code grows in size so do your memory requirements, whilst with Micronaut this is not the case.
+In addition, with Micronaut framework your application startup time and memory consumption are not affected by the size of your codebase in the same way as with a framework that uses reflection. Reflection-based IoC frameworks load and cache reflection data for every single field, method, and constructor in your code. Thus, as your code grows in size so do your memory requirements, whilst with Micronaut this is not the case.

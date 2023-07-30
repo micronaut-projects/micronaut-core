@@ -48,7 +48,7 @@ public interface PropertySource extends Iterable<String>, Ordered {
     Object get(String key);
 
     /**
-     * @return Whether the property source has upper case under score separated keys
+     * @return Whether the property source has upper case underscore separated keys
      */
     default PropertyConvention getConvention() {
         return PropertyConvention.JAVA_PROPERTIES;
@@ -151,7 +151,7 @@ public interface PropertySource extends Iterable<String>, Ordered {
     enum PropertyConvention {
 
         /**
-         * Upper case separated by under scores (environment variable style).
+         * Upper case separated by underscores (environment variable style).
          */
         ENVIRONMENT_VARIABLE,
 

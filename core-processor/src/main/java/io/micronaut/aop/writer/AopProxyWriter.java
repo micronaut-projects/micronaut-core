@@ -490,7 +490,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     /**
-     * Visit a abstract method that is to be implemented.
+     * Visit an abstract method that is to be implemented.
      *
      * @param declaringBean The declaring bean of the method.
      * @param methodElement The method element
@@ -971,7 +971,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                     MethodRef methodRef = iterator.next();
 
                     // The following will initialize the array of $proxyMethod instances
-                    // Eg. this.$proxyMethods[0] = $PARENT_BEAN.getRequiredMethod("test", new Class[]{String.class});
+                    // E.g. this.$proxyMethods[0] = $PARENT_BEAN.getRequiredMethod("test", new Class[]{String.class});
                     proxyConstructorGenerator.loadThis();
 
                     // Step 1: dereference the array - this.$proxyMethods[0]
@@ -1024,7 +1024,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                                 executableMethodsDefinitionWriter.isInterface(methodIndex) && !executableMethodsDefinitionWriter.isDefault(methodIndex)));
 
                 // The following will initialize the array of $proxyMethod instances
-                // Eg. this.proxyMethods[0] = new $blah0();
+                // E.g. this.proxyMethods[0] = new $blah0();
                 proxyConstructorGenerator.loadThis();
                 proxyConstructorGenerator.getField(proxyType, FIELD_PROXY_METHODS, FIELD_TYPE_PROXY_METHODS);
                 proxyConstructorGenerator.push(i);
@@ -1572,7 +1572,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
     private void pushResolveInterceptorsCall(GeneratorAdapter proxyConstructorGenerator, int i, boolean isIntroduction) {
         // The following will initialize the array of interceptor instances
-        // eg. this.interceptors[0] = InterceptorChain.resolveAroundInterceptors(beanContext, proxyMethods[0], interceptors);
+        // e.g. this.interceptors[0] = InterceptorChain.resolveAroundInterceptors(beanContext, proxyMethods[0], interceptors);
         proxyConstructorGenerator.loadThis();
         proxyConstructorGenerator.getField(proxyType, FIELD_INTERCEPTORS, FIELD_TYPE_INTERCEPTORS);
         proxyConstructorGenerator.push(i);
@@ -1580,13 +1580,13 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         // First argument. The bean context
         proxyConstructorGenerator.loadArg(beanContextArgumentIndex);
 
-        // Second argument ie. proxyMethods[0]
+        // Second argument i.e. proxyMethods[0]
         proxyConstructorGenerator.loadThis();
         proxyConstructorGenerator.getField(proxyType, FIELD_PROXY_METHODS, FIELD_TYPE_PROXY_METHODS);
         proxyConstructorGenerator.push(i);
         proxyConstructorGenerator.visitInsn(AALOAD);
 
-        // Third argument ie. interceptors
+        // Third argument i.e. interceptors
         proxyConstructorGenerator.loadArg(interceptorArgumentIndex);
         if (isIntroduction) {
             proxyConstructorGenerator.invokeStatic(TYPE_INTERCEPTOR_CHAIN, Method.getMethod(RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD));

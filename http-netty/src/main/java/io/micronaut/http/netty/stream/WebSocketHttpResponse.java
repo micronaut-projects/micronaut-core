@@ -22,7 +22,7 @@ import org.reactivestreams.Processor;
 
 /**
  * Combines {@link HttpResponse} and {@link Processor}
- * into one message. So it represents an http response with a processor that can handle
+ * into one message. So it represents a http response with a processor that can handle
  * a WebSocket.
  *
  * This is only used for server side responses. For client side websocket requests, it's

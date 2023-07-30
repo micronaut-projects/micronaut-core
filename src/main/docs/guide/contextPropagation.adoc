@@ -14,7 +14,7 @@ include::{testsuitejava}/propagation/MdcPropagationContext.java[tags="class"]
 <3> The previous state is captured to be restored
 <3> The previous state is restored
 
-In this example, the propagated context element implements the setting of the MDC context and it restores it after.
+In this example, the propagated context element implements the setting of the MDC context, and it restores it after.
 
 NOTE: The api:core.propagation.ThreadPropagatedContextElement[] is inspired by Kotlin Coroutines propagation API element `kotlinx.coroutines.ThreadContextElement`
 

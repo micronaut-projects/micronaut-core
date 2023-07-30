@@ -18,7 +18,7 @@ package io.micronaut.http.multipart;
 import io.micronaut.http.exceptions.HttpException;
 
 /**
- * Exception thrown during multi part handling.
+ * Exception thrown during multipart handling.
  *
  * @author Graeme Rocher
  * @since 1.0

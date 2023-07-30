@@ -14,7 +14,7 @@ repositories {
 ----
 
 <1> Micronaut releases are available on Maven Central
-<2> Micronaut snapshots are available on Sonatype OSS Snapshots
+<2> Micronaut's snapshots are available on Sonatype OSS Snapshots
 
 In the case of Maven, edit `pom.xml`:
 
@@ -46,6 +46,6 @@ In the case of Maven, edit `pom.xml`:
 
 ----
 <1> Set the snapshot version.
-<2> Micronaut snapshots are available on Sonatype OSS Snapshots
+<2> Micronaut's snapshots are available on Sonatype OSS Snapshots
 
 NOTE: Previously snapshots were published to Bintray, however due to JFrog shutting the service down, snapshots are now being published to Sonatype.

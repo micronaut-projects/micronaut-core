@@ -50,4 +50,4 @@ snippet::io.micronaut.docs.server.request.MessageController[tags="imports,class,
 <1> The Mono is created with a reference to the context
 <2> The request is retrieved from the context
 
-Using the context to retrieve the request is the best approach for reactive flows because Project Reactor propagates the context and it does not rely on a thread local like api:io.micronaut.http.context.ServerRequestContext[].
+Using the context to retrieve the request is the best approach for reactive flows because Project Reactor propagates the context, and it does not rely on a thread local like api:io.micronaut.http.context.ServerRequestContext[].

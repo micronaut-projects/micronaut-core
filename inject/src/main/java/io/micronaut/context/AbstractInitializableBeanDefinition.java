@@ -931,7 +931,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     /**
-     * Sets the value of a field of a object that requires reflection.
+     * Sets the value of a field of an object that requires reflection.
      *
      * @param resolutionContext The resolution context
      * @param context           The object context
@@ -1888,7 +1888,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     /**
-     * Obtains a an optional for the field at the given index and the argument at the given index
+     * Obtains an optional for the field at the given index and the argument at the given index
      * <p>
      * Warning: this method is used by internal generated code and should not be called by user code.
      *
@@ -2273,7 +2273,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     private <R> boolean isEachBeanParent(Argument<R> argument) {
-        // treat an each bean declaration like an inner configuration
+        // treat each bean declaration like an inner configuration
         Class<?> t = getAnnotationMetadata().classValue(EachBean.class).orElse(null);
         return t != null && t.equals(argument.getType());
     }

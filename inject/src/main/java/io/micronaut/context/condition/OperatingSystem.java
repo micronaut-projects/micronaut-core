@@ -76,7 +76,7 @@ public final class OperatingSystem {
     }
 
     /**
-     * @return <code>true</code> if the current operating system is in the Mac OS family.
+     * @return <code>true</code> if the current operating system is in the macOS family.
      */
     public boolean isMacOs() {
         return family == Family.MAC_OS;

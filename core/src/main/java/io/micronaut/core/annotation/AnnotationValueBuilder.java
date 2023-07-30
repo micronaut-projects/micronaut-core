@@ -764,7 +764,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
 
     /**
      * Adds the members from the provided map. All values must be primitives, enums,
-     * strings, annotation values, or an array of any of the previous types.
+     * strings, annotation values, or an array of the previous types.
      *
      * @param members The map of members
      * @return This builder

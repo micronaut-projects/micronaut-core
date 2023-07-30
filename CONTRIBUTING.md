@@ -83,11 +83,11 @@ In this case, to fix the issues, we need to:
 - Add a space after `if` in line 34
 
 The plugin also adds a new tab in IDEA's bottom view pane to run a checkstyle report to display errors and warnings.
-Run the report and fix any exposed issues before submitting a pull request. The gradle `check` task also produces a HTML report if there are errors.
+Run the report and fix any exposed issues before submitting a pull request. The gradle `check` task also produces an HTML report if there are errors.
 
 ## Building on Windows 10
 
 The following prerequisites are needed for building and testing on Windows 10:
 
 * Docker Desktop version 2.0.0.0 win81 build 29211 or higher is installed and running.
-* OpenSSL binaries are installed, for example (https://indy.fulgan.com/SSL/) and on the PATH.
+* OpenSSL's binaries are installed, for example (https://indy.fulgan.com/SSL/) and on the PATH.

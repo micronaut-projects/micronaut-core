@@ -23,7 +23,7 @@ The following example demonstrates how the annotation might be applied to a spec
 snippet::io.micronaut.docs.http.server.cors.CorsController[tags="imports,controller", indent=0, title="@CrossOrigin Example"]
 
 <1> The ann:http.server.cors.CrossOrigin[] annotation is applied to a specific endpoint, making the CORS configuration fine-grained.
-<2> The `GET /hello` endpoint has "https://myui.com" as an allowed cross origin endpoint
+<2> The `GET /hello` endpoint has "https://myui.com" as an allowed cross-origin endpoint
 <3> The `GET /hello/nocors` endpoint cannot use "https://myui.com" as an origin, since it doesn't have a CORS configuration that allows it.
 
 NOTE: The `@CrossOrigin` annotation uses the same defaults as the application configuration alternative, when corresponding annotation attributes are not set. See <<corsConfiguration, CORS configuration>> for details.

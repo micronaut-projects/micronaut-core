@@ -26,7 +26,7 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * Stereotype meta-annotation applied to all WebSocket related annotations such as {@link OnOpen}, {@link OnMessage} etc..
+ * Stereotype meta-annotation applied to all WebSocket related annotations such as {@link OnOpen}, {@link OnMessage} etc.
  *
  * @author graemerocher
  * @since 1.0

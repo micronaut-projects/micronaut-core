@@ -259,7 +259,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider {
     }
 
     /**
-     * @return The default amount of time to allow write operation connections to remain idle
+     * @return The default amount of time to allow to write operation connections to remain idle
      */
     public Duration getWriteIdleTimeout() {
         return Optional.ofNullable(writeIdleTimeout).orElse(Duration.ofMinutes(DEFAULT_WRITE_IDLE_TIME_MINUTES));

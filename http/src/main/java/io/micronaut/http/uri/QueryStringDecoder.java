@@ -268,7 +268,7 @@ final class QueryStringDecoder {
     }
 
     /**
-     * Decodes a bit of an URL encoded by a browser.
+     * Decodes a bit of a URL encoded by a browser.
      * <p>
      * This is equivalent to calling {@link #decodeComponent(String, Charset)}
      * with the UTF-8 charset (recommended to comply with RFC 3986, Section 2).
@@ -283,7 +283,7 @@ final class QueryStringDecoder {
     }
 
     /**
-     * Decodes a bit of an URL encoded by a browser.
+     * Decodes a bit of a URL encoded by a browser.
      * <p>
      * The string is expected to be encoded as per RFC 3986, Section 2.
      * This is the encoding used by JavaScript functions {@code encodeURI}

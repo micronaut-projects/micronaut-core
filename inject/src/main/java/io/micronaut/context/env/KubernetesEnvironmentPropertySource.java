@@ -27,7 +27,7 @@ import static io.micronaut.context.env.EnvironmentPropertySource.getEnv;
 /**
  * A property source specific for the Kubernetes environment.
  *
- * It excludes Kubernetes-specific environment variables (like FOO_SERVICE_HOST, FOO_SERVICE_PORT, etc) since they would
+ * It excludes Kubernetes-specific environment variables (like FOO_SERVICE_HOST, FOO_SERVICE_PORT, etc.) since they would
  * slow down application startup
  *
  * @author Nilson Pontello
