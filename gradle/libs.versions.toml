@@ -56,7 +56,7 @@ wiremock = "2.33.2"
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
-managed-groovy = "4.0.12"
+managed-groovy = "4.0.13"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "2.15.1"
 managed-jackson-databind = "2.15.2"
