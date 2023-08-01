@@ -148,6 +148,7 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
                 BeanDefinitionProcessor.handleProcessingException(environment, e)
             } catch (e: Throwable) {
                 environment.logger.error("Error finalizing type visitor  [${loadedVisitor.visitor}]: ${e.message}")
+                environment.logger.exception(e)
             }
         }
         processed.clear()

@@ -16,6 +16,7 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -32,6 +33,7 @@ import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
+import io.micronaut.inject.ast.KotlinParameterElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
@@ -559,10 +561,17 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
             );
 
             String argumentName = entry.getName();
-            AnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(
+            MutableAnnotationMetadata annotationMetadata = new AnnotationMetadataHierarchy(
                 entry.getAnnotationMetadata(),
                 genericType.getTypeAnnotationMetadata()
             ).merge();
+
+            if (entry instanceof KotlinParameterElement kp && kp.hasDefault()) {
+                annotationMetadata.removeAnnotation(AnnotationUtil.NON_NULL);
+                annotationMetadata.addAnnotation(AnnotationUtil.NULLABLE, Map.of());
+                annotationMetadata.addDeclaredAnnotation(AnnotationUtil.NULLABLE, Map.of());
+            }
+
             Map<String, ClassElement> typeArguments = genericType.getTypeArguments();
             pushCreateArgument(
                     annotationMetadataWithDefaults,

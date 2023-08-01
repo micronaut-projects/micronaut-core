@@ -35,6 +35,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.KotlinParameterElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -784,20 +785,11 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                 methodName,
                 desc);
 
-        invokeBeanConstructor(instantiateInternal, constructor, (writer, con) -> {
-            List<ParameterElement> constructorArguments = Arrays.asList(con.getParameters());
-            Collection<Type> argumentTypes = constructorArguments.stream().map(pe ->
-                JavaModelUtils.getTypeReference(pe.getType())
-            ).toList();
-
-            int i = 0;
-            for (Type argumentType : argumentTypes) {
-                writer.loadArg(0);
-                writer.push(i++);
-                writer.arrayLoad(TYPE_OBJECT);
-                pushCastToType(writer, argumentType);
-            }
-
+        invokeBeanConstructor(instantiateInternal, constructor, true, (index, parameter) -> {
+            instantiateInternal.loadArg(0);
+            instantiateInternal.push(index);
+            instantiateInternal.arrayLoad(TYPE_OBJECT);
+            pushCastToType(instantiateInternal, JavaModelUtils.getTypeReference(parameter.getType()));
         });
 
         instantiateInternal.returnValue();
@@ -805,14 +797,40 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         instantiateInternal.visitEnd();
     }
 
-    private void invokeBeanConstructor(GeneratorAdapter writer, MethodElement constructor, BiConsumer<GeneratorAdapter, MethodElement> argumentsPusher) {
+    private void invokeBeanConstructor(GeneratorAdapter writer, MethodElement constructor, boolean allowDefaults, BiConsumer<Integer, ParameterElement> argumentsPusher) {
         boolean isConstructor = constructor instanceof ConstructorElement;
         boolean isCompanion = constructor.getDeclaringType().getSimpleName().endsWith("$Companion");
 
         List<ParameterElement> constructorArguments = Arrays.asList(constructor.getParameters());
         Collection<Type> argumentTypes = constructorArguments.stream().map(pe ->
                 JavaModelUtils.getTypeReference(pe.getType())
-        ).collect(Collectors.toList());
+        ).toList();
+        boolean isKotlinDefault = allowDefaults && constructorArguments.stream().anyMatch(p -> p instanceof KotlinParameterElement kp && kp.hasDefault());
+
+        int maskLocal = -1;
+        if (isKotlinDefault) {
+            // Calculate the Kotlin defaults mask
+            // Every bit indicated true/false if the parameter should have the default value set
+            maskLocal = writer.newLocal(Type.INT_TYPE);
+            writer.push(0);
+            writer.storeLocal(maskLocal);
+            int maskIndex = 1;
+            int paramIndex = 0;
+            for (ParameterElement constructorArgument : constructorArguments) {
+                if (constructorArgument instanceof KotlinParameterElement kp && kp.hasDefault()) {
+                    Label elseLabel = writer.newLabel();
+                    argumentsPusher.accept(paramIndex, constructorArgument);
+                    writer.ifNonNull(elseLabel);
+                    writer.push(maskIndex);
+                    writer.loadLocal(maskLocal, Type.INT_TYPE);
+                    writer.math(GeneratorAdapter.OR, Type.INT_TYPE);
+                    writer.storeLocal(maskLocal);
+                    writer.visitLabel(elseLabel);
+                }
+                maskIndex *= 2;
+                paramIndex++;
+            }
+        }
 
         if (isConstructor) {
             writer.newInstance(beanType);
@@ -821,11 +839,21 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             writer.getStatic(beanType, "Companion", JavaModelUtils.getTypeReference(constructor.getDeclaringType()));
         }
 
-        argumentsPusher.accept(writer, constructor);
+        int index = 0;
+        for (ParameterElement constructorArgument : constructorArguments) {
+            argumentsPusher.accept(index, constructorArgument);
+            index++;
+        }
 
         if (isConstructor) {
             final String constructorDescriptor = getConstructorDescriptor(constructorArguments);
-            writer.invokeConstructor(beanType, new Method("<init>", constructorDescriptor));
+            Method method = new Method("<init>", constructorDescriptor);
+            if (isKotlinDefault) {
+                method = asDefaultKotlinConstructor(method);
+                writer.loadLocal(maskLocal, Type.INT_TYPE); // Bit mask of defaults
+                writer.push((String) null); // Last parameter is just a marker and is always null
+            }
+            writer.invokeConstructor(beanType, method);
         } else if (constructor.isStatic()) {
             final String methodDescriptor = getMethodDescriptor(beanType, argumentTypes);
             Method method = new Method(constructor.getName(), methodDescriptor);
@@ -838,6 +866,15 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         } else if (isCompanion) {
             writer.invokeVirtual(JavaModelUtils.getTypeReference(constructor.getDeclaringType()), new Method(constructor.getName(), getMethodDescriptor(beanType, argumentTypes)));
         }
+    }
+
+    private Method asDefaultKotlinConstructor(Method method) {
+        Type[] argumentTypes = method.getArgumentTypes();
+        int length = argumentTypes.length;
+        Type[] newArgumentTypes = Arrays.copyOf(argumentTypes, length + 2);
+        newArgumentTypes[length] = Type.INT_TYPE;
+        newArgumentTypes[length + 1] = Type.getObjectType("kotlin/jvm/internal/DefaultConstructorMarker");
+        return new Method(method.getName(), method.getReturnType(), newArgumentTypes);
     }
 
     private void writeIntrospectionReference(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
@@ -1061,32 +1098,30 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                 int prevBeanTypeLocal = writer.newLocal(beanType);
                 writer.storeLocal(prevBeanTypeLocal, beanType);
 
-                invokeBeanConstructor(writer, constructor, (constructorWriter, constructor) -> {
-                    for (int i = 0; i < parameters.length; i++) {
-                        ParameterElement parameter = parameters[i];
-                        Object constructorArgument = constructorArguments[i];
-                        boolean isPrimitive;
-                        if (constructorArgument == this) {
-                            constructorWriter.loadArg(2);
-                            isPrimitive = false;
-                        } else if (constructorArgument instanceof MethodElement readMethod) {
-                            constructorWriter.loadLocal(prevBeanTypeLocal, beanType);
-                            invokeMethod(constructorWriter, readMethod);
-                            isPrimitive = readMethod.getReturnType().isPrimitive();
-                        } else if (constructorArgument instanceof FieldElement fieldElement) {
-                            constructorWriter.loadLocal(prevBeanTypeLocal, beanType);
-                            invokeGetField(constructorWriter, fieldElement);
-                            isPrimitive = fieldElement.isPrimitive();
-                        } else {
-                            throw new IllegalStateException();
+                // NOTE: It doesn't make sense to check defaults for the copy constructor
+                invokeBeanConstructor(writer, constructor, false, (paramIndex, parameter) -> {
+                    Object constructorArgument = constructorArguments[paramIndex];
+                    boolean isPrimitive;
+                    if (constructorArgument == this) {
+                        writer.loadArg(2);
+                        isPrimitive = false;
+                    } else if (constructorArgument instanceof MethodElement readMethod) {
+                        writer.loadLocal(prevBeanTypeLocal, beanType);
+                        invokeMethod(writer, readMethod);
+                        isPrimitive = readMethod.getReturnType().isPrimitive();
+                    } else if (constructorArgument instanceof FieldElement fieldElement) {
+                        writer.loadLocal(prevBeanTypeLocal, beanType);
+                        invokeGetField(writer, fieldElement);
+                        isPrimitive = fieldElement.isPrimitive();
+                    } else {
+                        throw new IllegalStateException();
+                    }
+                    if (isPrimitive) {
+                        if (!parameter.isPrimitive()) {
+                            pushBoxPrimitiveIfNecessary(parameter, writer);
                         }
-                        if (isPrimitive) {
-                            if (!parameter.isPrimitive()) {
-                                pushBoxPrimitiveIfNecessary(parameter, constructorWriter);
-                            }
-                        } else {
-                            pushCastToType(constructorWriter, parameter);
-                        }
+                    } else {
+                        pushCastToType(writer, parameter);
                     }
                 });
 
