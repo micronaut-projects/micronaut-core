@@ -16,6 +16,7 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.client.exceptions.ResponseClosedException;
 import io.micronaut.http.netty.reactive.HotObservable;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -45,6 +46,15 @@ abstract class ReactiveClientReader extends ChannelInboundHandlerAdapter impleme
     public final void handlerAdded(ChannelHandlerContext ctx) throws Exception {
         this.ctx = ctx;
         eventLoop = ctx.channel().eventLoop();
+    }
+
+    @Override
+    public final void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        super.channelInactive(ctx);
+        if (!cancelled) {
+            cancelled = true;
+            subscriber.onError(new ResponseClosedException("Connection closed before full response body was transferred"));
+        }
     }
 
     @Override

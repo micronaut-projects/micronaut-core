@@ -67,6 +67,7 @@ import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.exceptions.NoHostException;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
+import io.micronaut.http.client.exceptions.ResponseClosedException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.filter.DefaultHttpClientFilterResolver;
 import io.micronaut.http.client.filters.ClientServerContextFilter;
@@ -183,7 +184,6 @@ import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.channels.ClosedChannelException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -2059,7 +2059,7 @@ public class DefaultHttpClient implements
         @Override
         public void channelInactive(ChannelHandlerContext ctx) throws Exception {
             // connection became inactive before this handler was removed (i.e. before channelRead)
-            responsePromise.tryFailure(new ClosedChannelException());
+            responsePromise.tryFailure(new ResponseClosedException("Connection closed before response was received"));
             ctx.fireChannelInactive();
         }
 
