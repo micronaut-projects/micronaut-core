@@ -25,6 +25,7 @@ import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -85,6 +86,11 @@ class EnvironmentAnnotationValue<A extends Annotation> extends AnnotationValue<A
             return o;
         } : null);
         this.environment = environment;
+    }
+
+    @Override
+    protected Function<Object, Object> getValueMapper() {
+        return super.getValueMapper();
     }
 
     @Override

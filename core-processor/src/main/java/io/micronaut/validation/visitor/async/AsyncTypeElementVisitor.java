@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.scheduling.async.validation;
+package io.micronaut.validation.visitor.async;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -22,19 +22,26 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.scheduling.annotation.Async;
 import org.reactivestreams.Publisher;
 
+import java.util.Set;
 import java.util.concurrent.CompletionStage;
 
 /**
- * A {@link TypeElementVisitor} that validates methods annotated with {@link Async} return void or futures.
+ * A {@link TypeElementVisitor} that validates methods annotated with {@code @˚Async} return void or futures.
  *
  * @author graemerocher
  * @since 1.0
  */
 @Internal
-public final class AsyncTypeElementVisitor implements TypeElementVisitor<Object, Async> {
+public final class AsyncTypeElementVisitor implements TypeElementVisitor<Object, Object> {
+
+    private static final String ANN = "io.micronaut.scheduling.annotation.Async";
+
+    @Override
+    public Set<String> getSupportedAnnotationNames() {
+        return Set.of(ANN);
+    }
 
     @NonNull
     @Override
@@ -44,14 +51,16 @@ public final class AsyncTypeElementVisitor implements TypeElementVisitor<Object,
 
     @Override
     public void visitMethod(MethodElement element, VisitorContext context) {
-        ClassElement returnType = element.getReturnType();
-        boolean isValid = returnType != null &&
+        if (element.hasDeclaredAnnotation(ANN)) {
+            ClassElement returnType = element.getReturnType();
+            boolean isValid = returnType != null &&
                 (returnType.isAssignable(CompletionStage.class) || returnType.isAssignable(void.class) ||
-                        returnType.isAssignable(Publisher.class) ||
-                        Publishers.getKnownReactiveTypes().stream().anyMatch(returnType::isAssignable));
+                    returnType.isAssignable(Publisher.class) ||
+                    Publishers.getKnownReactiveTypes().stream().anyMatch(returnType::isAssignable));
 
-        if (!isValid) {
-            context.fail("Method must return void, a Reactive Streams type or a subtype of CompletionStage", element);
+            if (!isValid) {
+                context.fail("Method must return void, a Reactive Streams type or a subtype of CompletionStage", element);
+            }
         }
     }
 }

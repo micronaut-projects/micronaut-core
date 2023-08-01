@@ -76,5 +76,13 @@ class TimeConverterRegistrarSpec extends Specification {
         "2022-08-12T12:19:00+05:00"                | ZonedDateTime  | ZonedDateTime.of(2022, 8, 12, 12, 19, 0, 0, ZoneOffset.ofHours(5))
         "2022-08-12T12:19:00+02:00[Europe/Berlin]" | ZonedDateTime  | ZonedDateTime.of(2022, 8, 12, 12, 19, 0, 0, ZoneId.of("Europe/Berlin"))
         "2022-08-12T12:19:00Z"                     | Instant        | LocalDateTime.of(2022, 8, 12, 12, 19).toInstant(ZoneOffset.UTC)
+
+        LocalDate.of(2022, 8, 12)                                               | String | "2022-08-12"
+        LocalDateTime.of(2022, 8, 12, 12, 19)                                   | String | "2022-08-12T12:19:00"
+        OffsetTime.of(12, 19, 0, 0, ZoneOffset.ofHours(5))                      | String | "12:19:00+05:00"
+        OffsetDateTime.of(2022, 8, 12, 12, 19, 0, 0, ZoneOffset.ofHours(5))     | String | "2022-08-12T12:19:00+05:00"
+        ZonedDateTime.of(2022, 8, 12, 12, 19, 0, 0, ZoneOffset.ofHours(5))      | String | "2022-08-12T12:19:00+05:00"
+        ZonedDateTime.of(2022, 8, 12, 12, 19, 0, 0, ZoneId.of("Europe/Berlin")) | String | "2022-08-12T12:19:00+02:00[Europe/Berlin]"
+        LocalDateTime.of(2022, 8, 12, 12, 19).toInstant(ZoneOffset.UTC)         | String | "2022-08-12T12:19:00Z"
     }
 }

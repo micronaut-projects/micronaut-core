@@ -11,3 +11,8 @@ snippet::io.micronaut.docs.server.json.PersonController[tags="statusError", inde
 <1> The api:http.annotation.Error[] declares which api:http.HttpStatus[] error code to handle (in this case 404)
 <2> A api:http.hateoas.JsonError[] instance is returned for all 404 responses
 <3> An api:http.HttpStatus#NOT_FOUND[] response is returned
+
+Similar to other controller methods, error handlers can use <<binding, request binding annotations>> on parameters e.g.
+to access header values. However, binding the request body comes with additional restrictions depending on the HTTP
+server implementation used. If the body has already been bound to a parameter of the original controller method, it may
+not be possible to bind the body to a different type, as the original bytes may already have been discarded.

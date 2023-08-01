@@ -37,11 +37,13 @@ ioc:
   events: Bean Events
   introspection:
     title: Bean Introspection
+    makingABeanAvailableForIntrospection: Making a Bean Available for Introspection
     atIntrospected: Use the @Introspected Annotation
     introspectedAccessorsStyle: Use @Introspected with @AccessorsStyle
     accessKind: Bean Fields
     atCreator: Constructor Methods
     staticAtCreator: Static Creator Methods
+    introspectionBuilders: Builders
     introspectionEnums: Introspect Enums
     introspectedAnnotationOnAConfigurationClass: Use the @Introspected Annotation on a Configuration Class
     introspectExistingAnnotations: Write an AnnotationMapper to Introspect Existing Annotations

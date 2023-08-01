@@ -131,6 +131,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * {@code true} iff we should flush on {@link #channelReadComplete}.
      */
     private boolean flushPending = false;
+    /**
+     * {@code true} inside {@link #writeSome()} to avoid reentrancy.
+     */
+    private boolean writing = false;
 
     public PipeliningServerHandler(RequestHandler requestHandler) {
         this.requestHandler = requestHandler;
@@ -265,23 +269,32 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * Write some data if possible.
      */
     private void writeSome() {
-        while (ctx.channel().isWritable()) {
-            // if we have no outboundHandler, check whether the first queued response is ready
-            if (outboundHandler == null) {
-                OutboundAccess next = outboundQueue.peek();
-                if (next != null && next.handler != null) {
-                    outboundQueue.poll();
-                    outboundHandler = next.handler;
-                } else {
-                    return;
+        if (writing) {
+            // already inside writeSome
+            return;
+        }
+        writing = true;
+        try {
+            while (ctx.channel().isWritable()) {
+                // if we have no outboundHandler, check whether the first queued response is ready
+                if (outboundHandler == null) {
+                    OutboundAccess next = outboundQueue.peek();
+                    if (next != null && next.handler != null) {
+                        outboundQueue.poll();
+                        outboundHandler = next.handler;
+                    } else {
+                        return;
+                    }
+                }
+                OutboundHandler oldHandler = outboundHandler;
+                oldHandler.writeSome();
+                if (outboundHandler == oldHandler) {
+                    // handler is not done yet
+                    break;
                 }
             }
-            OutboundHandler oldHandler = outboundHandler;
-            oldHandler.writeSome();
-            if (outboundHandler == oldHandler) {
-                // handler is not done yet
-                break;
-            }
+        } finally {
+            writing = false;
         }
     }
 
@@ -788,6 +801,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         StreamingOutboundHandler(OutboundAccess outboundAccess, HttpResponse initialMessage) {
             super(outboundAccess);
+            if (initialMessage instanceof FullHttpResponse) {
+                throw new IllegalArgumentException("Cannot have a full response as the initial message of a streaming response");
+            }
             this.outboundAccess = outboundAccess;
             this.initialMessage = Objects.requireNonNull(initialMessage, "initialMessage");
         }

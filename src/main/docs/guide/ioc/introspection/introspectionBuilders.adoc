@@ -7,3 +7,5 @@ You can use the `builder()` method of the api:core.beans.BeanIntrospection[] API
 snippet::io.micronaut.docs.ioc.builders.IntrospectionBuilderSpec[tags="builder", indent=0]
 
 TIP: The `builder()` method also works regardless if the type uses a builder and can be used as a general abstraction for object construction. Note however that there is a slight performance overhead vs direct instantiation via the `instantiate()` method, hence the `hasBuilder()` method can be checked if optimized code paths are needed.
+
+NOTE: Introspection Builder does not work with https://groovy-lang.org/metaprogramming.html#xform-Builder[Groovy `@Builder` AST].
