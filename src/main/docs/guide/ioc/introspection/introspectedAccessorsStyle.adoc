@@ -1,0 +1,12 @@
+It is possible to use <<configurationPropertiesAccessorsStyle, the `@AccessorsStyle` annotation>> with `@Introspected`:
+
+snippet::io.micronaut.docs.ioc.introspection.Person[tags="class"]
+
+<1> Annotate the class with `@AccessorsStyle` to define empty read and write prefixes for getters and setters.
+<2> Define the getters and setters without a prefix.
+
+Now it is possible to retrieve the compile time generated introspection using the api:core.beans.BeanIntrospection[] API:
+
+snippet::io.micronaut.docs.ioc.introspection.PersonSpec[tags="usage"]
+
+----

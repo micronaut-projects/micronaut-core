@@ -100,6 +100,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private static final Method COLLECTIONS_EMPTY_LIST = Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(Collections.class, "emptyList")
     );
+    private static final String METHOD_IS_BUILDABLE = "isBuildable";
 
     private final ClassWriter referenceWriter;
     private final String introspectionName;
@@ -574,14 +575,27 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         dispatchWriter.buildGetTargetMethodByIndex(classWriter);
         buildFindIndexedProperty(classWriter);
         buildGetIndexedProperties(classWriter);
-
+        boolean hasBuilder = annotationMetadata != null && annotationMetadata.isPresent(Introspected.class, "builder");
         if (defaultConstructor != null) {
             writeInstantiateMethod(classWriter, defaultConstructor, "instantiate");
-        }
-        if (constructor != null && ArrayUtils.isNotEmpty(constructor.getParameters())) {
-            writeInstantiateMethod(classWriter, constructor, "instantiateInternal", Object[].class);
+            // in case invoked directly or via instantiateUnsafe
+            if (constructor == null) {
+                writeInstantiateMethod(classWriter, defaultConstructor, "instantiateInternal", Object[].class);
+                writeBooleanMethod(classWriter, METHOD_IS_BUILDABLE, true);
+            }
         }
 
+        if (constructor != null) {
+            if (ArrayUtils.isEmpty(constructor.getParameters())) {
+                writeInstantiateMethod(classWriter, constructor, "instantiate");
+            }
+            writeInstantiateMethod(classWriter, constructor, "instantiateInternal", Object[].class);
+            writeBooleanMethod(classWriter, METHOD_IS_BUILDABLE, true);
+        } else if (defaultConstructor == null) {
+            writeBooleanMethod(classWriter, METHOD_IS_BUILDABLE, hasBuilder);
+        }
+
+        writeBooleanMethod(classWriter, "hasBuilder", hasBuilder);
         for (GeneratorAdapter method : loadTypeMethods.values()) {
             method.visitMaxs(3, 1);
             method.visitEnd();
@@ -592,6 +606,14 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         try (OutputStream outputStream = classWriterOutputVisitor.visitClass(introspectionName, getOriginatingElements())) {
             outputStream.write(classWriter.toByteArray());
         }
+    }
+
+    private void writeBooleanMethod(ClassWriter classWriter, String methodName, boolean state) {
+        GeneratorAdapter booleanMethod = startPublicMethodZeroArgs(classWriter, boolean.class, methodName);
+        booleanMethod.push(state);
+        booleanMethod.returnValue();
+        booleanMethod.visitMaxs(2, 1);
+        booleanMethod.endMethod();
     }
 
     private void buildFindIndexedProperty(ClassWriter classWriter) {
@@ -808,10 +830,10 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             final String methodDescriptor = getMethodDescriptor(beanType, argumentTypes);
             Method method = new Method(constructor.getName(), methodDescriptor);
             if (classElement.isInterface()) {
-                writer.visitMethodInsn(INVOKESTATIC, beanType.getInternalName(), method.getName(),
+                writer.visitMethodInsn(INVOKESTATIC, getTypeReference(constructor.getDeclaringType()).getInternalName(), method.getName(),
                         method.getDescriptor(), true);
             } else {
-                writer.invokeStatic(beanType, method);
+                writer.invokeStatic(getTypeReference(constructor.getDeclaringType()), method);
             }
         } else if (isCompanion) {
             writer.invokeVirtual(JavaModelUtils.getTypeReference(constructor.getDeclaringType()), new Method(constructor.getName(), getMethodDescriptor(beanType, argumentTypes)));
@@ -1007,12 +1029,12 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                     Object member;
                     ClassElement propertyType;
                     DispatchWriter.DispatchTarget dispatchTarget = dispatchWriter.getDispatchTargets().get(readDispatchIndex);
-                    if (dispatchTarget instanceof DispatchWriter.MethodDispatchTarget) {
-                        MethodElement methodElement = ((DispatchWriter.MethodDispatchTarget) dispatchTarget).getMethodElement();
+                    if (dispatchTarget instanceof DispatchWriter.MethodDispatchTarget methodDispatchTarget) {
+                        MethodElement methodElement = methodDispatchTarget.getMethodElement();
                         propertyType = methodElement.getGenericReturnType();
                         member = methodElement;
-                    } else if (dispatchTarget instanceof DispatchWriter.FieldGetDispatchTarget) {
-                        FieldElement field = ((DispatchWriter.FieldGetDispatchTarget) dispatchTarget).getField();
+                    } else if (dispatchTarget instanceof DispatchWriter.FieldGetDispatchTarget fieldGetDispatchTarget) {
+                        FieldElement field = fieldGetDispatchTarget.getField();
                         propertyType = field.getGenericType();
                         member = field;
                     } else {
@@ -1043,22 +1065,27 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                     for (int i = 0; i < parameters.length; i++) {
                         ParameterElement parameter = parameters[i];
                         Object constructorArgument = constructorArguments[i];
+                        boolean isPrimitive;
                         if (constructorArgument == this) {
                             constructorWriter.loadArg(2);
-                            pushCastToType(constructorWriter, parameter);
+                            isPrimitive = false;
+                        } else if (constructorArgument instanceof MethodElement readMethod) {
+                            constructorWriter.loadLocal(prevBeanTypeLocal, beanType);
+                            invokeMethod(constructorWriter, readMethod);
+                            isPrimitive = readMethod.getReturnType().isPrimitive();
+                        } else if (constructorArgument instanceof FieldElement fieldElement) {
+                            constructorWriter.loadLocal(prevBeanTypeLocal, beanType);
+                            invokeGetField(constructorWriter, fieldElement);
+                            isPrimitive = fieldElement.isPrimitive();
+                        } else {
+                            throw new IllegalStateException();
+                        }
+                        if (isPrimitive) {
                             if (!parameter.isPrimitive()) {
                                 pushBoxPrimitiveIfNecessary(parameter, constructorWriter);
                             }
-                        } else if (constructorArgument instanceof MethodElement) {
-                            MethodElement readMethod = (MethodElement) constructorArgument;
-                            constructorWriter.loadLocal(prevBeanTypeLocal, beanType);
-                            invokeMethod(constructorWriter, readMethod);
-                        } else if (constructorArgument instanceof FieldElement) {
-                            FieldElement fieldElement = (FieldElement) constructorArgument;
-                            constructorWriter.loadLocal(prevBeanTypeLocal, beanType);
-                            invokeGetField(constructorWriter, fieldElement);
                         } else {
-                            throw new IllegalStateException();
+                            pushCastToType(constructorWriter, parameter);
                         }
                     }
                 });

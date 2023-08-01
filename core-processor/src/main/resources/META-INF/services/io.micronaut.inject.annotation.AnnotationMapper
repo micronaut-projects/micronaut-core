@@ -6,5 +6,6 @@ io.micronaut.inject.beans.visitor.MappedSuperClassIntrospectionMapper
 io.micronaut.inject.beans.visitor.JsonCreatorAnnotationMapper
 io.micronaut.inject.beans.visitor.persistence.JakartaEntityIntrospectedAnnotationMapper
 io.micronaut.inject.beans.visitor.persistence.JakartaMappedSuperClassIntrospectionMapper
+io.micronaut.inject.beans.visitor.MapperAnnotationMapper
 io.micronaut.aop.mapper.InterceptorBeanMapper
 

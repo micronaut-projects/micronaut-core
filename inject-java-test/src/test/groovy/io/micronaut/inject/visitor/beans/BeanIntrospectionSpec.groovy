@@ -52,7 +52,6 @@ import java.lang.reflect.Field
 import java.time.Instant
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
-
     void "test expressions in introspection properties with type use"() {
         given:
         def introspection = buildBeanIntrospection('mixed.Test', '''

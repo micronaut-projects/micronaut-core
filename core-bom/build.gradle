@@ -12,12 +12,3 @@ micronautBom {
     ]
     propertyName = 'core'
 }
-
-micronautBuild {
-    binaryCompatibility {
-        def dash = version.indexOf('-')
-        def v = dash > 0 ? version.substring(0, dash) : version
-        def (major, minor, patch) = v.split('[.]').collect { it.toInteger() }
-        enabled = major > 4 || (major == 4 && minor > 0) || (major == 4 && minor == 0 && patch > 0)
-    }
-}

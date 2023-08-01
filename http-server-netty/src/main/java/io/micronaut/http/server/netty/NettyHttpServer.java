@@ -326,20 +326,20 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     @Override
     @NonNull
     public synchronized NettyEmbeddedServer stop() {
-        return stop(true);
+        return stop(false);
     }
 
     @Override
     @NonNull
     public NettyEmbeddedServer stopServerOnly() {
-        return stop(false);
+        return stop(true);
     }
 
     @NonNull
-    private NettyEmbeddedServer stop(boolean stopApplicationContext) {
+    private NettyEmbeddedServer stop(boolean stopServerOnly) {
         if (isRunning() && workerGroup != null) {
             if (running.compareAndSet(true, false)) {
-                stopInternal(stopApplicationContext);
+                stopInternal(stopServerOnly);
             }
         }
         return this;
@@ -573,7 +573,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     LOG.error("Error starting Micronaut server: " + e.getMessage(), e);
                 }
             }
-            stopInternal(true);
+            stopInternal(false);
             throw new ServerStartupException("Unable to start Micronaut server on " + displayAddress(cfg), e);
         }
     }
@@ -604,35 +604,40 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     private void logShutdownErrorIfNecessary(Future<?> future) {
-        if (!future.isSuccess()) {
-            if (LOG.isWarnEnabled()) {
-                Throwable e = future.cause();
-                LOG.warn("Error stopping Micronaut server: " + e.getMessage(), e);
-            }
+        if (!future.isSuccess() && LOG.isWarnEnabled()) {
+            Throwable e = future.cause();
+            LOG.warn("Error stopping Micronaut server: " + e.getMessage(), e);
         }
     }
 
-    private void stopInternal(boolean stopApplicationContext) {
+    private void stopInternal(boolean stopServerOnly) {
+        List<Future<?>> futures = new ArrayList<>(2);
         try {
             if (shutdownParent) {
                 EventLoopGroupConfiguration parent = serverConfiguration.getParent();
                 if (parent != null) {
                     long quietPeriod = parent.getShutdownQuietPeriod().toMillis();
                     long timeout = parent.getShutdownTimeout().toMillis();
-                    parentGroup.shutdownGracefully(quietPeriod, timeout, TimeUnit.MILLISECONDS)
-                            .addListener(this::logShutdownErrorIfNecessary);
+                    futures.add(
+                        parentGroup.shutdownGracefully(quietPeriod, timeout, TimeUnit.MILLISECONDS)
+                            .addListener(this::logShutdownErrorIfNecessary)
+                    );
                 } else {
-                    parentGroup.shutdownGracefully()
-                            .addListener(this::logShutdownErrorIfNecessary);
+                    futures.add(
+                        parentGroup.shutdownGracefully()
+                            .addListener(this::logShutdownErrorIfNecessary)
+                    );
                 }
             }
             if (shutdownWorker) {
-                workerGroup.shutdownGracefully()
-                        .addListener(this::logShutdownErrorIfNecessary);
+                futures.add(
+                    workerGroup.shutdownGracefully()
+                        .addListener(this::logShutdownErrorIfNecessary)
+                );
             }
             webSocketSessions.close();
             applicationContext.getEventPublisher(ServerShutdownEvent.class).publishEvent(new ServerShutdownEvent(this));
-            if (isDefault && applicationContext.isRunning() && stopApplicationContext) {
+            if (isDefault && applicationContext.isRunning() && !stopServerOnly) {
                 applicationContext.stop();
             }
             serverConfiguration.getMultipart().getLocation().ifPresent(dir -> DiskFileUpload.baseDirectory = null);
@@ -643,6 +648,20 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 }
             }
             this.activeListeners = null;
+
+            // If we are only stopping the server, we need to wait for the futures to complete otherwise
+            // when CRaC is trying to take a snapshot it will capture objects in flow of shutting down.
+            if (stopServerOnly) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Waiting for graceful shutdown to complete");
+                }
+                for (Future<?> future : futures) {
+                    future.awaitUninterruptibly();
+                }
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Done...");
+                }
+            }
         } catch (Throwable e) {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Error stopping Micronaut server: " + e.getMessage(), e);

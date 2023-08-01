@@ -4,12 +4,6 @@ plugins {
     id "org.jetbrains.kotlin.kapt"
 }
 
-micronautBuild {
-    binaryCompatibility {
-        enabled.set(false)
-    }
-}
-
 dependencies {
     annotationProcessor project(":inject-java")
     annotationProcessor project(":graal")

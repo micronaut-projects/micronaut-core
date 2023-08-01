@@ -14,7 +14,7 @@ pluginManagement {
 }
 
 plugins {
-    id 'io.micronaut.build.shared.settings' version '6.5.0'
+    id 'io.micronaut.build.shared.settings' version '6.5.3'
 }
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
@@ -50,6 +50,7 @@ include "inject-groovy"
 include "inject-groovy-test"
 include "inject-java"
 include "inject-java-test"
+include "inject-java-helper"
 include 'inject-kotlin'
 include 'inject-kotlin-test'
 include "inject-test-utils"

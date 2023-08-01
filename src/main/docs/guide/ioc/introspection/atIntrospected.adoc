@@ -1,0 +1,13 @@
+The ann:core.annotation.Introspected[] annotation can be used on any class to make it available for introspection. Simply annotate the class with ann:core.annotation.Introspected[]:
+
+snippet::io.micronaut.docs.ioc.beans.Person[tags="imports,class"]
+
+Once introspection data has been produced at compile time, retrieve it via the api:core.beans.BeanIntrospection[] API:
+
+snippet::io.micronaut.docs.ioc.beans.IntrospectionSpec[tags="usage", indent=0]
+
+<1> You can retrieve a api:core.beans.BeanIntrospection[] with the static `getIntrospection` method
+<2> Once you have a api:core.beans.BeanIntrospection[] you can instantiate a bean with the `instantiate` method.
+<3> A api:core.beans.BeanProperty[] can be retrieved from the introspection
+<4> Use the `set` method to set the property value
+<5> Use the `get` method to retrieve the property value

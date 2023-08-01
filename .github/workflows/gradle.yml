@@ -19,7 +19,6 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        graalvm: [ 'latest']
         java: ['17']
     env:
       GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
@@ -48,9 +47,8 @@ jobs:
       - name: "🔧 Setup GraalVM CE"
         uses: graalvm/setup-graalvm@v1
         with:
-          version: ${{ matrix.graalvm }}
+          distribution: 'graalvm-community'
           java-version: ${{ matrix.java }}
-          components: 'native-image'
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: "🔧 Setup Gradle"

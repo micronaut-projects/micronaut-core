@@ -328,6 +328,10 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             Map<String, GeneratorAdapter> loadTypeMethods,
             AnnotationMetadata annotationMetadata) {
         annotationMetadata = annotationMetadata.getTargetAnnotationMetadata();
+        if (annotationMetadata instanceof AnnotationMetadataHierarchy annotationMetadataHierarchy) {
+            // Synthetic property getters / setters can consist of field + (setter / getter) annotation hierarchy
+            annotationMetadata = MutableAnnotationMetadata.of(annotationMetadataHierarchy);
+        }
         if (annotationMetadata.isEmpty()) {
             generatorAdapter.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
         } else if (annotationMetadata instanceof MutableAnnotationMetadata mutableAnnotationMetadata) {

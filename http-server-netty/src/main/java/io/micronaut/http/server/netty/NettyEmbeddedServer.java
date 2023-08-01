@@ -60,6 +60,7 @@ public interface NettyEmbeddedServer
     /**
      * Stops the Netty instance, but keeps the ApplicationContext running.
      * This for CRaC checkpointing purposes.
+     * This method will only return after waiting for netty to stop.
      *
      * @return The stopped NettyEmbeddedServer
      */

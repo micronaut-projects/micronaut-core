@@ -60,16 +60,22 @@ public final class CrossOriginUtil {
         if (!annotationMetadata.hasAnnotation(CrossOrigin.class)) {
             return Optional.empty();
         }
+
         CorsOriginConfiguration config = new CorsOriginConfiguration();
-        config.setAllowedOrigins(Arrays.asList(annotationMetadata.stringValues(CrossOrigin.class, MEMBER_ALLOWED_ORIGINS)));
-        annotationMetadata.stringValue(CrossOrigin.class, MEMBER_ALLOWED_ORIGINS_REGEX)
-            .ifPresent(config::setAllowedOriginsRegex);
+        String[] allowedOrigins = annotationMetadata.stringValues(CrossOrigin.class, MEMBER_ALLOWED_ORIGINS);
+        annotationMetadata.stringValue(CrossOrigin.class, MEMBER_ALLOWED_ORIGINS_REGEX).ifPresentOrElse(
+            regex -> {
+                config.setAllowedOriginsRegex(regex);
+                // when allowed-origins-regex is set, don't default allowed-origins to ANY, use both iff set explicitly
+                config.setAllowedOrigins(Arrays.asList(allowedOrigins));
+            },
+            () -> config.setAllowedOrigins(allowedOrigins.length == 0 ? CorsOriginConfiguration.ANY : Arrays.asList(allowedOrigins))
+        );
 
         String[] allowedHeaders = annotationMetadata.stringValues(CrossOrigin.class, MEMBER_ALLOWED_HEADERS);
         List<String> allowedHeadersList = allowedHeaders.length == 0 ? CorsOriginConfiguration.ANY : Arrays.asList(allowedHeaders);
         config.setAllowedHeaders(allowedHeadersList);
         config.setExposedHeaders(Arrays.asList(annotationMetadata.stringValues(CrossOrigin.class, MEMBER_EXPOSED_HEADERS)));
-
 
         List<HttpMethod> allowedMethods = Stream.of(annotationMetadata.stringValues(CrossOrigin.class, MEMBER_ALLOWED_METHODS))
             .map(HttpMethod::parse)

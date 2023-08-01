@@ -1320,7 +1320,7 @@ class Lst<E>
     }
 
     void "test generics model for wildcard"() {
-        ClassElement ce = buildClassElement('test.Test', '''
+        MethodElement method = buildClassElementMapped('test.Test', '''
 package test
 
 class Test<T> {
@@ -1332,9 +1332,8 @@ class Test<T> {
 
 class Lst<E>
 
-''')
+''', {ce -> ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()})
         expect:
-            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
             def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
             !genericTypeArgument.isGenericPlaceholder()
             genericTypeArgument.isRawType()
@@ -1347,7 +1346,7 @@ class Lst<E>
     }
 
     void "test generics model for placeholder"() {
-        ClassElement ce = buildClassElement('test.Test', '''
+        MethodElement method = buildClassElementMapped('test.Test', '''
 package test
 
 class Test<T> {
@@ -1359,9 +1358,8 @@ class Test<T> {
 
 class Lst<E>
 
-''')
+''', {ce -> ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()})
         expect:
-            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
             def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
             genericTypeArgument.isGenericPlaceholder()
             !genericTypeArgument.isRawType()
@@ -1374,7 +1372,7 @@ class Lst<E>
     }
 
     void "test generics model for class placeholder wildcard"() {
-        ClassElement ce = buildClassElement('test.Test', '''
+        def (ClassElement ce, MethodElement method)  = buildClassElementMapped('test.Test', '''
 package test
 
 class Test<T> {
@@ -1386,9 +1384,8 @@ class Test<T> {
 
 class Lst<E>
 
-''')
+''', {ce -> Tuple.tuple(ce, ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get())})
         expect:
-            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
             def genericTypeArgument = method.getGenericReturnType().getTypeArguments()["E"]
             !genericTypeArgument.isGenericPlaceholder()
             !genericTypeArgument.isRawType()
@@ -1425,7 +1422,7 @@ class Lst<E>
     }
 
     void "test generics model for method placeholder wildcard"() {
-        ClassElement ce = buildClassElement('test.Test', '''
+        MethodElement method = buildClassElementMapped('test.Test', '''
 package test
 
 class Test {
@@ -1437,9 +1434,8 @@ class Test {
 
 class Lst<E>
 
-''')
+''', {ce -> ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()})
         expect:
-            def method = ce.getEnclosedElement(ElementQuery.ALL_METHODS.named("method")).get()
             method.getDeclaredTypeVariables().size() == 1
             method.getDeclaredTypeVariables()[0].declaringElement.get() == method
             method.getDeclaredTypeVariables()[0].variableName == "T"
@@ -1727,7 +1723,6 @@ class MyBeanX {
             def element = ce.findMethod("save").get().getParameters()[0]
             element.getGenericType().simpleName == "MyBeanX"
             element.getType().simpleName == "Object"
-            element.getGenericType().isAssignable("test.MyBeanX")
         when:
             def genRepo = ce.getTypeArguments("test.GenericRepository")
         then:
@@ -1735,6 +1730,34 @@ class MyBeanX {
             genRepo.get("E").getSyntheticBeanProperties().size() == 1
             genRepo.get("E").getMethods().size() == 0
             genRepo.get("E").getFields().get(0).name == "name"
+    }
+
+    void "test interface placeholder 2 isAssignable"() {
+        when:
+        boolean isAssignable = buildClassElementMapped('test.MyRepoX', '''
+package test
+import io.micronaut.context.annotation.Prototype
+import java.util.List
+
+interface MyRepoX : RepoX<MyBeanX, Long>
+interface RepoX<E, ID> : GenericRepository<E, ID> {
+    fun <S : E> save(ent: S)
+}
+interface GenericRepository<E, ID>
+@Prototype
+class MyBeanX {
+    var name: String? = null
+}
+
+''', { ce ->
+            def element = ce.findMethod("save").get().getParameters()[0]
+            element.getGenericType().simpleName == "MyBeanX"
+            element.getType().simpleName == "Object"
+            element.getGenericType().isAssignable("test.MyBeanX")
+        })
+
+        then:
+            isAssignable
     }
 
     void "test abstract placeholder"() {

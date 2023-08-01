@@ -36,6 +36,11 @@ public class JsonArray extends JsonContainer {
     }
 
     @Override
+    public Object getValue() {
+        return values.stream().map(JsonNode::getValue).toList();
+    }
+
+    @Override
     public int size() {
         return values.size();
     }

@@ -120,17 +120,29 @@ public interface ConversionService {
      */
     default @Nullable <T> T convertRequired(@Nullable Object value, Argument<T> argument) {
         ArgumentConversionContext<T> context = ConversionContext.of(argument);
+        return convertRequired(value, context);
+    }
+
+    /**
+     * Convert the value to the given type.
+     * @param value The value
+     * @param context The conversion context
+     * @param <T> The generic type
+     * @return The converted value
+     * @throws ConversionErrorException if the value cannot be converted
+     * @since 4.1.0
+     */
+    default  <T> T convertRequired(Object value, ArgumentConversionContext<T> context) {
+        Argument<T> argument = context.getArgument();
         return convert(
-                value,
-                argument.getType(),
-                context
-        ).orElseThrow(() -> {
-            Optional<ConversionError> lastError = context.getLastError();
-            if (lastError.isPresent()) {
-                return new ConversionErrorException(context.getArgument(), lastError.get());
-            } else {
-                return new ConversionErrorException(context.getArgument(), new IllegalArgumentException("Cannot convert type [" + value.getClass() + "] to target type: " + argument.getType() + ". Considering defining a TypeConverter bean to handle this case."));
-            }
-        });
+            value,
+            argument.getType(),
+            context
+        ).orElseThrow(() -> newConversionError(context, argument, value));
+    }
+
+    private static <T> ConversionErrorException newConversionError(ArgumentConversionContext<T> context, Argument<T> argument, Object value) {
+        Optional<ConversionError> lastError = context.getLastError();
+        return lastError.map(conversionError -> new ConversionErrorException(context.getArgument(), conversionError)).orElseGet(() -> new ConversionErrorException(context.getArgument(), new IllegalArgumentException("Cannot convert type [" + value.getClass() + "] to target type: " + argument.getType() + ". Considering defining a TypeConverter bean to handle this case.")));
     }
 }

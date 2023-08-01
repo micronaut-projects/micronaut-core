@@ -14,13 +14,6 @@ configurations {
     }
 }
 
-micronautBuild {
-    binaryCompatibility {
-        // Enable before Micronaut 4 release
-        enabled.set(false)
-    }
-}
-
 // Workaround for javadoc not finding java source
 // files for classes written in an alternate language (Kotlin, Groovy)
 configurations {

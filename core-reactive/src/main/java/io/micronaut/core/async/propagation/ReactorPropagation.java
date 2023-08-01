@@ -15,7 +15,7 @@
  */
 package io.micronaut.core.async.propagation;
 
-import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.propagation.PropagatedContextElement;
@@ -31,7 +31,7 @@ import java.util.stream.Stream;
  * @author Denis Stepanov
  * @since 4.0.0
  */
-@Internal
+@Experimental
 public final class ReactorPropagation {
 
     /**

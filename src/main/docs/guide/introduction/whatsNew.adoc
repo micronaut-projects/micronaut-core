@@ -1,23 +1,31 @@
-//Micronaut {version} includes the following changes:
+== 4.1.0
+
+Support for <<beanMappers, Bean Mappers>> and <<introspection, introspection Builders>>.
+
 == 4.0.0
-
-=== Kotlin 1.8
-
-Micronaut framework 4.0 supports https://kotlinlang.org/docs/whatsnew18.html[Kotlin 1.8]
-
-=== Experimental Support for Kotlin Symbol Processing (KSP)
-
-Micronaut framework has offered support for Kotlin via <<kapt, KAPT>>. With version 4.0, Micronaut framework supports Kotlin also via <<ksp, Kotlin Symbol Processing (KSP) API>>.
-
-=== Apache Groovy 4.0
-
-Micronaut framework 4.x supports https://groovy-lang.org/releasenotes/groovy-4.0.html[Apache Groovy 4.0].
 
 === Core Changes
 
 ==== Java 17 Baseline
 
 Micronaut 4 now requires a minimum of Java 17 for building and running applications.
+
+==== GraalVM 23 support, GraalVM Metadata Repository and Runtime Initialization
+
+The https://graalvm.github.io/native-build-tools/latest/gradle-plugin.html#metadata-support[GraalVM Metadata Repository] in Micronaut's Gradle and Maven plugins is now enabled by default and Micronaut has been altered to by default primarily initialize at runtime to ensure consistency in behaviour between JIT and Native applications.
+
+==== Kotlin 1.8
+
+Micronaut framework 4.0 supports https://kotlinlang.org/docs/whatsnew18.html[Kotlin 1.8]
+
+==== Experimental Support for Kotlin Symbol Processing (KSP)
+
+Micronaut framework has offered support for Kotlin via <<kapt, KAPT>>. With version 4.0, Micronaut framework supports Kotlin also via <<ksp, Kotlin Symbol Processing (KSP) API>>.
+
+==== Apache Groovy 4.0
+
+Micronaut framework 4.x supports https://groovy-lang.org/releasenotes/groovy-4.0.html[Apache Groovy 4.0].
+
 
 ==== Improved Modularity
 
@@ -26,10 +34,6 @@ The core of Micronaut has been further refactored to improve modularity and redu
 * Third-party dependencies on SnakeYAML and Jackson Databind are now optional and can be removed if other implementations are present.
 * The runtime and compiler code has been split, allowing the removal of the re-packaging of ASM and Caffeine and reduction of the runtime footprint.
 * The built in <<validation, Validation>>, <<retry, Retry>>, <<serviceDiscovery, Service Discovery>>, <<sessions, HTTP Session>> and <<websocket, WebSocket>> features have been split into separate modules allowing removal of this functionality if not needed.
-
-==== GraalVM Metadata Repository and Runtime Initialization
-
-The https://graalvm.github.io/native-build-tools/latest/gradle-plugin.html#metadata-support[GraalVM Metadata Repository] in Micronaut's Gradle and Maven plugins is now enabled by default and Micronaut has been altered to by default primarily initialize at runtime to ensure consistency in behaviour between JIT and Native applications.
 
 ==== Completed `javax` to `jakarta` Migration
 
@@ -67,6 +71,14 @@ The disabled beans are also now visible via the <<beansEndpoint, Beans Endpoint>
 
 Preview <<virtualThreads, support for Virtual Threads>> has been added. When using JDK 19 or above with preview features enabled you can off load processing to a virtual thread pool.
 
+==== Experimental Support for HTTP/3
+
+Experimental Support for HTTP/3 via the Netty incubator project has been added.
+
+==== Experimental Support for io_uring
+
+Experimental support for https://en.wikipedia.org/wiki/Io_uring[io_uring] via the Netty incubator project has been added.
+
 ==== Rewritten HTTP layer
 
 The HTTP layer has been rewritten to improve performance and reduce the presence of reactive stack frames if reactive is not used (such as with Virtual threads).
@@ -78,6 +90,10 @@ See <<filtermethods, Filter Methods>>
 ==== JDK HTTP Client
 
 <<javanetClient, Additional implementation of the HTTP Client based on Java HTTP Client>>
+
+==== Context Propagation API
+
+Micronaut Framework 4 introduces a new <<contextPropagation, Context Propagation API>>, which aims to simplify reactor instrumentation, avoid thread-local usage, and integrate idiomatically with Kotlin Coroutines.
 
 === Breaking Changes
 

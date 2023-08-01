@@ -577,7 +577,7 @@ public class Publishers {
     }
 
     /**
-     * A publisher for a value.
+     * A publisher for a value. Needs to be public for micronaut-aot.
      *
      * @param <T> The type
      */
@@ -616,11 +616,12 @@ public class Publishers {
 
 
     /**
-     * A publisher that throws an error.
+     * A publisher that throws an error. Needs to be public for micronaut-aot.
      *
      * @param <T> The type
      */
-    private static class JustThrowPublisher<T> implements MicronautPublisher<T> {
+    @Internal
+    public static class JustThrowPublisher<T> implements MicronautPublisher<T> {
 
         private final Throwable error;
 
