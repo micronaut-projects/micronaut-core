@@ -1099,6 +1099,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                 writer.storeLocal(prevBeanTypeLocal, beanType);
 
                 // NOTE: It doesn't make sense to check defaults for the copy constructor
+
                 invokeBeanConstructor(writer, constructor, false, (paramIndex, parameter) -> {
                     Object constructorArgument = constructorArguments[paramIndex];
                     boolean isPrimitive;
