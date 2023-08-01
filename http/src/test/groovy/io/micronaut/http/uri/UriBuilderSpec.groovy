@@ -183,4 +183,17 @@ class UriBuilderSpec extends Specification {
         expect:
         uri == 'myurl?%24top=10&%24filter=xyz'
     }
+    
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/6246")
+    void "test uri build parse query param"() {
+        given:
+        String stringUri = "https://google.com/search?q1=v1"
+        UriBuilder builder = UriBuilder.of(stringUri)
+
+        when:
+        builder.queryParam("q2", "v2")
+
+        then:
+        builder.build().toString() == "https://google.com/search?q1=v1&q2=v2"
+    }
 }
