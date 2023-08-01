@@ -12,7 +12,7 @@ import org.junit.platform.suite.api.SuiteDisplayName;
 @SelectPackages("io.micronaut.http.client.tck.tests")
 @SuiteDisplayName("HTTP Client TCK for the HTTP Client Implementation based on Java HTTP Client")
 @SuppressWarnings("java:S2187") // This runs a suite of tests, but has no tests of its own
-@ExcludeClassNamePatterns("io.micronaut.http.client.tck.tests.filter.Client.*FilterTest") // JDK client does not support client filters
+@ExcludeClassNamePatterns({"io.micronaut.http.client.tck.tests.filter.Client.*FilterTest", "io.micronaut.http.client.tck.tests.ContinueTest"}) // JDK client does not support client filters
 public class JdkHttpMethodTests {
 }
 

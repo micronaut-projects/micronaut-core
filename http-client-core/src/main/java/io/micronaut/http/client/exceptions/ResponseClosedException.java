@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,20 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.netty;
-
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.netty.stream.Http2Content;
-import io.netty.handler.codec.http.LastHttpContent;
+package io.micronaut.http.client.exceptions;
 
 /**
- * Represents HTTP2 streamed content.
+ * Exception raised when the connection is closed during the response.
  *
- * @author graemerocher
- * @since 2.1.3
- * @deprecated Unused
+ * @since 4.1.0
+ * @author Jonas Konrad
  */
-@Internal
-@Deprecated
-public interface LastHttp2Content extends Http2Content, LastHttpContent {
+public class ResponseClosedException extends HttpClientException {
+    public ResponseClosedException(String message) {
+        super(message);
+    }
 }
