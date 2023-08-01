@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.tck.tests;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
@@ -109,6 +110,7 @@ class ContinueTest {
     }
 
     @Controller("/continue")
+    @Requires(property = "spec.name", value = SPEC_NAME)
     public static class SimpleController {
         @Post("/plain")
         @ExecuteOn(TaskExecutors.BLOCKING)
