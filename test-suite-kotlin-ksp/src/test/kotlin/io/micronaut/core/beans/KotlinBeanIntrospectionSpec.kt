@@ -2,6 +2,9 @@ package io.micronaut.core.beans
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
+import kotlin.test.assertFails
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class KotlinBeanIntrospectionSpec {
 
@@ -57,5 +60,26 @@ class KotlinBeanIntrospectionSpec {
         assertEquals("Hello", instance3.lastName)
         assertEquals("HR", instance3.job)
         assertEquals(22, instance3.age)
+
+        val test1 = introspection.beanMethods.stream().filter { m -> m.name.equals("test1") }.findFirst().get()
+        assertEquals("Z B 3", test1.invoke(instance3, "Z", "B", 3))
+        assertEquals("A B 99", test1.invoke(instance3, null, "B", 99))
+        assertEquals("A Z 99", test1.invoke(instance3, null, "Z", 99))
+
+        val test2 = introspection.beanMethods.stream().filter { m -> m.name.equals("test2") }.findFirst().get()
+        assertEquals("A", test2.invoke(instance3, null))
+        assertEquals("B", test2.invoke(instance3, "B"))
+
+        val test3 = introspection.beanMethods.stream().filter { m -> m.name.equals("test3") }.findFirst().get()
+        assertEquals("678", test3.invoke(instance3, 678))
+        assertTrue {
+            assertFails {
+                test3.invoke(instance3, null)
+            } is NullPointerException
+        }
+
+        val test4 = introspection.beanMethods.stream().filter { m -> m.name.equals("test4") }.findFirst().get()
+        assertEquals("88", test4.invoke(instance3, null))
+        assertEquals("99", test4.invoke(instance3, 99))
     }
 }
