@@ -185,13 +185,18 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
 
     @Override
     public Optional<ClassElement> getClassElement(String name, ElementAnnotationMetadataFactory annotationMetadataFactory) {
-        TypeElement typeElement = elements.getTypeElement(name);
-        if (typeElement == null) {
-            // maybe inner class?
-            typeElement = elements.getTypeElement(name.replace('$', '.'));
+        try {
+            TypeElement typeElement = elements.getTypeElement(name);
+            if (typeElement == null) {
+                // maybe inner class?
+                typeElement = elements.getTypeElement(name.replace('$', '.'));
+            }
+            return Optional.ofNullable(typeElement)
+                .map(typeElement1 -> elementFactory.newClassElement(typeElement1, annotationMetadataFactory));
+        } catch (RuntimeException e) {
+            // can throw exception on Eclipse JDT which is braindead
+            return Optional.empty();
         }
-        return Optional.ofNullable(typeElement)
-            .map(typeElement1 -> elementFactory.newClassElement(typeElement1, annotationMetadataFactory));
     }
 
     @Override
