@@ -1,6 +1,6 @@
 Applications built for the Cloud often need to adapt to running in a Cloud environment, read and share configuration in a distributed manner, and externalize configuration to the environment where necessary.
 
-Micronaut's <<environments, Environment>> concept can be configured to be Cloud platform-aware and makes the best effort to detect the underlying active Cloud environment.
+Micronaut's <<environments, Environment>> concept can be configured to be Cloud platform-aware and makes a best effort to detect the underlying active Cloud environment.
 
 To enable this feature you can:
 
