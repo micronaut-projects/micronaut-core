@@ -1204,6 +1204,9 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
     /**
      * index to be created.
+     *
+     * @param annotationName The annotation name
+     * @param value The annotation value
      */
     private record AnnotationWithValue(@NonNull String annotationName, @Nullable String value) {
 
@@ -1219,5 +1222,9 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             return annotationName.equals(that.annotationName) && Objects.equals(value, that.value);
         }
 
+        @Override
+        public int hashCode() {
+            return annotationName.hashCode();
+        }
     }
 }
