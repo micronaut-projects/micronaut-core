@@ -87,7 +87,7 @@ public interface BeanElementBuilder extends ConfigurableElement {
     }
 
     /**
-     * Specifies the bean will created with the given method element. If
+     * Specifies the bean will be created with the given method element. If
      * not specified the bean will be created with {@link ClassElement#getPrimaryConstructor()}.
      *
      * <p>Note that the method can be a one of the following:</p>

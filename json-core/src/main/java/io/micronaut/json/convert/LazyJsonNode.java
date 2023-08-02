@@ -187,7 +187,7 @@ public final class LazyJsonNode implements ReferenceCounted {
      */
     @Internal
     public void tryRelease() {
-        // this is a bit yikes but it's necessary so we can attempt conversion twice.
+        // this is a bit of yikes, but it's necessary, so we can attempt conversion twice.
         // it seems to work fine because the first conversion is to JsonNode, which we store
         // locally.
         lock.lock();

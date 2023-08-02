@@ -20,7 +20,7 @@ With the above example if the `listBooks()` method throws a RuntimeException, it
 
 The `multiplier` value of the `@Retryable` annotation can be used to configure a multiplier used to calculate the delay between retries, allowing exponential retry support.
 
-To customize retry behaviour, set the `attempts` and `delay` members, For example to configure five attempts with a two second delay:
+To customize retry behaviour, set the `attempts` and `delay` members, For example to configure five attempts with a two seconds delay:
 
 snippet::io.micronaut.docs.aop.retry.BookService[tags="attempts", indent=0, title="Setting Retry Attempts"]
 

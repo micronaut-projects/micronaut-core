@@ -23,6 +23,6 @@ Where this grouping becomes useful is when the bean configuration is made condit
 package my.package
 ----
 
-In the above example, all bean definitions within the annotated package are only loaded and made available if a `javax.sql.DataSource` bean is present. This lets you implement conditional auto-configuration of bean definitions.
+In the above example, all bean definitions within the annotated package are only loaded and made available if a `javax.sql.DataSource` bean is present. This lets you implement conditional autoconfiguration of bean definitions.
 
 NOTE: Java and Kotlin also support this functionality via `package-info.java`. Kotlin does not support a `package-info.kt` as of version 1.3.

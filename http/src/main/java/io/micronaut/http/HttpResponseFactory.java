@@ -41,7 +41,7 @@ public interface HttpResponseFactory {
      * Return a response for the given status.
      *
      * @param status The status
-     * @param reason An alternatively reason message
+     * @param reason An alternative reason message
      * @param <T>    The response type
      * @return The response
      */
@@ -51,7 +51,7 @@ public interface HttpResponseFactory {
      * Return a response for the given status.
      *
      * @param status The status
-     * @param reason An alternatively reason message
+     * @param reason An alternative reason message
      * @param <T>    The response type
      * @return The response
      */

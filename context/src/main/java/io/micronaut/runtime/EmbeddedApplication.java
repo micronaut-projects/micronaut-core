@@ -66,7 +66,7 @@ public interface EmbeddedApplication<T extends EmbeddedApplication> extends Appl
 
     /**
      * Most servers shutdown cleanly, however some integrations make require a forced exist. If
-     * true is returned Micronaut will explicitly invoke System.exit(..).
+     * true is returned Micronaut will explicitly invoke System.exit(...).
      *
      * @return Whether exiting the server should be forced.
      */

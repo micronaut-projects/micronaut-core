@@ -59,7 +59,7 @@ public class Application {
 
 It is important to note that it is not recommended to store sensitive configuration such as passwords and tokens within configuration files that can potentially be checked into source control systems.
 
-It is good practise to instead externalize sensitive configuration completely from the application code using preferably a external secret manager system (there are many options here, many provided by Cloud providers) or environment variables that are set during the deployment of the application. You can also use property placeholders (see the following section), to customize names of the environment variables to use and supply default values:
+It is good practise to instead externalize sensitive configuration completely from the application code using preferably an external secret manager system (there are many options here, many provided by Cloud providers) or environment variables that are set during the deployment of the application. You can also use property placeholders (see the following section), to customize names of the environment variables to use and supply default values:
 
 .Using Property Value Placeholders to Define Secure Configuration
 [configuration]

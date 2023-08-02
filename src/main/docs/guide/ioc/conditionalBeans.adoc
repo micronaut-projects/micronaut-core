@@ -1,4 +1,4 @@
-At times you may want a bean to load conditionally based on various potential factors including the classpath, the configuration, the presence of other beans, etc.
+At times, you may want a bean to load conditionally based on various potential factors including the classpath, the configuration, the presence of other beans, etc.
 
 The link:{api}/io/micronaut/context/annotation/Requires.html[Requires] annotation provides the ability to define one or many conditions on a bean.
 
@@ -110,7 +110,7 @@ Adding a requirement on a property has some additional functionality. You can re
 
 === Referencing bean properties in @Requires.
 
-You can also reference other beans properties in `@Requires` to conditionally load beans. Similar to `property` requirements, you can specify required `value` or set the value bean property should no be equal to using `notEquals` annotation member. For the bean property to be checked, the bean of type specified in `bean` annotation member should be present within context, otherwise conditional bean will not be loaded.
+You can also reference other beans properties in `@Requires` to conditionally load beans. Similar to `property` requirements, you can specify required `value` or set the value bean property should not be equal to using `notEquals` annotation member. For the bean property to be checked, the bean of type specified in `bean` annotation member should be present within context, otherwise conditional bean will not be loaded.
 
 [source,java]
 ----

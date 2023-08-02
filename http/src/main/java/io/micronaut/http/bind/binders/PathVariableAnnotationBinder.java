@@ -62,7 +62,7 @@ public class PathVariableAnnotationBinder<T> extends AbstractArgumentBinder<T> i
         String parameterName = annotationMetadata.stringValue(PathVariable.class).orElse(argument.getName());
         // If we need to bind all request params to command object
         // checks if the variable is defined with modifier char *
-        // eg. ?pojo*
+        // e.g. ?pojo*
         final Optional<UriMatchInfo> matchInfo = source.getAttribute(HttpAttributes.ROUTE_MATCH, UriMatchInfo.class);
         boolean bindAll = matchInfo
             .flatMap(umi -> umi.getVariables()

@@ -743,7 +743,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             Label tryEnd = new Label();
             Label exceptionHandler = new Label();
 
-            // This logic will generate a method such as the following, allowing non dynamic classloading:
+            // This logic will generate a method such as the following, allowing non-dynamic classloading:
             //
             // AnnotationClassValue $micronaut_load_class_value_0() {
             //     try {

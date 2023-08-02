@@ -20,7 +20,7 @@ import io.micronaut.http.HttpStatus;
 import java.util.Optional;
 
 /**
- * Exception thrown to return an specific HttpStatus and an error message.
+ * Exception thrown to return a specific HttpStatus and an error message.
  *
  * @author Iván López
  * @since 1.0

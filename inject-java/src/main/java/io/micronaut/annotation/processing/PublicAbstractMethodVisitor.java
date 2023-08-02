@@ -80,7 +80,7 @@ public abstract class PublicAbstractMethodVisitor<R, P> extends PublicMethodVisi
     }
 
     /**
-     * Return whether the given executable element is acceptable. By default just checks if the method is abstract.
+     * Return whether the given executable element is acceptable. By default, just checks if the method is abstract.
      * @param executableElement The method
      * @return True if it is
      */

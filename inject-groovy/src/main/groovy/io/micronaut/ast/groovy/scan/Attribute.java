@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import groovyjarjarasm.asm.Label;
 
 /**
- * A non standard class, field, method or code attribute.
+ * A non-standard class, field, method or code attribute.
  *
  * @author Eric Bruneton
  * @author Eugene Kuleshov

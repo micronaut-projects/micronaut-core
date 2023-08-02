@@ -130,7 +130,7 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders, Convers
     /**
      * Adds the DATE header for the given {@link Long}.
      *
-     * @param timeInMillis The time in milli seconds since Epoch.
+     * @param timeInMillis The time in milliseconds since Epoch.
      * @return The {@link MutableHttpHeaders}
      */
     default MutableHttpHeaders date(long timeInMillis) {
@@ -141,7 +141,7 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders, Convers
     /**
      * Adds the EXPIRES header for the given {@link Long}.
      *
-     * @param timeInMillis The time in milli seconds since Epoch.
+     * @param timeInMillis The time in milliseconds since Epoch.
      * @return The {@link MutableHttpHeaders}
      */
     default MutableHttpHeaders expires(long timeInMillis) {
@@ -152,7 +152,7 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders, Convers
     /**
      * Adds the LAST_MODIFIED header for the given {@link Long}.
      *
-     * @param timeInMillis The time in milli seconds since Epoch.
+     * @param timeInMillis The time in milliseconds since Epoch.
      * @return The {@link MutableHttpHeaders}
      */
     default MutableHttpHeaders lastModified(long timeInMillis) {
@@ -163,7 +163,7 @@ public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders, Convers
     /**
      * Adds the IF_MODIFIED_SINCE header for the given {@link Long}.
      *
-     * @param timeInMillis The time in milli seconds since Epoch.
+     * @param timeInMillis The time in milliseconds since Epoch.
      * @return The {@link MutableHttpHeaders}
      */
     default MutableHttpHeaders ifModifiedSince(long timeInMillis) {

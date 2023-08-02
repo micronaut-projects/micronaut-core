@@ -3615,7 +3615,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
                     satisfied.add(clazz);
                 }
 
-                //none of the required components are in the unsorted list
+                //none of the required components are in the unsorted list,
                 //so it can be added to the sorted list
                 if (!found) {
                     acyclic = true;

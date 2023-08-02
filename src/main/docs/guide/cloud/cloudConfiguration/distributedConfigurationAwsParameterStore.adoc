@@ -48,4 +48,4 @@ For example, if the configuration name `/config/application_test/server.url` is 
 
 Each level of the tree can be composed of key=value pairs. For multiple key/value pairs, set the type to `StringList`.
 
-For special secure information, such as keys or passwords, use the type `SecureString`. KMS will be automatically invoked when you add and retrieve values, and will decrypt them with the default key store for your account. If you set the configuration to not use secure strings, they will be returned to you encrypted and you must manually decrypt them.
+For special secure information, such as keys or passwords, use the type `SecureString`. KMS will be automatically invoked when you add and retrieve values, and will decrypt them with the default key store for your account. If you set the configuration to not use secure strings, they will be returned to you encrypted, and you must manually decrypt them.

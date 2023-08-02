@@ -45,7 +45,7 @@ public sealed interface GroovyNativeElement {
     }
 
     /**
-     * The class element with an owner (Generic type etc).
+     * The class element with an owner (Generic type etc.).
      *
      * @param annotatedNode The class node
      * @param owner         The owner

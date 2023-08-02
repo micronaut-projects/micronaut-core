@@ -42,7 +42,7 @@ public interface FullHttpRequest<B> extends HttpRequest<B> {
      * Get the raw body of this request. May be called multiple times. Buffer ownership is not
      * transferred to the caller.
      *
-     * @return The body contents or null if there are none or they are not obtainable.
+     * @return The body contents or null if there are none, or they are not obtainable.
      */
     @Nullable
     ByteBuffer<?> contents();

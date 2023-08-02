@@ -121,7 +121,7 @@ Start Micronaut, and the application will run on `https://localhost:8443` using 
 
 Keeping HTTPS certificates up-to-date after expiry can be a challenge. A great solution to this is https://en.wikipedia.org/wiki/Automated_Certificate_Management_Environment[Automated Certificate Management Environment] (ACME) and the https://micronaut-projects.github.io/micronaut-acme/latest/guide/index.html[Micronaut ACME Module] which provides support for automatically refreshing certificates from a certificate authority.
 
-If the use of a certificate authority is not possible and you need to manually update certificates from disk then you should fire a api:runtime.context.scope.refresh.RefreshEvent[] using Micronaut's support for <<events, Application Events>> containing the keys where your HTTPS configuration is defined and the Micronaut framework will reload the certificates from disk and apply the new configuration to the server.
+If the use of a certificate authority is not possible, and you need to manually update certificates from disk then you should fire a api:runtime.context.scope.refresh.RefreshEvent[] using Micronaut's support for <<events, Application Events>> containing the keys where your HTTPS configuration is defined and the Micronaut framework will reload the certificates from disk and apply the new configuration to the server.
 
 NOTE: You can also use the <<refreshEndpoint, Refresh Management Endpoint>>, however this will only apply if the physical location of certificate on disk has changed
 

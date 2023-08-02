@@ -100,7 +100,7 @@ public class SslConfiguration implements Toggleable {
     }
 
     /**
-     * @return Whether or not to build a self signed certificate
+     * @return Whether to build a self-signed certificate
      */
     public boolean buildSelfSigned() {
         return buildSelfSigned;
@@ -177,7 +177,7 @@ public class SslConfiguration implements Toggleable {
     }
 
     /**
-     * Sets whether to build a self signed certificate. Default value ({@value io.micronaut.http.ssl.SslConfiguration#DEFAULT_BUILDSELFSIGNED}).
+     * Sets whether to build a self-signed certificate. Default value ({@value io.micronaut.http.ssl.SslConfiguration#DEFAULT_BUILDSELFSIGNED}).
      *
      * @param buildSelfSigned True if a certificate should be built
      *

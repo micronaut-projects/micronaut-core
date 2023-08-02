@@ -9,10 +9,10 @@ class RecConf {
     var mapChildren: Map<String, RecConf>? = null
     var listChildren: List<RecConf>? = null
 
-    override fun equals(o: Any?): Boolean {
-        if (this === o) return true
-        if (o == null || javaClass != o.javaClass) return false
-        val recConf = o as RecConf
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other == null || javaClass != other.javaClass) return false
+        val recConf = other as RecConf
         return namesListOf == recConf.namesListOf &&
                 mapChildren == recConf.mapChildren &&
                 listChildren == recConf.listChildren

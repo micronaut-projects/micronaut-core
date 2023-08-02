@@ -4,7 +4,7 @@ To emit events from the server, return a Reactive Streams rs:Publisher[] that em
 
 The rs:Publisher[] itself could publish events from a background task, via an event system, etc.
 
-Imagine for an example a event stream of news headlines; you may define a data class as follows:
+Imagine for an example an event stream of news headlines; you may define a data class as follows:
 
 snippet::io.micronaut.docs.server.sse.Headline[tags="class", indent=0,title="Headline"]
 

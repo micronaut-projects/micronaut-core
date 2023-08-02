@@ -29,7 +29,7 @@ import java.nio.file.StandardOpenOption;
 import java.util.Optional;
 
 /**
- * A {@link ClassWriterOutputVisitor} that writes to a target target directory.
+ * A {@link ClassWriterOutputVisitor} that writes to a target directory.
  *
  * @author graemerocher
  * @since 1.0

@@ -50,7 +50,7 @@ public interface ExecutableBinder<S> {
 
     /**
      * Binds a given {@link Executable} using the given registry and source object. Unlike {@link #bind(Executable, ArgumentBinderRegistry, Object)} this
-     * method will not throw an {@link UnsatisfiedArgumentException} if an argument cannot be bound. Instead the {@link BoundExecutable#getUnboundArguments()} property
+     * method will not throw an {@link UnsatisfiedArgumentException} if an argument cannot be bound. Instead, the {@link BoundExecutable#getUnboundArguments()} property
      * will be populated with any arguments that could not be bound
      *
      * @param target The target executable

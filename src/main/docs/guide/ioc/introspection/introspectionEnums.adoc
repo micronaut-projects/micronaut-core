@@ -1,1 +1,1 @@
-It is possible to introspect enums as well. Add the annotation to the enum and it can be constructed through the standard `valueOf` method.
+It is possible to introspect enums as well. Add the annotation to the enum, and it can be constructed through the standard `valueOf` method.

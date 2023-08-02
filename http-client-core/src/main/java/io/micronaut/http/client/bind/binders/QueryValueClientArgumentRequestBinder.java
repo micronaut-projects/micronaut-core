@@ -35,7 +35,7 @@ import java.util.Optional;
 /**
  * Implementation of the Binder for {@link QueryValue}
  * The details of implementation can be found in the
- * {@link #bind(ArgumentConversionContext, ClientRequestUriContext, Object, MutableHttpRequest)} bind()} method javadoc.
+ * {@link #bind(ArgumentConversionContext, ClientRequestUriContext, Object, MutableHttpRequest)} method javadoc.
  *
  * @author Andriy Dmytruk
  * @since 3.0.0
@@ -59,12 +59,12 @@ public class QueryValueClientArgumentRequestBinder implements AnnotatedClientArg
      * The ConvertibleMultiValues converters are found in
      * {@link io.micronaut.core.convert.converters.MultiValuesConverterFactory} and perform conversion only when the
      * {@link io.micronaut.core.convert.format.Format} annotation has one of the supported values.
-     * Otherwise if the {@link io.micronaut.core.convert.format.Format} annotation is present, it is converted to {@link String}. If none of these
+     * Otherwise, if the {@link io.micronaut.core.convert.format.Format} annotation is present, it is converted to {@link String}. If none of these
      * are satisfied, the{@link io.micronaut.http.uri.UriTemplate} decides what to do with the given value which
      * is supplied as an Object (it is added to uriContext.pathParameter).
      *
      * <br> By default value is converted to ConvertibleMultiValues when the {@link io.micronaut.core.convert.format.Format} annotation is present and has
-     * one of the defined above formats. Otherwise empty optional is returned.
+     * one of the defined above formats. Otherwise, empty optional is returned.
      *
      * <br> The default {@link io.micronaut.http.uri.UriTemplate} will convert the value to String and to parameters.
      * Optionally, the value can be formatted if the path template states so.

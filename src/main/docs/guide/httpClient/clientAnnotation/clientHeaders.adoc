@@ -10,7 +10,7 @@ snippet::io.micronaut.docs.annotation.headers.PetClient[tags="class", indent=0, 
 
 The above example defines a ann:http.annotation.Header[] annotation on the `PetClient` interface that reads the `pet.client.id` property using property placeholder configuration.
 
-Then set the following in your configuration file (e.g `application.yml`) to populate the value:
+Then set the following in your configuration file (e.g. `application.yml`) to populate the value:
 
 .Configuring Headers
 [configuration]

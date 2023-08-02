@@ -18,7 +18,7 @@ package io.micronaut.http.codec;
 import io.micronaut.http.exceptions.HttpException;
 
 /**
- * An exception thrown when a object cannot be decoded.
+ * An exception thrown when an object cannot be decoded.
  *
  * @author Graeme Rocher
  * @since 1.0

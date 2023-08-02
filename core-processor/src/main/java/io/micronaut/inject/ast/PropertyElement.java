@@ -128,7 +128,7 @@ public interface PropertyElement extends TypedElement, MemberElement {
     }
 
     /**
-     * Does a this property override the given property. Supported only with languages that have native properties.
+     * Does this property override the given property. Supported only with languages that have native properties.
      * @param overridden The overridden method.
      * @return True this property overrides the given property.
      * @since 4.0.0

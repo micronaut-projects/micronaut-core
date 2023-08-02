@@ -80,7 +80,7 @@ public interface Element extends MutableAnnotationMetadataDelegate<Element>, Ann
     boolean isPublic();
 
     /**
-     * Returns the native underlying type. This API is extended by all of the inject language implementations.
+     * Returns the native underlying type. This API is extended by all inject language implementations.
      * The object returned by this method will be the language native type the information is being retrieved from.
      *
      * @return The native type

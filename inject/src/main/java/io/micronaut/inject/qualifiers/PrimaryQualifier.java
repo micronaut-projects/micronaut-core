@@ -57,7 +57,7 @@ public final class PrimaryQualifier<T> implements Qualifier<T> {
     }
 
     /**
-     * Generified way to get the a primary instance.
+     * Generified way to get the primary instance.
      * @return The instance
      * @param <T1> The generic type
      * @since 3.6.0

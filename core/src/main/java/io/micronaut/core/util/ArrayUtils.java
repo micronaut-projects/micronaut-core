@@ -213,7 +213,7 @@ public final class ArrayUtils {
     }
 
     /**
-     * Returns an array containing all of the elements in this collection, using the provided generator function to allocate the returned array.
+     * Returns an array containing all elements in this collection, using the provided generator function to allocate the returned array.
      *
      * @param collection The collection
      * @param createArrayFn The function to create the array
@@ -226,7 +226,7 @@ public final class ArrayUtils {
     }
 
     /**
-     * Returns an array containing all of the elements in this collection, using the item class.
+     * Returns an array containing all elements in this collection, using the item class.
      *
      * @param collection The collection
      * @param arrayItemClass The array item class

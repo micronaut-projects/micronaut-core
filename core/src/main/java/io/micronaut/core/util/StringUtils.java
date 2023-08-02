@@ -109,7 +109,7 @@ public final class StringUtils {
      * Converts the given objects into a set of interned strings contained within an internal pool of sets. See {@link String#intern()}.
      *
      * @param objects The objects
-     * @return A unmodifiable, pooled set of strings
+     * @return An unmodifiable, pooled set of strings
      */
     @SuppressWarnings("unused")
     public static List<String> internListOf(Object... objects) {
@@ -165,7 +165,7 @@ public final class StringUtils {
      * the {@link Locale#toString} format as well as BCP 47 language tags.
      *
      * @param localeValue the locale value: following either {@code Locale's}
-     *                    {@code toString()} format ("en", "en_UK", etc), also accepting spaces as
+     *                    {@code toString()} format ("en", "en_UK", etc.), also accepting spaces as
      *                    separators (as an alternative to underscores), or BCP 47 (e.g. "en-UK")
      *                    as specified by {@link Locale#forLanguageTag} on Java 7+
      *                    <p>Copied from the Spring Framework while retaining all license, copyright and author information.</p>
@@ -358,12 +358,12 @@ public final class StringUtils {
     /**
      * Prepends a partial uri and normalizes / characters.
      * For example, if the base uri is "/foo/" and the uri
-     * is "/bar/", the output will be "/foo/bar/". Similarly
+     * is "/bar/", the output will be "/foo/bar/". Similarly,
      * if the base uri is "/foo" and the uri is "bar", the
      * output will be "/foo/bar"
      *
-     * @param baseUri The uri to prepend. Eg. /foo
-     * @param uri     The uri to combine with the baseUri. Eg. /bar
+     * @param baseUri The uri to prepend. E.g. /foo
+     * @param uri     The uri to combine with the baseUri. E.g. /bar
      * @return A combined uri string
      */
     public static String prependUri(String baseUri, String uri) {

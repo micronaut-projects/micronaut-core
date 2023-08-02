@@ -25,7 +25,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Resolves the Locale from a Cookie within a HTTP Request.
+ * Resolves the Locale from a Cookie within an HTTP Request.
  *
  * @author Sergio del Amo
  * @author James Kleeh

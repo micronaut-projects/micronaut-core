@@ -76,17 +76,17 @@ public class AnnotationUtil {
     );
 
     /**
-     * Constant indicating an zero annotation.
+     * Constant indicating a zero annotation.
      */
     public static final Annotation[] ZERO_ANNOTATIONS = new Annotation[0];
 
     /**
-     * Constant indicating an zero annotation.
+     * Constant indicating a zero annotation.
      */
     public static final AnnotatedElement[] ZERO_ANNOTATED_ELEMENTS = new AnnotatedElement[0];
 
     /**
-     * Constant indicating an zero annotation values.
+     * Constant indicating a zero annotation values.
      */
     public static final AnnotationValue<?>[] ZERO_ANNOTATION_VALUES = new AnnotationValue[0];
 
@@ -186,7 +186,7 @@ public class AnnotationUtil {
     public static final String POST_CONSTRUCT = "jakarta.annotation.PostConstruct";
 
     /**
-     * The annotation attribute containing all the attributes marked as non binding.
+     * The annotation attribute containing all the attributes marked as non-binding.
      */
     public static final String NON_BINDING_ATTRIBUTE = "$nonBinding";
 
@@ -254,7 +254,7 @@ public class AnnotationUtil {
      * <p>This method serves the purpose of reducing memory footprint by pooling common lists of annotations in compiled {@link AnnotationMetadata}</p>
      *
      * @param objects The objects
-     * @return A unmodifiable, pooled set of strings
+     * @return Immutable, pooled set of strings
      */
     @SuppressWarnings({"unused"})
     @UsedByGeneratedCode
@@ -288,7 +288,7 @@ public class AnnotationUtil {
             throw new IllegalArgumentException("Number of arguments should be an even number representing the keys and values");
         }
 
-        // if the length is 2 then only a single annotation is defined, so tried use internal pool
+        // if the length is 2 then only a single annotation is defined, so tried to use internal pool
         if (len == 2) {
             return internMapOf((String) values[0], values[1]);
         } else {

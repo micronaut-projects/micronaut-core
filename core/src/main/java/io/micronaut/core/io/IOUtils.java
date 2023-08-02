@@ -191,7 +191,7 @@ public class IOUtils {
 
     /**
      * Read the content of the BufferedReader and return it as a String in a blocking manner.
-     * The BufferedReader is closed afterwards.
+     * The BufferedReader is closed afterward.
      *
      * @param reader a BufferedReader whose content we want to read
      * @return a String containing the content of the buffered reader

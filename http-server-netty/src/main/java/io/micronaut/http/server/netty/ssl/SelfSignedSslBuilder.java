@@ -33,7 +33,7 @@ import java.util.Optional;
 
 /**
  * The Netty implementation of {@link SslBuilder} that generates an {@link SslContext} to create a server handler
- * with SSL support via a generated self signed certificate.
+ * with SSL support via a generated self-signed certificate.
  */
 @Requires(condition = SslEnabledCondition.class)
 @Requires(condition = SelfSignedSslBuilder.SelfSignedConfigured.class)

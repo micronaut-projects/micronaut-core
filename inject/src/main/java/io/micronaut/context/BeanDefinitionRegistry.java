@@ -252,21 +252,21 @@ public interface BeanDefinitionRegistry {
     @NonNull Collection<BeanDefinition<?>> getBeanDefinitions(@NonNull Qualifier<Object> qualifier);
 
     /**
-     * Get all of the registered {@link BeanDefinition}.
+     * Get all registered {@link BeanDefinition}.
      *
      * @return The bean definitions
      */
     @NonNull Collection<BeanDefinition<?>> getAllBeanDefinitions();
 
     /**
-     * Get all of the enabled {@link BeanDefinitionReference}.
+     * Get all enabled {@link BeanDefinitionReference}.
      *
      * @return The bean definitions
      */
     @NonNull Collection<BeanDefinitionReference<?>> getBeanDefinitionReferences();
 
     /**
-     * Get all of the disabled {@link DisabledBean}.
+     * Get all disabled {@link DisabledBean}.
      *
      * @return The disabled bean definitions
      * @since 4.0.0
@@ -509,7 +509,7 @@ public interface BeanDefinitionRegistry {
     /**
      * Obtain a {@link BeanDefinition} for the given type.
      *
-     * @param beanType  The potentially parameterized type type
+     * @param beanType  The potentially parameterized type
      * @param qualifier The qualifier
      * @param <T>       The concrete type
      * @return The {@link BeanDefinition}

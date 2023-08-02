@@ -152,7 +152,7 @@ public enum HttpMethod implements CharSequence {
 
     /**
      *
-     * @param httpMethodName Name of the http method (may be nonstandard)
+     * @param httpMethodName Name of the http method (maybe nonstandard)
      * @return the value of enum (CUSTOM by default).
      */
     public static HttpMethod parse(String httpMethodName) {

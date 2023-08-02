@@ -31,7 +31,7 @@ public interface TaskExecutors {
 
     /**
      * The name of the {@link java.util.concurrent.ExecutorService} used to schedule blocking tasks.
-     * If available, this will use {@link #VIRTUAL virtual threads}. Otherwise it will fall back to
+     * If available, this will use {@link #VIRTUAL virtual threads}. Otherwise, it will fall back to
      * {@link #IO}.
      */
     String BLOCKING = "blocking";

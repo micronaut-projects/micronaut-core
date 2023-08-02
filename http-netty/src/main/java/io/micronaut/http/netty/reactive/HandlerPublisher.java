@@ -50,7 +50,7 @@ import static io.micronaut.http.netty.reactive.HandlerPublisher.State.NO_SUBSCRI
  * All interactions with the subscriber are done from the handlers executor, hence, they provide the same happens before
  * semantics that Netty provides.
  * <p>
- * The handler publishes all messages that match the type as specified by the passed in class. Any non matching messages
+ * The handler publishes all messages that match the type as specified by the passed in class. Any non-matching messages
  * are forwarded to the next handler.
  * <p>
  * The publisher will signal complete if it receives a channel inactive event.

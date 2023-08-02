@@ -40,13 +40,13 @@ public final class Weighers {
     }
 
     /**
-     * A entry weigher backed by the specified weigher. The weight of the value
+     * An entry weigher backed by the specified weigher. The weight of the value
      * determines the weight of the entry.
      *
-     * @param weigher the weigher to be "wrapped" in a entry weigher.
+     * @param weigher the weigher to be "wrapped" in an entry weigher.
      * @param <K> The key type
      * @param <V> The value type
-     * @return A entry weigher view of the specified weigher.
+     * @return An entry weigher view of the specified weigher.
      */
     public static <K, V> EntryWeigher<K, V> asEntryWeigher(
             final Weigher<? super V> weigher) {

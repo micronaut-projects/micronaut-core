@@ -202,7 +202,7 @@ public class RequiresCondition implements Condition {
         }
 
         // need this check because when this method is called with a BeanDefinitionReference the context
-        // is not yet initialized so we cannot know if beans are present or not
+        // is not yet initialized, so we cannot know if beans are present or not
         // check only that the classes are present for the beans requirement
         matchesPresenceOfClasses(context, requirements, MEMBER_BEANS);
     }

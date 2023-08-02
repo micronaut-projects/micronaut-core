@@ -12,7 +12,7 @@ For Java code api:annotation.processing.BeanDefinitionInjectProcessor[] (which i
 
 NOTE: What constitutes a bean defining annotation is complex as it takes into account meta-annotations, but in general it is any annotation annotated with a JSR-330 bean `@Scope`
 
-The `BeanDefinitionInjectProcessor` will visit each bean in the user code source and generate additional byte code using the ASM byte code generation library that sits along side the annotated class in the same package.
+The `BeanDefinitionInjectProcessor` will visit each bean in the user code source and generate additional byte code using the ASM byte code generation library that sits alongside the annotated class in the same package.
 
 NOTE: For historic reasons the dependency injection processor does not use the api:inject.visitor.TypeElementVisitor[] API but will likely do so in the future
 
@@ -28,7 +28,7 @@ snippet::io.micronaut.docs.inject.intro.Vehicle[tags="class",indent=0]
 
 The following is generated:
 
-* A `example.$Vehicle$Definition$Reference` class that implements the api:inject.BeanDefinitionReference[] interface that allows the application to soft load the bean definition without loading all of the metadata or the class itself (in the case where the introspected class is itself not on the classpath). Since references are loaded via link:{jdkapi}/java.base/java/util/ServiceLoader.html[ServiceLoader] an entry in a generated `META-INF/services/io.micronaut.inject.BeanDefinitionReference` referring to this type is also generated at compilation time.
+* A `example.$Vehicle$Definition$Reference` class that implements the api:inject.BeanDefinitionReference[] interface that allows the application to soft load the bean definition without loading all metadata or the class itself (in the case where the introspected class is itself not on the classpath). Since references are loaded via link:{jdkapi}/java.base/java/util/ServiceLoader.html[ServiceLoader] an entry in a generated `META-INF/services/io.micronaut.inject.BeanDefinitionReference` referring to this type is also generated at compilation time.
 * A `example.$Vehicle$Definition` which contains the actual api:inject.BeanDefinition[] information.
 
 A api:inject.BeanDefinition[] is a type that holds metadata about the particular type including:
@@ -38,7 +38,7 @@ A api:inject.BeanDefinition[] is a type that holds metadata about the particular
 * Knowledge of the available api:inject.InjectionPoint[] instances
 * References to any api:inject.ExecutableMethod[] defined
 
-In addition the `BeanDefinition` contains logic which knows how the bean is wired together, including how the type is constructed and fields and/or methods injected.
+In addition, the `BeanDefinition` contains logic which knows how the bean is wired together, including how the type is constructed and fields and/or methods injected.
 
 During compilation the ASM byte code library is used to fill out the details of the `BeanDefinition`, including a `build` method that, for the previous example, looks like:
 
@@ -63,7 +63,7 @@ public Vehicle build(
 <2> The type is instantiated and each constructor argument looked up by calling methods of api:context.AbstractInitializableBeanDefinition[]
 <3> In this case the index of the constructor argument is tracked
 
-NOTE: Special handling is required when a Java field or method has `private` access. In this case Micronaut has no option but to fallback to using Java reflection to perform dependency injection.
+NOTE: Special handling is required when a Java field or method has `private` access. In this case Micronaut has no option but to fall back to using Java reflection to perform dependency injection.
 
 === Configuration Properties Handling
 

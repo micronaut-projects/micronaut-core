@@ -30,8 +30,7 @@ public interface RouteDataCollector<T> {
 
     /**
      * @param routes A java stream of uri route infos
-     * @return A publisher that returns data representing all of
-     * the given routes.
+     * @return A publisher that returns data representing all given routes.
      */
     T getData(Stream<UriRouteInfo<?, ?>> routes);
 }

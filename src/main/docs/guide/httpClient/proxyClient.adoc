@@ -1,6 +1,6 @@
 A common requirement in Microservice environments is to proxy requests in a Gateway Microservice to other backend Microservices.
 
-The regular api:http.client.HttpClient[] API is designed around simplifying message exchange and is not designed for proxying requests. For this case, use the api:http.client.ProxyHttpClient[], which can be used from a <<filters, HTTP Server Filter>> to proxy requests to backend Microservices.
+The regular api:http.client.HttpClient[] API is designed around simplifying message exchange and is not designed for proxying requests. For this case, use the api:http.client.ProxyHttpClient[], which can be used from an <<filters, HTTP Server Filter>> to proxy requests to backend Microservices.
 
 The following example demonstrates rewriting requests under the URI `/proxy` to the URI `/real` onto the same server (although in a real environment you generally proxy to another server):
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 /**
- * The main classes implementing cross cutting behavior in Micronaut.
+ * The main classes implementing cross-cutting behavior in Micronaut.
  *
  * @author graemerocher
  * @since 1.0

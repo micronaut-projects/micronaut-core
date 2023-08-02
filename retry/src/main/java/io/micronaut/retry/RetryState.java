@@ -31,7 +31,7 @@ import java.util.OptionalDouble;
 public interface RetryState {
 
     /**
-     * Should a retry attempt occur.
+     * Should a retry attempt to occur.
      *
      * @param exception The error
      *

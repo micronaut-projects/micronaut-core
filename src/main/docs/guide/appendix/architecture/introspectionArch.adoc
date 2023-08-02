@@ -12,7 +12,7 @@ This generation happens via the `io.micronaut.inject.beans.visitor.BeanIntrospec
 
 For example, given a class called `example.Person` the classes generated are:
 
-* `example.$Person$IntrospectionRef` - an implementation of api:core.beans.BeanIntrospectionReference[] that allows the application to soft load the introspection without loading all of the metadata or the class itself (in the case where the introspected class is itself not on the classpath). Since references are loaded via link:{jdkapi}/java.base/java/util/ServiceLoader.html[ServiceLoader] an entry in a generated `META-INF/services/io.micronaut.core.beans.BeanIntrospectionReference` referring to this type is also generated at compilation time.
+* `example.$Person$IntrospectionRef` - an implementation of api:core.beans.BeanIntrospectionReference[] that allows the application to soft load the introspection without loading all metadata or the class itself (in the case where the introspected class is itself not on the classpath). Since references are loaded via link:{jdkapi}/java.base/java/util/ServiceLoader.html[ServiceLoader] an entry in a generated `META-INF/services/io.micronaut.core.beans.BeanIntrospectionReference` referring to this type is also generated at compilation time.
 * `example.$Person$Introspection` - an implementation of api:core.beans.BeanIntrospection[] which contains the actual runtime introspection information.
 
 The following example demonstrates usage of the api:core.beans.BeanIntrospection[] API:

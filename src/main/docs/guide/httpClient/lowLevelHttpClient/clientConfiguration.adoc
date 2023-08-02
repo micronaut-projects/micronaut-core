@@ -15,7 +15,7 @@ The above example sets the `readTimeout` property of the api:http.client.HttpCli
 
 === Client Specific Configuration
 
-To have separate configuration per-client, there are a couple of options. You can configure <<serviceDiscoveryManual, Service Discovery>> manually in your configuration file (e.g `application.yml`) and apply per-client configuration:
+To have separate configuration per-client, there are a couple of options. You can configure <<serviceDiscoveryManual, Service Discovery>> manually in your configuration file (e.g. `application.yml`) and apply per-client configuration:
 
 .Manually configuring HTTP services
 [configuration]

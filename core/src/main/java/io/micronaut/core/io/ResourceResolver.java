@@ -80,7 +80,7 @@ public class ResourceResolver {
     /**
      * Searches resource loaders for one that supports the given prefix.
      *
-     * @param prefix The prefix the loader should support. (classpath:, file:, etc)
+     * @param prefix The prefix the loader should support. (classpath:, file:, etc.)
      * @return An optional resource loader
      */
     public @NonNull  Optional<ResourceLoader> getSupportingLoader(@NonNull String prefix) {

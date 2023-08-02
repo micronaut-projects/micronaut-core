@@ -10,7 +10,7 @@ snippet::io.micronaut.docs.server.body.MessageController[tags="imports,class,ech
 
 Note that reading the request body is done in a non-blocking manner in that the request contents are read as the data becomes available and accumulated into the String passed to the method.
 
-TIP: The `micronaut.server.maxRequestSize` setting in your configuration file (e.g `application.yml`) limits the size of the data (the default maximum request size is 10MB) read/buffered by the server. `@Size` is *not* a replacement for this setting.
+TIP: The `micronaut.server.maxRequestSize` setting in your configuration file (e.g. `application.yml`) limits the size of the data (the default maximum request size is 10MB) read/buffered by the server. `@Size` is *not* a replacement for this setting.
 
 Regardless of the limit, for a large amount of data accumulating the data into a String in-memory may lead to memory strain on the server. A better approach is to include a Reactive library in your project (such as `Reactor`, `RxJava`,or `Akka`) that supports the Reactive streams implementation and stream the data it becomes available:
 

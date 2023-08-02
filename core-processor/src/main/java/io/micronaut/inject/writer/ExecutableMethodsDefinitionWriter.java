@@ -136,9 +136,9 @@ public class ExecutableMethodsDefinitionWriter extends AbstractClassFileWriter i
     }
 
     /**
-     * Does method supports intercepted proxy.
+     * Does method support intercepted proxy.
      *
-     * @return Does method supports intercepted proxy
+     * @return Does method support intercepted proxy
      */
     public boolean isSupportsInterceptedProxy() {
         return methodDispatchWriter.isHasInterceptedMethod();

@@ -122,14 +122,14 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
      *
      * @param in     The incoming message
      * @param stream The publisher for the Http Content
-     * @return An streamed incoming message
+     * @return A streamed incoming message
      */
     protected abstract In createStreamedMessage(In in, Publisher<? extends HttpContent> stream);
 
     /**
      * Invoked when an incoming message is first received.
      * <p>
-     * Overridden by sub classes for state tracking.
+     * Overridden by subclasses for state tracking.
      *
      * @param ctx The channel handler context
      */
@@ -139,7 +139,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     /**
      * Invoked when an incoming message is fully consumed.
      * <p>
-     * Overridden by sub classes for state tracking.
+     * Overridden by subclasses for state tracking.
      *
      * @param ctx The channel handler context
      */
@@ -149,7 +149,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     /**
      * Invoked when an outgoing message is first received.
      * <p>
-     * Overridden by sub classes for state tracking.
+     * Overridden by subclasses for state tracking.
      *
      * @param ctx The channel handler context
      */
@@ -159,7 +159,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     /**
      * Invoked when an outgoing message is fully sent.
      * <p>
-     * Overridden by sub classes for state tracking.
+     * Overridden by subclasses for state tracking.
      *
      * @param ctx The channel handler context
      */
@@ -461,7 +461,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
      * Most operations we want to do even if the channel is not active, because if it's not, then we want to encounter
      * the error that occurs when that operation happens and so that it can be passed up to the user. However, removing
      * handlers should only be done if the channel is active, because the error that is encountered when they aren't
-     * makes no sense to the user (NoSuchElementException).
+     * make no sense to the user (NoSuchElementException).
      */
     private void removeHandlerIfActive(ChannelHandlerContext ctx, String name) {
         if (ctx.channel().isActive()) {

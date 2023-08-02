@@ -28,7 +28,7 @@ import io.micronaut.core.annotation.Internal;
 public interface UnsafeExecutable<T, R> extends Executable<T, R> {
 
     /**
-     * Invokes the method without the arguments validation.
+     * Invokes the method without the arguments' validation.
      *
      * @param instance  The instance. Nullable only if it's a static method call.
      * @param arguments The arguments

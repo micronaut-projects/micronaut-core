@@ -30,7 +30,7 @@ public final class JsonSyntaxException extends IOException {
      * @param cause The framework exception
      */
     public JsonSyntaxException(Throwable cause) {
-        // copy the message so it's shown properly to the user
+        // copy the message, so it's shown properly to the user
         super(cause.getMessage(), cause);
     }
 

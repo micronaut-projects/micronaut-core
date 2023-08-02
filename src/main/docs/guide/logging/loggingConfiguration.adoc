@@ -1,4 +1,4 @@
-Log levels can be configured via properties defined in your configuration file (e.g `application.yml`) (and environment variables) with the `logger.levels` prefix:
+Log levels can be configured via properties defined in your configuration file (e.g. `application.yml`) (and environment variables) with the `logger.levels` prefix:
 
 [configuration]
 ----

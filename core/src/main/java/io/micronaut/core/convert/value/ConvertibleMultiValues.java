@@ -57,7 +57,7 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
     @Nullable V get(CharSequence name);
 
     /**
-     * @return Whether this values is empty
+     * @return Whether these values are empty
      */
     @Override
     default boolean isEmpty() {
@@ -194,7 +194,7 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
      * @param requiredType The required type
      * @param defaultValue The default value
      * @param <T>          The generic type
-     * @return The first value of the default supplied value if it is isn't present
+     * @return The first value of the default supplied value if it is present
      */
     default <T> T getFirst(CharSequence name, Class<T> requiredType, T defaultValue) {
         return getFirst(name, requiredType).orElse(defaultValue);

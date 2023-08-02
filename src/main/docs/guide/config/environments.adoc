@@ -79,7 +79,7 @@ NOTE: Previously, we recommended using `Micronaut.defaultEnvironments("dev")` ho
 
 == Micronaut Banner
 
-Since Micronaut framework 2.3 a banner is shown when the application starts. It is enabled by default and it also shows the Micronaut version.
+Since Micronaut framework 2.3 a banner is shown when the application starts. It is enabled by default, and it also shows the Micronaut version.
 
 [source,shell,subs="attributes"]
 ----

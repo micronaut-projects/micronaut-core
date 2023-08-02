@@ -108,7 +108,7 @@ public class MediaType implements CharSequence {
     public static final MediaType APPLICATION_FORM_URLENCODED_TYPE = new MediaType(APPLICATION_FORM_URLENCODED);
 
     /**
-     * Short cut for {@link #APPLICATION_FORM_URLENCODED_TYPE}.
+     * Shortcut for {@link #APPLICATION_FORM_URLENCODED_TYPE}.
      */
     public static final MediaType FORM = APPLICATION_FORM_URLENCODED_TYPE;
 

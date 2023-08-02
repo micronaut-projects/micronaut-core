@@ -98,8 +98,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      *
      * @param declaredAnnotations     The directly declared annotations
      * @param declaredStereotypes     The directly declared stereotypes
-     * @param allStereotypes          All of the stereotypes
-     * @param allAnnotations          All of the annotations
+     * @param allStereotypes          All stereotypes
+     * @param allAnnotations          All annotations
      * @param annotationsByStereotype The annotations by stereotype
      */
     @Internal
@@ -118,8 +118,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      *
      * @param declaredAnnotations     The directly declared annotations
      * @param declaredStereotypes     The directly declared stereotypes
-     * @param allStereotypes          All of the stereotypes
-     * @param allAnnotations          All of the annotations
+     * @param allStereotypes          All stereotypes
+     * @param allAnnotations          All annotations
      * @param annotationsByStereotype The annotations by stereotype
      * @param hasPropertyExpressions  Whether property expressions exist in the metadata
      */
@@ -140,8 +140,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      *
      * @param declaredAnnotations      The directly declared annotations
      * @param declaredStereotypes      The directly declared stereotypes
-     * @param allStereotypes           All of the stereotypes
-     * @param allAnnotations           All of the annotations
+     * @param allStereotypes           All stereotypes
+     * @param allAnnotations           All annotations
      * @param annotationsByStereotype  The annotations by stereotype
      * @param hasPropertyExpressions   Whether property expressions exist in the metadata
      * @param hasEvaluatedExpressions  Whether evaluated expressions exist in the metadata

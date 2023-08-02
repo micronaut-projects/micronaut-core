@@ -49,8 +49,8 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
 
     /**
      *
-     * @param webSocketMessageEncoder A instance of {@link io.micronaut.http.netty.websocket.WebSocketMessageEncoder} responsible of encoding WebSocket messages.
-     * @param webSocketSessionRepository A instance of {@link io.micronaut.http.netty.websocket.WebSocketSessionRepository}. Defines a ChannelGroup repository to handle WebSockets.
+     * @param webSocketMessageEncoder An instance of {@link io.micronaut.http.netty.websocket.WebSocketMessageEncoder} responsible for encoding WebSocket messages.
+     * @param webSocketSessionRepository An instance of {@link io.micronaut.http.netty.websocket.WebSocketSessionRepository}. Defines a ChannelGroup repository to handle WebSockets.
      */
     public NettyServerWebSocketBroadcaster(WebSocketMessageEncoder webSocketMessageEncoder,
                                            WebSocketSessionRepository webSocketSessionRepository) {
@@ -124,8 +124,8 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
             return singleCause;
         } else if (failure instanceof ClosedChannelException) {
             // ClosedChannelException can happen when there is a race condition between the call to writeAndFlush and
-            // the closing of a channel. session.isOpen will still return true, but when the write is actually
-            // performed, the channel is closed. Since we would have skipped the write anyway had we known the channel
+            // the closing of a channel. session.isOpen will still return true, but when to write is actually
+            // performed, the channel is closed. Since we would have skipped to write anyway had we known the channel
             // would go away, we can safely ignore this error.
             return null;
         } else {

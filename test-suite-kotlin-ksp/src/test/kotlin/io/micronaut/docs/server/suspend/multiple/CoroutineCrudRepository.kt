@@ -34,7 +34,7 @@ interface CoroutineCrudRepository<E, ID> {
     /**
      * Saves all given entities, possibly returning new instances representing the saved state.
      *
-     * @param entities The entities to saved. Must not be null.
+     * @param entities The entities to save. Must not be null.
      * @param <S> The generic type
      * @return The saved entities objects. will never be null.
      */

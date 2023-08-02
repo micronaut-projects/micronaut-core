@@ -2,7 +2,7 @@ Since Micronaut framework 4.x, Micronaut's Netty-based HTTP server can be config
 
 ==== Configuring the Server for HTTP/3
 
-Instead of the TCP used for HTTP/1.1 and HTTP/2, HTTP/3 runs on UDP. To expose a HTTP/3 server, you need to define a <<listener, listener>> with the special `QUIC` protocol family:
+Instead of the TCP used for HTTP/1.1 and HTTP/2, HTTP/3 runs on UDP. To expose an HTTP/3 server, you need to define a <<listener, listener>> with the special `QUIC` protocol family:
 
 .Enabling HTTP/3 Support
 [source,yaml]
