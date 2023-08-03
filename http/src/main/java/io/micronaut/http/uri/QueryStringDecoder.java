@@ -374,6 +374,7 @@ final class QueryStringDecoder {
                 continue;
             }
 
+            // this cast and those below are necessary for java 8 binary compat (see issue core#9637)
             ((Buffer) byteBuf).clear();
             do {
                 if (i + 3 > toExcluded) {
