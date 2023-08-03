@@ -33,6 +33,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * The mapper visitor.
+ * @since 4.1.0
+ */
 public final class MapperVisitor implements TypeElementVisitor<Object, Mapper> {
     private ClassElement lastClassElement;
 

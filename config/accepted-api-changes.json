@@ -343,5 +343,10 @@
     "type": "io.micronaut.http.server.exceptions.response.HateoasErrorResponseProcessor",
     "member": "Constructor io.micronaut.http.server.exceptions.response.HateoasErrorResponseProcessor(io.micronaut.jackson.JacksonConfiguration)",
     "reason": "Removed as was deprecated in 3.8.x"
+  },
+  {
+    "type": "io.micronaut.core.graal.AutomaticFeatureUtils",
+    "member": "Constructor io.micronaut.core.graal.AutomaticFeatureUtils()",
+    "reason": "Was deprecated"
   }
 ]

@@ -49,6 +49,34 @@ class Test
         introspection.instantiate().class.name == "test.Test"
     }
 
+    void "test default introspection"() {
+        when:
+            def introspection = buildBeanIntrospection("test.Test", """
+package test
+
+import io.micronaut.core.annotation.Introspected
+
+@Introspected
+data class Test(val firstName: String = "Denis",
+               val lastName: String,
+               val job: String? = "IT",
+               val age: Int)
+""")
+
+        then:
+            noExceptionThrown()
+            introspection != null
+            introspection.getConstructorArguments()[0].isDeclaredNullable()
+            introspection.getConstructorArguments()[0].isNullable()
+            !introspection.getConstructorArguments()[1].isDeclaredNullable()
+            introspection.getConstructorArguments()[2].isDeclaredNullable()
+            !introspection.getConstructorArguments()[3].isDeclaredNullable()
+            !introspection.getProperty("firstName").get().isNullable()
+            !introspection.getProperty("lastName").get().isNullable()
+            introspection.getProperty("job").get().isNullable()
+            !introspection.getProperty("age").get().isNullable()
+    }
+
     void "test data class introspection"() {
         when:
         def introspection = buildBeanIntrospection("test.ContactEntity", """

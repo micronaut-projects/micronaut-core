@@ -268,7 +268,6 @@ public abstract class EnclosedElementsQuery<C, N> {
         return elements;
     }
 
-
     /**
      * Gets the element name.
      * @param element The element
