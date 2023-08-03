@@ -109,7 +109,7 @@ unnecessary upgrade burden on our users. Read the
 [Module Upgrade Strategy](https://github.com/micronaut-projects/micronaut-core/wiki/Module-Upgrade-Strategy) for more
 information.
 
-Note that if a new version arrives, and we are not ready yet to do the upgrade, you need to
+Note that if a new version arrives and we are not ready yet to do the upgrade, you need to
 [pin the old version](https://github.com/micronaut-projects/micronaut-build/#configuration-options), because otherwise,
 Renovate and our workflow will keep sending PRs. You should also create an issue to upgrade so that it's not forgotten.
 
