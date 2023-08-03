@@ -75,7 +75,7 @@ public interface Router {
     void applyDefaultPorts(List<Integer> ports);
 
     /**
-     * Finds all of the possible routes for the given HTTP method and URI.
+     * Finds all possible routes for the given HTTP method and URI.
      *
      * @param httpMethod The HTTP method
      * @param uri        The URI route match
@@ -88,7 +88,7 @@ public interface Router {
     <T, R> Stream<UriRouteMatch<T, R>> find(@NonNull HttpMethod httpMethod, @NonNull CharSequence uri, @Nullable HttpRequest<?> context);
 
     /**
-     * Finds all of the possible routes for the given HTTP method and URI.
+     * Finds all possible routes for the given HTTP method and URI.
      *
      * @param httpMethod The HTTP method
      * @param uri        The URI
@@ -103,7 +103,7 @@ public interface Router {
     }
 
     /**
-     * Finds all of the possible routes for the given HTTP request.
+     * Finds all possible routes for the given HTTP request.
      *
      * @param request The HTTP request
      * @param <T>     The target type
@@ -116,7 +116,7 @@ public interface Router {
     }
 
     /**
-     * Find method, that should be used for non-standard http methods. For standards it should act
+     * Find method, that should be used for non-standard http methods. For standards, it should act
      * the same as {@link #find(HttpMethod, CharSequence, HttpRequest)}
      * @param request The request, that can have overridden {@link HttpRequest#getMethodName()}
      * @param uri     The URI route match.

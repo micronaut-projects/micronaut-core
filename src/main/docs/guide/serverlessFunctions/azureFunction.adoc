@@ -25,7 +25,7 @@ You can deploy regular Micronaut applications that use ann:http.annotation.Contr
 [TIP]
 .Using the CLI
 ====
-To create a Azure HTTP Function:
+To create an Azure HTTP Function:
 ----
 $ mn create-app my-app --features azure-function
 ----

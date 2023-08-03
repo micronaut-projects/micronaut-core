@@ -289,7 +289,7 @@ public class AntPathMatcher implements PathMatcher {
         }
         if (strIdxStart > strIdxEnd) {
             // All characters in the string are used. Check if only '*'s are
-            // left in the pattern. If so, we succeeded. Otherwise failure.
+            // left in the pattern. If so, we succeeded. Otherwise, failure.
             for (int i = patIdxStart; i <= patIdxEnd; i++) {
                 if (patArr[i] != '*') {
                     return false;
@@ -311,7 +311,7 @@ public class AntPathMatcher implements PathMatcher {
         }
         if (strIdxStart > strIdxEnd) {
             // All characters in the string are used. Check if only '*'s are
-            // left in the pattern. If so, we succeeded. Otherwise failure.
+            // left in the pattern. If so, we succeeded. Otherwise, failure.
             for (int i = patIdxStart; i <= patIdxEnd; i++) {
                 if (patArr[i] != '*') {
                     return false;
@@ -364,7 +364,7 @@ public class AntPathMatcher implements PathMatcher {
         }
 
         // All characters in the string are used. Check if only '*'s are left
-        // in the pattern. If so, we succeeded. Otherwise failure.
+        // in the pattern. If so, we succeeded. Otherwise, failure.
         for (int i = patIdxStart; i <= patIdxEnd; i++) {
             if (patArr[i] != '*') {
                 return false;

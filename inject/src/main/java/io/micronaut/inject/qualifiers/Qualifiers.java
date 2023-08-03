@@ -154,7 +154,7 @@ public class Qualifiers {
 
 
     /**
-     * Qualify by a prefix. Applies starting with logic to the name of the bean..
+     * Qualify by a prefix. Applies starting with logic to the name of the bean.
      *
      * @param prefix The name
      * @param <T>  The component type

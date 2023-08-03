@@ -128,7 +128,7 @@ public interface CommandLine {
         T addOption(String name, String description);
 
         /**
-         * Parses a string of all the command line options converting them into an array of arguments to pass to #parse(String..args).
+         * Parses a string of all the command line options converting them into an array of arguments to pass to #parse(String... args).
          *
          * @param string The string
          * @return The command line

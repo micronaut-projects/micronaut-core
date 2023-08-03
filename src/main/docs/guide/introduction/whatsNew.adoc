@@ -33,7 +33,7 @@ The core of Micronaut has been further refactored to improve modularity and redu
 
 * Third-party dependencies on SnakeYAML and Jackson Databind are now optional and can be removed if other implementations are present.
 * The runtime and compiler code has been split, allowing the removal of the re-packaging of ASM and Caffeine and reduction of the runtime footprint.
-* The built in <<validation, Validation>>, <<retry, Retry>>, <<serviceDiscovery, Service Discovery>>, <<sessions, HTTP Session>> and <<websocket, WebSocket>> features have been split into separate modules allowing removal of this functionality if not needed.
+* The built-in <<validation, Validation>>, <<retry, Retry>>, <<serviceDiscovery, Service Discovery>>, <<sessions, HTTP Session>> and <<websocket, WebSocket>> features have been split into separate modules allowing removal of this functionality if not needed.
 
 ==== Completed `javax` to `jakarta` Migration
 
@@ -41,7 +41,7 @@ The remaining functionality depending on the `javax` specification has been migr
 
 ==== Expression Language
 
-A new fully compilation time, type-safe and reflection-free <<evaluatedExpressions, Expression Language>> has been added to the framework which unlocks a number of new possibilities (like conditional job scheduling). It is expected that sub-modules will adopt the new EL over time to add features and capabilities.
+A new fully compilation time, type-safe and reflection-free <<evaluatedExpressions, Expression Language>> has been added to the framework which unlocks a number of new possibilities (like conditional job scheduling). It is expected that submodules will adopt the new EL over time to add features and capabilities.
 
 ==== Injection of Maps
 

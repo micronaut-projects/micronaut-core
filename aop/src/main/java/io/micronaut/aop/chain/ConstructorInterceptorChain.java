@@ -141,7 +141,7 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
      * @param interceptors      The interceptors. Can be null and if so should be resolved from the context.
      * @param definition        The definition
      * @param constructor       The bean constructor
-     * @param parameters        Th resolved parameters
+     * @param parameters        The resolved parameters
      * @param <T1>              The bean type
      * @return The instantiated bean
      * @since 3.0.0

@@ -1,4 +1,4 @@
-By default with Java, the parameter name data for method parameters is not retained at compile time. This can be a problem for the Micronaut framework if you do not define parameter names explicitly and depend on an external JAR that is already compiled.
+By default, with Java, the parameter name data for method parameters is not retained at compile time. This can be a problem for the Micronaut framework if you do not define parameter names explicitly and depend on an external JAR that is already compiled.
 
 Consider this interface:
 

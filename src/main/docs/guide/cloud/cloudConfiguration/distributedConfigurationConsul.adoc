@@ -110,7 +110,7 @@ EOF
 
 Another popular option is https://github.com/breser/git2consul[git2consul] which mirrors the contents of a Git repository to Consul's key/value store.
 
-You can setup a Git repository that contains files like `application.yml`, `hello-world-test.json`, etc., and the contents of these files will be cloned to Consul.
+You can set up a Git repository that contains files like `application.yml`, `hello-world-test.json`, etc., and the contents of these files will be cloned to Consul.
 
 In this case, each key in Consul represents a file with an extension, for example `/config/application.yml`, and you must configure the `FILE` format:
 

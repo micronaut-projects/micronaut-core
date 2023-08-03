@@ -15,7 +15,7 @@ FAILURE: Build failed with an exception.
 Execution failed for task ':publishGuide'.
 > org.jruby.exceptions.RaiseException: (TypeError) cannot convert instance of class org.jruby.RubyObject to interface org.asciidoctor.ast.DocumentRuby
 
-I found a closed issue on github that sounds similar https://github.com/asciidoctor/asciidoctorj/issues/267 but not really certain
+I found a closed issue on GitHub that sounds similar https://github.com/asciidoctor/asciidoctorj/issues/267 but not really certain
 ////
 
 The `save` method performs an HTTP `POST` with the following JSON by default:

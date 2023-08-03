@@ -88,7 +88,7 @@ class SimpleRetry implements RetryState, MutableRetryState {
     }
 
     /**
-     * Should a retry attempt occur.
+     * Should a retry attempt to occur.
      *
      * @return True if it should
      */
@@ -164,7 +164,7 @@ class SimpleRetry implements RetryState, MutableRetryState {
     }
 
     /**
-     * @return Return the milli second value for the next delay
+     * @return Return the millisecond value for the next delay
      */
     @Override
     @Internal

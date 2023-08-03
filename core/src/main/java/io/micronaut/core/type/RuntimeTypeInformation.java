@@ -50,7 +50,7 @@ final class RuntimeTypeInformation {
      * Returns whether the annotation metadata specifies the type as single.
      * @param type The return type
      * @param annotationMetadata The annotation metadata provider
-     * @return True if does
+     * @return True if it does
      */
     static boolean isSpecifiedSingle(Class<?> type, AnnotationMetadataProvider annotationMetadata) {
         if (isJavaBasicTypeAndNotReactiveAndNotWrapper(type)) {

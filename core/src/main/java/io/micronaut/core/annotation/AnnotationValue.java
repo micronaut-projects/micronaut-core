@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * A runtime representation of the an annotation and its values.
+ * A runtime representation of the annotation and its values.
  *
  * <p>This class implements the {@link AnnotationValueResolver} interface and methods such as {@link AnnotationValueResolver#get(CharSequence, Class)} can be used to retrieve the values of annotation members.</p>
  *
@@ -243,7 +243,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * </pre>
      *
      * @param member The member
-     * @return The properties as a immutable map.
+     * @return The properties as an immutable map.
      */
     @NonNull
     public Map<String, String> getProperties(@NonNull String member) {
@@ -1537,7 +1537,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     }
 
     /**
-     * The classes class values for the given value.
+     * The class values for the given value.
      *
      * @param value The value
      * @return The class values or null

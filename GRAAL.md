@@ -1,6 +1,6 @@
 # Test Micronaut and GraalVM
 
-The problem we want to solve is detect regressions in both Micronaut and GraalVM as soon as they are introduced and 
+The problem we want to solve is detect regressions in both Micronaut and GraalVM as soon as they are introduced and
 before a new version is released.
 
 ## Gitlab CI
@@ -22,7 +22,7 @@ There are two repositories:
 
 ### Branch structure
 
-It is possible to test different Micronaut and GraalVM versions. For Micronaut we always test the current stable version
+It is possible to test different Micronaut and GraalVM versions. For Micronaut, we always test the current stable version
 and the next one (using snapshots in both cases).
 In the case of GraalVM we can test up to three different branches at the same time: stable, prerelease and development,
 and we always test at least two of them.
@@ -52,7 +52,7 @@ All the configuration is in [this repository](https://gitlab.com/micronaut-proje
 the `README` explains how it works. The only thing that we need to modify is the file `should-trigger-the-build.sh` to
 use the appropriate Micronaut and GraalVM branches.
 
-**Important:** When adding commits to more than one branch, **always** cherry-pick the changes instead of merging branches. It helps a lot keeping the branches "clean" without merges.
+**Important:** When adding commits to more than one branch, **always** cherry-pick the changes instead of merging branches. It helps a lot of keeping the branches "clean" without merges.
 
 ### CI pipeline
 
@@ -173,7 +173,7 @@ jdk17:basic-app:micronaut-build:
 ```
 1. Common parent template for all jobs in `micronaut` stage.
 2. Use a custom [Docker image](https://gitlab.com/micronaut-projects/micronaut-graal-tests/-/tree/3.3.x-dev/docker) for building the native image based on the official GraalVM docker.
-3. Remove the suffixes `-dev`,  `-stable` and `-prerelease` from the current branch. The environment variable `APP_BRANCH` is used in every test application build script to checkout the appropriate git branch.
+3. Remove the suffixes `-dev`,  `-stable` and `-prerelease` from the current branch. The environment variable `APP_BRANCH` is used in every test application build script to check out the appropriate git branch.
 4. Allow failures for the jobs in this stage. We don't want that a failure here stops the execution of the rest of the jobs.
 5. Retry if there is an error. Sometimes this happens for connectivity issues when downloading the dependencies.
 6. Template for building JDK11 applications. Extends from the parent one.
@@ -263,7 +263,7 @@ These are the steps to add a new Micronaut-GraalVM test application to the pipel
     - Add the jobs for the new application in `micronaut` and `test` stages.
     - Create the scripts to build the native-image for the micronaut application and for the tests. If the application needs a Docker dependency make sure it is configured properly and define the appropriate environment variables for the CI Environment.
     - Commit the changes (a).
-    - Remove/comment out the rest of the test applications so they are not executed and we don't waste time and resources running them.
+    - Remove/comment out the rest of the test applications, so they are not executed, and we don't waste time and resources running them.
     - Commit the changes (b).
     - Push the branch and wait for the build.
     - If something fails, fix commit (c) and repeat.

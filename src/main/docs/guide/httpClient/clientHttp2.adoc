@@ -11,7 +11,7 @@ micronaut:
 
 Or by specifying the HTTP version to use when injecting the client:
 
-.Injecting a HTTP/2 Client
+.Injecting an HTTP/2 Client
 [source,java]
 ----
 @Inject

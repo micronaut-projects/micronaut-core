@@ -35,7 +35,7 @@ public class VersionUtils {
 
     private static final Properties VERSIONS = new Properties();
 
-    // This block needs to be here so it is executed before MICRONAUT_VERSION
+    // This block needs to be here, so it is executed before MICRONAUT_VERSION
     static {
         URL resource = VersionUtils.class.getResource("/micronaut-version.properties");
         if (resource != null) {

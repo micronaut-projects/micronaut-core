@@ -304,7 +304,7 @@ public final class RouteExecutor {
 
         // First try to find an error route by the exception
         if (declaringType != null) {
-            // handle error with a method that is non global with exception
+            // handle error with a method that is non-global with exception
             errorRoute = router.findErrorRoute(declaringType, cause, httpRequest).orElse(null);
         }
         if (errorRoute == null) {
@@ -325,7 +325,7 @@ public final class RouteExecutor {
 
             if (errorStatus != null) {
                 if (declaringType != null) {
-                    // handle error with a method that is non global with bad request
+                    // handle error with a method that is non-global with bad request
                     errorRoute = router.findStatusRoute(declaringType, errorStatus, httpRequest).orElse(null);
                 }
                 if (errorRoute == null) {
@@ -349,7 +349,7 @@ public final class RouteExecutor {
         Class<?> declaringType = finalRoute.getDeclaringType();
         // handle re-mapping of errors
         RouteMatch<Object> statusRoute = null;
-        // if declaringType is not null, this means its a locally marked method handler
+        // if declaringType is not null, this means it's a locally marked method handler
         if (declaringType != null) {
             statusRoute = router.findStatusRoute(declaringType, status, incomingRequest)
                 .orElseGet(() -> router.findStatusRoute(status, incomingRequest).orElse(null));

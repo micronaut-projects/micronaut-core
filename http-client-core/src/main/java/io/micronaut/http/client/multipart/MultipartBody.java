@@ -25,7 +25,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A builder class to generate a list a list of parts for a multi part request.
+ * A builder class to generate a list of parts for a multipart request.
  *
  * @author James Kleeh
  * @author graemerocher

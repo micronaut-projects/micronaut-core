@@ -17,7 +17,7 @@ The api:context.ApplicationContext[] is a specialized version of the api:context
 
 The api:context.env.Environment[] is loaded from one or more defined api:context.env.PropertySource[] instances that are discovered via the https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/ServiceLoader.html[standard Java service loader mechanism] by loading instances of api:context.env.PropertySourceLoader[].
 
-A developer can extend Micronaut to load a api:context.env.PropertySource[] through an entirely custom mechanism by adding an additional implementation and the associated `META-INF/services/io.micronaut.context.env.PropertySourceLoader` file referencing this class.
+A developer can extend Micronaut to load a api:context.env.PropertySource[] through an entirely custom mechanism by adding another implementation and the associated `META-INF/services/io.micronaut.context.env.PropertySourceLoader` file referencing this class.
 
 A high level different between a api:context.BeanContext[] and an api:context.ApplicationContext[] is illustrated below:
 

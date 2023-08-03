@@ -71,7 +71,7 @@ public interface RouteMatch<R> extends Callable<R>, AnnotationMetadataProvider {
     void fulfillAfterFilters(RequestBinderRegistry requestBinderRegistry, HttpRequest<?> request);
 
     /**
-     * @return Whether the route match can be executed without passing any additional arguments ie. via
+     * @return Whether the route match can be executed without passing any additional arguments i.e. via
      * {@link #execute()}
      * @since 4.0.0
      */

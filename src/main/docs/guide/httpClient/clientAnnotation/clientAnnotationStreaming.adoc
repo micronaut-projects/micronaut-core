@@ -49,7 +49,7 @@ When streaming responses from servers, the underlying HTTP client will not apply
 
 Instead, the `read-idle-timeout` setting (which defaults to 5 minutes) dictates when to close a connection after it becomes idle.
 
-If you stream data from a server that defines a longer delay than 5 minutes between items, you should adjust `readIdleTimeout`. The following configuration in your configuration file (e.g `application.yml`) demonstrates how:
+If you stream data from a server that defines a longer delay than 5 minutes between items, you should adjust `readIdleTimeout`. The following configuration in your configuration file (e.g. `application.yml`) demonstrates how:
 
 .Adjusting the readIdleTimeout
 [configuration]

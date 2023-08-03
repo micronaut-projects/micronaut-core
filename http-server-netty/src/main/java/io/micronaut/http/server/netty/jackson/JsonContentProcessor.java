@@ -82,7 +82,7 @@ public final class JsonContentProcessor extends AbstractHttpContentProcessor {
             if (Publishers.isConvertibleToPublisher(targetType) && !Publishers.isSingle(targetType)) {
                 Optional<Argument<?>> genericArgument = type.getFirstTypeVariable();
                 if (genericArgument.isPresent() && !Iterable.class.isAssignableFrom(genericArgument.get().getType()) && !isJsonStream) {
-                    // if the generic argument is not a iterable type them stream the array into the publisher
+                    // if the generic argument is not an iterable type them stream the array into the publisher
                     counter.unwrapTopLevelArray();
                     tokenize = true;
                 }

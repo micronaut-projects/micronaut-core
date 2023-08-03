@@ -24,7 +24,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 
 /**
- * The default exception handler used if non other is found. Simply logs the exception.
+ * The default exception handler used if non-other is found. Simply logs the exception.
  *
  * @author graemerocher
  * @since 1.0

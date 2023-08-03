@@ -39,7 +39,7 @@ import java.util.stream.Collectors;
  * response. The top level object represents the most severe status found in the provided health results, or
  * {@link HealthStatus#UNKNOWN} if none found. All registered indicators have their own
  * {status: , description: (optional , details: } object, keyed by the name of the {@link HealthResult} defined inside
- * of the details of the top level object.
+ * the details of the top level object.
  * <p>
  * Example:
  * [status: "UP, details: [diskSpace: [status: UP, details: [:]], cpuUsage: ...]]</p>

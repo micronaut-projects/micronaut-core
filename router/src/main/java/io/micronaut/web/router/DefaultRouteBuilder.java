@@ -72,7 +72,7 @@ import java.util.function.Supplier;
 public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     /**
-     * A {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy} where by camel case conventions are used.
+     * A {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy} whereby camel case conventions are used.
      */
     public static final UriNamingStrategy CAMEL_CASE_NAMING_STRATEGY = new UriNamingStrategy() {
     };
@@ -423,9 +423,9 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     /**
-     * A special case that is required for non standard http methods.
+     * A special case that is required for non-standard http methods.
      * @param httpMethodName The name of method. For standard http methods matches {@link HttpMethod#name()}
-     * @param httpMethod The http method. Is {@link HttpMethod#CUSTOM} for non standard http methods.
+     * @param httpMethod The http method. Is {@link HttpMethod#CUSTOM} for non-standard http methods.
      * @param uri The uri.
      * @param beanDefinition The definition of the bean.
      * @param method The method description

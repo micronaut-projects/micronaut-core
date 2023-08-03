@@ -24,7 +24,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * Extended version of {@link OptionalValuesMap} that resolved place holders.
+ * Extended version of {@link OptionalValuesMap} that resolved placeholders.
  *
  * @param <V> A generic value
  * @author graemerocher

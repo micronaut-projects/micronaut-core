@@ -7,7 +7,7 @@ NOTE: If you are unsure about something and the issue is more of a question a be
 
 - [ ] Steps to reproduce provided
 - [ ] Stacktrace (if present) provided
-- [ ] Example that reproduces the problem uploaded to Github
+- [ ] Example that reproduces the problem uploaded to GitHub
 - [ ] Full description of the issue provided (see below)
 
 ### Steps to Reproduce
@@ -32,5 +32,5 @@ Tell us what happens instead
 
 ### Example Application
 
-- TODO: link to github repository with example that reproduces the issue
+- TODO: link to GitHub repository with example that reproduces the issue
 

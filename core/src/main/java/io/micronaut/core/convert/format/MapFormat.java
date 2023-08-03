@@ -54,7 +54,7 @@ public @interface MapFormat {
     enum MapTransformation {
 
         /**
-         * A nested map has the any keys such as {@code foo.bar} transformed into a structure that is a map of maps
+         * A nested map has any keys such as {@code foo.bar} transformed into a structure that is a map of maps
          * such as JSON.
          */
         NESTED,

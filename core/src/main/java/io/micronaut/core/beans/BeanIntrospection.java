@@ -51,7 +51,7 @@ import java.util.Optional;
 public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanInfo<T> {
 
     /**
-     * @return A immutable collection of properties.
+     * @return An immutable collection of properties.
      */
     @NonNull Collection<BeanProperty<T, Object>> getBeanProperties();
 
@@ -60,7 +60,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      * then it will be included in the resulting list.
      *
      * @param annotationType The annotation type
-     * @return A immutable collection of properties.
+     * @return An immutable collection of properties.
      * @see io.micronaut.core.annotation.Introspected#indexed()
      */
     @NonNull Collection<BeanProperty<T, Object>> getIndexedProperties(@NonNull Class<? extends Annotation> annotationType);
@@ -133,7 +133,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      *
      * @param annotationType  The annotation type
      * @param annotationValue The annotation value
-     * @return A immutable collection of properties.
+     * @return An immutable collection of properties.
      * @see io.micronaut.core.annotation.Introspected#indexed()
      */
     @NonNull Optional<BeanProperty<T, Object>> getIndexedProperty(
@@ -146,7 +146,8 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      * <p>The {@link BeanMethod} instances are only those methods annotated with {@code io.micronaut.context.annotation.Executable} and hence represent a subset
      * of the actual methods of the class and do not include any methods that are exposed as {@link BeanProperty} instances.</p>
      *
-     * @return A immutable collection of methods.
+     * @return An immutable collection of methods.
+     *
      * @since 2.3.0
      */
     @NonNull
@@ -158,7 +159,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      * Get all the bean properties annotated for the given type.
      *
      * @param annotationType The annotation type
-     * @return A immutable collection of properties.
+     * @return An immutable collection of properties.
      * @see io.micronaut.core.annotation.Introspected#indexed()
      */
     default @NonNull Optional<BeanProperty<T, Object>> getIndexedProperty(

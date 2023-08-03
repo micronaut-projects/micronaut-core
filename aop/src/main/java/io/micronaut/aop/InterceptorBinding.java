@@ -52,7 +52,7 @@ public @interface InterceptorBinding {
     InterceptorKind kind() default InterceptorKind.AROUND;
 
     /**
-     * By default annotation members are not used when resolving interceptors. The value of
+     * By default, annotation members are not used when resolving interceptors. The value of
      * {@code bindMembers()} can be set to {@code true} to indicate that annotation members
      * should be used when binding interceptors to an annotation declaration.
      *

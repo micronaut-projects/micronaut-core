@@ -49,7 +49,7 @@ import java.util.stream.Collectors;
  * The converters only work when an {@link ArgumentConversionContext} is provided (so the type is an argument), as
  * the name of the parameter needs to be retrieved from there.
  *
- * Also {@link Format} annotation is required and needs to have one of the below mentioned formats: "csv", "ssv",
+ * Also {@link Format} annotation is required and needs to have one of the below-mentioned formats: "csv", "ssv",
  * "pipes", "multi", "deep-object". The format can be written in any case, e.g. "DEEP_OBJECT", "deep-object".
  *
  * @since 3.0.0
@@ -244,7 +244,7 @@ public class MultiValuesConverterFactory {
 
         /**
          * Implemented convert function that checks which Format is specified inside the {@link Format} annotation
-         * If one is specified, it calls one of the corresponding abstract methods. Otherwise empty optional is returned
+         * If one is specified, it calls one of the corresponding abstract methods. Otherwise, empty optional is returned
          */
         @Override
         public Optional<T> convert(

@@ -39,4 +39,4 @@ The Micronaut framework uses the configured `micronaut.application.name` to look
 
 |===
 
-See the https://www.vaultproject.io/api-docs/secret/kv[Documentation for HashiCorp Vault] for more information on how to setup the server.
+See the https://www.vaultproject.io/api-docs/secret/kv[Documentation for HashiCorp Vault] for more information on how to set up the server.

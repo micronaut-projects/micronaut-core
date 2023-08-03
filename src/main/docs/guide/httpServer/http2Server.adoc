@@ -51,6 +51,6 @@ Support for server push has been added in Micronaut framework 3.2. Server push a
 
 A new interface, api:http.PushCapableHttpRequest[], has been created to support the feature. Simply add a api:http.PushCapableHttpRequest[] parameter to a controller method and use its API to trigger additional requests.
 
-NOTE: api:http.PushCapableHttpRequest[] extends api:http.HttpRequest[] so its not necessary to have both as arguments in a controller method.
+NOTE: api:http.PushCapableHttpRequest[] extends api:http.HttpRequest[] so it's not necessary to have both as arguments in a controller method.
 
 Before triggering additional requests, the `isServerPushSupported()` method should be called to ensure the feature is available. Once it's known the feature is supported, use the `serverPush(HttpRequest)` method to trigger additional requests. For example: `request.serverPush(HttpRequest.GET("/static/style.css"))`).

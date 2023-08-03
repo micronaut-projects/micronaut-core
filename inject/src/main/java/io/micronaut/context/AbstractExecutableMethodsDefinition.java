@@ -44,7 +44,7 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 /**
- * Abstract base class for for {@link ExecutableMethodsDefinition}.
+ * Abstract base class for {@link ExecutableMethodsDefinition}.
  *
  * @param <T> The type
  * @author Denis Stepanov
@@ -109,7 +109,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
     }
 
     /**
-     * Gets {@link ExecutableMethod} method by it's index.
+     * Gets {@link ExecutableMethod} method by its index.
      *
      * @param index The method index
      * @param <R>   The result type

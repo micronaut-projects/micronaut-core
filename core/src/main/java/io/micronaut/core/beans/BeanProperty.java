@@ -137,7 +137,7 @@ public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadata
     }
 
     /**
-     * This method will attempt to modify the property or if this is a immutable type using a copy constructor to return a new instance with the new value.
+     * This method will attempt to modify the property or if this is an immutable type using a copy constructor to return a new instance with the new value.
      *
      * <p>This differs from {@link #set(Object, Object)} which will throw an exception if the property does not have a setter.</p>
      *

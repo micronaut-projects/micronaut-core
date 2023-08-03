@@ -30,7 +30,7 @@ import java.util.Collection;
 import java.util.Optional;
 
 /**
- * Wraps a bean allowing to read and write its properties via a underlying {@link BeanIntrospection}.
+ * Wraps a bean allowing to read and write its properties via an underlying {@link BeanIntrospection}.
  *
  * @param <T> The bean type.
  * @author graemerocher

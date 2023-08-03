@@ -47,7 +47,7 @@ public interface UriRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, RequestM
     /**
      * Match this route within the given URI and produce a {@link RouteMatch} if a match is found.
      *
-     * @param uri The URI The URI
+     * @param uri The URI
      * @return An {@link Optional} of {@link RouteMatch}
      */
     @Override
@@ -58,7 +58,7 @@ public interface UriRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, RequestM
     /**
      * Match this route within the given URI and produce a {@link RouteMatch} if a match is found.
      *
-     * @param uri The URI The URI
+     * @param uri The URI
      * @return A null or a {@link RouteMatch}
      */
     @Nullable

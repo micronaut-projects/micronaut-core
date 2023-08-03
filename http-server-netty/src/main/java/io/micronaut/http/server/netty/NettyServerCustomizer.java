@@ -72,7 +72,7 @@ public interface NettyServerCustomizer {
      * Called when the "final" stream pipeline has been built for processing http requests. For
      * HTTP/1, this is immediately after {@link #onInitialPipelineBuilt()}. For TLS-based HTTP/2
      * support, where HTTP/1 or HTTP/2 is negotiated through TLS ALPN, this will be called when
-     * negotiation is complete. However for HTTP/2 specifically, this may be changed in the future
+     * negotiation is complete. However, for HTTP/2 specifically, this may be changed in the future
      * when we switch to netty channel multiplexing, where each HTTP/2 stream gets its own channel.
      * <br>
      * Another case is h2c with upgrade from HTTP/1. As with ALPN this method will be called after

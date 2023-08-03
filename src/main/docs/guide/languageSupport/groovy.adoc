@@ -154,7 +154,7 @@ include::router/src/test/groovy/io/micronaut/context/router/GroovyRouteBuilderSp
 ----
 
 <1> You can use injected controllers to create routes by convention and Groovy method references to create routes to methods
-<2> The `ID` property can be used to reference include an `{id}` URI variable
+<2> The `ID` property can be used to reference to include an `{id}` URI variable
 
 The above example results in the following routes:
 

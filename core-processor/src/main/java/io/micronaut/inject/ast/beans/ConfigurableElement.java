@@ -41,7 +41,7 @@ public interface ConfigurableElement extends Element {
     /**
      * Adds a {@link jakarta.inject.Named} qualifier to the element.
      *
-     * @param qualifier The qualifier. If {@code null} an named annotation with no value is added assuming the default name.
+     * @param qualifier The qualifier. If {@code null} a named annotation with no value is added assuming the default name.
      * @return This element
      */
     default @NonNull

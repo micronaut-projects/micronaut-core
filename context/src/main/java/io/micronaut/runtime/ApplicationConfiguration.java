@@ -157,21 +157,21 @@ public class ApplicationConfiguration {
         }
 
         /**
-         * @return The instance auto scaling group
+         * @return The instance auto-scaling group
          */
         public Optional<String> getGroup() {
             return Optional.ofNullable(group);
         }
 
         /**
-         * @param group The instance auto scaling group
+         * @param group The instance auto-scaling group
          */
         public void setGroup(String group) {
             this.group = group;
         }
 
         /**
-         * @return The instance availability zone. For example it's possible to configure Netflix Ribbon to load balance between servers only in a particular zone
+         * @return The instance availability zone. For example, it's possible to configure Netflix Ribbon to load balance between servers only in a particular zone
          */
         public Optional<String> getZone() {
             if (zone != null) {

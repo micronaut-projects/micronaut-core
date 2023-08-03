@@ -8,7 +8,7 @@ The return types of methods annotated with a bean scope annotation are the bean 
 
 snippet::io.micronaut.docs.factories.CrankShaft,io.micronaut.docs.factories.V8Engine,io.micronaut.docs.factories.EngineFactory[tags="class",indent=0]
 
-In this case, a `V8Engine` is created by the `EngineFactory` class' `v8Engine` method. Note that you can inject parameters into the method and they will be resolved as beans. The resulting `V8Engine` bean will be a singleton.
+In this case, a `V8Engine` is created by the `EngineFactory` class' `v8Engine` method. Note that you can inject parameters into the method, and they will be resolved as beans. The resulting `V8Engine` bean will be a singleton.
 
 A factory can have multiple methods annotated with bean scope annotations, each one returning a distinct bean type.
 

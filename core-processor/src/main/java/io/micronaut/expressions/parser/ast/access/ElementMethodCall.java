@@ -96,7 +96,7 @@ public sealed class ElementMethodCall extends AbstractMethodCall permits Propert
                     calleeType = JavaModelUtils.getTypeReference(calleeClass);
                     mv.checkCast(calleeType);
                 }
-                // null safe operator is used so we need to check the result is null
+                // null safe operator is used, so we need to check the result is null
                 mv.storeLocal(2, calleeType);
                 mv.loadLocal(2, calleeType);
                 Label proceed = new Label();

@@ -287,7 +287,7 @@ final class ServiceScanner<S> {
     }
 
     /**
-     * Reads URL, parses the file and produces sub tasks to initialize the entry.
+     * Reads URL, parses the file and produces sub-tasks to initialize the entry.
      */
     @SuppressWarnings("java:S1948")
     private final class UrlServicesLoader extends RecursiveActionValuesCollector<S> {

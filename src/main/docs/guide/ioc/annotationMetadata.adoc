@@ -37,7 +37,7 @@ This approach is not recommended however, as it requires reflection and increase
 
 === Annotation Inheritance
 
-The Micronaut framework will respect the rules defined in Java's jdk:java.lang.reflect.AnnotatedElement[] API with regards to annotation inheritance:
+The Micronaut framework will respect the rules defined in Java's jdk:java.lang.reflect.AnnotatedElement[] API with regard to annotation inheritance:
 
 * Annotations meta-annotated with jdk:java.lang.annotation.Inherited[] will be available via the `getAnnotation*` methods of the api:core.annotation.AnnotationMetadata[] API whilst those directly declared are available via the `getDeclaredAnnotation*` methods.
 * Annotations not meta-annotated with jdk:java.lang.annotation.Inherited[] will not be included in the metadata

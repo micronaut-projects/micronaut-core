@@ -24,7 +24,7 @@ import java.util.Optional;
 
 /**
  * Interface that allows for different builder instances to be able to create
- * an the SSLContext supplied later to the micronaut http server.
+ * the SSLContext supplied later to the micronaut http server.
  */
 public interface ServerSslBuilder {
 

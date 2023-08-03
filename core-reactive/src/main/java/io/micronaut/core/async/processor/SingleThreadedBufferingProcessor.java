@@ -94,7 +94,7 @@ public abstract class SingleThreadedBufferingProcessor<R, T> extends SingleThrea
     }
 
     /**
-     * Called when an message is received from the upstream {@link Subscriber}.
+     * Called when a message is received from the upstream {@link Subscriber}.
      *
      * @param message The message
      */

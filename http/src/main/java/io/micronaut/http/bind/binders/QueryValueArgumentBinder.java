@@ -62,7 +62,7 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
      * It will first try to convert to ConvertibleMultiValues type and if conversion is successful, add the
      * corresponding parameters to the request. (By default the conversion will be successful if the {@link Format}
      * annotation is present and has one of the supported values - see
-     * {@link io.micronaut.core.convert.converters.MultiValuesConverterFactory} for specific converters). Otherwise
+     * {@link io.micronaut.core.convert.converters.MultiValuesConverterFactory} for specific converters). Otherwise,
      * the uri template will be used to deduce what will be done with the request. For example, simple parameters are
      * converted to {@link String}
      */
@@ -78,7 +78,7 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
         }
 
         // First try converting from the ConvertibleMultiValues type and if conversion is successful, return it.
-        // Otherwise use the given uri template to deduce what to do with the variable
+        // Otherwise, use the given uri template to deduce what to do with the variable
         Optional<T> multiValueConversion;
         if (annotationMetadata.hasAnnotation(Format.class)) {
             multiValueConversion = conversionService.convert(parameters, context);
@@ -93,7 +93,7 @@ public class QueryValueArgumentBinder<T> extends AbstractArgumentBinder<T> imple
         String parameterName = annotationMetadata.stringValue(QueryValue.class).orElse(argument.getName());
 
         // If we need to bind all request params to command object
-        // checks if the variable is defined with modifier char *, eg. ?pojo*
+        // checks if the variable is defined with modifier char *, e.g. ?pojo*
         boolean bindAll = source.getAttribute(HttpAttributes.ROUTE_MATCH, UriMatchInfo.class)
             .map(umi -> {
                 UriMatchVariable uriMatchVariable = umi.getVariableMap().get(parameterName);

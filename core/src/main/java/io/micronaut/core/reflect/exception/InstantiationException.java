@@ -16,7 +16,7 @@
 package io.micronaut.core.reflect.exception;
 
 /**
- * Thrown when an error occurs instantiating a instance.
+ * Thrown when an error occurs instantiating an instance.
  *
  * @author Graeme Rocher
  * @since 1.0

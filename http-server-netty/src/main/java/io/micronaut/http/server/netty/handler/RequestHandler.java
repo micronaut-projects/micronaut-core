@@ -37,7 +37,7 @@ public interface RequestHandler {
     void accept(ChannelHandlerContext ctx, HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess);
 
     /**
-     * Handle an error that is not bound to a request, i.e. happens outside of a
+     * Handle an error that is not bound to a request, i.e. happens outside a
      * {@link io.micronaut.http.netty.stream.StreamedHttpRequest}.
      *
      * @param cause The error

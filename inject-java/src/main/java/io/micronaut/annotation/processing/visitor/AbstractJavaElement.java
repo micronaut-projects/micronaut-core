@@ -445,7 +445,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
         if (!(that instanceof AbstractJavaElement abstractJavaElement)) {
             return false;
         }
-        // We allow to match different sub classes like JavaClassElement, JavaPlaceholder, JavaWildcard etc
+        // We allow to match different subclasses like JavaClassElement, JavaPlaceholder, JavaWildcard etc
         return nativeElement.element().equals(abstractJavaElement.getNativeType().element());
     }
 

@@ -1,4 +1,4 @@
-By default when you annotate a bean with a scope such as `@Singleton` the bean class and all interfaces it implements and super classes it extends from become injectable via `@Inject`.
+By default, when you annotate a bean with a scope such as `@Singleton` the bean class and all interfaces it implements and super classes it extends from become injectable via `@Inject`.
 
 Consider the following example from the previous section on defining beans:
 
