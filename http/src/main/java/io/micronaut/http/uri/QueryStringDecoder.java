@@ -20,10 +20,20 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArgumentUtils;
 
 import java.net.URI;
+import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
-import java.nio.charset.*;
-import java.util.*;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CoderResult;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 import static io.micronaut.core.util.StringUtils.EMPTY_STRING;
 import static io.micronaut.core.util.StringUtils.SPACE;
@@ -364,7 +374,8 @@ final class QueryStringDecoder {
                 continue;
             }
 
-            byteBuf.clear();
+            // this cast and those below are necessary for java 8 binary compat (see issue core#9637)
+            ((Buffer) byteBuf).clear();
             do {
                 if (i + 3 > toExcluded) {
                     throw new IllegalArgumentException("unterminated escape sequence at index " + i + " of: " + s);
@@ -374,8 +385,8 @@ final class QueryStringDecoder {
             } while (i < toExcluded && s.charAt(i) == '%');
             i--;
 
-            byteBuf.flip();
-            charBuf.clear();
+            ((Buffer) byteBuf).flip();
+            ((Buffer) charBuf).clear();
             CoderResult result = decoder.reset().decode(byteBuf, charBuf, true);
             try {
                 if (!result.isUnderflow()) {
@@ -388,7 +399,7 @@ final class QueryStringDecoder {
             } catch (CharacterCodingException ex) {
                 throw new IllegalStateException(ex);
             }
-            strBuf.append(charBuf.flip());
+            strBuf.append(((Buffer) charBuf).flip());
         }
         return strBuf.toString();
     }
