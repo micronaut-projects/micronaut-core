@@ -8,7 +8,7 @@ snippet::io.micronaut.docs.config.env.DataSourceConfiguration[tags="eachProperty
 <2> The `@Parameter` annotation can be used to inject the name of the sub-property that defines the name of the bean (which is also the bean qualifier)
 <3> Each property of the bean is bound to configuration.
 
-NOTE: Property references are specified in kebab case. For example, given the configuration property `myBean`, using `@EachProperty("my-bean")` works, but `@EachProperty("myBean")` will fail.
+NOTE: Micronaut configuration uses kebap case, not lower camel case. For example, using `@EachProperty("my-bean")` works, but `@EachProperty("myBean")` fails.
 
 The above `DataSourceConfiguration` defines a `url` property to configure one or more data sources. The URLs themselves can be configured using any of the link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource] instances evaluated to Micronaut:
 
