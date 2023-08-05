@@ -269,7 +269,7 @@ internal open class KotlinVisitorContext(
 
         override fun openOutputStream(): OutputStream = environment.codeGenerator.createNewFile(
             dependencies,
-            elements.joinToString("."),
+            path,
             fileName.substringBeforeLast('.'),
             fileName.substringAfterLast('.'))
 

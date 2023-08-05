@@ -49,31 +49,37 @@ internal class KotlinOutputVisitor(private val environment: SymbolProcessorEnvir
     }
 
     override fun visitMetaInfFile(path: String, vararg originatingElements: Element): Optional<GeneratedFile> {
-        val elements = path.split(File.separator).toMutableList()
-        elements.add(0, "META-INF")
+        val elements = normalizePath("META-INF/$path")
         return Optional.of(KotlinVisitorContext.KspGeneratedFile(environment, elements, getNativeElements(originatingElements)))
     }
 
     override fun visitGeneratedFile(path: String): Optional<GeneratedFile> {
-        val elements = path.split(File.separator).toMutableList()
+        val elements = normalizePath(path)
         return Optional.of(KotlinVisitorContext.KspGeneratedFile(environment, elements, Dependencies(aggregating = true, sources = emptyArray())))
     }
 
     override fun visitGeneratedFile(path: String, vararg originatingElements: Element): Optional<GeneratedFile> {
-        val elements = path.split(File.separator).toMutableList()
+        val elements = normalizePath(path)
         return Optional.of(KotlinVisitorContext.KspGeneratedFile(environment, elements, getNativeElements(originatingElements)))
     }
 
+    private fun normalizePath(path: String) = path.replace("\\\\", "/").split("/").toMutableList()
+
     private fun getNativeElements(originatingElements: Array<out Element>): Dependencies {
-        val originatingFiles: MutableList<KSFile> = ArrayList(originatingElements.size)
-        for (originatingElement in originatingElements) {
-            if (originatingElement is AbstractKotlinElement<*>) {
-                val nativeType = originatingElement.nativeType.element.containingFile
-                if (nativeType is KSFile) {
-                    originatingFiles.add(nativeType)
+        val sources: Array<KSFile> = if (originatingElements.isNotEmpty()) {
+            val originatingFiles: MutableList<KSFile> = ArrayList(originatingElements.size)
+            for (originatingElement in originatingElements) {
+                if (originatingElement is AbstractKotlinElement<*>) {
+                    val nativeType = originatingElement.nativeType.element.containingFile
+                    if (nativeType is KSFile) {
+                        originatingFiles.add(nativeType)
+                    }
                 }
             }
+            originatingFiles.toTypedArray()
+        } else {
+            emptyArray()
         }
-        return Dependencies(aggregating = originatingElements.size > 1, sources = originatingFiles.toTypedArray())
+        return Dependencies(aggregating = originatingElements.size > 1, sources = sources)
     }
 }
