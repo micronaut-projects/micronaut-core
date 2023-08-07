@@ -238,6 +238,58 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.readOutbound() == null
     }
 
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/9366')
+    def 'responseWritten not called on close'(boolean completeOnCancel) {
+        given:
+        def mon = new MonitorHandler()
+        def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        resp.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        def sink = Sinks.many().unicast().<HttpContent>onBackpressureBuffer()
+        def cleaned = 0
+        def ch = new EmbeddedChannel(mon, new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, PipeliningServerHandler.OutboundAccess outboundAccess) {
+                assert request instanceof FullHttpRequest
+                request.release()
+                outboundAccess.writeStreamed(resp, sink.asFlux().doOnCancel {
+                    // optional extra weirdness: onComplete *after* cancel. Could lead to double call to responseWritten, if I was an idiot.
+                    if (completeOnCancel) sink.tryEmitComplete()
+                })
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+
+            @Override
+            void responseWritten(Object attachment) {
+                cleaned++
+            }
+        }))
+
+        when:
+        def req = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/", Unpooled.EMPTY_BUFFER)
+        ch.writeOneInbound(req)
+        ch.flushInbound()
+        def c1 = new DefaultHttpContent(Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8))
+        sink.emitNext(c1, Sinks.EmitFailureHandler.FAIL_FAST)
+        then:
+        ch.checkException()
+        ch.readOutbound() == resp
+        ch.readOutbound() == c1
+
+        when:
+        ch.close()
+        then:
+        ch.checkException()
+        ch.readOutbound() == null
+        cleaned == 1
+
+        where:
+        completeOnCancel << [true, false]
+    }
+
     static class MonitorHandler extends ChannelOutboundHandlerAdapter {
         int flush = 0
         int read = 0

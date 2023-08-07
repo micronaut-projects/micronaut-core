@@ -268,6 +268,8 @@ public final class FormRouteCompleter implements Subscriber<Object>, HttpBody {
                 unsentIncomplete = data;
                 return;
             }
+            // cancel can be called by the emitNext call, so prevent release there
+            unsentIncomplete = null;
 
             demand--;
             if (sink.tryEmitNext(data) != Sinks.EmitResult.OK) {
