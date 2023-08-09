@@ -23,6 +23,7 @@ import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.core.util.SupplierUtil;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
@@ -89,6 +90,7 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
             body = s.toString().getBytes(StandardCharsets.UTF_8);
         } else {
             ByteBuffer buf = ((MessageBodyWriter) jsonWriter.get()).writeTo(getBodyType(type), MediaType.APPLICATION_JSON_TYPE, event.getData(), outgoingHeaders, bufferFactory);
+            outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
             body = buf.toByteArray();
             if (buf instanceof ReferenceCounted rc) {
                 rc.release();
