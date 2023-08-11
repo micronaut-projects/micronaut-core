@@ -16,6 +16,7 @@
 package io.micronaut.http.client.jdk;
 
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
@@ -31,10 +32,13 @@ import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.NoHostException;
+import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.jdk.cookie.CookieDecoder;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ContextPathUtils;
 import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.filter.HttpClientFilterResolver;
+import io.micronaut.http.filter.HttpFilterResolver;
 import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.ClientSslConfiguration;
 import org.slf4j.Logger;
@@ -54,6 +58,7 @@ import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -85,6 +90,8 @@ abstract class AbstractJdkHttpClient {
     protected final ConversionService conversionService;
     protected final JdkClientSslBuilder sslBuilder;
     protected final Logger log;
+    protected final HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver;
+    protected final List<HttpFilterResolver.FilterEntry> clientFilterEntries;
     protected final CookieDecoder cookieDecoder;
     protected MediaTypeCodecRegistry mediaTypeCodecRegistry;
 
@@ -100,12 +107,15 @@ abstract class AbstractJdkHttpClient {
      * @param conversionService      The {@link ConversionService}
      * @param sslBuilder             The {@link JdkClientSslBuilder} for creating an {@link javax.net.ssl.SSLContext}
      */
+    @SuppressWarnings({"java:S107", "checkstyle:parameternumber"}) // too many parameters
     protected AbstractJdkHttpClient(
         Logger log,
         LoadBalancer loadBalancer,
         HttpVersionSelection httpVersion,
         HttpClientConfiguration configuration,
         String contextPath,
+        @Nullable HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
+        @Nullable List<HttpFilterResolver.FilterEntry> clientFilterEntries,
         MediaTypeCodecRegistry mediaTypeCodecRegistry,
         RequestBinderRegistry requestBinderRegistry,
         String clientId,
@@ -124,6 +134,17 @@ abstract class AbstractJdkHttpClient {
         this.conversionService = conversionService;
         this.cookieManager = new CookieManager();
         this.sslBuilder = sslBuilder;
+
+        this.filterResolver = filterResolver;
+        if (clientFilterEntries != null) {
+            this.clientFilterEntries = clientFilterEntries;
+        } else if (filterResolver == null) {
+            this.clientFilterEntries = Collections.emptyList();
+        } else {
+            this.clientFilterEntries = filterResolver.resolveFilterEntries(
+                new ClientFilterResolutionContext(null, AnnotationMetadata.EMPTY_METADATA)
+            );
+        }
 
         if (System.getProperty("jdk.internal.httpclient.disableHostnameVerification") != null && log.isWarnEnabled()) {
             log.warn("The jdk.internal.httpclient.disableHostnameVerification system property is set. This is not recommended for production use as it prevents proper certificate validation and may allow man-in-the-middle attacks.");
@@ -269,7 +290,7 @@ abstract class AbstractJdkHttpClient {
             });
     }
 
-    private Mono<URI> resolveRequestUri(io.micronaut.http.HttpRequest<?> request) {
+    protected Mono<URI> resolveRequestUri(io.micronaut.http.HttpRequest<?> request) {
         if (request.getUri().getScheme() != null) {
             // Full request URI, so use that
             return Mono.just(request.getUri());

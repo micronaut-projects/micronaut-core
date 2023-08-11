@@ -35,10 +35,13 @@ import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.jdk.cookie.CompositeCookieDecoder;
 import io.micronaut.http.client.jdk.cookie.CookieDecoder;
 import io.micronaut.http.client.jdk.cookie.DefaultCookieDecoder;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.filter.HttpClientFilterResolver;
+import io.micronaut.http.filter.HttpFilterResolver;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.codec.JsonMediaTypeCodec;
 import io.micronaut.json.codec.JsonStreamMediaTypeCodec;
@@ -64,6 +67,8 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
         HttpVersionSelection httpVersion,
         @NonNull HttpClientConfiguration configuration,
         @Nullable String contextPath,
+        @Nullable HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
+        @Nullable List<HttpFilterResolver.FilterEntry> clientFilterEntries,
         MediaTypeCodecRegistry mediaTypeCodecRegistry,
         RequestBinderRegistry requestBinderRegistry,
         String clientId,
@@ -77,6 +82,8 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
             httpVersion,
             configuration,
             contextPath,
+            filterResolver,
+            clientFilterEntries,
             mediaTypeCodecRegistry,
             requestBinderRegistry,
             clientId,
@@ -91,6 +98,8 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
             uri == null ? null : LoadBalancer.fixed(uri),
             null,
             new DefaultHttpClientConfiguration(),
+            null,
+            null,
             null,
             createDefaultMediaTypeRegistry(),
             new DefaultRequestBinderRegistry(conversionService),
@@ -112,6 +121,8 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
             null,
             configuration,
             null,
+            null,
+            null,
             mediaTypeCodecRegistry,
             new DefaultRequestBinderRegistry(conversionService),
             null,
@@ -132,7 +143,20 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
 
     @Override
     public BlockingHttpClient toBlocking() {
-        return new JdkBlockingHttpClient(loadBalancer, httpVersion, configuration, contextPath, mediaTypeCodecRegistry, requestBinderRegistry, clientId, conversionService, sslBuilder, cookieDecoder);
+        return new JdkBlockingHttpClient(
+            loadBalancer,
+            httpVersion,
+            configuration,
+            contextPath,
+            filterResolver,
+            clientFilterEntries,
+            mediaTypeCodecRegistry,
+            requestBinderRegistry,
+            clientId,
+            conversionService,
+            sslBuilder,
+            cookieDecoder
+        );
     }
 
     @Override
