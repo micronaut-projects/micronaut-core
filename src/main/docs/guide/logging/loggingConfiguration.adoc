@@ -14,10 +14,10 @@ The same configuration can be achieved by setting the environment variable `LOGG
 [configuration]
 ----
 logger:
-  config: custom-logback.xml
+  config: /foo/custom-logback.xml
 ----
 
-You can also set a custom Logback XML configuration file to be used via `logger.config`. Be aware that **the referenced file should be an accessible resource on your classpath**!
+You can also set a custom Logback XML configuration file to be used via `logger.config`. The file is first checked on the class path and then on the filesystem.
 
 ==== Disabling a Logger with Properties
 
