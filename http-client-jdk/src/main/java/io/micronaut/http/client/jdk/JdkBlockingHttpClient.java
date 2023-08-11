@@ -20,15 +20,11 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
-import io.micronaut.http.client.exceptions.HttpClientException;
-import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
-import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.jdk.cookie.CookieDecoder;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
@@ -37,7 +33,6 @@ import io.micronaut.http.filter.HttpFilterResolver;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.net.http.HttpResponse;
 import java.util.List;
 
 /**
@@ -84,26 +79,11 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
     public <I, O, E> io.micronaut.http.HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request,
                                               Argument<O> bodyType,
                                               Argument<E> errorType) {
-        var httpRequest = mapToHttpRequest(request, bodyType).block();
-        try {
-            if (log.isDebugEnabled()) {
-                log.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
-            }
-            HttpResponse<byte[]> httpResponse = client.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
-            boolean errorStatus = httpResponse.statusCode() >= 400;
-            if (errorStatus && configuration.isExceptionOnErrorStatus()) {
-                if (log.isErrorEnabled()) {
-                    log.error("Client {} Received HTTP Response: {} {}", clientId, httpResponse.statusCode(), httpResponse.uri());
-                }
-                throw HttpClientExceptionUtils.populateServiceId(new HttpClientResponseException(HttpStatus.valueOf(httpResponse.statusCode()).getReason(), response(httpResponse, bodyType)), clientId, configuration);
-            }
-            return response(httpResponse, bodyType);
-        } catch (IOException e) {
-            throw new HttpClientException("Error sending request: " + e.getMessage(), e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new HttpClientException("Error sending request: " + e.getMessage(), e);
-        }
+        var defaultPublisher = responsePublisher(request, bodyType);
+        return resolveRequestUri(request)
+            .flux()
+            .flatMap(uri -> applyFilterToResponsePublisher(request, uri, defaultPublisher))
+            .blockFirst();
     }
 
     @Override

@@ -22,30 +22,40 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
+import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.exceptions.NoHostException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.jdk.cookie.CookieDecoder;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.context.ContextPathUtils;
 import io.micronaut.http.cookie.Cookie;
+import io.micronaut.http.filter.FilterRunner;
+import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpClientFilterResolver;
 import io.micronaut.http.filter.HttpFilterResolver;
+import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.ClientSslConfiguration;
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import javax.net.ssl.SSLParameters;
+import java.io.IOException;
 import java.net.Authenticator;
 import java.net.CookieManager;
 import java.net.HttpCookie;
@@ -332,5 +342,53 @@ abstract class AbstractJdkHttpClient {
     @NonNull
     protected <O> HttpResponse<O> response(@NonNull java.net.http.HttpResponse<byte[]> netResponse, @NonNull Argument<O> bodyType) {
         return new HttpResponseAdapter<>(netResponse, bodyType, conversionService, mediaTypeCodecRegistry);
+    }
+
+    protected <I, R extends io.micronaut.http.HttpResponse<?>> Publisher<R> applyFilterToResponsePublisher(
+        io.micronaut.http.HttpRequest<I> request,
+        URI requestURI,
+        Publisher<R> responsePublisher
+    ) {
+        if (!(request instanceof MutableHttpRequest mutRequest) || filterResolver == null) {
+            return responsePublisher;
+        }
+
+        mutRequest.uri(requestURI);
+        List<GenericHttpFilter> filters =
+            filterResolver.resolveFilters(request, clientFilterEntries);
+
+        FilterRunner.sortReverse(filters);
+        filters.add(new GenericHttpFilter.TerminalReactive(responsePublisher));
+
+        FilterRunner runner = new FilterRunner(filters);
+        return Mono.from(ReactiveExecutionFlow.fromFlow((ExecutionFlow<R>) runner.run(request)).toPublisher());
+    }
+
+    protected <O> Publisher<io.micronaut.http.HttpResponse<O>> responsePublisher(
+        io.micronaut.http.HttpRequest<?> request,
+        Argument<O> bodyType
+    ) {
+        return Flux.create(sink -> {
+            var httpRequest = mapToHttpRequest(request, bodyType).block();
+            try {
+                if (log.isDebugEnabled()) {
+                    log.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
+                }
+                java.net.http.HttpResponse<byte[]> httpResponse = client.send(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
+                boolean errorStatus = httpResponse.statusCode() >= 400;
+                if (errorStatus && configuration.isExceptionOnErrorStatus()) {
+                    if (log.isErrorEnabled()) {
+                        log.error("Client {} Received HTTP Response: {} {}", clientId, httpResponse.statusCode(), httpResponse.uri());
+                    }
+                    sink.error(HttpClientExceptionUtils.populateServiceId(new HttpClientResponseException(HttpStatus.valueOf(httpResponse.statusCode()).getReason(), response(httpResponse, bodyType)), clientId, configuration));
+                }
+                sink.next(response(httpResponse, bodyType));
+            } catch (IOException e) {
+                sink.error(new HttpClientException("Error sending request: " + e.getMessage(), e));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                sink.error(new HttpClientException("Error sending request: " + e.getMessage(), e));
+            }
+        });
     }
 }
