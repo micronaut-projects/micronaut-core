@@ -170,7 +170,7 @@ class ClientFilterStereotypeSpec extends Specification {
 
         @Override
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
-            return Flux.from(chain.proceed(request))
+            Flux.from(chain.proceed(request))
                     .map({ HttpResponse response ->
                         HttpResponse.ok(response.body().toString() + " Intercepted")
                     })
@@ -188,7 +188,7 @@ class ClientFilterStereotypeSpec extends Specification {
 
         @Override
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
-            return Flux.from(chain.proceed(request))
+            Flux.from(chain.proceed(request))
                     .map({ HttpResponse response ->
                         HttpResponse.ok(response.body().toString() + " Twice")
                     })
@@ -206,7 +206,7 @@ class ClientFilterStereotypeSpec extends Specification {
 
         @Override
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
-            return Flux.from(chain.proceed(request))
+            Flux.from(chain.proceed(request))
                     .map({ HttpResponse response ->
                         HttpResponse.ok(response.body().toString() + " Post")
                     })
@@ -224,7 +224,7 @@ class ClientFilterStereotypeSpec extends Specification {
 
         @Override
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
-            return Flux.from(chain.proceed(request))
+            Flux.from(chain.proceed(request))
                     .map({ HttpResponse response ->
                         HttpResponse.ok(response.body().toString() + " URL")
                     })
