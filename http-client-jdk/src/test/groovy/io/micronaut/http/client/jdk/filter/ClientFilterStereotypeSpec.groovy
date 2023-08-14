@@ -181,7 +181,6 @@ class ClientFilterStereotypeSpec extends Specification {
     @AnotherMarkerStereotypeAnnotation
     @Singleton
     static class AnotherMarkerFilter implements HttpClientFilter {
-
         @Override
         int getOrder() {
             1
@@ -200,7 +199,6 @@ class ClientFilterStereotypeSpec extends Specification {
     @MarkerStereotypeAnnotation(methods = HttpMethod.POST)
     @Singleton
     static class MarkerPostFilter implements HttpClientFilter {
-
         @Override
         int getOrder() {
             2
@@ -219,7 +217,6 @@ class ClientFilterStereotypeSpec extends Specification {
     @Singleton
     @Filter("/filters/marked")
     static class UrlFilter implements HttpClientFilter {
-
         @Override
         int getOrder() {
             3
