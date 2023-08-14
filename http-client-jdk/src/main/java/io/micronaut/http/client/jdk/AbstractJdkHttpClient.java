@@ -48,6 +48,7 @@ import io.micronaut.http.filter.HttpFilterResolver;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.ClientSslConfiguration;
+import io.micronaut.http.util.HttpHeadersUtil;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -146,15 +147,7 @@ abstract class AbstractJdkHttpClient {
         this.sslBuilder = sslBuilder;
 
         this.filterResolver = filterResolver;
-        if (clientFilterEntries != null) {
-            this.clientFilterEntries = clientFilterEntries;
-        } else if (filterResolver == null) {
-            this.clientFilterEntries = Collections.emptyList();
-        } else {
-            this.clientFilterEntries = filterResolver.resolveFilterEntries(
-                new ClientFilterResolutionContext(null, AnnotationMetadata.EMPTY_METADATA)
-            );
-        }
+        this.clientFilterEntries = clientFilterEntries(filterResolver, clientFilterEntries);
 
         if (System.getProperty("jdk.internal.httpclient.disableHostnameVerification") != null && log.isWarnEnabled()) {
             log.warn("The jdk.internal.httpclient.disableHostnameVerification system property is set. This is not recommended for production use as it prevents proper certificate validation and may allow man-in-the-middle attacks.");
@@ -212,6 +205,20 @@ abstract class AbstractJdkHttpClient {
         }
 
         this.client = builder.build();
+    }
+
+    @NonNull
+    private static List<HttpFilterResolver.FilterEntry> clientFilterEntries(@Nullable HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver,
+                                                                            @Nullable List<HttpFilterResolver.FilterEntry> clientFilterEntries) {
+        if (clientFilterEntries != null) {
+            return clientFilterEntries;
+        }
+        if (filterResolver == null) {
+            return Collections.emptyList();
+        }
+        return filterResolver.resolveFilterEntries(
+                new ClientFilterResolutionContext(null, AnnotationMetadata.EMPTY_METADATA)
+        );
     }
 
     private static HttpCookie toJdkCookie(@NonNull Cookie cookie,
@@ -379,9 +386,9 @@ abstract class AbstractJdkHttpClient {
                 if (log.isDebugEnabled()) {
                     log.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
                 }
-                if (log.isTraceEnabled()) {
-                    httpRequest.headers().map().forEach((k, v) -> log.trace("Client {} Sending HTTP Request Header: {}={}", clientId, k, v));
-                }
+                HttpHeadersUtil.trace(log,
+                    () -> httpRequest.headers().map().keySet(),
+                    headerName -> httpRequest.headers().allValues(headerName));
                 return client.sendAsync(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
             })
             .flatMap(Mono::fromCompletionStage)
