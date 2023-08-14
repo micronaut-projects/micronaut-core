@@ -2214,6 +2214,69 @@ class TestNamed {
             ce.findMethod("method2").get().getReturnType().canonicalName == Integer.class.name
     }
 
+    void "test conf with inner companion"() {
+        when:
+        ClassElement ce = buildClassElement('test.StripeConfig', '''
+package test
+
+import io.micronaut.context.annotation.ConfigurationProperties
+import io.micronaut.core.annotation.Introspected
+import jakarta.validation.Valid
+import jakarta.validation.constraints.NotNull
+import io.micronaut.context.annotation.Context
+
+@Context
+@ConfigurationProperties(StripeConfig.PREFIX)
+class StripeConfig {
+    companion object {
+        const val PREFIX = "stripe"
+    }
+
+    @Valid
+    @NotNull
+    var usa: UsaStripeClientConfig = UsaStripeClientConfig()
+
+    @Valid
+    @NotNull
+    var canada: CanadaStripeClientConfig = CanadaStripeClientConfig()
+
+    @Introspected
+    interface StripeClientConfig {
+        val apiKey: String
+        val webhookSecret: String
+    }
+
+    @Context
+    @ConfigurationProperties(UsaStripeClientConfig.PREFIX)
+    @Introspected
+    class UsaStripeClientConfig : StripeClientConfig {
+        internal companion object {
+            internal const val PREFIX = "usa"
+        }
+
+        override lateinit var apiKey: String
+        override lateinit var webhookSecret: String
+    }
+
+    @Context
+    @ConfigurationProperties(CanadaStripeClientConfig.PREFIX)
+    @Introspected
+    class CanadaStripeClientConfig : StripeClientConfig {
+        internal companion object {
+            internal const val PREFIX = "canada"
+        }
+
+        override lateinit var apiKey: String
+        override lateinit var webhookSecret: String
+    }
+}
+
+
+''')
+        then:
+            noExceptionThrown()
+    }
+
     private void assertListGenericArgument(ClassElement type, Closure cl) {
         def arg1 = type.getAllTypeArguments().get(List.class.name).get("E")
         def arg2 = type.getAllTypeArguments().get(Collection.class.name).get("E")
