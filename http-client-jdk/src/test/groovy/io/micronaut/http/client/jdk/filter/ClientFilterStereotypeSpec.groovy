@@ -17,14 +17,16 @@ package io.micronaut.http.client.jdk.filter
 
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.Order
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MutableHttpRequest
+import io.micronaut.http.annotation.ClientFilter
 import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Filter
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.ResponseFilter
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.filter.ClientFilterChain
@@ -204,21 +206,12 @@ class ClientFilterStereotypeSpec extends Specification {
     }
 
     @Requires(property = 'spec.name', value = 'ClientFilterStereotypeSpec')
-    @Singleton
-    @Filter("/filters/marked")
-    static class UrlFilter implements HttpClientFilter {
-        @Override
-        int getOrder() {
-            3
-        }
-
-        @Override
-        Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request, ClientFilterChain chain) {
-            Flux.from(chain.proceed(request))
-                    .map({ HttpResponse response ->
-                        HttpResponse.ok(response.body().toString() + " URL")
-                    })
+    @Order(3)
+    @ClientFilter("/filters/marked")
+    static class UrlFilter {
+        @ResponseFilter
+        HttpResponse<?> doFilter(HttpResponse<?> response) {
+            HttpResponse.ok(response.body().toString() + " URL")
         }
     }
-
 }
