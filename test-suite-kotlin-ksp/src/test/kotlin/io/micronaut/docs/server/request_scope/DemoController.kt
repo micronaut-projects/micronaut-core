@@ -1,10 +1,12 @@
 package io.micronaut.docs.server.request_scope
 
+import io.micronaut.context.annotation.Property
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.QueryValue
 
+@Property(name = "spec.name", value = "TestControllerTest")
 @Controller
 class DemoController(
     private val requestScopeClass: RequestScopeClass
