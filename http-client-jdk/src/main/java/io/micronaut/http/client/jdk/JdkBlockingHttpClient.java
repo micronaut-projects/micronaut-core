@@ -79,10 +79,7 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
     public <I, O, E> io.micronaut.http.HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request,
                                               Argument<O> bodyType,
                                               Argument<E> errorType) {
-        var defaultPublisher = responsePublisher(request, bodyType);
-        return resolveRequestUri(request)
-            .flux()
-            .flatMap(uri -> applyFilterToResponsePublisher(request, uri, defaultPublisher))
+        return exchangeImpl(request, bodyType, errorType)
             .blockFirst();
     }
 

@@ -51,6 +51,7 @@ import java.util.List;
 
 /**
  * {@link HttpClient} implementation for {@literal java.net.http.*} HTTP Client.
+ *
  * @author Sergio del Amo
  * @since 4.0.0
  */
@@ -157,10 +158,7 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
 
     @Override
     public <I, O, E> Publisher<HttpResponse<O>> exchange(@NonNull HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType) {
-        var defaultPublisher = responsePublisher(request, bodyType);
-        return resolveRequestUri(request)
-            .flux()
-            .flatMap(uri -> applyFilterToResponsePublisher(request, uri, defaultPublisher));
+        return exchangeImpl(request, bodyType, errorType);
     }
 
     @Override

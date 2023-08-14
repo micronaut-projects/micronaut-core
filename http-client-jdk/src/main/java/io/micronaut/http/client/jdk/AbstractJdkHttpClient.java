@@ -344,6 +344,12 @@ abstract class AbstractJdkHttpClient {
         return new HttpResponseAdapter<>(netResponse, bodyType, conversionService, mediaTypeCodecRegistry);
     }
 
+    protected <I, O, E> Flux<HttpResponse<O>> exchangeImpl(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType) {
+        var defaultPublisher = responsePublisher(request, bodyType);
+        return resolveRequestUri(request)
+            .flatMapMany(uri -> applyFilterToResponsePublisher(request, uri, defaultPublisher));
+    }
+
     protected <I, R extends io.micronaut.http.HttpResponse<?>> Publisher<R> applyFilterToResponsePublisher(
         io.micronaut.http.HttpRequest<I> request,
         URI requestURI,
@@ -368,27 +374,31 @@ abstract class AbstractJdkHttpClient {
         io.micronaut.http.HttpRequest<?> request,
         Argument<O> bodyType
     ) {
-        return Flux.create(sink -> {
-            var httpRequest = mapToHttpRequest(request, bodyType).block();
-            try {
+        return Flux.defer(() -> mapToHttpRequest(request, bodyType)) // defered so any client filter changes are used
+            .map(httpRequest -> {
                 if (log.isDebugEnabled()) {
                     log.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
                 }
-                java.net.http.HttpResponse<byte[]> httpResponse = client.send(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
-                boolean errorStatus = httpResponse.statusCode() >= 400;
-                if (errorStatus && configuration.isExceptionOnErrorStatus()) {
-                    if (log.isErrorEnabled()) {
-                        log.error("Client {} Received HTTP Response: {} {}", clientId, httpResponse.statusCode(), httpResponse.uri());
-                    }
-                    sink.error(HttpClientExceptionUtils.populateServiceId(new HttpClientResponseException(HttpStatus.valueOf(httpResponse.statusCode()).getReason(), response(httpResponse, bodyType)), clientId, configuration));
+                if (log.isTraceEnabled()) {
+                    httpRequest.headers().map().forEach((k, v) -> log.trace("Client {} Sending HTTP Request Header: {}={}", clientId, k, v));
                 }
-                sink.next(response(httpResponse, bodyType));
-            } catch (IOException e) {
-                sink.error(new HttpClientException("Error sending request: " + e.getMessage(), e));
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                sink.error(new HttpClientException("Error sending request: " + e.getMessage(), e));
-            }
-        });
+                return client.sendAsync(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
+            })
+            .flatMap(Mono::fromCompletionStage)
+            .onErrorMap(IOException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
+            .onErrorMap(InterruptedException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
+            .handle((netResponse, sink) -> {
+                log.error("Client {} Received HTTP Response: {} {}", clientId, netResponse.statusCode(), netResponse.uri());
+                boolean errorStatus = netResponse.statusCode() >= 400;
+                if (errorStatus && configuration.isExceptionOnErrorStatus()) {
+                    sink.error(HttpClientExceptionUtils.populateServiceId(
+                        new HttpClientResponseException(HttpStatus.valueOf(netResponse.statusCode()).getReason(), response(netResponse, bodyType)),
+                        clientId,
+                        configuration
+                    ));
+                } else {
+                    sink.next(response(netResponse, bodyType));
+                }
+            });
     }
 }
