@@ -1,4 +1,4 @@
-package io.micronaut.http.client.filter
+package io.micronaut.http.client.jdk.filter
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
