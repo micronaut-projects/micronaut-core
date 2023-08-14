@@ -25,6 +25,8 @@ import com.google.devtools.ksp.symbol.KSNode
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.convert.value.MutableConvertibleValues
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap
+import io.micronaut.core.reflect.ClassUtils
+import io.micronaut.core.reflect.ReflectionUtils
 import io.micronaut.core.util.StringUtils
 import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory
 import io.micronaut.expressions.context.ExpressionCompilationContextFactory
@@ -63,6 +65,17 @@ internal open class KotlinVisitorContext(
         elementAnnotationMetadataFactory =
             KotlinElementAnnotationMetadataFactory(false, annotationMetadataBuilder)
         expressionCompilationContextFactory = DefaultExpressionCompilationContextFactory(this)
+
+        try {
+            // Workaround for bug in KSP https://github.com/google/ksp/issues/1493
+            val resolverImplClass = ClassUtils.forName("com.google.devtools.ksp.processing.impl.ResolverImpl", javaClass.classLoader).orElseThrow()
+            val kotlinTypeMapperClass = ClassUtils.forName("org.jetbrains.kotlin.codegen.state.KotlinTypeMapper", javaClass.classLoader).orElseThrow()
+            val kotlinTypeMapperInstance = ReflectionUtils.getFieldValue(resolverImplClass, "typeMapper", resolver).orElseThrow()
+            ReflectionUtils.setField(kotlinTypeMapperClass, "useOldManglingRulesForFunctionAcceptingInlineClass", kotlinTypeMapperInstance, false)
+        } catch (e: Exception) {
+            e.printStackTrace();
+            // Ignore
+        }
     }
 
     override fun <T : Any?> get(
