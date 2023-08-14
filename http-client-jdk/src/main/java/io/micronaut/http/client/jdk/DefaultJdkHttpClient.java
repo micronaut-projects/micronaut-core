@@ -149,9 +149,11 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
             })
             .flatMap(Mono::fromCompletionStage)
             .map(netResponse -> {
-                log.error("Client {} Received HTTP Response: {} {}", clientId, netResponse.statusCode(), netResponse.uri());
                 boolean errorStatus = netResponse.statusCode() >= 400;
                 if (errorStatus && configuration.isExceptionOnErrorStatus()) {
+                    if (log.isErrorEnabled()) {
+                        log.error("Client {} Received HTTP Response: {} {}", clientId, netResponse.statusCode(), netResponse.uri());
+                    }
                     throw HttpClientExceptionUtils.populateServiceId(new HttpClientResponseException(HttpStatus.valueOf(netResponse.statusCode()).getReason(),
                         response(netResponse, bodyType)), clientId, configuration);
                 }
