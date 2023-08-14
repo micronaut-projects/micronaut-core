@@ -81,11 +81,11 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
                 log.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
             }
             HttpResponse<byte[]> httpResponse = client.send(httpRequest, HttpResponse.BodyHandlers.ofByteArray());
+            if (log.isDebugEnabled()) {
+                log.debug("Client {} Received HTTP Response: {} {}", clientId, httpResponse.statusCode(), httpResponse.uri());
+            }
             boolean errorStatus = httpResponse.statusCode() >= 400;
             if (errorStatus && configuration.isExceptionOnErrorStatus()) {
-                if (log.isErrorEnabled()) {
-                    log.error("Client {} Received HTTP Response: {} {}", clientId, httpResponse.statusCode(), httpResponse.uri());
-                }
                 throw HttpClientExceptionUtils.populateServiceId(new HttpClientResponseException(HttpStatus.valueOf(httpResponse.statusCode()).getReason(), response(httpResponse, bodyType)), clientId, configuration);
             }
             return response(httpResponse, bodyType);
