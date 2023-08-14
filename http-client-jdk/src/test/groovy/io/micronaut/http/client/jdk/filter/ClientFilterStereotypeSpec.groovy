@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.client.jdk.filter
 
-import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
@@ -30,57 +29,49 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.filter.ClientFilterChain
 import io.micronaut.http.filter.HttpClientFilter
-import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
-import spock.lang.AutoCleanup
-import spock.lang.Shared
 import spock.lang.Specification
 
+@Property(name = 'spec.name', value = 'ClientFilterStereotypeSpec')
+@MicronautTest
 class ClientFilterStereotypeSpec extends Specification {
+    @Inject
+    UnmarkedClient unmarkedClient
 
-    @Shared
-    @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': 'ClientFilterStereotypeSpec'])
+    @Inject
+    MarkedClient markedClient
 
-    @Shared
-    @AutoCleanup
-    ApplicationContext ctx = embeddedServer.applicationContext
+    @Inject
+    MarkedTwiceClient markedTwiceClient
+
+    @Inject
+    ClientBeans clientBeans
+
+    @Inject
+    IndirectlyMarkedClient indirectlyMarkedClient
 
     void "test declarative client matching"() {
-        when:
-        UnmarkedClient unmarkedClient = ctx.getBean(UnmarkedClient)
-
-        then:
+        expect:
         unmarkedClient.echo() == "echo URL" // not intercepted by
 
-        when:
-        MarkedClient markedClient = ctx.getBean(MarkedClient)
-
-        then:
+        and:
         markedClient.echoPost() == "echo Intercepted Post URL"
         markedClient.echo() == "echo Intercepted URL"
 
-        when:
-        MarkedTwiceClient markedTwiceClient = ctx.getBean(MarkedTwiceClient)
-
-        then:
+        and:
         markedTwiceClient.echoPost() == "echo Intercepted Twice Post URL"
         markedTwiceClient.echo() == "echo Intercepted Twice URL"
 
-        when:
-        IndirectlyMarkedClient indirectlyMarkedClient = ctx.getBean(IndirectlyMarkedClient)
-
-        then:
+        and:
         indirectlyMarkedClient.echoPost() == "echo Intercepted Twice Post URL"
         indirectlyMarkedClient.echo() == "echo Intercepted Twice URL"
     }
 
     void "low-level client filter matching"() {
-        given:
-        ClientBeans clientBeans = ctx.getBean(ClientBeans)
-
         expect:
         clientBeans.annotatedClient.toBlocking().retrieve('/') == "echo Intercepted URL"
         clientBeans.client.toBlocking().retrieve('/') == "echo URL"
@@ -162,7 +153,6 @@ class ClientFilterStereotypeSpec extends Specification {
     @MarkerStereotypeAnnotation
     @Singleton
     static class MarkerFilter implements HttpClientFilter {
-
         @Override
         int getOrder() {
             0
