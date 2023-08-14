@@ -37,6 +37,7 @@ import java.util.Set;
 
 public class AllElementsVisitor implements TypeElementVisitor<Object, Object> {
     public static boolean WRITE_FILE = false;
+    public static boolean WRITE_IN_METAINF = false;
     public static List<String> VISITED_ELEMENTS = new ArrayList<>();
     public static List<ClassElement> VISITED_CLASS_ELEMENTS = new ArrayList<>();
     public static List<MethodElement> VISITED_METHOD_ELEMENTS = new ArrayList<>();
@@ -52,14 +53,18 @@ public class AllElementsVisitor implements TypeElementVisitor<Object, Object> {
 
     @Override
     public void finish(VisitorContext visitorContext) {
-        Optional<GeneratedFile> generatedFile = visitorContext.visitGeneratedFile("foo/bar.txt", VISITED_CLASS_ELEMENTS.toArray(ClassElement.ZERO_CLASS_ELEMENTS));
-        generatedFile.ifPresent(gf -> {
-            try (Writer w = gf.openWriter()) {
-                w.write("All good");
-            } catch (IOException e) {
-                visitorContext.fail(e.getMessage(), null);
-            }
-        });
+        Optional<GeneratedFile> generatedFile;
+        if (WRITE_IN_METAINF) {
+            generatedFile = visitorContext.visitMetaInfFile("foo/bar.txt", VISITED_CLASS_ELEMENTS.toArray(ClassElement.ZERO_CLASS_ELEMENTS));
+        } else {
+            generatedFile = visitorContext.visitGeneratedFile("foo/bar.txt", VISITED_CLASS_ELEMENTS.toArray(ClassElement.ZERO_CLASS_ELEMENTS));
+        }
+        var gf = generatedFile.orElseThrow();
+        try (Writer w = gf.openWriter()) {
+            w.write("All good");
+        } catch (IOException e) {
+            visitorContext.fail(e.getMessage(), null);
+        }
     }
 
     @Override

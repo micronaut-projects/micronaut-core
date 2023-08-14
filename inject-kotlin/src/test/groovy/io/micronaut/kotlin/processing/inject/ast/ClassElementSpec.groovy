@@ -51,6 +51,37 @@ class Test {
         AllElementsVisitor.WRITE_FILE == false
     }
 
+    void "test visitGeneratedFile META-INF"() {
+        given:
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS.clear()
+        AllElementsVisitor.VISITED_ELEMENTS.clear()
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS.clear()
+        AllElementsVisitor.WRITE_FILE = true
+        AllElementsVisitor.WRITE_IN_METAINF = true
+
+        when:
+        def definition = buildBeanDefinition('test.visit.Test', '''
+package test.visit
+
+ import jakarta.inject.Singleton
+
+
+@Singleton
+class Test {
+    fun myMethod() {}
+}
+''')
+
+        then:
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 1
+        definition.getClass().getClassLoader().getResource("META-INF/foo/bar.txt").text == 'All good'
+
+        cleanup:
+        AllElementsVisitor.WRITE_FILE == false
+        AllElementsVisitor.WRITE_IN_METAINF = false
+    }
+
     void "test class element"() {
         expect:
         buildClassElement('ast.test.Test', '''

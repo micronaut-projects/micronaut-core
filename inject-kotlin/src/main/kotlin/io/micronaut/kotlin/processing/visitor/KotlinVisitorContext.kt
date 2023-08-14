@@ -42,6 +42,7 @@ import java.net.URI
 import java.nio.file.Files
 import java.util.*
 import java.util.function.BiConsumer
+import kotlin.collections.ArrayList
 
 @OptIn(KspExperimental::class)
 internal open class KotlinVisitorContext(
@@ -245,15 +246,29 @@ internal open class KotlinVisitorContext(
     }
 
     class KspGeneratedFile(
-        private val environment: SymbolProcessorEnvironment,
-        private val elements : MutableList<String>,
-        private val dependencies : Dependencies
+        environment: SymbolProcessorEnvironment,
+        elements: MutableList<String>,
+        dependencies: Dependencies
     ) : GeneratedFile {
 
-        private val fileName = elements.removeAt(elements.size - 1)
-        private val path = elements.joinToString(".")
-        private val file = File(path)
+        private val file: File
 
+        init {
+            val fileName = elements.removeAt(elements.size - 1)
+            val prevFiles = ArrayList(environment.codeGenerator.generatedFile)
+            environment.codeGenerator.createNewFile(
+                dependencies,
+                elements.joinToString("."),
+                fileName.substringBeforeLast('.'),
+                fileName.substringAfterLast('.', "")
+            ).close() // Create an empty file first to find the actual file location
+            val newFiles = ArrayList(environment.codeGenerator.generatedFile)
+            newFiles.removeAll(prevFiles)
+            if (newFiles.size != 1) {
+                throw IllegalStateException("Expected to find one file!")
+            }
+            file = newFiles[0]
+        }
 
         override fun toURI(): URI {
             return file.toURI()
@@ -267,11 +282,9 @@ internal open class KotlinVisitorContext(
             return Files.newInputStream(file.toPath())
         }
 
-        override fun openOutputStream(): OutputStream = environment.codeGenerator.createNewFile(
-            dependencies,
-            elements.joinToString("."),
-            fileName.substringBeforeLast('.'),
-            fileName.substringAfterLast('.'))
+        override fun openOutputStream(): OutputStream {
+            return Files.newOutputStream(file.toPath())
+        }
 
         override fun openReader(): Reader {
             return file.reader()
