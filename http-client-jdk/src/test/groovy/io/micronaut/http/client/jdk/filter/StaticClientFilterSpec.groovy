@@ -42,7 +42,6 @@ class StaticClientFilterSpec extends Specification {
     @Requires(property = "spec.name", value = "StaticClientFilterSpec")
     @Client(id = "a")
     static interface ClientA {
-
         @Get("/temp")
         String call()
     }
@@ -50,7 +49,6 @@ class StaticClientFilterSpec extends Specification {
     @Requires(property = "spec.name", value = "StaticClientFilterSpec")
     @Client(id = "b")
     static interface ClientB {
-
         @Get("/temp")
         String call()
     }
@@ -76,7 +74,6 @@ class StaticClientFilterSpec extends Specification {
     @Requires(property = "spec.name", value = "StaticClientFilterSpec")
     @Controller
     static class Echo {
-
         @Get("/temp")
         String echo(@Header("Filtered-Through") String filter) {
             return filter
