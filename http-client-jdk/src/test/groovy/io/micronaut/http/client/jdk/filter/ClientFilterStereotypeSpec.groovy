@@ -106,10 +106,10 @@ class ClientFilterStereotypeSpec extends Specification {
     @Client("/filters/marked")
     @MarkerStereotypeAnnotation
     static interface MarkedClient {
-        @Get("/")
+        @Get
         String echo()
 
-        @Post("/")
+        @Post
         String echoPost()
     }
 
@@ -118,10 +118,10 @@ class ClientFilterStereotypeSpec extends Specification {
     @AnotherMarkerStereotypeAnnotation
     @MarkerStereotypeAnnotation
     static interface MarkedTwiceClient {
-        @Get("/")
+        @Get
         String echo()
 
-        @Post("/")
+        @Post
         String echoPost()
     }
 
@@ -129,17 +129,17 @@ class ClientFilterStereotypeSpec extends Specification {
     @Client("/filters/marked")
     @IndirectMarkerStereotypeAnnotation
     static interface IndirectlyMarkedClient {
-        @Get("/")
+        @Get
         String echo()
 
-        @Post("/")
+        @Post
         String echoPost()
     }
 
     @Requires(property = 'spec.name', value = 'ClientFilterStereotypeSpec')
     @Client("/filters/marked")
     static interface UnmarkedClient {
-        @Get("/")
+        @Get
         String echo()
     }
 
