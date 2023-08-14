@@ -49,7 +49,9 @@ public final class HttpHeadersUtil {
      */
     public static void trace(@NonNull Logger log,
                              @NonNull HttpHeaders httpHeaders) {
-        trace(log, httpHeaders.names(), httpHeaders::getAll);
+        if (log.isTraceEnabled()) {
+            trace(log, httpHeaders.names(), httpHeaders::getAll);
+        }
     }
 
     /**
@@ -61,7 +63,23 @@ public final class HttpHeadersUtil {
     public static void trace(@NonNull Logger log,
                              @NonNull Set<String> names,
                              @NonNull Function<String, List<String>> getAllHeaders) {
-        names.forEach(name -> trace(log, name, getAllHeaders));
+        if (log.isTraceEnabled()) {
+            names.forEach(name -> trace(log, name, getAllHeaders));
+        }
+    }
+
+    /**
+     * Trace HTTP Headers.
+     * @param log Logger
+     * @param namesSupplier HTTP Header names Provider
+     * @param getAllHeaders Function to get all the header values for a particular header name
+     */
+    public static void trace(@NonNull Logger log,
+                             @NonNull Supplier<Set<String>> namesSupplier,
+                             @NonNull Function<String, List<String>> getAllHeaders) {
+        if (log.isTraceEnabled()) {
+            trace(log, namesSupplier.get(), getAllHeaders);
+        }
     }
 
     /**

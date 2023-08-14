@@ -48,6 +48,7 @@ import io.micronaut.http.filter.HttpFilterResolver;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.ssl.ClientAuthentication;
 import io.micronaut.http.ssl.ClientSslConfiguration;
+import io.micronaut.http.util.HttpHeadersUtil;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -385,9 +386,9 @@ abstract class AbstractJdkHttpClient {
                 if (log.isDebugEnabled()) {
                     log.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
                 }
-                if (log.isTraceEnabled()) {
-                    httpRequest.headers().map().forEach((k, v) -> log.trace("Client {} Sending HTTP Request Header: {}={}", clientId, k, v));
-                }
+                HttpHeadersUtil.trace(log,
+                    () -> httpRequest.headers().map().keySet(),
+                    headerName -> httpRequest.headers().allValues(headerName));
                 return client.sendAsync(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
             })
             .flatMap(Mono::fromCompletionStage)
