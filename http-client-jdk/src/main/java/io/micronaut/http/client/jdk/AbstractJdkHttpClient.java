@@ -344,7 +344,7 @@ abstract class AbstractJdkHttpClient {
         return new HttpResponseAdapter<>(netResponse, bodyType, conversionService, mediaTypeCodecRegistry);
     }
 
-    protected <I, O, E> Flux<HttpResponse<O>> exchangeImpl(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType) {
+    protected <I, O, E> Flux<HttpResponse<O>> exchangeImpl(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<O> bodyType) {
         var defaultPublisher = responsePublisher(request, bodyType);
         return resolveRequestUri(request)
             .flatMapMany(uri -> applyFilterToResponsePublisher(request, uri, defaultPublisher));

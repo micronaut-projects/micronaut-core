@@ -158,7 +158,7 @@ public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHt
 
     @Override
     public <I, O, E> Publisher<HttpResponse<O>> exchange(@NonNull HttpRequest<I> request, @NonNull Argument<O> bodyType, @NonNull Argument<E> errorType) {
-        return exchangeImpl(request, bodyType, errorType);
+        return exchangeImpl(request, bodyType);
     }
 
     @Override
