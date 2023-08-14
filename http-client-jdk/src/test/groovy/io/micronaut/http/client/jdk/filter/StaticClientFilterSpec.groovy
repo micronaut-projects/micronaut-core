@@ -36,7 +36,7 @@ class StaticClientFilterSpec extends Specification {
         b.call() == "B"
 
         cleanup:
-        ctx.close()
+        server.close()
     }
 
     @Requires(property = "spec.name", value = "StaticClientFilterSpec")
