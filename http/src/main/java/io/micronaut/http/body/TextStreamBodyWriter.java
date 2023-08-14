@@ -90,12 +90,13 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
             body = s.toString().getBytes(StandardCharsets.UTF_8);
         } else {
             ByteBuffer buf = ((MessageBodyWriter) jsonWriter.get()).writeTo(getBodyType(type), MediaType.APPLICATION_JSON_TYPE, event.getData(), outgoingHeaders, bufferFactory);
-            outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
             body = buf.toByteArray();
             if (buf instanceof ReferenceCounted rc) {
                 rc.release();
             }
         }
+
+        outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.TEXT_EVENT_STREAM_TYPE);
 
         ByteBuffer eventData = bufferFactory.buffer(body.length + 10);
         writeAttribute(eventData, COMMENT_PREFIX, event.getComment());
