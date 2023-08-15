@@ -47,7 +47,6 @@ import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.inject.ExecutableMethod;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.ListIterator;
@@ -554,11 +553,10 @@ public class FilterRunner {
                     context.propagatedContext,
                     Publishers.convertPublisher(conversionService, returnValue, Publisher.class)
                 );
-                Mono<?> mono = Mono.from(publisher);
                 if (continuation instanceof ResultAwareContinuation resultAwareContinuation) {
-                    return resultAwareContinuation.processResult(mono);
+                    return resultAwareContinuation.processResult(publisher);
                 }
-                return ReactiveExecutionFlow.fromPublisher(mono).flatMap(v -> {
+                return ReactiveExecutionFlow.fromPublisher(publisher).flatMap(v -> {
                     try {
                         return next.handle(context, v, continuation);
                     } catch (Throwable e) {
