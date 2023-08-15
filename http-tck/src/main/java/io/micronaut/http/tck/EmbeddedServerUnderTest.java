@@ -74,10 +74,14 @@ public class EmbeddedServerUnderTest implements ServerUnderTest {
 
     @Override
     public void close() throws IOException {
+        if (client != null) {
+            client.close();
+        }
         if (httpClient != null) {
             httpClient.close();
         }
         if (embeddedServer != null) {
+            embeddedServer.getApplicationContext().close();
             embeddedServer.close();
         }
     }
