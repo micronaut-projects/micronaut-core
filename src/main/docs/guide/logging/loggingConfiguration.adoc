@@ -17,7 +17,8 @@ logger:
   config: /foo/custom-logback.xml
 ----
 
-You can also set a custom Logback XML configuration file to be used via `logger.config`. The file is first checked on the class path and then on the filesystem.
+You can also set a custom Logback XML configuration file to be used via `logger.config`.
+The file is first checked on the classpath and then on the file system.
 
 ==== Disabling a Logger with Properties
 
