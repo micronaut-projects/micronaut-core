@@ -81,7 +81,7 @@ public @interface Mapper {
         String defaultValue() default "";
 
         /**
-         * @return The format (for numbers an dates).
+         * @return The format to convert numbers or dates into a string.
          */
         String format() default "";
     }
