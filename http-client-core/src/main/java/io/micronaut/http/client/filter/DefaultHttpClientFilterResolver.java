@@ -26,6 +26,7 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.ClientFilter;
@@ -94,7 +95,7 @@ public class DefaultHttpClientFilterResolver extends BaseFilterProcessor<ClientF
         List<GenericHttpFilter> filterList = new ArrayList<>(filterEntries.size());
         for (FilterEntry filterEntry : filterEntries) {
             final GenericHttpFilter filter = filterEntry.getFilter();
-            if (filter instanceof GenericHttpFilter.AroundLegacy al && !al.isEnabled()) {
+            if (filter instanceof Toggleable toggleable && !toggleable.isEnabled()) {
                 continue;
             }
             if (matchesFilterEntry(method, requestPath, filterEntry)) {
@@ -167,7 +168,7 @@ public class DefaultHttpClientFilterResolver extends BaseFilterProcessor<ClientF
         FilterPatternStyle patternStyle = annotationMetadata.enumValue(Filter.class,
             "patternStyle", FilterPatternStyle.class).orElse(FilterPatternStyle.ANT);
         return new ClientFilterEntry(
-            new GenericHttpFilter.AroundLegacy(httpClientFilter, new FilterOrder.Dynamic(OrderUtil.getOrder(annotationMetadata))),
+            GenericHttpFilter.createLegacyFilter(httpClientFilter, new FilterOrder.Dynamic(OrderUtil.getOrder(annotationMetadata))),
             annotationMetadata,
             methodsForFilter(annotationMetadata),
             patternStyle,

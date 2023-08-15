@@ -259,10 +259,10 @@ public class RequestLifecycle {
 
         List<GenericHttpFilter> filters = new ArrayList<>(httpFilters.size() + 1);
         filters.addAll(httpFilters);
-        filters.add((GenericHttpFilter.Terminal) (request) -> {
+        filters.add(GenericHttpFilter.terminal(request -> {
             this.request = request;
             return downstream.get();
-        });
+        }));
         FilterRunner filterRunner = new FilterRunner(filters) {
             @Override
             protected ExecutionFlow<? extends HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response, PropagatedContext propagatedContext) {

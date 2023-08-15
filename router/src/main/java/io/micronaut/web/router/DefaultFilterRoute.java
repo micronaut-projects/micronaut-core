@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.PathMatcher;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.GenericHttpFilter;
@@ -134,7 +135,7 @@ class DefaultFilterRoute implements FilterRoute {
         for (String pattern : patterns) {
             if (matcher.matches(pattern, uriStr)) {
                 GenericHttpFilter filter = getFilter();
-                if (filter instanceof GenericHttpFilter.AroundLegacy al && !al.isEnabled()) {
+                if (filter instanceof Toggleable toggleable && !toggleable.isEnabled()) {
                     return Optional.empty();
                 }
                 return Optional.of(filter);
