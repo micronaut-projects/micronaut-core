@@ -73,7 +73,6 @@ internal open class KotlinVisitorContext(
             val kotlinTypeMapperInstance = ReflectionUtils.getFieldValue(resolverImplClass, "typeMapper", resolver).orElseThrow()
             ReflectionUtils.setField(kotlinTypeMapperClass, "useOldManglingRulesForFunctionAcceptingInlineClass", kotlinTypeMapperInstance, false)
         } catch (e: Exception) {
-            e.printStackTrace();
             // Ignore
         }
     }
