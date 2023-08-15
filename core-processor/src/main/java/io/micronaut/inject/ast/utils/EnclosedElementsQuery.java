@@ -214,10 +214,13 @@ public abstract class EnclosedElementsQuery<C, N> {
             Set<T> addedFromClassElements = new LinkedHashSet<>();
             classElements:
             for (N element : classElements) {
-                String elementName = getElementName(element);
-                for (Predicate<String> namePredicate : result.getNamePredicates()) {
-                    if (!namePredicate.test(elementName)) {
-                        continue classElements;
+                List<Predicate<String>> namePredicates = result.getNamePredicates();
+                if (!namePredicates.isEmpty()) {
+                    String elementName = getElementName(element);
+                    for (Predicate<String> namePredicate : namePredicates) {
+                        if (!namePredicate.test(elementName)) {
+                            continue classElements;
+                        }
                     }
                 }
 
