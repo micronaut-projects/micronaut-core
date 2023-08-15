@@ -9,9 +9,9 @@ repositories {
 
 dependencies {
     implementation "org.aim42:htmlSanityCheck:1.1.6"
-    implementation "io.micronaut.build.internal:micronaut-gradle-plugins:6.5.4"
+    implementation "io.micronaut.build.internal:micronaut-gradle-plugins:6.5.5"
 
     implementation "org.tomlj:tomlj:1.1.0"
     implementation "me.champeau.gradle:japicmp-gradle-plugin:0.4.2"
-    implementation "org.graalvm.buildtools.native:org.graalvm.buildtools.native.gradle.plugin:0.9.23"
+    implementation "org.graalvm.buildtools.native:org.graalvm.buildtools.native.gradle.plugin:0.9.24"
 }

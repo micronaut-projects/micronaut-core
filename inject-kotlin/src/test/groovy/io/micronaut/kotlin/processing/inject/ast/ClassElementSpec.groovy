@@ -51,6 +51,37 @@ class Test {
         AllElementsVisitor.WRITE_FILE == false
     }
 
+    void "test visitGeneratedFile META-INF"() {
+        given:
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS.clear()
+        AllElementsVisitor.VISITED_ELEMENTS.clear()
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS.clear()
+        AllElementsVisitor.WRITE_FILE = true
+        AllElementsVisitor.WRITE_IN_METAINF = true
+
+        when:
+        def definition = buildBeanDefinition('test.visit.Test', '''
+package test.visit
+
+ import jakarta.inject.Singleton
+
+
+@Singleton
+class Test {
+    fun myMethod() {}
+}
+''')
+
+        then:
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 1
+        definition.getClass().getClassLoader().getResource("META-INF/foo/bar.txt").text == 'All good'
+
+        cleanup:
+        AllElementsVisitor.WRITE_FILE == false
+        AllElementsVisitor.WRITE_IN_METAINF = false
+    }
+
     void "test class element"() {
         expect:
         buildClassElement('ast.test.Test', '''
@@ -2181,6 +2212,69 @@ class TestNamed {
         expect:
             ce.findMethod("method1").get().getReturnType().canonicalName == "int"
             ce.findMethod("method2").get().getReturnType().canonicalName == Integer.class.name
+    }
+
+    void "test conf with inner companion"() {
+        when:
+        ClassElement ce = buildClassElement('test.StripeConfig', '''
+package test
+
+import io.micronaut.context.annotation.ConfigurationProperties
+import io.micronaut.core.annotation.Introspected
+import jakarta.validation.Valid
+import jakarta.validation.constraints.NotNull
+import io.micronaut.context.annotation.Context
+
+@Context
+@ConfigurationProperties(StripeConfig.PREFIX)
+class StripeConfig {
+    companion object {
+        const val PREFIX = "stripe"
+    }
+
+    @Valid
+    @NotNull
+    var usa: UsaStripeClientConfig = UsaStripeClientConfig()
+
+    @Valid
+    @NotNull
+    var canada: CanadaStripeClientConfig = CanadaStripeClientConfig()
+
+    @Introspected
+    interface StripeClientConfig {
+        val apiKey: String
+        val webhookSecret: String
+    }
+
+    @Context
+    @ConfigurationProperties(UsaStripeClientConfig.PREFIX)
+    @Introspected
+    class UsaStripeClientConfig : StripeClientConfig {
+        internal companion object {
+            internal const val PREFIX = "usa"
+        }
+
+        override lateinit var apiKey: String
+        override lateinit var webhookSecret: String
+    }
+
+    @Context
+    @ConfigurationProperties(CanadaStripeClientConfig.PREFIX)
+    @Introspected
+    class CanadaStripeClientConfig : StripeClientConfig {
+        internal companion object {
+            internal const val PREFIX = "canada"
+        }
+
+        override lateinit var apiKey: String
+        override lateinit var webhookSecret: String
+    }
+}
+
+
+''')
+        then:
+            noExceptionThrown()
     }
 
     private void assertListGenericArgument(ClassElement type, Closure cl) {

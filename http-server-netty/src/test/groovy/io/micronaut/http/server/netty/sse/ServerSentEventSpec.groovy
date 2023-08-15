@@ -19,25 +19,26 @@ import groovy.transform.EqualsAndHashCode
 import groovy.transform.ToString
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
+import io.micronaut.http.HttpHeaders
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Produces
+import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.sse.Event
+import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Flux
-import reactor.core.publisher.FluxSink
-import reactor.core.publisher.SynchronousSink
 import spock.lang.Specification
 
 import java.time.Duration
 import java.time.temporal.ChronoUnit
-import java.util.function.Consumer
 
 /**
  * @author Graeme Rocher
@@ -47,6 +48,8 @@ import java.util.function.Consumer
 @Property(name = 'spec.name', value = 'ServerSentEventSpec')
 class ServerSentEventSpec extends Specification {
 
+    @Inject EmbeddedServer server
+    @Inject HttpClient httpClient
     @Inject SseClient client
 
     void "test consume event stream object"() {
@@ -86,6 +89,19 @@ class ServerSentEventSpec extends Specification {
         def ex = thrown(HttpClientResponseException)
         ex.status == HttpStatus.INTERNAL_SERVER_ERROR
         ex.message == "Client '/sse': Internal Server Error"
+    }
+
+    void "test Content-Type header is correct"() {
+        def httpRequest = HttpRequest
+                .GET(server.getURI().toString() + "/sse/object")
+                .accept(MediaType.TEXT_EVENT_STREAM)
+
+        when:
+        def response = httpClient.toBlocking().exchange(httpRequest)
+
+        then:
+        response.status() == HttpStatus.OK
+        response.header(HttpHeaders.CONTENT_TYPE) == MediaType.TEXT_EVENT_STREAM
     }
 
     @Client('/sse')

@@ -76,8 +76,6 @@ internal class KotlinPropertySetterMethodElement(
 
     override fun isSynthetic() = true
 
-    override fun isFinal() = true
-
     override fun withNewOwningType(owningType: ClassElement): MethodElement {
         val newMethod = KotlinPropertySetterMethodElement(
             owningType,

@@ -23,6 +23,7 @@ import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableHeaders;
 import io.micronaut.core.util.SupplierUtil;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
@@ -94,6 +95,8 @@ final class TextStreamBodyWriter<T> implements MessageBodyWriter<T> {
                 rc.release();
             }
         }
+
+        outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.TEXT_EVENT_STREAM_TYPE);
 
         ByteBuffer eventData = bufferFactory.buffer(body.length + 10);
         writeAttribute(eventData, COMMENT_PREFIX, event.getComment());
