@@ -550,13 +550,15 @@ public class FilterRunner {
                 if (returnValue == null && !nullable) {
                     return next.handle(context, null, continuation);
                 }
-
-                Mono<?> monoPublisher = Mono.from(Publishers.convertPublisher(conversionService, returnValue, Publisher.class));
-                Publisher<?> publisher = ReactivePropagation.propagate(context.propagatedContext, monoPublisher);
+                Publisher<?> publisher = ReactivePropagation.propagate(
+                    context.propagatedContext,
+                    Publishers.convertPublisher(conversionService, returnValue, Publisher.class)
+                );
+                Mono<?> mono = Mono.from(publisher);
                 if (continuation instanceof ResultAwareContinuation resultAwareContinuation) {
-                    return resultAwareContinuation.processResult(publisher);
+                    return resultAwareContinuation.processResult(mono);
                 }
-                return ReactiveExecutionFlow.fromPublisher(publisher).flatMap(v -> {
+                return ReactiveExecutionFlow.fromPublisher(mono).flatMap(v -> {
                     try {
                         return next.handle(context, v, continuation);
                     } catch (Throwable e) {
