@@ -266,7 +266,8 @@ internal open class TypeElementSymbolProcessor(private val environment: SymbolPr
                     val innerClasses = classElement.getEnclosedElements(innerClassQuery)
                     innerClasses.forEach {
                         val visitor = loadedVisitor.visitor
-                        if (loadedVisitor.matches(it)) {
+                        val kspClassElement: KotlinClassElement = it as KotlinClassElement
+                        if (loadedVisitor.matches(kspClassElement.declaration)) {
                             visitor.visitClass(it, loadedVisitor.visitorContext)
                             visitMembers(it)
                         }
