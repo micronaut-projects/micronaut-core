@@ -37,8 +37,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Switch based dispatch writer.
@@ -238,12 +240,14 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
                 DISPATCH_ONE_METHOD.getDescriptor()
         );
         dispatchMethod.loadArg(0);
+        Map<String, DispatchTargetState> stateMap = new HashMap<>();
         dispatchMethod.tableSwitch(cases, new TableSwitchGenerator() {
             @Override
             public void generateCase(int key, Label end) {
                 DispatchTarget method = dispatchTargets.get(key);
-                method.writeDispatchOne(dispatchMethod, key);
-                dispatchMethod.returnValue();
+                if (method.writeDispatchOne(dispatchMethod, key, stateMap)) {
+                    dispatchMethod.returnValue();
+                }
             }
 
             @Override
@@ -254,6 +258,9 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
                 dispatchMethod.throwException();
             }
         }, true);
+        for (DispatchTargetState state : stateMap.values()) {
+            state.complete(dispatchMethod);
+        }
         dispatchMethod.visitMaxs(DEFAULT_MAX_STACK, 1);
         dispatchMethod.visitEnd();
     }
@@ -360,6 +367,20 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
         }
 
         /**
+         * Generate {@code dispatchOne} with shared state.
+         *
+         * @param writer The method writer
+         * @param methodIndex The method index
+         * @param stateMap State map shared for this {@code dispatchOne} method, may be written to
+         * @return {@code true} iff the return value is on the top of the stack, {@code false} iff
+         * we branched instead
+         */
+        default boolean writeDispatchOne(GeneratorAdapter writer, int methodIndex, Map<String, DispatchTargetState> stateMap) {
+            writeDispatchOne(writer, methodIndex);
+            return true;
+        }
+
+        /**
          * Generate dispatch one.
          * @param methodIndex The method index
          *
@@ -386,6 +407,20 @@ public final class DispatchWriter extends AbstractClassFileWriter implements Opc
             throw new IllegalStateException("Not supported");
         }
 
+    }
+
+    /**
+     * State carried between different {@link DispatchTarget}s. This allows for code size reduction
+     * by sharing bytecode in the same method.
+     */
+    @Internal
+    public interface DispatchTargetState {
+        /**
+         * Complete writing this state.
+         *
+         * @param writer The method writer
+         */
+        void complete(GeneratorAdapter writer);
     }
 
     /**

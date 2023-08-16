@@ -4,15 +4,12 @@ import com.blazebit.persistence.impl.function.entity.ValuesEntity
 import com.fasterxml.jackson.annotation.JsonClassDescription
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonProperty
-import com.fasterxml.jackson.databind.ObjectMapper
-import groovy.transform.PackageScope
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.annotation.processing.test.JavaParser
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Replaces
-import io.micronaut.context.annotation.Value
 import io.micronaut.context.visitor.ConfigurationReaderVisitor
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
@@ -34,6 +31,11 @@ import io.micronaut.jackson.modules.BeanIntrospectionModule
 import io.micronaut.json.JsonMapper
 import io.micronaut.validation.visitor.ValidationVisitor
 import jakarta.inject.Singleton
+import jakarta.validation.Constraint
+import jakarta.validation.constraints.DecimalMin
+import jakarta.validation.constraints.Min
+import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Size
 import spock.lang.IgnoreIf
 import spock.lang.Issue
 import spock.lang.Requires
@@ -43,13 +45,9 @@ import javax.persistence.Column
 import javax.persistence.Entity
 import javax.persistence.Id
 import javax.persistence.Version
-import jakarta.validation.Constraint
-import jakarta.validation.constraints.DecimalMin
-import jakarta.validation.constraints.Min
-import jakarta.validation.constraints.NotBlank
-import jakarta.validation.constraints.Size
 import java.lang.reflect.Field
-import java.time.Instant
+import java.util.stream.Collectors
+import java.util.stream.IntStream
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
@@ -4849,6 +4847,29 @@ class OptionalStringHolder {
             introspection.getProperty("optionalString").get().getType() == Optional.class
             introspection.getProperty("optionalString").get().asArgument().getFirstTypeVariable().get().getAnnotationMetadata().hasAnnotation(NotBlank)
 
+    }
+
+    void "test massive dispatch"() {
+        given:
+        int count = 120
+        List<String> fieldNames = IntStream.range(0, count).mapToObj(i -> "f$i").toList()
+        BeanIntrospection introspection = buildBeanIntrospection('test.Massive', """
+package test;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class Massive {
+    ${fieldNames.stream().map(f -> "private final String $f;").collect(Collectors.joining("\n"))}
+
+    Massive(${fieldNames.stream().map(f -> "String $f").collect(Collectors.joining(", "))}) {
+        ${fieldNames.stream().map(f -> "this.$f = $f;").collect(Collectors.joining("\n"))}
+    }
+
+    ${fieldNames.stream().map(f -> "public String get${f.capitalize()}() { return $f; }").collect(Collectors.joining("\n"))}
+}""")
+
+        expect:
+        introspection.getBeanProperties().size() == count
     }
 
     @Override
