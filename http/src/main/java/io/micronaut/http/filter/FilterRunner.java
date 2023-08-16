@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.async.propagation.ReactivePropagation;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.annotation.Bindable;
@@ -46,7 +47,6 @@ import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.inject.ExecutableMethod;
 import org.reactivestreams.Publisher;
-import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.ListIterator;
@@ -274,23 +274,21 @@ public class FilterRunner {
             FilterChainImpl chainSuspensionPoint = new FilterChainImpl(downstream, context);
             // Legacy `Publisher<HttpResponse> proceed(..)` filters are always suspended
             if (executeOn == null) {
-                try {
-                    try (PropagatedContext.Scope ignore = context.propagatedContext.propagate()) {
-                        return chainSuspensionPoint.processResult(
-                            around.bean().doFilter(context.request, chainSuspensionPoint)
-                        );
-                    }
+                try (PropagatedContext.Scope ignore = context.propagatedContext.propagate()) {
+                    return chainSuspensionPoint.processResult(
+                        around.bean().doFilter(context.request, chainSuspensionPoint),
+                        context.propagatedContext
+                    );
                 } catch (Exception e) {
                     return ExecutionFlow.error(e);
                 }
             } else {
                 return ExecutionFlow.async(executeOn, () -> {
-                    try {
-                        try (PropagatedContext.Scope ignore = context.propagatedContext.propagate()) {
-                            return chainSuspensionPoint.processResult(
-                                around.bean().doFilter(context.request, chainSuspensionPoint)
-                            );
-                        }
+                    try (PropagatedContext.Scope ignore = context.propagatedContext.propagate()) {
+                        return chainSuspensionPoint.processResult(
+                            around.bean().doFilter(context.request, chainSuspensionPoint),
+                            context.propagatedContext
+                        );
                     } catch (Exception e) {
                         return ExecutionFlow.error(e);
                     }
@@ -551,9 +549,10 @@ public class FilterRunner {
                 if (returnValue == null && !nullable) {
                     return next.handle(context, null, continuation);
                 }
-
-                Mono<?> publisher = Mono.from(Publishers.convertPublisher(conversionService, returnValue, Publisher.class));
-
+                Publisher<?> publisher = ReactivePropagation.propagate(
+                    context.propagatedContext,
+                    Publishers.convertPublisher(conversionService, returnValue, Publisher.class)
+                );
                 if (continuation instanceof ResultAwareContinuation resultAwareContinuation) {
                     return resultAwareContinuation.processResult(publisher);
                 }
@@ -975,8 +974,9 @@ public class FilterRunner {
             ).toPublisher();
         }
 
-        public ExecutionFlow<FilterContext> processResult(Publisher<? extends HttpResponse<?>> publisher) {
-            return ReactiveExecutionFlow.fromPublisher(publisher).map(httpResponse -> filterContext.withResponse(httpResponse));
+        public ExecutionFlow<FilterContext> processResult(Publisher<? extends HttpResponse<?>> publisher, PropagatedContext propagatedContext) {
+            return ReactiveExecutionFlow.fromPublisher(ReactivePropagation.propagate(propagatedContext, publisher))
+                .map(httpResponse -> filterContext.withResponse(httpResponse));
         }
 
     }
