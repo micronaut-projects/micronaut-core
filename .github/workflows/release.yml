@@ -91,7 +91,7 @@ jobs:
         if: success()
         uses: micronaut-projects/github-pages-deploy-action@master
         env:
-          BETA: ${{ contains(steps.release_version.outputs.release_version, 'M') || contains(steps.release_version.outputs.release_version, 'RC') }}
+          BETA: ${{ !(github.event.release.target_commitish == github.event.repository.default_branch) || contains(steps.release_version.outputs.release_version, 'M') || contains(steps.release_version.outputs.release_version, 'RC') }}
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
           BRANCH: gh-pages
           FOLDER: build/docs
