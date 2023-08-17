@@ -58,7 +58,6 @@ import java.util.List;
 @Internal
 @Experimental
 public class DefaultJdkHttpClient extends AbstractJdkHttpClient implements JdkHttpClient {
-
     public DefaultJdkHttpClient(
         @Nullable LoadBalancer loadBalancer,
         HttpVersionSelection httpVersion,
