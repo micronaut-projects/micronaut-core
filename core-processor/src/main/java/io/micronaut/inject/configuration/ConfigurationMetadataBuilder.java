@@ -20,6 +20,7 @@ import com.github.javaparser.javadoc.Javadoc;
 import com.github.javaparser.javadoc.JavadocBlockTag;
 import com.github.javaparser.javadoc.description.JavadocDescription;
 import com.github.javaparser.javadoc.description.JavadocDescriptionElement;
+import com.github.javaparser.javadoc.description.JavadocInlineTag;
 import com.github.javaparser.javadoc.description.JavadocSnippet;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.core.annotation.Internal;
@@ -130,6 +131,8 @@ public class ConfigurationMetadataBuilder {
                     for (JavadocDescriptionElement jde : elements) {
                         if (jde instanceof JavadocSnippet snippet) {
                             builder.append(snippet.toText());
+                        } else if (jde instanceof JavadocInlineTag tag) {
+                            builder.append(tag.toText());
                         }
                     }
                 } else if (element instanceof MethodElement) {

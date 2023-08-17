@@ -44,7 +44,17 @@ class ConfigurationMetadataSpec extends AbstractTypeElementSpec {
         def expectedMap = mapper.readValue(expected, Map.class)
         def providedJson = mapper.writeValueAsString(providedMap)
         def expectedJson = mapper.writeValueAsString(expectedMap)
-        return providedJson == expectedJson
+        assert providedJson == expectedJson
+        true
+    }
+
+    private boolean jsonEquals(@Language("json") String provided, Map expected) {
+        ObjectMapper mapper = new ObjectMapper()
+        def providedMap = mapper.readValue(provided, Map.class)
+        def providedJson = mapper.writeValueAsString(providedMap)
+        def expectedJson = mapper.writeValueAsString(expected)
+        assert providedJson == expectedJson
+        true
     }
 
     protected String buildConfigurationMetadata(@Language("java") String cls) {
@@ -112,6 +122,49 @@ interface MyProperties {
         jsonEquals(metadataJson, '''
 {"groups":[{"name":"test","type":"test.MyProperties","description":"My Configuration description."}],"properties":[{"name":"test.name","type":"java.lang.String","sourceType":"test.MyProperties","description":"The name"},{"name":"test.age","type":"int","sourceType":"test.MyProperties","description":"The age"}]}
 ''')
+    }
+
+    void "test default values and descriptions"() {
+        when:
+        String metadataJson = buildConfigurationMetadata('''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+/**
+*  My Configuration description.
+*
+*/
+@ConfigurationProperties("test")
+interface MyProperties {
+
+    String DEFAULT_NAME = "Fred";
+
+    /**
+    * Get the name, default value {@value #DEFAULT_NAME}.
+    * @return The name
+    */
+    String getName();
+
+    /**
+     * The age
+     */
+    int getAge();
+}
+
+''')
+
+        then:
+        jsonEquals(metadataJson, [
+                groups: [
+                        [name: 'test', type: "test.MyProperties", description: "My Configuration description."],
+                ],
+                properties: [
+                        [name: 'test.name', type: "java.lang.String", sourceType: "test.MyProperties", description: "Get the name, default value {@value #DEFAULT_NAME}."],
+                        [name: 'test.age', type: "int", sourceType: "test.MyProperties", description: "The age"]
+                ]
+
+        ])
     }
 
     void "test configuration metadata and javabeans"() {
