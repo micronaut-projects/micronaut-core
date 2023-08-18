@@ -114,7 +114,6 @@ public class DefaultMutableConversionService implements MutableConversionService
             return Optional.of((T) object);
         }
         targetType = targetType.isPrimitive() ? (Class<T>) ReflectionUtils.getWrapperType(targetType) : targetType;
-
         if (targetType.isInstance(object) && !(object instanceof Iterable) && !(object instanceof Map)) {
             return Optional.of((T) object);
         }
