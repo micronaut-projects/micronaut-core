@@ -1049,7 +1049,9 @@ annotation class NotNull
         ''')
 
         when:
-            def doWorkMethod = definition.getBeanType().getDeclaredMethods()[1]
+            def doWorkMethod = Arrays.stream(definition.getBeanType().getDeclaredMethods())
+                    .filter {f -> !f.isSynthetic()}
+                    .findFirst().orElseThrow()
             def supertypeMethods = definition.getBeanType().getSuperclass().getDeclaredMethods()
         then:
             supertypeMethods.collect { it.name}.contains(doWorkMethod.name)
