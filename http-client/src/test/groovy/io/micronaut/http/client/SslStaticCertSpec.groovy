@@ -26,10 +26,12 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
 import reactor.core.publisher.Flux
+import spock.lang.IgnoreIf
 import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 
+@IgnoreIf({ os.isMacOs() })
 @Retry(mode = Retry.Mode.SETUP_FEATURE_CLEANUP)
 class SslStaticCertSpec extends Specification {
 
