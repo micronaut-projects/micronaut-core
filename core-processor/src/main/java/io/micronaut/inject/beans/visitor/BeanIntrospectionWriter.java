@@ -103,6 +103,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     );
     private static final String METHOD_IS_BUILDABLE = "isBuildable";
 
+    private final VisitorContext visitorContext;
     private final ClassWriter referenceWriter;
     private final String introspectionName;
     private final Type introspectionType;
@@ -130,9 +131,10 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     BeanIntrospectionWriter(String targetPackage, ClassElement classElement, AnnotationMetadata beanAnnotationMetadata,
                             VisitorContext visitorContext) {
         super(computeReferenceName(targetPackage, classElement.getName()), classElement, beanAnnotationMetadata, true, visitorContext);
+        this.visitorContext = visitorContext;
         final String name = classElement.getName();
         this.classElement = classElement;
-        this.referenceWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        this.referenceWriter = new AptClassWriter(ClassWriter.COMPUTE_MAXS, visitorContext);
         this.introspectionName = computeShortIntrospectionName(targetPackage, name);
         this.introspectionType = getTypeReferenceForName(introspectionName);
         this.beanType = getTypeReferenceForName(name);
@@ -158,9 +160,10 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         AnnotationMetadata beanAnnotationMetadata,
         VisitorContext visitorContext) {
         super(computeReferenceName(targetPackage, generatingType) + index, originatingElement, beanAnnotationMetadata, true, visitorContext);
+        this.visitorContext = visitorContext;
         final String className = classElement.getName();
         this.classElement = classElement;
-        this.referenceWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        this.referenceWriter = new AptClassWriter(ClassWriter.COMPUTE_MAXS, visitorContext);
         this.introspectionName = computeIntrospectionName(targetPackage, className);
         this.introspectionType = getTypeReferenceForName(introspectionName);
         this.beanType = getTypeReferenceForName(className);
@@ -495,7 +498,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private void writeIntrospectionClass(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
         final Type superType = Type.getType(AbstractInitializableBeanIntrospection.class);
 
-        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
+        ClassWriter classWriter = new AptClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES, visitorContext);
         classWriter.visit(V17, ACC_SYNTHETIC | ACC_FINAL,
             introspectionType.getInternalName(),
             null,
@@ -1021,7 +1024,40 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         }
 
         @Override
-        public void writeDispatchOne(GeneratorAdapter writer, int index) {
+        public boolean writeDispatchOne(GeneratorAdapter writer, int methodIndex, Map<String, DispatchWriter.DispatchTargetState> stateMap) {
+            CopyConstructorDispatchState state = (CopyConstructorDispatchState) stateMap.computeIfAbsent(CopyConstructorDispatchState.KEY, k -> new CopyConstructorDispatchState(constructor, writer.newLabel()));
+            state.propertyNames.put(parameterName, methodIndex);
+            writer.goTo(state.label);
+            return false;
+        }
+    }
+
+    /**
+     * Shared implementation of {@link CopyConstructorDispatchTarget#writeDispatchOne}. <br>
+     *
+     * A non-shared copy constructor implementation would be O(n²) in the number of properties: For
+     * every property we generate a constructor call, and that constructor call has that many
+     * parameters too that all have to be loaded.<br>
+     *
+     * This shared implementation instead only generates one constructor call, and branches on each
+     * loaded property to figure out whether to copy it or to use the replacement from the
+     * {@code dispatchOne} parameter.
+     */
+    private class CopyConstructorDispatchState implements DispatchWriter.DispatchTargetState {
+        static final String KEY = CopyConstructorDispatchState.class.getName();
+
+        final MethodElement constructor;
+        final Label label;
+        final Map<String, Integer> propertyNames = new HashMap<>();
+
+        CopyConstructorDispatchState(MethodElement constructor, Label label) {
+            this.constructor = constructor;
+            this.label = label;
+        }
+
+        @Override
+        public void complete(GeneratorAdapter writer) {
+            writer.visitLabel(label);
             // In this case we have to do the copy constructor approach
             Set<BeanPropertyData> constructorProps = new HashSet<>();
 
@@ -1033,11 +1069,6 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
             for (int i = 0; i < parameters.length; i++) {
                 ParameterElement parameter = parameters[i];
                 String parameterName = parameter.getName();
-
-                if (this.parameterName.equals(parameterName)) {
-                    constructorArguments[i] = this;
-                    continue;
-                }
 
                 BeanPropertyData prop = beanProperties.stream()
                     .filter(bp -> bp.name.equals(parameterName))
@@ -1085,25 +1116,66 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                 invokeBeanConstructor(writer, constructor, false, (paramIndex, parameter) -> {
                     Object constructorArgument = constructorArguments[paramIndex];
                     boolean isPrimitive;
-                    if (constructorArgument == this) {
-                        writer.loadArg(2);
-                        isPrimitive = false;
-                    } else if (constructorArgument instanceof MethodElement readMethod) {
-                        writer.loadLocal(prevBeanTypeLocal, beanType);
-                        invokeMethod(writer, readMethod);
+                    if (constructorArgument instanceof MethodElement readMethod) {
                         isPrimitive = readMethod.getReturnType().isPrimitive();
                     } else if (constructorArgument instanceof FieldElement fieldElement) {
-                        writer.loadLocal(prevBeanTypeLocal, beanType);
-                        invokeGetField(writer, fieldElement);
                         isPrimitive = fieldElement.isPrimitive();
                     } else {
                         throw new IllegalStateException();
                     }
-                    if (isPrimitive) {
-                        if (!parameter.isPrimitive()) {
-                            pushBoxPrimitiveIfNecessary(parameter, writer);
+
+                    boolean writeNonReplaceBranch = true;
+
+                    Label endOfProperty = null;
+                    Integer target = propertyNames.get(parameter.getName());
+                    if (target != null) {
+                        // replace property with new value
+
+                        // if we're the only replaceable property, we can skip the second branch
+                        writeNonReplaceBranch = propertyNames.size() > 1;
+
+                        Label nonReplaceBranch = null;
+                        if (writeNonReplaceBranch) {
+                            nonReplaceBranch = writer.newLabel();
+                            writer.loadArg(0);
+                            writer.push(target);
+                            writer.ifICmp(GeneratorAdapter.NE, nonReplaceBranch);
                         }
-                    } else {
+
+                        writer.loadArg(2);
+                        // if the parameter is non-primitive, we share the cast with the non-replace branch
+                        if (isPrimitive) {
+                            pushCastToType(writer, parameter);
+                        }
+
+                        if (writeNonReplaceBranch) {
+                            endOfProperty = writer.newLabel();
+                            writer.goTo(endOfProperty);
+                            writer.visitLabel(nonReplaceBranch);
+                        }
+                    }
+
+                    if (writeNonReplaceBranch) {
+                        // non-replace branch
+                        if (constructorArgument instanceof MethodElement readMethod) {
+                            writer.loadLocal(prevBeanTypeLocal, beanType);
+                            invokeMethod(writer, readMethod);
+                        } else {
+                            writer.loadLocal(prevBeanTypeLocal, beanType);
+                            invokeGetField(writer, (FieldElement) constructorArgument);
+                        }
+                        if (isPrimitive) {
+                            if (!parameter.isPrimitive()) {
+                                pushBoxPrimitiveIfNecessary(parameter, writer);
+                            }
+                        }
+                    }
+
+                    if (endOfProperty != null) {
+                        writer.visitLabel(endOfProperty);
+                    }
+
+                    if (!isPrimitive) {
                         pushCastToType(writer, parameter);
                     }
                 });
@@ -1148,6 +1220,7 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                     }
                     writer.loadLocal(beanTypeLocal, beanType);
                 }
+                writer.returnValue();
             } else {
                 // In this case the bean cannot be mutated via either copy constructor or setter so simply throw an exception
                 writer.throwException(Type.getType(UnsupportedOperationException.class), nonMutableMessage);
