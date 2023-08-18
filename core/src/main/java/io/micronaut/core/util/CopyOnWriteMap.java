@@ -24,6 +24,7 @@ import java.util.BitSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ThreadLocalRandom;
@@ -154,6 +155,10 @@ public final class CopyOnWriteMap<K, V> extends AbstractMap<K, V> implements Con
      */
     public static void evict(Map<?, ?> map, int numToEvict) {
         int size = map.size();
+        if (size < numToEvict) {
+            // can occasionally happen with concurrent evict with CHM. we're best-effort in that case
+            numToEvict = size;
+        }
         // select some indices in the map to remove at random
         BitSet toRemove = new BitSet(size);
         for (int i = 0; i < numToEvict; i++) {
@@ -162,7 +167,13 @@ public final class CopyOnWriteMap<K, V> extends AbstractMap<K, V> implements Con
         // iterate over the map and remove those indices
         Iterator<?> iterator = map.entrySet().iterator();
         for (int i = 0; i < size; i++) {
-            iterator.next();
+            try {
+                iterator.next();
+            } catch (NoSuchElementException ignored) {
+                // if called on a ConcurrentHashMap, another thread may have modified the map in
+                // the meantime
+                break;
+            }
             if (toRemove.get(i)) {
                 iterator.remove();
             }
