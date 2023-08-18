@@ -1,18 +1,3 @@
-/*
- * Copyright 2017-2019 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.micronaut.inject.configuration
 
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -44,7 +29,17 @@ class ConfigurationMetadataSpec extends AbstractTypeElementSpec {
         def expectedMap = mapper.readValue(expected, Map.class)
         def providedJson = mapper.writeValueAsString(providedMap)
         def expectedJson = mapper.writeValueAsString(expectedMap)
-        return providedJson == expectedJson
+        assert providedJson == expectedJson
+        true
+    }
+
+    private boolean jsonEquals(@Language("json") String provided, Map expected) {
+        ObjectMapper mapper = new ObjectMapper()
+        def providedMap = mapper.readValue(provided, Map.class)
+        def providedJson = mapper.writeValueAsString(providedMap)
+        def expectedJson = mapper.writeValueAsString(expected)
+        assert providedJson == expectedJson
+        true
     }
 
     protected String buildConfigurationMetadata(@Language("java") String cls) {
@@ -112,6 +107,98 @@ interface MyProperties {
         jsonEquals(metadataJson, '''
 {"groups":[{"name":"test","type":"test.MyProperties","description":"My Configuration description."}],"properties":[{"name":"test.name","type":"java.lang.String","sourceType":"test.MyProperties","description":"The name"},{"name":"test.age","type":"int","sourceType":"test.MyProperties","description":"The age"}]}
 ''')
+    }
+
+    void "test default values and descriptions"() {
+        when:
+        String metadataJson = buildConfigurationMetadata('''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+/**
+*  My Configuration description.
+*/
+@ConfigurationProperties("test")
+interface MyProperties {
+
+    String DEFAULT_NAME = "Fred";
+
+    /**
+    * Get the name, default value {@value #DEFAULT_NAME}.
+    * @return The name
+    */
+    String getName();
+
+    /**
+     * The age
+     */
+    int getAge();
+}
+
+''')
+
+        then:
+        jsonEquals(metadataJson, [
+                groups    : [
+                        [name: 'test', type: "test.MyProperties", description: "My Configuration description."],
+                ],
+                properties: [
+                        [name: 'test.name', type: "java.lang.String", sourceType: "test.MyProperties", description: "Get the name, default value {@value #DEFAULT_NAME}."],
+                        [name: 'test.age', type: "int", sourceType: "test.MyProperties", description: "The age"]
+                ]
+
+        ])
+    }
+
+    void "test setter descriptions"() {
+        when:
+        String metadataJson = buildConfigurationMetadata('''
+package test;
+
+import io.micronaut.context.annotation.*;
+import io.micronaut.core.util.Toggleable;
+
+interface BaseConfig extends Toggleable {
+
+    /**
+     * @return The name
+     */
+    String getName();
+}
+
+@ConfigurationProperties("test")
+class Config implements BaseConfig {
+
+    public static final String DEFAULT_NAME = "test";
+
+    private String name = DEFAULT_NAME;
+
+    @Override
+    public String getName() {
+        return name;
+    }
+
+    /**
+     * Sets the name (default {@value #DEFAULT_NAME}).
+     * @param name the name to use
+     */
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+''')
+
+        then:
+        jsonEquals(metadataJson, [
+                groups    : [
+                        [name: 'test', type: "test.Config"],
+                ],
+                properties: [
+                        [name: 'test.name', type: "java.lang.String", sourceType: "test.Config", description: "Sets the name (default {@value #DEFAULT_NAME})."],
+                ]
+
+        ])
     }
 
     void "test configuration metadata and javabeans"() {
