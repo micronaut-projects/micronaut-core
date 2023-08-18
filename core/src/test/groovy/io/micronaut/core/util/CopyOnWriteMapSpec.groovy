@@ -2,6 +2,13 @@ package io.micronaut.core.util
 
 import spock.lang.Specification
 
+import java.util.concurrent.Callable
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
+import java.util.stream.IntStream
+
 @SuppressWarnings('GrEqualsBetweenInconvertibleTypes')
 class CopyOnWriteMapSpec extends Specification {
     def "simple ops"() {
@@ -92,5 +99,29 @@ class CopyOnWriteMapSpec extends Specification {
 
         where:
         maxSize << [0, 5]
+    }
+
+    def "concurrent evict"() {
+        // COWMap is not thread-safe, but the static evict method should work for CHM
+
+        given:
+        def map = new ConcurrentHashMap<>()
+        ExecutorService service = Executors.newFixedThreadPool(2)
+
+        List<Callable<?>> callables = IntStream.range(0, 1000).mapToObj {i -> (Callable<Void>) () -> {
+            map.put("foo", "bar")
+            CopyOnWriteMap.evict(map, 1)
+            return null
+        }}
+
+        when:
+        for (Future<?> f : service.invokeAll(callables)) {
+            f.get()
+        }
+        then:
+        noExceptionThrown()
+
+        cleanup:
+        service.shutdown()
     }
 }
