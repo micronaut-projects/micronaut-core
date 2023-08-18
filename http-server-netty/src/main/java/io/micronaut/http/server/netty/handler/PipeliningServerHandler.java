@@ -901,6 +901,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         void discard() {
+            // this is safe because:
+            // - onComplete/onError cannot have been called yet, because otherwise outboundHandler
+            //   would be null and discard couldn't have been called
+            // - while cancel() may trigger onComplete/onError, `removed` is true at this point, so
+            //   they won't call responseWritten in turn
+            requestHandler.responseWritten(outboundAccess.attachment);
             subscription.cancel();
             outboundHandler = null;
         }

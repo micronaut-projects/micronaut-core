@@ -100,21 +100,6 @@ jobs:
           GRADLE_ENTERPRISE_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
           GRADLE_ENTERPRISE_CACHE_USERNAME: ${{ secrets.GRADLE_ENTERPRISE_CACHE_USERNAME }}
           GRADLE_ENTERPRISE_CACHE_PASSWORD: ${{ secrets.GRADLE_ENTERPRISE_CACHE_PASSWORD }}
-      - name: Checkout micronaut-core
-        uses: actions/checkout@v3
-        with:
-          token: ${{ secrets.GH_TOKEN }}
-          repository: micronaut-projects/micronaut-core
-          ref: ${{ env.githubCoreBranch }}
-          path: micronaut-core # Must be micronaut-core
-        continue-on-error: true
-      - name: Update BOM
-        uses: micronaut-projects/github-actions/update-bom@master
-        env:
-          MICRONAUT_BUILD_EMAIL: ${{ secrets.MICRONAUT_BUILD_EMAIL }}
-        with:
-          token: ${{ secrets.GH_TOKEN }}
-        continue-on-error: true
       - name: Run post-release
         if: success()
         uses: micronaut-projects/github-actions/post-release@master
@@ -149,7 +134,7 @@ jobs:
       actions: read # To read the workflow path.
       id-token: write # To sign the provenance.
       contents: write # To add assets to a release.
-    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.7.0
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v1.8.0
     with:
       base64-subjects: "${{ needs.provenance-subject.outputs.artifacts-sha256 }}"
       upload-assets: true # Upload to a new release.

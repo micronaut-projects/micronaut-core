@@ -19,6 +19,7 @@ import spock.lang.Specification
 import static io.micronaut.annotation.processing.test.KotlinCompiler.buildBeanDefinition
 import static io.micronaut.annotation.processing.test.KotlinCompiler.buildBeanDefinitionReference
 import static io.micronaut.annotation.processing.test.KotlinCompiler.buildContext
+import static io.micronaut.annotation.processing.test.KotlinCompiler.buildInterceptedBeanDefinition
 import static io.micronaut.annotation.processing.test.KotlinCompiler.getBean
 import static io.micronaut.annotation.processing.test.KotlinCompiler.getBeanDefinition
 
@@ -1007,5 +1008,52 @@ interface Deserializer<T> {
             deserializerTypeParam.simpleName == "String[]"
             deserializerTypeParam.isTypeVariable()
             (deserializerTypeParam instanceof GenericPlaceholder)
+    }
+
+    void "test inline class return type"() {
+        given:
+            BeanDefinition definition = buildInterceptedBeanDefinition('test.NotNullMyInlineInnerExample', '''
+package test
+
+import io.micronaut.aop.Around
+import kotlin.annotation.AnnotationRetention.RUNTIME
+import kotlin.annotation.AnnotationTarget.CLASS
+import kotlin.annotation.AnnotationTarget.FILE
+import kotlin.annotation.AnnotationTarget.FUNCTION
+import kotlin.annotation.AnnotationTarget.PROPERTY_GETTER
+import kotlin.annotation.AnnotationTarget.PROPERTY_SETTER
+import jakarta.inject.Singleton
+
+@Singleton
+open class NotNullMyInlineInnerExample {
+
+    @NotNull
+    open fun doWork(taskName: String?) : MyResult {
+        println("Doing job: $taskName")
+        return MyResult(taskName!!)
+    }
+}
+
+@JvmInline
+value class MyResult(val task: String) {
+    init {
+        require(task.isNotEmpty()) { "Should not be empty" }
+    }
+}
+
+@MustBeDocumented
+@Retention(RUNTIME)
+@Target(CLASS, FILE, FUNCTION, PROPERTY_GETTER, PROPERTY_SETTER)
+@Around
+annotation class NotNull
+        ''')
+
+        when:
+            def doWorkMethod = Arrays.stream(definition.getBeanType().getDeclaredMethods())
+                    .filter {f -> !f.isSynthetic()}
+                    .findFirst().orElseThrow()
+            def supertypeMethods = definition.getBeanType().getSuperclass().getDeclaredMethods()
+        then:
+            supertypeMethods.collect { it.name}.contains(doWorkMethod.name)
     }
 }
