@@ -50,8 +50,8 @@ final class JavaFileObjects {
         Objects.requireNonNull(fullyQualifiedName);
         if (fullyQualifiedName.startsWith("package ")) {
             throw new IllegalArgumentException(
-                    String.format("fullyQualifiedName starts with \"package\" (%s). Did you forget to "
-                            + "specify the name and specify just the source text?", fullyQualifiedName));
+            ("fullyQualifiedName starts with \"package\" (%s). Did you forget to "
+            + "specify the name and specify just the source text?").formatted(fullyQualifiedName));
         }
         return new StringSourceJavaFileObject(fullyQualifiedName, Objects.requireNonNull(source));
     }

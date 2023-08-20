@@ -341,8 +341,8 @@ public final class TreeGenerator extends JsonGenerator {
     public void writeTree(TreeNode rootNode) throws IOException {
         if (rootNode == null) {
             writeNull();
-        } else if (rootNode instanceof JsonNode) {
-            writeScalar(JsonToken.VALUE_EMBEDDED_OBJECT, (JsonNode) rootNode);
+        } else if (rootNode instanceof JsonNode node) {
+            writeScalar(JsonToken.VALUE_EMBEDDED_OBJECT, node);
         } else {
             JsonStreamTransfer.transferNext(rootNode.traverse(), this, JsonStreamConfig.DEFAULT);
         }

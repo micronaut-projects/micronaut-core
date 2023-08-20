@@ -73,16 +73,15 @@ class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         V value = map.get(name);
-        if (value instanceof AnnotationClassValue) {
-            AnnotationClassValue acv = (AnnotationClassValue) value;
+        if (value instanceof AnnotationClassValue acv) {
             return environment.convert(acv, conversionContext);
-        } else if (value instanceof CharSequence) {
+        } else if (value instanceof CharSequence sequence) {
             PropertyPlaceholderResolver placeholderResolver = environment.getPlaceholderResolver();
-            String str = doResolveIfNecessary((CharSequence) value, placeholderResolver);
+            String str = doResolveIfNecessary(sequence, placeholderResolver);
             return environment.convert(str, conversionContext);
-        } else if (value instanceof String[]) {
+        } else if (value instanceof String[] strings) {
             PropertyPlaceholderResolver placeholderResolver = environment.getPlaceholderResolver();
-            String[] resolved = Arrays.stream((String[]) value)
+            String[] resolved = Arrays.stream(strings)
                 .flatMap(val -> {
                     try {
                         String[] values = placeholderResolver.resolveRequiredPlaceholder(val, String[].class);
@@ -93,16 +92,14 @@ class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
                 })
                 .toArray(String[]::new);
             return environment.convert(resolved, conversionContext);
-        } else if (value instanceof io.micronaut.core.annotation.AnnotationValue[]) {
-            io.micronaut.core.annotation.AnnotationValue[] annotationValues = (io.micronaut.core.annotation.AnnotationValue[]) value;
+        } else if (value instanceof io.micronaut.core.annotation.AnnotationValue[] annotationValues) {
             io.micronaut.core.annotation.AnnotationValue[] b = new AnnotationValue[annotationValues.length];
             for (int i = 0; i < annotationValues.length; i++) {
                 io.micronaut.core.annotation.AnnotationValue annotationValue = annotationValues[i];
                 b[i] = new EnvironmentAnnotationValue(environment, annotationValue);
             }
             return environment.convert(b, conversionContext);
-        } else if (value instanceof io.micronaut.core.annotation.AnnotationValue) {
-            io.micronaut.core.annotation.AnnotationValue av = (io.micronaut.core.annotation.AnnotationValue) value;
+        } else if (value instanceof io.micronaut.core.annotation.AnnotationValue av) {
             av = new EnvironmentAnnotationValue(environment, av);
             return environment.convert(av, conversionContext);
         } else {

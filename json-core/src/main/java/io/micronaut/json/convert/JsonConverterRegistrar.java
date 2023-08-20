@@ -169,8 +169,8 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
     protected TypeConverter<Map, Object> mapToObjectConverter() {
         return (map, targetType, context) -> {
             ArgumentConversionContext<Object> conversionContext;
-            if (context instanceof ArgumentConversionContext) {
-                conversionContext = (ArgumentConversionContext<Object>) context;
+            if (context instanceof ArgumentConversionContext argumentConversionContext) {
+                conversionContext = argumentConversionContext;
             } else {
                 conversionContext = ConversionContext.of(targetType);
             }
@@ -199,10 +199,10 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
     }
 
     private Object correctKeys(Object o) {
-        if (o instanceof List) {
-            return correctKeys((List) o);
-        } else if (o instanceof Map) {
-            return correctKeys((Map) o);
+        if (o instanceof List list) {
+            return correctKeys(list);
+        } else if (o instanceof Map map) {
+            return correctKeys(map);
         }
         return o;
     }
@@ -224,8 +224,8 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
     @NonNull
     private static Argument<?> argument(Class<Object> targetType, ConversionContext context) {
         Argument<?> argument = null;
-        if (context instanceof ArgumentConversionContext) {
-            argument = ((ArgumentConversionContext<?>) context).getArgument();
+        if (context instanceof ArgumentConversionContext conversionContext) {
+            argument = conversionContext.getArgument();
             if (targetType != argument.getType()) {
                 argument = null;
             }

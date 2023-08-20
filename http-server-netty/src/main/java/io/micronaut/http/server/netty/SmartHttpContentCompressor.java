@@ -58,8 +58,7 @@ public class SmartHttpContentCompressor extends HttpContentCompressor {
 
     @Override
     protected void encode(ChannelHandlerContext ctx, HttpObject msg, List<Object> out) throws Exception {
-        if (msg instanceof HttpResponse) {
-            HttpResponse res = (HttpResponse) msg;
+        if (msg instanceof HttpResponse res) {
             skipEncoding = shouldSkip(res);
         }
         super.encode(ctx, msg, out);

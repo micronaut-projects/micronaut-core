@@ -110,10 +110,10 @@ public class OrderUtil {
      * @return {@link Ordered#getOrder} when object is instance of Ordered otherwise {@link Ordered#LOWEST_PRECEDENCE}
      */
     public static int getOrder(Object o) {
-        if (o instanceof Ordered) {
-            return getOrder((Ordered) o);
-        } else if (o instanceof AnnotationMetadata) {
-            return getOrder(((AnnotationMetadata) o));
+        if (o instanceof Ordered ordered) {
+            return getOrder(ordered);
+        } else if (o instanceof AnnotationMetadata metadata) {
+            return getOrder(metadata);
         }
         return Ordered.LOWEST_PRECEDENCE;
     }
@@ -127,8 +127,8 @@ public class OrderUtil {
      * @return The order of the object. If no order is found, {@link Ordered#LOWEST_PRECEDENCE} is returned.
      */
     public static int getOrder(AnnotationMetadata annotationMetadata, Object o) {
-        if (o instanceof Ordered) {
-            return getOrder((Ordered) o);
+        if (o instanceof Ordered ordered) {
+            return getOrder(ordered);
         }
         return getOrder(annotationMetadata);
     }

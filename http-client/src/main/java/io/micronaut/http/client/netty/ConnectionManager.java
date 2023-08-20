@@ -292,8 +292,8 @@ public class ConnectionManager {
         AtomicInteger count = new AtomicInteger();
         for (Pool pool : pools.values()) {
             pool.forEachConnection(c -> {
-                if (c instanceof Pool.Http1ConnectionHolder) {
-                    if (((Pool.Http1ConnectionHolder) c).hasLiveRequests()) {
+                if (c instanceof Pool.Http1ConnectionHolder holder) {
+                    if (holder.hasLiveRequests()) {
                         count.incrementAndGet();
                     }
                 } else {
@@ -497,8 +497,7 @@ public class ConnectionManager {
         String username = configuration.getProxyUsername().orElse(null);
         String password = configuration.getProxyPassword().orElse(null);
 
-        if (proxyAddress instanceof InetSocketAddress) {
-            InetSocketAddress isa = (InetSocketAddress) proxyAddress;
+        if (proxyAddress instanceof InetSocketAddress isa) {
             if (isa.isUnresolved()) {
                 proxyAddress = new InetSocketAddress(isa.getHostString(), isa.getPort());
             }
@@ -704,8 +703,7 @@ public class ConnectionManager {
 
                         @Override
                         public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-                            if (evt instanceof SslHandshakeCompletionEvent) {
-                                SslHandshakeCompletionEvent event = (SslHandshakeCompletionEvent) evt;
+                            if (evt instanceof SslHandshakeCompletionEvent event) {
                                 if (!event.isSuccess()) {
                                     InitialConnectionErrorHandler.setFailureCause(ctx.channel(), event.cause());
                                 }

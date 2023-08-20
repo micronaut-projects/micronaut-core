@@ -450,13 +450,11 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     static @NonNull
     Argument<?> of(@NonNull Type type) {
         Objects.requireNonNull(type, "Type cannot be null");
-        if (type instanceof Class) {
-            return Argument.of((Class<?>) type);
-        } else if (type instanceof ParameterizedType) {
-            ParameterizedType pt = (ParameterizedType) type;
+        if (type instanceof Class class1) {
+            return Argument.of(class1);
+        } else if (type instanceof ParameterizedType pt) {
             final Type rawType = pt.getRawType();
-            if (rawType instanceof Class<?>) {
-                Class<?> rawClass = (Class<?>) rawType;
+            if (rawType instanceof Class<?> rawClass) {
                 final Type[] actualTypeArguments = pt.getActualTypeArguments();
                 if (ArrayUtils.isNotEmpty(actualTypeArguments)) {
                     Argument<?>[] typeArguments = new Argument[actualTypeArguments.length];

@@ -415,8 +415,8 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
             bounds = new ArrayList<>();
             TypeMirror upperBound = tv.getUpperBound();
             // type variable is still free.
-            List<? extends TypeMirror> boundsUnresolved = upperBound instanceof IntersectionType ?
-                    ((IntersectionType) upperBound).getBounds() :
+            List<? extends TypeMirror> boundsUnresolved = upperBound instanceof IntersectionType it ?
+                    it.getBounds() :
                     Collections.singletonList(upperBound);
             boundsUnresolved.stream()
                     .map(tm -> (JavaClassElement) newClassElement(owner, tm, parentTypeArguments, visitedTypes, true))
@@ -438,7 +438,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement {
             return false;
         }
         io.micronaut.inject.ast.Element that = (io.micronaut.inject.ast.Element) o;
-        if (that instanceof TypedElement && ((TypedElement) that).isPrimitive()) {
+        if (that instanceof TypedElement element && element.isPrimitive()) {
             return false;
         }
         // Do not check if classes match, sometimes it's an anonymous one

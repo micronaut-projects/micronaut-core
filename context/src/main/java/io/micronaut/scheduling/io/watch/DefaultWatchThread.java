@@ -111,13 +111,13 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
                                         }
                                     } else {
                                         final Object context = watchEvent.context();
-                                        if (context instanceof Path) {
+                                        if (context instanceof Path path) {
 
                                             if (LOG.isDebugEnabled()) {
                                                 LOG.debug("File at path {} changed. Firing change event: {}", context, kind);
                                             }
                                             eventPublisher.publishEvent(new FileChangedEvent(
-                                                    (Path) context,
+                                                    path,
                                                     kind
                                             ));
                                         }

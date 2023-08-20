@@ -359,8 +359,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
             AnnotationMetadata annotationMetadata;
             if (metadata) {
                 annotationMetadata = beanProperty.getTargetAnnotationMetadata();
-                if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
-                    annotationMetadata = ((AnnotationMetadataHierarchy) annotationMetadata).merge();
+                if (annotationMetadata instanceof AnnotationMetadataHierarchy hierarchy) {
+                    annotationMetadata = hierarchy.merge();
                 }
             } else {
                 annotationMetadata = AnnotationMetadata.EMPTY_METADATA;

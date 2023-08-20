@@ -64,6 +64,6 @@ public class ConversionErrorException extends RuntimeException {
     }
 
     private static String buildMessage(Argument argument, ConversionError conversionError) {
-        return String.format("Failed to convert argument [%s] for value [%s] due to: %s", argument.getName(), conversionError.getOriginalValue().orElse(null), conversionError.getCause().getMessage());
+        return "Failed to convert argument [%s] for value [%s] due to: %s".formatted(argument.getName(), conversionError.getOriginalValue().orElse(null), conversionError.getCause().getMessage());
     }
 }

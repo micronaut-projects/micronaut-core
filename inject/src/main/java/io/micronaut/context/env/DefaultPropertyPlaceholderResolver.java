@@ -75,7 +75,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
                 if (exResolvers == null) {
                     this.expressionResolvers = new ArrayList<>();
                     exResolvers = new ArrayList<>();
-                    ClassLoader classLoader = (environment instanceof Environment) ? ((Environment) environment).getClassLoader() : environment.getClass().getClassLoader();
+                    ClassLoader classLoader = (environment instanceof Environment e) ? e.getClassLoader() : environment.getClass().getClassLoader();
                     SoftServiceLoader.load(PropertyExpressionResolver.class, classLoader).collectAll(exResolvers);
                     this.expressionResolvers = exResolvers;
                 }
@@ -204,8 +204,8 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     public void close() throws Exception {
         if (expressionResolvers != null) {
             for (PropertyExpressionResolver expressionResolver : expressionResolvers) {
-                if (expressionResolver instanceof AutoCloseable) {
-                    ((AutoCloseable) expressionResolver).close();
+                if (expressionResolver instanceof AutoCloseable closeable) {
+                    closeable.close();
                 }
             }
         }
@@ -305,7 +305,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
             if (defaultValue != null) {
                 return conversionService.convert(defaultValue, type)
                         .orElseThrow(() ->
-                                new ConfigurationException(String.format("Could not convert default value [%s] in placeholder ${%s}", defaultValue, placeholder)));
+                                new ConfigurationException("Could not convert default value [%s] in placeholder ${%s}".formatted(defaultValue, placeholder)));
             } else {
                 throw new ConfigurationException("Could not resolve placeholder ${" + placeholder + "}");
             }

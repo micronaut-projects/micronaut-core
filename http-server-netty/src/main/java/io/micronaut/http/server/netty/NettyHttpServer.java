@@ -381,9 +381,9 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             // started already, just use the localAddress() of each channel
             for (Listener listener : listenersLocal) {
                 SocketAddress localAddress = listener.serverChannel.localAddress();
-                if (localAddress instanceof InetSocketAddress) {
+                if (localAddress instanceof InetSocketAddress address) {
                     // found one \o/
-                    return ((InetSocketAddress) localAddress).getPort();
+                    return address.getPort();
                 } else {
                     hasUnix = true;
                 }
