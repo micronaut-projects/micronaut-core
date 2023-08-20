@@ -250,8 +250,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             boolean variableSatisfied = uriVariables.isEmpty() || pathParams.keySet().containsAll(uriVariables);
             if (body != null && !variableSatisfied) {
-                if (body instanceof Map map) {
-                    for (Map.Entry<Object, Object> entry : map.entrySet()) {
+                if (body instanceof Map<?,?> map) {
+                    for (Map.Entry<?, ?> entry : map.entrySet()) {
                         String k = entry.getKey().toString();
                         Object v = entry.getValue();
                         if (v != null) {

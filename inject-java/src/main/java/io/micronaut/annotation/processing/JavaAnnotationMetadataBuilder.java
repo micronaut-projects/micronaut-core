@@ -823,10 +823,10 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                         final String className = JavaModelUtils.getClassName(element);
                         values.add(new AnnotationClassValue<>(className));
                     }
-                } else if (t instanceof ArrayType type) {
-                    TypeMirror componentType = type.getComponentType();
-                    if (componentType instanceof DeclaredType type) {
-                        Element typeElement = type.asElement();
+                } else if (t instanceof ArrayType arrayType) {
+                    TypeMirror componentType = arrayType.getComponentType();
+                    if (componentType instanceof DeclaredType declaredType) {
+                        Element typeElement = declaredType.asElement();
                         if (typeElement instanceof TypeElement element) {
                             final String className = JavaModelUtils.getClassArrayName(element);
                             values.add(new AnnotationClassValue<>(className));

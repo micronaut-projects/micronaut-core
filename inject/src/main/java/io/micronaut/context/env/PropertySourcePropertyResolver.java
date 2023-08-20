@@ -708,7 +708,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 }
             }
             entries.put(prefix, value);
-        } else if (value instanceof Map map) {
+        } else if (value instanceof Map<?, ?> map) {
             for (Map.Entry<?, ?> entry: map.entrySet()) {
                 Object key = entry.getKey();
                 if (key instanceof CharSequence sequence) {
@@ -804,7 +804,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 final Object o = i.next();
                 if (o instanceof CharSequence) {
                     i.set(resolvePlaceHoldersIfNecessary(o));
-                } else if (o instanceof Map submap) {
+                } else if (o instanceof Map<?,?> submap) {
                     Map<Object, Object> newMap = new LinkedHashMap<>(submap.size());
                     for (Map.Entry<?, ?> entry : submap.entrySet()) {
                         final Object k = entry.getKey();

@@ -26,7 +26,7 @@ public class MetadataClientArgumentBinder implements AnnotatedClientArgumentRequ
                      @NonNull ClientRequestUriContext uriContext,
                      @NonNull Object value,
                      @NonNull MutableHttpRequest<?> request) {
-        if (value instanceof Map map) {
+        if (value instanceof Map<?,?> map) {
             for (Map.Entry<?, ?> entry: map.entrySet()) {
                 String key = NameUtils.hyphenate(StringUtils.capitalize(entry.getKey().toString()), false);
                 request.header("X-Metadata-" + key, entry.getValue().toString());
