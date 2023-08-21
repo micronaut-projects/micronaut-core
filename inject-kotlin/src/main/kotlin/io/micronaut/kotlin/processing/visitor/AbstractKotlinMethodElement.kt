@@ -15,9 +15,8 @@
  */
 package io.micronaut.kotlin.processing.visitor
 
-import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSModifierListOwner
-import com.google.devtools.ksp.symbol.KSPropertySetter
 import com.google.devtools.ksp.symbol.Modifier
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.util.ArrayUtils
@@ -39,6 +38,8 @@ internal abstract class AbstractKotlinMethodElement<T : KotlinNativeElement>(
     visitorContext: KotlinVisitorContext
 ) : AbstractKotlinElement<T>(nativeType, annotationMetadataFactory, visitorContext), MethodElement {
 
+    abstract val declaration: KSDeclaration?
+    abstract val overridee: KSDeclaration?
     abstract val internalDeclaringType: ClassElement
     abstract val internalDeclaredTypeArguments: Map<String, ClassElement>
     abstract val internalReturnType: ClassElement
@@ -104,19 +105,13 @@ internal abstract class AbstractKotlinMethodElement<T : KotlinNativeElement>(
     }
 
     override fun overrides(overridden: MethodElement): Boolean {
-        if (overridden !is AbstractKotlinElement<*>) {
+        if (overridden !is AbstractKotlinMethodElement<*>) {
             return false
         }
-        val nativeType = getNativeType().element
-        val overriddenNativeType = (overridden as AbstractKotlinElement<*>).nativeType.element
-        if (nativeType == overriddenNativeType) {
+        if (nativeType.element == overridden.nativeType.element) {
             return false
-        } else if (nativeType is KSFunctionDeclaration) {
-            return overriddenNativeType == nativeType.findOverridee()
-        } else if (nativeType is KSPropertySetter && overriddenNativeType is KSPropertySetter) {
-            return overriddenNativeType.receiver == nativeType.receiver.findOverridee()
         }
-        return false
+        return declaration == overridden.overridee
     }
 
     override fun hides(memberElement: MemberElement?) =
