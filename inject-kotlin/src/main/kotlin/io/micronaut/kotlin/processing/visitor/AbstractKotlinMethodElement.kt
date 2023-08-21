@@ -105,13 +105,16 @@ internal abstract class AbstractKotlinMethodElement<T : KotlinNativeElement>(
     }
 
     override fun overrides(overridden: MethodElement): Boolean {
-        if (overridden !is AbstractKotlinMethodElement<*>) {
+        if (this == overridden || overridden !is AbstractKotlinMethodElement<*>) {
             return false
         }
-        if (nativeType.element == overridden.nativeType.element) {
-            return false
+        if (name != overridden.getName() || parameters.size != overridden.parameters.size) {
+            return false // Fast escape
         }
-        return declaration == overridden.overridee
+        if (nativeType == overridden.nativeType) {
+            return false // The same method
+        }
+        return overridee == overridden.declaration
     }
 
     override fun hides(memberElement: MemberElement?) =
