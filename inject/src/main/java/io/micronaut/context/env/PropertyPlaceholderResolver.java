@@ -80,4 +80,21 @@ public interface PropertyPlaceholderResolver {
     default @NonNull <T> T resolveRequiredPlaceholder(String str, Class<T> type) throws ConfigurationException {
         throw new ConfigurationException("Unsupported operation");
     }
+
+    /**
+     * Resolves the optional value of a single placeholder.
+     *
+     * @param str The string containing the placeholder
+     * @param type The class of the type
+     * @param <T> The type the value should be converted to
+     * @return The resolved optional value
+     * @since 4.2.0
+     */
+    default <T> Optional<T> resolveOptionalPlaceholder(String str, Class<T> type) throws ConfigurationException {
+        try {
+            return Optional.of(resolveRequiredPlaceholder(str, type));
+        } catch (ConfigurationException e) {
+            return Optional.empty();
+        }
+    }
 }
