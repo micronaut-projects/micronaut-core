@@ -31,6 +31,7 @@ import io.micronaut.inject.ast.annotation.WildcardElementAnnotationMetadata;
 import javax.lang.model.type.WildcardType;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -66,6 +67,11 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
         this.upperBounds = upperBounds;
         this.lowerBounds = lowerBounds;
         typeAnnotationMetadata = new WildcardElementAnnotationMetadata(this, upperBound);
+    }
+
+    @Override
+    public Optional<ClassElement> getResolved() {
+        return Optional.of(upperBound);
     }
 
     @Override
