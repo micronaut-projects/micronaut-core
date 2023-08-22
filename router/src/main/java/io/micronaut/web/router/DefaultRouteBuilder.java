@@ -414,7 +414,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     private UriRoute buildRoute(String httpMethodName, HttpMethod httpMethod, String uri, MethodExecutionHandle<Object, Object> executableHandle) {
-        return buildRoute(httpMethodName, httpMethod, uri, Collections.singletonList(MediaType.APPLICATION_JSON_TYPE), executableHandle);
+        return buildRoute(httpMethodName, httpMethod, uri, List.of(MediaType.APPLICATION_JSON_TYPE), executableHandle);
     }
 
     private UriRoute buildRoute(String httpMethodName, HttpMethod httpMethod, String uri, List<MediaType> mediaTypes, MethodExecutionHandle<Object, Object> executableHandle) {
