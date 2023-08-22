@@ -37,6 +37,7 @@ import reactor.core.publisher.Mono
 import reactor.util.function.Tuple2
 import reactor.util.function.Tuples
 import spock.lang.AutoCleanup
+import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -46,6 +47,7 @@ import java.util.concurrent.TimeUnit
 import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN
 import static io.micronaut.scheduling.TaskExecutors.IO
 
+@Retry
 class MDCRxJava2Spec extends Specification {
 
     private static final Logger LOG = LoggerFactory.getLogger(MDCRxJava2Spec)
@@ -102,7 +104,8 @@ class MDCRxJava2Spec extends Specification {
         @ExecuteOn(IO)
         String test(@Header("X-TrackingId") String tracingId, @Body SomeBody body) {
             LOG.debug("test1")
-            checkTracing(tracingId)
+            String error = checkTracing("test1", tracingId)
+            if (error) return error
 
             return mdcClient.test2(tracingId)
         }
@@ -111,10 +114,13 @@ class MDCRxJava2Spec extends Specification {
         @Get("/test2")
         Mono<String> test2(@Header("X-TrackingId") String tracingId) {
             LOG.debug("test2")
-            checkTracing(tracingId)
+            String error = checkTracing("test2", tracingId)
+            if (error) return Mono.just(error)
 
             return Mono<String>.fromCallable {
-                checkTracing(tracingId)
+                String error2 = checkTracing("test2 (callable)", tracingId)
+                if (error2) return error2
+
                 mdcClient.test3(tracingId, new SomeBody())
             }.delayElement(Duration.ofMillis(50))
         }
@@ -122,9 +128,11 @@ class MDCRxJava2Spec extends Specification {
         @SingleResult
         @Put("/test3")
         Publisher<String> test3(@Header("X-TrackingId") String tracingId, @Body SomeBody body) {
+            LOG.debug("test3")
             return Flowable.just("x").delay(50, TimeUnit.MILLISECONDS).flatMap {
                 LOG.debug("test3")
-                checkTracing(tracingId)
+                String error = checkTracing("test3", tracingId)
+                if (error) return Flowable.just(error)
 
                 return Flowable.fromPublisher(
                         httpClient.retrieve(HttpRequest
@@ -138,7 +146,8 @@ class MDCRxJava2Spec extends Specification {
         @Post("/test4")
         String test4(@Header("X-TrackingId") String tracingId, @Body SomeBody body) {
             LOG.debug("test4")
-            checkTracing(tracingId)
+            String error = checkTracing("test4", tracingId)
+            if (error) return error
 
             return httpClient.toBlocking().retrieve(HttpRequest
                     .PATCH("/mdc/test5", body)
@@ -147,8 +156,9 @@ class MDCRxJava2Spec extends Specification {
 
         @Patch("/test5")
         String test5(@Header("X-TrackingId") String tracingId, @Body SomeBody body) {
-            checkTracing(tracingId)
             LOG.debug("test5")
+            String error = checkTracing("test5", tracingId)
+            if (error) return error
 
             return MDC.get("trackingId")
         }
@@ -175,11 +185,14 @@ class MDCRxJava2Spec extends Specification {
         @Override
         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request,
                                                    ServerFilterChain chain) {
+            LOG.debug("Server filter {} - {}", request.uri, request.headers.get("X-TrackingId"))
             try {
                 String trackingId = request.headers.get("X-TrackingId")
                 MDC.put("trackingId", trackingId)
                 MDC.put("trackingId", trackingId)
-                try (PropagatedContext.Scope ignore = (PropagatedContext.get() + new MdcPropagationContext()).propagate()) {
+                checkTracing("Server filter", trackingId)
+
+                try (PropagatedContext.Scope ignore = (PropagatedContext.getOrEmpty() + new MdcPropagationContext()).propagate()) {
                     return Mono.from(chain.proceed(request))
                 }
             } finally {
@@ -195,8 +208,9 @@ class MDCRxJava2Spec extends Specification {
         @Override
         Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> request,
                                                       ClientFilterChain chain) {
-            checkTracing(request)
-            PropagatedContext.get()
+            LOG.debug("Client filter {}", request.uri, request.headers.get("X-TrackingId"))
+            checkTracing("Client filter", request.headers.get("X-TrackingId"))
+
             return Mono.from(chain.proceed(request))
         }
 
@@ -206,15 +220,16 @@ class MDCRxJava2Spec extends Specification {
         }
     }
 
-    static void checkTracing(MutableHttpRequest<?> request) {
-        String trackingId = request.headers.get("X-TrackingId")
-        checkTracing(trackingId)
-    }
-
-    static void checkTracing(String trackingId) {
+    static String checkTracing(String name, String trackingId) {
+        if (PropagatedContext.find().isEmpty()) {
+            LOG.warn("[${name}] Could not find PropagatedContext")
+        }
         String mdcTracingId = MDC.get("trackingId")
         if (trackingId != mdcTracingId) {
-            throw new IllegalArgumentException("TrackingIds do not match! Request: $trackingId vs. Context: $mdcTracingId")
+            String error = "[${name}] TrackingIds do not match! Request: $trackingId vs. Context: $mdcTracingId"
+            LOG.error(error)
+            return error
         }
+        return null
     }
 }
