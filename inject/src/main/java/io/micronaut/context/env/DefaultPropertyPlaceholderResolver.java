@@ -91,11 +91,17 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
 
     @Override
     public Optional<String> resolvePlaceholders(String str) {
-        try {
-            return Optional.of(resolveRequiredPlaceholders(str));
-        } catch (ConfigurationException e) {
-            return Optional.empty();
+        List<Segment> segments = buildSegments(str, false);
+        StringBuilder value = new StringBuilder();
+        for (Segment segment: segments) {
+            Optional<String> resolved = segment.findValue(String.class);
+            if (resolved.isPresent()) {
+                value.append(resolved.get());
+            } else {
+                return Optional.empty();
+            }
         }
+        return Optional.of(value.toString());
     }
 
     @Override
@@ -131,6 +137,16 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
         }
     }
 
+    @Override
+    public <T> Optional<T> resolveOptionalPlaceholder(String str, Class<T> type) throws ConfigurationException {
+        List<Segment> segments = buildSegments(str, false);
+        if (segments.size() == 1) {
+            return segments.get(0).findValue(type);
+        } else {
+            return Optional.empty();
+        }
+    }
+
     /**
      * Split a placeholder value into logic segments.
      *
@@ -138,6 +154,18 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
      * @return The list of segments
      */
     public List<Segment> buildSegments(String str) {
+        return buildSegments(str, true);
+    }
+
+    /**
+     * Split a placeholder value into logic segments.
+     *
+     * @param str The placeholder
+     * @param failOnIncomplete True if should fail on incomplete placeholder, empty list will be returned otherwise
+     * @return The list of segments
+     * @since 4.2.0
+     */
+    private List<Segment> buildSegments(String str, boolean failOnIncomplete) {
         List<Segment> segments = new ArrayList<>();
         String value = str;
         int i = value.indexOf(PREFIX);
@@ -153,15 +181,15 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
             if (suffixIdx > -1) {
                 String expr = value.substring(0, suffixIdx).trim();
                 segments.add(new PlaceholderSegment(expr));
-                if (value.length() > suffixIdx) {
-                    value = value.substring(suffixIdx + SUFFIX.length());
-                }
-            } else {
+                value = value.substring(suffixIdx + SUFFIX.length());
+            } else if (failOnIncomplete) {
                 throw new ConfigurationException("Incomplete placeholder definitions detected: " + str);
+            } else {
+                return List.of();
             }
             i = value.indexOf(PREFIX);
         }
-        if (value.length() > 0) {
+        if (!value.isEmpty()) {
             segments.add(new RawSegment(value));
         }
         return segments;
@@ -200,6 +228,34 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
         return null;
     }
 
+    /**
+     * Resolves a single optional expression.
+     *
+     * @param expression The expression
+     * @param type The class
+     * @param <T> The type the expression should be converted to
+     * @return The resolved and converted expression
+     */
+    private <T> Optional<T> resolveOptionalExpression(String expression, Class<T> type) {
+        for (PropertyExpressionResolver expressionResolver : getExpressionResolvers()) {
+            Optional<T> value = expressionResolver.resolve(environment, conversionService, expression, type);
+            if (value.isPresent()) {
+                return value;
+            }
+        }
+        Optional<T> property = environment.getProperty(expression, type);
+        if (property.isPresent()) {
+            return property;
+        }
+        if (NameUtils.isEnvironmentName(expression)) {
+            String envVar = CachedEnvironment.getenv(expression);
+            if (StringUtils.isNotEmpty(envVar)) {
+                return conversionService.convert(envVar, type);
+            }
+        }
+        return Optional.empty();
+    }
+
     @Override
     public void close() throws Exception {
         if (expressionResolvers != null) {
@@ -229,6 +285,23 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
          * @throws ConfigurationException If any error occurs
          */
        <T> T getValue(Class<T> type) throws ConfigurationException;
+
+        /**
+         * Returns the optional value of a given segment converted to
+         * the provided type. Any conversions errors are ignored.
+         *
+         * @param type The class
+         * @param <T> The type to convert the value to
+         * @return The converted optional value
+         * @since 4.2.0
+         */
+       default <T> Optional<T> findValue(Class<T> type) {
+           try {
+               return Optional.of(getValue(type));
+           } catch (ConfigurationException e) {
+               return Optional.empty();
+           }
+       }
     }
 
     /**
@@ -258,6 +331,15 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
                 return conversionService.convert(text, type)
                         .orElseThrow(() ->
                                 new ConfigurationException("Could not convert: [" + text + "] to the required type: [" + type.getName() + "]"));
+            }
+        }
+
+        @Override
+        public <T> Optional<T> findValue(Class<T> type) {
+            if (type.isInstance(text)) {
+                return Optional.of((T) text);
+            } else {
+                return Optional.empty();
             }
         }
     }
@@ -309,7 +391,20 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
             } else {
                 throw new ConfigurationException("Could not resolve placeholder ${" + placeholder + "}");
             }
+        }
 
+        @Override
+        public <T> Optional<T> findValue(Class<T> type) {
+            for (String expression: expressions) {
+                Optional<T> optionalValue = resolveOptionalExpression(expression, type);
+                if (optionalValue.isPresent()) {
+                    return optionalValue;
+                }
+            }
+            if (defaultValue != null) {
+                return conversionService.convert(defaultValue, type);
+            }
+            return Optional.empty();
         }
 
         private void findExpressions(String placeholder) {

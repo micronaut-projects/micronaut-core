@@ -114,7 +114,6 @@ public class DefaultMutableConversionService implements MutableConversionService
             return Optional.of((T) object);
         }
         targetType = targetType.isPrimitive() ? (Class<T>) ReflectionUtils.getWrapperType(targetType) : targetType;
-
         if (targetType.isInstance(object) && !(object instanceof Iterable) && !(object instanceof Map)) {
             return Optional.of((T) object);
         }
@@ -302,8 +301,7 @@ public class DefaultMutableConversionService implements MutableConversionService
 
         // InputStream -> String
         addConverter(InputStream.class, String.class, (object, targetType, context) -> {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(object));
-            try {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(object))) {
                 return Optional.of(IOUtils.readText(reader));
             } catch (IOException e) {
                 context.reject(e);
@@ -331,8 +329,7 @@ public class DefaultMutableConversionService implements MutableConversionService
 
         // Reader -> String
         addConverter(Reader.class, String.class, (object, targetType, context) -> {
-            BufferedReader reader = object instanceof BufferedReader ? (BufferedReader) object : new BufferedReader(object);
-            try {
+            try (BufferedReader reader = object instanceof BufferedReader bufferedReader ? bufferedReader : new BufferedReader(object)) {
                 return Optional.of(IOUtils.readText(reader));
             } catch (IOException e) {
                 context.reject(e);
@@ -427,7 +424,7 @@ public class DefaultMutableConversionService implements MutableConversionService
                         return Optional.empty();
                     }
                     try {
-                        return Optional.ofNullable(Paths.get(object.toString()));
+                        return Optional.of(Paths.get(object.toString()));
                     } catch (Exception e) {
                         context.reject("Invalid path [" + object + " ]: " + e.getMessage(), e);
                         return Optional.empty();
@@ -549,15 +546,10 @@ public class DefaultMutableConversionService implements MutableConversionService
         // String -> Boolean
         addConverter(CharSequence.class, Boolean.class, (CharSequence object, Class<Boolean> targetType, ConversionContext context) -> {
             String booleanString = object.toString().toLowerCase(Locale.ENGLISH);
-            switch (booleanString) {
-                case "yes":
-                case "y":
-                case "on":
-                case "true":
-                    return Optional.of(Boolean.TRUE);
-                default:
-                    return Optional.of(Boolean.FALSE);
-            }
+            return switch (booleanString) {
+                case "yes", "y", "on", "true" -> Optional.of(Boolean.TRUE);
+                default -> Optional.of(Boolean.FALSE);
+            };
         });
 
         // String -> URL
@@ -652,9 +644,9 @@ public class DefaultMutableConversionService implements MutableConversionService
 
         // String -> Array
         addConverter(CharSequence.class, Object[].class, (CharSequence object, Class<Object[]> targetType, ConversionContext context) -> {
-            if (object instanceof AnnotationClassValue && targetType.equals(AnnotationClassValue[].class)) {
-                AnnotationClassValue[] array = new AnnotationClassValue[1];
-                array[0] = (AnnotationClassValue) object;
+            if (object instanceof AnnotationClassValue<?> annotationClassValue && targetType.equals(AnnotationClassValue[].class)) {
+                AnnotationClassValue<?>[] array = new AnnotationClassValue<?>[1];
+                array[0] = annotationClassValue;
                 return Optional.of(array);
             }
 
@@ -756,8 +748,8 @@ public class DefaultMutableConversionService implements MutableConversionService
                 return Optional.of(object.doubleValue());
             }
             if (targetNumberType == BigInteger.class) {
-                if (object instanceof BigDecimal) {
-                    return Optional.of(((BigDecimal) object).toBigInteger());
+                if (object instanceof BigDecimal bigDecimal) {
+                    return Optional.of(bigDecimal.toBigInteger());
                 }
                 return Optional.of(BigInteger.valueOf(object.longValue()));
             }
@@ -775,9 +767,9 @@ public class DefaultMutableConversionService implements MutableConversionService
 
             Class<?> targetComponentType = ReflectionUtils.getWrapperType(componentType.getType());
             String[] strings = object.toString().split(",");
-            List list = new ArrayList();
+            List<Object> list = new ArrayList<>();
             for (String string : strings) {
-                Optional converted = convert(string, targetComponentType, newContext);
+                Optional<?> converted = convert(string, targetComponentType, newContext);
                 if (converted.isPresent()) {
                     list.add(converted.get());
                 }
@@ -803,12 +795,12 @@ public class DefaultMutableConversionService implements MutableConversionService
 
         addConverter(Object.class, OptionalInt.class, (object, targetType, context) -> {
             Optional<Integer> converted = convert(object, Integer.class, context);
-            return converted.map(integer -> Optional.of(OptionalInt.of(integer))).orElseGet(() -> Optional.of(OptionalInt.empty()));
+            return converted.map(OptionalInt::of).or(() -> Optional.of(OptionalInt.empty()));
         });
 
         addConverter(Object.class, OptionalLong.class, (object, targetType, context) -> {
             Optional<Long> converted = convert(object, Long.class, context);
-            return converted.map(longValue -> Optional.of(OptionalLong.of(longValue))).orElseGet(() -> Optional.of(OptionalLong.empty()));
+            return converted.map(OptionalLong::of).or(() -> Optional.of(OptionalLong.empty()));
         });
 
         // Iterable -> String
@@ -848,7 +840,7 @@ public class DefaultMutableConversionService implements MutableConversionService
             if (targetType.isInstance(object) && targetComponentType == Object.class) {
                 return Optional.of(object);
             }
-            List list = new ArrayList();
+            List<Object> list = new ArrayList<>();
             ConversionContext newContext = context.with(componentType);
             for (Object o : object) {
                 Optional<?> converted = convert(o, targetComponentType, newContext);
@@ -865,7 +857,7 @@ public class DefaultMutableConversionService implements MutableConversionService
         // Object[] -> Object[] (inner type conversion)
         addConverter(Object[].class, Object[].class, (object, targetType, context) -> {
             Class<?> targetComponentType = targetType.getComponentType();
-            List results = new ArrayList();
+            List<Object> results = new ArrayList<>(object.length);
             for (Object o : object) {
                 Optional<?> converted = convert(o, targetComponentType, context);
                 if (converted.isPresent()) {
@@ -878,7 +870,7 @@ public class DefaultMutableConversionService implements MutableConversionService
         // Iterable -> Object[]
         addConverter(Iterable.class, Object[].class, (object, targetType, context) -> {
             Class<?> targetComponentType = targetType.getComponentType();
-            List results = new ArrayList();
+            List<Object> results = new ArrayList<>();
             for (Object o : object) {
                 Optional<?> converted = convert(o, targetComponentType, context);
                 if (converted.isPresent()) {
@@ -896,12 +888,10 @@ public class DefaultMutableConversionService implements MutableConversionService
             Class<?> targetComponentType = targetType.getComponentType();
             Optional<?> converted = convert(object, targetComponentType);
             if (converted.isPresent()) {
-
                 Object[] result = (Object[]) Array.newInstance(targetComponentType, 1);
                 result[0] = converted.get();
                 return Optional.of(result);
             }
-
             return Optional.empty();
         });
 
@@ -920,14 +910,14 @@ public class DefaultMutableConversionService implements MutableConversionService
             ConversionContext keyContext = context.with(keyArgument);
             ConversionContext valContext = context.with(valArgument);
 
-            Map newMap = isProperties ? new Properties() : new LinkedHashMap();
+            Map<Object, Object> newMap = isProperties ? new Properties() : new LinkedHashMap<>();
 
             for (Object o : object.entrySet()) {
-                Map.Entry entry = (Map.Entry) o;
+                Map.Entry<?, ?> entry = (Map.Entry) o;
                 Object key = entry.getKey();
                 Object value = entry.getValue();
                 if (!keyType.isInstance(key)) {
-                    Optional convertedKey = convert(key, keyType, keyContext);
+                    Optional<?> convertedKey = convert(key, keyType, keyContext);
                     if (convertedKey.isPresent()) {
                         key = convertedKey.get();
                     } else {
@@ -935,7 +925,7 @@ public class DefaultMutableConversionService implements MutableConversionService
                     }
                 }
                 if (!valueType.isInstance(value) || value instanceof Map || value instanceof Collection) {
-                    Optional converted = convert(value, valueType, valContext);
+                    Optional<?> converted = convert(value, valueType, valContext);
                     if (converted.isPresent()) {
                         value = converted.get();
                     } else {
@@ -1036,8 +1026,8 @@ public class DefaultMutableConversionService implements MutableConversionService
 
     private <S, T> ConvertiblePair newPair(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
         ConvertiblePair pair;
-        if (typeConverter instanceof FormattingTypeConverter) {
-            pair = new ConvertiblePair(sourceType, targetType, ((FormattingTypeConverter) typeConverter).annotationType().getName());
+        if (typeConverter instanceof FormattingTypeConverter<S, T, ?> formattingTypeConverter) {
+            pair = new ConvertiblePair(sourceType, targetType, formattingTypeConverter.annotationType().getName());
         } else {
             pair = new ConvertiblePair(sourceType, targetType);
         }

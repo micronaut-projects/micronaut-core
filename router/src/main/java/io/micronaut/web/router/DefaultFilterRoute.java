@@ -134,7 +134,7 @@ class DefaultFilterRoute implements FilterRoute {
         for (String pattern : patterns) {
             if (matcher.matches(pattern, uriStr)) {
                 GenericHttpFilter filter = getFilter();
-                if (filter instanceof GenericHttpFilter.AroundLegacy al && !al.isEnabled()) {
+                if (!GenericHttpFilter.isEnabled(filter)) {
                     return Optional.empty();
                 }
                 return Optional.of(filter);

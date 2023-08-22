@@ -31,10 +31,21 @@ import io.micronaut.core.util.StringUtils;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Array;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * A runtime representation of the annotation and its values.
@@ -1564,8 +1575,11 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
                 if (len == 1) {
                     return annotationValues[0].classValues();
                 } else {
-                    return Arrays.stream(annotationValues)
-                            .flatMap(annotationValue -> Stream.of(annotationValue.classValues())).toArray(Class[]::new);
+                    List<Class<?>> list = new ArrayList<>(5);
+                    for (AnnotationValue<?> annotationValue : annotationValues) {
+                        list.addAll(Arrays.asList(annotationValue.classValues()));
+                    }
+                    return list.toArray(new Class[0]);
                 }
             }
             return null;
@@ -1577,14 +1591,18 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             if (values instanceof Class<?>[] classes) {
                 return classes;
             } else {
-                return Arrays.stream(values).flatMap(o -> {
+                List<Class<?>> list = new ArrayList<>(5);
+                for (Object o : values) {
                     if (o instanceof AnnotationClassValue<?> annotationClassValue) {
-                        return annotationClassValue.getType().stream();
+                        if (annotationClassValue.theClass != null) {
+                            list.add(annotationClassValue.theClass);
+                        }
                     } else if (o instanceof Class<?> aClass) {
-                        return Stream.of(aClass);
+                        list.add(aClass);
                     }
-                    return Stream.empty();
-                }).toArray(Class[]::new);
+                }
+                return list.toArray(new Class[0]);
+
             }
         }
         if (value instanceof Class<?> aClass) {

@@ -53,7 +53,7 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, Object
     static final String MICRONAUT_PROCESSING_INCREMENTAL = "micronaut.processing.incremental";
     static final String VALIDATION_OPTION = "micronaut.route.validation";
     private static final String METHOD_MAPPING_ANN = "io.micronaut.http.annotation.HttpMethodMapping";
-    private List<RouteValidationRule> rules = new ArrayList<>();
+    private final List<RouteValidationRule> rules = new ArrayList<>();
     private boolean skipValidation = false;
     private final DefaultPropertyPlaceholderResolver resolver = new DefaultPropertyPlaceholderResolver(null, ConversionService.SHARED);
 

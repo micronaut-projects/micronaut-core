@@ -16,6 +16,7 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.NonNull;
 
 import java.util.List;
@@ -68,6 +69,8 @@ public interface GenericPlaceholderElement extends GenericElement {
      * @return The resolved value of the placeholder.
      * @since 4.0.0
      */
+    @NextMajorVersion("Remove this method. There is an equivalent in the super class.")
+    @Override
     default Optional<ClassElement> getResolved() {
         return Optional.empty();
     }
