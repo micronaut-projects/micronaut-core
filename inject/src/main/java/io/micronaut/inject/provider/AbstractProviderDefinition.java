@@ -124,8 +124,8 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
         final BeanResolutionContext.Segment<?, ?> segment = resolutionContext.getPath().currentSegment().orElse(null);
         if (segment != null) {
             final InjectionPoint<?> injectionPoint = segment.getInjectionPoint();
-            if (injectionPoint instanceof ArgumentCoercible) {
-                Argument<?> injectionPointArgument = ((ArgumentCoercible<?>) injectionPoint)
+            if (injectionPoint instanceof ArgumentCoercible coercible) {
+                Argument<?> injectionPointArgument = coercible
                         .asArgument();
 
                 Argument<?> resolveArgument = injectionPointArgument;

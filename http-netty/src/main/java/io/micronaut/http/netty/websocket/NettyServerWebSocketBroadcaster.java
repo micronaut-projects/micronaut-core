@@ -109,9 +109,9 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
      */
     @Nullable
     private Throwable extractBroadcastFailure(Throwable failure) {
-        if (failure instanceof ChannelGroupException) {
+        if (failure instanceof ChannelGroupException exception) {
             Throwable singleCause = null;
-            for (Map.Entry<Channel, Throwable> entry : (ChannelGroupException) failure) {
+            for (Map.Entry<Channel, Throwable> entry : exception) {
                 Throwable entryCause = extractBroadcastFailure(entry.getValue());
                 if (entryCause != null) {
                     if (singleCause == null) {

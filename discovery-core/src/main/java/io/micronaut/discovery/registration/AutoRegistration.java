@@ -60,8 +60,7 @@ public abstract class AutoRegistration implements ApplicationEventListener<Abstr
                 if (registrationConfiguration.isDeregister()) {
                     deregister(event.getSource());
                 }
-            } else if (event instanceof HeartbeatEvent) {
-                HeartbeatEvent heartbeatEvent = (HeartbeatEvent) event;
+            } else if (event instanceof HeartbeatEvent heartbeatEvent) {
                 pulsate(event.getSource(), heartbeatEvent.getStatus());
             }
         }

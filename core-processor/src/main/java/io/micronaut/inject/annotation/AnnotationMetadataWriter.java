@@ -174,8 +174,8 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             boolean writeAnnotationDefaults) {
         super(originatingElement);
         this.className = className + AnnotationMetadata.CLASS_NAME_SUFFIX;
-        if (annotationMetadata instanceof AnnotationMetadataDelegate) {
-            annotationMetadata = ((AnnotationMetadataDelegate) annotationMetadata).getAnnotationMetadata();
+        if (annotationMetadata instanceof AnnotationMetadataDelegate delegate) {
+            annotationMetadata = delegate.getAnnotationMetadata();
         }
         if (annotationMetadata instanceof DefaultAnnotationMetadata) {
             this.annotationMetadata = annotationMetadata;
@@ -343,8 +343,8 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                     defaultsStorage,
                     loadTypeMethods
             );
-        } else if (annotationMetadata instanceof AnnotationMetadataReference) {
-            pushAnnotationMetadataReference(generatorAdapter, (AnnotationMetadataReference) annotationMetadata);
+        } else if (annotationMetadata instanceof AnnotationMetadataReference reference) {
+            pushAnnotationMetadataReference(generatorAdapter, reference);
         } else {
             throw new IllegalStateException("Unknown annotation metadata: " + annotationMetadata);
         }
@@ -529,8 +529,8 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                                   boolean boxValue) {
         if (value == null) {
             throw new IllegalStateException("Cannot map null value in: " + declaringType.getClassName());
-        } else if (value instanceof Boolean) {
-            methodVisitor.push((Boolean) value);
+        } else if (value instanceof Boolean boolean1) {
+            methodVisitor.push(boolean1);
             if (boxValue) {
                 pushBoxPrimitiveIfNecessary(boolean.class, methodVisitor);
             }
@@ -588,38 +588,38 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                     );
                 }
             }
-        } else if (value instanceof Long) {
-            methodVisitor.push(((Long) value));
+        } else if (value instanceof Long long1) {
+            methodVisitor.push(long1);
             if (boxValue) {
                 pushBoxPrimitiveIfNecessary(long.class, methodVisitor);
             }
-        } else if (value instanceof Double) {
-            methodVisitor.push(((Double) value));
+        } else if (value instanceof Double double1) {
+            methodVisitor.push(double1);
             if (boxValue) {
                 pushBoxPrimitiveIfNecessary(double.class, methodVisitor);
             }
-        } else if (value instanceof Float) {
-            methodVisitor.push(((Float) value));
+        } else if (value instanceof Float float1) {
+            methodVisitor.push(float1);
             if (boxValue) {
                 pushBoxPrimitiveIfNecessary(float.class, methodVisitor);
             }
-        } else if (value instanceof Byte) {
-            methodVisitor.push(((Byte) value));
+        } else if (value instanceof Byte byte1) {
+            methodVisitor.push(byte1);
             if (boxValue) {
                 pushBoxPrimitiveIfNecessary(byte.class, methodVisitor);
             }
-        } else if (value instanceof Short) {
-            methodVisitor.push(((Short) value));
+        } else if (value instanceof Short short1) {
+            methodVisitor.push(short1);
             if (boxValue) {
                 pushBoxPrimitiveIfNecessary(short.class, methodVisitor);
             }
-        } else if (value instanceof Character) {
-            methodVisitor.push(((Character) value));
+        } else if (value instanceof Character character) {
+            methodVisitor.push(character);
             if (boxValue) {
                 pushBoxPrimitiveIfNecessary(char.class, methodVisitor);
             }
-        } else if (value instanceof Number) {
-            methodVisitor.push(((Number) value).intValue());
+        } else if (value instanceof Number number) {
+            methodVisitor.push(number.intValue());
             if (boxValue) {
                 pushBoxPrimitiveIfNecessary(ReflectionUtils.getPrimitiveType(value.getClass()), methodVisitor);
             }

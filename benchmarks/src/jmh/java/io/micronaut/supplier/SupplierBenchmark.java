@@ -78,7 +78,7 @@ public class SupplierBenchmark {
                     if (value == null) {
                         return null;
                     }
-                    if (value instanceof Optional && !((Optional) value).isPresent()) {
+                    if (value instanceof Optional optional && !optional.isPresent()) {
                         return value;
                     }
                     delegate = () -> value;

@@ -1406,8 +1406,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 }
             } catch (RuntimeException e) {
                 Throwable cause = e.getCause();
-                if (cause instanceof IOException) {
-                    throw (IOException) cause;
+                if (cause instanceof IOException exception) {
+                    throw exception;
                 } else {
                     throw e;
                 }
@@ -3657,8 +3657,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                 return hasAroundConstruct;
             } else if (hasAroundConstruct) {
                 AnnotationMetadata typeMetadata = annotationMetadata;
-                if (!isSuperFactory && typeMetadata instanceof AnnotationMetadataHierarchy) {
-                    typeMetadata = ((AnnotationMetadataHierarchy) typeMetadata).getRootMetadata();
+                if (!isSuperFactory && typeMetadata instanceof AnnotationMetadataHierarchy hierarchy) {
+                    typeMetadata = hierarchy.getRootMetadata();
                     final AnnotationValue<Annotation> av =
                             typeMetadata.getAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
                     if (av != null) {
@@ -4232,8 +4232,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             );
         }
         // 4: annotationMetadata
-        if (annotationMetadata instanceof AnnotationMetadataHierarchy) {
-            annotationMetadata = ((AnnotationMetadataHierarchy) annotationMetadata).merge();
+        if (annotationMetadata instanceof AnnotationMetadataHierarchy hierarchy) {
+            annotationMetadata = hierarchy.merge();
         }
         pushAnnotationMetadata(staticInit, annotationMetadata);
         if (isPreDestroyMethod || isPostConstructMethod) {
@@ -4385,8 +4385,8 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         } else {
             ppsv.visitClassType(typeParameter.getInternalName());
         }
-        if (isPrimitiveArray && ppsv instanceof ArrayAwareSignatureWriter) {
-            ((ArrayAwareSignatureWriter) ppsv).visitEndArray();
+        if (isPrimitiveArray && ppsv instanceof ArrayAwareSignatureWriter writer) {
+            writer.visitEndArray();
         } else {
             ppsv.visitEnd();
         }
@@ -4508,12 +4508,12 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     }
 
     private ClassElement getDeclaringType(Element beanProducingElement) {
-        if (beanProducingElement instanceof ClassElement) {
-            return (ClassElement) beanProducingElement;
-        } else if (beanProducingElement instanceof MemberElement) {
-            return ((MemberElement) beanProducingElement).getDeclaringType();
-        } else if (beanProducingElement instanceof BeanElementBuilder) {
-            return ((BeanElementBuilder) beanProducingElement).getDeclaringElement();
+        if (beanProducingElement instanceof ClassElement element) {
+            return element;
+        } else if (beanProducingElement instanceof MemberElement element) {
+            return element.getDeclaringType();
+        } else if (beanProducingElement instanceof BeanElementBuilder builder) {
+            return builder.getDeclaringElement();
         } else {
             return this.beanTypeElement;
         }
@@ -4579,9 +4579,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public BeanElementBuilder addAssociatedBean(ClassElement type, VisitorContext visitorContext) {
-        if (visitorContext instanceof BeanElementVisitorContext) {
+        if (visitorContext instanceof BeanElementVisitorContext context) {
             final Element[] originatingElements = getOriginatingElements();
-            return ((BeanElementVisitorContext) visitorContext)
+            return context
                     .addAssociatedBean(originatingElements[0], type);
         }
         return BeanElement.super.addAssociatedBean(type, visitorContext);

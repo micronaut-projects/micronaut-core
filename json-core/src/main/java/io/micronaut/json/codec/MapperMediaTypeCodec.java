@@ -246,8 +246,8 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
     @Override
     public <T> byte[] encode(T object) throws CodecException {
         try {
-            if (object instanceof byte[]) {
-                return (byte[]) object;
+            if (object instanceof byte[] bytes) {
+                return bytes;
             } else {
                 return getJsonMapper().writeValueAsBytes(object);
             }
@@ -259,8 +259,8 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
     @Override
     public <T> byte[] encode(Argument<T> type, T object) throws CodecException {
         try {
-            if (object instanceof byte[]) {
-                return (byte[]) object;
+            if (object instanceof byte[] bytes) {
+                return bytes;
             } else {
                 return getJsonMapper().writeValueAsBytes(type, object);
             }
@@ -271,16 +271,16 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
 
     @Override
     public <T, B> ByteBuffer<B> encode(T object, ByteBufferFactory<?, B> allocator) throws CodecException {
-        if (object instanceof byte[]) {
-            return allocator.copiedBuffer((byte[]) object);
+        if (object instanceof byte[] bytes) {
+            return allocator.copiedBuffer(bytes);
         }
         ByteBuffer<B> buffer = allocator.buffer();
         try {
             OutputStream outputStream = buffer.toOutputStream();
             encode(object, outputStream);
         } catch (Throwable t) {
-            if (buffer instanceof ReferenceCounted) {
-                ((ReferenceCounted) buffer).release();
+            if (buffer instanceof ReferenceCounted counted) {
+                counted.release();
             }
             throw t;
         }
@@ -289,8 +289,8 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
 
     @Override
     public <T, B> ByteBuffer<B> encode(Argument<T> type, T object, ByteBufferFactory<?, B> allocator) throws CodecException {
-        if (object instanceof byte[]) {
-            return allocator.copiedBuffer((byte[]) object);
+        if (object instanceof byte[] bytes) {
+            return allocator.copiedBuffer(bytes);
         }
         ByteBuffer<B> buffer = allocator.buffer();
         try {
@@ -298,8 +298,8 @@ public abstract class MapperMediaTypeCodec implements MediaTypeCodec {
             encode(type, object, outputStream);
             return buffer;
         } catch (Throwable t) {
-            if (buffer instanceof ReferenceCounted) {
-                ((ReferenceCounted) buffer).release();
+            if (buffer instanceof ReferenceCounted counted) {
+                counted.release();
             }
             throw t;
         }

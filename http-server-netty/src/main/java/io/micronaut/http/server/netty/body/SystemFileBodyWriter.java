@@ -102,7 +102,7 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
                             position = range.firstPos;
                             contentLength = range.lastPos + 1 - range.firstPos;
                             response.status(HttpStatus.PARTIAL_CONTENT);
-                            response.header(CONTENT_RANGE, String.format("%s %d-%d/%d", UNIT_BYTES, range.firstPos, range.lastPos, fileLength));
+                            response.header(CONTENT_RANGE, "%s %d-%d/%d".formatted(UNIT_BYTES, range.firstPos, range.lastPos, fileLength));
                         }
                     }
                     response.header(HttpHeaders.ACCEPT_RANGES, UNIT_BYTES);

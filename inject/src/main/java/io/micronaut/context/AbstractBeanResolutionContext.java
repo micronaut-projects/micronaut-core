@@ -148,8 +148,8 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         final CustomScope<?> injectScope = context.getCustomScopeRegistry()
                 .findScope(InjectScope.class.getName())
                 .orElse(null);
-        if (injectScope instanceof LifeCycle<?>) {
-            ((LifeCycle<?>) injectScope).stop();
+        if (injectScope instanceof LifeCycle<?> cycle) {
+            cycle.stop();
         }
     }
 
@@ -372,7 +372,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                 detectCircularDependency(declaringType, argument, constructorSegment);
             } else {
                 Segment<?, ?> previous = peek();
-                MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, methodName, argument, arguments, previous instanceof MethodSegment ? (MethodSegment) previous : null);
+                MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, methodName, argument, arguments, previous instanceof MethodSegment ms ? ms : null);
                 if (contains(methodSegment)) {
                     throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, CIRCULAR_ERROR_MSG);
                 } else {
@@ -391,7 +391,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         public Path pushMethodArgumentResolve(BeanDefinition declaringType, MethodInjectionPoint methodInjectionPoint, Argument argument) {
             Segment<?, ?> previous = peek();
             MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, methodInjectionPoint.getName(), argument,
-                    methodInjectionPoint.getArguments(), previous instanceof MethodSegment ? (MethodSegment) previous : null);
+                    methodInjectionPoint.getArguments(), previous instanceof MethodSegment ms ? ms : null);
             if (contains(methodSegment)) {
                 throw new CircularDependencyException(AbstractBeanResolutionContext.this, methodInjectionPoint, argument, CIRCULAR_ERROR_MSG);
             } else {
@@ -404,7 +404,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         @Override
         public Path pushMethodArgumentResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments) {
             Segment<?, ?> previous = peek();
-            MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, methodName, argument, arguments, previous instanceof MethodSegment ? (MethodSegment) previous : null);
+            MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, methodName, argument, arguments, previous instanceof MethodSegment ms ? ms : null);
             if (contains(methodSegment)) {
                 throw new CircularDependencyException(AbstractBeanResolutionContext.this, declaringType, methodName, argument, CIRCULAR_ERROR_MSG);
             } else {

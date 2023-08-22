@@ -277,16 +277,16 @@ final class HttpPipelineBuilder implements Closeable {
          * appearing in the file path
          */
         private String resolveIfNecessary(SocketAddress address) {
-            if (address instanceof InetSocketAddress) {
-                if (((InetSocketAddress) address).isUnresolved()) {
+            if (address instanceof InetSocketAddress socketAddress) {
+                if (socketAddress.isUnresolved()) {
                     // try resolution
-                    address = new InetSocketAddress(((InetSocketAddress) address).getHostString(), ((InetSocketAddress) address).getPort());
-                    if (((InetSocketAddress) address).isUnresolved()) {
+                    address = new InetSocketAddress(socketAddress.getHostString(), socketAddress.getPort());
+                    if (socketAddress.isUnresolved()) {
                         // resolution failed, bail
                         return "unresolved";
                     }
                 }
-                return ((InetSocketAddress) address).getAddress().getHostAddress() + ':' + ((InetSocketAddress) address).getPort();
+                return socketAddress.getAddress().getHostAddress() + ':' + socketAddress.getPort();
             }
             String s = address.toString();
             if (s.contains("/")) {
@@ -433,8 +433,7 @@ final class HttpPipelineBuilder implements Closeable {
 
                 @Override
                 public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-                    if (evt instanceof SslHandshakeCompletionEvent) {
-                        SslHandshakeCompletionEvent event = (SslHandshakeCompletionEvent) evt;
+                    if (evt instanceof SslHandshakeCompletionEvent event) {
                         if (!event.isSuccess()) {
                             final Throwable cause = event.cause();
                             if (!(cause instanceof ClosedChannelException)) {
@@ -656,8 +655,8 @@ final class HttpPipelineBuilder implements Closeable {
             int i = 0;
             for (ChannelOutboundHandler outboundHandlerAdapter : embeddedServices.getOutboundHandlers()) {
                 String name;
-                if (outboundHandlerAdapter instanceof Named) {
-                    name = ((Named) outboundHandlerAdapter).getName();
+                if (outboundHandlerAdapter instanceof Named named) {
+                    name = named.getName();
                 } else {
                     name = ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND + NettyHttpServer.OUTBOUND_KEY + ++i;
                 }

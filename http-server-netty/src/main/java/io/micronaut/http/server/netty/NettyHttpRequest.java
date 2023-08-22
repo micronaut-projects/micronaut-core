@@ -753,8 +753,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
         @Override
         public MutableHttpRequest<T> cookie(Cookie cookie) {
-            if (cookie instanceof NettyCookie) {
-                NettyCookie nettyCookie = (NettyCookie) cookie;
+            if (cookie instanceof NettyCookie nettyCookie) {
                 String value = ClientCookieEncoder.LAX.encode(nettyCookie.getNettyCookie());
                 headers.add(HttpHeaderNames.COOKIE, value);
             }

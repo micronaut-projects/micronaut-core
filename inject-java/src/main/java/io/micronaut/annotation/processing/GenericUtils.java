@@ -79,8 +79,7 @@ public class GenericUtils {
             }
         }
 
-        if (element instanceof TypeElement) {
-            TypeElement typeElement = (TypeElement) element;
+        if (element instanceof TypeElement typeElement) {
             if (CollectionUtils.isNotEmpty(boundTypes)) {
                 beanTypeArguments.put(JavaModelUtils.getClassName(typeElement), boundTypes);
             }
@@ -100,8 +99,7 @@ public class GenericUtils {
         for (TypeMirror tm : element.getInterfaces()) {
             DeclaredType declaredType = (DeclaredType) tm;
             Element declaredElement = declaredType.asElement();
-            if (declaredElement instanceof TypeElement) {
-               TypeElement te = (TypeElement) declaredElement;
+            if (declaredElement instanceof TypeElement te) {
                 if (interfaceName.equals(te.getQualifiedName().toString())) {
                     return declaredType.getTypeArguments();
                 }
@@ -165,8 +163,7 @@ public class GenericUtils {
                         if (extendsBound != null) {
                             resolveGenericTypeParameter(resolvedParameters, parameterName, extendsBound, boundTypes);
                         } else if (superBound != null) {
-                            if (superBound instanceof TypeVariable) {
-                                TypeVariable superTypeVar = (TypeVariable) superBound;
+                            if (superBound instanceof TypeVariable superTypeVar) {
                                 final TypeMirror upperBound = superTypeVar.getUpperBound();
                                 if (upperBound != null && !type.equals(upperBound)) {
                                     resolveGenericTypeParameter(resolvedParameters, parameterName, superBound, boundTypes);
@@ -252,8 +249,7 @@ public class GenericUtils {
                     parameterName,
                     mirror
             );
-        } else if (mirror instanceof TypeVariable) {
-            TypeVariable tv = (TypeVariable) mirror;
+        } else if (mirror instanceof TypeVariable tv) {
             String variableName = tv.toString();
             if (boundTypes.containsKey(variableName)) {
                 resolvedParameters.put(
@@ -289,9 +285,9 @@ public class GenericUtils {
 
 
                     Element te = dt.asElement();
-                    if (te instanceof TypeElement) {
+                    if (te instanceof TypeElement element) {
                         TypeElement child = current;
-                        current = (TypeElement) te;
+                        current = element;
                         if (CollectionUtils.isNotEmpty(superArguments)) {
                             Map<String, TypeMirror> boundTypes = typeArguments.get(JavaModelUtils.getClassName(child));
                             if (boundTypes != null) {

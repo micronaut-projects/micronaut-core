@@ -104,8 +104,8 @@ public class NettyCookie implements Cookie {
 
     @Override
     public Optional<SameSite> getSameSite() {
-        if (nettyCookie instanceof io.netty.handler.codec.http.cookie.DefaultCookie) {
-            io.netty.handler.codec.http.cookie.CookieHeaderNames.SameSite sameSite = ((io.netty.handler.codec.http.cookie.DefaultCookie) nettyCookie).sameSite();
+        if (nettyCookie instanceof io.netty.handler.codec.http.cookie.DefaultCookie cookie) {
+            io.netty.handler.codec.http.cookie.CookieHeaderNames.SameSite sameSite = cookie.sameSite();
             if (sameSite != null) {
                 return Optional.of(SameSite.valueOf(sameSite.name()));
             }
@@ -115,8 +115,8 @@ public class NettyCookie implements Cookie {
 
     @Override
     public @NonNull Cookie sameSite(@Nullable SameSite sameSite) {
-        if (nettyCookie instanceof io.netty.handler.codec.http.cookie.DefaultCookie) {
-            ((io.netty.handler.codec.http.cookie.DefaultCookie) nettyCookie).setSameSite(sameSite == null ? null : io.netty.handler.codec.http.cookie.CookieHeaderNames.SameSite.valueOf(sameSite.name()));
+        if (nettyCookie instanceof io.netty.handler.codec.http.cookie.DefaultCookie cookie) {
+            cookie.setSameSite(sameSite == null ? null : io.netty.handler.codec.http.cookie.CookieHeaderNames.SameSite.valueOf(sameSite.name()));
         }
         return this;
     }

@@ -97,7 +97,7 @@ public class NullableParameterRule implements RouteValidationRule {
                             ClassElement type = p.getType();
                             boolean hasDefaultValue = p.findAnnotation(Bindable.class).flatMap(av -> av.stringValue("defaultValue")).isPresent();
                             if (!isNullable(p) && type != null && !type.isAssignable(Optional.class) && !hasDefaultValue) {
-                                errorMessages.add(String.format("The uri variable [%s] is optional, but the corresponding method argument [%s %s] is not defined as an Optional or annotated with a Nullable annotation.", variable.getName(), p.getType().toString(), p.getName()));
+                                errorMessages.add("The uri variable [%s] is optional, but the corresponding method argument [%s %s] is not defined as an Optional or annotated with a Nullable annotation.".formatted(variable.getName(), p.getType().toString(), p.getName()));
                             }
                         });
             }

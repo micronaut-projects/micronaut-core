@@ -414,9 +414,9 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                     classElement.asType().accept(new PublicAbstractMethodVisitor<Object, Object>(classElement, javaVisitorContext) {
                         @Override
                         protected void accept(DeclaredType type, Element element, Object o) {
-                            if (element instanceof ExecutableElement) {
+                            if (element instanceof ExecutableElement executableElement) {
                                 ElementVisitor.this.visitExecutable(
-                                    (ExecutableElement) element,
+                                    executableElement,
                                     o
                                 );
                             }

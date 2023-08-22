@@ -141,16 +141,16 @@ abstract class ReflectTypeElement<T extends Type> implements ClassElement {
      * @return The erased class, never {@code null}
      */
     static @NonNull Class<?> getErasure(@NonNull Type type) {
-        if (type instanceof Class<?>) {
-            return (Class<?>) type;
-        } else if (type instanceof GenericArrayType) {
-            return Array.newInstance(getErasure(((GenericArrayType) type).getGenericComponentType()), 0).getClass();
-        } else if (type instanceof ParameterizedType) {
-            return getErasure(((ParameterizedType) type).getRawType());
-        } else if (type instanceof TypeVariable<?>) {
-            return getErasure(((TypeVariable<?>) type).getBounds()[0]);
-        } else if (type instanceof WildcardType) {
-            return getErasure(((WildcardType) type).getUpperBounds()[0]);
+        if (type instanceof Class<?> class1) {
+            return class1;
+        } else if (type instanceof GenericArrayType arrayType) {
+            return Array.newInstance(getErasure(arrayType.getGenericComponentType()), 0).getClass();
+        } else if (type instanceof ParameterizedType parameterizedType) {
+            return getErasure(parameterizedType.getRawType());
+        } else if (type instanceof TypeVariable<?> variable) {
+            return getErasure(variable.getBounds()[0]);
+        } else if (type instanceof WildcardType wildcardType) {
+            return getErasure(wildcardType.getUpperBounds()[0]);
         } else {
             throw new IllegalArgumentException("Unsupported type: " + type.getClass());
         }

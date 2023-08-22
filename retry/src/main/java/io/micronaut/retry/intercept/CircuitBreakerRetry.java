@@ -95,8 +95,8 @@ class CircuitBreakerRetry implements MutableRetryState {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Rethrowing existing exception for Open Circuit [{}]: {}", method, lastError.getMessage());
             }
-            if (lastError instanceof RuntimeException && !throwWrappedException) {
-                throw (RuntimeException) lastError;
+            if (lastError instanceof RuntimeException exception && !throwWrappedException) {
+                throw exception;
             } else {
                 throw new CircuitOpenException("Circuit Open: " + lastError.getMessage(), lastError);
             }

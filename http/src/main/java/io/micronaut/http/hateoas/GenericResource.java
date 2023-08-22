@@ -67,10 +67,10 @@ public final class GenericResource extends AbstractResource<GenericResource> {
 
     @Override
     public boolean equals(Object o) {
-        return o instanceof GenericResource &&
-                getLinks().equals(((GenericResource) o).getLinks()) &&
-                getEmbedded().equals(((GenericResource) o).getEmbedded()) &&
-                getAdditionalProperties().equals(((GenericResource) o).getAdditionalProperties());
+        return o instanceof GenericResource gr &&
+                getLinks().equals(gr.getLinks()) &&
+                getEmbedded().equals(gr.getEmbedded()) &&
+                getAdditionalProperties().equals(gr.getAdditionalProperties());
     }
 
     @Override

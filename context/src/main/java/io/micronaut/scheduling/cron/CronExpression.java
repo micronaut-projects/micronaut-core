@@ -193,7 +193,7 @@ public final class CronExpression {
 
         final String[] parts = expr.split("\\s+"); //$NON-NLS-1$
         if (parts.length < CRON_EXPRESSION_LENGTH_WITHOUT_SEC || parts.length > CRON_EXPRESSION_LENGTH_WITH_SEC) {
-            throw new IllegalArgumentException(String.format("Invalid cron expression [%s], expected 5 or 6 fields, got %s", expr, parts.length));
+            throw new IllegalArgumentException("Invalid cron expression [%s], expected 5 or 6 fields, got %s".formatted(expr, parts.length));
         }
         boolean withSeconds = parts.length == CRON_EXPRESSION_LENGTH_WITH_SEC;
 
@@ -332,15 +332,17 @@ public final class CronExpression {
      */
     abstract static class BasicField {
         private static final Pattern CRON_FIELD_REGEXP = Pattern
-                .compile("(?:                                             # start of group 1\n"
-                                + "   (?:(?<all>\\*)|(?<ignore>\\?)|(?<last>L))  # global flag (L, ?, *)\n"
-                                + " | (?<start>[0-9]{1,2}|[a-z]{3,3})              # or start number or symbol\n"
-                                + "      (?:                                        # start of group 2\n"
-                                + "         (?<mod>L|W)                             # modifier (L, W)\n"
-                                + "       | -(?<end>[0-9]{1,2}|[a-z]{3,3})        # or end nummer or symbol (in range)\n"
-                                + "      )?                                         # end of group 2\n"
-                                + ")                                              # end of group 1\n"
-                                + "(?:(?<incmod>/|\\#)(?<inc>[0-9]{1,7}))?        # increment and increment modifier (/ or \\#)\n",
+                .compile("""
+                                (?:                                             # start of group 1
+                                   (?:(?<all>\\*)|(?<ignore>\\?)|(?<last>L))  # global flag (L, ?, *)
+                                 | (?<start>[0-9]{1,2}|[a-z]{3,3})              # or start number or symbol
+                                      (?:                                        # start of group 2
+                                         (?<mod>L|W)                             # modifier (L, W)
+                                       | -(?<end>[0-9]{1,2}|[a-z]{3,3})        # or end nummer or symbol (in range)
+                                      )?                                         # end of group 2
+                                )                                              # end of group 1
+                                (?:(?<incmod>/|\\#)(?<inc>[0-9]{1,7}))?        # increment and increment modifier (/ or \\#)
+                                """,
                         Pattern.CASE_INSENSITIVE | Pattern.COMMENTS);
 
         private static final int PART_INCREMENT = 999;
@@ -419,9 +421,9 @@ public final class CronExpression {
          */
         protected void validatePart(FieldPart part) {
             if (part.modifier != null) {
-                throw new IllegalArgumentException(String.format("Invalid modifier [%s]", part.modifier));
+                throw new IllegalArgumentException("Invalid modifier [%s]".formatted(part.modifier));
             } else if (part.incrementModifier != null && !"/".equals(part.incrementModifier)) {
-                throw new IllegalArgumentException(String.format("Invalid increment modifier [%s]", part.incrementModifier));
+                throw new IllegalArgumentException("Invalid increment modifier [%s]".formatted(part.incrementModifier));
             }
         }
 
@@ -432,13 +434,13 @@ public final class CronExpression {
          */
         private void validateRange(FieldPart part) {
             if ((part.from != null && part.from < fieldType.from) || (part.to != null && part.to > fieldType.to)) {
-                throw new IllegalArgumentException(String.format("Invalid interval [%s-%s], must be %s<=_<=%s", part.from, part.to, fieldType.from,
-                        fieldType.to));
+                throw new IllegalArgumentException("Invalid interval [%s-%s], must be %s<=_<=%s".formatted(part.from, part.to, fieldType.from,
+                fieldType.to));
             } else if (part.from != null && part.to != null && part.from > part.to) {
                 throw new IllegalArgumentException(
-                        String.format(
-                                "Invalid interval [%s-%s].  Rolling periods are not supported (ex. 5-1, only 1-5) since this won't give a deterministic result. Must be %s<=_<=%s",
-                                part.from, part.to, fieldType.from, fieldType.to));
+                
+                "Invalid interval [%s-%s].  Rolling periods are not supported (ex. 5-1, only 1-5) since this won't give a deterministic result. Must be %s<=_<=%s".formatted(
+                part.from, part.to, fieldType.from, fieldType.to));
             }
         }
 
@@ -556,9 +558,9 @@ public final class CronExpression {
         @Override
         protected void validatePart(FieldPart part) {
             if (part.modifier != null && Arrays.asList("L", "?").indexOf(part.modifier) == -1) {
-                throw new IllegalArgumentException(String.format("Invalid modifier [%s]", part.modifier));
+                throw new IllegalArgumentException("Invalid modifier [%s]".formatted(part.modifier));
             } else if (part.incrementModifier != null && Arrays.asList("/", "#").indexOf(part.incrementModifier) == -1) {
-                throw new IllegalArgumentException(String.format("Invalid increment modifier [%s]", part.incrementModifier));
+                throw new IllegalArgumentException("Invalid increment modifier [%s]".formatted(part.incrementModifier));
             }
         }
     }
@@ -612,9 +614,9 @@ public final class CronExpression {
         @Override
         protected void validatePart(FieldPart part) {
             if (part.modifier != null && Arrays.asList("L", "W", "?").indexOf(part.modifier) == -1) {
-                throw new IllegalArgumentException(String.format("Invalid modifier [%s]", part.modifier));
+                throw new IllegalArgumentException("Invalid modifier [%s]".formatted(part.modifier));
             } else if (part.incrementModifier != null && !"/".equals(part.incrementModifier)) {
-                throw new IllegalArgumentException(String.format("Invalid increment modifier [%s]", part.incrementModifier));
+                throw new IllegalArgumentException("Invalid increment modifier [%s]".formatted(part.incrementModifier));
             }
         }
 

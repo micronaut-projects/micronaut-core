@@ -50,8 +50,8 @@ public class WholeBodyUploadController {
                 @Override
                 public void onNext(CompletedPart completedPart) {
                     String partName = completedPart.getName();
-                    if (completedPart instanceof CompletedFileUpload) {
-                        String originalFileName = ((CompletedFileUpload) completedPart).getFilename();
+                    if (completedPart instanceof CompletedFileUpload upload) {
+                        String originalFileName = upload.getFilename();
                     }
                 }
 
