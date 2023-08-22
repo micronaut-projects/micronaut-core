@@ -187,7 +187,7 @@ final class LinkedDeque<E extends Linked<E>> extends AbstractCollection<E> imple
 
     @Override
     public boolean contains(Object o) {
-        return (o instanceof Linked<?>) && contains((Linked<?>) o);
+        return (o instanceof Linked<?> l) && contains(l);
     }
 
     // A fast-path containment check

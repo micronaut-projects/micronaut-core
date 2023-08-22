@@ -57,8 +57,8 @@ final class CompositeQualifier<T> implements Qualifier<T> {
 
     @Override
     public boolean contains(Qualifier<T> qualifier) {
-        if (qualifier instanceof CompositeQualifier) {
-            for (Qualifier q : ((CompositeQualifier<Object>) qualifier).qualifiers) {
+        if (qualifier instanceof CompositeQualifier compositeQualifier) {
+            for (Qualifier q : compositeQualifier.qualifiers) {
                 if (!contains(q)) {
                     return false;
                 }

@@ -131,7 +131,7 @@ public final class PrimitiveElement implements ArrayableClassElement {
                 return element;
             }
         }
-        throw new IllegalArgumentException(String.format("No primitive found for name: %s", name));
+        throw new IllegalArgumentException("No primitive found for name: %s".formatted(name));
     }
 
     @Override

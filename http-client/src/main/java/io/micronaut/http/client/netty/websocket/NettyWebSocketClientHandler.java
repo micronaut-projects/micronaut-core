@@ -104,8 +104,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
 
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-        if (evt instanceof IdleStateEvent) {
-            IdleStateEvent idleStateEvent = (IdleStateEvent) evt;
+        if (evt instanceof IdleStateEvent idleStateEvent) {
             if (idleStateEvent.state() == IdleState.ALL_IDLE && clientSession != null && clientSession.isOpen()) {
                 // close the connection if it is idle for too long
                 clientSession.close(CloseReason.NORMAL);
@@ -166,8 +165,8 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
 
             T targetBean = genericWebSocketBean.getTarget();
 
-            if (targetBean instanceof WebSocketSessionAware) {
-                ((WebSocketSessionAware) targetBean).setWebSocketSession(clientSession);
+            if (targetBean instanceof WebSocketSessionAware aware) {
+                aware.setWebSocketSession(clientSession);
             }
 
             ExecutableBinder<WebSocketState> binder = new DefaultExecutableBinder<>();
@@ -217,8 +216,8 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
             return;
         }
 
-        if (msg instanceof WebSocketFrame) {
-            handleWebSocketFrame(ctx, (WebSocketFrame) msg);
+        if (msg instanceof WebSocketFrame frame) {
+            handleWebSocketFrame(ctx, frame);
         } else {
             ctx.fireChannelRead(msg);
         }

@@ -146,8 +146,8 @@ public class NettyWebSocketSession implements WebSocketSession {
             if (message != null) {
                 CompletableFuture<T> future = new CompletableFuture<>();
                 WebSocketFrame frame;
-                if (message instanceof WebSocketFrame) {
-                    frame = (WebSocketFrame) message;
+                if (message instanceof WebSocketFrame socketFrame) {
+                    frame = socketFrame;
                 } else {
                     frame = messageEncoder.encodeMessage(message, mediaType);
                 }
@@ -173,8 +173,8 @@ public class NettyWebSocketSession implements WebSocketSession {
             if (message != null) {
                 try {
                     WebSocketFrame frame;
-                    if (message instanceof WebSocketFrame) {
-                        frame = (WebSocketFrame) message;
+                    if (message instanceof WebSocketFrame socketFrame) {
+                        frame = socketFrame;
                     } else {
                         frame = messageEncoder.encodeMessage(message, mediaType);
                     }
@@ -202,8 +202,8 @@ public class NettyWebSocketSession implements WebSocketSession {
                 emitter.error(new WebSocketSessionException("Session closed"));
             } else {
                 WebSocketFrame frame;
-                if (message instanceof WebSocketFrame) {
-                    frame = (WebSocketFrame) message;
+                if (message instanceof WebSocketFrame socketFrame) {
+                    frame = socketFrame;
                 } else {
                     frame = messageEncoder.encodeMessage(message, mediaType);
                 }

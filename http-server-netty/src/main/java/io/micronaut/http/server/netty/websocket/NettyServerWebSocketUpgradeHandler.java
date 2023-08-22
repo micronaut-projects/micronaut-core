@@ -241,8 +241,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         handshaker = wsFactory.newHandshaker(req.getNativeRequest());
         MutableHttpHeaders headers = response.getHeaders();
         io.netty.handler.codec.http.HttpHeaders nettyHeaders;
-        if (headers instanceof NettyHttpHeaders) {
-            nettyHeaders = ((NettyHttpHeaders) headers).getNettyHeaders();
+        if (headers instanceof NettyHttpHeaders httpHeaders) {
+            nettyHeaders = httpHeaders.getNettyHeaders();
         } else {
             nettyHeaders = new DefaultHttpHeaders();
             for (Map.Entry<String, List<String>> entry : headers) {

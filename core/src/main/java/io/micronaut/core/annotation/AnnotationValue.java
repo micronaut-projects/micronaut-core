@@ -1333,8 +1333,8 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         if (object == null) {
             return "null";
         }
-        if (object instanceof Object[]) {
-            return Arrays.deepToString((Object[]) object);
+        if (object instanceof Object[] object1s) {
+            return Arrays.deepToString(object1s);
         }
         return object.toString();
     }

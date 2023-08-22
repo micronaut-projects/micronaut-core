@@ -49,7 +49,7 @@ final class JsonNumber extends JsonScalar {
 
     @Override
     public boolean equals(Object o) {
-        return o instanceof JsonNumber && ((JsonNumber) o).value.equals(value);
+        return o instanceof JsonNumber jn && jn.value.equals(value);
     }
 
     @Override

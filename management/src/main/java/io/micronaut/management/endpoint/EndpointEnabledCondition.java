@@ -47,13 +47,12 @@ public class EndpointEnabledCondition implements Condition {
             String defaultId = annotationMetadata.stringValue(Endpoint.class, "defaultConfigurationId").orElse("all");
 
             BeanContext beanContext = context.getBeanContext();
-            if (beanContext instanceof PropertyResolver) {
-                PropertyResolver propertyResolver = (PropertyResolver) beanContext;
-                Optional<Boolean> enabled = propertyResolver.getProperty(String.format("%s.%s.enabled", prefix, id), Boolean.class);
+            if (beanContext instanceof PropertyResolver propertyResolver) {
+                Optional<Boolean> enabled = propertyResolver.getProperty("%s.%s.enabled".formatted(prefix, id), Boolean.class);
                 if (enabled.isPresent()) {
                     return enabled.get();
                 } else {
-                    enabled = propertyResolver.getProperty(String.format("%s.%s.enabled", prefix, defaultId), Boolean.class);
+                    enabled = propertyResolver.getProperty("%s.%s.enabled".formatted(prefix, defaultId), Boolean.class);
                     return enabled.orElse(defaultEnabled);
                 }
             }

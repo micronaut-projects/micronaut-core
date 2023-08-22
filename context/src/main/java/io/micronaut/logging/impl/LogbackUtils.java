@@ -119,7 +119,7 @@ public final class LogbackUtils {
             configurator.setContext(context);
             configurator.configure(context);
         } catch (Exception e) {
-            throw new LoggingSystemException(String.format("Failed to initialize Configurator: %s using ServiceLoader", configurator.getClass().getCanonicalName()), e);
+            throw new LoggingSystemException("Failed to initialize Configurator: %s using ServiceLoader".formatted(configurator.getClass().getCanonicalName()), e);
         }
     }
 }

@@ -35,8 +35,8 @@ public class ArgMutatingInterceptor implements Interceptor {
         MutableArgumentValue arg = (MutableArgumentValue) context.getParameters().get(m.value());
         if(arg != null) {
             Object value = arg.getValue();
-            if(value instanceof Number) {
-                arg.setValue(((Number)value).intValue()*2);
+            if(value instanceof Number number) {
+                arg.setValue(number.intValue()*2);
             }
             else {
                 arg.setValue("changed");

@@ -274,8 +274,8 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
 
     private void printMessage(String message, Diagnostic.Kind kind, @Nullable io.micronaut.inject.ast.Element element) {
         if (StringUtils.isNotEmpty(message)) {
-            if (element instanceof BeanElement) {
-                element = ((BeanElement) element).getDeclaringClass();
+            if (element instanceof BeanElement beanElement) {
+                element = beanElement.getDeclaringClass();
             }
             if (element instanceof AbstractJavaElement abstractJavaElement) {
                 Element el = abstractJavaElement.getNativeType().element();
@@ -443,8 +443,8 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
     }
 
     private void populateClassElements(@NonNull String[] stereotypes, boolean includeAll, PackageElement packageElement, Element enclosedElement, List<ClassElement> classElements) {
-        if (enclosedElement instanceof TypeElement) {
-            JavaClassElement classElement = elementFactory.newClassElement((TypeElement) enclosedElement, elementAnnotationMetadataFactory);
+        if (enclosedElement instanceof TypeElement element) {
+            JavaClassElement classElement = elementFactory.newClassElement(element, elementAnnotationMetadataFactory);
             if ((includeAll || Arrays.stream(stereotypes).anyMatch(classElement::hasStereotype)) && !classElement.isAbstract()) {
                 classElements.add(classElement);
             }
@@ -452,8 +452,8 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
             for (Element nestedElement : nestedElements) {
                 populateClassElements(stereotypes, includeAll, packageElement, nestedElement, classElements);
             }
-        } else if (enclosedElement instanceof PackageElement) {
-            populateClassElements(stereotypes, (PackageElement) enclosedElement, classElements);
+        } else if (enclosedElement instanceof PackageElement element) {
+            populateClassElements(stereotypes, element, classElements);
         }
     }
 
@@ -514,7 +514,7 @@ public final class JavaVisitorContext implements VisitorContext, BeanElementVisi
             originatingElement,
             type,
             ConfigurationMetadataBuilder.INSTANCE,
-            type instanceof AbstractAnnotationElement ? ((AbstractAnnotationElement) type).getElementAnnotationMetadataFactory() : elementAnnotationMetadataFactory,
+            type instanceof AbstractAnnotationElement aae ? aae.getElementAnnotationMetadataFactory() : elementAnnotationMetadataFactory,
             this
         );
     }

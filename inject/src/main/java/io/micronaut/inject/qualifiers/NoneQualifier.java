@@ -40,8 +40,8 @@ final class NoneQualifier<T> implements Qualifier<T> {
     @Override
     public <B extends BeanType<T>> Stream<B> reduce(Class<T> beanType, Stream<B> candidates) {
         return candidates.filter(candidate -> {
-            if (candidate instanceof BeanDefinition) {
-                return ((BeanDefinition<?>) candidate).getDeclaredQualifier() == null;
+            if (candidate instanceof BeanDefinition definition) {
+                return definition.getDeclaredQualifier() == null;
             }
             return !AnnotationUtil.hasDeclaredQualifierAnnotation(candidate.getAnnotationMetadata());
         });

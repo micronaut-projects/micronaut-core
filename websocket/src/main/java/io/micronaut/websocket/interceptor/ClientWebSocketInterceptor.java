@@ -54,8 +54,8 @@ public class ClientWebSocketInterceptor implements MethodInterceptor<Object, Obj
             Object[] values = context.getParameterValues();
             if (ArrayUtils.isNotEmpty(values)) {
                 Object o = values[0];
-                if (o instanceof WebSocketSession) {
-                    this.webSocketSession = (WebSocketSession) o;
+                if (o instanceof WebSocketSession session) {
+                    this.webSocketSession = session;
                     return null;
                 }
             }

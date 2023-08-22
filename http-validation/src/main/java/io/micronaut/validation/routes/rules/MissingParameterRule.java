@@ -69,7 +69,7 @@ public class MissingParameterRule implements RouteValidationRule {
 
         for (String v: variables) {
             if (!routeVariables.contains(v)) {
-                errorMessages.add(String.format("The route declares a uri variable named [%s], but no corresponding method argument is present", v));
+                errorMessages.add("The route declares a uri variable named [%s], but no corresponding method argument is present".formatted(v));
             }
         }
 

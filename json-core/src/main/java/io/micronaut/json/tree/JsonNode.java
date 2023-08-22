@@ -253,10 +253,10 @@ public abstract class JsonNode {
     @NonNull
     public final BigInteger getBigIntegerValue() {
         Number numberValue = getNumberValue();
-        if (numberValue instanceof BigInteger) {
-            return (BigInteger) numberValue;
-        } else if (numberValue instanceof BigDecimal) {
-            return ((BigDecimal) numberValue).toBigInteger();
+        if (numberValue instanceof BigInteger integer) {
+            return integer;
+        } else if (numberValue instanceof BigDecimal decimal) {
+            return decimal.toBigInteger();
         } else {
             return BigInteger.valueOf(numberValue.longValue());
         }
@@ -269,10 +269,10 @@ public abstract class JsonNode {
     @NonNull
     public final BigDecimal getBigDecimalValue() {
         Number numberValue = getNumberValue();
-        if (numberValue instanceof BigInteger) {
-            return new BigDecimal((BigInteger) numberValue);
-        } else if (numberValue instanceof BigDecimal) {
-            return (BigDecimal) numberValue;
+        if (numberValue instanceof BigInteger integer) {
+            return new BigDecimal(integer);
+        } else if (numberValue instanceof BigDecimal decimal) {
+            return decimal;
         } else if (numberValue instanceof Long) {
             return BigDecimal.valueOf(numberValue.longValue());
         } else {

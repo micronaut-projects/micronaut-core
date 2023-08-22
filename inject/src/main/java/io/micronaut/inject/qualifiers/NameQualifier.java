@@ -72,15 +72,15 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
                     .flatMap(AnnotationValue::stringValue)
                     .orElse(null);
 
-            if (thisName == null && candidate instanceof BeanDefinition) {
-                Qualifier<?> qualifier = ((BeanDefinition<?>) candidate).getDeclaredQualifier();
+            if (thisName == null && candidate instanceof BeanDefinition definition) {
+                Qualifier<?> qualifier = definition.getDeclaredQualifier();
                 if (qualifier != null && qualifier.contains((Qualifier) this)) {
                     return true;
                 }
             }
             if (thisName == null) {
-                 if (candidate instanceof NameResolver) {
-                    Optional<String> resolvedName = ((NameResolver) candidate).resolveName();
+                 if (candidate instanceof NameResolver resolver) {
+                    Optional<String> resolvedName = resolver.resolveName();
                     thisName = resolvedName.orElse(candidate.getBeanType().getSimpleName());
                 } else {
                      thisName = candidate.getBeanType().getSimpleName();

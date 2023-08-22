@@ -213,7 +213,7 @@ public final class BodyAssertion<T, E> {
             }
             String firstTen = IntStream.range(0, value.length)
                 .map(i -> value[i] & 0xff)
-                .mapToObj(i -> String.format("%02x", i))
+                .mapToObj(i -> "%02x".formatted(i))
                 .limit(10)
                 .collect(Collectors.joining(", ", "", "..."));
             return "ByteArray(length=" + value.length + ", [" + firstTen + "])";

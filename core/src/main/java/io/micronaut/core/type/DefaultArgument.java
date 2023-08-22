@@ -159,8 +159,8 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
         this.annotationMetadata = annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
         if (type == null) {
             type = getClass().getGenericSuperclass();
-            if (type instanceof ParameterizedType) {
-                type = ((ParameterizedType) type).getActualTypeArguments()[0];
+            if (type instanceof ParameterizedType parameterizedType) {
+                type = parameterizedType.getActualTypeArguments()[0];
             } else {
                 throw new IllegalArgumentException(type + " is not parameterized");
             }
@@ -169,8 +169,7 @@ public class DefaultArgument<T> implements Argument<T>, ArgumentCoercible<T> {
             //noinspection unchecked
             this.type = (Class<T>) type;
             this.typeParameterArray = Argument.ZERO_ARGUMENTS;
-        } else if (type instanceof ParameterizedType) {
-            ParameterizedType parameterizedType = (ParameterizedType) type;
+        } else if (type instanceof ParameterizedType parameterizedType) {
             //noinspection unchecked
             this.type = (Class<T>) parameterizedType.getRawType();
             TypeVariable<Class<T>>[] params = this.type.getTypeParameters();

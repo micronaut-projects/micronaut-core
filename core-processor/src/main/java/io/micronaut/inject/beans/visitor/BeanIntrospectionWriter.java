@@ -211,10 +211,10 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         this.evaluatedExpressionProcessor.processEvaluatedExpressions(annotationMetadata, classElement);
         int readDispatchIndex = -1;
         if (readMember != null) {
-            if (readMember instanceof MethodElement) {
-                readDispatchIndex = dispatchWriter.addMethod(classElement, (MethodElement) readMember, true);
-            } else if (readMember instanceof FieldElement) {
-                readDispatchIndex = dispatchWriter.addGetField((FieldElement) readMember);
+            if (readMember instanceof MethodElement element) {
+                readDispatchIndex = dispatchWriter.addMethod(classElement, element, true);
+            } else if (readMember instanceof FieldElement element) {
+                readDispatchIndex = dispatchWriter.addGetField(element);
             } else {
                 throw new IllegalStateException();
             }
@@ -222,10 +222,10 @@ final class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         int writeDispatchIndex = -1;
         int withMethodIndex = -1;
         if (writeMember != null) {
-            if (writeMember instanceof MethodElement) {
-                writeDispatchIndex = dispatchWriter.addMethod(classElement, (MethodElement) writeMember, true);
-            } else if (writeMember instanceof FieldElement) {
-                writeDispatchIndex = dispatchWriter.addSetField((FieldElement) writeMember);
+            if (writeMember instanceof MethodElement element) {
+                writeDispatchIndex = dispatchWriter.addMethod(classElement, element, true);
+            } else if (writeMember instanceof FieldElement element) {
+                writeDispatchIndex = dispatchWriter.addSetField(element);
             } else {
                 throw new IllegalStateException();
             }

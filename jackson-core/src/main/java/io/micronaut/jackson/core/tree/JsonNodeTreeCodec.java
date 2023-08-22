@@ -152,12 +152,12 @@ public final class JsonNodeTreeCodec {
                 generator.writeNumber(value.doubleValue());
             } else if (value instanceof Float) {
                 generator.writeNumber(value.floatValue());
-            } else if (value instanceof BigDecimal) {
-                generator.writeNumber((BigDecimal) value);
+            } else if (value instanceof BigDecimal decimal) {
+                generator.writeNumber(decimal);
             } else if (value instanceof Byte || value instanceof Short) {
                 generator.writeNumber(value.shortValue());
-            } else if (value instanceof BigInteger) {
-                generator.writeNumber((BigInteger) value);
+            } else if (value instanceof BigInteger integer) {
+                generator.writeNumber(integer);
             } else {
                 throw new IllegalStateException("Unknown number type " + value.getClass().getName());
             }
