@@ -24,6 +24,7 @@ import io.micronaut.inject.ast.WildcardElement
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 import io.micronaut.inject.ast.annotation.WildcardElementAnnotationMetadata
+import java.util.*
 import java.util.function.Function
 
 internal class KotlinWildcardElement(
@@ -47,6 +48,7 @@ internal class KotlinWildcardElement(
     private val resolvedTypeAnnotationMetadata: ElementAnnotationMetadata by lazy {
         WildcardElementAnnotationMetadata(this, upper)
     }
+
     private val resolvedAnnotationMetadata: AnnotationMetadata by lazy {
         AnnotationMetadataHierarchy(
             true,
@@ -54,9 +56,12 @@ internal class KotlinWildcardElement(
             resolvedGenericTypeAnnotationMetadata
         )
     }
+
     private val resolvedGenericTypeAnnotationMetadata: ElementAnnotationMetadata by lazy {
         elementAnnotationMetadataFactory.buildGenericTypeAnnotations(this)
     }
+
+    override fun getResolved(): Optional<ClassElement> = Optional.of(upper)
 
     override fun getAnnotationMetadataToWrite() = resolvedGenericTypeAnnotationMetadata
 

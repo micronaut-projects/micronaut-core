@@ -20,6 +20,8 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Optional;
+
 /**
  * Represents a generic element that can appear as a type argument.
  *
@@ -53,6 +55,27 @@ public interface GenericElement extends ClassElement {
     @NotNull
     default MutableAnnotationMetadataDelegate<AnnotationMetadata> getGenericTypeAnnotationMetadata() {
         return (MutableAnnotationMetadataDelegate<AnnotationMetadata>) MutableAnnotationMetadataDelegate.EMPTY;
+    }
+
+    /**
+     * In some cases the class element can be a resolved as a generic element and this element should return the actual
+     * type that is generic element is representing.
+     *
+     * @return The resolved value of the generic element.
+     * @since 4.2.0
+     */
+    default Optional<ClassElement> getResolved() {
+        return Optional.empty();
+    }
+
+    /**
+     * Tries to resolve underneath type using {@link #getResolved()} or returns this type otherwise.
+     *
+     * @return The resolved value of the generic element or this type.
+     * @since 4.2.0
+     */
+    default ClassElement resolved() {
+        return getResolved().orElse(this);
     }
 
 }
