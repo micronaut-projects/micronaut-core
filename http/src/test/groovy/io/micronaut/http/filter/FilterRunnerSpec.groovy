@@ -42,7 +42,7 @@ class FilterRunnerSpec extends Specification {
                     events.add("before")
                     null
                 },
-                (GenericHttpFilter.Terminal) (req -> {
+                GenericHttpFilter.terminalFilter (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
                 })
@@ -72,7 +72,7 @@ class FilterRunnerSpec extends Specification {
                         return resp2
                     })
                 },
-                (GenericHttpFilter.Terminal) (req -> {
+                GenericHttpFilter.terminalFilter (req -> {
                     assert req == req2
                     events.add("terminal")
                     ExecutionFlow.just(resp1)
@@ -107,12 +107,12 @@ class FilterRunnerSpec extends Specification {
                             .contextWrite { it.put('value', 'around 2') }
                     }
                 },
-                (GenericHttpFilter.Terminal) (req) -> {
+                GenericHttpFilter.terminalFilter (req -> {
                     return ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(ctx -> {
                         events.add('terminal: ' + ctx.get('value'))
                         Mono.just(HttpResponse.ok("resp1"))
                     }))
-                }
+                })
         ]
 
         when:
@@ -152,12 +152,12 @@ class FilterRunnerSpec extends Specification {
                                 .contextWrite { it.put('value', 'around 2') }
                     }
                 },
-                (GenericHttpFilter.Terminal) (req) -> {
+                GenericHttpFilter.terminalFilter (req -> {
                     return ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(ctx -> {
                         events.add('terminal: ' + ctx.get('value'))
                         Mono.just(HttpResponse.ok("resp1"))
                     }))
-                }
+                })
         ]
 
         when:
@@ -181,7 +181,7 @@ class FilterRunnerSpec extends Specification {
         def testExc = new Exception("Test exception")
         List<GenericHttpFilter> filters = [
                 before(ReturnType.of(void)) { throw testExc },
-                (GenericHttpFilter.Terminal) (req -> {
+                GenericHttpFilter.terminalFilter (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
                 })
@@ -201,7 +201,7 @@ class FilterRunnerSpec extends Specification {
         def testExc = new Exception("Test exception")
         List<GenericHttpFilter> filters = [
                 after(ReturnType.of(void)) { req, resp -> throw testExc },
-                (GenericHttpFilter.Terminal) (req -> {
+                GenericHttpFilter.terminalFilter (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
                 })
@@ -219,7 +219,7 @@ class FilterRunnerSpec extends Specification {
         given:
         def testExc = new RuntimeException("Test exception")
         List<GenericHttpFilter> filters = [
-                (GenericHttpFilter.Terminal) (req -> {
+            GenericHttpFilter.terminalFilter (req -> {
                     throw testExc
                 })
         ]
@@ -235,7 +235,7 @@ class FilterRunnerSpec extends Specification {
         given:
         def testExc = new Exception("Test exception")
         List<GenericHttpFilter> filters = [
-                (GenericHttpFilter.Terminal) (req -> {
+            GenericHttpFilter.terminalFilter (req -> {
                     return ExecutionFlow.error(testExc)
                 })
         ]
@@ -255,7 +255,7 @@ class FilterRunnerSpec extends Specification {
                 around(legacy) { request, chain ->
                     throw testExc
                 },
-                (GenericHttpFilter.Terminal) (req -> {
+                GenericHttpFilter.terminalFilter (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
                 })
@@ -280,7 +280,7 @@ class FilterRunnerSpec extends Specification {
                 around(legacy) { request, chain ->
                     return Flux.from(chain.proceed(request)).map(r -> { throw testExc })
                 },
-                (GenericHttpFilter.Terminal) (req -> {
+                GenericHttpFilter.terminalFilter (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
                 })
@@ -307,7 +307,7 @@ class FilterRunnerSpec extends Specification {
                     Flux.from(chain.proceed(request)).subscribe()
                     throw testExc
                 },
-                (GenericHttpFilter.Terminal) (req -> {
+                GenericHttpFilter.terminalFilter (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
                 })
@@ -334,7 +334,7 @@ class FilterRunnerSpec extends Specification {
                     Flux.from(chain.proceed(request)).subscribe()
                     throw testExc
                 },
-                (GenericHttpFilter.Terminal) (req -> {
+                GenericHttpFilter.terminalFilter (req -> {
                     CompletableFutureExecutionFlow.just(terminalFuture)
                 })
         ]
@@ -361,7 +361,7 @@ class FilterRunnerSpec extends Specification {
                     events.add("around")
                     Flux.just(HttpResponse.ok("foo"))
                 },
-                (GenericHttpFilter.Terminal) (req -> {
+                GenericHttpFilter.terminalFilter (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
                 })
@@ -388,7 +388,7 @@ class FilterRunnerSpec extends Specification {
                     events.add("before")
                     req2
                 },
-                (GenericHttpFilter.Terminal) (req -> {
+                GenericHttpFilter.terminalFilter (req -> {
                     assert req == req2
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
@@ -409,7 +409,7 @@ class FilterRunnerSpec extends Specification {
                     events.add("before")
                     HttpResponse.ok()
                 },
-                (GenericHttpFilter.Terminal) (req -> {
+                GenericHttpFilter.terminalFilter (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
                 })
@@ -432,7 +432,7 @@ class FilterRunnerSpec extends Specification {
                     events.add("before")
                     Flux.just(req2)
                 },
-                (GenericHttpFilter.Terminal) (req -> {
+                GenericHttpFilter.terminalFilter (req -> {
                     assert req == req2
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
@@ -456,7 +456,7 @@ class FilterRunnerSpec extends Specification {
                     events.add("before")
                     CompletableFuture.completedFuture(req2)
                 },
-                (GenericHttpFilter.Terminal) (req -> {
+                GenericHttpFilter.terminalFilter (req -> {
                     assert req == req2
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
@@ -477,7 +477,7 @@ class FilterRunnerSpec extends Specification {
                     events.add("before")
                     Flux.just(HttpResponse.ok())
                 },
-                (GenericHttpFilter.Terminal) (req -> {
+                GenericHttpFilter.terminalFilter (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(HttpResponse.ok())
                 })
@@ -500,7 +500,7 @@ class FilterRunnerSpec extends Specification {
                     events.add("after")
                     resp2
                 },
-                (GenericHttpFilter.Terminal) (req -> {
+                GenericHttpFilter.terminalFilter (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(resp1)
                 })
@@ -524,7 +524,7 @@ class FilterRunnerSpec extends Specification {
                     events.add("after")
                     Flux.just(resp2)
                 },
-                (GenericHttpFilter.Terminal) (req -> {
+                GenericHttpFilter.terminalFilter (req -> {
                     events.add("terminal")
                     ExecutionFlow.just(resp1)
                 })
@@ -546,7 +546,7 @@ class FilterRunnerSpec extends Specification {
                     events.add("after")
                     null
                 },
-                (GenericHttpFilter.Terminal) (req -> {
+                GenericHttpFilter.terminalFilter (req -> {
                     events.add("terminal")
                     ExecutionFlow.error(testExc)
                 })
@@ -571,7 +571,7 @@ class FilterRunnerSpec extends Specification {
                     events.add("after")
                     resp1
                 },
-                (GenericHttpFilter.Terminal) (req -> {
+                GenericHttpFilter.terminalFilter (req -> {
                     events.add("terminal")
                     ExecutionFlow.error(testExc)
                 })
@@ -593,7 +593,7 @@ class FilterRunnerSpec extends Specification {
                     events.add("after")
                     null
                 },
-                (GenericHttpFilter.Terminal) (req -> {
+                GenericHttpFilter.terminalFilter (req -> {
                     events.add("terminal")
                     ExecutionFlow.error(testExc)
                 })
@@ -615,7 +615,7 @@ class FilterRunnerSpec extends Specification {
                     events.add("before1 " + Thread.currentThread().name)
                     null
                 },
-                new GenericHttpFilter.Async(before(ReturnType.of(void)) {
+                new AsyncFilter(before(ReturnType.of(void)) {
                     events.add("before2 " + Thread.currentThread().name)
                     null
                 }, Executors.newCachedThreadPool(new ThreadFactory() {
@@ -632,7 +632,7 @@ class FilterRunnerSpec extends Specification {
                     events.add("after1 " + Thread.currentThread().name)
                     null
                 },
-                new GenericHttpFilter.Async(after(ReturnType.of(void)) {
+                new AsyncFilter(after(ReturnType.of(void)) {
                     events.add("after2 " + Thread.currentThread().name)
                     null
                 }, Executors.newCachedThreadPool(new ThreadFactory() {
@@ -645,7 +645,7 @@ class FilterRunnerSpec extends Specification {
                     events.add("after3 " + Thread.currentThread().name)
                     null
                 },
-                (GenericHttpFilter.Terminal) (req -> {
+                GenericHttpFilter.terminalFilter (req -> {
                     events.add("terminal " + Thread.currentThread().name)
                     ExecutionFlow.just(HttpResponse.ok())
                 })
@@ -679,7 +679,7 @@ class FilterRunnerSpec extends Specification {
                     events.add("after")
                     return resp2
                 },
-                (GenericHttpFilter.Terminal) (req -> {
+                GenericHttpFilter.terminalFilter (req -> {
                     assert req == req2
                     events.add("terminal")
                     ExecutionFlow.just(resp1)
@@ -694,16 +694,16 @@ class FilterRunnerSpec extends Specification {
     }
 
     private def after(ReturnType returnType, List<Argument> arguments = closure.parameterTypes.collect { Argument.of(it) }, Closure<?> closure) {
-        return FilterRunner.prepareFilterMethod(ConversionService.SHARED, null, new LambdaExecutable(closure, arguments.toArray(new Argument[0]), returnType), true, new FilterOrder.Fixed(0), new DefaultRequestBinderRegistry(ConversionService.SHARED))
+        return MethodFilter.prepareFilterMethod(ConversionService.SHARED, null, new LambdaExecutable(closure, arguments.toArray(new Argument[0]), returnType), true, new FilterOrder.Fixed(0), new DefaultRequestBinderRegistry(ConversionService.SHARED))
     }
 
     private def before(ReturnType returnType, List<Argument> arguments = closure.parameterTypes.collect { Argument.of(it) }, Closure<?> closure) {
-        return FilterRunner.prepareFilterMethod(ConversionService.SHARED, null, new LambdaExecutable(closure, arguments.toArray(new Argument[0]), returnType), false, new FilterOrder.Fixed(0), new DefaultRequestBinderRegistry(ConversionService.SHARED))
+        return MethodFilter.prepareFilterMethod(ConversionService.SHARED, null, new LambdaExecutable(closure, arguments.toArray(new Argument[0]), returnType), false, new FilterOrder.Fixed(0), new DefaultRequestBinderRegistry(ConversionService.SHARED))
     }
 
     private def around(boolean legacy, Closure<Publisher<MutableHttpResponse<?>>> closure) {
         if (legacy) {
-            return new GenericHttpFilter.AroundLegacy(
+            return GenericHttpFilter.createLegacyFilter(
                     new HttpServerFilter() {
                         @Override
                         Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {

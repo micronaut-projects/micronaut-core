@@ -113,7 +113,7 @@ public interface HttpFilterResolver<T extends AnnotationMetadataProvider> {
             @Nullable Set<HttpMethod> methods,
             @NonNull FilterPatternStyle patternStyle, String... patterns) {
             return new DefaultFilterEntry(
-                new GenericHttpFilter.AroundLegacy(
+                GenericHttpFilter.createLegacyFilter(
                     Objects.requireNonNull(filter, "Filter cannot be null"),
                     new FilterOrder.Dynamic(OrderUtil.getOrder(annotationMetadata))),
                 annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA,
