@@ -26,7 +26,6 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.ClientFilter;
@@ -95,7 +94,7 @@ public class DefaultHttpClientFilterResolver extends BaseFilterProcessor<ClientF
         List<GenericHttpFilter> filterList = new ArrayList<>(filterEntries.size());
         for (FilterEntry filterEntry : filterEntries) {
             final GenericHttpFilter filter = filterEntry.getFilter();
-            if (filter instanceof Toggleable toggleable && !toggleable.isEnabled()) {
+            if (!GenericHttpFilter.isEnabled(filter)) {
                 continue;
             }
             if (matchesFilterEntry(method, requestPath, filterEntry)) {

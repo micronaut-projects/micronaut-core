@@ -42,7 +42,7 @@ record FilterContext(@NonNull HttpRequest<?> request,
         this(request, null, propagatedContext);
     }
 
-    public FilterContext withRequest(@NonNull HttpRequest<?> request) {
+    FilterContext withRequest(@NonNull HttpRequest<?> request) {
         if (this.request == request) {
             return this;
         }
@@ -53,16 +53,15 @@ record FilterContext(@NonNull HttpRequest<?> request,
         return new FilterContext(request, response, propagatedContext);
     }
 
-    public FilterContext withResponse(@NonNull HttpResponse<?> response) {
+    FilterContext withResponse(@NonNull HttpResponse<?> response) {
         if (this.response == response) {
             return this;
         }
         Objects.requireNonNull(response);
-        // New response should remove the failure
         return new FilterContext(request, response, propagatedContext);
     }
 
-    public FilterContext withPropagatedContext(@NonNull PropagatedContext propagatedContext) {
+    FilterContext withPropagatedContext(@NonNull PropagatedContext propagatedContext) {
         if (this.propagatedContext == propagatedContext) {
             return this;
         }

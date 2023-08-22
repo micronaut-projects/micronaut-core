@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.filter;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -58,6 +59,7 @@ public sealed interface GenericHttpFilter permits InternalHttpFilter {
      * @return new filter
      * @since 4.2.0
      */
+    @Internal
     static GenericHttpFilter createLegacyFilter(HttpFilter bean, FilterOrder order) {
         return new AroundLegacyFilter(bean, order);
     }
@@ -68,7 +70,8 @@ public sealed interface GenericHttpFilter permits InternalHttpFilter {
      * @return new terminal filter
      * @since 4.2.0
      */
-    static GenericHttpFilter terminal(Function<HttpRequest<?>, ExecutionFlow<MutableHttpResponse<?>>> fn) {
+    @Internal
+    static GenericHttpFilter terminalFilter(Function<HttpRequest<?>, ExecutionFlow<MutableHttpResponse<?>>> fn) {
         return new TerminalFilter(fn);
     }
 
@@ -78,8 +81,20 @@ public sealed interface GenericHttpFilter permits InternalHttpFilter {
      * @return new terminal filter
      * @since 4.2.0
      */
-    static GenericHttpFilter terminalReactive(Publisher<? extends HttpResponse<?>> responsePublisher) {
+    @Internal
+    static GenericHttpFilter terminalReactiveFilter(Publisher<? extends HttpResponse<?>> responsePublisher) {
         return new TerminalReactiveFilter(responsePublisher);
+    }
+
+    /**
+     * Check if the filter is enabled.
+     * @param filter The filter
+     * @return true if enabled
+     * @since 4.2.0
+     */
+    @Internal
+    static boolean isEnabled(GenericHttpFilter filter) {
+        return !(filter instanceof AroundLegacyFilter aroundLegacyFilter) || aroundLegacyFilter.isEnabled();
     }
 
 }

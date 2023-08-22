@@ -1224,7 +1224,7 @@ public class DefaultHttpClient implements
         }
 
         FilterRunner.sortReverse(filters);
-        filters.add(GenericHttpFilter.terminalReactive(responsePublisher));
+        filters.add(GenericHttpFilter.terminalReactiveFilter(responsePublisher));
 
         FilterRunner runner = new FilterRunner(filters);
         Mono<R> responseMono = Mono.from(ReactiveExecutionFlow.fromFlow((ExecutionFlow<R>) runner.run(request)).toPublisher());

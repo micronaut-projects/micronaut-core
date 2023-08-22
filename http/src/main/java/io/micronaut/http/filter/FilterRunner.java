@@ -28,7 +28,6 @@ import io.micronaut.http.MutableHttpResponse;
 
 import java.util.List;
 import java.util.ListIterator;
-import java.util.Objects;
 
 /**
  * The filter runner will start processing the filters in the forward order.
@@ -62,12 +61,7 @@ public class FilterRunner {
      * @param filters The filters to run
      */
     public FilterRunner(List<GenericHttpFilter> filters) {
-        this.filters = Objects.requireNonNull(filters, "filters").stream().map(f -> {
-            if (f instanceof InternalHttpFilter internalHttpFilter) {
-                return internalHttpFilter;
-            }
-            throw new IllegalStateException("Unrecognized filter implementation: " + f);
-        }).toList();
+        this.filters = (List) filters; // GenericHttpFilter is sealed and all implementations implement InternalHttpFilter
     }
 
     private static void checkOrdered(List<? extends GenericHttpFilter> filters) {

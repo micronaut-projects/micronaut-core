@@ -259,7 +259,7 @@ public class RequestLifecycle {
 
         List<GenericHttpFilter> filters = new ArrayList<>(httpFilters.size() + 1);
         filters.addAll(httpFilters);
-        filters.add(GenericHttpFilter.terminal(request -> {
+        filters.add(GenericHttpFilter.terminalFilter(request -> {
             this.request = request;
             return downstream.get();
         }));

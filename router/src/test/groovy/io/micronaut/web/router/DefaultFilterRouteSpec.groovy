@@ -33,7 +33,7 @@ class DefaultFilterRouteSpec extends Specification {
 
     void "test filter route matching with no methods specified"() {
         given:
-        def filter = new AroundLegacyFilter(new HttpFilter() {
+        def filter = GenericHttpFilter.createLegacyFilter(new HttpFilter() {
             @Override
             Publisher<? extends HttpResponse<?>> doFilter(HttpRequest<?> request, FilterChain chain) {
                 return null
@@ -56,7 +56,7 @@ class DefaultFilterRouteSpec extends Specification {
 
     void "test filter route matching with methods specified"() {
         given:
-        def filter = new AroundLegacyFilter(new HttpFilter() {
+        def filter = GenericHttpFilter.createLegacyFilter(new HttpFilter() {
             @Override
             Publisher<? extends HttpResponse<?>> doFilter(HttpRequest<?> request, FilterChain chain) {
                 return null
@@ -79,7 +79,7 @@ class DefaultFilterRouteSpec extends Specification {
 
     void "test filter route matching with regex pattern style specified"() {
         given:
-        def filter = new AroundLegacyFilter(new HttpFilter() {
+        def filter = GenericHttpFilter.createLegacyFilter(new HttpFilter() {
             @Override
             Publisher<? extends HttpResponse<?>> doFilter(HttpRequest<?> request, FilterChain chain) {
                 return null
