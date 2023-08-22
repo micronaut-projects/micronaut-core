@@ -407,6 +407,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
      * @param mediaTypes The media types
      * @param executableHandle The executable handle
      *
+     * @since 5.2.0
      * @return an {@link UriRoute}
      */
     protected UriRoute buildRoute(HttpMethod httpMethod, String uri, List<MediaType> mediaTypes, MethodExecutionHandle<Object, Object> executableHandle) {
