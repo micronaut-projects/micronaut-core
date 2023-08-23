@@ -856,10 +856,8 @@ public class DefaultMutableConversionService implements MutableConversionService
             return Optional.of(strings);
         });
 
-        TypeConverter<CharSequence, Enum> toEnumConverter = new CharSequenceToEnumConverter();
-
         // String -> Enum
-        addInternalConverter(CharSequence.class, Enum.class, toEnumConverter);
+        addInternalConverter(CharSequence.class, Enum.class, new CharSequenceToEnumConverter());
 
         // Object -> String
         addInternalConverter(Object.class, String.class, (Object object, Class<String> targetType, ConversionContext context) -> Optional.of(object.toString()));
@@ -1104,8 +1102,7 @@ public class DefaultMutableConversionService implements MutableConversionService
                 new MultiValuesConverterFactory.ObjectToMultiValuesConverter(this));
 
         // CharSequence -> java.net.Proxy.Type
-        CharSequenceToEnumConverter<Proxy.Type> toProxyType = new CharSequenceToEnumConverter<>();
-        addInternalConverter(CharSequence.class, Proxy.Type.class, (object, targetType, context) -> toProxyType.convert(object, targetType));
+        addInternalConverter(CharSequence.class, Proxy.Type.class, new CharSequenceToEnumConverter<>());
 
         Collection<TypeConverterRegistrar> registrars = new ArrayList<>();
         SoftServiceLoader.load(TypeConverterRegistrar.class)
