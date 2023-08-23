@@ -28,7 +28,6 @@ import io.micronaut.core.convert.value.ConvertibleValuesMap;
 import io.micronaut.core.io.IOUtils;
 import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.io.service.SoftServiceLoader;
-import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -1252,32 +1251,4 @@ public class DefaultMutableConversionService implements MutableConversionService
         }
     }
 
-    private static final class CharSequenceToEnumConverter<T extends Enum<T>> implements TypeConverter<CharSequence, T> {
-
-        @Override
-        public Optional<T> convert(CharSequence charSequence, Class<T> targetType, ConversionContext context) {
-            if (StringUtils.isEmpty(charSequence)) {
-                return Optional.empty();
-            }
-            String stringValue = charSequence.toString();
-            try {
-                T val = Enum.valueOf(targetType, stringValue);
-                return Optional.of(val);
-            } catch (IllegalArgumentException e) {
-                try {
-                    T val = Enum.valueOf(targetType, NameUtils.environmentName(stringValue));
-                    return Optional.of(val);
-                } catch (Exception e1) {
-                    Optional<T> valOpt = Arrays.stream(targetType.getEnumConstants())
-                            .filter(val -> val.toString().equals(stringValue))
-                            .findFirst();
-                    if (valOpt.isPresent()) {
-                        return valOpt;
-                    }
-                    context.reject(charSequence, e);
-                    return Optional.empty();
-                }
-            }
-        }
-    }
 }

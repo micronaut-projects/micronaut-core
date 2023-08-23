@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.CharSequenceToEnumConverter;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
@@ -50,11 +51,11 @@ import java.util.Optional;
 public final class NettyConvertersSpi implements TypeConverterRegistrar {
     @Override
     public void register(MutableConversionService conversionService) {
-        conversionService.addConverter(String.class, LogLevel.class, LogLevel::valueOf);
+        conversionService.addConverter(CharSequence.class, LogLevel.class, new CharSequenceToEnumConverter<>());
         conversionService.addConverter(
-                String.class,
+                CharSequence.class,
                 NettyHttpServerConfiguration.NettyListenerConfiguration.Family.class,
-                NettyHttpServerConfiguration.NettyListenerConfiguration.Family::valueOf
+                new CharSequenceToEnumConverter<>()
         );
         conversionService.addConverter(
             ByteBuf.class,
