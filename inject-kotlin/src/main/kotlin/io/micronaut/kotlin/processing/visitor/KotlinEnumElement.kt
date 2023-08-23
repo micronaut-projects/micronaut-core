@@ -41,6 +41,18 @@ internal class KotlinEnumElement(
         .map { ksClassDeclaration -> ksClassDeclaration.simpleName.asString() }
         .toList()
 
+    override fun elements() = declaration.declarations
+        .filterIsInstance<KSClassDeclaration>()
+        .map { ksClassDeclaration ->
+            KotlinEnumConstantElement(
+                this,
+                ksClassDeclaration,
+                elementAnnotationMetadataFactory,
+                visitorContext
+            )
+        }
+        .toList()
+
     override fun getDefaultConstructor(): Optional<MethodElement> = Optional.empty()
 
     override fun getPrimaryConstructor(): Optional<MethodElement> =
@@ -52,5 +64,4 @@ internal class KotlinEnumElement(
         visitorContext,
         resolvedTypeArguments
     )
-
 }

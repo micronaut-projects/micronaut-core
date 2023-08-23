@@ -17,6 +17,7 @@ package io.micronaut.kotlin.processing.visitor
 
 import com.google.devtools.ksp.symbol.ClassKind
 import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import io.micronaut.core.annotation.AnnotationUtil
@@ -30,7 +31,7 @@ import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
 
 internal class KotlinElementFactory(
     private val visitorContext: KotlinVisitorContext
-) : ElementFactory<Any, KSClassDeclaration, KSFunctionDeclaration, KSPropertyDeclaration> {
+) : ElementFactory<Any, KSClassDeclaration, KSFunctionDeclaration, KSDeclaration> {
 
     fun newClassElement(
         type: KSClassDeclaration
@@ -111,22 +112,32 @@ internal class KotlinElementFactory(
 
     override fun newFieldElement(
         owningClass: ClassElement,
-        field: KSPropertyDeclaration,
+        field: KSDeclaration,
         elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
     ): FieldElement {
         return KotlinFieldElement(
             owningClass,
-            field,
+            field as KSPropertyDeclaration,
             elementAnnotationMetadataFactory,
             visitorContext
         )
     }
 
     override fun newEnumConstantElement(
-        owningClass: ClassElement?,
-        enumConstant: KSPropertyDeclaration?,
-        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory?
+        owningClass: ClassElement,
+        enumConstant: KSDeclaration,
+        elementAnnotationMetadataFactory: ElementAnnotationMetadataFactory
     ): EnumConstantElement {
-        TODO("Not yet implemented")
+
+        if (owningClass !is KotlinEnumElement) {
+            throw IllegalArgumentException("Declaring class must be a KotlinEnumElement");
+        }
+
+        return KotlinEnumConstantElement(
+            owningClass,
+            enumConstant as KSClassDeclaration,
+            elementAnnotationMetadataFactory,
+            visitorContext
+        )
     }
 }
