@@ -58,9 +58,9 @@ class MDCRxJava2Spec extends Specification {
             'mdc.rxjava2test.enabled': true
     ])
 
-    @Shared
-    @AutoCleanup
-    HttpClient client = HttpClient.create(embeddedServer.URL)
+    HttpClient getClient() {
+        return embeddedServer.applicationContext.getBean(HttpClient)
+    }
 
     void "test MDC propagates"() {
         expect:
@@ -68,7 +68,7 @@ class MDCRxJava2Spec extends Specification {
                 .flatMap {
                     String tracingId = UUID.randomUUID()
                     HttpRequest<Object> request = HttpRequest
-                            .POST("/mdc/enter", new SomeBody())
+                            .POST(embeddedServer.URL.toString() + "/mdc/enter", new SomeBody())
                             .header("X-TrackingId", tracingId)
                     return Mono.from(client.retrieve(request)).map(response -> {
                         Tuples.of(tracingId, response)
