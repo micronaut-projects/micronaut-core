@@ -41,7 +41,6 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.ListIterator;
@@ -168,42 +167,41 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     public boolean containsProperty(@Nullable String name) {
         if (StringUtils.isEmpty(name)) {
             return false;
-        } else {
-            Boolean result = containsCache.get(name);
-            if (result == null) {
-
-                for (PropertyCatalog convention : CONVENTIONS) {
-                    Map<String, Object> entries = resolveEntriesForKey(name, false, convention);
-                    if (entries != null) {
-                        if (entries.containsKey(name)) {
-                            result = true;
-                            break;
-                        }
+        }
+        Boolean result = containsCache.get(name);
+        if (result == null) {
+            for (PropertyCatalog convention : CONVENTIONS) {
+                Map<String, Object> entries = resolveEntriesForKey(name, false, convention);
+                if (entries != null) {
+                    if (entries.containsKey(name)) {
+                        result = true;
+                        break;
                     }
                 }
-                if (result == null) {
-                    result = false;
-                }
-                containsCache.put(name, result);
             }
-            return result;
+            if (result == null) {
+                result = false;
+            }
+            containsCache.put(name, result);
         }
+        return result;
     }
 
     @Override
     public boolean containsProperties(@Nullable String name) {
-        if (!StringUtils.isEmpty(name)) {
-            for (PropertyCatalog propertyCatalog : CONVENTIONS) {
-                Map<String, Object> entries = resolveEntriesForKey(name, false, propertyCatalog);
-                if (entries != null) {
-                    if (entries.containsKey(name)) {
-                        return true;
-                    } else {
-                        String finalName = name + ".";
-                        for (String key : entries.keySet()) {
-                            if (key.startsWith(finalName)) {
-                                return true;
-                            }
+        if (StringUtils.isEmpty(name)) {
+            return false;
+        }
+        for (PropertyCatalog propertyCatalog : CONVENTIONS) {
+            Map<String, Object> entries = resolveEntriesForKey(name, false, propertyCatalog);
+            if (entries != null) {
+                if (entries.containsKey(name)) {
+                    return true;
+                } else {
+                    String finalName = name + ".";
+                    for (String key : entries.keySet()) {
+                        if (key.startsWith(finalName)) {
+                            return true;
                         }
                     }
                 }
@@ -215,226 +213,220 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     @NonNull
     @Override
     public Collection<String> getPropertyEntries(@NonNull String name) {
-        if (!StringUtils.isEmpty(name)) {
-            Map<String, Object> entries = resolveEntriesForKey(
-                    name, false, PropertyCatalog.NORMALIZED);
-            if (entries != null) {
-                String prefix = name + '.';
-                Set<String> result = new HashSet<>();
-                Set<String> strings = entries.keySet();
-                for (String k : strings) {
-                    if (k.startsWith(prefix)) {
-                        String withoutPrefix = k.substring(prefix.length());
-                        int i = withoutPrefix.indexOf('.');
-                        String s;
-                        if (i > -1) {
-                            s = withoutPrefix.substring(0, i);
-                        } else {
-                            s = withoutPrefix;
-                        }
-                        result.add(s);
-                    }
+        if (StringUtils.isEmpty(name)) {
+            return Collections.emptySet();
+        }
+        Map<String, Object> entries = resolveEntriesForKey(name, false, PropertyCatalog.NORMALIZED);
+        if (entries == null) {
+            return Collections.emptySet();
+        }
+        String prefix = name + '.';
+        Set<String> strings = entries.keySet();
+        Set<String> result = CollectionUtils.newHashSet(strings.size());
+        for (String k : strings) {
+            if (k.startsWith(prefix)) {
+                String withoutPrefix = k.substring(prefix.length());
+                int i = withoutPrefix.indexOf('.');
+                String s;
+                if (i > -1) {
+                    s = withoutPrefix.substring(0, i);
+                } else {
+                    s = withoutPrefix;
                 }
-                return result;
+                result.add(s);
             }
         }
-        return Collections.emptySet();
+        return result;
     }
 
     @Override
     public Set<List<String>> getPropertyPathMatches(String pathPattern) {
-        if (StringUtils.isNotEmpty(pathPattern)) {
-            Map<String, Object> entries = resolveEntriesForKey(
-                pathPattern, false, null);
-
-            if (entries != null) {
-                boolean endsWithWildCard = pathPattern.endsWith(WILD_CARD_SUFFIX);
-                String resolvedPattern = pathPattern
-                    .replace("[*]", "\\[([\\w\\d-]+?)\\]")
-                    .replace(".*.", "\\.([\\w\\d-]+?)\\.");
-                if (endsWithWildCard) {
-                    resolvedPattern = resolvedPattern.replace(WILD_CARD_SUFFIX, "\\S*");
-                } else {
-                    resolvedPattern += "\\S*";
-                }
-                Pattern pattern = Pattern.compile(resolvedPattern);
-                Set<String> keys = entries.keySet();
-                Set<List<String>> results = new HashSet<>(keys.size());
-                for (String key : keys) {
-                    Matcher matcher = pattern.matcher(key);
-                    if (matcher.matches()) {
-                        int i = matcher.groupCount();
-                        if (i > 0) {
-                            if (i == 1) {
-                                results.add(Collections.singletonList(matcher.group(1)));
-                            } else {
-                                List<String> resolved = new ArrayList<>(i);
-                                for (int j = 0; j < i; j++) {
-                                    resolved.add(matcher.group(j + 1));
-                                }
-                                results.add(CollectionUtils.unmodifiableList(resolved));
-                            }
+        if (StringUtils.isEmpty(pathPattern)) {
+            return Collections.emptySet();
+        }
+        Map<String, Object> entries = resolveEntriesForKey(pathPattern, false, null);
+        if (entries == null) {
+            return Collections.emptySet();
+        }
+        boolean endsWithWildCard = pathPattern.endsWith(WILD_CARD_SUFFIX);
+        String resolvedPattern = pathPattern
+            .replace("[*]", "\\[([\\w\\d-]+?)\\]")
+            .replace(".*.", "\\.([\\w\\d-]+?)\\.");
+        if (endsWithWildCard) {
+            resolvedPattern = resolvedPattern.replace(WILD_CARD_SUFFIX, "\\S*");
+        } else {
+            resolvedPattern += "\\S*";
+        }
+        Pattern pattern = Pattern.compile(resolvedPattern);
+        Set<String> keys = entries.keySet();
+        Set<List<String>> results = CollectionUtils.newHashSet(keys.size());
+        for (String key : keys) {
+            Matcher matcher = pattern.matcher(key);
+            if (matcher.matches()) {
+                int i = matcher.groupCount();
+                if (i > 0) {
+                    if (i == 1) {
+                        results.add(Collections.singletonList(matcher.group(1)));
+                    } else {
+                        List<String> resolved = new ArrayList<>(i);
+                        for (int j = 0; j < i; j++) {
+                            resolved.add(matcher.group(j + 1));
                         }
+                        results.add(CollectionUtils.unmodifiableList(resolved));
                     }
                 }
-
-                return Collections.unmodifiableSet(results);
             }
         }
-        return Collections.emptySet();
+        return Collections.unmodifiableSet(results);
     }
 
     @Override
     public @NonNull Map<String, Object> getProperties(String name, StringConvention keyFormat) {
-        if (!StringUtils.isEmpty(name)) {
-            Map<String, Object> entries = resolveEntriesForKey(name, false, keyFormat == StringConvention.RAW ? PropertyCatalog.RAW : PropertyCatalog.GENERATED);
-            if (entries != null) {
-                if (keyFormat == null) {
-                    keyFormat = StringConvention.RAW;
-                }
-                return resolveSubMap(
-                        name,
-                        entries,
-                        ConversionContext.MAP,
-                        keyFormat,
-                        MapFormat.MapTransformation.FLAT
-                );
-            } else {
-                entries = resolveEntriesForKey(name, false, PropertyCatalog.GENERATED);
-                if (keyFormat == null) {
-                    keyFormat = StringConvention.RAW;
-                }
-                if (entries == null) {
-                    return Collections.emptyMap();
-                }
-                return resolveSubMap(
-                        name,
-                        entries,
-                        ConversionContext.MAP,
-                        keyFormat,
-                        MapFormat.MapTransformation.FLAT
-                );
-            }
+        if (StringUtils.isEmpty(name)) {
+            return Collections.emptyMap();
         }
-        return Collections.emptyMap();
+        Map<String, Object> entries = resolveEntriesForKey(name, false, keyFormat == StringConvention.RAW ? PropertyCatalog.RAW : PropertyCatalog.GENERATED);
+        if (entries != null) {
+            if (keyFormat == null) {
+                keyFormat = StringConvention.RAW;
+            }
+            return resolveSubMap(
+                    name,
+                    entries,
+                    ConversionContext.MAP,
+                    keyFormat,
+                    MapFormat.MapTransformation.FLAT
+            );
+        } else {
+            entries = resolveEntriesForKey(name, false, PropertyCatalog.GENERATED);
+            if (keyFormat == null) {
+                keyFormat = StringConvention.RAW;
+            }
+            if (entries == null) {
+                return Collections.emptyMap();
+            }
+            return resolveSubMap(
+                    name,
+                    entries,
+                    ConversionContext.MAP,
+                    keyFormat,
+                    MapFormat.MapTransformation.FLAT
+            );
+        }
     }
 
     @Override
     public <T> Optional<T> getProperty(@NonNull String name, @NonNull ArgumentConversionContext<T> conversionContext) {
         if (StringUtils.isEmpty(name)) {
             return Optional.empty();
-        } else {
-            Objects.requireNonNull(conversionContext, "Conversion context should not be null");
-            Class<T> requiredType = conversionContext.getArgument().getType();
-            boolean cacheableType = ClassUtils.isJavaLangType(requiredType);
-            Object cached = cacheableType ? resolvedValueCache.get(new ConversionCacheKey(name, requiredType)) : null;
-            if (cached != null) {
-                return cached == NO_VALUE ? Optional.empty() : Optional.of((T) cached);
-            } else {
-                Object value = placeholderResolutionCache.get(name);
-                // entries map to get the value from, only populated if there's a cache miss with placeholderResolutionCache
-                Map<String, Object> entries = null;
-                if (value == null) {
-                    entries = resolveEntriesForKey(name, false, PropertyCatalog.GENERATED);
-                    if (entries == null) {
-                        entries = resolveEntriesForKey(name, false, PropertyCatalog.RAW);
+        }
+        Objects.requireNonNull(conversionContext, "Conversion context should not be null");
+        Class<T> requiredType = conversionContext.getArgument().getType();
+        boolean cacheableType = ClassUtils.isJavaLangType(requiredType);
+        ConversionCacheKey cacheKey = new ConversionCacheKey(name, requiredType);
+        Object cached = cacheableType ? resolvedValueCache.get(cacheKey) : null;
+        if (cached != null) {
+            return cached == NO_VALUE ? Optional.empty() : Optional.of((T) cached);
+        }
+        Object value = placeholderResolutionCache.get(name);
+        // entries map to get the value from, only populated if there's a cache miss with placeholderResolutionCache
+        Map<String, Object> entries = null;
+        if (value == null) {
+            entries = resolveEntriesForKey(name, false, PropertyCatalog.GENERATED);
+            if (entries == null) {
+                entries = resolveEntriesForKey(name, false, PropertyCatalog.RAW);
+            }
+        }
+        if (entries != null || value != null) {
+            if (value == null) {
+                value = entries.get(name);
+            }
+            if (value == null) {
+                value = entries.get(normalizeName(name));
+                if (value == null && name.indexOf('[') == -1) {
+                    // last chance lookup the raw value
+                    Map<String, Object> rawEntries = resolveEntriesForKey(name, false, PropertyCatalog.RAW);
+                    value = rawEntries != null ? rawEntries.get(name) : null;
+                    if (value != null) {
+                        entries = rawEntries;
                     }
                 }
-                if (entries != null || value != null) {
-                    if (value == null) {
-                        value = entries.get(name);
-                    }
-                    if (value == null) {
-                        value = entries.get(normalizeName(name));
-                        if (value == null && name.indexOf('[') == -1) {
-                            // last chance lookup the raw value
-                            Map<String, Object> rawEntries = resolveEntriesForKey(name, false, PropertyCatalog.RAW);
-                            value = rawEntries != null ? rawEntries.get(name) : null;
-                            if (value != null) {
-                                entries = rawEntries;
-                            }
-                        }
-                    }
-                    if (value == null) {
-                        int i = name.indexOf('[');
-                        if (i > -1 && name.endsWith("]")) {
-                            String newKey = name.substring(0, i);
-                            value = entries.get(newKey);
-                            String index = name.substring(i + 1, name.length() - 1);
-                            if (value != null) {
-                                if (StringUtils.isNotEmpty(index)) {
-                                    if (value instanceof List) {
-                                        try {
-                                            value = ((List) value).get(Integer.valueOf(index));
-                                        } catch (NumberFormatException e) {
-                                            // ignore
-                                        }
-                                    } else if (value instanceof Map) {
-                                        try {
-                                            value = ((Map) value).get(index);
-                                        } catch (NumberFormatException e) {
-                                            // ignore
-                                        }
-                                    }
+            }
+            if (value == null) {
+                int i = name.indexOf('[');
+                if (i > -1 && name.endsWith("]")) {
+                    String newKey = name.substring(0, i);
+                    value = entries.get(newKey);
+                    String index = name.substring(i + 1, name.length() - 1);
+                    if (StringUtils.isNotEmpty(index)) {
+                        if (value != null) {
+                            if (value instanceof List<?> list) {
+                                try {
+                                    value = list.get(Integer.parseInt(index));
+                                } catch (NumberFormatException e) {
+                                    // ignore
                                 }
-                            } else {
-                                if (StringUtils.isNotEmpty(index)) {
-                                    String subKey = newKey + '.' + index;
-                                    value = entries.get(subKey);
+                            } else if (value instanceof Map<?, ?> map) {
+                                try {
+                                    value = map.get(index);
+                                } catch (NumberFormatException e) {
+                                    // ignore
                                 }
                             }
-                        }
-                    }
-
-                    if (value != null) {
-                        Optional<T> converted;
-                        if (entries != null) {
-                            // iff entries is null, the value is from placeholderResolutionCache and doesn't need this step
-                            value = resolvePlaceHoldersIfNecessary(value);
-                            placeholderResolutionCache.put(name, value);
-                        }
-                        if (requiredType.isInstance(value) && !CollectionUtils.isIterableOrMap(requiredType)) {
-                            converted = (Optional<T>) Optional.of(value);
                         } else {
-                            converted = conversionService.convert(value, conversionContext);
+                            String subKey = newKey + '.' + index;
+                            value = entries.get(subKey);
                         }
-
-                        if (log.isTraceEnabled()) {
-                            if (converted.isPresent()) {
-                                log.trace("Resolved value [{}] for property: {}", converted.get(), name);
-                            } else {
-                                log.trace("Resolved value [{}] cannot be converted to type [{}] for property: {}", value, conversionContext.getArgument(), name);
-                            }
-                        }
-
-                        if (cacheableType) {
-                            resolvedValueCache.put(new ConversionCacheKey(name, requiredType), converted.orElse((T) NO_VALUE));
-                        }
-                        return converted;
-                    } else if (cacheableType) {
-                        resolvedValueCache.put(new ConversionCacheKey(name, requiredType), NO_VALUE);
-                        return Optional.empty();
-                    } else if (Properties.class.isAssignableFrom(requiredType)) {
-                        Properties properties = resolveSubProperties(name, entries, conversionContext);
-                        return Optional.of((T) properties);
-                    } else if (Map.class.isAssignableFrom(requiredType)) {
-                        Map<String, Object> subMap = resolveSubMap(name, entries, conversionContext);
-                        if (!subMap.isEmpty()) {
-                            return conversionService.convert(subMap, requiredType, conversionContext);
-                        } else {
-                            return (Optional<T>) Optional.of(subMap);
-                        }
-                    } else if (PropertyResolver.class.isAssignableFrom(requiredType)) {
-                        Map<String, Object> subMap = resolveSubMap(name, entries, conversionContext);
-                        return Optional.of((T) new MapPropertyResolver(subMap, conversionService));
                     }
                 }
             }
 
+            if (value != null) {
+                Optional<T> converted;
+                if (entries != null) {
+                    // iff entries is null, the value is from placeholderResolutionCache and doesn't need this step
+                    value = resolvePlaceHoldersIfNecessary(value);
+                    placeholderResolutionCache.put(name, value);
+                }
+                if (requiredType.isInstance(value) && !CollectionUtils.isIterableOrMap(requiredType)) {
+                    converted = (Optional<T>) Optional.of(value);
+                } else {
+                    converted = conversionService.convert(value, conversionContext);
+                }
+
+                if (log.isTraceEnabled()) {
+                    if (converted.isPresent()) {
+                        log.trace("Resolved value [{}] for property: {}", converted.get(), name);
+                    } else {
+                        log.trace("Resolved value [{}] cannot be converted to type [{}] for property: {}", value, conversionContext.getArgument(), name);
+                    }
+                }
+
+                if (cacheableType) {
+                    resolvedValueCache.put(cacheKey, converted.orElse((T) NO_VALUE));
+                }
+                return converted;
+            } else if (cacheableType) {
+                resolvedValueCache.put(cacheKey, NO_VALUE);
+                return Optional.empty();
+            } else if (Properties.class.isAssignableFrom(requiredType)) {
+                Properties properties = resolveSubProperties(name, entries, conversionContext);
+                return Optional.of((T) properties);
+            } else if (Map.class.isAssignableFrom(requiredType)) {
+                Map<String, Object> subMap = resolveSubMap(name, entries, conversionContext);
+                if (!subMap.isEmpty()) {
+                    return conversionService.convert(subMap, requiredType, conversionContext);
+                } else {
+                    return (Optional<T>) Optional.of(subMap);
+                }
+            } else if (PropertyResolver.class.isAssignableFrom(requiredType)) {
+                Map<String, Object> subMap = resolveSubMap(name, entries, conversionContext);
+                return Optional.of((T) new MapPropertyResolver(subMap, conversionService));
+            }
         }
+
         log.trace("No value found for property: {}", name);
 
-        Class<T> requiredType = conversionContext.getArgument().getType();
         if (Properties.class.isAssignableFrom(requiredType)) {
             return Optional.of((T) new Properties());
         } else if (Map.class.isAssignableFrom(requiredType)) {
@@ -470,8 +462,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                             finalMap.put(keys[i], new HashMap<>());
                         }
                         Object next = finalMap.get(keys[i]);
-                        if (next instanceof Map) {
-                            finalMap = ((Map) next);
+                        if (next instanceof Map theMap) {
+                            finalMap = theMap;
                         }
                     }
                     finalMap.put(keys[keys.length - 1], value);
@@ -553,7 +545,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             MapFormat.MapTransformation transformation) {
         final Argument<?> valueType = conversionContext.getTypeVariable("V").orElse(Argument.OBJECT_ARGUMENT);
         boolean valueTypeIsList = List.class.isAssignableFrom(valueType.getType());
-        Map<String, Object> subMap = new LinkedHashMap<>(entries.size());
+        Map<String, Object> subMap = CollectionUtils.newLinkedHashMap(entries.size());
 
         String prefix = name + '.';
         for (Map.Entry<String, Object> entry : entries.entrySet()) {
@@ -655,12 +647,12 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             String propertyRest = property.substring(li + 1);
             Object container = containerGet.get();
             if (StringUtils.isDigits(propertyIndex)) {
-                Integer number = Integer.valueOf(propertyIndex);
+                int number = Integer.parseInt(propertyIndex);
                 List list;
-                if (container instanceof List) {
-                    list = (List) container;
+                if (container instanceof List<?> theList) {
+                    list = theList;
                 } else {
-                    list = new ArrayList(10);
+                    list = new ArrayList<>(10);
                     containerSet.accept(list);
                 }
                 fill(list, number, null);
@@ -668,8 +660,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 expandProperty(propertyRest, val -> list.set(number, val), () -> list.get(number), actualValue);
             } else {
                 Map map;
-                if (container instanceof Map) {
-                    map = (Map) container;
+                if (container instanceof Map theMap) {
+                    map = theMap;
                 } else {
                     map = new LinkedHashMap(10);
                     containerSet.accept(map);
@@ -689,8 +681,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             }
             Object v = containerGet.get();
             Map map;
-            if (v instanceof Map) {
-                map = (Map) v;
+            if (v instanceof Map theMap) {
+                map = theMap;
             } else {
                 map = new LinkedHashMap(10);
                 containerSet.accept(map);
@@ -700,19 +692,19 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     private void collapseProperty(String prefix, Map<String, Object> entries, Object value) {
-        if (value instanceof List) {
-            for (int i = 0; i < ((List) value).size(); i++) {
-                Object item = ((List) value).get(i);
+        if (value instanceof List<?> list) {
+            for (int i = 0; i < list.size(); i++) {
+                Object item = list.get(i);
                 if (item != null) {
                     collapseProperty(prefix + "[" + i + "]", entries, item);
                 }
             }
             entries.put(prefix, value);
-        } else if (value instanceof Map) {
-            for (Map.Entry<?, ?> entry: ((Map<?, ?>) value).entrySet()) {
+        } else if (value instanceof Map<?, ?> map) {
+            for (Map.Entry<?, ?> entry: map.entrySet()) {
                 Object key = entry.getKey();
-                if (key instanceof CharSequence) {
-                    collapseProperty(prefix + "." + ((CharSequence) key).toString(), entries, entry.getValue());
+                if (key instanceof CharSequence charSequence) {
+                    collapseProperty(prefix + "." + charSequence, entries, entry.getValue());
                 }
             }
         } else {
@@ -728,7 +720,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      */
     @SuppressWarnings("MagicNumber")
     protected Map<String, Object> resolveEntriesForKey(String name, boolean allowCreate, @Nullable PropertyCatalog propertyCatalog) {
-        if (name.length() == 0) {
+        if (name.isEmpty()) {
             return null;
         }
         final Map<String, Object>[] catalog = getCatalog(propertyCatalog);
@@ -797,17 +789,15 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     private Object resolvePlaceHoldersIfNecessary(Object value) {
         if (value instanceof CharSequence) {
             return propertyPlaceholderResolver.resolveRequiredPlaceholdersObject(value.toString());
-        } else if (value instanceof List) {
-            List<?> list = (List) value;
+        } else if (value instanceof List<?> list) {
             List<?> newList = new ArrayList<>(list);
             final ListIterator i = newList.listIterator();
             while (i.hasNext()) {
                 final Object o = i.next();
                 if (o instanceof CharSequence) {
                     i.set(resolvePlaceHoldersIfNecessary(o));
-                } else if (o instanceof Map) {
-                    Map<?, ?> submap = (Map) o;
-                    Map<Object, Object> newMap = new LinkedHashMap<>(submap.size());
+                } else if (o instanceof Map<?, ?> submap) {
+                    Map<Object, Object> newMap = CollectionUtils.newLinkedHashMap(submap.size());
                     for (Map.Entry<?, ?> entry : submap.entrySet()) {
                         final Object k = entry.getKey();
                         final Object v = entry.getValue();
@@ -830,7 +820,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         );
     }
 
-    private void fill(List list, Integer toIndex, Object value) {
+    private void fill(List list, int toIndex, Object value) {
         if (toIndex >= list.size()) {
             for (int i = list.size(); i <= toIndex; i++) {
                 list.add(i, value);
@@ -840,8 +830,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
 
     @Override
     public void close() throws Exception {
-        if (propertyPlaceholderResolver instanceof AutoCloseable) {
-            ((AutoCloseable) propertyPlaceholderResolver).close();
+        if (propertyPlaceholderResolver instanceof AutoCloseable autoCloseable) {
+            autoCloseable.close();
         }
     }
 
@@ -869,5 +859,22 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
     }
 
     private record ConversionCacheKey(@NonNull String name, Class<?> requiredType) {
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null) {
+                return false;
+            }
+            ConversionCacheKey that = (ConversionCacheKey) o;
+            return Objects.equals(name, that.name) && Objects.equals(requiredType, that.requiredType);
+        }
+
+        @Override
+        public int hashCode() {
+            return name.hashCode();
+        }
     }
 }
