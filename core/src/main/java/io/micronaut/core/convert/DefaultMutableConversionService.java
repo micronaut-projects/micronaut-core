@@ -198,47 +198,32 @@ public class DefaultMutableConversionService implements MutableConversionService
 
         Class<?> sourceType = object.getClass();
         final AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
+        String formattingAnnotation;
         if (annotationMetadata.hasStereotypeNonRepeating(Format.class)) {
             Optional<String> formattingAnn = annotationMetadata.getAnnotationNameByStereotype(Format.class);
-            String formattingAnnotation = formattingAnn.orElse(null);
-            ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, formattingAnnotation);
-            TypeConverter<Object, T> typeConverter = findConverter(pair);
-            if (typeConverter == null) {
-                typeConverter = findTypeConverter(sourceType, targetType, formattingAnnotation);
-                if (typeConverter == null) {
-                    return Optional.empty();
-                } else {
-                    addToConverterCache(pair, typeConverter);
-                    if (typeConverter == UNCONVERTIBLE) {
-                        return Optional.empty();
-                    } else {
-                        return typeConverter.convert(object, targetType, context);
-                    }
-                }
-            } else if (typeConverter != UNCONVERTIBLE) {
-                return typeConverter.convert(object, targetType, context);
-            }
+            formattingAnnotation = formattingAnn.orElse(null);
         } else {
-            ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, null);
-            TypeConverter<Object, T> typeConverter = findConverter(pair);
+            formattingAnnotation = null;
+        }
+        ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, formattingAnnotation);
+        TypeConverter<Object, T> typeConverter = findConverter(pair);
+        if (typeConverter == null) {
+            typeConverter = findTypeConverter(sourceType, targetType, formattingAnnotation);
             if (typeConverter == null) {
-                typeConverter = findTypeConverter(sourceType, targetType, null);
-                if (typeConverter == null) {
-                    addToConverterCache(pair, UNCONVERTIBLE);
+                addToConverterCache(pair, UNCONVERTIBLE);
+                return Optional.empty();
+            } else {
+                addToConverterCache(pair, typeConverter);
+                if (typeConverter == UNCONVERTIBLE) {
                     return Optional.empty();
                 } else {
-                    addToConverterCache(pair, typeConverter);
-                    if (typeConverter == UNCONVERTIBLE) {
-                        return Optional.empty();
-                    } else {
-                        return typeConverter.convert(object, targetType, context);
-                    }
+                    return typeConverter.convert(object, targetType, context);
                 }
-            } else if (typeConverter != UNCONVERTIBLE) {
-                return typeConverter.convert(object, targetType, context);
             }
         }
-
+        if (typeConverter != UNCONVERTIBLE) {
+            return typeConverter.convert(object, targetType, context);
+        }
         return Optional.empty();
     }
 
@@ -281,11 +266,11 @@ public class DefaultMutableConversionService implements MutableConversionService
     /**
      * Add internal converter.
      *
-     * @param sourceType The source type
-     * @param targetType The target type
+     * @param sourceType    The source type
+     * @param targetType    The target type
      * @param typeConverter The converter
-     * @param <S> The source type
-     * @param <T> The target type
+     * @param <S>           The source type
+     * @param <T>           The target type
      */
     @Internal
     public <S, T> void addInternalConverter(Class<S> sourceType, Class<T> targetType, TypeConverter<S, T> typeConverter) {
@@ -351,9 +336,9 @@ public class DefaultMutableConversionService implements MutableConversionService
      *
      * @param sourceType The source type
      * @param targetType The target type
-     * @param function The converter function
-     * @param <S> The source type
-     * @param <T> The target type
+     * @param function   The converter function
+     * @param <S>        The source type
+     * @param <T>        The target type
      */
     @Internal
     public <S, T> void addInternalConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> function) {
@@ -542,20 +527,20 @@ public class DefaultMutableConversionService implements MutableConversionService
 
         // CharSequence -> Date
         addInternalConverter(
-            CharSequence.class,
-            Date.class,
-            (object, targetType, context) -> {
-                if (StringUtils.isEmpty(object)) {
-                    return Optional.empty();
+                CharSequence.class,
+                Date.class,
+                (object, targetType, context) -> {
+                    if (StringUtils.isEmpty(object)) {
+                        return Optional.empty();
+                    }
+                    try {
+                        SimpleDateFormat format = resolveFormat(context);
+                        return Optional.of(format.parse(object.toString()));
+                    } catch (ParseException e) {
+                        context.reject(object, e);
+                        return Optional.empty();
+                    }
                 }
-                try {
-                    SimpleDateFormat format = resolveFormat(context);
-                    return Optional.of(format.parse(object.toString()));
-                } catch (ParseException e) {
-                    context.reject(object, e);
-                    return Optional.empty();
-                }
-            }
         );
 
         // Date -> CharSequence
@@ -570,16 +555,16 @@ public class DefaultMutableConversionService implements MutableConversionService
 
         // Number -> CharSequence
         addInternalConverter(
-            Number.class,
-            CharSequence.class,
-            (object, targetType, context) -> {
-                NumberFormat format = resolveNumberFormat(context);
-                if (format != null) {
-                    return Optional.of(format.format(object));
-                } else {
-                    return Optional.of(object.toString());
+                Number.class,
+                CharSequence.class,
+                (object, targetType, context) -> {
+                    NumberFormat format = resolveNumberFormat(context);
+                    if (format != null) {
+                        return Optional.of(format.format(object));
+                    } else {
+                        return Optional.of(object.toString());
+                    }
                 }
-            }
         );
 
         // String -> Path
@@ -1038,7 +1023,7 @@ public class DefaultMutableConversionService implements MutableConversionService
         });
 
         addInternalConverter(Object[].class, Iterable.class, (object, targetType, context) ->
-            convert(Arrays.asList(object), targetType, context)
+                convert(Arrays.asList(object), targetType, context)
         );
 
         addInternalConverter(Object.class, Object[].class, (object, targetType, context) -> {
@@ -1125,8 +1110,8 @@ public class DefaultMutableConversionService implements MutableConversionService
 
         Collection<TypeConverterRegistrar> registrars = new ArrayList<>();
         SoftServiceLoader.load(TypeConverterRegistrar.class)
-            .disableFork()
-            .collectAll(registrars);
+                .disableFork()
+                .collectAll(registrars);
         for (TypeConverterRegistrar registrar : registrars) {
             registrar.register(internalMutableConversionService);
         }
@@ -1134,8 +1119,8 @@ public class DefaultMutableConversionService implements MutableConversionService
 
     /**
      * Register converters using the internal mutable conversion service.
-     * @param registrars The converters
      *
+     * @param registrars The converters
      * @since 4.2.0
      */
     @Internal
@@ -1147,10 +1132,11 @@ public class DefaultMutableConversionService implements MutableConversionService
 
     /**
      * Find the type converter.
-     * @param sourceType sourceType
-     * @param targetType  targetType
+     *
+     * @param sourceType           sourceType
+     * @param targetType           targetType
      * @param formattingAnnotation formattingAnnotation
-     * @param <T> Generic type
+     * @param <T>                  Generic type
      * @return type converter
      */
     protected <T> TypeConverter<Object, T> findTypeConverter(Class<?> sourceType, Class<T> targetType, String formattingAnnotation) {
@@ -1167,19 +1153,6 @@ public class DefaultMutableConversionService implements MutableConversionService
                 }
             }
         }
-        boolean hasFormatting = formattingAnnotation != null;
-        if (hasFormatting) {
-            for (Class<?> sourceSuperType : sourceHierarchy) {
-                for (Class<?> targetSuperType : targetHierarchy) {
-                    ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType);
-                    typeConverter = findRegisteredConverter(pair);
-                    if (typeConverter != null) {
-                        addToConverterCache(pair, typeConverter);
-                        return typeConverter;
-                    }
-                }
-            }
-        }
         return typeConverter;
     }
 
@@ -1187,8 +1160,8 @@ public class DefaultMutableConversionService implements MutableConversionService
         AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
         Optional<String> format = annotationMetadata.stringValue(Format.class);
         return format
-            .map(pattern -> new SimpleDateFormat(pattern, context.getLocale()))
-            .orElseGet(() -> new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", context.getLocale()));
+                .map(pattern -> new SimpleDateFormat(pattern, context.getLocale()))
+                .orElseGet(() -> new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", context.getLocale()));
     }
 
     private NumberFormat resolveNumberFormat(ConversionContext context) {
