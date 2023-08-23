@@ -342,6 +342,11 @@ public class DefaultMutableConversionService implements MutableConversionService
         }
     }
 
+    @Override
+    public <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> function) {
+        addConverter(sourceType, targetType, TypeConverter.of(sourceType, targetType, function));
+    }
+
     /**
      * Add internal converter.
      *
@@ -351,11 +356,6 @@ public class DefaultMutableConversionService implements MutableConversionService
      * @param <S> The source type
      * @param <T> The target type
      */
-    @Override
-    public <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> function) {
-        addConverter(sourceType, targetType, TypeConverter.of(sourceType, targetType, function));
-    }
-
     @Internal
     public <S, T> void addInternalConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> function) {
         addInternalConverter(sourceType, targetType, TypeConverter.of(sourceType, targetType, function));
