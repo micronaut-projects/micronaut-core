@@ -51,14 +51,32 @@ class RouteBuilderMediaTypeTest extends Specification {
     }
 
     @Test
-    void saveTest(@Client("/") HttpClient httpClient) {
+    void saveTest(@Client("/") HttpClient httpClient, ContactController contactController) {
         BlockingHttpClient client = httpClient.toBlocking();
-        HttpRequest<?> request = HttpRequest.POST(UriBuilder.of("/contact").path("save").build(),
-                Map.of("firstName", "Sergio", "lastName", "del Amo"))
+        Map<String, String> body = Map.of("firstName", "Sergio", "lastName", "del Amo");
+        HttpRequest<?> request = HttpRequest.POST(UriBuilder.of("/contact").path("save").build(), body)
             .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE);
-        HttpResponse<?> response = assertDoesNotThrow(() -> client.exchange(request, String.class));
+        HttpResponse<?> response = assertDoesNotThrow(() -> client.exchange(request));
         assertEquals(HttpStatus.SEE_OTHER, response.getStatus());
         assertEquals("/foo", response.getHeaders().get(HttpHeaders.LOCATION));
+        assertEquals(contactController.contact, new Contact("Sergio", "del Amo"));
+
+        contactController.contact = null;
+    }
+
+    @Test
+    void saveTestWithoutBodyParameter(@Client("/") HttpClient httpClient, ContactController contactController) {
+        BlockingHttpClient client = httpClient.toBlocking();
+        Map<String, String> body = Map.of("firstName", "Sergio", "lastName", "del Amo");
+        HttpRequest<?> request = HttpRequest.POST(UriBuilder.of("/contact").path("saveWithoutBody").build(), body)
+            .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE);
+        HttpResponse<?> response = assertDoesNotThrow(() -> client.exchange(request));
+        assertEquals(HttpStatus.SEE_OTHER, response.getStatus());
+        assertEquals("/foo", response.getHeaders().get(HttpHeaders.LOCATION));
+        assertEquals(contactController.contact, new Contact("Sergio", "del Amo"));
+
+        contactController.contact = null;
+
     }
 
     @Requires(property = "spec.name", value = "RouteBuilderMediaTypeSpec")
@@ -80,6 +98,11 @@ class RouteBuilderMediaTypeTest extends Specification {
                     MethodExecutionHandle<Object, Object> executionHandle = ExecutionHandle.of(controller, (ExecutableMethod) m);
                     buildRoute(HttpMethod.POST, "/contact/save", Collections.singletonList(MediaType.APPLICATION_FORM_URLENCODED_TYPE), executionHandle);
                 });
+
+                bd.findMethod("saveWithoutBody", HttpRequest.class).ifPresent(m -> {
+                    MethodExecutionHandle<Object, Object> executionHandle = ExecutionHandle.of(controller, (ExecutableMethod) m);
+                    buildRoute(HttpMethod.POST, "/contact/saveWithoutBody", Collections.singletonList(MediaType.APPLICATION_FORM_URLENCODED_TYPE), executionHandle);
+                });
             }
         }
     }
@@ -88,18 +111,25 @@ class RouteBuilderMediaTypeTest extends Specification {
     @Requires(property = "spec.name", value = "RouteBuilderMediaTypeSpec")
     @Singleton
     static class ContactController {
+        Contact contact;
 
         @Produces(MediaType.TEXT_HTML)
-        @Get
         @Executable
-        String create(HttpRequest request) {
+        String create(HttpRequest<?> request) {
             return "<!DOCTYPE html><html><body></body></html>";
         }
 
         @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
-        @Post
         @Executable
-        HttpResponse<?> save(HttpRequest request, @NotNull @Valid @Body Contact form) {
+        HttpResponse<?> save(HttpRequest<?> request, @NotNull @Valid @Body Contact form) {
+            this.contact = form;
+            return HttpResponse.seeOther(URI.create("/foo"));
+        }
+
+        @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+        @Executable
+        HttpResponse<?> saveWithoutBody(HttpRequest<?> request) {
+            this.contact = request.getBody(Contact.class).orElse(null);
             return HttpResponse.seeOther(URI.create("/foo"));
         }
     }
