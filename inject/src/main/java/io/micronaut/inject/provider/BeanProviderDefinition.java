@@ -60,8 +60,9 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
             @NonNull Argument<Object> argument,
             @Nullable Qualifier<Object> qualifier,
             boolean singleton) {
-        return new BeanProvider<Object>() {
+        return new BeanProvider<>() {
 
+            private final DefaultBeanContext defaultBeanContext = (DefaultBeanContext) context;
             private final Qualifier<Object> finalQualifier =
                     qualifier instanceof AnyQualifier ? null : qualifier;
 
@@ -78,12 +79,12 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
 
             @Override
             public Object get() {
-                return ((DefaultBeanContext) context).getBean(resolutionContext.copy(), argument, finalQualifier);
+                return defaultBeanContext.getBean(resolutionContext.copy(), argument, finalQualifier);
             }
 
             @Override
             public Optional<Object> find(Qualifier<Object> qualifier) {
-                return ((DefaultBeanContext) context).findBean(resolutionContext.copy(), argument, qualify(qualifier));
+                return defaultBeanContext.findBean(resolutionContext.copy(), argument, qualify(qualifier));
             }
 
             @Override
@@ -93,7 +94,7 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
 
             @Override
             public Object get(Qualifier<Object> qualifier) {
-                return ((DefaultBeanContext) context).getBean(resolutionContext.copy(), argument, qualify(qualifier));
+                return defaultBeanContext.getBean(resolutionContext.copy(), argument, qualify(qualifier));
             }
 
             @Override
@@ -113,12 +114,12 @@ public final class BeanProviderDefinition extends AbstractProviderDefinition<Bea
             @NonNull
             @Override
             public Iterator<Object> iterator() {
-                return ((DefaultBeanContext) context).getBeansOfType(resolutionContext.copy(), argument, finalQualifier).iterator();
+                return defaultBeanContext.getBeansOfType(resolutionContext.copy(), argument, finalQualifier).iterator();
             }
 
             @Override
             public Stream<Object> stream() {
-                return ((DefaultBeanContext) context).streamOfType(resolutionContext.copy(), argument, finalQualifier);
+                return defaultBeanContext.streamOfType(resolutionContext.copy(), argument, finalQualifier);
             }
         };
     }
