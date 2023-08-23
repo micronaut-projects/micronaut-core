@@ -22,6 +22,8 @@ import io.micronaut.inject.ast.GenericElement
 import io.micronaut.inject.ast.annotation.AbstractElementAnnotationMetadata
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate
+import java.util.*
+import kotlin.collections.ArrayList
 
 internal class KotlinTypeArgumentElement(
     private var internalGenericNativeType: KotlinTypeArgumentNativeElement,
@@ -64,6 +66,7 @@ internal class KotlinTypeArgumentElement(
         }
         KotlinTypeArgumentElementAnnotationMetadata(this, resolved)
     }
+
     private val resolvedAnnotationMetadata: AnnotationMetadata by lazy {
         AnnotationMetadataHierarchy(
             true,
@@ -71,9 +74,12 @@ internal class KotlinTypeArgumentElement(
             resolvedGenericTypeAnnotationMetadata
         )
     }
+
     private val resolvedGenericTypeAnnotationMetadata: ElementAnnotationMetadata by lazy {
         elementAnnotationMetadataFactory.buildGenericTypeAnnotations(this)
     }
+
+    override fun getResolved(): Optional<ClassElement> = Optional.of(resolved)
 
     override fun getGenericNativeType() = internalGenericNativeType
 

@@ -18,6 +18,7 @@ package io.micronaut.web.router
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.filter.AroundLegacyFilter
 import io.micronaut.http.filter.FilterChain
 import io.micronaut.http.filter.FilterOrder
 import io.micronaut.http.filter.FilterPatternStyle
@@ -32,7 +33,7 @@ class DefaultFilterRouteSpec extends Specification {
 
     void "test filter route matching with no methods specified"() {
         given:
-        def filter = new GenericHttpFilter.AroundLegacy(new HttpFilter() {
+        def filter = GenericHttpFilter.createLegacyFilter(new HttpFilter() {
             @Override
             Publisher<? extends HttpResponse<?>> doFilter(HttpRequest<?> request, FilterChain chain) {
                 return null
@@ -55,7 +56,7 @@ class DefaultFilterRouteSpec extends Specification {
 
     void "test filter route matching with methods specified"() {
         given:
-        def filter = new GenericHttpFilter.AroundLegacy(new HttpFilter() {
+        def filter = GenericHttpFilter.createLegacyFilter(new HttpFilter() {
             @Override
             Publisher<? extends HttpResponse<?>> doFilter(HttpRequest<?> request, FilterChain chain) {
                 return null
@@ -78,7 +79,7 @@ class DefaultFilterRouteSpec extends Specification {
 
     void "test filter route matching with regex pattern style specified"() {
         given:
-        def filter = new GenericHttpFilter.AroundLegacy(new HttpFilter() {
+        def filter = GenericHttpFilter.createLegacyFilter(new HttpFilter() {
             @Override
             Publisher<? extends HttpResponse<?>> doFilter(HttpRequest<?> request, FilterChain chain) {
                 return null

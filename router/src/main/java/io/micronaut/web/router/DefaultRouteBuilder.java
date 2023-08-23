@@ -399,19 +399,39 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         return buildRoute(httpMethod.name(), httpMethod, uri, executableHandle);
     }
 
+    /**
+     * Build a route.
+     *
+     * @param httpMethod The HTTP method
+     * @param uri The URI
+     * @param mediaTypes The media types
+     * @param executableHandle The executable handle
+     *
+     * @since 4.2.0
+     * @return an {@link UriRoute}
+     */
+    protected UriRoute buildRoute(HttpMethod httpMethod, String uri, List<MediaType> mediaTypes, MethodExecutionHandle<Object, Object> executableHandle) {
+        return buildRoute(httpMethod.name(), httpMethod, uri, mediaTypes, executableHandle);
+    }
+
     private UriRoute buildRoute(String httpMethodName, HttpMethod httpMethod, String uri, MethodExecutionHandle<Object, Object> executableHandle) {
+        return buildRoute(httpMethodName, httpMethod, uri, List.of(MediaType.APPLICATION_JSON_TYPE), executableHandle);
+    }
+
+    private UriRoute buildRoute(String httpMethodName, HttpMethod httpMethod, String uri, List<MediaType> mediaTypes, MethodExecutionHandle<Object, Object> executableHandle) {
         UriRoute route;
         if (currentParentRoute != null) {
             route = new DefaultUriRoute(
                 httpMethod,
                 currentParentRoute.uriMatchTemplate.nest(uri),
+                mediaTypes,
                 executableHandle,
                 httpMethodName,
                 conversionService
             );
             currentParentRoute.nestedRoutes.add((DefaultUriRoute) route);
         } else {
-            route = new DefaultUriRoute(httpMethod, uri, executableHandle, httpMethodName, conversionService);
+            route = new DefaultUriRoute(httpMethod, uri, mediaTypes, executableHandle, httpMethodName, conversionService);
         }
 
         this.uriRoutes.add(route);
@@ -797,6 +817,23 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                         String httpMethodName,
                         ConversionService conversionService) {
             this(httpMethod, new UriMatchTemplate(uriTemplate), Collections.singletonList(mediaType), targetMethod, httpMethodName, conversionService);
+        }
+
+        /**
+         * @param httpMethod The HTTP method
+         * @param uriTemplate The URI Template as a {@link CharSequence}
+         * @param mediaTypes The Media types
+         * @param targetMethod The target method execution handle
+         * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+         * @param conversionService The conversion service
+         */
+        DefaultUriRoute(HttpMethod httpMethod,
+                        CharSequence uriTemplate,
+                        List<MediaType> mediaTypes,
+                        MethodExecutionHandle<Object, Object> targetMethod,
+                        String httpMethodName,
+                        ConversionService conversionService) {
+            this(httpMethod, new UriMatchTemplate(uriTemplate), mediaTypes, targetMethod, httpMethodName, conversionService);
         }
 
         /**

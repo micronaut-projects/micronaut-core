@@ -371,7 +371,7 @@ abstract class AbstractJdkHttpClient {
             filterResolver.resolveFilters(request, clientFilterEntries);
 
         FilterRunner.sortReverse(filters);
-        filters.add(new GenericHttpFilter.TerminalReactive(responsePublisher));
+        filters.add(GenericHttpFilter.terminalReactiveFilter(responsePublisher));
 
         FilterRunner runner = new FilterRunner(filters);
         return Mono.from(ReactiveExecutionFlow.fromFlow((ExecutionFlow<R>) runner.run(request)).toPublisher());

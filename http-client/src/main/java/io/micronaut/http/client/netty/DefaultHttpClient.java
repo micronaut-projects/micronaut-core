@@ -986,7 +986,7 @@ public class DefaultHttpClient implements
 
         // apply filters
         streamResponsePublisher = Flux.from(
-                applyFilterToResponsePublisher(parentRequest, request, requestURI, requestWrapper, streamResponsePublisher)
+                applyFilterToResponsePublisher(parentRequest, request, requestURI, streamResponsePublisher)
         );
 
         return streamResponsePublisher;
@@ -1017,7 +1017,6 @@ public class DefaultHttpClient implements
                                     request,
                                     requestWrapper.get(),
                                     requestURI,
-                                    requestWrapper,
                                     (Publisher) proxyResponsePublisher
                             )
                     );
@@ -1117,7 +1116,6 @@ public class DefaultHttpClient implements
             parentRequest,
             request,
             requestURI,
-            requestWrapper,
             responsePublisher
         );
         Flux<io.micronaut.http.HttpResponse<O>> finalReactiveSequence = Flux.from(finalPublisher);
@@ -1203,16 +1201,14 @@ public class DefaultHttpClient implements
             io.micronaut.http.HttpRequest<?> parentRequest,
             io.micronaut.http.HttpRequest<I> request,
             URI requestURI,
-            AtomicReference<MutableHttpRequest<?>> requestWrapper,
             Publisher<R> responsePublisher) {
 
-        if (!(request instanceof MutableHttpRequest mutRequest)) {
+        if (!(request instanceof MutableHttpRequest<?> mutRequest)) {
             return responsePublisher;
         }
 
         mutRequest.uri(requestURI);
-        if (informationalServiceId != null &&
-            !mutRequest.getAttribute(HttpAttributes.SERVICE_ID).isPresent()) {
+        if (informationalServiceId != null && mutRequest.getAttribute(HttpAttributes.SERVICE_ID).isEmpty()) {
 
             mutRequest.setAttribute(HttpAttributes.SERVICE_ID, informationalServiceId);
         }
@@ -1222,12 +1218,12 @@ public class DefaultHttpClient implements
         if (parentRequest != null) {
             // todo: migrate to new filter
             filters.add(
-                new GenericHttpFilter.AroundLegacy(new ClientServerContextFilter(parentRequest),
-                new FilterOrder.Fixed(Ordered.HIGHEST_PRECEDENCE)));
+                GenericHttpFilter.createLegacyFilter(new ClientServerContextFilter(parentRequest), new FilterOrder.Fixed(Ordered.HIGHEST_PRECEDENCE))
+            );
         }
 
         FilterRunner.sortReverse(filters);
-        filters.add(new GenericHttpFilter.TerminalReactive(responsePublisher));
+        filters.add(GenericHttpFilter.terminalReactiveFilter(responsePublisher));
 
         FilterRunner runner = new FilterRunner(filters);
         Mono<R> responseMono = Mono.from(ReactiveExecutionFlow.fromFlow((ExecutionFlow<R>) runner.run(request)).toPublisher());

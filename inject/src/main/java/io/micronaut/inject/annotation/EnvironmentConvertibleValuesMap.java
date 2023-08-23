@@ -17,7 +17,6 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
-import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
@@ -31,18 +30,17 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
  * Extended version of {@link ConvertibleValuesMap} that resolves placeholders based on the environment.
  *
- * @param <V> generic valu
+ * @param <V> generic value
  * @author graemerocher
  * @since 1.0
  */
 @Internal
-class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
+final class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
 
     private final Environment environment;
 
@@ -73,34 +71,29 @@ class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         V value = map.get(name);
-        if (value instanceof AnnotationClassValue acv) {
+        if (value instanceof AnnotationClassValue<?> acv) {
             return environment.convert(acv, conversionContext);
-        } else if (value instanceof CharSequence sequence) {
+        } else if (value instanceof CharSequence) {
             PropertyPlaceholderResolver placeholderResolver = environment.getPlaceholderResolver();
-            String str = doResolveIfNecessary(sequence, placeholderResolver);
+            String str = doResolveIfNecessary((CharSequence) value, placeholderResolver);
             return environment.convert(str, conversionContext);
-        } else if (value instanceof String[] strings) {
+        } else if (value instanceof String[] values) {
             PropertyPlaceholderResolver placeholderResolver = environment.getPlaceholderResolver();
-            String[] resolved = Arrays.stream(strings)
-                .flatMap(val -> {
-                    try {
-                        String[] values = placeholderResolver.resolveRequiredPlaceholder(val, String[].class);
-                        return Arrays.stream(values);
-                    } catch (ConfigurationException e) {
-                        return Stream.of(doResolveIfNecessary(val, placeholderResolver));
-                    }
-                })
+            String[] resolved = Arrays.stream(values)
+                .flatMap(val -> placeholderResolver.resolveOptionalPlaceholder(val, String[].class)
+                    .map(Arrays::stream)
+                    .orElseGet(() -> Stream.of(doResolveIfNecessary(val, placeholderResolver))))
                 .toArray(String[]::new);
             return environment.convert(resolved, conversionContext);
-        } else if (value instanceof io.micronaut.core.annotation.AnnotationValue[] annotationValues) {
-            io.micronaut.core.annotation.AnnotationValue[] b = new AnnotationValue[annotationValues.length];
+        } else if (value instanceof AnnotationValue<?>[] annotationValues) {
+            io.micronaut.core.annotation.AnnotationValue<?>[] b = new AnnotationValue[annotationValues.length];
             for (int i = 0; i < annotationValues.length; i++) {
-                io.micronaut.core.annotation.AnnotationValue annotationValue = annotationValues[i];
-                b[i] = new EnvironmentAnnotationValue(environment, annotationValue);
+                io.micronaut.core.annotation.AnnotationValue<?> annotationValue = annotationValues[i];
+                b[i] = new EnvironmentAnnotationValue<>(environment, annotationValue);
             }
             return environment.convert(b, conversionContext);
-        } else if (value instanceof io.micronaut.core.annotation.AnnotationValue av) {
-            av = new EnvironmentAnnotationValue(environment, av);
+        } else if (value instanceof AnnotationValue<?> av) {
+            av = new EnvironmentAnnotationValue<>(environment, av);
             return environment.convert(av, conversionContext);
         } else {
             return super.get(name, conversionContext);
@@ -115,7 +108,7 @@ class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
                 v = (V) environment.getPlaceholderResolver().resolveRequiredPlaceholders(v.toString());
             }
             return v;
-        }).collect(Collectors.toList());
+        }).toList();
     }
 
     private String doResolveIfNecessary(CharSequence value, PropertyPlaceholderResolver placeholderResolver) {

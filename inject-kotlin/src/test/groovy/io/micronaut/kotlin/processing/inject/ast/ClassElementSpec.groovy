@@ -10,6 +10,7 @@ import io.micronaut.inject.ast.Element
 import io.micronaut.inject.ast.ElementModifier
 import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.ast.FieldElement
+import io.micronaut.inject.ast.GenericElement
 import io.micronaut.inject.ast.GenericPlaceholderElement
 import io.micronaut.inject.ast.MemberElement
 import io.micronaut.inject.ast.MethodElement
@@ -2275,6 +2276,36 @@ class StripeConfig {
 ''')
         then:
             noExceptionThrown()
+    }
+
+    void "test enum collection"() {
+        def ce = buildClassElement('test.TestNamed', '''
+package test
+import io.micronaut.context.annotation.Executable
+import io.micronaut.context.annotation.Prototype
+import jakarta.inject.Singleton
+import java.util.List
+
+@Prototype
+class TestNamed {
+    @Executable
+    fun method1(coll: Collection<MyType>) : kotlin.Int {
+        return 111
+    }
+
+}
+
+
+enum class MyType {
+    A, B
+}
+
+''')
+
+        def theType = ce.findMethod("method1").get().getParameters()[0].type.firstTypeArgument.get()
+        expect:
+            theType instanceof GenericElement
+            (theType as GenericElement).resolved().isEnum()
     }
 
     private void assertListGenericArgument(ClassElement type, Closure cl) {

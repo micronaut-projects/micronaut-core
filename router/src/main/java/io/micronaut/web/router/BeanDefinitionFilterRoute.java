@@ -43,7 +43,7 @@ class BeanDefinitionFilterRoute extends DefaultFilterRoute {
      * @param definition The definition
      */
     BeanDefinitionFilterRoute(String pattern, BeanLocator beanLocator, BeanDefinition<? extends HttpFilter> definition) {
-        super(pattern, () -> new GenericHttpFilter.AroundLegacy(
+        super(pattern, () -> GenericHttpFilter.createLegacyFilter(
             beanLocator.getBean(definition),
             new FilterOrder.Dynamic(OrderUtil.getOrder(definition))));
         this.definition = definition;
