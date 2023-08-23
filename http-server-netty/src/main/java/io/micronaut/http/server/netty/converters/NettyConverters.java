@@ -52,7 +52,7 @@ import java.util.Optional;
  */
 @Prototype
 @Internal
-public class NettyConverters implements TypeConverterRegistrar {
+public final class NettyConverters implements TypeConverterRegistrar {
 
     private final ConversionService conversionService;
     private final BeanProvider<MediaTypeCodecRegistry> decoderRegistryProvider;
@@ -157,7 +157,7 @@ public class NettyConverters implements TypeConverterRegistrar {
     /**
      * @return A FileUpload to CompletedFileUpload converter
      */
-    protected TypeConverter<FileUpload, Object> fileUploadToObjectConverter() {
+    private TypeConverter<FileUpload, Object> fileUploadToObjectConverter() {
         return (object, targetType, context) -> {
             try {
                 if (!object.isCompleted()) {
@@ -188,7 +188,7 @@ public class NettyConverters implements TypeConverterRegistrar {
     /**
      * @return A converter that returns bytebufs to objects
      */
-    protected TypeConverter<ByteBuf, Object> byteBufToObjectConverter() {
+    private TypeConverter<ByteBuf, Object> byteBufToObjectConverter() {
         return (object, targetType, context) -> conversionService.convert(object.toString(context.getCharset()), targetType, context);
     }
 

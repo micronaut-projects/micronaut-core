@@ -1,1 +1,2 @@
 io.micronaut.runtime.converters.time.TimeConverterRegistrar
+io.micronaut.logging.LoggingConverterRegistrar

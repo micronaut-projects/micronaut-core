@@ -21,6 +21,7 @@ import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import io.micronaut.http.multipart.CompletedPart;
+import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.multipart.NettyCompletedAttribute;
 import io.micronaut.http.server.netty.multipart.NettyCompletedFileUpload;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
@@ -32,6 +33,7 @@ import io.netty.channel.WriteBufferWaterMark;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
+import io.netty.handler.logging.LogLevel;
 
 import java.io.IOException;
 import java.util.Map;
@@ -48,6 +50,12 @@ import java.util.Optional;
 public final class NettyConvertersSpi implements TypeConverterRegistrar {
     @Override
     public void register(MutableConversionService conversionService) {
+        conversionService.addConverter(String.class, LogLevel.class, LogLevel::valueOf);
+        conversionService.addConverter(
+                String.class,
+                NettyHttpServerConfiguration.NettyListenerConfiguration.Family.class,
+                NettyHttpServerConfiguration.NettyListenerConfiguration.Family::valueOf
+        );
         conversionService.addConverter(
             ByteBuf.class,
             CharSequence.class,
