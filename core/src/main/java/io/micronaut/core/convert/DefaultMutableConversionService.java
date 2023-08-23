@@ -200,8 +200,7 @@ public class DefaultMutableConversionService implements MutableConversionService
         final AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
         String formattingAnnotation;
         if (annotationMetadata.hasStereotypeNonRepeating(Format.class)) {
-            Optional<String> formattingAnn = annotationMetadata.getAnnotationNameByStereotype(Format.class);
-            formattingAnnotation = formattingAnn.orElse(null);
+            formattingAnnotation = annotationMetadata.getAnnotationNameByStereotype(Format.class).orElse(null);
         } else {
             formattingAnnotation = null;
         }
