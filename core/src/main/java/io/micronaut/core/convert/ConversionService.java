@@ -44,12 +44,6 @@ public interface ConversionService {
      * @return The optional
      */
     default <T> Optional<T> convert(Object object, Class<T> targetType, ConversionContext context) {
-        if (object == null || targetType == null || context == null) {
-            return Optional.empty();
-        }
-        if (targetType == Object.class) {
-            return Optional.of((T) object);
-        }
         return convert(object, (Class<Object>) object.getClass(), targetType, context);
     }
 
