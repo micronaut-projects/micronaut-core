@@ -32,7 +32,7 @@ import java.lang.annotation.Target;
  * @since 4.1.0
  */
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.METHOD)
+@Target({ ElementType.METHOD, ElementType.TYPE })
 @Experimental
 public @interface Mapper {
 
@@ -50,7 +50,7 @@ public @interface Mapper {
      * The mappings.
      */
     @Retention(RetentionPolicy.RUNTIME)
-    @Target(ElementType.METHOD)
+    @Target({ ElementType.METHOD, ElementType.TYPE })
     @Repeatable(value = Mapper.class)
     @interface Mapping {
         String MEMBER_TO = "to";
