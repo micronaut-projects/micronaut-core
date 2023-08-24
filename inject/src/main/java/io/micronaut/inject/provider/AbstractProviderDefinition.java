@@ -147,8 +147,7 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
                             qualifier = Qualifiers.byName(n.toString());
                         }
                     }
-                    boolean allowEmptyProviders = isAllowEmptyProviders(context);
-                    if (isNullableProvider || isOptionalProvider || !allowEmptyProviders && !(qualifier instanceof AnyQualifier)) {
+                    if (isNullableProvider || isOptionalProvider || !(isAllowEmptyProviders(context) || qualifier instanceof AnyQualifier)) {
                         // Skip the contains bean for the providers that support an empty value and aren't nullable or optional
                         boolean hasBean = context.containsBean(argument, qualifier);
                         if (!hasBean) {
