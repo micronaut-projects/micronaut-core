@@ -21,6 +21,7 @@ import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Any;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.exceptions.BeanInstantiationException;
+import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -40,6 +41,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Abstract bean definition for other providers to extend from.
@@ -150,6 +152,12 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
                         // Skip the contains bean for the providers that support an empty value and aren't nullable or optional
                         boolean hasBean = context.containsBean(argument, qualifier);
                         if (!hasBean) {
+                            if (isNullableProvider) {
+                                throw new DisabledBeanException("Nullable bean doesn't exist");
+                            }
+                            if (isOptionalProvider) {
+                                return (T) Optional.empty();
+                            }
                             throw new NoSuchBeanException(argument, qualifier);
                         }
                     }
