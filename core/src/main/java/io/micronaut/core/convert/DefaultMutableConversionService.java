@@ -106,6 +106,7 @@ public class DefaultMutableConversionService implements MutableConversionService
     private static final TypeConverter UNCONVERTIBLE = (object, targetType, context) -> Optional.empty();
 
     private static final Map<Class<?>, List<Class<?>>> COMMON_TYPE_HIERARCHY = CollectionUtils.newHashMap(30);
+
     static {
         // Optimize common hierarchy scenarios
         COMMON_TYPE_HIERARCHY.put(String.class, List.of(String.class, CharSequence.class, Object.class));
