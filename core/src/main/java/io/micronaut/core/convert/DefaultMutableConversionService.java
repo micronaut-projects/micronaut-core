@@ -247,17 +247,12 @@ public class DefaultMutableConversionService implements MutableConversionService
                 return Optional.empty();
             } else {
                 addToConverterCache(pair, typeConverter);
-                if (typeConverter == UNCONVERTIBLE) {
-                    return Optional.empty();
-                } else {
-                    return typeConverter.convert(object, targetType, context);
-                }
             }
         }
-        if (typeConverter != UNCONVERTIBLE) {
-            return typeConverter.convert(object, targetType, context);
+        if (typeConverter == UNCONVERTIBLE) {
+            return Optional.empty();
         }
-        return Optional.empty();
+        return typeConverter.convert(object, targetType, context);
     }
 
     @Override
