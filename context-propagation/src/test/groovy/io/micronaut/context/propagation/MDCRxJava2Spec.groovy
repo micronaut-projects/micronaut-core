@@ -37,7 +37,6 @@ import reactor.core.publisher.Mono
 import reactor.util.function.Tuple2
 import reactor.util.function.Tuples
 import spock.lang.AutoCleanup
-import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -47,7 +46,6 @@ import java.util.concurrent.TimeUnit
 import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN
 import static io.micronaut.scheduling.TaskExecutors.IO
 
-@Retry
 class MDCRxJava2Spec extends Specification {
 
     private static final Logger LOG = LoggerFactory.getLogger(MDCRxJava2Spec)
