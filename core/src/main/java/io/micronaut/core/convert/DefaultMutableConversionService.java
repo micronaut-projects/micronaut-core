@@ -105,6 +105,34 @@ public class DefaultMutableConversionService implements MutableConversionService
     private static final int CACHE_EVICTION_BATCH = 64;
     private static final TypeConverter UNCONVERTIBLE = (object, targetType, context) -> Optional.empty();
 
+    private static final Map<Class<?>, List<Class<?>>> COMMON_TYPE_HIERARCHY = CollectionUtils.newHashMap(30);
+    static {
+        // Optimize common hierarchy scenarios
+        COMMON_TYPE_HIERARCHY.put(String.class, List.of(String.class, CharSequence.class, Object.class));
+        COMMON_TYPE_HIERARCHY.put(CharSequence.class, List.of(CharSequence.class, Object.class));
+        COMMON_TYPE_HIERARCHY.put(Character.class, List.of(Character.class, Object.class));
+        COMMON_TYPE_HIERARCHY.put(Number.class, List.of(Number.class, Object.class));
+        COMMON_TYPE_HIERARCHY.put(Integer.class, List.of(Integer.class, Number.class, Object.class));
+        COMMON_TYPE_HIERARCHY.put(Double.class, List.of(Double.class, Number.class, Object.class));
+        COMMON_TYPE_HIERARCHY.put(Float.class, List.of(Float.class, Number.class, Object.class));
+        COMMON_TYPE_HIERARCHY.put(Long.class, List.of(Long.class, Number.class, Object.class));
+        COMMON_TYPE_HIERARCHY.put(Short.class, List.of(Short.class, Number.class, Object.class));
+        COMMON_TYPE_HIERARCHY.put(Byte.class, List.of(Byte.class, Number.class, Object.class));
+        COMMON_TYPE_HIERARCHY.put(BigInteger.class, List.of(BigInteger.class, Number.class, Object.class));
+        COMMON_TYPE_HIERARCHY.put(BigDecimal.class, List.of(BigDecimal.class, Number.class, Object.class));
+        COMMON_TYPE_HIERARCHY.put(Iterable.class, List.of(Iterable.class, Object.class));
+        COMMON_TYPE_HIERARCHY.put(Collection.class, List.of(Collection.class, Iterable.class, Object.class));
+        COMMON_TYPE_HIERARCHY.put(List.class, List.of(List.class, Collection.class, Iterable.class, Object.class));
+        COMMON_TYPE_HIERARCHY.put(Set.class, List.of(Set.class, Collection.class, Iterable.class, Object.class));
+        COMMON_TYPE_HIERARCHY.put(ArrayList.class, List.of(ArrayList.class, List.class, Collection.class, Iterable.class, Object.class));
+        COMMON_TYPE_HIERARCHY.put(LinkedList.class, List.of(LinkedList.class, List.class, Collection.class, Iterable.class, Object.class));
+        COMMON_TYPE_HIERARCHY.put(HashSet.class, List.of(HashSet.class, Set.class, Collection.class, Iterable.class, Object.class));
+        COMMON_TYPE_HIERARCHY.put(LinkedHashSet.class, List.of(LinkedHashSet.class, Set.class, Collection.class, Iterable.class, Object.class));
+        COMMON_TYPE_HIERARCHY.put(Map.class, List.of(Map.class, Object.class));
+        COMMON_TYPE_HIERARCHY.put(HashMap.class, List.of(HashMap.class, Map.class, Object.class));
+        COMMON_TYPE_HIERARCHY.put(LinkedHashMap.class, List.of(LinkedHashMap.class, Map.class, Object.class));
+    }
+
     /**
      * The internal converters added during the startup.
      * The collection should be modified in the synchronous way only during the startup, after that it should be immutable.
@@ -905,7 +933,7 @@ public class DefaultMutableConversionService implements MutableConversionService
         });
 
         // String -> Enum
-        addInternalConverter(CharSequence.class, Enum.class, new CharSequenceToEnumConverter());
+        addInternalConverter(CharSequence.class, Enum.class, new CharSequenceToEnumConverter<>());
 
         // Object -> String
         addInternalConverter(Object.class, String.class, (Object object, Class<String> targetType, ConversionContext context) -> Optional.of(object.toString()));
@@ -1186,8 +1214,8 @@ public class DefaultMutableConversionService implements MutableConversionService
      * @return type converter
      */
     protected <T> TypeConverter<Object, T> findTypeConverter(Class<?> sourceType, Class<T> targetType, String formattingAnnotation) {
-        List<Class<?>> sourceHierarchy = ClassUtils.resolveHierarchy(sourceType);
-        List<Class<?>> targetHierarchy = ClassUtils.resolveHierarchy(targetType);
+        List<Class<?>> sourceHierarchy = resolveHierarchy(sourceType);
+        List<Class<?>> targetHierarchy = resolveHierarchy(targetType);
         for (Class<?> sourceSuperType : sourceHierarchy) {
             for (Class<?> targetSuperType : targetHierarchy) {
                 ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType, formattingAnnotation);
@@ -1212,6 +1240,14 @@ public class DefaultMutableConversionService implements MutableConversionService
             }
         }
         return UNCONVERTIBLE;
+    }
+
+    private List<Class<?>> resolveHierarchy(Class<?> sourceType) {
+        List<Class<?>> hierarchy = COMMON_TYPE_HIERARCHY.get(sourceType);
+        if (hierarchy != null) {
+            return hierarchy;
+        }
+        return ClassUtils.resolveHierarchy(sourceType);
     }
 
     private SimpleDateFormat resolveFormat(ConversionContext context) {
