@@ -44,19 +44,17 @@ public class ReadableBytesTypeConverter implements FormattingTypeConverter<CharS
         }
         String value = object.toString().toUpperCase(Locale.ENGLISH);
         try {
+            long numberPart = Long.parseLong(value.substring(0, value.length() - 2));
+            long size;
             if (value.endsWith("KB")) {
-                long size = Long.valueOf(value.substring(0, value.length() - 2)) * KB_UNIT;
-                return ConversionService.SHARED.convert(size, targetType);
+                size = numberPart * KB_UNIT;
+            } else if (value.endsWith("MB")) {
+                size = numberPart * KB_UNIT * KB_UNIT;
+            } else if (value.endsWith("GB")) {
+                size = numberPart * KB_UNIT * KB_UNIT * KB_UNIT;
+            } else {
+                size = Long.parseLong(value);
             }
-            if (value.endsWith("MB")) {
-                long size = Long.valueOf(value.substring(0, value.length() - 2)) * KB_UNIT * KB_UNIT;
-                return ConversionService.SHARED.convert(size, targetType);
-            }
-            if (value.endsWith("GB")) {
-                long size = Long.valueOf(value.substring(0, value.length() - 2)) * KB_UNIT * KB_UNIT * KB_UNIT;
-                return ConversionService.SHARED.convert(size, targetType);
-            }
-            Long size = Long.valueOf(value);
             return ConversionService.SHARED.convert(size, targetType);
         } catch (NumberFormatException e) {
             context.reject(value, e);

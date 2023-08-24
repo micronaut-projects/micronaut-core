@@ -311,6 +311,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     @Override
+    public <S, T> Optional<T> convert(S object, Class<? super S> sourceType, Class<T> targetType, ConversionContext context) {
+        return mutableConversionService.convert(object, sourceType, targetType, context);
+    }
+
+    @Override
     public <S, T> boolean canConvert(Class<S> sourceType, Class<T> targetType) {
         return mutableConversionService.canConvert(sourceType, targetType);
     }

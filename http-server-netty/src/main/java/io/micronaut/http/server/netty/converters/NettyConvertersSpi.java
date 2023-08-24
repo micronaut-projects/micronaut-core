@@ -18,7 +18,6 @@ package io.micronaut.http.server.netty.converters;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.CharSequenceToEnumConverter;
 import io.micronaut.core.convert.MutableConversionService;
-import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import io.micronaut.http.multipart.CompletedPart;
@@ -58,192 +57,139 @@ public final class NettyConvertersSpi implements TypeConverterRegistrar {
                 new CharSequenceToEnumConverter<>()
         );
         conversionService.addConverter(
-            ByteBuf.class,
-            CharSequence.class,
-            byteBufCharSequenceTypeConverter()
+                ByteBuf.class,
+                CharSequence.class,
+                (byteBuf, target, context) -> Optional.of(byteBuf.toString(context.getCharset()))
         );
 
         conversionService.addConverter(
-            CompositeByteBuf.class,
-            CharSequence.class,
-            compositeByteBufCharSequenceTypeConverter()
+                ByteBuf.class,
+                String.class,
+                (byteBuf, target, context) -> Optional.of(byteBuf.toString(context.getCharset()))
         );
 
         conversionService.addConverter(
-            ByteBuf.class,
-            byte[].class,
-            byteBufToArrayTypeConverter()
+                CompositeByteBuf.class,
+                CharSequence.class,
+                (object, targetType, context) -> Optional.of(object.toString(context.getCharset()))
         );
 
         conversionService.addConverter(
-            byte[].class,
-            ByteBuf.class,
-            byteArrayToByteBuffTypeConverter()
+                ByteBuf.class,
+                byte[].class,
+                (object, targetType, context) -> Optional.of(ByteBufUtil.getBytes(object))
         );
 
         conversionService.addConverter(
-            FileUpload.class,
-            CompletedFileUpload.class,
-            fileUploadToCompletedFileUploadConverter()
+                byte[].class,
+                ByteBuf.class,
+                (object, targetType, context) -> Optional.of(Unpooled.wrappedBuffer(object))
         );
 
         conversionService.addConverter(
-            Attribute.class,
-            CompletedPart.class,
-            attributeToCompletedPartConverter()
-        );
-
-        conversionService.addConverter(
-            NettyPartData.class,
-            byte[].class,
-            nettyPartDataToByteArrayConverter()
-        );
-
-        conversionService.addConverter(
-            Map.class,
-            WriteBufferWaterMark.class,
-            (map, targetType, context) -> {
-                Object h = map.get("high");
-                Object l = map.get("low");
-                if (h != null && l != null) {
+                FileUpload.class,
+                CompletedFileUpload.class,
+                (object, targetType, context) -> {
                     try {
-                        int high = Integer.parseInt(h.toString());
-                        int low = Integer.parseInt(l.toString());
-                        return Optional.of(new WriteBufferWaterMark(low, high));
-                    } catch (NumberFormatException e) {
+                        if (!object.isCompleted()) {
+                            return Optional.empty();
+                        }
+
+                        // unlike NettyCompletedAttribute, NettyCompletedFileUpload does a `retain` on
+                        // construct, so we don't need one here
+                        return Optional.of(new NettyCompletedFileUpload(object));
+                    } catch (Exception e3) {
+                        context.reject(e3);
+                        return Optional.empty();
+                    }
+                }
+        );
+
+        conversionService.addConverter(
+                Attribute.class,
+                CompletedPart.class,
+                (object, targetType, context) -> {
+                    try {
+                        if (!object.isCompleted() || !targetType.isAssignableFrom(NettyCompletedAttribute.class)) {
+                            return Optional.empty();
+                        }
+
+                        // converter does not claim the input object, so we need to retain it here. it's
+                        // released by NettyCompletedAttribute.get*
+                        return Optional.of(new NettyCompletedAttribute(object.retain()));
+                    } catch (Exception e2) {
+                        context.reject(e2);
+                        return Optional.empty();
+                    }
+                }
+        );
+
+        conversionService.addConverter(
+                NettyPartData.class,
+                byte[].class,
+                (upload, targetType, context) -> {
+                    try {
+                        return Optional.of(upload.getBytes());
+                    } catch (IOException e2) {
+                        context.reject(e2);
+                        return Optional.empty();
+                    }
+                }
+        );
+
+        conversionService.addConverter(
+                Map.class,
+                WriteBufferWaterMark.class,
+                (map, targetType, context) -> {
+                    Object h = map.get("high");
+                    Object l = map.get("low");
+                    if (h != null && l != null) {
+                        try {
+                            int high = Integer.parseInt(h.toString());
+                            int low = Integer.parseInt(l.toString());
+                            return Optional.of(new WriteBufferWaterMark(low, high));
+                        } catch (NumberFormatException e) {
+                            context.reject(e);
+                            return Optional.empty();
+                        }
+                    }
+                    return Optional.empty();
+                }
+        );
+
+        conversionService.addConverter(
+                HttpData.class,
+                byte[].class,
+                (upload, targetType, context) -> {
+                    try {
+                        if (!upload.isCompleted()) {
+                            return Optional.empty();
+                        }
+                        ByteBuf byteBuf1 = upload.getByteBuf();
+                        return Optional.of(ByteBufUtil.getBytes(byteBuf1));
+                    } catch (Exception e1) {
+                        context.reject(e1);
+                        return Optional.empty();
+                    }
+                }
+        );
+
+        conversionService.addConverter(
+                HttpData.class,
+                CharSequence.class,
+                (upload, targetType, context) -> {
+                    try {
+                        if (!upload.isCompleted()) {
+                            return Optional.empty();
+                        }
+                        ByteBuf byteBuf = upload.getByteBuf();
+                        return Optional.of(byteBuf.toString(context.getCharset()));
+                    } catch (Exception e) {
                         context.reject(e);
                         return Optional.empty();
                     }
                 }
-                return Optional.empty();
-            }
-        );
-
-        conversionService.addConverter(
-            HttpData.class,
-            byte[].class,
-            httpDataToByteArrayConverter()
-        );
-
-        conversionService.addConverter(
-            HttpData.class,
-            CharSequence.class,
-            httpDataToStringConverter()
         );
     }
 
-    private TypeConverter<NettyPartData, byte[]> nettyPartDataToByteArrayConverter() {
-        return (upload, targetType, context) -> {
-            try {
-                return Optional.of(upload.getBytes());
-            } catch (IOException e) {
-                context.reject(e);
-                return Optional.empty();
-            }
-        };
-    }
-
-    /**
-     * @return A FileUpload to CompletedFileUpload converter
-     */
-    private TypeConverter<FileUpload, CompletedFileUpload> fileUploadToCompletedFileUploadConverter() {
-        return (object, targetType, context) -> {
-            try {
-                if (!object.isCompleted()) {
-                    return Optional.empty();
-                }
-
-                // unlike NettyCompletedAttribute, NettyCompletedFileUpload does a `retain` on
-                // construct, so we don't need one here
-                return Optional.of(new NettyCompletedFileUpload(object));
-            } catch (Exception e) {
-                context.reject(e);
-                return Optional.empty();
-            }
-        };
-    }
-
-    /**
-     * @return An Attribute to CompletedPart converter
-     */
-    private TypeConverter<Attribute, CompletedPart> attributeToCompletedPartConverter() {
-        return (object, targetType, context) -> {
-            try {
-                if (!object.isCompleted() || !targetType.isAssignableFrom(NettyCompletedAttribute.class)) {
-                    return Optional.empty();
-                }
-
-                // converter does not claim the input object, so we need to retain it here. it's
-                // released by NettyCompletedAttribute.get*
-                return Optional.of(new NettyCompletedAttribute(object.retain()));
-            } catch (Exception e) {
-                context.reject(e);
-                return Optional.empty();
-            }
-        };
-    }
-
-    /**
-     * @return A converter that converts bytebufs to strings
-     */
-    private TypeConverter<ByteBuf, CharSequence> byteBufCharSequenceTypeConverter() {
-        return (object, targetType, context) -> Optional.of(object.toString(context.getCharset()));
-    }
-
-    /**
-     * @return A converter that converts composite bytebufs to strings
-     */
-    private TypeConverter<CompositeByteBuf, CharSequence> compositeByteBufCharSequenceTypeConverter() {
-        return (object, targetType, context) -> Optional.of(object.toString(context.getCharset()));
-    }
-
-    /**
-     * @return A converter that converts bytebufs to byte arrays
-     */
-    private TypeConverter<ByteBuf, byte[]> byteBufToArrayTypeConverter() {
-        return (object, targetType, context) -> Optional.of(ByteBufUtil.getBytes(object));
-    }
-
-    /**
-     * @return A converter that converts bytebufs to byte arrays
-     */
-    private TypeConverter<byte[], ByteBuf> byteArrayToByteBuffTypeConverter() {
-        return (object, targetType, context) -> Optional.of(Unpooled.wrappedBuffer(object));
-    }
-
-    /**
-     * @return The HTTP data to string converter.
-     */
-    private TypeConverter<HttpData, CharSequence> httpDataToStringConverter() {
-        return (upload, targetType, context) -> {
-            try {
-                if (!upload.isCompleted()) {
-                    return Optional.empty();
-                }
-                ByteBuf byteBuf = upload.getByteBuf();
-                return Optional.of(byteBuf.toString(context.getCharset()));
-            } catch (Exception e) {
-                context.reject(e);
-                return Optional.empty();
-            }
-        };
-    }
-
-    /**
-     * @return The HTTP data to byte array converter
-     */
-    private TypeConverter<HttpData, byte[]> httpDataToByteArrayConverter() {
-        return (upload, targetType, context) -> {
-            try {
-                if (!upload.isCompleted()) {
-                    return Optional.empty();
-                }
-                ByteBuf byteBuf = upload.getByteBuf();
-                return Optional.of(ByteBufUtil.getBytes(byteBuf));
-            } catch (Exception e) {
-                context.reject(e);
-                return Optional.empty();
-            }
-        };
-    }
 }

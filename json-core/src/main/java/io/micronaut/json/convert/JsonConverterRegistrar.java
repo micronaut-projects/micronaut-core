@@ -36,6 +36,8 @@ import io.micronaut.json.tree.JsonNode;
 import jakarta.inject.Inject;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -94,6 +96,16 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
                 Object.class,
                 jsonNodeToObjectConverter()
         );
+        conversionService.addConverter(JsonNode.class, String.class, JsonNode::getStringValue);
+        conversionService.addConverter(JsonNode.class, Integer.class, JsonNode::getIntValue);
+        conversionService.addConverter(JsonNode.class, Double.class, JsonNode::getDoubleValue);
+        conversionService.addConverter(JsonNode.class, BigDecimal.class, JsonNode::getBigDecimalValue);
+        conversionService.addConverter(JsonNode.class, BigInteger.class, JsonNode::getBigIntegerValue);
+        conversionService.addConverter(JsonNode.class, Boolean.class, JsonNode::getBooleanValue);
+        conversionService.addConverter(JsonNode.class, Double.class, JsonNode::getDoubleValue);
+        conversionService.addConverter(JsonNode.class, Float.class, JsonNode::getFloatValue);
+        conversionService.addConverter(JsonNode.class, Number.class, JsonNode::getNumberValue);
+
         conversionService.addConverter(
                 LazyJsonNode.class,
                 Object.class,

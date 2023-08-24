@@ -40,10 +40,34 @@ public interface ConversionService {
      * @param object     The object to convert
      * @param targetType The target type
      * @param context    The conversion context
-     * @param <T>        The generic type
+     * @param <T>        The target type
      * @return The optional
      */
-    <T> Optional<T> convert(Object object, Class<T> targetType, ConversionContext context);
+    default <T> Optional<T> convert(Object object, Class<T> targetType, ConversionContext context) {
+        if (object == null || targetType == null || context == null) {
+            return Optional.empty();
+        }
+        if (targetType == Object.class) {
+            return Optional.of((T) object);
+        }
+        return convert(object, (Class<Object>) object.getClass(), targetType, context);
+    }
+
+    /**
+     * Attempts to convert the given object to the given target type from the given source type. If conversion fails or is not possible an empty {@link Optional} is returned.
+     *
+     * @param object     The object to convert
+     * @param sourceType The source type
+     * @param targetType The target type
+     * @param context    The conversion context
+     * @param <S>        The source type
+     * @param <T>        The target type
+     * @return The optional
+     * @since 4.2.0
+     */
+    default <S, T> Optional<T> convert(S object, Class<? super S> sourceType, Class<T> targetType, ConversionContext context) {
+        return convert(object, targetType, context);
+    }
 
     /**
      * Return whether the given source type is convertible to the given target type.
@@ -78,6 +102,21 @@ public interface ConversionService {
      */
     default <T> Optional<T> convert(Object object, Argument<T> targetType) {
         return convert(object, targetType.getType(), ConversionContext.of(targetType));
+    }
+
+    /**
+     * Attempts to convert the given object to the given target type from the given source type. If conversion fails or is not possible an empty {@link Optional} is returned.
+     *
+     * @param object     The object to convert
+     * @param sourceType The source type
+     * @param targetType The target type
+     * @param <S>        The source type
+     * @param <T>        The target type
+     * @return The optional
+     * @since 4.2.0
+     */
+    default <S, T> Optional<T> convert(S object, Class<? super S> sourceType, Argument<T> targetType) {
+        return convert(object, sourceType, targetType.getType(), ConversionContext.of(targetType));
     }
 
     /**

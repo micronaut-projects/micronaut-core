@@ -85,7 +85,11 @@ public final class ImmediateSingleObjectBody extends ManagedBody<Object> impleme
         Object o = prepareClaim();
         Optional<?> converted;
         if (o instanceof io.netty.util.ReferenceCounted rc) {
-            converted = conversionService.convert(rc, context);
+            if (rc instanceof ByteBuf byteBuf) {
+                converted = conversionService.convert(byteBuf, ByteBuf.class, context.getArgument().getType(), context);
+            } else {
+                converted = conversionService.convert(rc, context);
+            }
             // stolen from NettyConverters.refCountAwareConvert. We don't need the isEmpty branch,
             // because we don't call next() in that case and don't transfer ownership.
             if (converted.isPresent()) {

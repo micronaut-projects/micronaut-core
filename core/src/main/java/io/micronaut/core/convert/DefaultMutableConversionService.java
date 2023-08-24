@@ -22,6 +22,7 @@ import io.micronaut.core.convert.converters.MultiValuesConverterFactory;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.format.FormattingTypeConverter;
+import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.convert.format.ReadableBytesTypeConverter;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.ConvertibleValuesMap;
@@ -43,6 +44,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -140,6 +142,11 @@ public class DefaultMutableConversionService implements MutableConversionService
         }
 
         @Override
+        public <S, T> Optional<T> convert(S object, Class<? super S> sourceType, Class<T> targetType, ConversionContext context) {
+            return DefaultMutableConversionService.this.convert(object, sourceType, targetType, context);
+        }
+
+        @Override
         public <S, T> boolean canConvert(Class<S> sourceType, Class<T> targetType) {
             return DefaultMutableConversionService.this.canConvert(sourceType, targetType);
         }
@@ -184,7 +191,7 @@ public class DefaultMutableConversionService implements MutableConversionService
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> Optional<T> convert(Object object, Class<T> targetType, ConversionContext context) {
+    public <S, T> Optional<T> convert(S object, Class<? super S> sourceType, Class<T> targetType, ConversionContext context) {
         if (object == null || targetType == null || context == null) {
             return Optional.empty();
         }
@@ -196,7 +203,6 @@ public class DefaultMutableConversionService implements MutableConversionService
             return Optional.of((T) object);
         }
 
-        Class<?> sourceType = object.getClass();
         final AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
         String formattingAnnotation;
         if (annotationMetadata.hasStereotypeNonRepeating(Format.class)) {
@@ -283,7 +289,24 @@ public class DefaultMutableConversionService implements MutableConversionService
         addConverterToMap(typeConverters, sourceType, targetType, typeConverter);
         // Add variations of common representations of the source type
         if (sourceType == CharSequence.class) {
-            addConverterToMap(typeConverters, String.class, targetType, (value, theTarget, context) -> typeConverter.convert((S) ((CharSequence) value).toString(), theTarget, context));
+            TypeConverter<String, T> converter;
+            if (typeConverter instanceof FormattingTypeConverter<S, T, ?> formattingTypeConverter) {
+                converter = new FormattingTypeConverter<>() {
+
+                    @Override
+                    public Class<Annotation> annotationType() {
+                        return (Class<Annotation>) formattingTypeConverter.annotationType();
+                    }
+
+                    @Override
+                    public Optional<T> convert(String value, Class<T> targetType, ConversionContext context) {
+                        return typeConverter.convert((S) ((CharSequence) value).toString(), (Class<T>) CharSequence.class, context);
+                    }
+                };
+            } else {
+                converter = (value, theTarget, context) -> typeConverter.convert((S) ((CharSequence) value).toString(), theTarget, context);
+            }
+            addConverterToMap(typeConverters, String.class, targetType, converter);
         } else if (sourceType == String.class) {
             addConverterToMap(typeConverters, CharSequence.class, targetType, (TypeConverter) typeConverter);
         } else if (sourceType == Iterable.class) {
@@ -522,7 +545,32 @@ public class DefaultMutableConversionService implements MutableConversionService
         });
 
         // CharSequence -> Long for bytes
-        addInternalConverter(CharSequence.class, Number.class, new ReadableBytesTypeConverter());
+        ReadableBytesTypeConverter readableBytesTypeConverter = new ReadableBytesTypeConverter();
+        addInternalConverter(CharSequence.class, Number.class, readableBytesTypeConverter);
+        addInternalConverter(CharSequence.class, Long.class, new FormattingTypeConverter<CharSequence, Long, ReadableBytes>() {
+
+            @Override
+            public Class<ReadableBytes> annotationType() {
+                return readableBytesTypeConverter.annotationType();
+            }
+
+            @Override
+            public Optional<Long> convert(CharSequence object, Class<Long> targetType, ConversionContext context) {
+                return readableBytesTypeConverter.convert(object, Number.class, context).map(Number::longValue);
+            }
+        });
+        addInternalConverter(CharSequence.class, Integer.class, new FormattingTypeConverter<CharSequence, Integer, ReadableBytes>() {
+
+            @Override
+            public Class<ReadableBytes> annotationType() {
+                return readableBytesTypeConverter.annotationType();
+            }
+
+            @Override
+            public Optional<Integer> convert(CharSequence object, Class<Integer> targetType, ConversionContext context) {
+                return readableBytesTypeConverter.convert(object, Number.class, context).map(Number::intValue);
+            }
+        });
 
         // CharSequence -> Date
         addInternalConverter(
@@ -1103,6 +1151,8 @@ public class DefaultMutableConversionService implements MutableConversionService
 
         // CharSequence -> java.net.Proxy.Type
         addInternalConverter(CharSequence.class, Proxy.Type.class, new CharSequenceToEnumConverter<>());
+        // Boolean -> String
+        addInternalConverter(Boolean.class, String.class, Object::toString);
 
         Collection<TypeConverterRegistrar> registrars = new ArrayList<>();
         SoftServiceLoader.load(TypeConverterRegistrar.class)
@@ -1136,20 +1186,32 @@ public class DefaultMutableConversionService implements MutableConversionService
      * @return type converter
      */
     protected <T> TypeConverter<Object, T> findTypeConverter(Class<?> sourceType, Class<T> targetType, String formattingAnnotation) {
-        TypeConverter<Object, T> typeConverter = UNCONVERTIBLE;
         List<Class<?>> sourceHierarchy = ClassUtils.resolveHierarchy(sourceType);
         List<Class<?>> targetHierarchy = ClassUtils.resolveHierarchy(targetType);
         for (Class<?> sourceSuperType : sourceHierarchy) {
             for (Class<?> targetSuperType : targetHierarchy) {
                 ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType, formattingAnnotation);
-                typeConverter = findRegisteredConverter(pair);
+                TypeConverter<Object, T> typeConverter = findRegisteredConverter(pair);
                 if (typeConverter != null) {
                     addToConverterCache(pair, typeConverter);
                     return typeConverter;
                 }
             }
         }
-        return typeConverter;
+        boolean hasFormatting = formattingAnnotation != null;
+        if (hasFormatting) {
+            for (Class<?> sourceSuperType : sourceHierarchy) {
+                for (Class<?> targetSuperType : targetHierarchy) {
+                    ConvertiblePair pair = new ConvertiblePair(sourceSuperType, targetSuperType);
+                    TypeConverter<Object, T> typeConverter = findRegisteredConverter(pair);
+                    if (typeConverter != null) {
+                        addToConverterCache(pair, typeConverter);
+                        return typeConverter;
+                    }
+                }
+            }
+        }
+        return UNCONVERTIBLE;
     }
 
     private SimpleDateFormat resolveFormat(ConversionContext context) {
