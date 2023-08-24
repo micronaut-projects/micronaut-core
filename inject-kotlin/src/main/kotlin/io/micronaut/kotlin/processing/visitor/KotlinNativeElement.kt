@@ -177,6 +177,15 @@ class KotlinFieldNativeElement(
     }
 }
 
+class KotlinEnumConstantNativeElement(
+    val declaration: KSClassDeclaration,
+) : KotlinNativeElement(declaration) {
+
+    override fun toString(): String {
+        return "KotlinEnumConstantNativeElement(declaration=$declaration)"
+    }
+}
+
 class KotlinMethodParameterNativeElement(
     val declaration: KSValueParameter,
     val method: KotlinNativeElement

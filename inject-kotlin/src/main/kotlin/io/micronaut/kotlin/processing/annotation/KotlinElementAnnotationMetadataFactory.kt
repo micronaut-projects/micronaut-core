@@ -35,6 +35,7 @@ import io.micronaut.kotlin.processing.visitor.AbstractKotlinElement
 import io.micronaut.kotlin.processing.visitor.AbstractKotlinMethodElement
 import io.micronaut.kotlin.processing.visitor.KotlinClassNativeElement
 import io.micronaut.kotlin.processing.visitor.KotlinClassElement
+import io.micronaut.kotlin.processing.visitor.KotlinEnumConstantElement
 import io.micronaut.kotlin.processing.visitor.KotlinFieldElement
 import io.micronaut.kotlin.processing.visitor.KotlinGenericPlaceholderElement
 import io.micronaut.kotlin.processing.visitor.KotlinParameterElement
@@ -152,8 +153,15 @@ internal class KotlinElementAnnotationMetadataFactory(
     }
 
     override fun lookupForField(fieldElement: FieldElement): CachedAnnotationMetadata? {
-        val kotlinFieldElement = fieldElement as KotlinFieldElement
-        val owner = kotlinFieldElement.owningType as KotlinClassElement
+        val kotlinFieldElement = fieldElement as AbstractKotlinElement<*>
+        val owner: KotlinClassElement
+        if (kotlinFieldElement is KotlinFieldElement) {
+            owner = kotlinFieldElement.owningType as KotlinClassElement
+        } else if (kotlinFieldElement is KotlinEnumConstantElement) {
+            owner = kotlinFieldElement.owningType as KotlinClassElement
+        } else {
+            throw RuntimeException("Unknown field element type ${fieldElement.javaClass}")
+        }
         return metadataBuilder.lookupOrBuild(
             Key2(
                 getClassDefinitionCacheKey(owner),

@@ -18,10 +18,65 @@ import io.micronaut.inject.ast.PropertyElement
 import io.micronaut.inject.ast.WildcardElement
 import io.micronaut.kotlin.processing.visitor.AllElementsVisitor
 import io.micronaut.kotlin.processing.visitor.KotlinClassElement
+import io.micronaut.kotlin.processing.visitor.KotlinEnumElement
 import jakarta.validation.Valid
 import spock.lang.PendingFeature
 
 class ClassElementSpec extends AbstractKotlinCompilerSpec {
+
+    void "test visit enum"() {
+
+        given:
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS.clear()
+        AllElementsVisitor.VISITED_ELEMENTS.clear()
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS.clear()
+        AllElementsVisitor.WRITE_FILE = true
+        AllElementsVisitor.WRITE_IN_METAINF = true
+
+        when:
+        def definition = buildBeanDefinition('test.MyBean', '''
+package test
+
+import io.micronaut.core.annotation.*
+import io.micronaut.http.annotation.*
+import io.micronaut.http.*
+
+@Controller("/hello")
+class HelloController {
+
+    @Get
+    @Produces(MediaType.TEXT_PLAIN)
+    fun index(@QueryValue("channels") channels: Channel?) = ""
+
+    @Introspected
+    enum class Channel {
+        SYSTEM1,
+        SYSTEM2
+    }
+}
+
+@jakarta.inject.Singleton
+class MyBean {}
+''')
+        then:
+        definition
+
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 3
+        def enumEl = AllElementsVisitor.VISITED_CLASS_ELEMENTS.find { 
+            it.name == 'test.HelloController$Channel'
+        }
+        
+        enumEl
+        def enmConsts = ((KotlinEnumElement) enumEl).elements()
+        enmConsts
+        enmConsts.size() == 2
+        enmConsts.find {
+            it.name == "SYSTEM1"
+        } != null
+        enmConsts.find {
+            it.name == "SYSTEM2"
+        } != null
+    }
 
     void "test visitGeneratedFile"() {
         given:
