@@ -17,6 +17,7 @@ package io.micronaut.inject.provider
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.context.exceptions.NonUniqueBeanException
 import io.micronaut.inject.BeanDefinition
@@ -259,6 +260,9 @@ class Test {
         then: 'BeanOneTwo is found'
         foundBean.isPresent()
         foundBean.get().class.name == 'test.BeanOneTwo'
+
+        cleanup:
+        context.close()
     }
 
     void "test BeanProvider's get by qualifier method" () {
@@ -319,5 +323,87 @@ class Test {
 
         then: 'BeanOneTwo is returned'
         foundBean.class.name == 'test.BeanOneTwo'
+
+        cleanup:
+        context.close()
+    }
+
+    void "test Jakarta Provider is triggering containsBean" () {
+        given:
+        DefaultApplicationContext context = buildContext('''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Provider;
+
+interface BeanNumber { }
+
+@jakarta.inject.Singleton
+class BeanNumberImpl implements BeanNumber {
+}
+
+@jakarta.inject.Singleton
+class Test {
+    public Provider<BeanNumber> provider;
+    Test(Provider<BeanNumber> provider) {
+        this.provider = provider;
+    }
+}
+''')
+        def containsBeanCacheField = context.getClass().superclass.superclass.declaredFields.find {it.name == "containsBeanCache"}
+        containsBeanCacheField.accessible = true
+        Map containsBeanCache = containsBeanCacheField.get(context)
+
+        when: 'retrieve test bean'
+        int mapSize = containsBeanCache.size()
+        def bean = getBean(context, 'test.Test')
+
+        then: 'containsBean is triggered'
+        containsBeanCache.size() == mapSize + 1
+
+        then: 'bean exists'
+        bean.provider.get()
+
+        cleanup:
+        context.close()
+    }
+
+    void "test BeanProvider is not triggering containsBean" () {
+        given:
+        DefaultApplicationContext context = buildContext('''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+import io.micronaut.context.BeanProvider;
+
+interface BeanNumber { }
+
+@jakarta.inject.Singleton
+class Test {
+    public BeanProvider<BeanNumber> provider;
+    Test(BeanProvider<BeanNumber> provider) {
+        this.provider = provider;
+    }
+}
+''')
+        def containsBeanCacheField = context.getClass().superclass.superclass.declaredFields.find {it.name == "containsBeanCache"}
+        containsBeanCacheField.accessible = true
+        Map containsBeanCache = containsBeanCacheField.get(context)
+
+        when: 'retrieve test bean'
+        int mapSize = containsBeanCache.size()
+        def bean = getBean(context, 'test.Test')
+
+        then: 'containsBean is not triggered'
+        containsBeanCache.size() == mapSize
+
+        then: 'containsBean is triggered'
+        !bean.provider.isPresent()
+        containsBeanCache.size() == mapSize + 1
+
+        cleanup:
+        context.close()
     }
 }

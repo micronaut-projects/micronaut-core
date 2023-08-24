@@ -124,13 +124,16 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
         final BeanResolutionContext.Segment<?, ?> segment = resolutionContext.getPath().currentSegment().orElse(null);
         if (segment != null) {
             final InjectionPoint<?> injectionPoint = segment.getInjectionPoint();
-            if (injectionPoint instanceof ArgumentCoercible) {
-                Argument<?> injectionPointArgument = ((ArgumentCoercible<?>) injectionPoint)
-                        .asArgument();
-
+            if (injectionPoint instanceof ArgumentCoercible<?> argumentCoercible) {
+                Argument<?> injectionPointArgument = argumentCoercible.asArgument();
                 Argument<?> resolveArgument = injectionPointArgument;
+                boolean isNullableProvider = injectionPointArgument.isNullable();
+                boolean isOptionalProvider;
                 if (resolveArgument.isOptional()) {
                     resolveArgument = resolveArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+                    isOptionalProvider = true;
+                } else {
+                    isOptionalProvider = false;
                 }
                 @SuppressWarnings("unchecked") Argument<Object> argument =
                         (Argument<Object>) resolveArgument
@@ -144,36 +147,26 @@ public abstract class AbstractProviderDefinition<T> implements InstantiatableBea
                             qualifier = Qualifiers.byName(n.toString());
                         }
                     }
-
-                    boolean hasBean = context.containsBean(argument, qualifier);
-                    if (hasBean) {
-                        return buildProvider(
-                                resolutionContext,
-                                context,
-                                argument,
-                                qualifier,
-                                isSingleton()
-                        );
-                    } else {
-                        if (injectionPointArgument.isOptional()) {
-                            return (T) Optional.empty();
-                        } else if (injectionPointArgument.isNullable()) {
-                            throw new DisabledBeanException("Nullable bean doesn't exist");
-                        } else {
-                            if (qualifier instanceof AnyQualifier || isAllowEmptyProviders(context)) {
-                                return buildProvider(
-                                        resolutionContext,
-                                        context,
-                                        argument,
-                                        qualifier,
-                                        isSingleton()
-                                );
-                            } else {
-                                throw new NoSuchBeanException(argument, qualifier);
+                    if (isNullableProvider || isOptionalProvider || !(isAllowEmptyProviders(context) || qualifier instanceof AnyQualifier)) {
+                        // Skip the contains bean for the providers that support an empty value and aren't nullable or optional
+                        boolean hasBean = context.containsBean(argument, qualifier);
+                        if (!hasBean) {
+                            if (isNullableProvider) {
+                                throw new DisabledBeanException("Nullable bean doesn't exist");
                             }
+                            if (isOptionalProvider) {
+                                return (T) Optional.empty();
+                            }
+                            throw new NoSuchBeanException(argument, qualifier);
                         }
                     }
-
+                    return buildProvider(
+                            resolutionContext,
+                            context,
+                            argument,
+                            qualifier,
+                            isSingleton()
+                    );
                 }
             }
         }
