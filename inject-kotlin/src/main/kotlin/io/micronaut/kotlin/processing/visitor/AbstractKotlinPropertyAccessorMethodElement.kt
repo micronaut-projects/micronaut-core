@@ -19,7 +19,6 @@ import com.google.devtools.ksp.*
 import com.google.devtools.ksp.symbol.*
 import io.micronaut.inject.ast.*
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
-import java.util.*
 
 @OptIn(KspExperimental::class)
 internal abstract class AbstractKotlinPropertyAccessorMethodElement<T : KotlinNativeElement>(
@@ -36,6 +35,14 @@ internal abstract class AbstractKotlinPropertyAccessorMethodElement<T : KotlinNa
     elementAnnotationMetadataFactory,
     visitorContext
 ), MethodElement {
+
+    override val declaration: KSDeclaration? by lazy {
+        accessor.receiver
+    }
+
+    override val overridee: KSDeclaration? by lazy {
+        accessor.receiver.findOverridee()
+    }
 
     override val internalDeclaringType: ClassElement by lazy {
         resolveDeclaringType(accessor.receiver, owningType)
