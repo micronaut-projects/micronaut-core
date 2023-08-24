@@ -19,7 +19,6 @@ import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.async.subscriber.Completable;
-import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
@@ -73,7 +72,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
 
     /**
      * @param fullHttpResponse       The full Http response
-     * @param mediaTypeCodecRegistry The media type codec registry
+     * @param handlerRegistry        The message body handler registry
      * @param bodyType               The body type
      * @param convertBody            Whether to auto convert the body to bodyType
      * @param conversionService      The conversion service
@@ -200,7 +199,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
         return CharSequence.class.isAssignableFrom(rawBodyType) || Map.class.isAssignableFrom(rawBodyType);
     }
 
-    private <T> Optional convertByteBuf(ByteBuf content, Argument<T> type) {
+    private <T> Optional<T> convertByteBuf(ByteBuf content, Argument<T> type) {
         if (content.refCnt() == 0 || content.readableBytes() == 0) {
             if (LOG.isTraceEnabled()) {
                 LOG.trace("Full HTTP response received an empty body");
@@ -229,7 +228,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
             LOG.trace("Missing or unknown Content-Type received from server.");
         }
         // last chance, try type conversion
-        return conversionService.convert(content, ConversionContext.of(type));
+        return conversionService.convert(content, ByteBuf.class, type);
     }
 
     @Override

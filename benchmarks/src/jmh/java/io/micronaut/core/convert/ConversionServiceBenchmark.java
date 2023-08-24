@@ -37,13 +37,13 @@ public class ConversionServiceBenchmark {
     }
 
     @Benchmark
-    public void convertCacheHit() {
-        conversionService.convert("10", Integer.class);
+    public Object convertCacheHit() {
+        return conversionService.convert("10", Integer.class);
     }
 
     @Benchmark
-    public void convertCacheMiss() {
-        conversionService.convert(URI.create("http://test.com"), Integer.class);
+    public Object convertCacheMiss() {
+        return conversionService.convert(URI.create("http://test.com"), Integer.class);
     }
 
     public static void main(String[] args) throws RunnerException {

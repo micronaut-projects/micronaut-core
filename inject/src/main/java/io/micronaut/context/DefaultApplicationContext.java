@@ -32,6 +32,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.DefaultMutableConversionService;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
@@ -628,7 +629,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @param beanContext The bean context
      */
     protected void initializeTypeConverters(BeanContext beanContext) {
-        MutableConversionService mutableConversionService = getConversionService();
+        DefaultMutableConversionService defaultMutableConversionService = (DefaultMutableConversionService) ((DefaultEnvironment) getEnvironment()).getMutableConversionService();
         for (BeanRegistration<TypeConverter> typeConverterRegistration : beanContext.getBeanRegistrations(TypeConverter.class)) {
             TypeConverter typeConverter = typeConverterRegistration.getBean();
             List<Argument<?>> typeArguments = typeConverterRegistration.getBeanDefinition().getTypeArguments(TypeConverter.class);
@@ -636,20 +637,18 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                 Class<?> source = typeArguments.get(0).getType();
                 Class<?> target = typeArguments.get(1).getType();
                 if (!(source == Object.class && target == Object.class)) {
-                    mutableConversionService.addConverter(source, target, typeConverter);
+                    defaultMutableConversionService.addInternalConverter(source, target, typeConverter);
                 }
             }
         }
-        for (TypeConverterRegistrar registrar : beanContext.getBeansOfType(TypeConverterRegistrar.class)) {
-            registrar.register(mutableConversionService);
-        }
+        defaultMutableConversionService.registerInternalTypeConverters(beanContext.getBeansOfType(TypeConverterRegistrar.class));
     }
 
     /**
-     * Bootstraop property source implementation.
+     * Bootstrap property source implementation.
      */
     @SuppressWarnings("MagicNumber")
-    private static class BootstrapPropertySource implements PropertySource {
+    private static final class BootstrapPropertySource implements PropertySource {
         private final PropertySource delegate;
 
         BootstrapPropertySource(PropertySource bootstrapPropertySource) {
@@ -691,7 +690,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     /**
      * Bootstrap environment.
      */
-    private static class BootstrapEnvironment extends DefaultEnvironment {
+    private static final class BootstrapEnvironment extends DefaultEnvironment {
 
         private List<PropertySource> propertySourceList;
 
@@ -778,7 +777,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     /**
      * Bootstrap application context.
      */
-    private class BootstrapApplicationContext extends DefaultApplicationContext {
+    private final class BootstrapApplicationContext extends DefaultApplicationContext {
         private final BootstrapEnvironment bootstrapEnvironment;
 
         BootstrapApplicationContext(BootstrapEnvironment bootstrapEnvironment, String... activeEnvironments) {
@@ -847,7 +846,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     /**
      * Runtime configured environment.
      */
-    private class RuntimeConfiguredEnvironment extends DefaultEnvironment {
+    private final class RuntimeConfiguredEnvironment extends DefaultEnvironment {
 
         private final ApplicationContextConfiguration configuration;
         private BootstrapPropertySourceLocator bootstrapPropertySourceLocator;

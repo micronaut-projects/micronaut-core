@@ -18,12 +18,12 @@ package io.micronaut.buffer.netty;
 import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.MutableConversionService;
+import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
-import jakarta.annotation.PostConstruct;
 import jakarta.inject.Singleton;
 
 import java.util.function.Supplier;
@@ -37,7 +37,7 @@ import java.util.function.Supplier;
 @Internal
 @Singleton
 @BootstrapContextCompatible
-public class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocator, ByteBuf> {
+public final class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocator, ByteBuf>, TypeConverterRegistrar {
 
     /**
      * Default Netty ByteBuffer Factory.
@@ -60,8 +60,8 @@ public class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocato
         this.allocatorSupplier = () -> allocator;
     }
 
-    @PostConstruct
-    final void register(MutableConversionService conversionService) {
+    @Override
+    public void register(MutableConversionService conversionService) {
         conversionService.addConverter(ByteBuf.class, ByteBuffer.class, DEFAULT::wrap);
         conversionService.addConverter(ByteBuffer.class, ByteBuf.class, byteBuffer -> {
             if (byteBuffer instanceof NettyByteBuffer) {

@@ -306,7 +306,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
             if (messageHandler == null) {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("WebSocket bean [" + webSocketBean.getTarget() + "] received message, but defined no @OnMessage handler. Dropping frame...");
+                    LOG.debug("WebSocket bean [{}] received message, but defined no @OnMessage handler. Dropping frame...", webSocketBean.getTarget());
                 }
                 writeCloseFrameAndTerminate(
                         ctx,
@@ -335,10 +335,10 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 }
 
                 Argument<?> bodyArgument = this.getBodyArgument();
-                Optional<?> converted = conversionService.convert(content, bodyArgument);
+                Optional<?> converted = conversionService.convert(content, ByteBuf.class, bodyArgument);
                 content.release();
 
-                if (!converted.isPresent()) {
+                if (converted.isEmpty()) {
                     MediaType mediaType;
                     try {
                         mediaType = messageHandler.stringValue(Consumes.class).map(MediaType::of).orElse(MediaType.APPLICATION_JSON_TYPE);
@@ -393,9 +393,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     );
                 }
             }
-        } else if (msg instanceof PingWebSocketFrame) {
+        } else if (msg instanceof PingWebSocketFrame pingWebSocketFrame) {
             // respond with pong
-            PingWebSocketFrame frame = (PingWebSocketFrame) msg.retain();
+            PingWebSocketFrame frame = pingWebSocketFrame.retain();
             ctx.writeAndFlush(new PongWebSocketFrame(frame.content()));
 
         } else if (msg instanceof PongWebSocketFrame) {
@@ -439,8 +439,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     exceptionCaught(ctx, e);
                 }
             }
-        } else if (msg instanceof CloseWebSocketFrame) {
-            CloseWebSocketFrame cwsf = (CloseWebSocketFrame) msg;
+        } else if (msg instanceof CloseWebSocketFrame cwsf) {
             handleCloseFrame(ctx, cwsf);
         } else {
             writeCloseFrameAndTerminate(
@@ -583,7 +582,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         }
 
         if (LOG.isErrorEnabled()) {
-            LOG.error("Unexpected Exception in WebSocket [" + webSocketBean.getTarget() + "]: " + cause.getMessage(), cause);
+            LOG.error("Unexpected Exception in WebSocket [{}]: {}", webSocketBean.getTarget(), cause.getMessage(), cause);
         }
         Channel channel = ctx.channel();
         if (channel.isOpen()) {

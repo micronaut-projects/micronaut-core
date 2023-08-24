@@ -415,7 +415,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
             } else if (Map.class.isAssignableFrom(requiredType)) {
                 Map<String, Object> subMap = resolveSubMap(name, entries, conversionContext);
                 if (!subMap.isEmpty()) {
-                    return conversionService.convert(subMap, requiredType, conversionContext);
+                    return conversionService.convert(subMap, Map.class, requiredType, conversionContext);
                 } else {
                     return (Optional<T>) Optional.of(subMap);
                 }

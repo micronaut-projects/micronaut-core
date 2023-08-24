@@ -16,6 +16,7 @@
 package io.micronaut.runtime.converters.time;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.MutableConversionService;
@@ -81,6 +82,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
     private static final Pattern DURATION_MATCHER = Pattern.compile("^(-?\\d+)([unsmhd])(s?)$");
     private static final int MILLIS = 3;
 
+    @NextMajorVersion("Consider deletion of LocalDate and LocalDateTime converters")
     @Override
     public void register(MutableConversionService conversionService) {
         final BiFunction<CharSequence, ConversionContext, Optional<Duration>> durationConverter = (object, context) -> {
@@ -100,30 +102,33 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                     char type = g2.charAt(0);
                     try {
                         switch (type) {
-                            case 's':
+                            case 's' -> {
                                 return Optional.of(Duration.ofSeconds(Integer.parseInt(amount)));
-                            case 'm':
+                            }
+                            case 'm' -> {
                                 String ms = matcher.group(MILLIS);
                                 if (StringUtils.hasText(ms)) {
                                     return Optional.of(Duration.ofMillis(Integer.parseInt(amount)));
                                 } else {
                                     return Optional.of(Duration.ofMinutes(Integer.parseInt(amount)));
                                 }
-                            case 'h':
+                            }
+                            case 'h' -> {
                                 return Optional.of(Duration.ofHours(Integer.parseInt(amount)));
-                            case 'd':
+                            }
+                            case 'd' -> {
                                 return Optional.of(Duration.ofDays(Integer.parseInt(amount)));
-                            default:
+                            }
+                            default -> {
                                 final String seq = g2 + matcher.group(3);
-                                switch (seq) {
-                                    case "ns":
-                                        return Optional.of(Duration.ofNanos(Integer.parseInt(amount)));
-                                    default:
-                                        context.reject(
-                                                value,
-                                                new DateTimeParseException("Unparseable date format (" + value + "). Should either be a ISO-8601 duration or a round number followed by the unit type", value, 0));
-                                        return Optional.empty();
+                                if (seq.equals("ns")) {
+                                    return Optional.of(Duration.ofNanos(Integer.parseInt(amount)));
                                 }
+                                context.reject(
+                                        value,
+                                        new DateTimeParseException("Unparseable date format (" + value + "). Should either be a ISO-8601 duration or a round number followed by the unit type", value, 0));
+                                return Optional.empty();
+                            }
                         }
                     } catch (NumberFormatException e) {
                         context.reject(value, e);
@@ -138,6 +143,13 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
             CharSequence.class,
             Duration.class,
             (object, targetType, context) -> durationConverter.apply(object, context)
+        );
+
+        // Integer -> Duration
+        conversionService.addConverter(
+            Integer.class,
+            Duration.class,
+            (integer, targetType, context) -> durationConverter.apply(integer.toString(), context)
         );
 
         // CharSequence -> TemporalAmount

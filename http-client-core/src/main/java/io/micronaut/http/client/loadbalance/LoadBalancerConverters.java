@@ -15,8 +15,10 @@
  */
 package io.micronaut.http.client.loadbalance;
 
+import io.micronaut.core.convert.CharSequenceToEnumConverter;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
+import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 
 import java.net.URI;
@@ -42,5 +44,6 @@ public class LoadBalancerConverters implements TypeConverterRegistrar {
                 return null;
             }
         });
+        conversionService.addConverter(CharSequence.class, HttpVersionSelection.PlaintextMode.class, new CharSequenceToEnumConverter<>());
     }
 }

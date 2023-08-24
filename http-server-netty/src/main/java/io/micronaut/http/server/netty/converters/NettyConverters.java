@@ -22,7 +22,6 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.MutableConversionService;
-import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
@@ -52,7 +51,7 @@ import java.util.Optional;
  */
 @Prototype
 @Internal
-public class NettyConverters implements TypeConverterRegistrar {
+public final class NettyConverters implements TypeConverterRegistrar {
 
     private final ConversionService conversionService;
     private final BeanProvider<MediaTypeCodecRegistry> decoderRegistryProvider;
@@ -60,9 +59,10 @@ public class NettyConverters implements TypeConverterRegistrar {
 
     /**
      * Default constructor.
-     * @param conversionService The conversion service
+     *
+     * @param conversionService       The conversion service
      * @param decoderRegistryProvider The decoder registry provider
-     * @param channelOptionFactory The decoder channel option factory
+     * @param channelOptionFactory    The decoder channel option factory
      */
     public NettyConverters(ConversionService conversionService,
                            //Prevent early initialization of the codecs
@@ -88,25 +88,78 @@ public class NettyConverters implements TypeConverterRegistrar {
         conversionService.addConverter(
                 ByteBuf.class,
                 Object.class,
-                byteBufToObjectConverter()
+                (object, targetType, context) -> conversionService.convert(object.toString(context.getCharset()), targetType, context)
         );
 
         conversionService.addConverter(
                 FileUpload.class,
                 Object.class,
-                fileUploadToObjectConverter()
+                (object, targetType, context) -> {
+                    try {
+                        if (!object.isCompleted()) {
+                            return Optional.empty();
+                        }
+                        String contentType = object.getContentType();
+                        ByteBuf byteBuf = object.getByteBuf();
+                        if (StringUtils.isNotEmpty(contentType)) {
+                            MediaType mediaType = MediaType.of(contentType);
+                            Optional<MediaTypeCodec> registered = decoderRegistryProvider.get().findCodec(mediaType);
+                            if (registered.isPresent()) {
+                                MediaTypeCodec decoder = registered.get();
+                                Object val = decoder.decode(targetType, new ByteBufInputStream(byteBuf));
+                                return Optional.of(val);
+                            } else {
+                                return this.conversionService.convert(byteBuf, targetType, context);
+                            }
+                        }
+                        return this.conversionService.convert(byteBuf, targetType, context);
+                    } catch (Exception e) {
+                        context.reject(e);
+                        return Optional.empty();
+                    }
+                }
         );
 
         conversionService.addConverter(
                 NettyPartData.class,
                 Object.class,
-                nettyPartDataToObjectConverter()
+                (object, targetType, context) -> {
+                    try {
+                        if (targetType.isAssignableFrom(ByteBuffer.class)) {
+                            return Optional.of(object.getByteBuffer());
+                        } else if (targetType.isAssignableFrom(InputStream.class)) {
+                            return Optional.of(object.getInputStream());
+                        } else {
+                            ByteBuf byteBuf = object.getByteBuf();
+                            try {
+                                return this.conversionService.convert(byteBuf, targetType, context);
+                            } finally {
+                                byteBuf.release();
+                            }
+                        }
+                    } catch (IOException e) {
+                        context.reject(e);
+                        return Optional.empty();
+                    }
+                }
         );
 
         conversionService.addConverter(
                 Attribute.class,
                 Object.class,
-                nettyAttributeToObjectConverter()
+                (object, targetType, context) -> {
+                    try {
+                        final String value = object.getValue();
+                        if (targetType.isInstance(value)) {
+                            return Optional.of(value);
+                        } else {
+                            return this.conversionService.convert(value, targetType, context);
+                        }
+                    } catch (IOException e) {
+                        context.reject(e);
+                        return Optional.empty();
+                    }
+                }
         );
 
         conversionService.addConverter(
@@ -116,82 +169,6 @@ public class NettyConverters implements TypeConverterRegistrar {
         );
     }
 
-    private TypeConverter<Attribute, Object> nettyAttributeToObjectConverter() {
-        return (object, targetType, context) -> {
-            try {
-                final String value = object.getValue();
-                if (targetType.isInstance(value)) {
-                    return Optional.of(value);
-                } else {
-                    return conversionService.convert(value, targetType, context);
-                }
-            } catch (IOException e) {
-                context.reject(e);
-                return Optional.empty();
-            }
-        };
-    }
-
-    private TypeConverter<NettyPartData, Object> nettyPartDataToObjectConverter() {
-        return (object, targetType, context) -> {
-            try {
-                if (targetType.isAssignableFrom(ByteBuffer.class)) {
-                    return Optional.of(object.getByteBuffer());
-                } else if (targetType.isAssignableFrom(InputStream.class)) {
-                    return Optional.of(object.getInputStream());
-                } else {
-                    ByteBuf byteBuf = object.getByteBuf();
-                    try {
-                        return conversionService.convert(byteBuf, targetType, context);
-                    } finally {
-                        byteBuf.release();
-                    }
-                }
-            } catch (IOException e) {
-                context.reject(e);
-                return Optional.empty();
-            }
-        };
-    }
-
-    /**
-     * @return A FileUpload to CompletedFileUpload converter
-     */
-    protected TypeConverter<FileUpload, Object> fileUploadToObjectConverter() {
-        return (object, targetType, context) -> {
-            try {
-                if (!object.isCompleted()) {
-                    return Optional.empty();
-                }
-
-                String contentType = object.getContentType();
-                ByteBuf byteBuf = object.getByteBuf();
-                if (StringUtils.isNotEmpty(contentType)) {
-                    MediaType mediaType = MediaType.of(contentType);
-                    Optional<MediaTypeCodec> registered = decoderRegistryProvider.get().findCodec(mediaType);
-                    if (registered.isPresent()) {
-                        MediaTypeCodec decoder = registered.get();
-                        Object val = decoder.decode(targetType, new ByteBufInputStream(byteBuf));
-                        return Optional.of(val);
-                    } else {
-                        return conversionService.convert(byteBuf, targetType, context);
-                    }
-                }
-                return conversionService.convert(byteBuf, targetType, context);
-            } catch (Exception e) {
-                context.reject(e);
-                return Optional.empty();
-            }
-        };
-    }
-
-    /**
-     * @return A converter that returns bytebufs to objects
-     */
-    protected TypeConverter<ByteBuf, Object> byteBufToObjectConverter() {
-        return (object, targetType, context) -> conversionService.convert(object.toString(context.getCharset()), targetType, context);
-    }
-
     /**
      * This method converts a
      * {@link io.netty.util.ReferenceCounted netty reference counted object} and transfers release
@@ -199,8 +176,8 @@ public class NettyConverters implements TypeConverterRegistrar {
      *
      * @param service The conversion service
      * @param context The context to convert to
-     * @param input The object to convert
-     * @param <T> Target type
+     * @param input   The object to convert
+     * @param <T>     Target type
      * @return The converted object
      */
     public static <T> Optional<T> refCountAwareConvert(ConversionService service, ReferenceCounted input, ArgumentConversionContext<T> context) {
@@ -214,11 +191,11 @@ public class NettyConverters implements TypeConverterRegistrar {
      * {@link io.netty.util.ReferenceCounted netty reference counted object} and transfers release
      * ownership to the new object.
      *
-     * @param service The conversion service
-     * @param input The object to convert
+     * @param service    The conversion service
+     * @param input      The object to convert
      * @param targetType The type to convert to
-     * @param context The context to convert with
-     * @param <T> Target type
+     * @param context    The context to convert with
+     * @param <T>        Target type
      * @return The converted object
      */
     public static <T> Optional<T> refCountAwareConvert(ConversionService service, ReferenceCounted input, Class<T> targetType, ConversionContext context) {

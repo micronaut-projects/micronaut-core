@@ -17,6 +17,7 @@ package io.micronaut.context.env;
 
 import io.micronaut.context.ApplicationContextConfiguration;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.convert.ConversionContext;
@@ -64,7 +65,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -139,7 +139,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         this.configuration = configuration;
         this.resourceLoader = configuration.getResourceLoader();
 
-        Set<String> environments = new LinkedHashSet<>(3);
         List<String> specifiedNames = new ArrayList<>(configuration.getEnvironments());
 
         specifiedNames.addAll(0, Stream.of(CachedEnvironment.getProperty(ENVIRONMENTS_PROPERTY),
@@ -147,14 +146,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 .filter(StringUtils::isNotEmpty)
                 .flatMap(s -> Arrays.stream(s.split(",")))
                 .map(String::trim)
-                .collect(Collectors.toList()));
+                .toList());
 
         this.deduceEnvironments = configuration.getDeduceEnvironments().orElse(null);
         EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage(specifiedNames);
         if (environmentsAndPackage.enviroments.isEmpty() && specifiedNames.isEmpty()) {
             specifiedNames = configuration.getDefaultEnvironments();
         }
-        environments.addAll(environmentsAndPackage.enviroments);
+        Set<String> environments = new LinkedHashSet<>(environmentsAndPackage.enviroments);
         String aPackage = environmentsAndPackage.aPackage;
         if (aPackage != null) {
             packages.add(aPackage);
@@ -293,9 +292,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         reading.set(false);
         this.propertySources.values().removeAll(refreshablePropertySources);
         synchronized (catalog) {
-            for (int i = 0; i < catalog.length; i++) {
-                catalog[i] = null;
-            }
+            Arrays.fill(catalog, null);
             resetCaches();
         }
         return this;
@@ -314,6 +311,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     @Override
+    public <S, T> Optional<T> convert(S object, Class<? super S> sourceType, Class<T> targetType, ConversionContext context) {
+        return mutableConversionService.convert(object, sourceType, targetType, context);
+    }
+
+    @Override
     public <S, T> boolean canConvert(Class<S> sourceType, Class<T> targetType) {
         return mutableConversionService.canConvert(sourceType, targetType);
     }
@@ -326,6 +328,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @Override
     public <S, T> void addConverter(Class<S> sourceType, Class<T> targetType, Function<S, T> typeConverter) {
         mutableConversionService.addConverter(sourceType, targetType, typeConverter);
+    }
+
+    /**
+     * @return The mutable conversion service.
+     */
+    @Internal
+    public MutableConversionService getMutableConversionService() {
+        return mutableConversionService;
     }
 
     @Override
