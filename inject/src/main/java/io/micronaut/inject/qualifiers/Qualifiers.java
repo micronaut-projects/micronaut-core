@@ -115,7 +115,16 @@ public class Qualifiers {
      * @return The qualifier
      */
     public static <T> Qualifier<T> byQualifiers(Qualifier<T>... qualifiers) {
-        return new CompositeQualifier<>(qualifiers);
+        FilteringQualifier<T>[] filteringQualifiers = new FilteringQualifier[qualifiers.length];
+        for (int i = 0; i < qualifiers.length; i++) {
+            Qualifier<T> qualifier = qualifiers[i];
+            if (qualifier instanceof FilteringQualifier<T> filteringQualifier) {
+                filteringQualifiers[i] = filteringQualifier;
+            } else {
+                return new CompositeQualifier<>(qualifiers);
+            }
+        }
+        return new FilteringCompositeQualifier<>(filteringQualifiers);
     }
 
     /**

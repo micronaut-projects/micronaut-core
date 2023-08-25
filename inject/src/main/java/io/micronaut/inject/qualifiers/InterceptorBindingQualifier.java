@@ -15,7 +15,6 @@
  */
 package io.micronaut.inject.qualifiers;
 
-import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -34,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Qualifier used to resolve the interceptor binding when injection method interceptors for AOP.
@@ -44,7 +42,7 @@ import java.util.stream.Stream;
  * @since 2.4.0
  */
 @Internal
-public final class InterceptorBindingQualifier<T> implements Qualifier<T> {
+public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> {
     public static final String META_BINDING_VALUES = "$bindingValues";
     private static final String META_MEMBER_INTERCEPTOR_TYPE = "interceptorType";
     private final Map<String, List<AnnotationValue<?>>> supportedAnnotationNames;
@@ -99,64 +97,62 @@ public final class InterceptorBindingQualifier<T> implements Qualifier<T> {
     }
 
     @Override
-    public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
-        return candidates.filter(candidate -> {
-            if (supportedInterceptorTypes.contains(candidate.getBeanType())) {
-                return true;
-            }
-            final AnnotationMetadata annotationMetadata = candidate.getAnnotationMetadata();
-            Collection<AnnotationValue<Annotation>> interceptorValues = resolveInterceptorAnnotationValues(annotationMetadata, null);
-            if (interceptorValues.isEmpty()) {
+    public boolean isQualifies(Class<T> beanType, BeanType<T> candidate) {
+        if (supportedInterceptorTypes.contains(candidate.getBeanType())) {
+            return true;
+        }
+        final AnnotationMetadata annotationMetadata = candidate.getAnnotationMetadata();
+        Collection<AnnotationValue<Annotation>> interceptorValues = resolveInterceptorAnnotationValues(annotationMetadata, null);
+        if (interceptorValues.isEmpty()) {
+            return false;
+        }
+        if (interceptorValues.size() == 1) {
+            // single binding case, fast path
+            final AnnotationValue<?> interceptorBinding = interceptorValues.iterator().next();
+            final String annotationName = interceptorBinding.stringValue().orElse(null);
+            if (annotationName == null) {
                 return false;
             }
-            if (interceptorValues.size() == 1) {
-                // single binding case, fast path
-                final AnnotationValue<?> interceptorBinding = interceptorValues.iterator().next();
-                final String annotationName = interceptorBinding.stringValue().orElse(null);
+            final List<AnnotationValue<?>> bindingList = supportedAnnotationNames.get(annotationName);
+            if (bindingList != null) {
+                final AnnotationValue<Annotation> otherBinding =
+                    interceptorBinding.getAnnotation(META_BINDING_VALUES).orElse(null);
+                boolean matched = true;
+                for (AnnotationValue<?> binding : bindingList) {
+                    matched = matched && (!binding.isPresent(META_BINDING_VALUES) || binding.equals(otherBinding));
+                }
+                return matched;
+            } else {
+                return supportedAnnotationNames.containsKey(annotationName);
+            }
+        } else {
+            // multiple binding case
+            boolean matched = false;
+            for (AnnotationValue<?> annotation : interceptorValues) {
+                final String annotationName = annotation.stringValue().orElse(null);
                 if (annotationName == null) {
-                    return false;
+                    continue;
                 }
                 final List<AnnotationValue<?>> bindingList = supportedAnnotationNames.get(annotationName);
                 if (bindingList != null) {
                     final AnnotationValue<Annotation> otherBinding =
-                            interceptorBinding.getAnnotation(META_BINDING_VALUES).orElse(null);
-                    boolean matched = true;
+                        annotation.getAnnotation(META_BINDING_VALUES).orElse(null);
                     for (AnnotationValue<?> binding : bindingList) {
-                        matched = matched && (!binding.isPresent(META_BINDING_VALUES) || binding.equals(otherBinding));
-                    }
-                    return matched;
-                } else {
-                    return supportedAnnotationNames.containsKey(annotationName);
-                }
-            } else {
-                // multiple binding case
-                boolean matched = false;
-                for (AnnotationValue<?> annotation : interceptorValues) {
-                    final String annotationName = annotation.stringValue().orElse(null);
-                    if (annotationName == null) {
-                        continue;
-                    }
-                    final List<AnnotationValue<?>> bindingList = supportedAnnotationNames.get(annotationName);
-                    if (bindingList != null) {
-                        final AnnotationValue<Annotation> otherBinding =
-                                annotation.getAnnotation(META_BINDING_VALUES).orElse(null);
-                        for (AnnotationValue<?> binding : bindingList) {
-                            matched = (!binding.isPresent(META_BINDING_VALUES) || binding.equals(otherBinding));
-                            if (matched) {
-                                break;
-                            }
+                        matched = (!binding.isPresent(META_BINDING_VALUES) || binding.equals(otherBinding));
+                        if (matched) {
+                            break;
                         }
-                    } else {
-                        matched = supportedAnnotationNames.containsKey(annotationName);
                     }
-
-                    if (matched) {
-                        break;
-                    }
+                } else {
+                    matched = supportedAnnotationNames.containsKey(annotationName);
                 }
-                return matched;
+
+                if (matched) {
+                    break;
+                }
             }
-        });
+            return matched;
+        }
     }
 
     @Override
@@ -193,19 +189,15 @@ public final class InterceptorBindingQualifier<T> implements Qualifier<T> {
         if (CollectionUtils.isEmpty(bindings)) {
             return Collections.emptyList();
         }
-        return bindings
-                .stream()
-                .filter(av -> {
-                    if (av.stringValue().isEmpty()) {
-                        return false;
-                    }
-                    if (kind == null) {
-                        return true;
-                    } else {
-                        final String specifiedkind = av.stringValue("kind").orElse(null);
-                        return specifiedkind == null || specifiedkind.equals(kind);
-                    }
-                })
-                .toList();
+        List<AnnotationValue<Annotation>> result = new ArrayList<>(bindings.size());
+        for (AnnotationValue<Annotation> av : bindings) {
+            if (av.stringValue().isEmpty()) {
+                continue;
+            }
+            if (kind == null || av.stringValue("kind").orElse(kind).equals(kind)) {
+                result.add(av);
+            }
+        }
+        return result;
     }
 }

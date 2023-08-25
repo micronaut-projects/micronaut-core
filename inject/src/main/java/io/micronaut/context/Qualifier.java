@@ -18,6 +18,7 @@ package io.micronaut.context;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.inject.BeanType;
 
+import java.util.Collection;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -64,5 +65,42 @@ public interface Qualifier<T> {
      */
     default <BT extends BeanType<T>> Optional<BT> qualify(Class<T> beanType, Stream<BT> candidates) {
         return reduce(beanType, candidates).findFirst();
+    }
+
+    /**
+     * Check if the candidate qualifies.
+     *
+     * @param beanType  The bean type
+     * @param candidate The candidate
+     * @return true if matches
+     * @since 4.2.0
+     */
+    default boolean isQualifies(Class<T> beanType, BeanType<T> candidate) {
+        return reduce(beanType, Stream.of(candidate)).findAny().isPresent();
+    }
+
+    /**
+     * Check if at least one candidate qualifies.
+     *
+     * @param beanType The bean type
+     * @param candidates The candidates
+     * @return true if qualifies
+     * @since 4.2.0
+     */
+    default boolean isQualifies(Class<T> beanType, Collection<? extends BeanType<T>> candidates) {
+        return reduce(beanType, candidates.stream()).findAny().isPresent();
+    }
+
+    /**
+     * Filter the candidates.
+     *
+     * @param beanType   The bean type
+     * @param candidates The candidates
+     * @param <BT>       The bean type subclass
+     * @return The filtered candidates
+     * @since 4.2.0
+     */
+    default <BT extends BeanType<T>> Collection<BT> filter(Class<T> beanType, Collection<BT> candidates) {
+        return reduce(beanType, candidates.stream()).toList();
     }
 }

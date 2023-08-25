@@ -15,7 +15,6 @@
  */
 package io.micronaut.inject.qualifiers;
 
-import io.micronaut.context.Qualifier;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.type.Argument;
@@ -28,7 +27,6 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Qualifies by the exact type argument name. Useful for qualifying when inheritance is not a factory such as by annotation.
@@ -37,7 +35,7 @@ import java.util.stream.Stream;
  * @since 3.0.0
  * @author graemerocher
  */
-final class ExactTypeArgumentNameQualifier<T> implements Qualifier<T> {
+final class ExactTypeArgumentNameQualifier<T> extends FilteringQualifier<T> {
     private static final Logger LOG = ClassUtils.getLogger(TypeArgumentQualifier.class);
     private final String typeName;
 
@@ -46,17 +44,17 @@ final class ExactTypeArgumentNameQualifier<T> implements Qualifier<T> {
     }
 
     @Override
-    public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
-        return candidates.filter(candidate -> beanType.isAssignableFrom(candidate.getBeanType()))
-                .filter(candidate -> {
-                    final List<Class<?>> typeArguments = getTypeArguments(beanType, candidate);
-                    boolean result = areTypesCompatible(typeArguments);
-                    if (LOG.isTraceEnabled() && !result) {
-                        LOG.trace("Bean type {} is not compatible with candidate generic types [{}] of candidate {}", beanType, CollectionUtils.toString(typeArguments), candidate);
-                    }
+    public boolean isQualifies(Class<T> beanType, BeanType<T> candidate) {
+        if (!beanType.isAssignableFrom(candidate.getBeanType())) {
+            return false;
+        }
+        final List<Class<?>> typeArguments = getTypeArguments(beanType, candidate);
+        boolean result = areTypesCompatible(typeArguments);
+        if (LOG.isTraceEnabled() && !result) {
+            LOG.trace("Bean type {} is not compatible with candidate generic types [{}] of candidate {}", beanType, CollectionUtils.toString(typeArguments), candidate);
+        }
 
-                    return result;
-                });
+        return result;
     }
 
     private boolean areTypesCompatible(List<Class<?>> typeArguments) {

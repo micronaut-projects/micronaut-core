@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2021 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,56 +19,48 @@ import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanType;
 
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Optional;
+import java.util.Collections;
 import java.util.stream.Stream;
 
 /**
- * A qualifier to lookup any type.
+ * A variation of {@link Qualifier} that is a simple filter.
  *
- * @param <T> The generic type
- * @since 3.0.0
+ * @param <T> The qualifier type
+ * @author Denis Stepanov
+ * @since 4.2.0
  */
 @Internal
-public final class AnyQualifier<T> extends FilteringQualifier<T> {
-    @SuppressWarnings("rawtypes")
-    public static final AnyQualifier INSTANCE = new AnyQualifier();
-
-    private AnyQualifier() {
-    }
-
-    @Override
-    public boolean isQualifies(Class<T> beanType, BeanType<T> candidate) {
-        return true;
-    }
+public abstract class FilteringQualifier<T> implements Qualifier<T> {
 
     @Override
     public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
-        return candidates;
-    }
-
-    @Override
-    public boolean contains(Qualifier<T> qualifier) {
-        return true;
-    }
-
-    @Override
-    public <BT extends BeanType<T>> Optional<BT> qualify(Class<T> beanType, Stream<BT> candidates) {
-        return candidates.findFirst();
+        return candidates.filter(candidate -> isQualifies(beanType, candidate));
     }
 
     @Override
     public boolean isQualifies(Class<T> beanType, Collection<? extends BeanType<T>> candidates) {
-        return !candidates.isEmpty();
+        for (BeanType<T> candidate : candidates) {
+            if (isQualifies(beanType, candidate)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
     public <BT extends BeanType<T>> Collection<BT> filter(Class<T> beanType, Collection<BT> candidates) {
-        return candidates;
-    }
-
-    @Override
-    public String toString() {
-        return "@Any";
+        int size = candidates.size();
+        if (size == 1) {
+            return isQualifies(beanType, candidates.iterator().next()) ? candidates : Collections.emptyList();
+        }
+        Collection<BT> result = new ArrayList<>(size);
+        for (BT candidate : candidates) {
+            if (isQualifies(beanType, candidate)) {
+                result.add(candidate);
+            }
+        }
+        return result;
     }
 }

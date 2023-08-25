@@ -15,12 +15,10 @@
  */
 package io.micronaut.inject.qualifiers;
 
-import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanType;
 
 import java.util.Objects;
-import java.util.stream.Stream;
 
 /**
  * Qualifiers for a named stereotype.
@@ -29,7 +27,7 @@ import java.util.stream.Stream;
  * @author graemerocher
  */
 @Internal
-final class NamedAnnotationStereotypeQualifier<T> implements Qualifier<T> {
+final class NamedAnnotationStereotypeQualifier<T> extends FilteringQualifier<T> {
 
     final String stereotype;
 
@@ -41,8 +39,8 @@ final class NamedAnnotationStereotypeQualifier<T> implements Qualifier<T> {
     }
 
     @Override
-    public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
-        return candidates.filter(candidate -> candidate.getAnnotationMetadata().hasStereotype(stereotype));
+    public boolean isQualifies(Class<T> beanType, BeanType<T> candidate) {
+        return candidate.getAnnotationMetadata().hasStereotype(stereotype);
     }
 
     @Override

@@ -38,7 +38,6 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * A {@link io.micronaut.context.Qualifier} that uses {@link AnnotationMetadata}.
@@ -48,7 +47,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-final class AnnotationMetadataQualifier<T> implements Qualifier<T> {
+final class AnnotationMetadataQualifier<T> extends FilteringQualifier<T> {
 
     @NonNull
     final String annotationName;
@@ -93,30 +92,27 @@ final class AnnotationMetadataQualifier<T> implements Qualifier<T> {
     }
 
     @Override
-    public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
-        return candidates.filter(candidate -> {
-            if (!QualifierUtils.matchType(beanType, candidate)) {
-                return false;
-            }
-            if (QualifierUtils.matchAny(beanType, candidate)) {
+    public boolean isQualifies(Class<T> beanType, BeanType<T> candidate) {
+        if (!QualifierUtils.matchType(beanType, candidate)) {
+            return false;
+        }
+        if (QualifierUtils.matchAny(beanType, candidate)) {
+            return true;
+        }
+        if (candidate instanceof BeanDefinition<T> bdCandidate) {
+            Qualifier<T> candidateDeclaredQualifier = bdCandidate.getDeclaredQualifier();
+            if (candidateDeclaredQualifier != null && candidateDeclaredQualifier.contains(this)) {
                 return true;
             }
-            if (candidate instanceof BeanDefinition) {
-                BeanDefinition<T> bdCandidate = (BeanDefinition<T>) candidate;
-                Qualifier<T> candidateDeclaredQualifier = bdCandidate.getDeclaredQualifier();
-                if (candidateDeclaredQualifier != null && candidateDeclaredQualifier.contains(this)) {
+            if (candidate instanceof DelegatingBeanDefinition) {
+                if (matchByAnnotationMetadata(candidate)) {
                     return true;
                 }
-                if (candidate instanceof DelegatingBeanDefinition) {
-                    if (matchByAnnotationMetadata(candidate)) {
-                        return true;
-                    }
-                }
-            } else if (matchByAnnotationMetadata(candidate)) {
-                return true;
             }
-            return QualifierUtils.matchByCandidateName(candidate, beanType, annotationSimpleName);
-        });
+        } else if (matchByAnnotationMetadata(candidate)) {
+            return true;
+        }
+        return QualifierUtils.matchByCandidateName(candidate, beanType, annotationSimpleName);
     }
 
     private <BT extends BeanType<T>> boolean matchByAnnotationMetadata(BT candidate) {

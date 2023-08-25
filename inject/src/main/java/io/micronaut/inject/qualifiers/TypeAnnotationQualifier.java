@@ -15,18 +15,16 @@
  */
 package io.micronaut.inject.qualifiers;
 
-import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.BeanType;
 
-import io.micronaut.core.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Implementation of {@link Type} qualifier.
@@ -36,7 +34,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-public class TypeAnnotationQualifier<T> implements Qualifier<T> {
+public class TypeAnnotationQualifier<T> extends FilteringQualifier<T> {
 
     private final List<Class<?>> types;
 
@@ -60,8 +58,8 @@ public class TypeAnnotationQualifier<T> implements Qualifier<T> {
     }
 
     @Override
-    public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
-        return candidates.filter(candidate -> areTypesCompatible(candidate.getBeanType()));
+    public boolean isQualifies(Class<T> beanType, BeanType<T> candidate) {
+        return areTypesCompatible(candidate.getBeanType());
     }
 
     @Override
