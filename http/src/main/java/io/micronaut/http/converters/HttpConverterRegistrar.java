@@ -23,6 +23,8 @@ import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.io.Readable;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
+import jakarta.inject.Inject;
+import jakarta.inject.Provider;
 
 import java.net.URL;
 import java.util.Optional;
@@ -43,8 +45,23 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
      *
      * @param resourceResolver The resource resolver
      */
+    @Inject
     protected HttpConverterRegistrar(BeanProvider<ResourceResolver> resourceResolver) {
         this.resourceResolver = resourceResolver;
+    }
+    /**
+     * The constructor.
+     *
+     * @param resourceResolver The resource resolver
+     */
+    @Deprecated
+    protected HttpConverterRegistrar(Provider<ResourceResolver> resourceResolver) {
+        this.resourceResolver = new BeanProvider<ResourceResolver>() {
+            @Override
+            public ResourceResolver get() {
+                return resourceResolver.get();
+            }
+        };
     }
 
     @Override
