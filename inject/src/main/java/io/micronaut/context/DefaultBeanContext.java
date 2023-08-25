@@ -1544,14 +1544,14 @@ public class DefaultBeanContext implements InitializableBeanContext {
                     continue;
                 }
                 BeanDefinitionReference<Object> reference = producer.getReference();
-                if (!filteringQualifier.isQualifies(Object.class, reference)) {
+                if (!filteringQualifier.doesQualify(Object.class, reference)) {
                     continue;
                 }
                 BeanDefinition<Object> beanDefinition = reference.load(this);
                 if (!beanDefinition.isEnabled(this)) {
                     continue;
                 }
-                if (!filteringQualifier.isQualifies(Object.class, beanDefinition)) {
+                if (!filteringQualifier.doesQualify(Object.class, beanDefinition)) {
                     continue;
                 }
                 bdCandidates.add(beanDefinition);
@@ -2611,14 +2611,14 @@ public class DefaultBeanContext implements InitializableBeanContext {
         @SuppressWarnings("unchecked") final Class<? extends Annotation> qualifierClass =
                 (Class<? extends Annotation>) qualifier.getType().orElse(null);
         if (qualifierClass != null && !qualifierClass.isAssignableFrom(Annotation.class)) {
-            return Qualifiers.<T>byStereotype(qualifierClass).isQualifies(replacedBeanType, definitionToBeReplaced);
+            return Qualifiers.<T>byStereotype(qualifierClass).doesQualify(replacedBeanType, definitionToBeReplaced);
         } else {
             throw new ConfigurationException(String.format("Default qualifier value was used while replacing %s", replacedBeanType));
         }
     }
 
     private <T> boolean qualifiedByNamed(BeanType<T> definitionToBeReplaced, Class<T> replacedBeanType, String named) {
-        return Qualifiers.<T>byName(named).isQualifies(replacedBeanType, definitionToBeReplaced);
+        return Qualifiers.<T>byName(named).doesQualify(replacedBeanType, definitionToBeReplaced);
     }
 
     private <T> Class<T> getCanonicalBeanType(BeanDefinition<T> beanDefinition) {
@@ -3580,7 +3580,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (!candidates.isEmpty()) {
             filterReplacedBeans(null, candidates);
             if (qualifier != null) {
-                return qualifier.isQualifies(beanType.getType(), candidates);
+                return qualifier.doesQualify(beanType.getType(), candidates);
             }
             return true;
         }

@@ -37,7 +37,7 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @Internal
-public class TypeArgumentQualifier<T> extends FilteringQualifier<T> {
+public final class TypeArgumentQualifier<T> extends FilteringQualifier<T> {
 
     private static final Logger LOG = ClassUtils.getLogger(TypeArgumentQualifier.class);
     private final Class<?>[] typeArguments;
@@ -50,7 +50,7 @@ public class TypeArgumentQualifier<T> extends FilteringQualifier<T> {
     }
 
     @Override
-    public boolean isQualifies(Class<T> beanType, BeanType<T> candidate) {
+    public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
         if (!beanType.isAssignableFrom(candidate.getBeanType())) {
             return false;
         }
@@ -74,7 +74,7 @@ public class TypeArgumentQualifier<T> extends FilteringQualifier<T> {
      * @param classes An array of classes
      * @return Whether the types are compatible
      */
-    protected boolean areTypesCompatible(List<Class<?>> classes) {
+    private boolean areTypesCompatible(List<Class<?>> classes) {
         final Class<?>[] typeArguments = this.typeArguments;
         return areTypesCompatible(typeArguments, classes);
     }
@@ -85,7 +85,7 @@ public class TypeArgumentQualifier<T> extends FilteringQualifier<T> {
      * @param <BT>       The bean type subclass
      * @return The list of type arguments
      */
-    protected <BT extends BeanType<T>> List<Class<?>> getTypeArguments(Class<T> beanType, BT candidate) {
+    private <BT extends BeanType<T>> List<Class<?>> getTypeArguments(Class<T> beanType, BT candidate) {
         if (candidate instanceof BeanDefinition) {
             BeanDefinition<BT> definition = (BeanDefinition<BT>) candidate;
             return definition.getTypeArguments(beanType).stream().map(Argument::getType).collect(Collectors.toList());

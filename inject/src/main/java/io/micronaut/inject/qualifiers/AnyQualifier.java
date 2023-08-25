@@ -38,7 +38,7 @@ public final class AnyQualifier<T> extends FilteringQualifier<T> {
     }
 
     @Override
-    public boolean isQualifies(Class<T> beanType, BeanType<T> candidate) {
+    public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
         return true;
     }
 
@@ -58,7 +58,7 @@ public final class AnyQualifier<T> extends FilteringQualifier<T> {
     }
 
     @Override
-    public boolean isQualifies(Class<T> beanType, Collection<? extends BeanType<T>> candidates) {
+    public boolean doesQualify(Class<T> beanType, Collection<? extends BeanType<T>> candidates) {
         return !candidates.isEmpty();
     }
 

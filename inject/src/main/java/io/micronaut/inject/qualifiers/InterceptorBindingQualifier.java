@@ -97,7 +97,7 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
     }
 
     @Override
-    public boolean isQualifies(Class<T> beanType, BeanType<T> candidate) {
+    public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
         if (supportedInterceptorTypes.contains(candidate.getBeanType())) {
             return true;
         }

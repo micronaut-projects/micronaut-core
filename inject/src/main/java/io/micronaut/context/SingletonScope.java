@@ -146,7 +146,7 @@ final class SingletonScope {
         List<BeanRegistration<?>> beanRegistrations = new ArrayList<>();
         for (BeanRegistration<?> beanRegistration : singletonByBeanDefinition.values()) {
             BeanDefinition<Object> beanDefinition = (BeanDefinition<Object>) beanRegistration.beanDefinition;
-            if (((Qualifier<Object>) qualifier).isQualifies(beanDefinition.getBeanType(), beanDefinition)) {
+            if (((Qualifier<Object>) qualifier).doesQualify(beanDefinition.getBeanType(), beanDefinition)) {
                 beanRegistrations.add(beanRegistration);
             }
         }

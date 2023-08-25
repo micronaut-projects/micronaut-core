@@ -43,7 +43,7 @@ class AnnotationQualifier<T> extends FilteringQualifier<T> {
     }
 
     @Override
-    public boolean isQualifies(Class<T> beanType, BeanType<T> candidate) {
+    public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
         if (!QualifierUtils.matchType(beanType, candidate)) {
             return false;
         }

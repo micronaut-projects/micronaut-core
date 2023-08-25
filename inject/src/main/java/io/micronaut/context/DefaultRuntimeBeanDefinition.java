@@ -29,6 +29,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
+import io.micronaut.inject.qualifiers.ClosestTypeArgumentQualifier;
 import io.micronaut.inject.qualifiers.PrimaryQualifier;
 import io.micronaut.inject.qualifiers.TypeArgumentQualifier;
 
@@ -248,6 +249,11 @@ final class DefaultRuntimeBeanDefinition<T> extends AbstractBeanContextCondition
         public Builder<B> qualifier(Qualifier<B> qualifier) {
             this.qualifier = qualifier;
             if (qualifier instanceof TypeArgumentQualifier<B> typeArgumentQualifier) {
+                Argument<?>[] arguments = Arrays.stream(typeArgumentQualifier.getTypeArguments())
+                                                .map(Argument::of)
+                                                .toArray(Argument[]::new);
+                typeArguments(arguments);
+            } else if (qualifier instanceof ClosestTypeArgumentQualifier<B> typeArgumentQualifier) {
                 Argument<?>[] arguments = Arrays.stream(typeArgumentQualifier.getTypeArguments())
                                                 .map(Argument::of)
                                                 .toArray(Argument[]::new);

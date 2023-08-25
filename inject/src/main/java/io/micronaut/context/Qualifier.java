@@ -75,7 +75,7 @@ public interface Qualifier<T> {
      * @return true if matches
      * @since 4.2.0
      */
-    default boolean isQualifies(Class<T> beanType, BeanType<T> candidate) {
+    default boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
         return reduce(beanType, Stream.of(candidate)).findAny().isPresent();
     }
 
@@ -87,7 +87,7 @@ public interface Qualifier<T> {
      * @return true if qualifies
      * @since 4.2.0
      */
-    default boolean isQualifies(Class<T> beanType, Collection<? extends BeanType<T>> candidates) {
+    default boolean doesQualify(Class<T> beanType, Collection<? extends BeanType<T>> candidates) {
         return reduce(beanType, candidates.stream()).findAny().isPresent();
     }
 

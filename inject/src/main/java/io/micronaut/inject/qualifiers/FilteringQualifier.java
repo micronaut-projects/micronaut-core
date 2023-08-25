@@ -36,13 +36,13 @@ public abstract class FilteringQualifier<T> implements Qualifier<T> {
 
     @Override
     public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
-        return candidates.filter(candidate -> isQualifies(beanType, candidate));
+        return candidates.filter(candidate -> doesQualify(beanType, candidate));
     }
 
     @Override
-    public boolean isQualifies(Class<T> beanType, Collection<? extends BeanType<T>> candidates) {
+    public boolean doesQualify(Class<T> beanType, Collection<? extends BeanType<T>> candidates) {
         for (BeanType<T> candidate : candidates) {
-            if (isQualifies(beanType, candidate)) {
+            if (doesQualify(beanType, candidate)) {
                 return true;
             }
         }
@@ -53,11 +53,11 @@ public abstract class FilteringQualifier<T> implements Qualifier<T> {
     public <BT extends BeanType<T>> Collection<BT> filter(Class<T> beanType, Collection<BT> candidates) {
         int size = candidates.size();
         if (size == 1) {
-            return isQualifies(beanType, candidates.iterator().next()) ? candidates : Collections.emptyList();
+            return doesQualify(beanType, candidates.iterator().next()) ? candidates : Collections.emptyList();
         }
         Collection<BT> result = new ArrayList<>(size);
         for (BT candidate : candidates) {
-            if (isQualifies(beanType, candidate)) {
+            if (doesQualify(beanType, candidate)) {
                 result.add(candidate);
             }
         }

@@ -15,10 +15,14 @@
  */
 package io.micronaut.inject.qualifiers;
 
+import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.reflect.GenericTypeUtils;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StreamUtils;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
 import org.slf4j.Logger;
 
@@ -35,20 +39,28 @@ import java.util.stream.Stream;
  * @since 1.1.1
  */
 @Internal
-public class ClosestTypeArgumentQualifier<T> extends TypeArgumentQualifier<T> {
+public final class ClosestTypeArgumentQualifier<T> implements Qualifier<T> {
 
     private static final Logger LOG = ClassUtils.getLogger(ClosestTypeArgumentQualifier.class);
     private final List<Class<?>>[] hierarchies;
+    private final Class<?>[] typeArguments;
 
     /**
      * @param typeArguments The type arguments
      */
     ClosestTypeArgumentQualifier(Class<?>... typeArguments) {
-        super(typeArguments);
+        this.typeArguments = typeArguments;
         this.hierarchies = new List[typeArguments.length];
         for (int i = 0 ; i < typeArguments.length; i++) {
             hierarchies[i] = ClassUtils.resolveHierarchy(typeArguments[i]);
         }
+    }
+
+    /**
+     * @return The type arguments
+     */
+    public Class<?>[] getTypeArguments() {
+        return typeArguments;
     }
 
     @Override
@@ -77,8 +89,7 @@ public class ClosestTypeArgumentQualifier<T> extends TypeArgumentQualifier<T> {
      * @param classesToCompare An array of classes
      * @return Whether the types are compatible
      */
-    protected int compare(List<Class<?>> classesToCompare) {
-        final Class<?>[] typeArguments = getTypeArguments();
+    private int compare(List<Class<?>> classesToCompare) {
         if (classesToCompare.isEmpty() && typeArguments.length == 0) {
             return 0;
         } else if (classesToCompare.size() != typeArguments.length) {
@@ -100,6 +111,18 @@ public class ClosestTypeArgumentQualifier<T> extends TypeArgumentQualifier<T> {
             }
             return comparison;
         }
+    }
 
+    private <BT extends BeanType<T>> List<Class<?>> getTypeArguments(Class<T> beanType, BT candidate) {
+        if (candidate instanceof BeanDefinition) {
+            BeanDefinition<BT> definition = (BeanDefinition<BT>) candidate;
+            return definition.getTypeArguments(beanType).stream().map(Argument::getType).collect(Collectors.toList());
+        } else {
+            if (beanType.isInterface()) {
+                return Arrays.asList(GenericTypeUtils.resolveInterfaceTypeArguments(candidate.getBeanType(), beanType));
+            } else {
+                return Arrays.asList(GenericTypeUtils.resolveSuperTypeGenericArguments(candidate.getBeanType(), beanType));
+            }
+        }
     }
 }

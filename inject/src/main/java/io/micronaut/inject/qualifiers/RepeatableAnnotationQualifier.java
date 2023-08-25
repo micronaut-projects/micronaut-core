@@ -53,7 +53,7 @@ final class RepeatableAnnotationQualifier<T> extends FilteringQualifier<T> {
     }
 
     @Override
-    public boolean isQualifies(Class<T> beanType, BeanType<T> candidate) {
+    public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
         final AnnotationValue<Annotation> declared = candidate.getAnnotationMetadata().getAnnotation(repeatableName);
         if (declared != null) {
             final List<AnnotationValue<Annotation>> repeated = declared.getAnnotations(AnnotationMetadata.VALUE_MEMBER);

@@ -42,9 +42,9 @@ final class FilteringCompositeQualifier<T> extends FilteringQualifier<T> {
     }
 
     @Override
-    public boolean isQualifies(Class<T> beanType, BeanType<T> candidate) {
+    public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
         for (FilteringQualifier<T> qualifier : qualifiers) {
-            if (!qualifier.isQualifies(beanType, candidate)) {
+            if (!qualifier.doesQualify(beanType, candidate)) {
                 return false;
             }
         }
