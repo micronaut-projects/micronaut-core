@@ -53,8 +53,9 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
      * The constructor.
      *
      * @param resourceResolver The resource resolver
+     * @deprecated Replaced by {@link #HttpConverterRegistrar(BeanProvider)}.
      */
-    @Deprecated
+    @Deprecated(forRemoval = true)
     protected HttpConverterRegistrar(Provider<ResourceResolver> resourceResolver) {
         this.resourceResolver = new BeanProvider<ResourceResolver>() {
             @Override
