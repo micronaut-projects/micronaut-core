@@ -18,3 +18,4 @@ io.micronaut.annotation.AnnotateMethodParameterSpec$AnnotateMethodParameterVisit
 io.micronaut.annotation.AnnotatePropertySpec$AnnotatePropertyVisitor
 io.micronaut.annotation.AnnotateClassSpec$AnnotateClassVisitor
 io.micronaut.annotation.AnnotateTypeArgSpec$AnnotateTypeArgVisitor
+io.micronaut.aop.introduction.beans.MyRepoVisitor2

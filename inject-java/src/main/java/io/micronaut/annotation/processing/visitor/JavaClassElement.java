@@ -97,7 +97,8 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
     private Map<String, Map<String, ClassElement>> resolvedAllTypeArguments;
     @Nullable
     private ClassElement resolvedSuperType;
-    private final JavaEnclosedElementsQuery enclosedElementsQuery = new JavaEnclosedElementsQuery();
+    private final JavaEnclosedElementsQuery enclosedElementsQuery = new JavaEnclosedElementsQuery(false);
+    private final JavaEnclosedElementsQuery sourceEnclosedElementsQuery = new JavaEnclosedElementsQuery(true);
     @Nullable
     private ElementAnnotationMetadata elementTypeAnnotationMetadata;
     @Nullable
@@ -455,6 +456,19 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         return enclosedElementsQuery.getEnclosedElements(this, query);
     }
 
+    /**
+     * This method will produce the elements just like {@link #getEnclosedElements(ElementQuery)}
+     * but the elements are constructed as the source ones.
+     * {@link io.micronaut.inject.ast.ElementFactory#newSourceMethodElement(ClassElement, Object, ElementAnnotationMetadataFactory)}.
+     *
+     * @param query The query
+     * @param <T>   The element type
+     * @return The list of elements
+     */
+    public final <T extends io.micronaut.inject.ast.Element> List<T> getSourceEnclosedElements(@NonNull ElementQuery<T> query) {
+        return sourceEnclosedElementsQuery.getEnclosedElements(this, query);
+    }
+
     @Override
     public boolean isArray() {
         return arrayDimensions > 0;
@@ -713,7 +727,12 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
 
     private final class JavaEnclosedElementsQuery extends EnclosedElementsQuery<TypeElement, Element> {
 
+        private final boolean isSource;
         private List<? extends Element> enclosedElements;
+
+        private JavaEnclosedElementsQuery(boolean isSource) {
+            this.isSource = isSource;
+        }
 
         @Override
         protected TypeElement getNativeClassType(ClassElement classElement) {
@@ -791,11 +810,21 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
         protected io.micronaut.inject.ast.Element toAstElement(Element nativeType, Class<?> elementType) {
             final JavaElementFactory elementFactory = visitorContext.getElementFactory();
             return switch (nativeType.getKind()) {
-                case METHOD -> elementFactory.newMethodElement(
-                    JavaClassElement.this,
-                    (ExecutableElement) nativeType,
-                    elementAnnotationMetadataFactory
-                );
+                case METHOD -> {
+                    if (isSource) {
+                        yield elementFactory.newSourceMethodElement(
+                            JavaClassElement.this,
+                            (ExecutableElement) nativeType,
+                            elementAnnotationMetadataFactory
+                        );
+                    } else {
+                        yield elementFactory.newMethodElement(
+                            JavaClassElement.this,
+                            (ExecutableElement) nativeType,
+                            elementAnnotationMetadataFactory
+                        );
+                    }
+                }
                 case FIELD -> elementFactory.newFieldElement(
                     JavaClassElement.this,
                     (VariableElement) nativeType,
@@ -811,10 +840,19 @@ public class JavaClassElement extends AbstractJavaElement implements ArrayableCl
                     (ExecutableElement) nativeType,
                     elementAnnotationMetadataFactory
                 );
-                case CLASS, ENUM -> elementFactory.newClassElement(
-                    (TypeElement) nativeType,
-                    elementAnnotationMetadataFactory
-                );
+                case CLASS, ENUM -> {
+                    if (isSource) {
+                        yield elementFactory.newSourceClassElement(
+                            (TypeElement) nativeType,
+                            elementAnnotationMetadataFactory
+                        );
+                    } else {
+                        yield elementFactory.newClassElement(
+                            (TypeElement) nativeType,
+                            elementAnnotationMetadataFactory
+                        );
+                    }
+                }
                 default -> throw new IllegalStateException("Unknown element: " + nativeType);
             };
         }
