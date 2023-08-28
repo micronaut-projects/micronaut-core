@@ -19,10 +19,8 @@ import io.micronaut.annotation.processing.visitor.JavaClassElement;
 import io.micronaut.annotation.processing.visitor.JavaElementFactory;
 import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import io.micronaut.annotation.processing.visitor.LoadedVisitor;
-import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Generated;
-import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.io.service.SoftServiceLoader;
@@ -30,12 +28,13 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.VersionUtils;
-import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.processing.JavaModelUtils;
+import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
@@ -43,14 +42,8 @@ import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ElementKind;
-import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.VariableElement;
-import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
-import javax.lang.model.util.ElementScanner8;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -64,8 +57,6 @@ import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static javax.lang.model.element.ElementKind.FIELD;
 
 /**
  * <p>The annotation processed used to execute type element visitors.</p>
@@ -264,12 +255,9 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 for (LoadedVisitor loadedVisitor : loadedVisitors) {
                     for (JavaClassElement javaClassElement : javaClassElements) {
                         try {
-                            if (!loadedVisitor.matchesClass(javaClassElement)) {
-                                continue;
+                            if (loadedVisitor.matchesClass(javaClassElement)) {
+                                visitClass(loadedVisitor, javaClassElement);
                             }
-                            TypeElement typeElement = javaClassElement.getNativeType().element();
-                            String className = typeElement.getQualifiedName().toString();
-                            typeElement.accept(new ElementVisitor(javaClassElement, typeElement, Collections.singletonList(loadedVisitor)), className);
                         } catch (ProcessingException e) {
                             JavaNativeElement originatingElement = (JavaNativeElement) e.getOriginatingElement();
                             if (originatingElement == null) {
@@ -309,6 +297,49 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             writeBeanDefinitionsToMetaInf();
         }
         return false;
+    }
+
+    private void visitClass(LoadedVisitor visitor, JavaClassElement classElement) {
+        visitor.getVisitor().visitClass(classElement, javaVisitorContext);
+
+        for (ConstructorElement constructorElement : classElement.getSourceEnclosedElements(ElementQuery.CONSTRUCTORS)) {
+            visitConstructor(visitor, constructorElement);
+        }
+        for (MemberElement memberElement : classElement.getSourceEnclosedElements(ElementQuery.ALL_FIELD_AND_METHODS)) {
+            if (memberElement instanceof EnumConstantElement enumConstantElement) {
+                visitEnumConstant(visitor, enumConstantElement);
+            } else if (memberElement instanceof FieldElement fieldElement) {
+                visitField(visitor, fieldElement);
+            } else if (memberElement instanceof MethodElement methodElement) {
+                visitMethod(visitor, methodElement);
+            } else {
+                throw new IllegalStateException("Unknown element: " + memberElement);
+            }
+        }
+    }
+
+    private void visitConstructor(LoadedVisitor visitor, ConstructorElement constructorElement) {
+        if (visitor.matchesElement(constructorElement)) {
+            visitor.getVisitor().visitConstructor(constructorElement, javaVisitorContext);
+        }
+    }
+
+    private void visitMethod(LoadedVisitor visitor, MethodElement methodElement) {
+        if (visitor.matchesElement(methodElement)) {
+            visitor.getVisitor().visitMethod(methodElement, javaVisitorContext);
+        }
+    }
+
+    private void visitEnumConstant(LoadedVisitor visitor, EnumConstantElement enumConstantElement) {
+        if (visitor.matchesElement(enumConstantElement)) {
+            visitor.getVisitor().visitEnumConstant(enumConstantElement, javaVisitorContext);
+        }
+    }
+
+    private void visitField(LoadedVisitor visitor, FieldElement fieldElement) {
+        if (visitor.matchesElement(fieldElement)) {
+            visitor.getVisitor().visitField(fieldElement, javaVisitorContext);
+        }
     }
 
     /**
@@ -370,191 +401,5 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             .<TypeElementVisitor<?, ?>>map(e -> e)
             // remove duplicate classes
             .collect(Collectors.toMap(Object::getClass, v -> v, (a, b) -> a)).values();
-    }
-
-    /**
-     * The class to visit the type elements.
-     */
-    private class ElementVisitor extends ElementScanner8<Object, Object> {
-
-        private final TypeElement concreteClass;
-        private final List<LoadedVisitor> visitors;
-        private JavaClassElement javaClassElement;
-
-        ElementVisitor(JavaClassElement javaClassElement, TypeElement concreteClass, List<LoadedVisitor> visitors) {
-            this.javaClassElement = javaClassElement;
-            this.concreteClass = concreteClass;
-            this.visitors = visitors;
-        }
-
-        @Override
-        public Object visitUnknown(Element e, Object o) {
-            // ignore
-            return o;
-        }
-
-        @Override
-        public Object visitType(TypeElement classElement, Object o) {
-            if (!classElement.equals(javaClassElement.getNativeType().element())) {
-                javaClassElement = javaVisitorContext.getElementFactory().newSourceClassElement(
-                    classElement,
-                    javaVisitorContext.getElementAnnotationMetadataFactory()
-                );
-            }
-            for (LoadedVisitor visitor : visitors) {
-                visitor.getVisitor().visitClass(javaClassElement, javaVisitorContext);
-            }
-
-            Element enclosingElement = classElement.getEnclosingElement();
-            // don't process inner class unless this is the visitor for it
-            boolean shouldVisit = !JavaModelUtils.isClass(enclosingElement) ||
-                concreteClass.getQualifiedName().equals(classElement.getQualifiedName());
-            if (shouldVisit) {
-                if (javaClassElement.hasStereotype(Introduction.class) || (javaClassElement.hasStereotype(Introspected.class) && javaClassElement.isAbstract())) {
-                    classElement.asType().accept(new PublicAbstractMethodVisitor<Object, Object>(classElement, javaVisitorContext) {
-                        @Override
-                        protected void accept(DeclaredType type, Element element, Object o) {
-                            if (element instanceof ExecutableElement) {
-                                ElementVisitor.this.visitExecutable(
-                                    (ExecutableElement) element,
-                                    o
-                                );
-                            }
-                        }
-                    }, null);
-                    return null;
-                } else if (JavaModelUtils.isEnum(classElement)) {
-                    return scan(classElement.getEnclosedElements(), o);
-                } else {
-                    List<? extends Element> elements = enclosedElements(classElement);
-                    Object value = null;
-                    for (Element element : elements) {
-                        if (element instanceof TypeElement) {
-                            // Ignore any inner classes, annotation processor will process them if needed
-                            continue;
-                        } else {
-                            value = scan(element, o);
-                        }
-                    }
-                    return value;
-                }
-            } else {
-                return null;
-            }
-        }
-
-        private List<? extends Element> enclosedElements(TypeElement classElement) {
-            List<Element> enclosedElements = new ArrayList<>(classElement.getEnclosedElements());
-            TypeElement superClass = modelUtils.superClassFor(classElement);
-            // collect fields and methods, skip overrides
-            while (superClass != null && !modelUtils.isObjectClass(superClass)) {
-                List<? extends Element> elements = superClass.getEnclosedElements();
-                for (Element elt1 : elements) {
-                    if (elt1 instanceof ExecutableElement) {
-                        checkMethodOverride(enclosedElements, elt1);
-                    } else if (elt1 instanceof VariableElement) {
-                        checkFieldHide(enclosedElements, elt1);
-                    }
-                }
-                superClass = modelUtils.superClassFor(superClass);
-            }
-            return enclosedElements;
-        }
-
-        private void checkFieldHide(List<Element> enclosedElements, Element elt1) {
-            boolean hides = false;
-            for (Element elt2 : enclosedElements) {
-                if (elt1.equals(elt2) || !(elt2 instanceof VariableElement)) {
-                    continue;
-                }
-                if (elementUtils.hides(elt2, elt1)) {
-                    hides = true;
-                    break;
-                }
-            }
-            if (!hides) {
-                enclosedElements.add(elt1);
-            }
-        }
-
-        private void checkMethodOverride(List<Element> enclosedElements, Element elt1) {
-            boolean overrides = false;
-            for (Element elt2 : enclosedElements) {
-                if (elt1.equals(elt2) || !(elt2 instanceof ExecutableElement)) {
-                    continue;
-                }
-                if (elementUtils.overrides((ExecutableElement) elt2, (ExecutableElement) elt1, modelUtils.classElementFor(elt2))) {
-                    overrides = true;
-                    break;
-                }
-            }
-            if (!overrides) {
-                enclosedElements.add(elt1);
-            }
-        }
-
-        @Override
-        public Object visitExecutable(ExecutableElement executableElement, Object o) {
-            if (javaClassElement == null) {
-                return null;
-            }
-            if (executableElement.getSimpleName().toString().equals("<init>")) {
-                ConstructorElement constructorElement = javaVisitorContext.getElementFactory().newConstructorElement(
-                    javaClassElement,
-                    executableElement,
-                    javaVisitorContext.getElementAnnotationMetadataFactory()
-                );
-                for (LoadedVisitor visitor : visitors) {
-                    if (visitor.matchesElement(constructorElement)) {
-                        visitor.getVisitor().visitConstructor(constructorElement, javaVisitorContext);
-                    }
-                }
-                return constructorElement;
-            }
-            MethodElement methodElement = javaVisitorContext.getElementFactory().newSourceMethodElement(
-                javaClassElement,
-                executableElement,
-                javaVisitorContext.getElementAnnotationMetadataFactory()
-            );
-            for (LoadedVisitor visitor : visitors) {
-                if (visitor.matchesElement(methodElement)) {
-                    visitor.getVisitor().visitMethod(methodElement, javaVisitorContext);
-                }
-            }
-            return methodElement;
-        }
-
-        @Override
-        public Object visitVariable(VariableElement variable, Object o) {
-            // assuming just fields, visitExecutable should be handling params for method calls
-            if (variable.getKind() != FIELD) {
-                return null;
-            }
-            if (variable.getKind() == ElementKind.ENUM_CONSTANT) {
-                EnumConstantElement constantElement = javaVisitorContext.getElementFactory().newEnumConstantElement(
-                    javaClassElement,
-                    variable,
-                    javaVisitorContext.getElementAnnotationMetadataFactory()
-                );
-                for (LoadedVisitor visitor : visitors) {
-                    if (visitor.matchesElement(constantElement)) {
-                        visitor.getVisitor().visitEnumConstant(constantElement, javaVisitorContext);
-                    }
-                }
-                return constantElement;
-            }
-            FieldElement fieldElement = javaVisitorContext.getElementFactory()
-                .newFieldElement(
-                    javaClassElement,
-                    variable,
-                    javaVisitorContext.getElementAnnotationMetadataFactory()
-                );
-            for (LoadedVisitor visitor : visitors) {
-                if (visitor.matchesElement(fieldElement)) {
-                    visitor.getVisitor().visitField(fieldElement, javaVisitorContext);
-                }
-            }
-            return fieldElement;
-        }
     }
 }

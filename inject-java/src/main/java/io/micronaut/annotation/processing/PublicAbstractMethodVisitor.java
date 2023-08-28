@@ -33,7 +33,9 @@ import java.util.Set;
  * @author graemerocher
  * @see javax.lang.model.util.AbstractTypeVisitor8
  * @since 1.0
+ * @deprecated No longer used
  */
+@Deprecated(forRemoval = true)
 public abstract class PublicAbstractMethodVisitor<R, P> extends PublicMethodVisitor<R, P> {
 
     private final TypeElement classElement;

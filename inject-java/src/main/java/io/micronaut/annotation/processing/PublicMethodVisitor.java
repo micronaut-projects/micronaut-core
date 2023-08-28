@@ -31,7 +31,9 @@ import java.util.Set;
  * @author graemerocher
  * @see javax.lang.model.util.AbstractTypeVisitor8
  * @since 1.0
+ * @deprecated No longer used
  */
+@Deprecated(forRemoval = true)
 public abstract class PublicMethodVisitor<R, P> extends SuperclassAwareTypeVisitor<R, P> {
 
     /**

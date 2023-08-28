@@ -86,7 +86,7 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
                         continue
                     }
                     try {
-                        def visitor = new ElementVisitor(source, compilationUnit, classNode, [loadedVisitor], visitorContext, targetClassElement)
+                        def visitor = new ElementVisitor(source, compilationUnit, classNode, loadedVisitor, visitorContext, targetClassElement)
                         visitor.visitClass(classNode)
                     } catch (ProcessingException ex) {
                         visitorContext.fail(ex.getMessage(), ex.getOriginatingElement() as ASTNode)
@@ -111,7 +111,7 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
         final CompilationUnit compilationUnit
         final GroovyVisitorContext visitorContext
         private final ClassNode concreteClass
-        private final Collection<LoadedVisitor> typeElementVisitors
+        private final LoadedVisitor visitor
 
         private ClassElement targetClassElement
 
@@ -119,12 +119,12 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
                 SourceUnit sourceUnit,
                 CompilationUnit compilationUnit,
                 ClassNode targetClassNode,
-                Collection<LoadedVisitor> typeElementVisitors,
+                LoadedVisitor visitor,
                 GroovyVisitorContext visitorContext,
                 ClassElement targetClassElement) {
             this.targetClassElement = targetClassElement
             this.compilationUnit = compilationUnit
-            this.typeElementVisitors = typeElementVisitors
+            this.visitor = visitor
             this.concreteClass = targetClassNode
             this.sourceUnit = sourceUnit
             this.visitorContext = visitorContext
@@ -134,10 +134,8 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
             if ((targetClassElement as GroovyClassElement).getNativeType().annotatedNode() != node) {
                 targetClassElement = visitorContext.getElementFactory().newSourceClassElement(node, visitorContext.getElementAnnotationMetadataFactory())
             }
-            for (LoadedVisitor it : typeElementVisitors) {
-                if (it.matchesClass(targetClassElement)) {
-                    it.getVisitor().visitClass(targetClassElement, visitorContext)
-                }
+            if (visitor.matchesClass(targetClassElement)) {
+                visitor.getVisitor().visitClass(targetClassElement, visitorContext)
             }
             GroovyClassElement classElement = targetClassElement as GroovyClassElement
             def properties = classElement.getSyntheticBeanProperties()
@@ -148,7 +146,9 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
                 visitConstructor(cn)
             }
             for (MemberElement memberElement : classElement.getSourceEnclosedElements(ElementQuery.ALL_FIELD_AND_METHODS)) {
-                if (memberElement instanceof FieldElement) {
+                if (memberElement instanceof EnumConstantElement) {
+                    visitEnumConstant(memberElement)
+                } else if (memberElement instanceof FieldElement) {
                     visitField(memberElement)
                 } else if (memberElement instanceof MethodElement) {
                     visitMethod(memberElement)
@@ -158,49 +158,38 @@ class TypeElementVisitorTransform implements ASTTransformation, CompilationUnitA
             }
         }
 
-        void visitConstructor(ConstructorNode node) {
+        private void visitConstructor(ConstructorNode node) {
             def e = visitorContext.getElementFactory()
                     .newConstructorElement(targetClassElement, node, visitorContext.getElementAnnotationMetadataFactory())
-            for (LoadedVisitor it : typeElementVisitors) {
-                if (it.matchesElement(e)) {
-                    it.getVisitor().visitConstructor(e, visitorContext)
-                }
+            if (visitor.matchesElement(e)) {
+                visitor.getVisitor().visitConstructor(e, visitorContext)
             }
         }
 
-        void visitMethod(MethodElement e) {
-            for (LoadedVisitor it : typeElementVisitors) {
-                if (it.matchesElement(e)) {
-                    it.getVisitor().visitMethod(e, visitorContext)
-                }
+        private void visitMethod(MethodElement e) {
+            if (visitor.matchesElement(e)) {
+                visitor.getVisitor().visitMethod(e, visitorContext)
             }
         }
 
-        void visitField(FieldElement fieldElement) {
-            if (fieldElement instanceof EnumConstantElement) {
-                EnumConstantElement enumConstantElement = fieldElement
-                for (LoadedVisitor it : typeElementVisitors) {
-                    if (it.matchesElement(enumConstantElement)) {
-                        it.getVisitor().visitEnumConstant(enumConstantElement, visitorContext)
-                    }
-                }
-            } else {
-                for (LoadedVisitor it : typeElementVisitors) {
-                    if (it.matchesElement(fieldElement)) {
-                        it.getVisitor().visitField(fieldElement, visitorContext)
-                    }
-                }
+        private void visitField(FieldElement fieldElement) {
+            if (visitor.matchesElement(fieldElement)) {
+                visitor.getVisitor().visitField(fieldElement, visitorContext)
             }
         }
 
-        void visitNativeProperty(PropertyElement propertyNode) {
-            for (LoadedVisitor it : typeElementVisitors) {
-                if (it.matchesElement(propertyNode)) {
-                    propertyNode.field.ifPresent(f -> it.getVisitor().visitField(f, visitorContext))
-                    // visit synthetic getter/setter methods
-                    propertyNode.writeMethod.ifPresent(m -> it.getVisitor().visitMethod(m, visitorContext))
-                    propertyNode.readMethod.ifPresent(m -> it.getVisitor().visitMethod(m, visitorContext))
-                }
+        private void visitEnumConstant(EnumConstantElement enumConstantElement) {
+            if (visitor.matchesElement(enumConstantElement)) {
+                visitor.getVisitor().visitEnumConstant(enumConstantElement, visitorContext)
+            }
+        }
+
+        private void visitNativeProperty(PropertyElement propertyNode) {
+            if (visitor.matchesElement(propertyNode)) {
+                propertyNode.field.ifPresent(f -> visitor.getVisitor().visitField(f, visitorContext))
+                // visit synthetic getter/setter methods
+                propertyNode.writeMethod.ifPresent(m -> visitor.getVisitor().visitMethod(m, visitorContext))
+                propertyNode.readMethod.ifPresent(m -> visitor.getVisitor().visitMethod(m, visitorContext))
             }
         }
     }
