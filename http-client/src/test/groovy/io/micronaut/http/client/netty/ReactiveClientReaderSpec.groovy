@@ -1,5 +1,6 @@
 package io.micronaut.http.client.netty
 
+import io.micronaut.http.client.exceptions.ResponseClosedException
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.embedded.EmbeddedChannel
@@ -8,6 +9,7 @@ import io.netty.handler.codec.http.HttpContent
 import io.netty.handler.flow.FlowControlHandler
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 
 class ReactiveClientReaderSpec extends Specification {
@@ -78,5 +80,49 @@ class ReactiveClientReaderSpec extends Specification {
         then:
         item == c3
         !nested
+    }
+
+    def 'error before subscribe'() {
+        given:
+        def reader = new ReactiveClientReader() {
+            @Override
+            protected void remove(ChannelHandlerContext ctx) {
+            }
+        }
+        def channel = new EmbeddedChannel(reader)
+        def err = new RuntimeException()
+
+        when:
+        channel.pipeline().fireExceptionCaught(err)
+        channel.checkException()
+        then:
+        noExceptionThrown()
+
+        when:
+        Flux.from(reader).blockLast()
+        then:
+        def e = thrown RuntimeException
+        e == err
+    }
+
+    def 'inactive before subscribe'() {
+        given:
+        def reader = new ReactiveClientReader() {
+            @Override
+            protected void remove(ChannelHandlerContext ctx) {
+            }
+        }
+        def channel = new EmbeddedChannel(reader)
+
+        when:
+        channel.pipeline().fireChannelInactive()
+        channel.checkException()
+        then:
+        noExceptionThrown()
+
+        when:
+        Flux.from(reader).blockLast()
+        then:
+        thrown ResponseClosedException
     }
 }
