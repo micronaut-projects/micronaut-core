@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.converters;
 
+import io.micronaut.context.BeanProvider;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.convert.MutableConversionService;
@@ -22,6 +23,7 @@ import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.io.Readable;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
+import jakarta.inject.Inject;
 import jakarta.inject.Provider;
 
 import java.net.URL;
@@ -36,15 +38,32 @@ import java.util.Optional;
 @Prototype
 public class HttpConverterRegistrar implements TypeConverterRegistrar {
 
-    private final Provider<ResourceResolver> resourceResolver;
+    private final BeanProvider<ResourceResolver> resourceResolver;
 
     /**
      * Default constructor.
      *
      * @param resourceResolver The resource resolver
      */
-    protected HttpConverterRegistrar(Provider<ResourceResolver> resourceResolver) {
+    @Inject
+    protected HttpConverterRegistrar(BeanProvider<ResourceResolver> resourceResolver) {
         this.resourceResolver = resourceResolver;
+    }
+
+    /**
+     * The constructor.
+     *
+     * @param resourceResolver The resource resolver
+     * @deprecated Replaced by {@link #HttpConverterRegistrar(BeanProvider)}.
+     */
+    @Deprecated(forRemoval = true)
+    protected HttpConverterRegistrar(Provider<ResourceResolver> resourceResolver) {
+        this.resourceResolver = new BeanProvider<ResourceResolver>() {
+            @Override
+            public ResourceResolver get() {
+                return resourceResolver.get();
+            }
+        };
     }
 
     @Override
@@ -55,7 +74,7 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
                 (object, targetType, context) -> {
                     String pathStr = object.toString();
                     Optional<ResourceLoader> supportingLoader = resourceResolver.get().getSupportingLoader(pathStr);
-                    if (!supportingLoader.isPresent()) {
+                    if (supportingLoader.isEmpty()) {
                         context.reject(pathStr, new ConfigurationException(
                                 "No supported resource loader for path [" + pathStr + "]. Prefix the path with a supported prefix such as 'classpath:' or 'file:'"
                         ));
