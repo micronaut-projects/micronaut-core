@@ -166,11 +166,25 @@ public class DefaultBeanContext implements InitializableBeanContext {
     private static final String PARALLEL_TYPE = Parallel.class.getName();
     private static final String INDEXES_TYPE = Indexes.class.getName();
     private static final String REPLACES_ANN = Replaces.class.getName();
-    private static final Comparator<BeanRegistration<?>> BEAN_REGISTRATION_COMPARATOR = (o1, o2) -> {
-        int order1 = OrderUtil.getOrder(o1.getBeanDefinition(), o1.getBean());
-        int order2 = OrderUtil.getOrder(o2.getBeanDefinition(), o2.getBean());
-        return Integer.compare(order1, order2);
+    private static final Comparator<BeanRegistration<?>> BEAN_REGISTRATION_COMPARATOR = new Comparator<BeanRegistration<?>>() {
+        // Keep anonymous class to avoid lambda overhead during the startup
+        @Override
+        public int compare(BeanRegistration<?> o1, BeanRegistration<?> o2) {
+            int order1 = OrderUtil.getOrder(o1.getBeanDefinition(), o1.getBean());
+            int order2 = OrderUtil.getOrder(o2.getBeanDefinition(), o2.getBean());
+            return Integer.compare(order1, order2);
+        }
     };
+    private static final Comparator<BeanDefinition<?>> BEAN_DEFINITION_COMPARATOR = new Comparator<>() {
+        // Keep anonymous class to avoid lambda overhead during the startup
+        @Override
+        public int compare(BeanDefinition<?> bean1, BeanDefinition<?> bean2) {
+            int order1 = OrderUtil.getOrder(bean1.getAnnotationMetadata());
+            int order2 = OrderUtil.getOrder(bean2.getAnnotationMetadata());
+            return Integer.compare(order1, order2);
+        }
+    };
+
     private static final String MSG_COULD_NOT_BE_LOADED = "] could not be loaded: ";
     public static final String MSG_BEAN_DEFINITION = "Bean definition [";
 
@@ -613,20 +627,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         BeanDefinition<T> beanDefinition = foundBean.get();
         Optional<ExecutableMethod<T, R>> foundMethod = beanDefinition.findMethod(method, arguments);
         if (foundMethod.isEmpty()) {
-            foundMethod = beanDefinition.<R>findPossibleMethods(method)
-                .findFirst()
-                .filter(m -> {
-                    Class<?>[] argTypes = m.getArgumentTypes();
-                    if (argTypes.length == arguments.length) {
-                        for (int i = 0; i < argTypes.length; i++) {
-                            if (!arguments[i].isAssignableFrom(argTypes[i])) {
-                                return false;
-                            }
-                        }
-                        return true;
-                    }
-                    return false;
-                });
+            foundMethod = beanDefinition.findMethod(method, arguments);
         }
         return foundMethod.map(executableMethod -> new BeanExecutionHandle<>(this, beanType, qualifier, executableMethod));
     }
@@ -996,8 +997,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (candidates.size() == 1) {
             beanDefinition = candidates.iterator().next();
         } else if (!candidates.isEmpty()) {
-            Argument t = Argument.of(instance.getClass());
-            beanDefinition = lastChanceResolve(t, null, true, (Collection) candidates);
+            beanDefinition = lastChanceResolve(Argument.of((Class<T>) instance.getClass()), null, true, candidates);
         } else {
             beanDefinition = null;
         }
@@ -2247,12 +2247,13 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
             if (candidates.size() > 1) {
                 // try narrow to exact type
-                candidates = candidates
-                        .stream()
-                        .filter(candidate ->
-                            candidate.getBeanType() == beanClass
-                        )
-                        .collect(Collectors.toList());
+                List<BeanDefinition<T>> list = new ArrayList<>(2);
+                for (BeanDefinition<T> candidate : candidates) {
+                    if (candidate.getBeanType() == beanClass) {
+                        list.add(candidate);
+                    }
+                }
+                candidates = list;
             }
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Resolved bean candidates {} for instance: {}", candidates, instance);
@@ -3134,8 +3135,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
     }
 
     private <T> Optional<BeanDefinition<T>> findProxyTargetNoCache(@Nullable BeanResolutionContext resolutionContext,
-                                                                         @NonNull Argument<T> beanType,
-                                                                         @Nullable Qualifier<T> qualifier) {
+                                                                   @NonNull Argument<T> beanType,
+                                                                   @Nullable Qualifier<T> qualifier) {
 
         Collection<BeanDefinition<T>> candidates = collectBeanCandidates(
             resolutionContext,
@@ -3148,48 +3149,33 @@ public class DefaultBeanContext implements InitializableBeanContext {
     }
 
     @NonNull
-    private <T> Optional<BeanDefinition<T>> pickOneBean(
-        Argument<T> beanType,
-        Qualifier<T> qualifier,
-        boolean throwNonUnique,
-        Collection<BeanDefinition<T>> candidates) {
+    private <T> Optional<BeanDefinition<T>> pickOneBean(Argument<T> beanType,
+                                                        Qualifier<T> qualifier,
+                                                        boolean throwNonUnique,
+                                                        Collection<BeanDefinition<T>> candidates) {
         if (candidates.isEmpty()) {
             return Optional.empty();
         }
-        BeanDefinition<T> definition;
         if (qualifier != null) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Qualifying bean [{}] for qualifier: {} ", beanType.getName(), qualifier);
             }
-
-            Collection<BeanDefinition<T>> beanDefinitionList = qualifier.filter(beanType.getType(), candidates);
-            if (beanDefinitionList.isEmpty()) {
+            candidates = qualifier.filter(beanType.getType(), candidates);
+            if (candidates.isEmpty()) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("No qualifying beans of type [{}] found for qualifier: {} ", beanType.getName(), qualifier);
                 }
                 return Optional.empty();
             }
-
-            definition = lastChanceResolve(
-                beanType,
-                qualifier,
-                throwNonUnique,
-                beanDefinitionList
-            );
+        }
+        BeanDefinition<T> definition;
+        if (candidates.size() == 1) {
+            definition = candidates.iterator().next();
         } else {
-            if (candidates.size() == 1) {
-                definition = candidates.iterator().next();
-            } else {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Searching for @Primary for type [{}] from candidates: {} ", beanType.getName(), candidates);
-                }
-                definition = lastChanceResolve(
-                    beanType,
-                    null,
-                    throwNonUnique,
-                    candidates
-                );
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Searching for @Primary for type [{}] from candidates: {} ", beanType.getName(), candidates);
             }
+            definition = lastChanceResolve(beanType, qualifier, throwNonUnique, candidates);
         }
         if (LOG.isDebugEnabled() && definition != null) {
             if (qualifier != null) {
@@ -3201,16 +3187,15 @@ public class DefaultBeanContext implements InitializableBeanContext {
         return Optional.ofNullable(definition);
     }
 
+    @Nullable
     private <T> BeanDefinition<T> lastChanceResolve(Argument<T> beanType,
                                                     Qualifier<T> qualifier,
                                                     boolean throwNonUnique,
                                                     Collection<BeanDefinition<T>> candidates) {
-        final Class<T> beanClass = beanType.getType();
-
         if (candidates.size() > 1) {
             List<BeanDefinition<T>> primary = candidates.stream()
-                    .filter(BeanDefinition::isPrimary)
-                    .toList();
+                .filter(BeanDefinition::isPrimary)
+                .toList();
             if (!primary.isEmpty()) {
                 candidates = primary;
             }
@@ -3218,19 +3203,15 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (candidates.size() == 1) {
             return candidates.iterator().next();
         }
-        BeanDefinition<T> definition = null;
         candidates = candidates.stream().filter(candidate -> !candidate.hasDeclaredStereotype(Secondary.class)).toList();
         if (candidates.size() == 1) {
             return candidates.iterator().next();
-        } else if (candidates.stream().anyMatch(candidate -> candidate.hasAnnotation(Order.class))) {
+        }
+        if (hasOrder(candidates)) {
             // pick the bean with the highest priority
-            final Iterator<BeanDefinition<T>> i = candidates.stream()
-                    .sorted((bean1, bean2) -> {
-                        int order1 = OrderUtil.getOrder(bean1.getAnnotationMetadata());
-                        int order2 = OrderUtil.getOrder(bean2.getAnnotationMetadata());
-                        return Integer.compare(order1, order2);
-                    })
-                    .iterator();
+            ArrayList<BeanDefinition<T>> listCandidates = new ArrayList<>(candidates);
+            listCandidates.sort(BEAN_DEFINITION_COMPARATOR);
+            final Iterator<BeanDefinition<T>> i = listCandidates.iterator();
             if (i.hasNext()) {
                 final BeanDefinition<T> bean = i.next();
                 if (i.hasNext()) {
@@ -3240,20 +3221,28 @@ public class DefaultBeanContext implements InitializableBeanContext {
                         throw new NonUniqueBeanException(beanType.getType(), candidates.iterator());
                     }
                 }
-
-                LOG.debug("Picked bean {} with the highest precedence for type {} and qualifier {}", bean, beanType, qualifier);
+                LOG.debug("Picked bean {} with the highest precedence for type {} and qualifier {}", bean, beanType, null);
                 return bean;
             }
             throw new NonUniqueBeanException(beanType.getType(), candidates.iterator());
         }
-
-        Collection<BeanDefinition<T>> exactMatches = filterExactMatch(beanClass, candidates);
+        Collection<BeanDefinition<T>> exactMatches = filterExactMatch(beanType.getType(), candidates);
         if (exactMatches.size() == 1) {
-            definition = exactMatches.iterator().next();
-        } else if (throwNonUnique) {
-            definition = findConcreteCandidate(beanClass, qualifier, candidates);
+            return exactMatches.iterator().next();
         }
-        return definition;
+        if (throwNonUnique) {
+            return findConcreteCandidate(beanType.getType(), qualifier, candidates);
+        }
+        return null;
+    }
+
+    private <T> boolean hasOrder(Collection<BeanDefinition<T>> candidates) {
+        for (BeanDefinition<T> candidate : candidates) {
+            if (candidate.hasAnnotation(Order.class)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void readAllBeanConfigurations() {
