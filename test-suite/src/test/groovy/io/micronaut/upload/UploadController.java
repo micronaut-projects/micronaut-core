@@ -15,6 +15,7 @@
  */
 package io.micronaut.upload;
 
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -28,17 +29,16 @@ import io.micronaut.http.multipart.CompletedPart;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.server.multipart.MultipartBody;
+import io.micronaut.scheduling.TaskExecutors;
+import io.micronaut.scheduling.annotation.ExecuteOn;
+import jakarta.inject.Singleton;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
-import io.micronaut.core.async.annotation.SingleResult;
-import jakarta.inject.Singleton;
 import reactor.core.Exceptions;
 import reactor.core.publisher.Flux;
-import reactor.core.publisher.FluxSink;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.ReplayProcessor;
-import reactor.core.publisher.Sinks;
 import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
@@ -86,6 +86,14 @@ public class UploadController {
         return Flux.from(data.transferTo(title + ".json"))
                        .map(success -> success ? HttpResponse.ok( "Uploaded " + size ) :  HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR, "Something bad happened"))
                 .onErrorReturn((MutableHttpResponse<?>) HttpResponse.status(HttpStatus.INTERNAL_SERVER_ERROR, "Something bad happened"));
+    }
+
+    @Post(value = "/receive-file-upload-input-stream", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
+    @ExecuteOn(TaskExecutors.BLOCKING)
+    public String receiveFileUploadInputStream(StreamingFileUpload data) throws IOException {
+        try (InputStream stream = data.asInputStream()) {
+            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 
     @Post(value = "/receive-completed-file-upload", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
