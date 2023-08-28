@@ -153,11 +153,15 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
             if (exactMatch.size() == 1) {
                 return beanLocator.getBean(exactMatch.iterator().next());
             } else {
-                // Pick the highest priority
+                // Pick the highest priority which isWriteable
                 return beanDefinitions.stream()
-                    .max(OrderUtil.REVERSE_COMPARATOR)
-                    .map(beanLocator::getBean)
-                    .orElse(null);
+                        .sorted(OrderUtil.COMPARATOR)
+                        .map(beanLocator::getBean)
+                        .filter(writer -> mediaTypes.stream().anyMatch(mediaType -> writer.isWriteable(type, mediaType)))
+                        .findFirst().orElseGet(() -> beanDefinitions.stream() // Pick the highest priority
+                                .max(OrderUtil.COMPARATOR)
+                                .map(beanLocator::getBean)
+                                .orElse(null));
             }
         }
     }
