@@ -16,17 +16,29 @@
 package io.micronaut.kotlin.processing.annotation
 
 import com.google.devtools.ksp.getClassDeclarationByName
-import com.google.devtools.ksp.getDeclaredProperties
 import com.google.devtools.ksp.isConstructor
 import com.google.devtools.ksp.isDefault
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
-import com.google.devtools.ksp.symbol.*
+import com.google.devtools.ksp.symbol.ClassKind
+import com.google.devtools.ksp.symbol.KSAnnotated
+import com.google.devtools.ksp.symbol.KSAnnotation
+import com.google.devtools.ksp.symbol.KSClassDeclaration
+import com.google.devtools.ksp.symbol.KSDeclaration
+import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.google.devtools.ksp.symbol.KSNode
+import com.google.devtools.ksp.symbol.KSPropertyDeclaration
+import com.google.devtools.ksp.symbol.KSPropertyGetter
+import com.google.devtools.ksp.symbol.KSPropertySetter
+import com.google.devtools.ksp.symbol.KSType
+import com.google.devtools.ksp.symbol.KSValueParameter
+import com.google.devtools.ksp.symbol.KSVisitor
+import com.google.devtools.ksp.symbol.Location
+import com.google.devtools.ksp.symbol.Origin
 import io.micronaut.context.annotation.Property
 import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValue
-import io.micronaut.core.reflect.ReflectionUtils
 import io.micronaut.core.util.ArrayUtils
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
@@ -36,15 +48,11 @@ import io.micronaut.kotlin.processing.getBinaryName
 import io.micronaut.kotlin.processing.getClassDeclaration
 import io.micronaut.kotlin.processing.visitor.KotlinVisitorContext
 import java.lang.annotation.RetentionPolicy
-import java.lang.reflect.Method
 import java.util.*
 
 internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnvironment: SymbolProcessorEnvironment,
                                       private val resolver: Resolver,
                                       private val visitorContext: KotlinVisitorContext): AbstractAnnotationMetadataBuilder<KSAnnotated, KSAnnotation>() {
-
-    private val annotationDefaultsCache: ConcurrentLinkedHashMap<String, MutableMap<out KSDeclaration, *>> =
-        ConcurrentLinkedHashMap.Builder<String, MutableMap<out KSDeclaration, *>>().maximumWeightedCapacity(200).build()
 
     companion object {
         private fun getTypeForAnnotation(annotationMirror: KSAnnotation, visitorContext: KotlinVisitorContext): KSClassDeclaration {
@@ -56,8 +64,8 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
         }
     }
 
-    override fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSClassDeclaration {
-        return Companion.getTypeForAnnotation(annotationMirror, visitorContext)
+    override fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSAnnotated {
+        return KotlinAnnotationType(annotationMirror, Companion.getTypeForAnnotation(annotationMirror, visitorContext))
     }
 
     override fun hasAnnotation(element: KSAnnotated, annotation: Class<out Annotation>): Boolean {
@@ -73,11 +81,15 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
     }
 
     override fun hasAnnotations(element: KSAnnotated): Boolean {
-        return if (element is KSPropertyDeclaration) {
-            element.annotations.iterator().hasNext() ||
-                    element.getter?.annotations?.iterator()?.hasNext() ?: false
+        var annotated = element
+        if (annotated is KotlinAnnotationType) {
+            annotated = annotated.type
+        }
+        return if (annotated is KSPropertyDeclaration) {
+            annotated.annotations.iterator().hasNext() ||
+                    annotated.getter?.annotations?.iterator()?.hasNext() ?: false
         } else {
-            element.annotations.iterator().hasNext()
+            annotated.annotations.iterator().hasNext()
         }
     }
 
@@ -86,11 +98,15 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
     }
 
     override fun getElementName(element: KSAnnotated): String {
-        if (element is KSDeclaration) {
-            return if (element is KSClassDeclaration) {
-                element.qualifiedName!!.asString()
+        var annotated = element
+        if (annotated is KotlinAnnotationType) {
+            annotated = annotated.type
+        }
+        if (annotated is KSDeclaration) {
+            return if (annotated is KSClassDeclaration) {
+                annotated.qualifiedName!!.asString()
             } else {
-                element.simpleName.asString()
+                annotated.simpleName.asString()
             }
         }
         TODO("Not yet implemented")
@@ -99,10 +115,14 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
     override fun getAnnotationsForType(element: KSAnnotated): MutableList<out KSAnnotation> {
         val annotationMirrors : MutableList<KSAnnotation> = mutableListOf()
 
-        when (element) {
+        var annotated = element
+        if (annotated is KotlinAnnotationType) {
+            annotated = annotated.type
+        }
+        when (annotated) {
             is KSValueParameter -> {
                 // fuse annotations for setter and property
-                val parent = element.parent
+                val parent = annotated.parent
                 if (parent is KSPropertySetter) {
                     val property = parent.parent
                     if (property is KSPropertyDeclaration) {
@@ -110,33 +130,33 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
                     }
                     annotationMirrors.addAll(parent.annotations)
                 }
-                annotationMirrors.addAll(element.annotations)
+                annotationMirrors.addAll(annotated.annotations)
             }
 
             is KSPropertyGetter, is KSPropertySetter -> {
-                val property = element.parent
+                val property = annotated.parent
                 if (property is KSPropertyDeclaration) {
                     annotationMirrors.addAll(property.annotations)
                 }
-                annotationMirrors.addAll(element.annotations)
+                annotationMirrors.addAll(annotated.annotations)
             }
 
             is KSPropertyDeclaration -> {
-                val parent : KSClassDeclaration? = findClassDeclaration(element)
+                val parent : KSClassDeclaration? = findClassDeclaration(annotated)
                 if (parent is KSClassDeclaration) {
                     if (parent.classKind == ClassKind.ANNOTATION_CLASS) {
-                        annotationMirrors.addAll(element.annotations)
-                        val getter = element.getter
+                        annotationMirrors.addAll(annotated.annotations)
+                        val getter = annotated.getter
                         if (getter != null) {
                             annotationMirrors.addAll(getter.annotations)
                         }
                     }
                 }
-                annotationMirrors.addAll(element.annotations)
+                annotationMirrors.addAll(annotated.annotations)
             }
 
             else -> {
-                annotationMirrors.addAll(element.annotations)
+                annotationMirrors.addAll(annotated.annotations)
             }
         }
         val expanded : MutableList<KSAnnotation> = mutableListOf()
@@ -182,16 +202,20 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
     }
 
     override fun postProcess(annotationMetadata: MutableAnnotationMetadata, element: KSAnnotated) {
-        if (element is KSValueParameter) {
-            handleNullability(element.type.resolve(), annotationMetadata)
-        } else if (element is KSFunctionDeclaration) {
-            val ksType = element.returnType?.resolve()
+        var annotated = element
+        if (annotated is KotlinAnnotationType) {
+            annotated = annotated.type
+        }
+        if (annotated is KSValueParameter) {
+            handleNullability(annotated.type.resolve(), annotationMetadata)
+        } else if (annotated is KSFunctionDeclaration) {
+            val ksType = annotated.returnType?.resolve()
             if (ksType != null) {
                 handleNullability(ksType, annotationMetadata)
             }
-        } else if (element is KSPropertyDeclaration) {
-            handleNullability(element.type.resolve(), annotationMetadata)
-        } else if (element is KSPropertySetter) {
+        } else if (annotated is KSPropertyDeclaration) {
+            handleNullability(annotated.type.resolve(), annotationMetadata)
+        } else if (annotated is KSPropertySetter) {
             if (!annotationMetadata.hasAnnotation(JvmField::class.java) && (annotationMetadata.hasStereotype(AnnotationUtil.QUALIFIER) || annotationMetadata.hasAnnotation(Property::class.java))) {
                 // implicitly inject
                 annotationMetadata.addDeclaredAnnotation(AnnotationUtil.INJECT, emptyMap())
@@ -218,49 +242,53 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
         inheritTypeAnnotations: Boolean,
         declaredOnly: Boolean
     ): MutableList<KSAnnotated> {
-        if (declaredOnly) {
-            return mutableListOf(element)
+        var annotated = element
+        if (annotated is KotlinAnnotationType) {
+            annotated = annotated.type
         }
-        when (element) {
+        if (declaredOnly) {
+            return mutableListOf(annotated)
+        }
+        when (annotated) {
 
             is KSValueParameter -> {
-                val parent = element.parent
+                val parent = annotated.parent
                 return if (parent is KSFunctionDeclaration) {
                     if (parent.isConstructor()) {
-                        mutableListOf(element)
+                        mutableListOf(annotated)
                     } else {
                         val parameters = parent.parameters
                         val parameterIndex =
-                            parameters.indexOf(parameters.find { it.name!!.asString() == element.name!!.asString() })
+                            parameters.indexOf(parameters.find { it.name!!.asString() == annotated.name!!.asString() })
                         methodsHierarchy(parent)
-                            .map { if (it == parent) element else it.parameters[parameterIndex] }
+                            .map { if (it == parent) annotated else it.parameters[parameterIndex] }
                             .toMutableList()
                     }
                 } else { // Setter
-                    mutableListOf(element)
+                    mutableListOf(annotated)
                 }
             }
 
             is KSClassDeclaration -> {
                 val hierarchy = mutableListOf<KSAnnotated>()
-                hierarchy.add(element)
-                if (element.classKind == ClassKind.ANNOTATION_CLASS) {
+                hierarchy.add(annotated)
+                if (annotated.classKind == ClassKind.ANNOTATION_CLASS) {
                     return hierarchy
                 }
-                populateTypeHierarchy(element, hierarchy)
+                populateTypeHierarchy(annotated, hierarchy)
                 hierarchy.reverse()
                 return hierarchy
             }
 
             is KSFunctionDeclaration -> {
-                val methodsHierarchy = methodsHierarchy(element)
+                val methodsHierarchy = methodsHierarchy(annotated)
                 val hierarchy = mutableListOf<KSAnnotated>()
                 hierarchy.addAll(methodsHierarchy)
                 return hierarchy
             }
 
             else -> {
-                return mutableListOf(element)
+                return mutableListOf(annotated)
             }
         }
     }
@@ -366,30 +394,30 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
         annotationName: String,
         annotationType: KSAnnotated
     ): MutableMap<out KSDeclaration, *> {
-        // issue getting default values for an annotation here
-        // TODO: awful hack due to https://github.com/google/ksp/issues/642 and not being able to access annotation defaults for a type
-        val classDeclaration = annotationType.getClassDeclaration(visitorContext)
-        val qualifiedName = classDeclaration.qualifiedName
-        return if (qualifiedName != null) {
-            annotationDefaultsCache.computeIfAbsent(qualifiedName.asString()) {
-                readDefaultValuesReflectively(
-                    classDeclaration,
-                    annotationType,
-                    "getDescriptor",
-                    "getJClass",
-                    "getMethods"
-                )
+        return if (annotationType is KotlinAnnotationType) {
+            val map = mutableMapOf<KSDeclaration, Any>()
+            annotationType.type.getAllProperties().forEach { prop ->
+                val argument = annotationType.mirror.defaultArguments.find { it.name == prop.simpleName }
+                if (argument?.value != null && argument.isDefault()) {
+                    val value = argument.value!!
+                    map[prop] = value
+                }
             }
+            map
         } else {
             mutableMapOf<KSDeclaration, Any>()
         }
     }
 
     override fun getOriginatingClassName(orginatingElement: KSAnnotated): String? {
-        val binaryName = if (orginatingElement is KSClassDeclaration) {
-            orginatingElement.getBinaryName(resolver, visitorContext)
+        var annotated = orginatingElement
+        if (annotated is KotlinAnnotationType) {
+            annotated = annotated.type
+        }
+        val binaryName = if (annotated is KSClassDeclaration) {
+            annotated.getBinaryName(resolver, visitorContext)
         } else {
-            val classDeclaration = orginatingElement.getClassDeclaration(visitorContext)
+            val classDeclaration = annotated.getClassDeclaration(visitorContext)
             classDeclaration.getBinaryName(resolver, visitorContext)
         }
         return if (binaryName != Object::javaClass.name) {
@@ -397,55 +425,6 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
         } else {
             null
         }
-    }
-
-    private fun readDefaultValuesReflectively(classDeclaration : KSClassDeclaration, annotationType: KSAnnotated, vararg path : String): MutableMap<KSDeclaration, Any> {
-        var o: Any? = findValueReflectively(annotationType, *path)
-        val declaredProperties = classDeclaration.getDeclaredProperties()
-        val map = mutableMapOf<KSDeclaration, Any>()
-        if (o != null) {
-            if (o is Iterable<*>) {
-                for (m in o) {
-                    if (m != null) {
-                        val name = findValueReflectively(m, "getName")
-                        // currently only handles JavaLiteralAnnotationArgument but probably should handle others
-                        val value =
-                            findValueReflectively(m, "getAnnotationParameterDefaultValue", "getValue")
-                        if (value != null && name != null) {
-                            val ksPropertyDeclaration = declaredProperties.find { it.simpleName.asString() == name.toString() }
-                            if (ksPropertyDeclaration != null) {
-                                map[ksPropertyDeclaration] = value
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        return map
-    }
-
-    private fun findValueReflectively(
-        root: Any,
-        vararg path : String
-    ): Any? {
-        var m: Method?
-        var o: Any = root
-        for (p in path) {
-            m = ReflectionUtils.findMethod(o.javaClass, p).orElse(null)
-            if (m == null) {
-                return null
-            } else {
-                try {
-                    o = m.invoke(o)
-                    if (o == null) {
-                        return null
-                    }
-                } catch (e: Exception) {
-                    return null
-                }
-            }
-        }
-        return o
     }
 
     override fun readAnnotationRawValues(annotationMirror: KSAnnotation): MutableMap<out KSDeclaration, *> {
@@ -525,17 +504,25 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
     }
 
     override fun getAnnotationMember(annotationElement: KSAnnotated, member: CharSequence): KSAnnotated? {
-        if (annotationElement is KSClassDeclaration) {
-            return annotationElement.getAllProperties().find { it.simpleName.asString() == member }
+        var annotated = annotationElement
+        if (annotated is KotlinAnnotationType) {
+            annotated = annotated.type
         }
-        throw IllegalStateException("Unknown annotation element: $annotationElement")
+        if (annotated is KSClassDeclaration) {
+            return annotated.getAllProperties().find { it.simpleName.asString() == member }
+        }
+        throw IllegalStateException("Unknown annotation element: $annotated")
     }
 
     override fun getAnnotationMemberName(member: KSAnnotated): String {
-        if (member is KSPropertyDeclaration) {
-            return member.simpleName.asString()
+        var annotated = member
+        if (annotated is KotlinAnnotationType) {
+            annotated = annotated.type
         }
-        throw IllegalStateException("Unknown annotation member element: $member")
+        if (annotated is KSPropertyDeclaration) {
+            return annotated.simpleName.asString()
+        }
+        throw IllegalStateException("Unknown annotation member element: $annotated")
     }
 
     override fun createVisitorContext(): VisitorContext {
@@ -618,6 +605,19 @@ internal class KotlinAnnotationMetadataBuilder(private val symbolProcessorEnviro
         }
 
          return value
+    }
+
+    private data class KotlinAnnotationType(
+        var mirror: KSAnnotation,
+        var type: KSClassDeclaration,
+        override val annotations: Sequence<KSAnnotation> = type.annotations,
+        override val location: Location = type.location,
+        override val origin: Origin = type.origin,
+        override val parent: KSNode? = type.parent
+    ) : KSAnnotated {
+        override fun <D, R> accept(visitor: KSVisitor<D, R>, data: D): R {
+            return type.accept(visitor, data);
+        }
     }
 
 }
