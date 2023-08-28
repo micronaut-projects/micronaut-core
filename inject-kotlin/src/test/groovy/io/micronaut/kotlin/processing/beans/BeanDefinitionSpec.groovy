@@ -2,17 +2,17 @@ package io.micronaut.kotlin.processing.beans
 
 import io.micronaut.annotation.processing.test.KotlinCompiler
 import io.micronaut.context.exceptions.NoSuchBeanException
-import io.micronaut.core.annotation.AnnotationUtil
-import io.micronaut.core.annotation.Introspected
-import io.micronaut.core.annotation.Order
+import io.micronaut.core.annotation.*
 import io.micronaut.core.bind.annotation.Bindable
 import io.micronaut.core.type.GenericPlaceholder
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.HttpMethodMapping
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.inject.BeanDefinition
+import io.micronaut.inject.annotation.AnnotationMetadataSupport
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.inject.writer.BeanDefinitionVisitor
+import kotlin.coroutines.Continuation
 import spock.lang.PendingFeature
 import spock.lang.Specification
 
@@ -216,6 +216,16 @@ class SuspendTest {
     suspend fun test() {
         TODO()
     }
+
+    @Executable
+    suspend fun testPrimitiveInt(o : Int) : Int {
+        TODO()
+    }
+    @Executable
+    suspend fun testPrimitiveBoolean(o : Boolean) : Boolean {
+        TODO()
+    }
+
 }
 
 @Singleton
@@ -223,7 +233,13 @@ class A
 ''')
         expect:
         definition != null
-        definition.executableMethods.size() == 1
+        definition.executableMethods.size() == 3
+        definition.executableMethods.every { it.isSuspend() }
+        def primtiveInt = definition.executableMethods.find { it.name == 'testPrimitiveInt' }
+        primtiveInt.arguments.size() == 2
+        primtiveInt.arguments[1].type == Continuation
+        primtiveInt.arguments[1].firstTypeVariable.get().type == int.class
+        primtiveInt.returnType.type == int.class
     }
 
     void "test @Inject on set of Kotlin property"() {
@@ -375,6 +391,147 @@ interface TestOperations {
         definition.getRequiredMethod("save", String)
                 .getAnnotation(HttpMethodMapping)
                 .getRequiredValue(String) == '/'
+    }
+
+    void "test annotation defaults arrays"() {
+        given:
+        AnnotationMetadataSupport.ANNOTATION_DEFAULTS.clear()
+        AnnotationMetadata metadata = buildBeanDefinition('test.Test', '''\
+package test;
+
+import io.micronaut.kotlin.processing.beans.MyAnnotation2
+import io.micronaut.kotlin.processing.beans.MyEnum2
+import jakarta.inject.Singleton
+
+@MyAnnotation2(intArray3 = [1], stringArray4 = ["X"], boolArray4 = [false], myEnumArray4 = [MyEnum2.FOO])
+@Singleton
+class Test
+''').getAnnotationMetadata()
+
+        when:
+        def defaults = metadata.getDefaultValues("io.micronaut.kotlin.processing.beans.MyAnnotation2")
+        def av = metadata.getAnnotation("io.micronaut.kotlin.processing.beans.MyAnnotation2")
+
+        then:
+        defaults["num"] == 10
+        defaults["bool"] == false
+        defaults["intArray1"] == new int[] {}
+        defaults["intArray2"] == new int[] {1, 2, 3}
+        defaults["intArray3"] == null
+        defaults["stringArray1"] == new String[] {}
+        defaults["stringArray2"] == new String[] {""}
+        defaults["stringArray3"] == new String[] {"A"}
+        defaults["stringArray4"] == null
+        defaults["boolArray1"] == new boolean[] {}
+        defaults["boolArray2"] == new boolean[] {true}
+        defaults["boolArray3"] == new boolean[] {false}
+        defaults["boolArray4"] == null
+        defaults["myEnumArray1"] == new String[] {}
+        defaults["myEnumArray2"] == new String[] {"ABC"}
+        defaults["myEnumArray3"] == new String[] {"FOO", "BAR"}
+        defaults["myEnumArray4"] == null
+        defaults["classesArray1"] == new AnnotationClassValue[0]
+        defaults["classesArray2"] == new AnnotationClassValue[] {new AnnotationClassValue(String)}
+        defaults["ann"] == AnnotationValue.builder(MyAnnotation3).value("foo").build()
+        defaults["annotationsArray1"] == new AnnotationValue[0]
+        defaults["annotationsArray2"] == new AnnotationValue[] { AnnotationValue.builder(MyAnnotation3).value("foo").build(), AnnotationValue.builder(MyAnnotation3).value("bar").build() }
+
+        av.getRequiredValue("num", Integer.class) == 10
+        av.getRequiredValue("bool", Boolean.class) == false
+//        av.getRequiredValue("intArray1", int[].class) == new int[] {}
+        av.getRequiredValue("intArray2", int[].class) == new int[] {1, 2, 3}
+        av.getRequiredValue("intArray3", int[].class) == new int[] {1}
+        av.getRequiredValue("stringArray1", String[].class) == new String[] {}
+        av.getRequiredValue("stringArray2", String[].class) == new String[] {""}
+        av.getRequiredValue("stringArray3", String[].class) == new String[] {"A"}
+        av.getRequiredValue("stringArray4", String[].class) == new String[] {"X"}
+        av.getRequiredValue("myEnumArray1", String[].class) == new String[] {}
+        av.getRequiredValue("myEnumArray2", String[].class) == new String[] {"ABC"}
+        av.getRequiredValue("myEnumArray3", String[].class) == new String[] {"FOO", "BAR"}
+        av.getRequiredValue("myEnumArray4", String[].class) == new String[] {"FOO"}
+        av.getRequiredValue("boolArray4", boolean[].class) == new boolean[] {false}
+    }
+
+    void "test stereotype annotation defaults arrays"() {
+        given:
+        AnnotationMetadataSupport.ANNOTATION_DEFAULTS.clear()
+        AnnotationMetadata metadata = buildBeanDefinition('test.Test', '''\
+package test;
+
+import io.micronaut.kotlin.processing.beans.MyAnnotationX
+import io.micronaut.kotlin.processing.beans.MyEnum2
+import jakarta.inject.Singleton
+
+@MyAnnotationX
+@Singleton
+class Test
+''').getAnnotationMetadata()
+
+        when:
+        def defaults = metadata.getDefaultValues("io.micronaut.kotlin.processing.beans.MyAnnotation2")
+        def av = metadata.getAnnotation("io.micronaut.kotlin.processing.beans.MyAnnotation2")
+
+        then:
+        defaults["num"] == 10
+        defaults["bool"] == false
+        defaults["intArray1"] == new int[] {}
+        defaults["intArray2"] == new int[] {1, 2, 3}
+        defaults["intArray3"] == null
+        defaults["stringArray1"] == new String[] {}
+        defaults["stringArray2"] == new String[] {""}
+        defaults["stringArray3"] == new String[] {"A"}
+        defaults["stringArray4"] == null
+        defaults["boolArray1"] == new boolean[] {}
+        defaults["boolArray2"] == new boolean[] {true}
+        defaults["boolArray3"] == new boolean[] {false}
+        defaults["boolArray4"] == null
+        defaults["myEnumArray1"] == new String[] {}
+        defaults["myEnumArray2"] == new String[] {"ABC"}
+        defaults["myEnumArray3"] == new String[] {"FOO", "BAR"}
+        defaults["myEnumArray4"] == null
+        defaults["classesArray1"] == new AnnotationClassValue[0]
+        defaults["classesArray2"] == new AnnotationClassValue[] {new AnnotationClassValue(String)}
+        defaults["ann"] == AnnotationValue.builder(MyAnnotation3).value("foo").build()
+        defaults["annotationsArray1"] == new AnnotationValue[0]
+        defaults["annotationsArray2"] == new AnnotationValue[] { AnnotationValue.builder(MyAnnotation3).value("foo").build(), AnnotationValue.builder(MyAnnotation3).value("bar").build() }
+
+        av.getRequiredValue("num", Integer.class) == 10
+        av.getRequiredValue("bool", Boolean.class) == false
+//        av.getRequiredValue("intArray1", int[].class) == new int[] {}
+        av.getRequiredValue("intArray2", int[].class) == new int[] {1, 2, 3}
+        av.getRequiredValue("intArray3", int[].class) == new int[] {1}
+        av.getRequiredValue("stringArray1", String[].class) == new String[] {}
+        av.getRequiredValue("stringArray2", String[].class) == new String[] {""}
+        av.getRequiredValue("stringArray3", String[].class) == new String[] {"A"}
+        av.getRequiredValue("stringArray4", String[].class) == new String[] {"X"}
+        av.getRequiredValue("myEnumArray1", String[].class) == new String[] {}
+        av.getRequiredValue("myEnumArray2", String[].class) == new String[] {"ABC"}
+        av.getRequiredValue("myEnumArray3", String[].class) == new String[] {"FOO", "BAR"}
+        av.getRequiredValue("myEnumArray4", String[].class) == new String[] {"FOO"}
+        av.getRequiredValue("boolArray4", boolean[].class) == new boolean[] {false}
+    }
+
+    void "test annotation defaults enum"() {
+        given:
+        AnnotationMetadata metadata = buildBeanDefinition('test.Test', '''\
+package test;
+
+import io.micronaut.kotlin.processing.beans.MyAnnotation2
+import io.micronaut.kotlin.processing.beans.MyEnum2
+import jakarta.inject.Singleton
+
+@MyAnnotation2(intArray3 = [1], stringArray4 = ["X"], boolArray4 = [false], myEnumArray4 = [MyEnum2.FOO])
+@Singleton
+class Test
+''').getAnnotationMetadata()
+
+        when:
+        def defaults = metadata.getDefaultValues("io.micronaut.kotlin.processing.beans.MyAnnotation2")
+        def av = metadata.getAnnotation("io.micronaut.kotlin.processing.beans.MyAnnotation2")
+
+        then:
+        defaults["myEnum"] == "ABC"
+        av.getRequiredValue("myEnum", MyEnum2.class) == MyEnum2.ABC
     }
 
     void "test @Inject internal var"() {
