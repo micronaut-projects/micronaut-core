@@ -49,6 +49,7 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
     protected HttpConverterRegistrar(BeanProvider<ResourceResolver> resourceResolver) {
         this.resourceResolver = resourceResolver;
     }
+
     /**
      * The constructor.
      *
