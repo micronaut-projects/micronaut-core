@@ -17,7 +17,6 @@ package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
-import io.micronaut.core.async.subscriber.PublisherAsBlocking;
 import io.netty.buffer.ByteBuf;
 
 import java.io.IOException;

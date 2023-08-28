@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.async.subscriber;
+package io.micronaut.http.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
+import io.netty.util.ReferenceCountUtil;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
@@ -33,7 +34,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * @author Jonas Konrad
  */
 @Internal
-public abstract class PublisherAsBlocking<T> implements Subscriber<T>, Closeable {
+public final class PublisherAsBlocking<T> implements Subscriber<T>, Closeable {
     private final Lock lock = new ReentrantLock();
     private final Condition newDataCondition = lock.newCondition();
     /**
@@ -70,12 +71,12 @@ public abstract class PublisherAsBlocking<T> implements Subscriber<T>, Closeable
      * completed successfully.
      */
     @Nullable
-    public final Throwable getFailure() {
+    public Throwable getFailure() {
         return failure;
     }
 
     @Override
-    public final void onSubscribe(Subscription s) {
+    public void onSubscribe(Subscription s) {
         boolean pendingDemand;
         lock.lock();
         try {
@@ -90,11 +91,11 @@ public abstract class PublisherAsBlocking<T> implements Subscriber<T>, Closeable
     }
 
     @Override
-    public final void onNext(T o) {
+    public void onNext(T o) {
         lock.lock();
         try {
             if (closed) {
-                release(o);
+                ReferenceCountUtil.release(o);
                 return;
             }
             swap = o;
@@ -105,11 +106,11 @@ public abstract class PublisherAsBlocking<T> implements Subscriber<T>, Closeable
     }
 
     @Override
-    public final void onError(Throwable t) {
+    public void onError(Throwable t) {
         lock.lock();
         try {
             if (swap != null) {
-                release(swap);
+                ReferenceCountUtil.release(swap);
                 swap = null;
             }
             failure = t;
@@ -121,7 +122,7 @@ public abstract class PublisherAsBlocking<T> implements Subscriber<T>, Closeable
     }
 
     @Override
-    public final void onComplete() {
+    public void onComplete() {
         lock.lock();
         try {
             done = true;
@@ -137,7 +138,7 @@ public abstract class PublisherAsBlocking<T> implements Subscriber<T>, Closeable
      * @return The next object, or {@code null} if the stream is done
      */
     @Nullable
-    public final T take() throws InterruptedException {
+    public T take() throws InterruptedException {
         boolean demanded = false;
         while (true) {
             Subscription subscription;
@@ -171,18 +172,16 @@ public abstract class PublisherAsBlocking<T> implements Subscriber<T>, Closeable
     }
 
     @Override
-    public final void close() {
+    public void close() {
         lock.lock();
         try {
             closed = true;
             if (swap != null) {
-                release(swap);
+                ReferenceCountUtil.release(swap);
                 swap = null;
             }
         } finally {
             lock.unlock();
         }
     }
-
-    protected abstract void release(T item);
 }

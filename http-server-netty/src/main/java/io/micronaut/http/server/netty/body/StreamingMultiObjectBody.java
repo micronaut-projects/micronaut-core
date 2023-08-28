@@ -16,7 +16,7 @@
 package io.micronaut.http.server.netty.body;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.async.subscriber.PublisherAsBlocking;
+import io.micronaut.http.netty.PublisherAsBlocking;
 import io.micronaut.http.netty.PublisherAsStream;
 import io.micronaut.http.netty.reactive.HotObservable;
 import io.micronaut.http.server.netty.FormRouteCompleter;
@@ -49,12 +49,7 @@ public final class StreamingMultiObjectBody extends ManagedBody<Publisher<?>> im
 
     @Override
     public InputStream coerceToInputStream(ByteBufAllocator alloc) {
-        PublisherAsBlocking<ByteBuf> publisherAsBlocking = new PublisherAsBlocking<>() {
-            @Override
-            protected void release(ByteBuf item) {
-                item.release();
-            }
-        };
+        PublisherAsBlocking<ByteBuf> publisherAsBlocking = new PublisherAsBlocking<>();
         //noinspection unchecked
         ((Publisher<ByteBuf>) claim()).subscribe(publisherAsBlocking);
         return new PublisherAsStream(publisherAsBlocking);

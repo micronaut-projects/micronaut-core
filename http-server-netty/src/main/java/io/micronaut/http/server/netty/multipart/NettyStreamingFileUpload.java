@@ -17,14 +17,13 @@ package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
-import io.micronaut.core.async.subscriber.PublisherAsBlocking;
-import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.functional.ThrowingSupplier;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
+import io.micronaut.http.netty.PublisherAsBlocking;
 import io.micronaut.http.netty.PublisherAsStream;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.netty.buffer.ByteBuf;
@@ -130,14 +129,7 @@ public final class NettyStreamingFileUpload implements StreamingFileUpload {
 
     @Override
     public InputStream asInputStream() {
-        PublisherAsBlocking<ByteBuf> publisherAsBlocking = new PublisherAsBlocking<>() {
-            @Override
-            protected void release(ByteBuf item) {
-                if (item instanceof ReferenceCounted rc) {
-                    rc.release();
-                }
-            }
-        };
+        PublisherAsBlocking<ByteBuf> publisherAsBlocking = new PublisherAsBlocking<>();
         subject.map(pd -> ((NettyPartData) pd).getByteBuf()).subscribe(publisherAsBlocking);
         return new PublisherAsStream(publisherAsBlocking);
     }
