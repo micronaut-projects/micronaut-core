@@ -15,7 +15,6 @@
  */
 package io.micronaut.inject.qualifiers;
 
-import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.util.ObjectUtils;
@@ -25,7 +24,6 @@ import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.stream.Stream;
 
 /**
  * A qualifier for repeatable annotations.
@@ -34,7 +32,7 @@ import java.util.stream.Stream;
  * @since 3.1.0
  * @param <T> The bean type
  */
-final class RepeatableAnnotationQualifier<T> implements Qualifier<T> {
+final class RepeatableAnnotationQualifier<T> extends FilteringQualifier<T> {
     private final List<AnnotationValue<Annotation>> repeatableValues;
     private final String repeatableName;
 
@@ -55,15 +53,13 @@ final class RepeatableAnnotationQualifier<T> implements Qualifier<T> {
     }
 
     @Override
-    public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
-        return candidates.filter(candidate -> {
-            final AnnotationValue<Annotation> declared = candidate.getAnnotationMetadata().getAnnotation(repeatableName);
-            if (declared != null) {
-                final List<AnnotationValue<Annotation>> repeated = declared.getAnnotations(AnnotationMetadata.VALUE_MEMBER);
-                return repeated.containsAll(repeatableValues);
-            }
-            return false;
-        });
+    public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
+        final AnnotationValue<Annotation> declared = candidate.getAnnotationMetadata().getAnnotation(repeatableName);
+        if (declared != null) {
+            final List<AnnotationValue<Annotation>> repeated = declared.getAnnotations(AnnotationMetadata.VALUE_MEMBER);
+            return repeated.containsAll(repeatableValues);
+        }
+        return false;
     }
 
     @Override

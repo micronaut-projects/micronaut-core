@@ -15,12 +15,10 @@
  */
 package io.micronaut.inject.qualifiers;
 
-import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanType;
 
 import java.lang.annotation.Annotation;
-import java.util.stream.Stream;
 
 /**
  * Qualifies using an annotation.
@@ -30,33 +28,32 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-class AnnotationQualifier<T> implements Qualifier<T> {
+class AnnotationQualifier<T> extends FilteringQualifier<T> {
 
     final Annotation annotation;
-
+    private String qualifiedName;
+    private String annotationSimpleName;
     /**
      * @param annotation The qualifier
      */
     AnnotationQualifier(Annotation annotation) {
         this.annotation = annotation;
+        this.qualifiedName = annotation.annotationType().getName();
+        this.annotationSimpleName = annotation.annotationType().getSimpleName();
     }
 
     @Override
-    public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
-        String qualifiedName = annotation.annotationType().getName();
-        String annotationSimpleName = annotation.annotationType().getSimpleName();
-        return candidates.filter(candidate -> {
-            if (!QualifierUtils.matchType(beanType, candidate)) {
-                return false;
-            }
-            if (QualifierUtils.matchAny(beanType, candidate)) {
-                return true;
-            }
-            if (candidate.getAnnotationMetadata().hasDeclaredAnnotation(qualifiedName)) {
-                return true;
-            }
-            return QualifierUtils.matchByCandidateName(candidate, beanType, annotationSimpleName);
-        });
+    public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
+        if (!QualifierUtils.matchType(beanType, candidate)) {
+            return false;
+        }
+        if (QualifierUtils.matchAny(beanType, candidate)) {
+            return true;
+        }
+        if (candidate.getAnnotationMetadata().hasDeclaredAnnotation(qualifiedName)) {
+            return true;
+        }
+        return QualifierUtils.matchByCandidateName(candidate, beanType, annotationSimpleName);
     }
 
     @Override

@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Stream;
 
 /**
  * The singleton scope implementation.
@@ -146,8 +145,8 @@ final class SingletonScope {
     Collection<BeanRegistration<?>> getBeanRegistrations(@NonNull Qualifier<?> qualifier) {
         List<BeanRegistration<?>> beanRegistrations = new ArrayList<>();
         for (BeanRegistration<?> beanRegistration : singletonByBeanDefinition.values()) {
-            BeanDefinition beanDefinition = beanRegistration.beanDefinition;
-            if (qualifier.reduce(beanDefinition.getBeanType(), Stream.of(beanDefinition)).findFirst().isPresent()) {
+            BeanDefinition<Object> beanDefinition = (BeanDefinition<Object>) beanRegistration.beanDefinition;
+            if (((Qualifier<Object>) qualifier).doesQualify(beanDefinition.getBeanType(), beanDefinition)) {
                 beanRegistrations.add(beanRegistration);
             }
         }

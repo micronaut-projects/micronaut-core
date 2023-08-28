@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2023 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,6 @@ import io.micronaut.inject.BeanType;
 
 import java.util.Arrays;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * A {@link Qualifier} composed of other qualifiers.
@@ -31,49 +30,50 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-final class CompositeQualifier<T> implements Qualifier<T> {
+final class FilteringCompositeQualifier<T> extends FilteringQualifier<T> {
 
-    private final Qualifier<T>[] qualifiers;
+    private final FilteringQualifier<T>[] qualifiers;
 
     /**
      * @param qualifiers The qualifiers
      */
-    CompositeQualifier(Qualifier<T>[] qualifiers) {
+    FilteringCompositeQualifier(FilteringQualifier<T>[] qualifiers) {
         this.qualifiers = qualifiers;
     }
 
     @Override
-    public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
-        Stream<BT> reduced = candidates;
-        for (Qualifier<T> qualifier : qualifiers) {
-            reduced = qualifier.reduce(beanType, reduced);
+    public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
+        for (FilteringQualifier<T> qualifier : qualifiers) {
+            if (!qualifier.doesQualify(beanType, candidate)) {
+                return false;
+            }
         }
-        return reduced;
+        return true;
     }
 
-    public Qualifier<T>[] getQualifiers() {
+    public FilteringQualifier<T>[] getQualifiers() {
         return qualifiers;
     }
 
     @Override
     public boolean contains(Qualifier<T> qualifier) {
-        if (qualifier instanceof CompositeQualifier<T> compositeQualifier) {
-            for (Qualifier<T> q : compositeQualifier.qualifiers) {
-                if (!contains(q)) {
-                    return false;
-                }
-            }
-            return true;
-        }
         if (qualifier instanceof FilteringCompositeQualifier<T> filteringCompositeQualifier) {
-            for (Qualifier<T> q : filteringCompositeQualifier.getQualifiers()) {
+            for (Qualifier<T> q : filteringCompositeQualifier.qualifiers) {
                 if (!contains(q)) {
                     return false;
                 }
             }
             return true;
         }
-        for (Qualifier<T> q : qualifiers) {
+        if (qualifier instanceof CompositeQualifier<T> compositeQualifier) {
+            for (Qualifier<T> q : compositeQualifier.getQualifiers()) {
+                if (!contains(q)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        for (FilteringQualifier<T> q : qualifiers) {
             if (q.contains(qualifier)) {
                 return true;
             }
@@ -90,7 +90,7 @@ final class CompositeQualifier<T> implements Qualifier<T> {
             return false;
         }
 
-        CompositeQualifier<?> that = (CompositeQualifier<?>) o;
+        FilteringCompositeQualifier<?> that = (FilteringCompositeQualifier<?>) o;
         return Arrays.equals(qualifiers, that.qualifiers);
     }
 

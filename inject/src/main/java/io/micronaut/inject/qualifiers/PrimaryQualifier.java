@@ -19,8 +19,6 @@ import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanType;
 
-import java.util.stream.Stream;
-
 /**
  * A qualifier to lookup a primary bean.
  *
@@ -30,7 +28,7 @@ import java.util.stream.Stream;
  */
 @Internal
 @SuppressWarnings("java:S1845")
-public final class PrimaryQualifier<T> implements Qualifier<T> {
+public final class PrimaryQualifier<T> extends FilteringQualifier<T> {
 
     @SuppressWarnings({"rawtypes", "java:S1845"})
     public static final PrimaryQualifier INSTANCE = new PrimaryQualifier();
@@ -39,16 +37,14 @@ public final class PrimaryQualifier<T> implements Qualifier<T> {
     }
 
     @Override
-    public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
-        return candidates.filter(candidate -> {
-            if (!QualifierUtils.matchType(beanType, candidate)) {
-                return false;
-            }
-            if (QualifierUtils.matchAny(beanType, candidate)) {
-                return true;
-            }
-            return candidate.isPrimary() || QualifierUtils.matchByCandidateName(candidate, beanType, Qualifier.PRIMARY);
-        });
+    public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
+        if (!QualifierUtils.matchType(beanType, candidate)) {
+            return false;
+        }
+        if (QualifierUtils.matchAny(beanType, candidate)) {
+            return true;
+        }
+        return candidate.isPrimary() || QualifierUtils.matchByCandidateName(candidate, beanType, Qualifier.PRIMARY);
     }
 
     @Override

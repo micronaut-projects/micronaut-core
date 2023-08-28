@@ -15,13 +15,10 @@
  */
 package io.micronaut.inject.qualifiers;
 
-import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
-
-import java.util.stream.Stream;
 
 /**
  * A qualifier to lookup beans without any qualifier.
@@ -30,7 +27,7 @@ import java.util.stream.Stream;
  * @since 3.8.0
  */
 @Internal
-final class NoneQualifier<T> implements Qualifier<T> {
+final class NoneQualifier<T> extends FilteringQualifier<T> {
     @SuppressWarnings("rawtypes")
     public static final NoneQualifier INSTANCE = new NoneQualifier();
 
@@ -38,13 +35,11 @@ final class NoneQualifier<T> implements Qualifier<T> {
     }
 
     @Override
-    public <B extends BeanType<T>> Stream<B> reduce(Class<T> beanType, Stream<B> candidates) {
-        return candidates.filter(candidate -> {
-            if (candidate instanceof BeanDefinition) {
-                return ((BeanDefinition<?>) candidate).getDeclaredQualifier() == null;
-            }
-            return !AnnotationUtil.hasDeclaredQualifierAnnotation(candidate.getAnnotationMetadata());
-        });
+    public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
+        if (candidate instanceof BeanDefinition<T> beanDefinition) {
+            return beanDefinition.getDeclaredQualifier() == null;
+        }
+        return !AnnotationUtil.hasDeclaredQualifierAnnotation(candidate.getAnnotationMetadata());
     }
 
     @Override

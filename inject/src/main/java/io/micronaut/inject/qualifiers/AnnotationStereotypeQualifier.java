@@ -20,7 +20,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanType;
 
 import java.lang.annotation.Annotation;
-import java.util.stream.Stream;
 
 /**
  * A {@link Qualifier} that qualifies based on a bean stereotype.
@@ -30,7 +29,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-final class AnnotationStereotypeQualifier<T> implements Qualifier<T> {
+final class AnnotationStereotypeQualifier<T> extends FilteringQualifier<T> {
 
     final Class<? extends Annotation> stereotype;
 
@@ -42,8 +41,8 @@ final class AnnotationStereotypeQualifier<T> implements Qualifier<T> {
     }
 
     @Override
-    public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
-        return candidates.filter(candidate -> candidate.getAnnotationMetadata().hasStereotype(stereotype));
+    public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
+        return candidate.getAnnotationMetadata().hasStereotype(stereotype);
     }
 
     @Override

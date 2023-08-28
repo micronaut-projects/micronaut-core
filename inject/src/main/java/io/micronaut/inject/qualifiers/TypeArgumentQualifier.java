@@ -28,7 +28,6 @@ import org.slf4j.Logger;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * A {@link Qualifier} that qualifies beans by generic type arguments.
@@ -38,7 +37,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-public class TypeArgumentQualifier<T> implements Qualifier<T> {
+public final class TypeArgumentQualifier<T> extends FilteringQualifier<T> {
 
     private static final Logger LOG = ClassUtils.getLogger(TypeArgumentQualifier.class);
     private final Class<?>[] typeArguments;
@@ -51,18 +50,17 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
     }
 
     @Override
-    public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
-        return candidates.filter(candidate -> beanType.isAssignableFrom(candidate.getBeanType()))
-                .filter(candidate -> {
+    public boolean doesQualify(Class<T> beanType, BeanType<T> candidate) {
+        if (!beanType.isAssignableFrom(candidate.getBeanType())) {
+            return false;
+        }
+        List<Class<?>> typeArguments = getTypeArguments(beanType, candidate);
 
-            List<Class<?>> typeArguments = getTypeArguments(beanType, candidate);
-
-            boolean result = areTypesCompatible(typeArguments);
-            if (LOG.isTraceEnabled() && !result) {
-                LOG.trace("Bean type {} is not compatible with candidate generic types [{}] of candidate {}", beanType, CollectionUtils.toString(typeArguments), candidate);
-            }
-            return result;
-        });
+        boolean result = areTypesCompatible(typeArguments);
+        if (LOG.isTraceEnabled() && !result) {
+            LOG.trace("Bean type {} is not compatible with candidate generic types [{}] of candidate {}", beanType, CollectionUtils.toString(typeArguments), candidate);
+        }
+        return result;
     }
 
     /**
@@ -76,7 +74,7 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
      * @param classes An array of classes
      * @return Whether the types are compatible
      */
-    protected boolean areTypesCompatible(List<Class<?>> classes) {
+    private boolean areTypesCompatible(List<Class<?>> classes) {
         final Class<?>[] typeArguments = this.typeArguments;
         return areTypesCompatible(typeArguments, classes);
     }
@@ -87,7 +85,7 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
      * @param <BT>       The bean type subclass
      * @return The list of type arguments
      */
-    protected <BT extends BeanType<T>> List<Class<?>> getTypeArguments(Class<T> beanType, BT candidate) {
+    private <BT extends BeanType<T>> List<Class<?>> getTypeArguments(Class<T> beanType, BT candidate) {
         if (candidate instanceof BeanDefinition) {
             BeanDefinition<BT> definition = (BeanDefinition<BT>) candidate;
             return definition.getTypeArguments(beanType).stream().map(Argument::getType).collect(Collectors.toList());
