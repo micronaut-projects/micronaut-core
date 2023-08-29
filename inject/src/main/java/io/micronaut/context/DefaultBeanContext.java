@@ -627,7 +627,20 @@ public class DefaultBeanContext implements InitializableBeanContext {
         BeanDefinition<T> beanDefinition = foundBean.get();
         Optional<ExecutableMethod<T, R>> foundMethod = beanDefinition.findMethod(method, arguments);
         if (foundMethod.isEmpty()) {
-            foundMethod = beanDefinition.findMethod(method, arguments);
+            foundMethod = beanDefinition.<R>findPossibleMethods(method)
+                .findFirst()
+                .filter(m -> {
+                    Class<?>[] argTypes = m.getArgumentTypes();
+                    if (argTypes.length == arguments.length) {
+                        for (int i = 0; i < argTypes.length; i++) {
+                            if (!arguments[i].isAssignableFrom(argTypes[i])) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    }
+                    return false;
+                });
         }
         return foundMethod.map(executableMethod -> new BeanExecutionHandle<>(this, beanType, qualifier, executableMethod));
     }
@@ -923,7 +936,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
      */
     protected <V> @NonNull Map<String, V> mapOfType(@Nullable BeanResolutionContext resolutionContext, @NonNull Argument<V> beanType, @Nullable Qualifier<V> qualifier) {
         // try and find a bean that implements the map with the generics
-        Argument<Map<String, V>> mapType = Argument.mapOf(Argument.of(String.class), beanType);
+        Argument<Map<String, V>> mapType = Argument.mapOf(Argument.STRING, beanType);
         @SuppressWarnings("unchecked") Qualifier<Map<String, V>> mapQualifier = (Qualifier<Map<String, V>>) qualifier;
         BeanDefinition<Map<String, V>> existingBean = findBeanDefinitionInternal(mapType, mapQualifier).orElse(null);
         if (existingBean != null) {
@@ -1896,14 +1909,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
      */
     protected void initializeEventListeners() {
         this.beanCreationEventListeners = loadListeners(BeanCreatedEventListener.class);
-        // Keep anonymous class to avoid lambda overhead during the startup
-        this.beanCreationEventListeners.add(new AbstractMap.SimpleEntry<>(AnnotationProcessor.class, new ListenersSupplier<BeanCreatedEventListener>() {
-            @Override
-            public Iterable<BeanCreatedEventListener> get(BeanResolutionContext beanResolutionContext) {
-                return Collections.singletonList(new AnnotationProcessorListener());
-            }
-
-        }));
+        this.beanCreationEventListeners.add(new AbstractMap.SimpleEntry<>(AnnotationProcessor.class, new AnnotationProcessorListenersSupplier()));
         this.beanInitializedEventListeners = loadListeners(BeanInitializedEventListener.class);
     }
 
@@ -1915,35 +1921,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         }
         List<Map.Entry<Class<?>, ListenersSupplier<T>>> eventToListeners = new ArrayList<>(typeToListener.size());
         for (Map.Entry<Class<?>, List<BeanDefinition<T>>> e : typeToListener.entrySet()) {
-            eventToListeners.add(new AbstractMap.SimpleEntry<>(e.getKey(), new ListenersSupplier<>() {
-
-                // The supplier can be triggered concurrently.
-                // We allow for the listeners collection to be initialized multiple times.
-                @SuppressWarnings("java:S3077")
-                private volatile List<T> listeners;
-
-                @Override
-                public Iterable<T> get(BeanResolutionContext beanResolutionContext) {
-                    if (listeners == null) {
-                        List<BeanDefinition<T>> listenersDefinitions = e.getValue();
-                        List<T> listeners = new ArrayList<>(listenersDefinitions.size());
-                        for (BeanDefinition<T> listenersDefinition : listenersDefinitions) {
-                            T listener;
-                            if (beanResolutionContext == null) {
-                                try (BeanResolutionContext context = newResolutionContext(listenersDefinition, null)) {
-                                    listener = resolveBeanRegistration(context, listenersDefinition).bean;
-                                }
-                            } else {
-                                listener = resolveBeanRegistration(beanResolutionContext, listenersDefinition).bean;
-                            }
-                            listeners.add(listener);
-                        }
-                        OrderUtil.sort(listeners);
-                        this.listeners = listeners;
-                    }
-                    return listeners;
-                }
-            }));
+            eventToListeners.add(new AbstractMap.SimpleEntry<>(e.getKey(), new EventListenerListenersSupplier<>(e.getValue())));
         }
         return eventToListeners;
     }
@@ -3711,7 +3689,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
      * @param <T> The type
      * @param <R> The return type
      */
-    private abstract static class AbstractExecutionHandle<T, R> implements MethodExecutionHandle<T, R> {
+    private abstract static sealed class AbstractExecutionHandle<T, R> implements MethodExecutionHandle<T, R> {
         protected final ExecutableMethod<T, R> method;
 
         /**
@@ -3879,7 +3857,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
      * @since 4.0.0
      */
     @Internal
-    interface ListenersSupplier<T extends EventListener> {
+    sealed interface ListenersSupplier<T extends EventListener> {
 
         /**
          * Retrieved the listeners lazily.
@@ -4026,7 +4004,50 @@ public class DefaultBeanContext implements InitializableBeanContext {
 
     }
 
-    private class SingletonBeanResolutionContext extends AbstractBeanResolutionContext {
+    private final class EventListenerListenersSupplier<T extends EventListener> implements ListenersSupplier<T> {
+
+        private final List<BeanDefinition<T>> listenersDefinitions;
+        // The supplier can be triggered concurrently.
+        // We allow for the listeners collection to be initialized multiple times.
+        @SuppressWarnings("java:S3077")
+        private volatile List<T> listeners;
+
+        public EventListenerListenersSupplier(List<BeanDefinition<T>> listenersDefinitions) {
+            this.listenersDefinitions = listenersDefinitions;
+        }
+
+        @Override
+        public Iterable<T> get(BeanResolutionContext beanResolutionContext) {
+            if (listeners == null) {
+                List<T> listeners = new ArrayList<>(listenersDefinitions.size());
+                for (BeanDefinition<T> listenersDefinition : listenersDefinitions) {
+                    T listener;
+                    if (beanResolutionContext == null) {
+                        try (BeanResolutionContext context = newResolutionContext(listenersDefinition, null)) {
+                            listener = resolveBeanRegistration(context, listenersDefinition).bean;
+                        }
+                    } else {
+                        listener = resolveBeanRegistration(beanResolutionContext, listenersDefinition).bean;
+                    }
+                    listeners.add(listener);
+                }
+                OrderUtil.sort(listeners);
+                this.listeners = listeners;
+            }
+            return listeners;
+        }
+    }
+
+    private static final class AnnotationProcessorListenersSupplier implements ListenersSupplier<BeanCreatedEventListener> {
+
+        @Override
+        public Iterable<BeanCreatedEventListener> get(BeanResolutionContext beanResolutionContext) {
+            return Collections.singletonList(new AnnotationProcessorListener());
+        }
+
+    }
+
+    private final class SingletonBeanResolutionContext extends AbstractBeanResolutionContext {
 
         public SingletonBeanResolutionContext(BeanDefinition<?> beanDefinition) {
             super(DefaultBeanContext.this, beanDefinition);
@@ -4275,4 +4296,5 @@ public class DefaultBeanContext implements InitializableBeanContext {
             return method.toString();
         }
     }
+
 }
