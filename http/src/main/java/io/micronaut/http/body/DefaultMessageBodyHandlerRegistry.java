@@ -153,15 +153,18 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
             if (exactMatch.size() == 1) {
                 return beanLocator.getBean(exactMatch.iterator().next());
             } else {
-                // Pick the highest priority which isWriteable
-                return beanDefinitions.stream()
-                        .sorted(OrderUtil.COMPARATOR)
-                        .map(beanLocator::getBean)
-                        .filter(writer -> mediaTypes.stream().anyMatch(mediaType -> writer.isWriteable(type, mediaType)))
-                        .findFirst().orElseGet(() -> beanDefinitions.stream() // Pick the highest priority
-                                .max(OrderUtil.COMPARATOR)
-                                .map(beanLocator::getBean)
-                                .orElse(null));
+                List<MessageBodyWriter> ordered = beanDefinitions.stream()
+                    .sorted(OrderUtil.COMPARATOR)
+                    .map(beanLocator::getBean)
+                    .toList();
+                // look for one that's isWriteable first
+                for (MessageBodyWriter writer : ordered) {
+                    if (mediaTypes.stream().anyMatch(mediaType -> writer.isWriteable(type, mediaType))) {
+                        return writer;
+                    }
+                }
+                // none isWriteable, just return the first
+                return ordered.get(0);
             }
         }
     }
