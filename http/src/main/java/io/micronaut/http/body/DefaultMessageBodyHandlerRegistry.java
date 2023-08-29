@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
@@ -166,7 +167,7 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
                     }
                 }
                 // none isWriteable, just return the first
-                return ordered.get(0);
+                return CollectionUtils.isNotEmpty(ordered) ? ordered.get(0) : null;
             }
         }
     }
