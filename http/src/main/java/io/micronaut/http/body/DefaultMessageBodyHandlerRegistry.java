@@ -140,6 +140,8 @@ public final class DefaultMessageBodyHandlerRegistry extends RawMessageBodyHandl
         );
         if (beanDefinitions.size() == 1) {
             return beanLocator.getBean(beanDefinitions.iterator().next());
+        } else if (beanDefinitions.isEmpty()) {
+            return null;
         } else {
             List<BeanDefinition<MessageBodyWriter>> exactMatch = beanDefinitions.stream()
                 .filter(d -> {
