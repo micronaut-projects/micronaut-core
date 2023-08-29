@@ -10,9 +10,9 @@ If you use the https://micronaut-projects.github.io/micronaut-gradle-plugin/late
 .build.gradle.kts
 ----
 plugins {
-    id("org.jetbrains.kotlin.jvm") version "1.8.21"
+    id("org.jetbrains.kotlin.jvm") version "1.9.10"
     id("com.google.devtools.ksp") version "1.8.21-1.0.11"
-    id("org.jetbrains.kotlin.plugin.allopen") version "1.8.21"
+    id("org.jetbrains.kotlin.plugin.allopen") version "1.9.10"
     id("io.micronaut.application") version "4.0.0"
 }
 version = "0.1"
@@ -61,9 +61,9 @@ If you don't use the https://micronaut-projects.github.io/micronaut-gradle-plugi
 [source, kotlin]
 ----
 plugins {
-    id("org.jetbrains.kotlin.jvm") version "1.8.21"
+    id("org.jetbrains.kotlin.jvm") version "1.9.10"
     id("com.google.devtools.ksp") version "1.8.21-1.0.11"
-    id("org.jetbrains.kotlin.plugin.allopen") version "1.8.21"
+    id("org.jetbrains.kotlin.plugin.allopen") version "1.9.10"
     application
 }
 version = "0.1"
