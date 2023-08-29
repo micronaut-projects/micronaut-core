@@ -26,7 +26,6 @@ import io.micronaut.http.uri.UriBuilder;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
-import java.util.Collections;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
 
