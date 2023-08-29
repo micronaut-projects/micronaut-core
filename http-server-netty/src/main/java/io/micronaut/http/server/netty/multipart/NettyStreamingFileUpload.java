@@ -23,7 +23,10 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.MultipartException;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
+import io.micronaut.http.netty.PublisherAsBlocking;
+import io.micronaut.http.netty.PublisherAsStream;
 import io.micronaut.http.server.HttpServerConfiguration;
+import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -36,6 +39,7 @@ import reactor.core.scheduler.Schedulers;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.file.Files;
 import java.util.Optional;
@@ -121,6 +125,13 @@ public final class NettyStreamingFileUpload implements StreamingFileUpload {
             fileUpload.delete();
             return true;
         });
+    }
+
+    @Override
+    public InputStream asInputStream() {
+        PublisherAsBlocking<ByteBuf> publisherAsBlocking = new PublisherAsBlocking<>();
+        subject.map(pd -> ((NettyPartData) pd).getByteBuf()).subscribe(publisherAsBlocking);
+        return new PublisherAsStream(publisherAsBlocking);
     }
 
     /**
