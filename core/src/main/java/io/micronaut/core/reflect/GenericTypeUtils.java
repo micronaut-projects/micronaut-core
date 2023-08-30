@@ -42,8 +42,8 @@ public class GenericTypeUtils {
      */
     public static Optional<Class<?>> resolveGenericTypeArgument(Field field) {
         Type genericType = field != null ? field.getGenericType() : null;
-        if (genericType instanceof ParameterizedType) {
-            Type[] typeArguments = ((ParameterizedType) genericType).getActualTypeArguments();
+        if (genericType instanceof ParameterizedType type) {
+            Type[] typeArguments = type.getActualTypeArguments();
             if (typeArguments.length > 0) {
                 Type typeArg = typeArguments[0];
                 return resolveParameterizedTypeArgument(typeArg);
@@ -64,8 +64,7 @@ public class GenericTypeUtils {
         Optional<Type> resolvedType = getAllGenericInterfaces(type)
                 .stream()
                 .filter(t -> {
-                            if (t instanceof ParameterizedType) {
-                                ParameterizedType pt = (ParameterizedType) t;
+                            if (t instanceof ParameterizedType pt) {
                                 return pt.getRawType() == interfaceType;
                             }
                             return false;
@@ -87,8 +86,7 @@ public class GenericTypeUtils {
         Type supertype = type.getGenericSuperclass();
         Class<?> superclass = type.getSuperclass();
         while (superclass != null && superclass != Object.class) {
-            if (supertype instanceof ParameterizedType) {
-                ParameterizedType pt = (ParameterizedType) supertype;
+            if (supertype instanceof ParameterizedType pt) {
                 if (pt.getRawType() == superTypeToResolve) {
                     return resolveTypeArguments(supertype);
                 }
@@ -126,8 +124,7 @@ public class GenericTypeUtils {
      */
     public static Class<?>[] resolveTypeArguments(Type genericType) {
         Class<?>[] typeArguments = ReflectionUtils.EMPTY_CLASS_ARRAY;
-        if (genericType instanceof ParameterizedType) {
-            ParameterizedType pt = (ParameterizedType) genericType;
+        if (genericType instanceof ParameterizedType pt) {
             typeArguments = resolveParameterizedType(pt);
         }
         return typeArguments;
@@ -144,8 +141,7 @@ public class GenericTypeUtils {
     public static Optional<Class<?>> resolveInterfaceTypeArgument(Class<?> type, Class<?> interfaceType) {
         Type[] genericInterfaces = type.getGenericInterfaces();
         for (Type genericInterface : genericInterfaces) {
-            if (genericInterface instanceof ParameterizedType) {
-                ParameterizedType pt = (ParameterizedType) genericInterface;
+            if (genericInterface instanceof ParameterizedType pt) {
                 if (pt.getRawType() == interfaceType) {
                     return resolveSingleTypeArgument(genericInterface);
                 }
@@ -165,8 +161,7 @@ public class GenericTypeUtils {
      * @return An {@link Optional} of the type
      */
         private static Optional<Class<?>> resolveSingleTypeArgument(Type genericType) {
-        if (genericType instanceof ParameterizedType) {
-            ParameterizedType pt = (ParameterizedType) genericType;
+        if (genericType instanceof ParameterizedType pt) {
             Type[] actualTypeArguments = pt.getActualTypeArguments();
             if (actualTypeArguments.length == 1) {
                 Type actualTypeArgument = actualTypeArguments[0];
@@ -181,13 +176,13 @@ public class GenericTypeUtils {
      * @return An optional with the resolved parameterized class
      */
     private static Optional<Class<?>> resolveParameterizedTypeArgument(Type actualTypeArgument) {
-        if (actualTypeArgument instanceof Class) {
-            return Optional.of((Class<?>) actualTypeArgument);
+        if (actualTypeArgument instanceof Class class1) {
+            return Optional.of(class1);
         }
         if (actualTypeArgument instanceof ParameterizedType pt) {
             Type rawType = pt.getRawType();
-            if (rawType instanceof Class) {
-                return Optional.of((Class<?>) rawType);
+            if (rawType instanceof Class class1) {
+                return Optional.of(class1);
             }
         }
         return Optional.empty();
@@ -212,8 +207,7 @@ public class GenericTypeUtils {
         Type[] theInterfaces = aClass.getGenericInterfaces();
         interfaces.addAll(Arrays.asList(theInterfaces));
         for (Type theInterface : theInterfaces) {
-            if (theInterface instanceof Class) {
-                Class<?> i = (Class<?>) theInterface;
+            if (theInterface instanceof Class i) {
                 if (ArrayUtils.isNotEmpty(i.getGenericInterfaces())) {
                     populateInterfaces(i, interfaces);
                 }

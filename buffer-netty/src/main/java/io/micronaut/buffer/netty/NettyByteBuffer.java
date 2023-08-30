@@ -159,8 +159,8 @@ class NettyByteBuffer implements ByteBuffer<ByteBuf>, ReferenceCounted {
         if (ArrayUtils.isNotEmpty(buffers)) {
             ByteBuf[] byteBufs = Arrays.stream(buffers)
                 .map(buffer -> {
-                    if (buffer instanceof NettyByteBuffer) {
-                        return ((NettyByteBuffer) buffer).asNativeBuffer();
+                    if (buffer instanceof NettyByteBuffer byteBuffer) {
+                        return byteBuffer.asNativeBuffer();
                     } else {
                         return Unpooled.wrappedBuffer(buffer.asNioBuffer());
                     }
@@ -185,8 +185,7 @@ class NettyByteBuffer implements ByteBuffer<ByteBuf>, ReferenceCounted {
      * @return The {@link ByteBuffer}
      */
     public ByteBuffer write(ByteBuf... byteBufs) {
-        if (this.delegate instanceof CompositeByteBuf) {
-            CompositeByteBuf compositeByteBuf = (CompositeByteBuf) this.delegate;
+        if (this.delegate instanceof CompositeByteBuf compositeByteBuf) {
             compositeByteBuf.addComponents(true, byteBufs);
         } else {
             ByteBuf current = this.delegate;

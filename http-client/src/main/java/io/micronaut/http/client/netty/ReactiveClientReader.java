@@ -16,6 +16,7 @@
 package io.micronaut.http.client.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
 import io.micronaut.http.netty.reactive.HotObservable;
 import io.netty.channel.ChannelHandlerContext;
@@ -38,7 +39,9 @@ import org.reactivestreams.Subscription;
 abstract class ReactiveClientReader extends ChannelInboundHandlerAdapter implements HotObservable<HttpContent>, Subscription {
     private EventLoop eventLoop;
     private ChannelHandlerContext ctx;
+    @Nullable
     private Subscriber<? super HttpContent> subscriber;
+    private Throwable heldBackException;
     private long demand;
     private boolean cancelled = false;
 
@@ -48,12 +51,21 @@ abstract class ReactiveClientReader extends ChannelInboundHandlerAdapter impleme
         eventLoop = ctx.channel().eventLoop();
     }
 
+    private void forwardException(Throwable t) {
+        if (subscriber == null) {
+            // no subscriber yet
+            heldBackException = t;
+        } else {
+            subscriber.onError(t);
+        }
+    }
+
     @Override
     public final void channelInactive(ChannelHandlerContext ctx) throws Exception {
         super.channelInactive(ctx);
         if (!cancelled) {
             cancelled = true;
-            subscriber.onError(new ResponseClosedException("Connection closed before full response body was transferred"));
+            forwardException(new ResponseClosedException("Connection closed before full response body was transferred"));
         }
     }
 
@@ -69,6 +81,11 @@ abstract class ReactiveClientReader extends ChannelInboundHandlerAdapter impleme
 
         subscriber = s;
         s.onSubscribe(this);
+        if (heldBackException != null) {
+            // already got an error
+            s.onError(heldBackException);
+            heldBackException = null;
+        }
     }
 
     @Override
@@ -118,6 +135,7 @@ abstract class ReactiveClientReader extends ChannelInboundHandlerAdapter impleme
             }
         } else {
             assert demand > 0 : "should be ensured by FlowControlHandler";
+            // demand > 0 => subscriber != null, so this is safe
             subscriber.onNext((HttpContent) msg);
             if (last) {
                 cancelled = true;
@@ -136,7 +154,7 @@ abstract class ReactiveClientReader extends ChannelInboundHandlerAdapter impleme
         } else {
             cancelled = true;
             remove(ctx);
-            subscriber.onError(cause);
+            forwardException(cause);
         }
     }
 

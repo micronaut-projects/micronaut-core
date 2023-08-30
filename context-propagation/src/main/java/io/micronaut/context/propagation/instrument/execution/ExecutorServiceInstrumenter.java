@@ -48,11 +48,11 @@ final class ExecutorServiceInstrumenter implements BeanCreatedEventListener<Exec
         Class<ExecutorService> beanType = event.getBeanDefinition().getBeanType();
         if (beanType == ExecutorService.class) {
             ExecutorService executorService = event.getBean();
-            if (executorService instanceof ScheduledExecutorService) {
+            if (executorService instanceof ScheduledExecutorService service) {
                 return new InstrumentedScheduledExecutorService() {
                     @Override
                     public ScheduledExecutorService getTarget() {
-                        return (ScheduledExecutorService) executorService;
+                        return service;
                     }
 
                     @Override

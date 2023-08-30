@@ -283,8 +283,7 @@ public interface ApplicationContextBuilder {
         ArgumentUtils.requireNonNull("type", type);
         ApplicationContext applicationContext = start();
         T bean = applicationContext.getBean(type);
-        if (bean instanceof LifeCycle) {
-            LifeCycle lifeCycle = (LifeCycle) bean;
+        if (bean instanceof LifeCycle lifeCycle) {
             if (!lifeCycle.isRunning()) {
                 lifeCycle.start();
             }

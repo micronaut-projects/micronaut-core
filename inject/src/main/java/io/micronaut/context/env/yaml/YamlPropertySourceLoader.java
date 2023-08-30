@@ -61,8 +61,7 @@ public class YamlPropertySourceLoader extends AbstractPropertySourceLoader {
         if (i.hasNext()) {
             while (i.hasNext()) {
                 Object object = i.next();
-                if (object instanceof Map) {
-                    Map map = (Map) object;
+                if (object instanceof Map map) {
                     log.trace("Processing YAML: {}", map);
                     String prefix = "";
                     processMap(finalMap, map, prefix);

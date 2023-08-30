@@ -109,8 +109,8 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
     }
 
     private SocketChannel findSocketChannel(Channel channel) {
-        if (channel instanceof SocketChannel) {
-            return (SocketChannel) channel;
+        if (channel instanceof SocketChannel socketChannel) {
+            return socketChannel;
         }
         Channel parent = channel.parent();
         if (parent == null) {
@@ -121,9 +121,8 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Http2Exception {
-        if (logger.isInfoEnabled() && msg instanceof HttpRequest) {
+        if (logger.isInfoEnabled() && msg instanceof HttpRequest request) {
             final SocketChannel channel = findSocketChannel(ctx.channel());
-            final HttpRequest request = (HttpRequest) msg;
             AccessLogHolder accessLogHolder = getAccessLogHolder(ctx, true);
             assert accessLogHolder != null; // can only return null when createIfMissing is false
             if (uriInclusion == null || uriInclusion.test(request.uri())) {
@@ -163,21 +162,21 @@ public class HttpAccessLogHandler extends ChannelDuplexHandler {
     private void processWriteEvent(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
         AccessLogHolder accessLogHolder = getAccessLogHolder(ctx, false);
         if (accessLogHolder != null) {
-            boolean isContinueResponse = msg instanceof HttpResponse && ((HttpResponse) msg).status().equals(HttpResponseStatus.CONTINUE);
+            boolean isContinueResponse = msg instanceof HttpResponse hr && hr.status().equals(HttpResponseStatus.CONTINUE);
             AccessLog accessLogger = accessLogHolder.getLogForResponse(
                     msg instanceof LastHttpContent && !isContinueResponse);
             if (accessLogger != null && !isContinueResponse) {
-                if (msg instanceof HttpResponse) {
-                    accessLogger.onResponseHeaders(ctx, ((HttpResponse) msg).headers(), ((HttpResponse) msg).status().codeAsText().toString());
+                if (msg instanceof HttpResponse response) {
+                    accessLogger.onResponseHeaders(ctx, response.headers(), response.status().codeAsText().toString());
                 }
-                if (msg instanceof LastHttpContent) {
-                    accessLogger.onLastResponseWrite(((LastHttpContent) msg).content().readableBytes());
+                if (msg instanceof LastHttpContent content) {
+                    accessLogger.onLastResponseWrite(content.content().readableBytes());
                     log(ctx, msg, promise, accessLogger);
                     return;
-                } else if (msg instanceof ByteBufHolder) {
-                    accessLogger.onResponseWrite(((ByteBufHolder) msg).content().readableBytes());
-                } else if (msg instanceof ByteBuf) {
-                    accessLogger.onResponseWrite(((ByteBuf) msg).readableBytes());
+                } else if (msg instanceof ByteBufHolder holder) {
+                    accessLogger.onResponseWrite(holder.content().readableBytes());
+                } else if (msg instanceof ByteBuf buf) {
+                    accessLogger.onResponseWrite(buf.readableBytes());
                 }
             }
         }

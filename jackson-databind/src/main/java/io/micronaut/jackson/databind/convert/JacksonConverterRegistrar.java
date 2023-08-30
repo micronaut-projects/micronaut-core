@@ -110,7 +110,7 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
                     Optional<PropertyNamingStrategy> propertyNamingStrategy = resolvePropertyNamingStrategy(charSequence);
 
                     if (!propertyNamingStrategy.isPresent()) {
-                        context.reject(charSequence, new IllegalArgumentException(String.format("Unable to convert '%s' to a com.fasterxml.jackson.databind.PropertyNamingStrategy", charSequence)));
+                        context.reject(charSequence, new IllegalArgumentException("Unable to convert '%s' to a com.fasterxml.jackson.databind.PropertyNamingStrategy".formatted(charSequence)));
                     }
 
                     return propertyNamingStrategy;
@@ -150,8 +150,8 @@ public class JacksonConverterRegistrar implements TypeConverterRegistrar {
                     return Optional.of(node.toString());
                 } else {
                     Argument<Object> argument = null;
-                    if (node instanceof ContainerNode && context instanceof ArgumentConversionContext && targetType.getTypeParameters().length != 0) {
-                        argument = ((ArgumentConversionContext<Object>) context).getArgument();
+                    if (node instanceof ContainerNode && context instanceof ArgumentConversionContext conversionContext && targetType.getTypeParameters().length != 0) {
+                        argument = conversionContext.getArgument();
                     }
                     Object result;
                     if (argument != null) {

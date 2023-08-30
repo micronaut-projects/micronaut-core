@@ -145,12 +145,12 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
      */
     static void encode(Environment environment, LocalFunctionRegistry registry, Class<?> returnType, Object result, OutputStream output) throws IOException {
         if (ClassUtils.isJavaLangType(returnType)) {
-            if (result instanceof Byte) {
-                output.write((Byte) result);
-            } else if (result instanceof Boolean) {
-                output.write(((Boolean) result) ? 1 : 0);
-            } else if (result instanceof byte[]) {
-                output.write((byte[]) result);
+            if (result instanceof Byte byte1) {
+                output.write(byte1);
+            } else if (result instanceof Boolean boolean1) {
+                output.write(boolean1 ? 1 : 0);
+            } else if (result instanceof byte[] bytes) {
+                output.write(bytes);
             } else {
                 byte[] bytes = environment
                     .convert(result.toString(), byte[].class)
@@ -158,11 +158,10 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
                 output.write(bytes);
             }
         } else {
-            if (result instanceof Writable) {
-                Writable writable = (Writable) result;
+            if (result instanceof Writable writable) {
                 writable.writeTo(output, environment.getProperty(LocalFunctionRegistry.FUNCTION_CHARSET, Charset.class, StandardCharsets.UTF_8));
             } else {
-                Optional<MediaTypeCodec> codec = registry instanceof MediaTypeCodecRegistry ? ((MediaTypeCodecRegistry) registry).findCodec(MediaType.APPLICATION_JSON_TYPE) : Optional.empty();
+                Optional<MediaTypeCodec> codec = registry instanceof MediaTypeCodecRegistry mtcr ? mtcr.findCodec(MediaType.APPLICATION_JSON_TYPE) : Optional.empty();
 
 
                 if (codec.isPresent()) {
@@ -192,8 +191,8 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
             return input;
         } else {
 
-            if (localFunctionRegistry instanceof MediaTypeCodecRegistry) {
-                Optional<MediaTypeCodec> registeredDecoder = ((MediaTypeCodecRegistry) localFunctionRegistry).findCodec(MediaType.APPLICATION_JSON_TYPE);
+            if (localFunctionRegistry instanceof MediaTypeCodecRegistry registry) {
+                Optional<MediaTypeCodec> registeredDecoder = registry.findCodec(MediaType.APPLICATION_JSON_TYPE);
                 if (registeredDecoder.isPresent()) {
                     MediaTypeCodec decoder = registeredDecoder.get();
                     return decoder.decode(arg, input);

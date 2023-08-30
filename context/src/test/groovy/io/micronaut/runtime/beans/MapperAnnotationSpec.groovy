@@ -72,6 +72,16 @@ class MapperAnnotationSpec extends Specification {
         result.parts == 10
     }
 
+    void "converting mapper test"() {
+        given:
+        SimpleRobotEntity result = testBean.toEntityConvert(new CreateRobot2("foo", "bar", "10"))
+
+        expect:
+        result.id == 'FOO'
+        result.companyId == 'bar'
+        result.parts == 10
+    }
+
     void "transform mapper test"() {
         when:
         SimpleRobotEntity result = testBean.toEntityTransform(new CreateRobot("foo", "bar", 10))
@@ -113,6 +123,10 @@ abstract class Test {
     abstract SimpleRobotEntity toEntity(CreateRobot createRobot)
 
     @Mapper.Mapping(to = "id", from = "#{createRobot.id.toUpperCase()}")
+    @Mapper.Mapping(to = "parts", from = "#{createRobot.parts}")
+    abstract SimpleRobotEntity toEntityConvert(CreateRobot2 createRobot)
+
+    @Mapper.Mapping(to = "id", from = "#{createRobot.id.toUpperCase()}")
     @Mapper.Mapping(to = "parts", from = "#{createRobot.parts * 2}", condition = "#{createRobot.parts < 50}", defaultValue = "10")
     @Mapper.Mapping(to = "companyId", from = "#{this.calcCompanyId(createRobot)}")
     abstract SimpleRobotEntity toEntityTransform(CreateRobot createRobot)
@@ -129,6 +143,19 @@ final class CreateRobot {
     final int parts
 
     CreateRobot(String id, String companyId, int parts) {
+        this.id = id
+        this.companyId = companyId
+        this.parts = parts
+    }
+}
+
+@Introspected
+final class CreateRobot2 {
+    final String id
+    final String companyId
+    final String parts
+
+    CreateRobot2(String id, String companyId, String parts) {
         this.id = id
         this.companyId = companyId
         this.parts = parts

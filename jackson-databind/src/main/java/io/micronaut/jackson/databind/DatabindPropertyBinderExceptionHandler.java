@@ -40,8 +40,7 @@ import java.util.Optional;
 final class DatabindPropertyBinderExceptionHandler implements JsonBeanPropertyBinderExceptionHandler {
     @Override
     public Optional<ConversionErrorException> toConversionError(@Nullable Object object, @NonNull Exception e) {
-        if (e instanceof InvalidFormatException) {
-            InvalidFormatException ife = (InvalidFormatException) e;
+        if (e instanceof InvalidFormatException ife) {
             Object originalValue = ife.getValue();
             ConversionError conversionError = new ConversionError() {
                 @Override

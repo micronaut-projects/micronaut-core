@@ -258,8 +258,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
 
     @Override
     public MutableHttpResponse<B> cookie(Cookie cookie) {
-        if (cookie instanceof NettyCookie) {
-            NettyCookie nettyCookie = (NettyCookie) cookie;
+        if (cookie instanceof NettyCookie nettyCookie) {
             String value = serverCookieEncoder.encode(nettyCookie.getNettyCookie());
             headers.add(HttpHeaderNames.SET_COOKIE, value);
         } else {
@@ -306,8 +305,8 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
     @Override
     public <T> MutableHttpResponse<T> body(@Nullable T body) {
         if (this.body != body) {
-            if (this.body instanceof ByteBuf) {
-                ((ByteBuf) this.body).release();
+            if (this.body instanceof ByteBuf buf) {
+                buf.release();
             }
             setBody(body);
             bodyConvertor.cleanup();
@@ -347,8 +346,8 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
         ByteBuf content;
         if (body == null) {
             content = Unpooled.EMPTY_BUFFER;
-        } else if (body instanceof ByteBuf) {
-            content = (ByteBuf) body;
+        } else if (body instanceof ByteBuf buf) {
+            content = buf;
         } else {
             throw new IllegalStateException("Body needs to be converted to ByteBuf from " + body.getClass());
         }
@@ -369,8 +368,8 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
         ByteBuf content;
         if (body == null) {
             content = Unpooled.EMPTY_BUFFER;
-        } else if (body instanceof ByteBuf) {
-            content = (ByteBuf) body;
+        } else if (body instanceof ByteBuf buf) {
+            content = buf;
         } else {
             throw new IllegalStateException("Body needs to be converted to ByteBuf from " + body.getClass());
         }
@@ -430,8 +429,8 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
         protected synchronized Optional<T> convertFromNext(ConversionService conversionService, ArgumentConversionContext<T> conversionContext, T value) {
             if (nextConvertor == null) {
                 Optional<T> conversion;
-                if (value instanceof ByteBuffer) {
-                    conversion = conversionService.convert(((ByteBuffer) value).asNativeBuffer(), conversionContext);
+                if (value instanceof ByteBuffer buffer) {
+                    conversion = conversionService.convert(buffer.asNativeBuffer(), conversionContext);
                 } else {
                     conversion = conversionService.convert(value, conversionContext);
                 }

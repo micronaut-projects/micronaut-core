@@ -97,7 +97,7 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
 
     private void configureLogLevelForPrefix(final String loggerPrefix, final Object levelValue) {
         final LogLevel newLevel;
-        if (levelValue instanceof Boolean && !((boolean) levelValue)) {
+        if (levelValue instanceof Boolean boolean1 && !boolean1) {
             newLevel = LogLevel.OFF; // SnakeYAML converts OFF (without quotations) to a boolean false value, hence we need to handle that here...
         } else {
             newLevel = toLogLevel(levelValue.toString());

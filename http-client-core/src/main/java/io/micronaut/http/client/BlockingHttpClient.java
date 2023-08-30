@@ -144,7 +144,7 @@ public interface BlockingHttpClient extends Closeable {
             Optional<O> body = response.getBody();
             if (!body.isPresent() && response.getBody(Argument.of(byte[].class)).isPresent()) {
                 throw new HttpClientResponseException(
-                        String.format("Failed to decode the body for the given content type [%s]", response.getContentType().orElse(null)),
+                "Failed to decode the body for the given content type [%s]".formatted(response.getContentType().orElse(null)),
                         response
                 );
             } else {

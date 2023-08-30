@@ -410,6 +410,22 @@ class Test {
     }
 
     /**
+     * Builds the bean definition for an AOP proxy bean.
+     * @param className The class name
+     * @param cls The class source
+     * @return The bean definition
+     */
+    protected BeanDefinition buildSimpleInterceptedBeanDefinition(String className, @Language("java") String cls) {
+        def classSimpleName = NameUtils.getSimpleName(className)
+        def beanDefName = (classSimpleName.startsWith('$') ? '' : '$') + classSimpleName + BeanDefinitionVisitor.PROXY_SUFFIX + BeanDefinitionWriter.CLASS_SUFFIX
+        def packageName = NameUtils.getPackageName(className)
+        String beanFullName = "${packageName}.${beanDefName}"
+
+        ClassLoader classLoader = buildClassLoader(className, cls)
+        return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
+    }
+
+    /**
      * Retrieve additional annotation mappers to apply
      * @param annotationName The annotation name
      * @return The mappers for the annotation

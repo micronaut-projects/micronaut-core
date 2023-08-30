@@ -175,7 +175,7 @@ final class MapperIntroduction implements MethodInterceptor<Object, Object> {
                     MutableAnnotationMetadata annotationMetadata = new MutableAnnotationMetadata();
                     annotationMetadata.addAnnotation(Format.class.getName(), Map.of(AnnotationMetadata.VALUE_MEMBER, format));
                     conversionContext = conversionContext.with(new AnnotationMetadataHierarchy(argument.getAnnotationMetadata(), annotationMetadata));
-                } else if (conflictStrategy == Mapper.ConflictStrategy.CONVERT) {
+                } else if (conflictStrategy == Mapper.ConflictStrategy.CONVERT || conflictStrategy == null) {
                     conversionContext = ConversionContext.of(argument);
                 }
 

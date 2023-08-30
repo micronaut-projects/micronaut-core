@@ -194,15 +194,12 @@ public class DefaultHttpClientBinderRegistry implements HttpClientBinderRegistry
      * @param <T> The type
      */
     public <T> void addBinder(ClientRequestBinder binder) {
-        if (binder instanceof AnnotatedClientRequestBinder) {
-            AnnotatedClientRequestBinder<?> annotatedBinder = (AnnotatedClientRequestBinder<?>) binder;
+        if (binder instanceof AnnotatedClientRequestBinder annotatedBinder) {
             methodByAnnotation.put(annotatedBinder.getAnnotationType(), annotatedBinder);
-        } else if (binder instanceof AnnotatedClientArgumentRequestBinder) {
-            AnnotatedClientArgumentRequestBinder<?> annotatedRequestArgumentBinder = (AnnotatedClientArgumentRequestBinder<?>) binder;
+        } else if (binder instanceof AnnotatedClientArgumentRequestBinder annotatedRequestArgumentBinder) {
             Class<? extends Annotation> annotationType = annotatedRequestArgumentBinder.getAnnotationType();
             byAnnotation.put(annotationType, annotatedRequestArgumentBinder);
-        } else if (binder instanceof TypedClientArgumentRequestBinder) {
-            TypedClientArgumentRequestBinder<?> typedRequestArgumentBinder = (TypedClientArgumentRequestBinder<?>) binder;
+        } else if (binder instanceof TypedClientArgumentRequestBinder typedRequestArgumentBinder) {
             byType.put(typedRequestArgumentBinder.argumentType().typeHashCode(), typedRequestArgumentBinder);
             List<Class<?>> superTypes = typedRequestArgumentBinder.superTypes();
             if (CollectionUtils.isNotEmpty(superTypes)) {

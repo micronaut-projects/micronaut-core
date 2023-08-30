@@ -31,13 +31,13 @@ jobs:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      # https://github.com/actions/virtual-environments/issues/709
+       # https://github.com/actions/virtual-environments/issues/709
       - name: "🗑 Free disk space"
         run: |
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-          sudo apt-get clean
-          df -h
+         sudo rm -rf "/usr/local/share/boost"
+         sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+         sudo apt-get clean
+         df -h
 
       - name: "📥 Checkout repository"
         uses: actions/checkout@v3

@@ -542,8 +542,8 @@ public class DefaultHttpClient implements
                             ReferenceCountUtil.safeRelease(bb);
                         }
                     });
-                    if (res instanceof FullNettyClientHttpResponse) {
-                        ((FullNettyClientHttpResponse) res).onComplete();
+                    if (res instanceof FullNettyClientHttpResponse response) {
+                        response.onComplete();
                     }
                 }).blockFirst();
             }
@@ -559,7 +559,7 @@ public class DefaultHttpClient implements
                     Optional<O> body = response.getBody();
                     if (!body.isPresent() && response.getBody(Argument.of(byte[].class)).isPresent()) {
                         throw decorate(new HttpClientResponseException(
-                            String.format("Failed to decode the body for the given content type [%s]", response.getContentType().orElse(null)),
+                        "Failed to decode the body for the given content type [%s]".formatted(response.getContentType().orElse(null)),
                             response
                         ));
                     } else {
@@ -587,8 +587,8 @@ public class DefaultHttpClient implements
 
     private <I> Publisher<Event<ByteBuffer<?>>> eventStreamOrError(@NonNull io.micronaut.http.HttpRequest<I> request, @NonNull Argument<?> errorType) {
 
-        if (request instanceof MutableHttpRequest) {
-            ((MutableHttpRequest) request).accept(MediaType.TEXT_EVENT_STREAM_TYPE);
+        if (request instanceof MutableHttpRequest httpRequest) {
+            httpRequest.accept(MediaType.TEXT_EVENT_STREAM_TYPE);
         }
 
         return Flux.create(emitter ->
@@ -688,8 +688,8 @@ public class DefaultHttpClient implements
                         } catch (Throwable e) {
                             onError(e);
                         } finally {
-                            if (buffer instanceof ReferenceCounted) {
-                                ((ReferenceCounted) buffer).release();
+                            if (buffer instanceof ReferenceCounted counted) {
+                                counted.release();
                             }
                         }
                     }
@@ -744,8 +744,7 @@ public class DefaultHttpClient implements
                 .flatMap(requestURI -> dataStreamImpl(toMutableRequest(request), errorType, parentRequest, requestURI)))
                 .doAfterNext(buffer -> {
                     Object o = buffer.asNativeBuffer();
-                    if (o instanceof ByteBuf) {
-                        ByteBuf byteBuf = (ByteBuf) o;
+                    if (o instanceof ByteBuf byteBuf) {
                         if (byteBuf.refCnt() > 0) {
                             ReferenceCountUtil.safeRelease(byteBuf);
                         }
@@ -766,8 +765,8 @@ public class DefaultHttpClient implements
                 .flatMap(uri -> exchangeStreamImpl(parentRequest, toMutableRequest(request), errorType, uri)))
                 .doAfterNext(byteBufferHttpResponse -> {
                     ByteBuffer<?> buffer = byteBufferHttpResponse.body();
-                    if (buffer instanceof ReferenceCounted) {
-                        ((ReferenceCounted) buffer).release();
+                    if (buffer instanceof ReferenceCounted counted) {
+                        counted.release();
                     }
                 });
     }
@@ -828,7 +827,7 @@ public class DefaultHttpClient implements
                 Optional<O> body = response.getBody();
                 if (!body.isPresent() && response.getBody(byte[].class).isPresent()) {
                     throw decorate(new HttpClientResponseException(
-                        String.format("Failed to decode the body for the given content type [%s]", response.getContentType().orElse(null)),
+                    "Failed to decode the body for the given content type [%s]".formatted(response.getContentType().orElse(null)),
                         response
                     ));
                 } else {
@@ -892,8 +891,8 @@ public class DefaultHttpClient implements
 
         MutableHttpHeaders headers = request.getHeaders();
         HttpHeaders customHeaders = EmptyHttpHeaders.INSTANCE;
-        if (headers instanceof NettyHttpHeaders) {
-            customHeaders = ((NettyHttpHeaders) headers).getNettyHeaders();
+        if (headers instanceof NettyHttpHeaders httpHeaders) {
+            customHeaders = httpHeaders.getNettyHeaders();
         }
         if (StringUtils.isNotEmpty(subprotocol)) {
             NettyHttpHeaders.validateHeader("Sec-WebSocket-Protocol", subprotocol);
@@ -1026,8 +1025,8 @@ public class DefaultHttpClient implements
     }
 
     private void setupConversionService(io.micronaut.http.HttpRequest<?> httpRequest) {
-        if (httpRequest instanceof ConversionServiceAware) {
-            ((ConversionServiceAware) httpRequest).setConversionService(conversionService);
+        if (httpRequest instanceof ConversionServiceAware aware) {
+            aware.setConversionService(conversionService);
         }
     }
 
@@ -1278,8 +1277,8 @@ public class DefaultHttpClient implements
             boolean hasBody = body.isPresent();
             if (requestContentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) && hasBody) {
                 Object bodyValue = body.get();
-                if (bodyValue instanceof CharSequence) {
-                    ByteBuf byteBuf = charSequenceToByteBuf((CharSequence) bodyValue, requestContentType);
+                if (bodyValue instanceof CharSequence sequence) {
+                    ByteBuf byteBuf = charSequenceToByteBuf(sequence, requestContentType);
                     FullHttpRequest nettyRequest = withBytes(nettyRequestBuilder.toHttpRequestWithoutBody(), byteBuf);
                     nettyRequest.setUri(newUri);
                     return new FullRequestWriter(nettyRequest);
@@ -1317,8 +1316,8 @@ public class DefaultHttpClient implements
                         HttpRequest nettyRequest = nettyRequestBuilder.toHttpRequestWithoutBody();
                         nettyRequest.setUri(newUri);
                         return new ReactiveRequestWriter(nettyRequest, requestBodyPublisher);
-                    } else if (bodyValue instanceof CharSequence) {
-                        bodyContent = charSequenceToByteBuf((CharSequence) bodyValue, requestContentType);
+                    } else if (bodyValue instanceof CharSequence sequence) {
+                        bodyContent = charSequenceToByteBuf(sequence, requestContentType);
                     } else {
                         ByteBuffer<?> buffer = dynamicWriter.writeTo(Argument.OBJECT_ARGUMENT, requestContentType, bodyValue, request.getHeaders(), byteBufferFactory);
                         bodyContent = (ByteBuf) buffer.asNativeBuffer();
@@ -1369,11 +1368,10 @@ public class DefaultHttpClient implements
     private Flux<MutableHttpResponse<?>> readBodyOnError(@Nullable Argument<?> errorType, @NonNull Flux<MutableHttpResponse<?>> publisher) {
         if (errorType != null && errorType != HttpClient.DEFAULT_ERROR_TYPE) {
             return publisher.onErrorResume(clientException -> {
-                if (clientException instanceof HttpClientResponseException) {
-                    final HttpResponse<?> response = ((HttpClientResponseException) clientException).getResponse();
-                    if (response instanceof NettyStreamedHttpResponse) {
+                if (clientException instanceof HttpClientResponseException exception) {
+                    final HttpResponse<?> response = exception.getResponse();
+                    if (response instanceof NettyStreamedHttpResponse streamedResponse) {
                         return Mono.create(emitter -> {
-                            NettyStreamedHttpResponse<?> streamedResponse = (NettyStreamedHttpResponse<?>) response;
                             final StreamedHttpResponse nettyResponse = streamedResponse.getNettyResponse();
                             nettyResponse.subscribe(new Subscriber<HttpContent>() {
                                 final CompositeByteBuf buffer = byteBufferFactory.getNativeAllocator().compositeBuffer();
@@ -1435,8 +1433,8 @@ public class DefaultHttpClient implements
 
         return Flux.from(loadBalancer.select(getLoadBalancerDiscriminator())).map(server -> {
                     Optional<String> authInfo = server.getMetadata().get(io.micronaut.http.HttpHeaders.AUTHORIZATION_INFO, String.class);
-                    if (request instanceof MutableHttpRequest && authInfo.isPresent()) {
-                        ((MutableHttpRequest) request).getHeaders().auth(authInfo.get());
+                    if (request instanceof MutableHttpRequest httpRequest && authInfo.isPresent()) {
+                        httpRequest.getHeaders().auth(authInfo.get());
                     }
 
                     try {
@@ -1622,8 +1620,7 @@ public class DefaultHttpClient implements
                     MediaType mediaType = request.getContentType().orElse(MediaType.APPLICATION_JSON_TYPE);
                     headers.set(HttpHeaderNames.CONTENT_TYPE, mediaType);
                 }
-                if (nettyRequest instanceof FullHttpRequest) {
-                    FullHttpRequest fullHttpRequest = (FullHttpRequest) nettyRequest;
+                if (nettyRequest instanceof FullHttpRequest fullHttpRequest) {
                     headers.set(HttpHeaderNames.CONTENT_LENGTH, fullHttpRequest.content().readableBytes());
                 } else {
                     if (!headers.contains(HttpHeaderNames.CONTENT_LENGTH) && !headers.contains(HttpHeaderNames.TRANSFER_ENCODING)) {
@@ -1648,8 +1645,7 @@ public class DefaultHttpClient implements
         for (Map.Entry<String, Object> entry : formData.entrySet()) {
             Object value = entry.getValue();
             if (value != null) {
-                if (value instanceof Collection) {
-                    Collection collection = (Collection) value;
+                if (value instanceof Collection collection) {
                     for (Object val : collection) {
                         addBodyAttribute(postRequestEncoder, entry.getKey(), val);
                     }
@@ -1672,11 +1668,10 @@ public class DefaultHttpClient implements
         HttpDataFactory factory = new DefaultHttpDataFactory(DefaultHttpDataFactory.MINSIZE);
         io.netty.handler.codec.http.HttpRequest request = NettyHttpRequestBuilder.asBuilder(clientHttpRequest).toHttpRequestWithoutBody();
         HttpPostRequestEncoder postRequestEncoder = new HttpPostRequestEncoder(factory, request, true, CharsetUtil.UTF_8, HttpPostRequestEncoder.EncoderMode.HTML5);
-        if (bodyValue instanceof MultipartBody.Builder) {
-            bodyValue = ((MultipartBody.Builder) bodyValue).build();
+        if (bodyValue instanceof MultipartBody.Builder builder) {
+            bodyValue = builder.build();
         }
-        if (bodyValue instanceof MultipartBody) {
-            final MultipartBody multipartBody = (MultipartBody) bodyValue;
+        if (bodyValue instanceof MultipartBody multipartBody) {
             postRequestEncoder.setBodyHttpDatas(multipartBody.getData(new MultipartDataFactory<InterfaceHttpData>() {
                 @NonNull
                 @Override
@@ -1704,21 +1699,20 @@ public class DefaultHttpClient implements
 
                 @Override
                 public void setContent(InterfaceHttpData fileUploadObject, Object content) throws IOException {
-                    if (fileUploadObject instanceof FileUpload) {
-                        FileUpload fu = (FileUpload) fileUploadObject;
-                        if (content instanceof InputStream) {
-                            fu.setContent((InputStream) content);
-                        } else if (content instanceof File) {
-                            fu.setContent((File) content);
-                        } else if (content instanceof byte[]) {
-                            final ByteBuf buffer = Unpooled.wrappedBuffer((byte[]) content);
+                    if (fileUploadObject instanceof FileUpload fu) {
+                        if (content instanceof InputStream stream) {
+                            fu.setContent(stream);
+                        } else if (content instanceof File file) {
+                            fu.setContent(file);
+                        } else if (content instanceof byte[] bytes) {
+                            final ByteBuf buffer = Unpooled.wrappedBuffer(bytes);
                             fu.setContent(buffer);
                         }
                     }
                 }
             }));
         } else {
-            throw new MultipartException(String.format("The type %s is not a supported type for a multipart request body", bodyValue.getClass().getName()));
+            throw new MultipartException("The type %s is not a supported type for a multipart request body".formatted(bodyValue.getClass().getName()));
         }
 
         return postRequestEncoder;
@@ -1733,8 +1727,7 @@ public class DefaultHttpClient implements
     private void traceRequest(io.micronaut.http.HttpRequest<?> request, io.netty.handler.codec.http.HttpRequest nettyRequest) {
         HttpHeaders headers = nettyRequest.headers();
         HttpHeadersUtil.trace(log, headers.names(), headers::getAll);
-        if (io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod()) && request.getBody().isPresent() && nettyRequest instanceof FullHttpRequest) {
-            FullHttpRequest fullHttpRequest = (FullHttpRequest) nettyRequest;
+        if (io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod()) && request.getBody().isPresent() && nettyRequest instanceof FullHttpRequest fullHttpRequest) {
             ByteBuf content = fullHttpRequest.content();
             if (log.isTraceEnabled()) {
                 traceBody("Request", content);

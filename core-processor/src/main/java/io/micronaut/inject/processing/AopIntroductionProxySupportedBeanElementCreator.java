@@ -43,6 +43,8 @@ final class AopIntroductionProxySupportedBeanElementCreator extends DeclaredBean
             throw new ProcessingException(classElement, "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + classElement.getName());
         }
         aopProxyVisitor = createIntroductionAopProxyWriter(classElement, visitorContext);
+        aopProxyVisitor.visitTypeArguments(classElement.getAllTypeArguments());
+        visitAnnotationMetadata(aopProxyVisitor, classElement.getAnnotationMetadata());
         beanDefinitionWriters.add(aopProxyVisitor);
         MethodElement constructorElement = classElement.getPrimaryConstructor().orElse(null);
         if (constructorElement != null) {

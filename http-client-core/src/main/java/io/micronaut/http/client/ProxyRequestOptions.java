@@ -56,8 +56,8 @@ public final class ProxyRequestOptions {
 
     @Override
     public boolean equals(Object o) {
-        return o instanceof ProxyRequestOptions &&
-                isRetainHostHeader() == ((ProxyRequestOptions) o).isRetainHostHeader();
+        return o instanceof ProxyRequestOptions pro &&
+                isRetainHostHeader() == pro.isRetainHostHeader();
     }
 
     @Override

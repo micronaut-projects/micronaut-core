@@ -69,8 +69,8 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
                 boolean isAcceptable = isAcceptable(enclosedElement);
                 if (isAcceptable) {
                     String qualifiedName;
-                    if (enclosedElement instanceof ExecutableElement) {
-                        qualifiedName = buildQualifiedName(type, typeElement, (ExecutableElement) enclosedElement);
+                    if (enclosedElement instanceof ExecutableElement executableElement) {
+                        qualifiedName = buildQualifiedName(type, typeElement, executableElement);
                     } else {
                         qualifiedName = types.erasure(enclosedElement.asType()).toString() + "." + enclosedElement.getSimpleName().toString();
                     }
@@ -79,8 +79,7 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
                         processed.add(qualifiedName);
                         accept(type, enclosedElement, p);
                     }
-                } else if (enclosedElement instanceof ExecutableElement) {
-                    ExecutableElement ee = (ExecutableElement) enclosedElement;
+                } else if (enclosedElement instanceof ExecutableElement ee) {
                     Set<Modifier> modifiers = ee.getModifiers();
                     if (!modifiers.contains(Modifier.PRIVATE) && !modifiers.contains(Modifier.STATIC)) {
                         String qualifiedName = buildQualifiedName(type, typeElement, ee);
@@ -92,14 +91,13 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
             }
 
             TypeMirror superMirror = typeElement.getSuperclass();
-            if (superMirror instanceof DeclaredType) {
-                visitDeclared((DeclaredType) superMirror, p);
+            if (superMirror instanceof DeclaredType declaredType) {
+                visitDeclared(declaredType, p);
             }
             if (visitInterfaces) {
                 List<TypeMirror> interfaces = new ArrayList<>();
                 for (TypeMirror anInterface : typeElement.getInterfaces()) {
-                    if (anInterface instanceof DeclaredType) {
-                        DeclaredType interfaceType = (DeclaredType) anInterface;
+                    if (anInterface instanceof DeclaredType interfaceType) {
                         interfaces.add(anInterface);
                         interfaces.addAll(getInterfaces(interfaceType));
                     }
@@ -125,11 +123,9 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
     private List<TypeMirror> getInterfaces(DeclaredType declaredType) {
         Element interfaceElement = declaredType.asElement();
         List<TypeMirror> interfaces = new ArrayList<>();
-        if (interfaceElement instanceof TypeElement) {
-            TypeElement interfaceTypeElement = (TypeElement) interfaceElement;
+        if (interfaceElement instanceof TypeElement interfaceTypeElement) {
             for (TypeMirror anInterface : interfaceTypeElement.getInterfaces()) {
-                if (anInterface instanceof DeclaredType) {
-                    DeclaredType interfaceType = (DeclaredType) anInterface;
+                if (anInterface instanceof DeclaredType interfaceType) {
                     interfaces.add(interfaceType);
                     interfaces.addAll(getInterfaces(interfaceType));
                 }

@@ -325,7 +325,7 @@ public class JavaMethodElement extends AbstractJavaElement implements MethodElem
 
     private static boolean sameType(String type, DeclaredType dt) {
         Element elt = dt.asElement();
-        return (elt instanceof TypeElement) && type.equals(((TypeElement) elt).getQualifiedName().toString());
+        return (elt instanceof TypeElement te) && type.equals(te.getQualifiedName().toString());
     }
 
     private boolean isSuspend(VariableElement ve) {

@@ -126,7 +126,7 @@ public abstract class EnclosedElementsQuery<C, N> {
                 if (element.isPrivate() || element.getName().startsWith("$")) {
                     return false;
                 }
-                if (element instanceof MemberElement && !((MemberElement) element).isAccessible()) {
+                if (element instanceof MemberElement memberElement && !memberElement.isAccessible()) {
                     return false;
                 }
             }
