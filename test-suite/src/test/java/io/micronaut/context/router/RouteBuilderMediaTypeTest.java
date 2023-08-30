@@ -59,7 +59,7 @@ class RouteBuilderMediaTypeTest extends Specification {
         HttpResponse<?> response = assertDoesNotThrow(() -> client.exchange(request));
         assertEquals(HttpStatus.SEE_OTHER, response.getStatus());
         assertEquals("/foo", response.getHeaders().get(HttpHeaders.LOCATION));
-        assertEquals(contactController.contact, new Contact("Sergio", "del Amo"));
+        assertEquals(new Contact("Sergio", "del Amo"), contactController.contact);
 
         contactController.contact = null;
     }
@@ -73,10 +73,9 @@ class RouteBuilderMediaTypeTest extends Specification {
         HttpResponse<?> response = assertDoesNotThrow(() -> client.exchange(request));
         assertEquals(HttpStatus.SEE_OTHER, response.getStatus());
         assertEquals("/foo", response.getHeaders().get(HttpHeaders.LOCATION));
-        assertEquals(contactController.contact, new Contact("Sergio", "del Amo"));
+        assertEquals(new Contact("Sergio", "del Amo"), contactController.contact);
 
         contactController.contact = null;
-
     }
 
     @Requires(property = "spec.name", value = "RouteBuilderMediaTypeSpec")
