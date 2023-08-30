@@ -293,7 +293,6 @@ abstract class AbstractKotlinCompilation<A : CommonCompilerArguments> internal c
 
 internal fun convertKotlinExitCode(code: ExitCode) = when(code) {
     ExitCode.OK -> KotlinCompilation.ExitCode.OK
-    ExitCode.OOM_ERROR,
     ExitCode.INTERNAL_ERROR -> KotlinCompilation.ExitCode.INTERNAL_ERROR
     ExitCode.COMPILATION_ERROR -> KotlinCompilation.ExitCode.COMPILATION_ERROR
     ExitCode.SCRIPT_EXECUTION_ERROR -> KotlinCompilation.ExitCode.SCRIPT_EXECUTION_ERROR
