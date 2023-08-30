@@ -93,8 +93,8 @@ final class CompletionStageInterceptedMethod implements InterceptedMethod {
     }
 
     private CompletionStage<Object> convertToCompletionStage(Object result) {
-        if (result instanceof CompletionStage) {
-            return (CompletionStage<Object>) result;
+        if (result instanceof CompletionStage stage) {
+            return stage;
         }
         throw new IllegalStateException("Cannot convert " + result + "  to 'java.util.concurrent.CompletionStage'");
     }
@@ -104,8 +104,8 @@ final class CompletionStageInterceptedMethod implements InterceptedMethod {
         if (returnTypeClass.isInstance(result)) {
             return result;
         }
-        if (result instanceof CompletionStage && (returnTypeClass == CompletableFuture.class || returnTypeClass == Future.class)) {
-            return ((CompletionStage<?>) result).toCompletableFuture();
+        if (result instanceof CompletionStage stage && (returnTypeClass == CompletableFuture.class || returnTypeClass == Future.class)) {
+            return stage.toCompletableFuture();
         }
         return conversionService.convert(result, returnType.asArgument())
                 .orElseThrow(() -> new IllegalStateException("Cannot convert completion stage result: " + result + " to '" + returnType.getType().getName() + "'"));

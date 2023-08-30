@@ -50,13 +50,13 @@ final class HttpLineBasedFrameDecoder extends LineBasedFrameDecoder {
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-        if (msg instanceof HttpResponse &&
-            ((HttpResponse) msg).status().equals(HttpResponseStatus.CONTINUE)) {
+        if (msg instanceof HttpResponse response &&
+            response.status().equals(HttpResponseStatus.CONTINUE)) {
             ignoreOneLast = true;
         }
 
-        if (msg instanceof HttpContent) {
-            super.channelRead(ctx, ((HttpContent) msg).content());
+        if (msg instanceof HttpContent content) {
+            super.channelRead(ctx, content.content());
         } else {
             ctx.fireChannelRead(msg);
         }

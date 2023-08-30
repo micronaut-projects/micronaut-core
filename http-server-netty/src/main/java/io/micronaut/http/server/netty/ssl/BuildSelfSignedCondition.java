@@ -35,8 +35,7 @@ abstract class BuildSelfSignedCondition implements Condition {
     @Override
     public boolean matches(ConditionContext context) {
         BeanContext beanContext = context.getBeanContext();
-        if (beanContext instanceof PropertyResolver) {
-            PropertyResolver resolver = (PropertyResolver) beanContext;
+        if (beanContext instanceof PropertyResolver resolver) {
 
             boolean deprecated = enabledForPrefix(resolver, SslConfiguration.PREFIX);
             boolean server = enabledForPrefix(resolver, ServerSslConfiguration.PREFIX);

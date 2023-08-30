@@ -74,8 +74,8 @@ public interface ReactiveExecutionFlow<T> extends ExecutionFlow<T> {
      */
     @NonNull
     static <K> ReactiveExecutionFlow<K> fromFlow(@NonNull ExecutionFlow<K> flow) {
-        if (flow instanceof ReactiveExecutionFlow<K>) {
-            return (ReactiveExecutionFlow<K>) flow;
+        if (flow instanceof ReactiveExecutionFlow<K> executionFlow) {
+            return executionFlow;
         }
         return (ReactiveExecutionFlow<K>) new ReactorExecutionFlowImpl(ReactorExecutionFlowImpl.toMono(flow));
     }

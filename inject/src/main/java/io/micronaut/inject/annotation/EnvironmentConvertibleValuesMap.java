@@ -73,9 +73,9 @@ final class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
         V value = map.get(name);
         if (value instanceof AnnotationClassValue<?> acv) {
             return environment.convert(acv, conversionContext);
-        } else if (value instanceof CharSequence) {
+        } else if (value instanceof CharSequence sequence) {
             PropertyPlaceholderResolver placeholderResolver = environment.getPlaceholderResolver();
-            String str = doResolveIfNecessary((CharSequence) value, placeholderResolver);
+            String str = doResolveIfNecessary(sequence, placeholderResolver);
             return environment.convert(str, conversionContext);
         } else if (value instanceof String[] values) {
             PropertyPlaceholderResolver placeholderResolver = environment.getPlaceholderResolver();

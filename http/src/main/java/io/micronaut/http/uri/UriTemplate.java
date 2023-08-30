@@ -216,8 +216,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
             if (result == null) {
                 continue;
             }
-            if (segment instanceof UriTemplateParser.VariablePathSegment) {
-                UriTemplateParser.VariablePathSegment varPathSegment = (UriTemplateParser.VariablePathSegment) segment;
+            if (segment instanceof UriTemplateParser.VariablePathSegment varPathSegment) {
                 if (varPathSegment.isQuerySegment && ! queryParameter) {
                     // reset anyPrevious* when we reach query parameters
                     queryParameter = true;
@@ -436,8 +435,8 @@ public class UriTemplate implements Comparable<UriTemplate> {
                 templateString = "";
             } else {
                 PathSegment last = segments.get(segments.size() - 1);
-                if (last instanceof UriTemplateParser.RawPathSegment) {
-                    String v = ((UriTemplateParser.RawPathSegment) last).value;
+                if (last instanceof UriTemplateParser.RawPathSegment segment) {
+                    String v = segment.value;
                     if (v.endsWith(SLASH_STRING)) {
                         templateString = templateString.substring(1);
                     } else {
@@ -982,9 +981,9 @@ public class UriTemplate implements Comparable<UriTemplate> {
                         found = expandPOJO(found); // Turn POJO into a Map
                     }
 
-                    if (found instanceof Iterable) {
-                        Iterable iter = ((Iterable) found);
-                        if (iter instanceof Collection && ((Collection) iter).isEmpty()) {
+                    if (found instanceof Iterable iterable) {
+                        Iterable iter = iterable;
+                        if (iter instanceof Collection collection && collection.isEmpty()) {
                             return "";
                         }
                         StringJoiner joiner = new StringJoiner(delimiter);
@@ -995,8 +994,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                             }
                         }
                         result = joiner.toString();
-                    } else if (found instanceof Map) {
-                        Map<Object, Object> map = (Map<Object, Object>) found;
+                    } else if (found instanceof Map map) {
                         if (map.isEmpty()) {
                             return "";
                         }
@@ -1025,7 +1023,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                 return;
                             }
                             String ks = key.toString();
-                            Iterable<?> values = (some instanceof Iterable) ? (Iterable) some : Collections.singletonList(some);
+                            Iterable<?> values = (some instanceof Iterable i) ? i : Collections.singletonList(some);
                             for (Object value: values) {
                                 if (value == null) {
                                     continue;

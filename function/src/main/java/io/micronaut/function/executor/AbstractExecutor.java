@@ -116,8 +116,8 @@ public class AbstractExecutor<C> implements ApplicationContextProvider, Closeabl
      */
     protected Environment startEnvironment(ApplicationContext applicationContext) {
         if (!applicationContext.isRunning()) {
-            if (this instanceof PropertySource) {
-                applicationContext.getEnvironment().addPropertySource((PropertySource) this);
+            if (this instanceof PropertySource source) {
+                applicationContext.getEnvironment().addPropertySource(source);
             }
 
             return applicationContext

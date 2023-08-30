@@ -149,16 +149,16 @@ class DefaultConditionContext<B extends AnnotationMetadataProvider> implements C
 
     @Override
     public boolean containsProperty(@NonNull String name) {
-        if (beanContext instanceof PropertyResolver) {
-            return ((PropertyResolver) beanContext).containsProperty(name);
+        if (beanContext instanceof PropertyResolver resolver) {
+            return resolver.containsProperty(name);
         }
         return false;
     }
 
     @Override
     public boolean containsProperties(@NonNull String name) {
-        if (beanContext instanceof PropertyResolver) {
-            return ((PropertyResolver) beanContext).containsProperties(name);
+        if (beanContext instanceof PropertyResolver resolver) {
+            return resolver.containsProperties(name);
         }
         return false;
     }
@@ -166,8 +166,8 @@ class DefaultConditionContext<B extends AnnotationMetadataProvider> implements C
     @NonNull
     @Override
     public <T> Optional<T> getProperty(@NonNull String name, @NonNull ArgumentConversionContext<T> conversionContext) {
-        if (beanContext instanceof PropertyResolver) {
-            return ((PropertyResolver) beanContext).getProperty(name, conversionContext);
+        if (beanContext instanceof PropertyResolver resolver) {
+            return resolver.getProperty(name, conversionContext);
         }
         return Optional.empty();
     }

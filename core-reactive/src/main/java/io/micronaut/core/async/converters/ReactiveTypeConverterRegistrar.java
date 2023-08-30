@@ -33,8 +33,8 @@ public class ReactiveTypeConverterRegistrar implements TypeConverterRegistrar {
     @Override
     public void register(MutableConversionService conversionService) {
         conversionService.addConverter(Object.class, Publisher.class, obj -> {
-            if (obj instanceof Publisher) {
-                return (Publisher) obj;
+            if (obj instanceof Publisher publisher) {
+                return publisher;
             } else {
                 return Publishers.just(obj);
             }

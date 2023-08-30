@@ -33,7 +33,7 @@ final class JsonString extends JsonScalar {
 
     @Override
     public boolean equals(Object o) {
-        return o instanceof JsonString && ((JsonString) o).value.equals(value);
+        return o instanceof JsonString js && js.value.equals(value);
     }
 
     @Override

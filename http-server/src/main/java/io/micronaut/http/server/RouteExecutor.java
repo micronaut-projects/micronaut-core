@@ -478,8 +478,8 @@ public final class RouteExecutor {
             try {
                 requestArgumentSatisfier.fulfillArgumentRequirementsAfterFilters(routeMatch, httpRequest);
                 Object body = ServerRequestContext.with(httpRequest, (Supplier<Object>) routeMatch::execute);
-                if (body instanceof Optional) {
-                    body = ((Optional<?>) body).orElse(null);
+                if (body instanceof Optional optional) {
+                    body = optional.orElse(null);
                 }
                 return createResponseForBody(propagatedContext, httpRequest, body, routeMatch.getRouteInfo(), routeMatch);
             } catch (Throwable e) {

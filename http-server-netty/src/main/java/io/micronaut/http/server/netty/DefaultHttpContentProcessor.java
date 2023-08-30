@@ -67,8 +67,8 @@ public class DefaultHttpContentProcessor implements HttpContentProcessor {
     }
 
     private long resolveLength(ByteBufHolder message) {
-        if (message instanceof HttpData) {
-            return ((HttpData) message).length();
+        if (message instanceof HttpData data) {
+            return data.length();
         } else {
             return message.content().readableBytes();
         }

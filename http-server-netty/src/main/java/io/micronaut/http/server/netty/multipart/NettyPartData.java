@@ -16,7 +16,6 @@
 package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.util.functional.ThrowingSupplier;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.PartData;
 import io.netty.buffer.ByteBuf;
@@ -39,13 +38,13 @@ import java.util.function.Supplier;
 public class NettyPartData implements PartData {
 
     private final Supplier<Optional<MediaType>> mediaTypeSupplier;
-    private final ThrowingSupplier<ByteBuf, IOException> byteBufSupplier;
+    private final Supplier<ByteBuf> byteBufSupplier;
 
     /**
      * @param mediaTypeSupplier The content type supplier
      * @param byteBufSupplier   The byte buffer supplier
      */
-    public NettyPartData(Supplier<Optional<MediaType>> mediaTypeSupplier, ThrowingSupplier<ByteBuf, IOException> byteBufSupplier) {
+    public NettyPartData(Supplier<Optional<MediaType>> mediaTypeSupplier, Supplier<ByteBuf> byteBufSupplier) {
         this.mediaTypeSupplier = mediaTypeSupplier;
         this.byteBufSupplier = byteBufSupplier;
     }
@@ -96,9 +95,8 @@ public class NettyPartData implements PartData {
 
     /**
      * @return The native netty {@link ByteBuf} for this chunk
-     * @throws IOException If an error occurs retrieving the buffer
      */
-    public ByteBuf getByteBuf() throws IOException {
+    public ByteBuf getByteBuf() {
         return byteBufSupplier.get();
     }
 }

@@ -1205,9 +1205,9 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 }
             }
         }
-        if (beanToDestroy instanceof LifeCycle) {
+        if (beanToDestroy instanceof LifeCycle cycle) {
             try {
-                ((LifeCycle<?>) beanToDestroy).stop();
+                cycle.stop();
             } catch (Exception e) {
                 throw new BeanDestructionException(definition, e);
             }
@@ -2039,8 +2039,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
                 List<BeanDefinitionMethodReference<?, ?>> methods = entry.getValue();
                 streamOfType(ExecutableMethodProcessor.class, Qualifiers.byTypeArguments(annotationType))
                     .forEach(processor -> {
-                        if (processor instanceof LifeCycle<?>) {
-                            ((LifeCycle<?>) processor).start();
+                        if (processor instanceof LifeCycle<?> cycle) {
+                            cycle.start();
                         }
                         for (BeanDefinitionMethodReference<?, ?> method : methods) {
 
@@ -2069,8 +2069,8 @@ public class DefaultBeanContext implements InitializableBeanContext {
                             }
                         }
 
-                        if (processor instanceof LifeCycle<?>) {
-                            ((LifeCycle<?>) processor).stop();
+                        if (processor instanceof LifeCycle<?> cycle) {
+                            cycle.stop();
                         }
 
                     });
@@ -2613,7 +2613,7 @@ public class DefaultBeanContext implements InitializableBeanContext {
         if (qualifierClass != null && !qualifierClass.isAssignableFrom(Annotation.class)) {
             return Qualifiers.<T>byStereotype(qualifierClass).doesQualify(replacedBeanType, definitionToBeReplaced);
         } else {
-            throw new ConfigurationException(String.format("Default qualifier value was used while replacing %s", replacedBeanType));
+            throw new ConfigurationException("Default qualifier value was used while replacing %s".formatted(replacedBeanType));
         }
     }
 

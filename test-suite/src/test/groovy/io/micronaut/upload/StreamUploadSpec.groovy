@@ -127,6 +127,26 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         file.text == data
     }
 
+    void "test upload big FileUpload object via asInputStream"() {
+        given:
+        def val = 'Big ' + 'xxxx' * 500
+
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "val", MediaType.TEXT_PLAIN_TYPE, val.bytes)
+                .build()
+
+        when:
+        Flux<HttpResponse<String>> flowable = Flux.from(client.exchange(
+                HttpRequest.POST("/upload/receive-file-upload-input-stream", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockFirst()
+        then:
+        response.getBody().get() == val
+    }
+
     void "test non-blocking upload with publisher receiving bytes"() {
         given:
         def data = 'some data ' * 500

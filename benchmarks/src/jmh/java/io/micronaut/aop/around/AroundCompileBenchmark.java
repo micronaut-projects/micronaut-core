@@ -43,15 +43,17 @@ public class AroundCompileBenchmark {
 
     @Setup
     public void prepare() {
-        source.append("package test;\n" +
-                "\n" +
-                "import jakarta.inject.Singleton;\n" +
-                "import javax.sql.DataSource;\n" +
-                "import io.micronaut.validation.Validated;\n" +
-                "\n" +
-                "@Singleton\n" +
-                "@Validated\n" +
-                "public class Test {\n" );
+        source.append("""
+                package test;
+                
+                import jakarta.inject.Singleton;
+                import javax.sql.DataSource;
+                import io.micronaut.validation.Validated;
+                
+                @Singleton
+                @Validated
+                public class Test {
+                """ );
 
         for (int i = 0; i < 1000; i++) {
              source.append("\npublic void insert")

@@ -87,7 +87,7 @@ public class DefaultInterceptorRegistry implements InterceptorRegistry {
                 false
         );
         if (LOG.isTraceEnabled()) {
-            LOG.trace("Resolved {} {} interceptors out of a possible {} for method: {} - {}", resolvedInterceptors.length, interceptorKind, interceptors.size(), method.getDeclaringType(), method instanceof Described ? ((Described) method).getDescription(true) : method.toString());
+            LOG.trace("Resolved {} {} interceptors out of a possible {} for method: {} - {}", resolvedInterceptors.length, interceptorKind, interceptors.size(), method.getDeclaringType(), method instanceof Described d ? d.getDescription(true) : method.toString());
             for (int i = 0; i < resolvedInterceptors.length; i++) {
                 Interceptor<?, ?> resolvedInterceptor = resolvedInterceptors[i];
                 LOG.trace("Interceptor {} - {}", i, resolvedInterceptor);

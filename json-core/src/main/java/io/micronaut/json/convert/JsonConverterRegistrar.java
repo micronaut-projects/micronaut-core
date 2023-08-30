@@ -179,8 +179,8 @@ public final class JsonConverterRegistrar implements TypeConverterRegistrar {
     private TypeConverter<Map, Object> mapToObjectConverter() {
         return (map, targetType, context) -> {
             ArgumentConversionContext<Object> conversionContext;
-            if (context instanceof ArgumentConversionContext) {
-                conversionContext = (ArgumentConversionContext<Object>) context;
+            if (context instanceof ArgumentConversionContext argumentConversionContext) {
+                conversionContext = argumentConversionContext;
             } else {
                 conversionContext = ConversionContext.of(targetType);
             }

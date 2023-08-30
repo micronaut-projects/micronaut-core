@@ -35,8 +35,7 @@ class TraceInterceptor implements Interceptor {
 
     @Override
     public Object intercept(InvocationContext context) {
-        if (LOG.isTraceEnabled() && context instanceof MethodExecutionHandle) {
-            MethodExecutionHandle handle = (MethodExecutionHandle) context;
+        if (LOG.isTraceEnabled() && context instanceof MethodExecutionHandle handle) {
 
             Collection<MutableArgumentValue<?>> values = context.getParameters().values();
 
@@ -45,8 +44,7 @@ class TraceInterceptor implements Interceptor {
                     values.stream().map(ArgumentValue::getValue).collect(Collectors.toList()));
         }
         Object result = context.proceed();
-        if (LOG.isTraceEnabled() && context instanceof MethodExecutionHandle) {
-            MethodExecutionHandle handle = (MethodExecutionHandle) context;
+        if (LOG.isTraceEnabled() && context instanceof MethodExecutionHandle handle) {
             LOG.trace("Method {}#{}(..) returned result {}",
                     context.getTarget().getClass().getName(), handle.getMethodName(),
                     result);

@@ -136,8 +136,8 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                     if (entry.getKey().getSimpleName().toString().equals("value")) {
                         javax.lang.model.element.AnnotationValue av = entry.getValue();
                         Object value = av.getValue();
-                        if (value instanceof DeclaredType) {
-                            Element element = ((DeclaredType) value).asElement();
+                        if (value instanceof DeclaredType type) {
+                            Element element = type.asElement();
                             return JavaModelUtils.getClassName((TypeElement) element);
                         }
                     }
@@ -198,14 +198,14 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             for (Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> entry : annotation.getElementValues().entrySet()) {
                 if (entry.getKey().getSimpleName().toString().equals("value")) {
                     Object value = entry.getValue().getValue();
-                    if (value instanceof List) {
+                    if (value instanceof List list) {
                         String parentAnnotationName = getAnnotationTypeName(annotation);
-                        for (Object val : (List<?>) value) {
-                            if (val instanceof AnnotationMirror) {
-                                String name = getRepeatableName((AnnotationMirror) val);
+                        for (Object val : list) {
+                            if (val instanceof AnnotationMirror mirror) {
+                                String name = getRepeatableName(mirror);
                                 if (name != null && name.equals(parentAnnotationName)) {
                                     repeatable = true;
-                                    expanded.add((AnnotationMirror) val);
+                                    expanded.add(mirror);
                                 }
                             }
                         }
@@ -345,9 +345,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         String memberName,
         Object annotationValue,
         Map<CharSequence, Object> annotationValues) {
-        if (memberName != null && annotationValue instanceof javax.lang.model.element.AnnotationValue && !annotationValues.containsKey(memberName)) {
+        if (memberName != null && annotationValue instanceof javax.lang.model.element.AnnotationValue value && !annotationValues.containsKey(memberName)) {
             final MetadataAnnotationValueVisitor resolver = new MetadataAnnotationValueVisitor(originatingElement, (ExecutableElement) member);
-            ((javax.lang.model.element.AnnotationValue) annotationValue).accept(resolver, this);
+            value.accept(resolver, this);
             Object resolvedValue = resolver.resolvedValue;
             if (resolvedValue != null) {
                 if (isEvaluatedExpression(resolvedValue)) {
@@ -388,9 +388,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Override
     protected Object readAnnotationValue(Element originatingElement, Element member, String annotationName, String memberName, Object annotationValue) {
-        if (memberName != null && annotationValue instanceof javax.lang.model.element.AnnotationValue) {
+        if (memberName != null && annotationValue instanceof javax.lang.model.element.AnnotationValue value) {
             final MetadataAnnotationValueVisitor visitor = new MetadataAnnotationValueVisitor(originatingElement, (ExecutableElement) member);
-            ((javax.lang.model.element.AnnotationValue) annotationValue).accept(visitor, this);
+            value.accept(visitor, this);
             return visitor.resolvedValue;
         } else if (memberName != null && annotationValue != null && ClassUtils.isJavaLangType(annotationValue.getClass())) {
             // only allow basic types
@@ -405,8 +405,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     @Override
     protected Map<? extends Element, ?> readAnnotationDefaultValues(String annotationTypeName, Element element) {
         Map<Element, AnnotationValue> defaultValues = new LinkedHashMap<>();
-        if (element instanceof TypeElement) {
-            TypeElement annotationElement = (TypeElement) element;
+        if (element instanceof TypeElement annotationElement) {
             final List<? extends Element> allMembers = elementUtils.getAllMembers(annotationElement);
             allMembers
                 .stream()
@@ -428,8 +427,8 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         if (defaultValue != null) {
             Object v = defaultValue.getValue();
             if (v != null) {
-                if (v instanceof String) {
-                    return StringUtils.isNotEmpty((CharSequence) v);
+                if (v instanceof String string) {
+                    return StringUtils.isNotEmpty(string);
                 } else {
                     return true;
                 }
@@ -445,8 +444,8 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Override
     protected String getElementName(Element element) {
-        if (element instanceof TypeElement) {
-            return elementUtils.getBinaryName(((TypeElement) element)).toString();
+        if (element instanceof TypeElement typeElement) {
+            return elementUtils.getBinaryName(typeElement).toString();
         }
         return element.getSimpleName().toString();
     }
@@ -470,15 +469,14 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                 TypeElement typeElement = (TypeElement) element;
                 List<? extends TypeMirror> interfaces = typeElement.getInterfaces();
                 for (TypeMirror anInterface : interfaces) {
-                    if (anInterface instanceof DeclaredType) {
-                        Element interfaceElement = ((DeclaredType) anInterface).asElement();
+                    if (anInterface instanceof DeclaredType type) {
+                        Element interfaceElement = type.asElement();
                         hierarchy.add(interfaceElement);
                         populateTypeHierarchy(interfaceElement, hierarchy);
                     }
                 }
                 TypeMirror superMirror = typeElement.getSuperclass();
-                if (superMirror instanceof DeclaredType) {
-                    DeclaredType type = (DeclaredType) superMirror;
+                if (superMirror instanceof DeclaredType type) {
                     if (type.toString().equals(Object.class.getName())) {
                         break;
                     } else {
@@ -496,8 +494,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         return OVERRIDDEN_METHOD_CACHE.computeIfAbsent(sourceMethod, executableElement -> {
             List<ExecutableElement> overridden = new ArrayList<>(3);
             Element enclosingElement = executableElement.getEnclosingElement();
-            if (enclosingElement instanceof TypeElement) {
-                TypeElement declaringElement = (TypeElement) enclosingElement;
+            if (enclosingElement instanceof TypeElement declaringElement) {
                 final Set<TypeElement> allInterfaces = modelUtils.getAllInterfaces(declaringElement);
                 for (TypeElement itfe : allInterfaces) {
                     addOverriddenMethodIfNecessary(executableElement, overridden, declaringElement, itfe);
@@ -531,8 +528,8 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     private TypeElement toTypeElement(TypeMirror mirror, Types typeUtils) {
         if (mirror != null) {
             final Element e = typeUtils.asElement(mirror);
-            if (e instanceof TypeElement) {
-                return (TypeElement) e;
+            if (e instanceof TypeElement element) {
+                return element;
             }
         }
         return null;
@@ -674,10 +671,10 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
         @Override
         public Object visitType(TypeMirror t, Object o) {
-            if (t instanceof DeclaredType) {
-                Element typeElement = ((DeclaredType) t).asElement();
-                if (typeElement instanceof TypeElement) {
-                    String className = JavaModelUtils.getClassName((TypeElement) typeElement);
+            if (t instanceof DeclaredType type) {
+                Element typeElement = type.asElement();
+                if (typeElement instanceof TypeElement element) {
+                    String className = JavaModelUtils.getClassName(element);
                     resolvedValue = new AnnotationClassValue<>(className);
                 }
             }
@@ -820,18 +817,18 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
             @Override
             public Object visitType(TypeMirror t, Object o) {
-                if (t instanceof DeclaredType) {
-                    Element typeElement = ((DeclaredType) t).asElement();
-                    if (typeElement instanceof TypeElement) {
-                        final String className = JavaModelUtils.getClassName((TypeElement) typeElement);
+                if (t instanceof DeclaredType type) {
+                    Element typeElement = type.asElement();
+                    if (typeElement instanceof TypeElement element) {
+                        final String className = JavaModelUtils.getClassName(element);
                         values.add(new AnnotationClassValue<>(className));
                     }
-                } else if (t instanceof ArrayType) {
-                    TypeMirror componentType = ((ArrayType) t).getComponentType();
-                    if (componentType instanceof DeclaredType) {
-                        Element typeElement = ((DeclaredType) componentType).asElement();
-                        if (typeElement instanceof TypeElement) {
-                            final String className = JavaModelUtils.getClassArrayName((TypeElement) typeElement);
+                } else if (t instanceof ArrayType arrayType) {
+                    TypeMirror componentType = arrayType.getComponentType();
+                    if (componentType instanceof DeclaredType declaredType) {
+                        Element typeElement = declaredType.asElement();
+                        if (typeElement instanceof TypeElement element) {
+                            final String className = JavaModelUtils.getClassArrayName(element);
                             values.add(new AnnotationClassValue<>(className));
                         }
                     }

@@ -84,6 +84,7 @@ class MyBean {}
         AllElementsVisitor.VISITED_ELEMENTS.clear()
         AllElementsVisitor.VISITED_METHOD_ELEMENTS.clear()
         AllElementsVisitor.WRITE_FILE = true
+        AllElementsVisitor.WRITE_IN_METAINF = false
 
         when:
         def definition = buildBeanDefinition('test.visit.Test', '''

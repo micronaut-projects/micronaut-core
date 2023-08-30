@@ -1215,12 +1215,12 @@ public abstract class AbstractClassFileWriter implements Opcodes, OriginatingEle
      * @return The {@link Type} for the object type
      */
     protected static Type getObjectType(Object type) {
-        if (type instanceof TypedElement) {
-            String name = ((TypedElement) type).getType().getName();
+        if (type instanceof TypedElement element) {
+            String name = element.getType().getName();
             String internalName = getTypeDescriptor(name);
             return Type.getType(internalName);
-        } else if (type instanceof Class) {
-            return Type.getType((Class) type);
+        } else if (type instanceof Class class1) {
+            return Type.getType(class1);
         } else if (type instanceof String) {
             String className = type.toString();
 

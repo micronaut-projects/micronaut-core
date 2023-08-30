@@ -15,9 +15,11 @@
  */
 package io.micronaut.http.multipart;
 
+import io.micronaut.core.annotation.NonNull;
 import org.reactivestreams.Publisher;
 
 import java.io.File;
+import java.io.InputStream;
 import java.io.OutputStream;
 
 /**
@@ -79,4 +81,15 @@ public interface StreamingFileUpload extends FileUpload, Publisher<PartData> {
      */
     Publisher<Boolean> delete();
 
+    /**
+     * Create an {@link InputStream} that reads this file. The returned stream must be closed after
+     * use. The stream may block when data isn't yet available.
+     *
+     * @return An {@link InputStream} that reads this file's contents
+     * @since 4.2.0
+     */
+    @NonNull
+    default InputStream asInputStream() {
+        throw new UnsupportedOperationException("StreamingFileUpload doesn't support asInputStream");
+    }
 }

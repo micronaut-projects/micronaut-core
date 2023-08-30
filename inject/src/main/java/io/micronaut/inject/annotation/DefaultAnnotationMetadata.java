@@ -423,8 +423,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         Object rawValue = getRawSingleValue(annotation, member, valueMapper);
         if (rawValue instanceof AnnotationClassValue annotationClassValue) {
             return annotationClassValue.getType();
-        } else if (rawValue instanceof Class) {
-            return Optional.of((Class) rawValue);
+        } else if (rawValue instanceof Class class1) {
+            return Optional.of(class1);
         } else if (rawValue != null) {
             return ConversionService.SHARED.convert(rawValue, Class.class);
         }

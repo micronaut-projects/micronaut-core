@@ -59,15 +59,15 @@ public class WebSocketMessageEncoder {
      * @return The encoded frame
      */
     public WebSocketFrame encodeMessage(Object message, MediaType mediaType) {
-        if (message instanceof byte[]) {
-            return new BinaryWebSocketFrame(Unpooled.wrappedBuffer((byte[]) message));
+        if (message instanceof byte[] bytes) {
+            return new BinaryWebSocketFrame(Unpooled.wrappedBuffer(bytes));
         } else if (ClassUtils.isJavaLangType(message.getClass()) || message instanceof CharSequence) {
             String s = message.toString();
             return new TextWebSocketFrame(s);
-        } else if (message instanceof ByteBuf) {
-            return new BinaryWebSocketFrame(((ByteBuf) message).slice());
-        } else if (message instanceof ByteBuffer) {
-            return new BinaryWebSocketFrame(Unpooled.wrappedBuffer((ByteBuffer) message));
+        } else if (message instanceof ByteBuf buf) {
+            return new BinaryWebSocketFrame(buf.slice());
+        } else if (message instanceof ByteBuffer buffer) {
+            return new BinaryWebSocketFrame(Unpooled.wrappedBuffer(buffer));
         } else {
             Optional<MediaTypeCodec> codec = codecRegistry.findCodec(mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
             if (codec.isPresent()) {

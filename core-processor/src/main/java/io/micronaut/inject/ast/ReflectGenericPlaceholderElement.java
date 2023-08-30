@@ -68,8 +68,8 @@ final class ReflectGenericPlaceholderElement
     @Override
     public Optional<Element> getDeclaringElement() {
         GenericDeclaration declaration = type.getGenericDeclaration();
-        if (declaration instanceof Class) {
-            return Optional.of(ClassElement.of((Class<?>) declaration));
+        if (declaration instanceof Class class1) {
+            return Optional.of(ClassElement.of(class1));
         } else {
             return Optional.empty();
         }
