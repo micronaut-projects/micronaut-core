@@ -982,7 +982,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                     }
 
                     if (found instanceof Iterable iterable) {
-                        Iterable iter =iterable;
+                        Iterable iter = iterable;
                         if (iter instanceof Collection collection && collection.isEmpty()) {
                             return "";
                         }
