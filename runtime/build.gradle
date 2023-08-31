@@ -50,7 +50,10 @@ spotless {
 
 tasks.withType(Test).configureEach {
     if (JavaVersion.current().majorVersion.toInteger() >= 17) {
-        logger.warn("Opening java.util, so SystemLambda can work")
-        jvmArgs += ['--add-opens', 'java.base/java.util=ALL-UNNAMED']
+        logger.warn("Opening java.util and java.lang, so SystemLambda can work")
+        jvmArgs += [
+                '--add-opens', 'java.base/java.util=ALL-UNNAMED',
+                '--add-opens', 'java.base/java.lang=ALL-UNNAMED',
+        ]
     }
 }
