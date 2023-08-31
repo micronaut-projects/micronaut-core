@@ -72,11 +72,11 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
     private final ConversionService conversionService;
 
     /**
-     * @param fullHttpResponse       The full Http response
-     * @param mediaTypeCodecRegistry The media type codec registry
-     * @param bodyType               The body type
-     * @param convertBody            Whether to auto convert the body to bodyType
-     * @param conversionService      The conversion service
+     * @param fullHttpResponse  The full Http response
+     * @param handlerRegistry   The media type codec registry
+     * @param bodyType          The body type
+     * @param convertBody       Whether to auto convert the body to bodyType
+     * @param conversionService The conversion service
      */
     FullNettyClientHttpResponse(
             FullHttpResponse fullHttpResponse,

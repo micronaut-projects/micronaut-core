@@ -1071,7 +1071,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * Allows configuration of properties for the {@link io.micronaut.http.server.netty.types.files.FileTypeHandler}.
+     * Allows configuration of properties for the {@link io.micronaut.http.server.netty.body.AbstractFileBodyWriter}.
      *
      * @author James Kleeh
      * @author graemerocher

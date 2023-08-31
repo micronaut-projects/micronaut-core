@@ -22,7 +22,7 @@ import static org.objectweb.asm.Opcodes.IFGE;
 import static org.objectweb.asm.Opcodes.IF_ICMPGE;
 
 /**
- * Expression AST node for binary '<' operator.
+ * Expression AST node for binary {@code '<'} operator.
  *
  * @author Sergey Gavrilov
  * @since 4.0.0
