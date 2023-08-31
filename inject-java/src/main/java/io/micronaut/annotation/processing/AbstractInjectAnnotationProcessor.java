@@ -80,10 +80,10 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     public SourceVersion getSupportedSourceVersion() {
         SourceVersion sourceVersion = SourceVersion.latest();
         if (sourceVersion.ordinal() <= 20) {
-            if (sourceVersion.ordinal() >= 8) {
+            if (sourceVersion.ordinal() >= 17) {
                 return sourceVersion;
             } else {
-                return SourceVersion.RELEASE_8;
+                return SourceVersion.RELEASE_17;
             }
         } else {
             return (SourceVersion.values())[20];
