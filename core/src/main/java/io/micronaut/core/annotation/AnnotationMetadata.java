@@ -711,7 +711,7 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
-     * Get all of the values for the given annotation.
+     * Get all values for the given annotation.
      *
      * @param annotationClass The annotation name
      * @param <T> The annotation type
@@ -732,9 +732,6 @@ public interface AnnotationMetadata extends AnnotationSource {
         }
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     default <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(@NonNull Class<T> annotationClass) {
         ArgumentUtils.requireNonNull("annotationClass", annotationClass);

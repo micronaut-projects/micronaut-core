@@ -25,7 +25,7 @@ import static org.objectweb.asm.Opcodes.GOTO;
 import static org.objectweb.asm.Opcodes.IFEQ;
 
 /**
- * Expression AST node for binary && operator.
+ * Expression AST node for binary {@code &&} operator.
  *
  * @author Sergey Gavrilov
  * @since 4.0.0

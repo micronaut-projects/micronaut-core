@@ -21,7 +21,7 @@ import io.netty.channel.SimpleChannelInboundHandler;
 
 /**
  * An extension of Netty {@link SimpleChannelInboundHandler} that instruments the channel read handler
- * by using collection of available {@link io.micronaut.scheduling.instrument.InvocationInstrumenterFactory} (such as
+ * by using collection of available io.micronaut.scheduling.instrument.InvocationInstrumenterFactory (such as
  * {@link io.micronaut.http.context.ServerRequestContext#with(io.micronaut.http.HttpRequest, java.util.concurrent.Callable)}) if present during
  * the constructor call of the http client.
  * Thanks to that the {@link io.micronaut.http.context.ServerRequestContext#currentRequest()} returns parent request.

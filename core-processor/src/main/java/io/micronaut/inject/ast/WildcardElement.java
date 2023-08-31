@@ -45,7 +45,7 @@ public interface WildcardElement extends GenericElement {
     List<? extends ClassElement> getLowerBounds();
 
     /**
-     * Is bounded wildcard - not "< ? >".
+     * Is bounded wildcard - not "{@code < ? >}".
      * @return true if the wildcard is bounded, false otherwise
      * @since 4.0.0
      */
