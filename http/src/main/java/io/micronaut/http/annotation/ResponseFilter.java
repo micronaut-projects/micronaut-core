@@ -36,7 +36,7 @@ import java.lang.annotation.Target;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * Method annotation for a request filter. A response filter is called after a request has been
+ * Method annotation for a response filter. A response filter is called after a request has been
  * sent and the response received. Possible parameter types are:
  *
  * <ul>

@@ -41,7 +41,7 @@ import static org.objectweb.asm.Opcodes.IFLT;
 import static org.objectweb.asm.Type.BOOLEAN_TYPE;
 
 /**
- * Expression AST node for relational operations (>, <, >=, <=) on
+ * Expression AST node for relational operations ({@literal >}, {@literal <}, {@code >=}, {@code <=}) on
  * types that implement {@link Comparable} interface.
  *
  * @since 4.0.0

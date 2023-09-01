@@ -20,7 +20,7 @@ import jakarta.inject.Provider;
 import java.util.Map;
 
 /**
- * An extended version of the {@link Provider} interface for {@link ParametrizedBeanFactory}.
+ * An extended version of the {@link Provider} interface.
  *
  * @param <T> The type
  * @author graemerocher

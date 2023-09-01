@@ -18,7 +18,7 @@ package io.micronaut.http.body;
 /**
  * A handler combines a reader and a writer.
  *
- * @param <T> The tye
+ * @param <T> The type
  * @see MessageBodyReader
  * @see MessageBodyWriter
  * @since 4.0.0

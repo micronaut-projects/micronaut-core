@@ -15,7 +15,7 @@
  */
 package io.micronaut.testsuitehelper;
 
-import static javax.lang.model.SourceVersion.RELEASE_8;
+import static javax.lang.model.SourceVersion.RELEASE_17;
 
 import java.io.File;
 import java.io.IOException;
@@ -34,7 +34,7 @@ import javax.tools.StandardLocation;
  * Annotation processor for test generation.
  */
 @SupportedAnnotationTypes("*")
-@SupportedSourceVersion(RELEASE_8)
+@SupportedSourceVersion(RELEASE_17)
 public class TestGeneratingAnnotationProcessor extends AbstractProcessor {
 
     private boolean executed = false;

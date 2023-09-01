@@ -38,7 +38,7 @@ import static org.objectweb.asm.Opcodes.LCMP;
 import static org.objectweb.asm.Type.BOOLEAN_TYPE;
 
 /**
- * Expression AST node for relational operations (>, <, >=, <=) on
+ * Expression AST node for relational operations ({@literal >}, {@literal <}, {@code >=}, {@code <=}) on
  * numeric types.
  *
  * @since 4.0.0
