@@ -17,6 +17,7 @@ package io.micronaut.core.io.service;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.optim.AotHelper;
 import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.reflect.ClassUtils;
 
@@ -181,6 +182,8 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             Collection<S> values,
             Predicate<S> predicate,
             String name) {
+        AotHelper.checkDynamicServiceLoad(name);
+
         ServiceCollector<S> collector = newCollector(name, condition, classLoader, className -> {
             try {
                 @SuppressWarnings("unchecked") final Class<S> loadedClass =
