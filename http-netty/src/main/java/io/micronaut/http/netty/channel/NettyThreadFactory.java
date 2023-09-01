@@ -54,8 +54,20 @@ public class NettyThreadFactory {
 
     /**
      * Constant with the default threads in the event loop.
+     *
+     * @deprecated Non-functional, replaced by {@link #getDefaultEventLoopThreads()}.
      */
-    public static final int DEFAULT_EVENT_LOOP_THREADS = Math.max(1, SystemPropertyUtil.getInt("io.netty.eventLoopThreads", NettyRuntime.availableProcessors() * 2));
+    @Deprecated(forRemoval = true, since = "4.2.0")
+    public static final int DEFAULT_EVENT_LOOP_THREADS = 1;
+
+    /**
+     * Get the default number of threads in the event loop.
+     *
+     * @return The number of threads
+     */
+    public static int getDefaultEventLoopThreads() {
+        return EventLoopThreadsHolder.DEFAULT_EVENT_LOOP_THREADS;
+    }
 
     /**
      * Constructs the default thread factory used by the HTTP client.
@@ -67,5 +79,9 @@ public class NettyThreadFactory {
     @BootstrapContextCompatible
     protected ThreadFactory nettyThreadFactory() {
         return new DefaultThreadFactory("default-" + DefaultThreadFactory.toPoolName(NioEventLoopGroup.class));
+    }
+
+    private static final class EventLoopThreadsHolder {
+        static final int DEFAULT_EVENT_LOOP_THREADS = Math.max(1, SystemPropertyUtil.getInt("io.netty.eventLoopThreads", NettyRuntime.availableProcessors() * 2));
     }
 }
